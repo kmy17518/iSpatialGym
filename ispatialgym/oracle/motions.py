@@ -42,7 +42,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union
 
 import torch as th
 
@@ -160,6 +160,14 @@ class MotionsConfig:
     base_tracker: BaseTrackerConfig = field(default_factory=BaseTrackerConfig)
     base_follow_speed: float = 0.15  # m/s along the recorded b_k
     base_follow_yaw_rate: float = 0.4  # rad/s
+    #: hybrid follow: the arm's hold target ramps between consecutive recorded poses by the base's progress along the
+    #: segment; a short base step with a large arm change (dishwasher_wide 0920-002330: 0.1 m at 0.15 m/s carrying a
+    #: 0.5 rad wrist change - 3 rad/s, the robot wobbled) is stretched so no arm joint ramps faster than this (rad/s)
+    follow_arm_speed: float = 0.35
+    #: hybrid follow, arm-only dense steps: eef speed (m/s) of the differential-IK tracking of the recorded handle pose
+    follow_eef_speed: float = 0.05
+    #: hybrid follow: base acceleration bound per segment (m/s^2; the stock tracker's 2.3 m/s^2 start/stop rocked the torso)
+    follow_base_accel: float = 0.4
     #: fraction of the tracker's v_max used to time-parameterise a recorded path
     path_speed_fraction: float = 0.8
     #: corner cutting the reference allows at a heading change (m): the speed through a corner of angle θ is
@@ -209,6 +217,49 @@ def as_world_pose(x: Any) -> Pose:
     if flat.numel() == 7:
         return flat[:3].clone(), flat[3:].clone()
     raise TypeError(f"cannot interpret {type(x).__name__} as a world pose")
+
+
+def joint_axis_from_contacts(contacts: Sequence[Sequence[float]]) -> Optional[Tuple[th.Tensor, th.Tensor]]:
+    """``(centre, unit axis)`` of the circle through the handle contact points recorded at several joint values (the
+    articulation's ``waypoints``): the hinge line the hand moves about. None with fewer than three distinct points."""
+    pts = [C.as_tensor(c).reshape(-1)[:3].double() for c in contacts]
+    if len(pts) < 3:
+        return None
+    p0, p1, p2 = pts[0], pts[len(pts) // 2], pts[-1]
+    u, v = p1 - p0, p2 - p0
+    n = th.cross(u, v, dim=0)
+    if float(n.norm()) < 1e-9:
+        return None
+    n = n / n.norm()
+    uu, vv, uv = float(u @ u), float(v @ v), float(u @ v)
+    d = 2.0 * (uu * vv - uv * uv)
+    if abs(d) < 1e-12:
+        return None
+    a = (vv * (uu - uv)) / d
+    b = (uu * (vv - uv)) / d
+    centre = p0 + a * u + b * v
+    return centre.float(), n.float()
+
+
+def arc_between(eef_a: Pose, eef_b: Pose, centre: th.Tensor, axis: th.Tensor, step_rad: float = 0.03) -> List[Pose]:
+    """Dense poses from ``eef_a`` to ``eef_b`` along the circle about (``centre``, ``axis``): the rigid rotation that
+    carries ``eef_a``'s position onto ``eef_b``'s (angle and sign from the two radial vectors), sampled every
+    ``step_rad``; falls back to ``[eef_b]`` when the two poses are not on one circle about that axis (> 2 cm off)."""
+    pa, qa = C.as_pose(eef_a)
+    pb, qb = C.as_pose(eef_b)
+    ax = C.unit(axis)
+    ra = (pa - centre) - ax * float((pa - centre) @ ax)
+    rb = (pb - centre) - ax * float((pb - centre) @ ax)
+    if float(ra.norm()) < 1e-6 or float(rb.norm()) < 1e-6 or abs(float(ra.norm()) - float(rb.norm())) > 0.02:
+        return [(pb, qb)]
+    cosang = max(-1.0, min(1.0, float(ra @ rb) / (float(ra.norm()) * float(rb.norm()))))
+    ang = math.acos(cosang)
+    if float(th.cross(ra, rb, dim=0) @ ax) < 0:
+        ang = -ang
+    n = max(1, int(math.ceil(abs(ang) / max(step_rad, 1e-6))))
+    out = C.orbit_waypoints((pa, qa), centre, C.quat_from_axis_angle(ax, ang), n=n, frame="world")
+    out[-1] = (pb, qb)  # land exactly on the recorded pose
+    return out
 
 
 def as_pose2d(x: Any) -> Tuple[float, float, float]:
@@ -317,6 +368,8 @@ class Motions:
         self.cfg = cfg or MotionsConfig()
         self.dt = float(getattr(planner, "control_dt", 1.0 / 30.0))
         self.state = ActionState(self.robot)
+        self.stop_requested = False  # cooperative stop of a running follow (execute_base_follow at the goal band)
+        self.follow_phase = "arm"  # sequential follow: "base" while the base drives (the caller watches the door then)
         self.last_relaxed_links: List[str] = []  # held-arm links taken out of the sphere model by the last arm_to plan
         self.last_witness_residual: Optional[Tuple[float, float]] = None  # a witness residual arm_to left unclosed (m, rad)
         self._joint_limits = (
@@ -692,10 +745,13 @@ class Motions:
 
     # ------------------------------------------------------------------ joint trajectory streaming
 
-    def execute_joint_trajectory(self, q_traj: th.Tensor, arms: Sequence[str], trunk: bool = False, tol: Optional[float] = None, loaded: bool = False) -> Iterator[th.Tensor]:
+    def execute_joint_trajectory(self, q_traj: th.Tensor, arms: Sequence[str], trunk: bool = False, tol: Optional[float] = None, loaded: bool = False,
+                                 converge: bool = True) -> Iterator[th.Tensor]:
         """Stream a ``(T, 28)`` joint trajectory (one waypoint per control step) for the given groups, then hold the
         last waypoint until the joints converge (``loaded``: a contact leg, the steady error under the contact force
-        is accepted up to ``joint_tol_loaded``)."""
+        is accepted up to ``joint_tol_loaded``). ``converge=False`` returns right after the last waypoint: the caller
+        judges the outcome on the object it moves (a door held by its joint friction never lets the loaded arm
+        converge - the follow waited the full 90 steps for a 0.052 rad error that could not change)."""
         q_traj = C.as_tensor(q_traj)
         if len(q_traj) > self.cfg.trajectory_max_steps:
             raise SkillError("timeout", f"trajectory of {len(q_traj)} steps exceeds the budget {self.cfg.trajectory_max_steps}")
@@ -703,9 +759,22 @@ class Motions:
         for q in q_traj:
             self.state.set_from_q(q, arms=arms, trunk=trunk)
             yield self._emit()
-        yield from self._wait_converged(arms, trunk, tol or self.cfg.joint_tol, self.cfg.settle_steps, loose=self.cfg.joint_tol_loaded if loaded else None)
+        if converge:
+            yield from self._wait_converged(arms, trunk, tol or self.cfg.joint_tol, self.cfg.settle_steps, loose=self.cfg.joint_tol_loaded if loaded else None)
         if trunk:
             self.trunk = TrunkState.from_q(self.state.trunk_target, translate_rate=self.cfg.trunk_translate_rate, tilt_rate=self.cfg.trunk_tilt_rate)
+
+    def unwind(self, arm: str) -> float:
+        """Re-target ``arm``'s hold target onto its measured joints so the drives stop pushing. A loaded arm (the hand
+        on a door held by its joint friction) is wound up against its target: the position drives (stiffness 1e7,
+        18-55 N·m caps) keep pressing until the load is gone, and the release then shoves the object (dishwasher
+        0917-213723: joint4 0.052 rad off its target, the door moved 0.009 rad while the fingers opened). Returns the
+        largest joint change (rad); emits nothing - the caller holds."""
+        q = self.robot.get_joint_positions()[self.robot.arm_control_idx[arm]].clone().float()
+        prev = self.state.arm_target.get(arm)
+        d = float(th.max(th.abs(q - prev))) if prev is not None else 0.0
+        self.state.arm_target[arm] = q
+        return d
 
     @staticmethod
     def _retime(q_traj: th.Tensor, steps: Sequence[int]) -> th.Tensor:
@@ -861,7 +930,7 @@ class Motions:
         return dense
 
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
-                  soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False) -> Iterator[th.Tensor]:
+                  soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False, converge: bool = True) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto (contact motions must touch — the QA
@@ -873,7 +942,10 @@ class Motions:
         is executed and the rest is planned by ``arm_to`` to ``finish.pose`` (to the sidecar's IK witness
         ``finish.q_hint`` when there is one, else cuRobo's own IK branch) instead of failing: the stall is the reach
         boundary of the *branch* the straight segment started in (more iterations do not help: 30 → 100 moved a
-        7.2 mm stall to 7.0 mm), while the pose itself is reachable (the sampler's exact IK)."""
+        7.2 mm stall to 7.0 mm), while the pose itself is reachable (the sampler's exact IK).
+
+        ``converge=False``: the streamed trajectory returns after its last waypoint without the joint-convergence wait
+        (:meth:`execute_joint_trajectory`); the caller watches the object it moves."""
         waypoints = list(waypoints)
         if not waypoints:
             return
@@ -953,12 +1025,111 @@ class Motions:
                 yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm], loaded=loaded)
                 return
             raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="diff_ik", n_waypoints=len(waypoints), **{k_: v for k_, v in diag.items() if k_ in ("fail_index", "pos_err", "rot_err")})
-        yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm], loaded=loaded)
+        yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm], loaded=loaded, converge=converge)
+
+    def arm_arc_closed_loop(self, arm: str, centre: th.Tensor, axis: th.Tensor, target: Pose, joint_value: Callable[[], float], q_to: float,
+                            speed: Optional[float] = None, band_rad: float = 0.005, lag_factor: float = 1.3, max_ik_failures: int = 10,
+                            max_iters: int = 20) -> Generator[th.Tensor, None, Dict[str, Any]]:
+        """Closed-loop follow of a rigidly held handle along the circle about (``centre``, ``axis``) until the joint it
+        moves reads ``q_to`` (``joint_value()``, within ``band_rad``) or the hand reaches ``target``'s angle on the arc.
+
+        Every control step: the FK pose of the MEASURED arm joints is rotated about the axis by one step's angle
+        (``speed`` m/s at the hand's radius) and one differential-IK step from the MEASURED joints gives the commanded
+        joint target. The target therefore never runs more than one step ahead of where the door lets the arm be:
+        with 1e7-stiff, effort-capped drives (the BEHAVIOR-1K robot's; a policy cannot change them) any accumulated
+        mismatch between an open-loop target path and the constraint saturates the drives at 18-55 N.m - ~100 N at
+        the hand, which tipped the 47.6 kg chassis 0.8 deg and bent torso_joint1 2.6 deg on the 250 kg one
+        (dishwasher_wide 0921-050314 / 0921-235247). The commanded lead is what the demo records and a policy imitates,
+        so this compliance survives the evaluator's stock drives. Stops early on ``stop_requested`` (the goal band),
+        when the commanded angle exceeds ``lag_factor`` x the expected one (the door does not follow: a blocked leaf
+        is not pushed harder), or after ``max_ik_failures`` consecutive IK misses (``plan_failed`` / ``diff_ik``)."""
+        frame = M.EEF_LINK[arm]
+        ax = C.unit(C.as_tensor(axis).float())
+        cen = C.as_tensor(centre).float()
+        speed = self.cfg.follow_eef_speed if speed is None else float(speed)
+        p_t, _ = C.as_pose(target)
+        q0 = float(joint_value())
+        expected = abs(float(q_to) - q0)
+        sgn_joint = 1.0 if float(q_to) >= q0 else -1.0
+
+        def radial(p):
+            r = p - cen
+            return r - ax * float(r @ ax)
+
+        def signed_angle(ra, rb) -> float:  # both radial (perpendicular to the axis): the cross product lies along +-axis
+            return math.atan2(float(th.cross(ra, rb, dim=0) @ ax), float(ra @ rb))
+
+        q_full = self.robot.get_joint_positions().clone().float()
+        p_fk, _ = as_world_pose(self.backend.fk([frame], q_full)[frame])
+        r_now = radial(p_fk)
+        radius = max(float(th.linalg.norm(r_now)), 0.05)
+        omega = speed / radius
+        step_ang = omega * self.dt
+        arc_dir = signed_angle(r_now, radial(p_t))  # signed arc angle from the hand to the recorded target about the axis
+        sgn = 1.0 if arc_dir >= 0 else -1.0
+        info: Dict[str, Any] = {"steps": 0, "commanded_rad": 0.0, "ik_failures": 0, "stop": None, "q_from": q0, "q_to": float(q_to), "arc_to_target_rad": round(arc_dir, 4)}
+        consecutive = 0
+        max_steps = int(max(expected, abs(arc_dir)) / max(step_ang, 1e-6) * 3) + 60
+        self.state.stop_base()
+        while True:
+            if self.stop_requested:
+                info["stop"] = "goal_band"
+                break
+            q_now = float(joint_value())
+            if sgn_joint * (q_now - float(q_to)) >= -band_rad:
+                info["stop"] = "joint_at_target"
+                break
+            if info["commanded_rad"] >= lag_factor * max(expected, 1e-3) + 2 * step_ang:
+                info["stop"] = "door_lags"  # the leaf did not follow the commanded angle: do not push harder
+                break
+            if info["steps"] >= max_steps:
+                info["stop"] = "max_steps"
+                break
+            q_full = self.robot.get_joint_positions().clone().float()
+            pose_fk = as_world_pose(self.backend.fk([frame], q_full)[frame])
+            remaining = signed_angle(radial(pose_fk[0]), radial(p_t))
+            d_ang = sgn * min(step_ang, max(abs(remaining), 0.25 * step_ang))  # never below a quarter step: the joint band decides the end
+            wp = C.orbit_waypoints(pose_fk, cen, C.quat_from_axis_angle(ax, d_ang), n=1, frame="world")[-1]
+            # tolerances far below the step (1.7 mm at 0.05 m/s): the path solver's 2 mm / 1 cm-soft acceptance took the
+            # step's target as already reached and commanded no lead at all (0922-112650: 0.169 rad "commanded", door still)
+            step_m = abs(d_ang) * radius
+            res = self.backend.solve_ik_path(f"{arm}_arm", [{frame: wp}], q_start=q_full, pos_tol=min(1e-4, 0.05 * step_m), rot_tol=5e-4,
+                                             max_iters=max_iters, check_collisions=False, sync_world=False, soft_pos_tol=0.25 * step_m, soft_rot_tol=2e-3)
+            if res.success and res.q_traj is not None and len(res.q_traj) > 0:
+                q_cmd = C.as_tensor(res.q_traj[-1]).reshape(-1).float()
+                idx = self.robot.arm_control_idx[arm]
+                dq = float(th.max(th.abs(q_cmd[idx] - q_full[idx])))
+                if dq > self.cfg.diff_ik_joint_speed * self.dt:  # a singularity escape: bound the joint step, keep the direction
+                    q_cmd = q_full.clone()
+                    q_cmd[idx] = q_full[idx] + (C.as_tensor(res.q_traj[-1]).reshape(-1).float()[idx] - q_full[idx]) * (self.cfg.diff_ik_joint_speed * self.dt / dq)
+                self.state.set_from_q(q_cmd, arms=[arm], trunk=False)
+                info["commanded_rad"] += abs(d_ang)
+                consecutive = 0
+            else:
+                consecutive += 1
+                info["ik_failures"] += 1
+                if consecutive >= max_ik_failures:
+                    raise SkillError("plan_failed", f"arm_arc_closed_loop({arm}): {consecutive} consecutive differential-IK misses at q = {q_now:.3f} ({getattr(res, 'status', '')[:120]})",
+                                     stage="diff_ik", n_waypoints=1)
+            info["steps"] += 1
+            yield self._emit()
+        info["q_end"] = float(joint_value())
+        info["deflection_m"] = self._deflection(arm)
+        return info
 
     # ------------------------------------------------------------------ base
 
-    def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float, a_max: Optional[float] = None) -> th.Tensor:
-        """Time-parameterise the polyline current pose → waypoints with a **corner-aware trapezoidal speed profile**:
+    def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float, a_max: Optional[float] = None, style: Optional[str] = None) -> th.Tensor:
+        """Time-parameterise the polyline current pose → waypoints.
+
+        ``style = "face_travel"`` (owner 2026-09-22, camera relocalization): the shared ``robot.base_path`` schedule —
+        the polyline simplified within one map cell (the pilot's dense grid records: 28 cells, headings alternating
+        0° / 45°, a speed dip and a zig-zag at every stair), fillets at the corners, the body facing the way with its
+        turns spread over windows that keep the cruise speed, the end turns on the spot above 90° and blended below —
+        with the lateral-acceleration and yaw limits through the arcs (``BP.time_parameterise``; the 0916-141035
+        record: 36.8 s and 18 % of the time at cruise → 25 s with the drive 90 % at cruise).
+
+        Otherwise (the recorded style) the **corner-aware trapezoidal speed profile** on the polyline as recorded:
         ``v_lin`` on the straights, ``sqrt(2·a_max·path_corner_cut) / sin(θ/2)`` through a heading change θ, zero at
         the end, ramps at ``a_max`` (the tracker's own limit), every segment slow enough for the yaw change toward the
         waypoint's recorded heading to stay within ``v_ang``; the yaw is blended linearly along each segment. A
@@ -1112,6 +1283,183 @@ class Motions:
         s = self.cfg.base_follow_speed if speed is None else float(speed)
         cfg = replace(self.cfg.base_tracker, v_max=(s, s, self.cfg.base_follow_yaw_rate))
         yield from self.track_path(base_poses, tracker_cfg=cfg)
+
+    def drive_with_arm_schedule(self, base_path: Sequence[Any], arm: str, arm_schedule: Sequence[Sequence[float]], speed: Optional[float] = None) -> Iterator[th.Tensor]:
+        """Sequential follow, anchored move: the base tracks ``base_path`` (strides) at the base-follow speed while the
+        ``arm``'s hold target follows the recorded per-stride joints ``arm_schedule`` (one 7-vector per stride, the last
+        for the path's end) by the tracker's progress, slew-limited at ``follow_arm_speed``, and both wind down together
+        at the end (no velocity cut). The trunk stays; the fingers stay closed."""
+        path = [as_pose2d(b) for b in base_path]
+        sched = [C.as_tensor(a).reshape(-1).float() for a in arm_schedule]
+        if not path or not sched:
+            return
+        s = self.cfg.base_follow_speed if speed is None else float(speed)
+        v_lin = self.cfg.path_speed_fraction * s
+        v_ang = self.cfg.path_speed_fraction * self.cfg.base_follow_yaw_rate
+        a_max = min(self.cfg.base_tracker.a_max[0], self.cfg.base_tracker.a_max[1], self.cfg.follow_base_accel)
+        cfg = replace(self.cfg.base_tracker, v_max=(s, s, self.cfg.base_follow_yaw_rate), a_max=(a_max, a_max, self.cfg.base_tracker.a_max[2]))
+        q0 = self.state.arm_target[arm].clone()
+        pts = [q0] + sched
+        m = len(pts) - 1
+
+        def at(f: float) -> th.Tensor:
+            x = min(max(f, 0.0), 1.0) * m
+            j = min(int(math.floor(x)), m - 1)
+            t = x - j
+            return pts[j] + (pts[j + 1] - pts[j]) * t
+
+        dq_max = max(float(th.max(th.abs(pts[j + 1] - pts[j]))) for j in range(m))
+        ref = self._base_reference(path, v_lin, v_ang, a_max=a_max)
+        tracker = PathTracker(ref, self.dt, cfg, max_lag=self.cfg.path_max_lag)
+        self.tracker = tracker
+        n_ref = max(1, len(ref) - 1)
+        f_step = (self.cfg.follow_arm_speed * self.dt) / (dq_max * m) if dq_max > 1e-6 else 1.0
+        v_prev, f_prev = th.zeros(3), 0.0
+        self.follow_phase = "base"
+        try:
+            while True:
+                v, done = tracker.step(self.base_pose2d())
+                if done:
+                    break
+                v_prev = th.as_tensor(v).reshape(-1).float().clone()
+                self.state.set_base_velocity(float(v[0]), float(v[1]), float(v[2]))
+                f_prev = min(1.0, min(tracker.k / n_ref, f_prev + f_step))
+                self.state.arm_target[arm] = at(f_prev)
+                yield self._emit()
+                if tracker.timed_out:
+                    d, dyaw = tracker.error(self.base_pose2d())
+                    raise SkillError("execution", f"drive_with_arm_schedule: base tracking timed out (pos err {d:.3f} m, yaw err {dyaw:.3f} rad)", pos_err_m=d, yaw_err_rad=dyaw)
+            n_dec = int(math.ceil(float(v_prev[:2].norm()) / max(self.cfg.follow_base_accel * self.dt, 1e-6)))
+            n_arm = int(math.ceil((1.0 - f_prev) / max(f_step, 1e-9)))
+            n_fin = max(1, n_dec, n_arm)
+            for k in range(1, n_fin + 1):
+                g = max(0.0, 1.0 - k / max(n_dec, 1))
+                self.state.set_base_velocity(float(v_prev[0]) * g, float(v_prev[1]) * g, float(v_prev[2]) * g)
+                self.state.arm_target[arm] = at(f_prev + (1.0 - f_prev) * k / n_fin)
+                yield self._emit()
+            self.state.arm_target[arm] = sched[-1].clone()
+        finally:
+            self.state.stop_base()
+            self.follow_phase = "arm"
+
+    def base_follow_hybrid(self, follow_path: Sequence[Any], arm: str, speed: Optional[float] = None,
+                           axis: Optional[Tuple[th.Tensor, th.Tensor]] = None) -> Iterator[th.Tensor]:
+        """Articulation with the handle grasped, **hybrid** mode (sampler ``articulation_hybrid``, D-011 C): the recorded
+        dense path ``poses[]`` = ``{"q", "base_pose2d": [x, y, yaw], "arm_q": [7 joints]}`` from the grasp (k = 0) to the
+        last followed waypoint. Per consecutive pair the base drives ``b_{i-1} -> b_i`` (the joystick tracker at the
+        base-follow speed) while ``arm``'s hold target ramps from where it is to ``arm_q_i`` **by the tracker's progress
+        along the segment** (not by time), so the eef stays on the handle arc the sampler verified at every pose
+        (consecutive poses are <= 10 deg of joint motion apart); an arm-only step (base unchanged) ramps the joints at
+        the joint speed bound. The trunk stays; the fingers stay closed."""
+        poses = [dict(p) for p in follow_path]
+        if len(poses) < 2:
+            return
+        self.stop_requested = False  # set by the caller (the goal band reached): wind the base down and return
+        idx = self.robot.arm_control_idx[arm]
+        s = self.cfg.base_follow_speed if speed is None else float(speed)
+        cfg = replace(self.cfg.base_tracker, v_max=(s, s, self.cfg.base_follow_yaw_rate))
+        v_lin = self.cfg.path_speed_fraction * s
+        v_ang = self.cfg.path_speed_fraction * self.cfg.base_follow_yaw_rate
+        self.state.arm_target[arm] = self.robot.get_joint_positions()[idx].clone().float()
+        try:
+            for i in range(1, len(poses)):
+                b1 = as_pose2d(poses[i]["base_pose2d"])
+                q0 = self.state.arm_target[arm].clone()
+                q1 = C.as_tensor(poses[i]["arm_q"]).reshape(-1).float()
+                if q1.numel() != q0.numel():
+                    raise SkillError("plan_failed", f"base_follow_hybrid: pose {i} has {q1.numel()} arm joints, the arm has {q0.numel()}", stage="targets")
+                here = self.base_pose2d()
+                dist = math.hypot(b1[0] - here[0], b1[1] - here[1])
+                dyaw = abs(C.wrap_angle(b1[2] - here[2]))
+                moves = dist > 2e-3 or dyaw > 5e-3
+                if moves:
+                    # the segment lasts at least as long as the arm change needs at follow_arm_speed: the base slows down
+                    # for a pose pair with a big arm change, the arm ramp (by progress) inherits the slower pace
+                    dq = float(th.max(th.abs(q1 - q0)))
+                    t_base = max(dist / max(v_lin, 1e-6), dyaw / max(v_ang, 1e-6))
+                    t_arm = dq / max(self.cfg.follow_arm_speed, 1e-6)
+                    scale = min(1.0, t_base / t_arm) if t_arm > 1e-6 else 1.0
+                    v_lin_i, v_ang_i = max(v_lin * scale, 0.01), max(v_ang * scale, 0.03)
+                    a_max = min(cfg.a_max[0], cfg.a_max[1], self.cfg.follow_base_accel)
+                    cfg_i = replace(cfg, v_max=(v_lin_i / self.cfg.path_speed_fraction, v_lin_i / self.cfg.path_speed_fraction, v_ang_i / self.cfg.path_speed_fraction),
+                                    a_max=(a_max, a_max, cfg.a_max[2]) if len(cfg.a_max) >= 3 else cfg.a_max)
+                    ref = self._base_reference([b1], v_lin_i, v_ang_i, a_max=a_max)
+                    tracker = PathTracker(ref, self.dt, cfg_i, max_lag=self.cfg.path_max_lag)
+                    self.tracker = tracker
+                    n_ref = max(1, len(ref) - 1)
+                    v_prev = th.zeros(3)
+                    f_prev = 0.0
+                    dq_seg = float(th.max(th.abs(q1 - q0)))
+                    f_step = (self.cfg.follow_arm_speed * self.dt) / dq_seg if dq_seg > 1e-6 else 1.0  # slew limit on the ramp fraction
+                    while True:
+                        v, done = tracker.step(self.base_pose2d())
+                        if done or self.stop_requested:
+                            break  # the final command is already ~0: ramp down from the previous one below
+                        v_prev = th.as_tensor(v).reshape(-1).float().clone()
+                        self.state.set_base_velocity(float(v[0]), float(v[1]), float(v[2]))
+                        # the arm follows the tracker's progress, but never faster than follow_arm_speed: the reference index
+                        # runs ahead of the base while a segment starts with its yaw blend (door 0920-173049: 0.4 rad in 6 steps)
+                        f_prev = min(1.0, min(tracker.k / n_ref, f_prev + f_step))
+                        self.state.arm_target[arm] = q0 + (q1 - q0) * f_prev
+                        yield self._emit()
+                        if tracker.timed_out:
+                            d, dyaw = tracker.error(self.base_pose2d())
+                            raise SkillError("execution", f"base_follow_hybrid: base tracking timed out at pose {i} (pos err {d:.3f} m, yaw err {dyaw:.3f} rad)",
+                                             pos_err_m=d, yaw_err_rad=dyaw, pose_index=i)
+                    # decelerate the base from its last command at follow_base_accel and finish the arm ramp at follow_arm_speed
+                    # over the same steps: no velocity cut and no jump to the final joints when the tracker reports done
+                    # (0920-160045: a 0.07 -> 0 m/s cut and a 0.13 m/s eef jump at the segment end)
+                    stopping = bool(self.stop_requested)
+                    q_hold = self.state.arm_target[arm].clone()
+                    dq_left = 0.0 if stopping else float(th.max(th.abs(q1 - q0))) * (1.0 - f_prev)
+                    n_dec = int(math.ceil(float(v_prev[:2].norm()) / max(self.cfg.follow_base_accel * self.dt, 1e-6)))
+                    n_arm = int(math.ceil(dq_left / max(self.cfg.follow_arm_speed * self.dt, 1e-6)))
+                    n_fin = max(1, n_dec, n_arm)
+                    for k in range(1, n_fin + 1):
+                        g = max(0.0, 1.0 - k / max(n_dec, 1))
+                        self.state.set_base_velocity(float(v_prev[0]) * g, float(v_prev[1]) * g, float(v_prev[2]) * g)
+                        self.state.arm_target[arm] = q_hold if stopping else q0 + (q1 - q0) * (f_prev + (1.0 - f_prev) * k / n_fin)
+                        yield self._emit()
+                    self.state.stop_base()
+                    if stopping:
+                        return
+                else:
+                    # an arm-only dense step: track the recorded eef pose with the differential IK (the arm-mode follow's
+                    # method) instead of a straight joint-space ramp between two IK solutions - that line leaves the handle
+                    # arc by a few mm and the loaded wrist winds up against the door's friction and slips (dishwasher_wide
+                    # 0920-140730: joint 7 at 2.1-2.6 rad/s in the arm-only steps, the arm-mode follow stays under 0.7)
+                    eef_i = poses[i].get("eef")
+                    tracked = False
+                    if eef_i is not None:
+                        try:
+                            target_i = as_world_pose(eef_i)
+                            wps: List[Any] = [target_i]
+                            if axis is not None and poses[i - 1].get("eef") is not None:
+                                # the true handle arc between the two recorded poses (rotation about the joint axis) instead
+                                # of the chord: no kink at every 10 deg pose (owner 2026-09-20 15:54: "smooth like a good teleoperator")
+                                wps = arc_between(as_world_pose(poses[i - 1]["eef"]), target_i, axis[0], axis[1])
+                            # converge=False as in the arm-mode follow: a loaded arm never meets the joint-convergence
+                            # tolerance and waited out the 90-step timeout at every pose (the 3 s pauses, owner 2026-09-20 18:43)
+                            yield from self.arm_along(arm, wps, loaded=True, speed=self.cfg.follow_eef_speed, converge=False)
+                            tracked = True
+                        except SkillError as e:
+                            log.warning("base_follow_hybrid: eef tracking of pose %d failed (%s): joint ramp instead", i, e.message or e.reason)
+                    if not tracked:
+                        dq = float(th.max(th.abs(q1 - q0)))
+                        n = max(1, int(math.ceil(dq / (min(self.cfg.diff_ik_joint_speed, self.cfg.follow_arm_speed) * self.dt))))
+                        for k in range(1, n + 1):
+                            self.state.arm_target[arm] = q0 + (q1 - q0) * (k / n)
+                            yield self._emit()
+                            if self.stop_requested:
+                                return
+                        self.state.arm_target[arm] = q1.clone()
+                    if self.stop_requested:
+                        return
+                    continue
+                self.state.arm_target[arm] = q1.clone()
+        finally:
+            self.state.stop_base()
+        yield from self.hold(3)
 
 
 __all__ = ["SkillError", "MotionsConfig", "Motions", "MOTION_CATEGORIES", "as_world_pose", "as_pose2d", "ApproachFinish", "PathTracker"]

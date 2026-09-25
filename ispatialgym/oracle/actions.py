@@ -1022,7 +1022,7 @@ class BaseFollow(Action):
     stance: Stance
     grasp_action: Grasp
     direction: str = "move"
-    TARGET_KEYS = ("mode", "fractions", "q_values", "handle_poses", "base_poses", "follow_path")
+    TARGET_KEYS = ("mode", "fractions", "q_values", "handle_poses", "base_poses", "follow_path", "follow_segments")
 
     def __post_init__(self):
         self.arms = (self.arm,)
@@ -1036,9 +1036,11 @@ class BaseFollow(Action):
         if not followed:
             raise SidecarError("base_follow: no waypoint beyond q_init to drive through")
         fractions = [f for f, _ in followed]
-        handle_poses = [_handle_eef(C, art.waypoints[key]) for _, key in followed]
+        delta = _handle_delta(art, state)  # the object moved since the record (a press shoved it): the follow moves with it
+        handle_poses = [_handle_eef(C, art.waypoints[key], delta=delta) for _, key in followed]
         base_poses = None
         follow_path = None
+        follow_segments = None
         if art.follow_mode == "base":
             eef0 = self.grasp_action.grasp_pose(sidecar, state)
             t_eef_base = _as_pose(C.eef_base_transform(eef0.tensors(), _yaw_pose(self.stance.base_pose2d).tensors()))
@@ -1054,6 +1056,8 @@ class BaseFollow(Action):
             follow_path = [dict(p) for p in (path.get("poses") or [])]
             if len(follow_path) < 2:
                 raise SidecarError("base_follow_path.poses: follow_mode 'hybrid' needs the recorded dense path (>= 2 poses)")
+            if path.get("policy") == "sequential" and path.get("segments"):  # owner 2026-09-20 20:19: typed segments, driven strictly one at a time
+                follow_segments = [dict(g) for g in path["segments"]]
         return {
             "mode": art.follow_mode,
             "fractions": fractions,
@@ -1061,6 +1065,7 @@ class BaseFollow(Action):
             "handle_poses": handle_poses,
             "base_poses": base_poses,
             "follow_path": follow_path,
+            "follow_segments": follow_segments,
         }
 
     def end_pose(self, sidecar, state):

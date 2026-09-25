@@ -65,7 +65,34 @@ DEFAULTS: Dict[str, Any] = {
     "min_margin_rad": 0.15,  # preferred joint-limit margin of a follow pose: the closest-to-seed IK solution with >= this wins,
     # else the best-margin one >= IKChecker.JOINT_LIMIT_MARGIN (top_cabinet 0917-014213: the retreat from the path's end
     # found left_arm_joint7 within 14 mrad of its limit on every solution -> ik_joint_limit at the program check)
+    "hard_margin_rad": 0.05,  # the floor below which no IK solution is taken (IKChecker.JOINT_LIMIT_MARGIN; the program check's floor is 0.025)
     "check_retreat": True,  # the last pose must also admit the retreat pose (pre_pose of h(q_last), RETREAT 0.10 m back)
+    # base-move policy when the arm alone cannot reach the next pose: "min_displacement" = the first feasible candidate in
+    # order of displacement (many small moves); "lookahead" = among the first ``lookahead_candidates`` feasible ones, the base
+    # pose from which the most of the next ``lookahead_steps`` dense poses are reachable arm-only (owner 2026-09-20 15:54:
+    # "continuous pull until the limit, one base move, pull again" - fewest base moves)
+    "base_move_policy": "min_displacement",
+    # follow policy (owner 2026-09-20 20:19): "hybrid" = the tracker above (base and arm move together per dense step);
+    # "sequential" = pull with the arm to its limit, stop, move the base with the door stationary (anchored: the hand stays
+    # on the handle while the base drives; else release -> move -> re-grasp), pull again - the fewest base moves
+    "policy": "hybrid",
+    "move_stride_m": 0.05,  # base path strides of a release -> move -> re-grasp move (whole-body collision check per stride)
+    "retreat_margin_slack_rad": 0.012,  # the search's retreat probe demands this much more margin than the program check's floor
+    # sequential release: the hand retreats along -a by the first of these distances whose pose has an IK with the margin (the
+    # path's final pose keeps the program's PRE_DIST retreat). The 0.10 m retreat alone cut every arm segment to one pose - the
+    # elbow folds past its limit when the handle has come close - and cost a base move per 8 deg (dishwasher_wide 0921-030918)
+    "release_retreat_m": [C.PRE_DIST, 0.07, 0.05],
+    "min_move_m": 0.10,  # a sequential base move shorter than this AND turning less than min_move_deg is not worth its release / re-grasp
+    "min_move_deg": 10.0,
+    # every IK solution of the search must clear cuRobo's self-collision padding by this much (the arm embodiment, the trunk
+    # where the stance puts it): the demo's trunk is not exactly there and the oracle refuses to plan from a start
+    # configuration inside the padding (dishwasher_wide 0921-044216, link5 - torso_link4 by 9 mm at the recorded retreat)
+    "self_clearance_m": 0.02,
+    "lookahead_candidates": 5,
+    "lookahead_steps": 8,
+    "check_fov": True,  # the fingertips at h(q) must lie in the head camera frame from the base pose (QA gripper_out_of_fov, spec 3.4;
+    # dishwasher close 0920-011633: the hand rose out of the frame's lower right, depth 0.38 m, as the base moved in)
+    "fov_margin": 0.08,  # frame margin (fraction) for that check; the QA monitor's is 0.05
     "reach_fraction": 1.0,  # torso-top-to-eef distance pre-filter: <= this fraction of the straight arm's + reach_extra_m
     "reach_extra_m": 0.10,  # (the arm mounts off the torso top: the straight-arm distance measured there is not the maximum)
     "min_reach_m": 0.15,
@@ -270,18 +297,27 @@ class HybridPath:
     step: Dict[str, float] = field(default_factory=dict)
     stats: Dict[str, Any] = field(default_factory=dict)
     knobs: Dict[str, Any] = field(default_factory=dict)
+    policy: str = "hybrid"
+    segments: Optional[List[Dict[str, Any]]] = None  # sequential policy: typed segments (arm / release_move_regrasp)
+    retreat_arm_q: Optional[List[float]] = None  # the search's retreat configuration (7 arm joints) at the final pose: the program check's witness
 
     @property
     def end_base(self) -> Pose2D:
         return self.poses[-1].base_pose2d
 
     def to_sidecar(self, record_eef: bool = True) -> Dict[str, Any]:
-        """The ``articulation.base_follow_path`` block."""
-        return {"mode": "hybrid", "arm": self.arm, "trunk": [float(self.trunk[0]), float(self.trunk[1])], "step": dict(self.step),
-                "arm_q_order": "arm joints 1..7 (r1pro_model.ARM_JOINTS[arm])", "idle_arm": self.idle_arm,
-                "idle_arm_q": None if self.idle_arm_q is None else [round(float(v), 6) for v in self.idle_arm_q],
-                "fingers": None if self.fingers is None else float(self.fingers),
-                "poses": [p.to_sidecar(record_eef) for p in self.poses], "stats": dict(self.stats), "knobs": {k: v for k, v in self.knobs.items() if k != "record_eef"}}
+        """The ``articulation.base_follow_path`` block (``poses`` always - the program check, validation and annotation
+        read them; ``segments`` with the sequential policy - the executor drives those)."""
+        out = {"mode": "hybrid", "policy": self.policy, "arm": self.arm, "trunk": [float(self.trunk[0]), float(self.trunk[1])], "step": dict(self.step),
+               "arm_q_order": "arm joints 1..7 (r1pro_model.ARM_JOINTS[arm])", "idle_arm": self.idle_arm,
+               "idle_arm_q": None if self.idle_arm_q is None else [round(float(v), 6) for v in self.idle_arm_q],
+               "fingers": None if self.fingers is None else float(self.fingers),
+               "poses": [p.to_sidecar(record_eef) for p in self.poses], "stats": dict(self.stats), "knobs": {k: v for k, v in self.knobs.items() if k != "record_eef"}}
+        if self.segments is not None:
+            out["segments"] = self.segments
+        if self.retreat_arm_q is not None:
+            out["retreat_arm_q"] = [round(float(v), 6) for v in self.retreat_arm_q]
+        return out
 
 
 def path_stats(poses: Sequence[FollowPose], q_init: float, q_goal: float) -> Dict[str, Any]:
@@ -321,7 +357,41 @@ def leaf_links(target, jinfo: Dict[str, Any], joint) -> Dict[str, Any]:
     if child:
         names.append(child)
     names += [s.get("link") for s in (jinfo.get("sub_links") or []) if isinstance(s, dict) and s.get("link")]
+    # every link fixed to the moving link (transitively) swings with it: door_crtrpa_0's ``glass`` panel hangs on the
+    # ``leaf`` by a fixed joint (not in OmniGibson's ``joints``, which lists the DoFs) and is not in the inventory's
+    # ``sub_links`` - left in the collision world it moved into the arm at every dense step (IK failures) and into the
+    # body at the start of every base path (0919-114353). The fixed joints are read from the object's USD ``joints`` scope.
+    pairs = fixed_joint_pairs(target)
+    grew = True
+    while grew and pairs:
+        grew = False
+        for parent, kid in pairs:
+            if parent in names and kid not in names:
+                names.append(kid)
+                grew = True
     return {n: target.links[n] for n in names if n in getattr(target, "links", {})}
+
+
+def fixed_joint_pairs(target) -> List[Tuple[str, str]]:
+    """``(parent link, child link)`` of every fixed joint prim under ``<target>/joints`` (USD; empty without a stage)."""
+    out: List[Tuple[str, str]] = []
+    try:
+        import omnigibson as og
+
+        stage = og.sim.stage
+        scope = stage.GetPrimAtPath(f"{target.prim_path}/joints")
+        if not scope or not scope.IsValid():
+            return out
+        for prim in scope.GetChildren():
+            if prim.GetTypeName() != "PhysicsFixedJoint":
+                continue
+            b0 = prim.GetRelationship("physics:body0").GetTargets()
+            b1 = prim.GetRelationship("physics:body1").GetTargets()
+            if b0 and b1:
+                out.append((str(b0[0]).split("/")[-1], str(b1[0]).split("/")[-1]))
+    except Exception:  # noqa: BLE001 — no simulator (tests) or an object without a joints scope
+        return out
+    return out
 
 
 def body_boxes(target, leaf: Dict[str, Any], floor_z: float, height: float) -> List[Tuple[float, float, float, float]]:
@@ -479,7 +549,7 @@ class FollowSearch:
         return dataclasses.replace(self.manip, name=name, base_pose2d=(float(b[0]), float(b[1]), float(b[2])), q=None)
 
     # -- IK ------------------------------------------------------------------------------------------------------
-    def _ik(self, eef: Tuple[th.Tensor, th.Tensor], q_seed: th.Tensor) -> Optional[th.Tensor]:
+    def _ik(self, eef: Tuple[th.Tensor, th.Tensor], q_seed: th.Tensor, hard_margin: Optional[float] = None) -> Optional[th.Tensor]:
         """Exact arm IK (every successful seed of the 32): the solution **closest to the seed** among those with a
         joint-limit margin >= ``min_margin_rad`` (arm continuity between consecutive poses), else the largest-margin one
         when it keeps ``IKChecker.JOINT_LIMIT_MARGIN``; None otherwise. Counted as one IK call."""
@@ -494,13 +564,80 @@ class FollowSearch:
         if sols is None or len(sols) == 0:
             return None
         sols = G.t(sols).reshape(-1, q_seed.shape[0])
+        clear = float(self.k.get("self_clearance_m", 0.0))
+        if clear > 0.0:
+            # the demo's trunk stands a centimetre off the recorded one and the oracle plans with the ARM embodiment (the
+            # trunk locked where it really is): a witness that just clears cuRobo's self-collision padding here is inside it
+            # there and no plan may start from it (dishwasher_wide 0921-044216: link5 - torso_link4 by 9 mm at the retreat)
+            keep = [k for k in range(len(sols)) if not self.kit.backend.self_collision_pairs(sols[k], f"{self.arm}_arm", margin=clear)]
+            if not keep:
+                n_sc = getattr(self, "_n_selfclear_debug", 0)
+                if n_sc < 3:
+                    self._n_selfclear_debug = n_sc + 1
+                    worst = self.kit.backend.self_collision_pairs(sols[0], f"{self.arm}_arm", margin=clear)[:2]
+                    log.info("%s: hybrid IK rejected by the self-collision clearance (%d solutions, none %.0f mm clear of the padding; e.g. %s)", self.s.gp.alias, len(sols),
+                             1000 * clear, [(p["links"], round(1000 * float(p["penetration"]) - 1000 * clear, 1)) for p in worst])
+                return None
+            sols = sols[keep]
         margins = th.tensor([self.ikc.joint_limit_margin(q, self.arm)[0] for q in sols])
         dist = th.linalg.norm(sols[:, self.idx] - G.t(q_seed)[self.idx], dim=1)
         good = margins >= float(self.k["min_margin_rad"])
         if bool(good.any()):
             return sols[int(th.argmin(th.where(good, dist, th.full_like(dist, float("inf")))))].clone()
         j = int(th.argmax(margins))
-        return sols[j].clone() if float(margins[j]) >= self.ikc.JOINT_LIMIT_MARGIN else None
+        # the hard floor: generation.hybrid_follow.hard_margin_rad (default IKChecker.JOINT_LIMIT_MARGIN 0.05; the program
+        # check's own floor is 0.025) - door_crtrpa_0 0919-074439: 36 / 40 candidates at 17 deg had solutions, none with margin
+        hard = float(self.k.get("hard_margin_rad", self.ikc.JOINT_LIMIT_MARGIN)) if hard_margin is None else float(hard_margin)
+        if float(margins[j]) >= hard:
+            return sols[j].clone()
+        n = getattr(self, "_n_margin_debug", 0)
+        if n < 3:
+            self._n_margin_debug = n + 1
+            nearest = [self.ikc.joint_limit_margin(q, self.arm)[1] for q in sols]
+            log.info("%s: hybrid IK rejected by the joint-limit margin (%d solutions, best %.3f rad < %.3f at %s; nearest limits %s)", self.s.gp.alias, len(sols),
+                     float(margins[j]), hard, nearest[j], sorted(set(nearest)))
+        return None
+
+    def _debug_polish(self, q: th.Tensor, eef: Tuple[th.Tensor, th.Tensor], residual: float) -> None:
+        """Why a follow pose's polish left > 5 mm (door 0919-044806: 31 of 40 candidates at the first dense step): the raw
+        IK residual, the diff-IK polish verdict, the polished configuration's collision / joint-limit-margin verdicts.
+        First three per search, INFO."""
+        n = getattr(self, "_n_polish_debug", 0)
+        if n >= 3:
+            return
+        self._n_polish_debug = n + 1
+        try:
+            from ispatialgym.oracle import r1pro_model as M
+
+            raw = self.ikc.fk_residual(q, eef, self.arm)
+            res = self.kit.backend.solve_ik_path(f"{self.arm}_arm", [{M.EEF_LINK[self.arm]: (G.t(eef[0]), G.t(eef[1]))}], q_start=G.t(q).clone(), pos_tol=1e-3, rot_tol=5e-3,
+                                                 max_iters=40, check_collisions=False, sync_world=False, max_joint_step=0.3)
+            info: Dict[str, Any] = {"raw_residual_mm": round(1000 * raw, 2), "polish_success": bool(res.success), "status": str(getattr(res, "status", ""))[:80]}
+            # the two kinematics the search mixes: the arm embodiment (IK / polish) vs the whole body (fk_residual) on the SAME q
+            link = M.EEF_LINK[self.arm]
+            p_body = G.t(self.kit.backend.fk([link], q_full=G.t(q), emb_name="whole_body")[link][0])
+            try:
+                p_arm = G.t(self.kit.backend.fk([link], q_full=G.t(q), emb_name=f"{self.arm}_arm")[link][0])
+                info["arm_vs_body_fk_mm"] = [round(1000 * float(v), 2) for v in (p_arm - p_body).tolist()]
+            except Exception as e:  # noqa: BLE001
+                info["arm_vs_body_fk_mm"] = f"n/a ({type(e).__name__})"
+            info["body_fk_minus_target_mm"] = [round(1000 * float(v), 2) for v in (p_body - G.t(eef[0])).tolist()]
+            rp = self.kit.backend.root_pose()[0]
+            info["root_z"] = round(float(rp[2]), 4)
+            info["floor_z"] = round(float(self.kit.floor_z), 4)
+            info["seed_base_z_joint"] = round(float(G.t(q)[self.kit.jidx["base_footprint_z_joint"]]), 4)
+            if res.success and res.q_traj is not None:
+                cand = res.q_traj[-1]
+                info["polished_residual_mm"] = round(1000 * self.ikc.fk_residual(cand, eef, self.arm), 2)
+                info["polished_free_margin0"] = bool(self.kit.collision_free(cand, margin=0.0)[0])
+                m, j = self.ikc.joint_limit_margin(cand, self.arm)
+                info["polished_margin_rad"] = round(float(m), 4)
+                info["nearest_limit_joint"] = j
+                if not info["polished_free_margin0"]:
+                    info["culprits"] = P0.debug_collision_q(self.s, G.t(cand), "hybrid polish", margin=0.0).get("objects_at_spheres")
+            log.info("%s: hybrid polish failure %d (residual %.1f mm): %s", self.s.gp.alias, self._n_polish_debug, 1000 * residual, info)
+        except Exception as e:  # noqa: BLE001 — diagnostics never fail the search
+            log.info("%s: hybrid polish debug failed: %r", self.s.gp.alias, e)
 
     def solve(self, b: Sequence[float], eef: Tuple[th.Tensor, th.Tensor], q_prev: th.Tensor, leaf_pts, retreat: bool = False) -> Optional[_Sol]:
         """Exact arm IK of ``eef`` from base ``b`` seeded with the previous configuration (:meth:`_ik`: margin-aware),
@@ -509,31 +646,60 @@ class FollowSearch:
         from the same base too. None when any of it fails."""
         q_seed = self.kit.q_at_base_pose(q_prev, float(b[0]), float(b[1]), float(b[2]))
         n0 = int(self.kit.stats.get("ik_calls", 0))
+        self.last_solve_fail = None  # why the last solve() returned None: ik / polish / collision / retreat_ik (door 0919-031559: 39 'ik')
         with self.ikc.ignoring(self.ignore):
             q = self._ik(eef, q_seed)
             if q is None:
+                self.last_solve_fail = "ik"
                 return None
             q_pol, residual = self.ikc.polish_witness(q, eef, self.arm, ignore=())
             if residual > 5e-3:  # the solver's own acceptance; the program check polishes again to <= 2 mm
+                self.last_solve_fail = "polish"
+                self._debug_polish(q, eef, residual)
                 return None
             free = bool(self.kit.collision_free(q_pol, margin=P0.COLLISION_MARGIN)[0])
-            if free and retreat and self._ik(C.pre_pose(eef, C.PRE_DIST), q_pol) is None:
+            if free and retreat and self._ik(C.pre_pose(eef, C.PRE_DIST), q_pol, hard_margin=float(self.k.get("hard_margin_rad", self.ikc.JOINT_LIMIT_MARGIN)) + float(self.k["retreat_margin_slack_rad"])) is None:
+                self.last_solve_fail = "retreat_ik"
                 return None
         if not free:
+            self.last_solve_fail = "collision"
+            return None
+        if bool(self.k["check_fov"]) and not self.in_view(b, eef):
+            self.last_solve_fail = "fov"
             return None
         margin, _ = self.ikc.joint_limit_margin(q_pol, self.arm)
         return _Sol(q_pol, float(residual), float(margin), int(self.kit.stats.get("ik_calls", 0)) - n0)
 
-    def path_ok(self, b_prev: Sequence[float], b: Sequence[float], q_prev: th.Tensor, q_new: th.Tensor, leaf_prev, leaf_now) -> Tuple[bool, str]:
+    def in_view(self, b: Sequence[float], eef: Tuple[th.Tensor, th.Tensor]) -> bool:
+        """The fingertips of the hand on ``eef`` lie in the head camera frame of the stance's trunk at base ``b``."""
+        try:
+            cam = P0.camera_poses(self.s, [self.stance_at(b, "view")])[0]
+            return bool(P0.in_frame(self.s, cam, C.fingertip(eef).reshape(1, 3), float(self.k["fov_margin"])))
+        except Exception as e:  # noqa: BLE001 - a camera model failure must not veto the path
+            log.debug("hybrid in_view failed (%r): accepted", e)
+            return True
+
+    def path_ok(self, b_prev: Sequence[float], b: Sequence[float], q_prev: th.Tensor, q_new: th.Tensor, leaf_prev, leaf_now,
+                joint_from: Optional[float] = None, joint_to: Optional[float] = None) -> Tuple[bool, str]:
         """The base path b_prev -> b in 0.1 m strides with the arm joints interpolated between the two solutions:
-        whole-body collision-free (leaf removed) and the leaf (at both joint values) clear of every stride footprint."""
+        whole-body collision-free (leaf removed) and the leaf clear of every stride footprint. The base and the door move
+        **together** (the executor interpolates both over the segment), so with the joint values given and an analytic
+        footprint the leaf is taken at the interpolated joint value per stride; without them the leaf at both ends is
+        tested at every stride (door_crtrpa_0 0919-114353: the leaf at its NEW angle against the base's START pose rejected
+        every IK-feasible candidate at stride 0 - the door had swung into where the base still stood)."""
         poses = NAV.stride_poses([tuple(b_prev), tuple(b)], NAV.STRIDE_M)
         n = max(len(poses) - 1, 1)
+        interp = joint_from is not None and joint_to is not None and self.leaf_fp.analytic
         qs = []
         for j, p in enumerate(poses):
             q = q_prev.clone()
             q[self.idx] = interpolate_arm(q_prev[self.idx], q_new[self.idx], j / n)
             qs.append(self.kit.q_at_base_pose(q, *p))
+            if interp:
+                q_leaf = float(joint_from) + (float(joint_to) - float(joint_from)) * (j / n)
+                if not leaf_clear_of_base(self.leaf_fp.at(q_leaf), p[:2], float(self.k["base_radius_m"])):
+                    return False, f"leaf (q {q_leaf:.3f}) in the footprint at stride {j}/{len(poses)}"
+                continue
             for pts, tag in ((leaf_prev, "leaf_prev"), (leaf_now, "leaf")):
                 if not leaf_clear_of_base(pts, p[:2], float(self.k["base_radius_m"])):
                     return False, f"{tag} in the footprint at stride {j}/{len(poses)}"
@@ -576,10 +742,14 @@ class FollowSearch:
                 b_new: Pose2D = b_prev
                 last = i_q == len(q_values) - 1 and bool(self.k["check_retreat"])  # the retreat must leave from the final pose
                 # 1. the arm alone from the current base (the leaf at q_i must stay clear of the footprint)
+                tried: Dict[str, int] = {}
                 if leaf_clear_of_base(leaf_now, b_prev[:2], float(self.k["base_radius_m"])) and self.reach_ok(b_prev, w.eef[0]):
                     sol = self.solve(b_prev, w.eef, q_prev, leaf_now, retreat=last)
+                    if sol is None:
+                        tried["arm_only_" + (getattr(self, "last_solve_fail", None) or "ik")] = 1
+                else:
+                    tried["arm_only_skipped"] = 1
                 # 2. move the base: the rigid-sweep interpolations, then the lattice, in order of displacement
-                tried: Dict[str, int] = {}
                 if sol is None:
                     cands = lattice_candidates(b_prev, b_rigid, float(self.k["lattice_step_m"]), float(self.k["lattice_radius_m"]),
                                                math.radians(float(self.k["yaw_step_deg"])), math.radians(float(self.k["yaw_extra_deg"])),
@@ -597,15 +767,41 @@ class FollowSearch:
                             continue
                         cand = self.solve(b, w.eef, q_prev, leaf_now, retreat=last)
                         if cand is None:
-                            tried["ik"] = tried.get("ik", 0) + 1
+                            why_s = getattr(self, "last_solve_fail", None) or "ik"
+                            tried[why_s] = tried.get(why_s, 0) + 1
                             continue
-                        ok, why = self.path_ok(b_prev, b, q_prev, cand.q, leaf_prev, leaf_now)
+                        ok, why = self.path_ok(b_prev, b, q_prev, cand.q, leaf_prev, leaf_now, joint_from=float(poses[-1].q), joint_to=float(q_i))
                         if not ok:
-                            tried["path"] = tried.get("path", 0) + 1
-                            log.debug("%s: hybrid candidate %s rejected: %s", s.gp.alias, [round(v, 3) for v in b], why)
+                            # door 0919-104121: 20 IK-feasible candidates at 18 deg all failed here - which gate (leaf / body / floor)
+                            kind = "path_leaf" if "footprint" in why else ("path_floor" if "floor" in why else "path_body")
+                            tried[kind] = tried.get(kind, 0) + 1
+                            n_dbg = getattr(self, "_n_path_debug", 0)
+                            if n_dbg < 3:
+                                self._n_path_debug = n_dbg + 1
+                                log.info("%s: hybrid candidate %s (%s) rejected by the base path: %s", s.gp.alias, [round(v, 3) for v in b], tag, why)
                             continue
+                        if str(self.k["base_move_policy"]) == "lookahead":
+                            # score = how many of the following dense poses the arm reaches from this base without moving it
+                            score = self.lookahead(b, cand.q, q_values[i_q + 1:], int(self.k["lookahead_steps"]), i_q + 1 == len(q_values))
+                            scored = getattr(self, "_scored", None)
+                            if scored is None or not scored or scored[-1][2] != i_q:
+                                scored = []
+                                self._scored = scored
+                            scored.append((score, cost, i_q, cand, b, tag))
+                            if len(scored) < int(self.k["lookahead_candidates"]) and self.n_ik - n_before < int(self.k["max_ik_per_step"]):
+                                continue
+                            best = max(scored, key=lambda t: (t[0], -t[1]))
+                            sol, b_new, chosen = best[3], best[4], f"{best[5]}+lookahead{best[0]}"
+                            tried["lookahead_scores"] = sorted((t[0] for t in scored), reverse=True)
+                            self._scored = []
+                            break
                         sol, b_new, chosen = cand, b, tag
                         break
+                    if sol is None and str(self.k["base_move_policy"]) == "lookahead" and getattr(self, "_scored", None):
+                        best = max(self._scored, key=lambda t: (t[0], -t[1]))  # fewer than lookahead_candidates were feasible
+                        sol, b_new, chosen = best[3], best[4], f"{best[5]}+lookahead{best[0]}"
+                        tried["lookahead_scores"] = sorted((t[0] for t in self._scored), reverse=True)
+                        self._scored = []
                 if sol is None:
                     self._fail(poses, "hybrid_follow_infeasible", f"no base pose within {self.k['lattice_radius_m']:.2f} m of {[round(v, 3) for v in b_prev]} reaches "
                                                                  f"h(q = {q_i:.3f}) (k = {k_i:.2f}); candidates rejected: {tried}; {self.n_ik - n_before} IK calls")
@@ -627,7 +823,310 @@ class FollowSearch:
                    "leaf_links": sorted(self.leaf), "n_body_boxes": len(self.boxes), "leaf_footprint": ("analytic" if self.leaf_fp.analytic else "aabb") + (" (aabb fallback used)" if self._fp_warned else "")})
         s.template_meta["hybrid_follow"] = {"ok": True, **st, "log": self.log}
         step = {"revolute_rad": math.radians(float(self.k["step_revolute_deg"]))} if s.joint.is_revolute else {"prismatic_m": float(self.k["step_prismatic_m"])}
-        return HybridPath(self.arm, self.trunk, poses, base_follow_dict(poses, marks), idle, [float(v) for v in self.q_star[idle_idx].tolist()], fingers, step, st, dict(self.k))
+        return HybridPath(self.arm, self.trunk, poses, base_follow_dict(poses, marks), idle, [float(v) for v in self.q_star[idle_idx].tolist()], fingers, step, st, dict(self.k),
+                          retreat_arm_q=self.retreat_witness(poses))
+
+    def lookahead(self, b: Sequence[float], q_at_b: th.Tensor, q_next: Sequence[float], max_steps: int, is_last: bool,
+                  retreat_ladder: Optional[Sequence[float]] = None) -> int:
+        """How many of the next dense joint values (in order, stopping at the first miss) the arm reaches from base ``b``
+        without moving it: the leaf clear of the footprint, the reach pre-filter and the exact IK chained from ``q_at_b``
+        (the retreat checked on the path's final pose). The joint is restored to the value it had on entry.
+        ``retreat_ladder`` (the sequential policy): a pose counts only up to the last one whose release is feasible - a
+        retreat pose of one of these distances along -a has an IK with the margin (the path's final pose: PRE_DIST) -
+        since an arm segment can end only there (dishwasher_wide 0921-034952: a 1 cm move scored 3 by reach alone,
+        then its segment was cut to one pose by the retreat)."""
+        s = self.s
+        q_entry = float(s.joint_value())
+        count, count_releasable = 0, 0
+        q_seed = q_at_b
+        n_rest = len(list(q_next))
+        hard = float(self.k.get("hard_margin_rad", self.ikc.JOINT_LIMIT_MARGIN)) + float(self.k["retreat_margin_slack_rad"])
+        try:
+            for j, q_j in enumerate(list(q_next)[:max_steps]):
+                s.pose_joint(float(q_j))
+                w = s.h([float(q_j)])[0]
+                leaf_j = self.footprint_at(float(q_j))
+                if not leaf_clear_of_base(leaf_j, b[:2], float(self.k["base_radius_m"])) or not self.reach_ok(b, w.eef[0]):
+                    break
+                # a cheap probe: the margin-aware IK alone (the chosen step is later gated by the full solve: polish,
+                # collision, retreat, fov) - the full solve per look-ahead step blew the 600 s search budget (0920-160045)
+                q_seed_b = self.kit.q_at_base_pose(q_seed, float(b[0]), float(b[1]), float(b[2]))
+                with self.ikc.ignoring(self.ignore):
+                    q_j_sol = self._ik(w.eef, q_seed_b)
+                if q_j_sol is None:
+                    break
+                q_seed = q_j_sol
+                count += 1
+                if retreat_ladder is not None:
+                    dists = [float(C.PRE_DIST)] if j == n_rest - 1 else [float(v) for v in retreat_ladder]
+                    with self.ikc.ignoring(self.ignore):
+                        if any(self._ik(C.pre_pose(w.eef, d_), q_j_sol, hard_margin=hard) is not None for d_ in dists):
+                            count_releasable = count
+        finally:
+            s.pose_joint(q_entry)
+        return count_releasable if retreat_ladder is not None else count
+
+    def retreat_witness(self, poses: List[FollowPose]) -> Optional[List[float]]:
+        """The retreat configuration (7 arm joints) at the path's final pose, solved as the search solves it (the free
+        margin-aware IK) - recorded so the program check verifies THIS configuration instead of re-solving the retreat as a
+        tracked chain (the two solvers disagreed by 8-17 mrad of margin: 0919-213438, 0921-022826)."""
+        if not poses or poses[-1].q_full is None or poses[-1].eef is None:
+            return None
+        hard = float(self.k.get("hard_margin_rad", self.ikc.JOINT_LIMIT_MARGIN)) + float(self.k["retreat_margin_slack_rad"])
+        try:
+            self.s.pose_joint(float(poses[-1].q))
+            with self.ikc.ignoring(self.ignore):
+                q_ret = self._ik(C.pre_pose(poses[-1].eef, C.PRE_DIST), poses[-1].q_full, hard_margin=hard)
+        finally:
+            self.s.pose_joint(self.q_init)
+        if q_ret is None:
+            return None
+        if not bool(self.kit.collision_free(q_ret, margin=P0.COLLISION_MARGIN)[0]):
+            return None
+        return [float(v) for v in q_ret[self.idx].tolist()]
+
+    # -- sequential policy (owner 2026-09-20 20:19) -----------------------------------------------------------------
+    def _arm_q(self, q_full: th.Tensor) -> List[float]:
+        return [float(v) for v in q_full[self.idx].tolist()]
+
+    @staticmethod
+    def _eef_rec(eef) -> Dict[str, List[float]]:
+        return {"position": [round(float(v), 6) for v in G.t(eef[0]).tolist()], "orientation": [round(float(v), 7) for v in G.t(eef[1]).tolist()]}
+
+    def release_move_regrasp(self, b_prev: Pose2D, b_new: Pose2D, w: C.HandleWaypoint, q_prev: th.Tensor, leaf_pts,
+                             retreat_m: float = C.PRE_DIST) -> Optional[Dict[str, Any]]:
+        """Release at the current joint value (retreat pose IK from the grasp configuration, ``retreat_m`` along -a),
+        drive ``b_prev -> b_new`` with the arm frozen at the retreat configuration (whole-body collision-free at every
+        stride, else the stance's idle posture), re-grasp ``w`` from ``b_new`` (pre-grasp + grasp exact-IK chain with
+        the margins). None when a step fails."""
+        retreat_eef = C.pre_pose(w.eef, float(retreat_m))
+        q_ret = self._ik(retreat_eef, q_prev)  # the full world: the hand leaves the handle, the leaf is an obstacle again
+        if q_ret is None or not bool(self.kit.collision_free(q_ret, margin=P0.COLLISION_MARGIN)[0]):
+            self.last_move_fail = "retreat_ik" if q_ret is None else "retreat_collision"
+            return None
+        strides = NAV.stride_poses([tuple(b_prev), tuple(b_new)], float(self.k["move_stride_m"]))
+        if len(strides) < 2:
+            strides = [tuple(b_prev), tuple(b_new)]
+        for p in strides:
+            if not leaf_clear_of_base(leaf_pts, p[:2], float(self.k["base_radius_m"])) or not self.footprint_ok(p, leaf_pts)[0]:
+                self.last_move_fail = "path_footprint"
+                return None
+        hold_posture, q_hold = "retreat", q_ret
+        qs = th.stack([self.kit.q_at_base_pose(q_hold, *p) for p in strides])
+        if not bool(self.kit.collision_free(qs, margin=P0.COLLISION_MARGIN).all()):
+            q_hold = self.ikc.q_locked(self.stance_at(b_prev, "idle"))  # the stance's recorded idle posture for every arm
+            qs = th.stack([self.kit.q_at_base_pose(q_hold, *p) for p in strides])
+            if not bool(self.kit.collision_free(qs, margin=P0.COLLISION_MARGIN).all()):
+                self.last_move_fail = "path_collision"
+                return None
+            hold_posture = "idle"
+        st_new = self.stance_at(b_new, "regrasp")
+        res = self.ikc.exact([w.pre_grasp, w.eef], st_new, self.arm, ignore_for_last=[self.obj], cache=False)
+        if not res.ok or res.q is None:
+            self.last_move_fail = f"regrasp: {res.reason[:80]}"
+            return None
+        q_pre = self.ikc.solutions.get((self.arm, self.ikc._pose_key(w.pre_grasp)))
+        clear = float(self.k.get("self_clearance_m", 0.0))
+        if clear > 0.0:
+            for tag_, q_ in (("regrasp", res.q), ("regrasp_pre", q_pre), ("hold", q_hold)):
+                if q_ is not None and self.kit.backend.self_collision_pairs(q_, f"{self.arm}_arm", margin=clear):
+                    self.last_move_fail = f"{tag_}_self_clearance"
+                    return None
+        self.last_move_fail = None
+        return {"type": "release_move_regrasp", "retreat_eef": self._eef_rec(retreat_eef), "retreat_m": round(float(retreat_m), 3),
+                "arm_q_retreat": [round(float(v), 6) for v in q_ret[self.idx].tolist()],
+                "base_path": [[float(v) for v in p] for p in strides[1:]], "hold_posture": hold_posture, "arm_q_hold": [round(float(v), 6) for v in q_hold[self.idx].tolist()],
+                "pre_grasp_eef": self._eef_rec(w.pre_grasp), "grasp_eef": self._eef_rec(w.eef),
+                "arm_q_pre": None if q_pre is None else [round(float(v), 6) for v in q_pre[self.idx].tolist()],
+                "arm_q_regrasp": [round(float(v), 6) for v in res.q[self.idx].tolist()], "q_end": res.q}
+
+    def run_sequential(self, q_values: Sequence[float], marks: Dict[str, float]) -> HybridPath:
+        """Owner policy 2026-09-20 20:19 / 23:58: arm segments to the arm's limit (+ margin), then one base move chosen by
+        the look-ahead (fewest base moves) as release / move / re-grasp with the door stationary; typed segments for the
+        executor, the flat ``poses`` list for the program check and the record."""
+        s = self.s
+        b: Pose2D = tuple(float(v) for v in self.manip.base_pose2d)  # type: ignore[assignment]
+        q_prev = self.kit.q_at_base_pose(self.q_star, *b)
+        s.pose_joint(self.q_init)
+        margin0, _ = self.ikc.joint_limit_margin(q_prev, self.arm)
+        poses = [FollowPose(0.0, self.q_init, b, self._arm_q(q_prev), q_prev.clone(), self.h0.eef, self.ikc.fk_residual(q_prev, self.h0.eef, self.arm), margin0, chosen="stance")]
+        segments: List[Dict[str, Any]] = []
+        n = len(q_values)
+        i = 0
+        q_cur, w_cur = float(self.q_init), self.h0
+        visited: Dict[Tuple[float, float, float, float], int] = {}  # (q_cur, base) -> visits: a base move must not return to a pose already tried at this joint value
+        try:
+            while i < n:
+                if time.time() - self.t0 > float(self.k["budget_s"]):
+                    self._fail(poses, "time_budget", f"sequential follow search over {self.k['budget_s']:.0f} s at q = {q_values[i]:.3f}")
+                # 1. arm segment: advance while the arm alone reaches h(q) with the margin; the segment then ends at the LAST pose
+                # whose retreat pose (0.10 m along -a) is reachable too - a release, or the path's end, follows every segment
+                # (dishwasher_wide 0921-011609: the arm pulled to 23.6 deg where no retreat pose had an IK - no move possible;
+                # requiring the retreat at every pose instead shrank the segments to one pose each, 0921-020027)
+                seg: List[FollowPose] = []
+                seg_state: List[Tuple[th.Tensor, float, Any, int, Optional[float]]] = []  # (q_full, q, waypoint, i_next, retreat distance or None) per pose
+                q_from, arm_from = q_cur, self._arm_q(q_prev)
+                hard = float(self.k.get("hard_margin_rad", self.ikc.JOINT_LIMIT_MARGIN)) + float(self.k["retreat_margin_slack_rad"])
+                ladder = [float(v) for v in (self.k.get("release_retreat_m") or [C.PRE_DIST])]
+                i_seg0 = i
+                while i < n:
+                    q_i = float(q_values[i])
+                    s.pose_joint(q_i)
+                    w = s.h([q_i])[0]
+                    leaf_i = self.footprint_at(q_i)
+                    n0 = self.n_ik
+                    if not (leaf_clear_of_base(leaf_i, b[:2], float(self.k["base_radius_m"])) and self.reach_ok(b, w.eef[0])):
+                        break
+                    sol = self.solve(b, w.eef, q_prev, leaf_i, retreat=False)
+                    if sol is None:
+                        break
+                    # the retreat that a release here would use: the program's PRE_DIST at the path's final pose, else the
+                    # first distance of the ladder with an IK (the leaf ignored: the hand is still on / at the handle)
+                    ret_m: Optional[float] = None
+                    if not bool(self.k["check_retreat"]):
+                        ret_m = float(C.PRE_DIST)
+                    else:
+                        with self.ikc.ignoring(self.ignore):
+                            for dist in ([float(C.PRE_DIST)] if i == n - 1 else ladder):
+                                if self._ik(C.pre_pose(w.eef, dist), sol.q, hard_margin=hard) is not None:
+                                    ret_m = dist
+                                    break
+                    k_i = fraction_of(q_i, self.q_init, self.q_goal)
+                    poses.append(FollowPose(k_i, q_i, b, self._arm_q(sol.q), sol.q.clone(), w.eef, sol.residual, sol.margin, 0.0, 0.0, "arm_only", self.n_ik - n0))
+                    seg.append(poses[-1])
+                    seg_state.append((sol.q, q_i, w, i + 1, ret_m))
+                    q_prev, q_cur, w_cur = sol.q, q_i, w
+                    i += 1
+                retreat_m_cur: float = float(C.PRE_DIST)
+                if seg:
+                    last_ok = max((j for j, st_ in enumerate(seg_state) if st_[4] is not None), default=-1)
+                    if last_ok >= 0:
+                        retreat_m_cur = float(seg_state[last_ok][4])  # type: ignore[arg-type]
+                    if last_ok < len(seg) - 1:
+                        dropped = len(seg) - 1 - last_ok
+                        del poses[len(poses) - dropped:]
+                        seg = seg[: last_ok + 1]
+                        if last_ok >= 0:
+                            q_prev, q_cur, w_cur, i = seg_state[last_ok][0], seg_state[last_ok][1], seg_state[last_ok][2], seg_state[last_ok][3]
+                        else:
+                            q_prev_keep = poses[-1].q_full
+                            q_prev, i = (q_prev_keep if q_prev_keep is not None else q_prev), i_seg0
+                            q_cur = float(poses[-1].q)
+                            s.pose_joint(q_cur)
+                            w_cur = s.h([q_cur])[0]
+                        log.info("%s: sequential: arm segment truncated by %d pose(s) to the last pose with a reachable retreat (q = %.3f, retreat %.2f m)", s.gp.alias, dropped, q_cur, retreat_m_cur)
+                if seg:
+                    segments.append({"type": "arm", "q_from": float(q_from), "q_to": float(q_cur), "base_pose2d": [float(v) for v in b], "arm_q_from": [round(v, 6) for v in arm_from],
+                                     "arm_q_to": [round(v, 6) for v in self._arm_q(q_prev)], "poses": [p.to_sidecar(True) for p in seg]})
+                    log.info("%s: sequential: arm segment %.3f -> %.3f (%d poses) from base %s, retreat %.2f m", s.gp.alias, q_from, q_cur, len(seg), [round(v, 3) for v in b], retreat_m_cur)
+                elif not segments:
+                    # the stance itself admits no arm pull that can be released (door 0921-022828 / 030920: the arm reached 10 deg
+                    # but the retreat from there folded the elbow past its limit) - a grasp followed by an immediate release and a
+                    # base move is not a demo; reject the stance so the sampler draws the next one (a farther stand-off)
+                    self._fail(poses, "hybrid_follow_infeasible", f"sequential: the stance {[round(v, 3) for v in b]} admits no arm segment with a reachable retreat "
+                                                                 f"(first pose q = {q_values[i_seg0]:.3f}: {'arm IK miss: ' + str(getattr(self, 'last_solve_fail', None)) if not seg_state else f'no retreat pose ({ladder} m along -a) has an IK with the margin'})")
+                elif segments and segments[-1]["type"] != "arm":
+                    self._fail(poses, "hybrid_follow_infeasible", f"sequential: no arm progress after the {segments[-1]['type']} at q = {q_cur:.3f} (the full solve of the next pose failed: "
+                                                                 f"{getattr(self, 'last_solve_fail', None)})")
+                if i >= n:
+                    break
+                # 2. base move with the door stationary at q_cur: candidates scored by the look-ahead from the next pose
+                s.pose_joint(q_cur)
+                leaf_cur = self.footprint_at(q_cur)
+                q_next = float(q_values[i])
+                s.pose_joint(q_next)
+                w_next = s.h([q_next])[0]
+                leaf_next = self.footprint_at(q_next)
+                b_rigid = self.rigid_pose(w_next.eef)
+                cands = lattice_candidates(b, b_rigid, float(self.k["lattice_step_m"]), float(self.k["lattice_radius_m"]), math.radians(float(self.k["yaw_step_deg"])),
+                                           math.radians(float(self.k["yaw_extra_deg"])), float(self.k["yaw_weight_m_per_rad"]), alphas=[float(a) for a in self.k["alphas"]])
+                n_before = self.n_ik
+                scored: List[Tuple[int, float, Pose2D, str]] = []
+                tried: Dict[str, int] = {}
+                visited[(round(q_cur, 4), round(b[0], 3), round(b[1], 3), round(b[2], 3))] = visited.get((round(q_cur, 4), round(b[0], 3), round(b[1], 3), round(b[2], 3)), 0) + 1
+                t_move, t_note, n_cand = time.time(), time.time(), 0
+                for cost, b_c, tag in cands:
+                    n_cand += 1
+                    if time.time() - t_note > 60.0:  # door 0921-030920: 30 min of silence inside this loop - say where the time goes
+                        t_note = time.time()
+                        log.info("%s: sequential: base-move search at q = %.3f running %.0f s: %d / %d candidates, %d IK calls, %d scored, rejected %s", s.gp.alias, q_cur,
+                                 time.time() - t_move, n_cand, len(cands), self.n_ik - n_before, len(scored), tried)
+                    if self.n_ik - n_before >= int(self.k["max_ik_per_step"]):
+                        tried["ik_cap"] = tried.get("ik_cap", 0) + 1
+                        break
+                    if pose2d_delta(b, b_c)[0] < float(self.k["min_move_m"]) and pose2d_delta(b, b_c)[1] < math.radians(float(self.k["min_move_deg"])):
+                        tried["too_small"] = tried.get("too_small", 0) + 1  # a release / re-grasp cycle for a 1 cm move (0921-034952) buys nothing
+                        continue
+                    if visited.get((round(q_cur, 4), round(float(b_c[0]), 3), round(float(b_c[1]), 3), round(float(b_c[2]), 3))):
+                        tried["visited"] = tried.get("visited", 0) + 1
+                        continue
+                    ok, why = self.footprint_ok(b_c, leaf_cur)
+                    if not ok or not self.footprint_ok(b_c, leaf_next)[0]:
+                        tried[why or "footprint"] = tried.get(why or "footprint", 0) + 1
+                        continue
+                    if not self.reach_ok(b_c, w_next.eef[0]):
+                        tried["reach"] = tried.get("reach", 0) + 1
+                        continue
+                    score = self.lookahead(b_c, q_prev, q_values[i:], int(self.k["lookahead_steps"]), False, retreat_ladder=ladder if bool(self.k["check_retreat"]) else None)
+                    if score <= 0:
+                        tried["ik"] = tried.get("ik", 0) + 1
+                        continue
+                    # the cheap look-ahead probe is not the gate: the next pose must pass the full solve from this base (polish,
+                    # collision, fov, the retreat at the path's end) - else the arm segment after the move makes no progress and
+                    # the search ping-pongs between two bases (dishwasher_wide 0920-203527 at q 0.471)
+                    s.pose_joint(q_next)
+                    sol_next = self.solve(b_c, w_next.eef, self.kit.q_at_base_pose(q_prev, *b_c), leaf_next, retreat=bool(self.k["check_retreat"]))
+                    s.pose_joint(q_cur)
+                    if sol_next is None:
+                        tried["ik_full_" + (getattr(self, "last_solve_fail", None) or "ik")] = tried.get("ik_full_" + (getattr(self, "last_solve_fail", None) or "ik"), 0) + 1
+                        continue
+                    scored.append((score, cost, tuple(float(v) for v in b_c), tag))
+                    if len(scored) >= int(self.k["lookahead_candidates"]):
+                        break
+                s.pose_joint(q_cur)
+                if not scored:
+                    self._fail(poses, "hybrid_follow_infeasible", f"sequential: no base pose within {self.k['lattice_radius_m']:.2f} m of {[round(v, 3) for v in b]} reaches "
+                                                                 f"h(q = {q_next:.3f}) with the door at {q_cur:.3f}; candidates rejected: {tried}; {self.n_ik - n_before} IK calls")
+                move: Optional[Dict[str, Any]] = None
+                b_new: Pose2D = b
+                for score, cost, b_c, tag in sorted(scored, key=lambda t: (-t[0], t[1])):
+                    # owner 2026-09-20 23:58: the only base move is release -> move -> re-grasp (the anchored move and its
+                    # per-stride IK are gone: 25-125 IK calls per move and the 7.467 <-> 7.567 ping-pong, 0920-203527)
+                    rec = self.release_move_regrasp(b, b_c, w_cur, q_prev, leaf_cur, retreat_m=retreat_m_cur)
+                    if rec is None:
+                        why_m = getattr(self, "last_move_fail", None) or "move"
+                        tried["move_" + why_m.split(":")[0]] = tried.get("move_" + why_m.split(":")[0], 0) + 1
+                        log.info("%s: sequential: release/move/re-grasp %s -> %s at q = %.3f rejected: %s", s.gp.alias, [round(v, 3) for v in b], [round(v, 3) for v in b_c], q_cur, why_m)
+                    if rec is not None:
+                        rec.update({"q": float(q_cur), "lookahead": int(score), "base_from": [float(v) for v in b], "base_to": [float(v) for v in b_c], "candidate": tag})
+                        move, b_new = rec, b_c
+                        break
+                if move is None:
+                    self._fail(poses, "hybrid_follow_infeasible", f"sequential: the door at {q_cur:.3f}: none of {len(scored)} scored base poses admits a release / move / re-grasp ({tried})")
+                q_end = move.pop("q_end")
+                d_m, d_yaw = pose2d_delta(b, b_new)
+                margin_e, _ = self.ikc.joint_limit_margin(q_end, self.arm)
+                poses.append(FollowPose(fraction_of(q_cur, self.q_init, self.q_goal), float(q_cur), b_new, self._arm_q(q_end), q_end.clone(), w_cur.eef,
+                                        self.ikc.fk_residual(q_end, w_cur.eef, self.arm), margin_e, d_m, d_yaw, move["type"], self.n_ik - n_before))
+                segments.append(move)
+                self.log.append({"q": round(float(q_cur), 4), "chosen": move["type"], "base_step_m": round(d_m, 3), "base_step_rad": round(d_yaw, 3), "lookahead": int(move["lookahead"]),
+                                 "n_ik": self.n_ik - n_before, "rejected": tried})
+                log.info("%s: sequential: %s at q = %.3f, base %s -> %s (%.2f m / %.2f rad, look-ahead %d, %d IK calls, rejected %s)", s.gp.alias, move["type"], q_cur,
+                         [round(v, 3) for v in b], [round(v, 3) for v in b_new], d_m, d_yaw, move["lookahead"], self.n_ik - n_before, tried)
+                b, q_prev = b_new, q_end
+        finally:
+            s.pose_joint(self.q_init)
+        idle = "left" if self.arm == "right" else "right"
+        idle_idx = self.kit.robot.arm_control_idx[idle]
+        fingers = float(self.q_star[self.kit.robot.gripper_control_idx[self.arm]][0])
+        st = path_stats(poses, self.q_init, self.q_goal)
+        st.update({"time_s": round(time.time() - self.t0, 1), "r_max_m": round(self.r_max, 3), "policy": "sequential", "n_segments": len(segments),
+                   "n_regrasp_moves": sum(1 for g in segments if g["type"] == "release_move_regrasp"),
+                   "leaf_links": sorted(self.leaf), "n_body_boxes": len(self.boxes)})
+        s.template_meta["hybrid_follow"] = {"ok": True, **st, "log": self.log}
+        step = {"revolute_rad": math.radians(float(self.k["step_revolute_deg"]))} if s.joint.is_revolute else {"prismatic_m": float(self.k["step_prismatic_m"])}
+        return HybridPath(self.arm, self.trunk, poses, base_follow_dict(poses, marks), idle, [float(v) for v in self.q_star[idle_idx].tolist()], fingers, step, st, dict(self.k),
+                          policy="sequential", segments=segments, retreat_arm_q=self.retreat_witness(poses))
 
     def _fail(self, poses: List[FollowPose], reason: str, msg: str):
         st = path_stats(poses, self.q_init, self.q_goal)
@@ -654,8 +1153,10 @@ def search_follow_path(s, manip: Stance, q_star: th.Tensor, h0: C.HandleWaypoint
     fs = FollowSearch(s, manip, q_star, h0, q_init, q_goal)
     step = math.radians(float(fs.k["step_revolute_deg"])) if s.joint.is_revolute else float(fs.k["step_prismatic_m"])
     q_values = dense_values(q_init, q_last, list(marks.values()), step)
-    log.info("%s: hybrid follow search %s from %.3f to %.3f (%d dense steps of <= %.3f, fractions %s), arm %s, leaf links %s, %d body boxes, reach <= %.2f m", s.gp.alias,
-             s.joint_name, q_init, q_last, len(q_values), step, sorted(marks), fs.arm, sorted(fs.leaf), len(fs.boxes), fs.r_max)
+    log.info("%s: %s follow search %s from %.3f to %.3f (%d dense steps of <= %.3f, fractions %s), arm %s, leaf links %s, %d body boxes, reach <= %.2f m", s.gp.alias,
+             fs.k["policy"], s.joint_name, q_init, q_last, len(q_values), step, sorted(marks), fs.arm, sorted(fs.leaf), len(fs.boxes), fs.r_max)
+    if str(fs.k["policy"]) == "sequential":
+        return fs.run_sequential(q_values, marks)
     return fs.run(q_values, marks)
 
 
@@ -697,6 +1198,7 @@ def check_program_follow(sidecar, sampler, action, targets: Dict[str, Any], stan
     prev_q = None
     prev_b = None
     prev_leaf = None
+    prev_joint = None
     try:
         for i, rec in enumerate(recs):
             b = tuple(float(v) for v in rec["base_pose2d"])
@@ -722,8 +1224,13 @@ def check_program_follow(sidecar, sampler, action, targets: Dict[str, Any], stan
                 free = bool(sampler.kit.collision_free(q_pol, margin=P0.COLLISION_MARGIN)[0])
             n += 1
             where = f"base_follow_path.poses[{i}] (q = {q_i:.3f}, base {[round(v, 3) for v in b]})"
-            if residual > sampler.ikc.WITNESS_RESIDUAL_MAX:
-                raise Reject("program_check_failed", f"{where}: FK residual {residual * 1000:.1f} mm > {sampler.ikc.WITNESS_RESIDUAL_MAX * 1000:.0f} mm", action="base_follow")
+            # a follow pose is accepted by the search at the solver's 5 mm (``solve``: a polish that would sit inside the
+            # joint-limit margin is discarded and the raw IK residual stands); the executor ramps the recorded joints while
+            # the grasp constraint carries a few mm of strain anyway (dishwasher 0917-213723: 3.4 mm) - the 2 mm end-pose
+            # standard rejected pose 2 of the door path at 4.8 mm (0919-195417). ``generation.witness_residual_follow_m``.
+            limit = float(sampler.gp.gen("witness_residual_follow_m", 5e-3))
+            if residual > limit:
+                raise Reject("program_check_failed", f"{where}: FK residual {residual * 1000:.1f} mm > {limit * 1000:.0f} mm", action="base_follow")
             if not free:
                 raise Reject("program_check_failed", f"{where}: whole body collides (leaf removed, body present)", action="base_follow")
             if not sampler.kit.trav_free(b[:2]):
@@ -733,7 +1240,8 @@ def check_program_follow(sidecar, sampler, action, targets: Dict[str, Any], stan
             margin, jn = sampler.ikc.joint_limit_margin(q_pol, arm)
             if margin < sampler.ikc.JOINT_LIMIT_MARGIN * 0.5:
                 raise Reject("program_check_failed", f"{where}: {jn} within {margin * 1000:.0f} mrad of its limit", action="base_follow")
-            if prev_q is not None and (pose2d_delta(prev_b, b)[0] > 1e-6 or pose2d_delta(prev_b, b)[1] > 1e-6):
+            stationary_move = prev_joint is not None and abs(float(prev_joint) - q_i) < 1e-9 and bool(path.get("segments"))
+            if prev_q is not None and not stationary_move and (pose2d_delta(prev_b, b)[0] > 1e-6 or pose2d_delta(prev_b, b)[1] > 1e-6):
                 poses2d = NAV.stride_poses([prev_b, b], NAV.STRIDE_M)
                 m = max(len(poses2d) - 1, 1)
                 qs = []
@@ -741,6 +1249,13 @@ def check_program_follow(sidecar, sampler, action, targets: Dict[str, Any], stan
                     qj = prev_q.clone()
                     qj[idx] = interpolate_arm(prev_q[idx], q_pol[idx], j / m)
                     qs.append(sampler.kit.q_at_base_pose(qj, *p))
+                    # the base and the door move together along the segment (as the search's path_ok): the leaf at the
+                    # interpolated joint value per stride when the footprint is analytic, else at both ends
+                    if fp.analytic and prev_joint is not None:
+                        q_leaf = float(prev_joint) + (float(q_i) - float(prev_joint)) * (j / m)
+                        if not leaf_clear_of_base(fp.at(q_leaf), p[:2], float(kn["base_radius_m"])):
+                            raise Reject("program_check_failed", f"{where}: the leaf (q {q_leaf:.3f}) is in the footprint along the base path (stride {j})", action="base_follow")
+                        continue
                     for pts in (prev_leaf, leaf_pts):
                         if not leaf_clear_of_base(pts, p[:2], float(kn["base_radius_m"])):
                             raise Reject("program_check_failed", f"{where}: the leaf is in the footprint along the base path (stride {j})", action="base_follow")
@@ -750,14 +1265,17 @@ def check_program_follow(sidecar, sampler, action, targets: Dict[str, Any], stan
                 if not bool(ok.all()):
                     raise Reject("program_check_failed", f"{where}: the base path from the previous pose collides at stride {int(th.nonzero(~ok)[0])}", action="base_follow")
             for key, qk in q_by_key.items():
-                if abs(qk - q_i) < 1e-6 and any(abs(float(u) - float(v)) > 1e-4 for u, v in zip(art.base_follow[key], b)):
-                    raise Reject("program_check_failed", f"articulation.base_follow[{key!r}] {art.base_follow[key]} differs from the path pose at q_k {list(b)}", action="base_follow")
+                if abs(qk - q_i) < 1e-6:
+                    bases_at_qk = [tuple(float(v) for v in r["base_pose2d"]) for r in recs if abs(float(r["q"]) - qk) < 1e-6]  # a stationary-door base move leaves two poses at q_k
+                    if not any(all(abs(float(u) - float(v)) <= 1e-4 for u, v in zip(art.base_follow[key], bb)) for bb in bases_at_qk):
+                        raise Reject("program_check_failed", f"articulation.base_follow[{key!r}] {art.base_follow[key]} differs from the path pose(s) at q_k {bases_at_qk}", action="base_follow")
             witnesses[f"handle_poses[{i}]"] = {"pose": {"position": [round(float(v), 5) for v in eef[0].tolist()], "orientation": [round(float(v), 6) for v in eef[1].tolist()]},
                                               "q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pol, st_b).tolist()],
                                               "q_frame": "root at the world origin (identity pose, z = 0)", "base_pose2d": [float(v) for v in b],
                                               "fk_residual_m": round(residual, 5), "joint_limit_margin_rad": round(margin, 4), "joint_limit_nearest": jn, "joint_q": q_i}
-            prev_q, prev_b, prev_leaf = q_pol, b, leaf_pts
+            prev_q, prev_b, prev_leaf, prev_joint = q_pol, b, leaf_pts, float(q_i)
         witnesses["follow_end"] = {**witnesses[f"handle_poses[{len(recs) - 1}]"], "translate": float(stance.translate), "tilt": float(stance.tilt), "arm": arm}
+        n += _check_segments(sidecar, sampler, art, path, stance, arm, witnesses, obj, joint_idx, q_saved, fp, ignore, kn)
     finally:
         obj.set_joint_positions(q_saved)
         obj.keep_still()
@@ -765,6 +1283,72 @@ def check_program_follow(sidecar, sampler, action, targets: Dict[str, Any], stan
         obj.set_joint_positions(q_saved)
         obj.keep_still()
         sampler.kit.sync_world()
+    return n
+
+
+def _check_segments(sidecar, sampler, art, path: Dict[str, Any], stance: Stance, arm: str, witnesses: Dict[str, Any], obj, joint_idx: int, q_saved: th.Tensor,
+                    fp: "LeafFootprint", ignore, kn: Dict[str, Any]) -> int:
+    """Sequential policy: the base moves happen with the door stationary and are verified per segment — an anchored move
+    at every recorded stride (arm on the handle: polish <= 5 mm, collision-free with the leaf removed, footprint, margin),
+    a release / move / re-grasp move at its retreat pose, along its path with the held arm (full world) and at the
+    re-grasp chain (exact IK, margins). Witnesses ``regrasp_pre[j]`` / ``regrasp[j]`` for the executor's arm_to hints."""
+    segs = list(path.get("segments") or [])
+    if not segs:
+        return 0
+    limit = float(sampler.gp.gen("witness_residual_follow_m", 5e-3))
+    n = 0
+
+    def set_joint(q_i: float):
+        q_all = q_saved.clone()
+        q_all[joint_idx] = q_i
+        obj.set_joint_positions(q_all)
+        obj.keep_still()
+        sampler.world.step_physics(1, still=[sampler.robot])
+        obj.set_joint_positions(q_all)
+        obj.keep_still()
+        sampler.kit.sync_world()
+
+    for j, seg in enumerate(segs):
+        kind = seg.get("type")
+        if kind == "arm":
+            continue
+        q_i = float(seg["q"])
+        set_joint(q_i)
+        aabb = sampler.moving_link_footprint() if hasattr(sampler, "moving_link_footprint") else None
+        leaf_pts = fp.at(q_i, fallback=aabb)
+        where = f"base_follow_path.segments[{j}] ({kind} at q = {q_i:.3f})"
+        if kind == "release_move_regrasp":
+            b0 = tuple(float(v) for v in seg["base_from"])
+            b1 = tuple(float(v) for v in seg["base_to"])
+            st0 = dataclasses.replace(stance, name=f"release_{j}", base_pose2d=b0, q=None)
+            st1 = dataclasses.replace(stance, name=f"regrasp_{j}", base_pose2d=b1, q=None)
+            aq_ret = th.tensor(seg["arm_q_retreat"], dtype=th.float32)
+            q_ret = sampler.ikc.q_locked(st0, right_arm=aq_ret if arm == "right" else None, left_arm=aq_ret if arm == "left" else None)
+            q_pol, residual = sampler.ikc.polish_witness(q_ret, _as_pose(seg["retreat_eef"]), arm, ignore=())
+            n += 1
+            if residual > limit or not bool(sampler.kit.collision_free(q_pol, margin=P0.COLLISION_MARGIN)[0]):
+                raise Reject("program_check_failed", f"{where}: the retreat pose fails (residual {residual * 1000:.1f} mm)", action="base_follow")
+            aq_hold = th.tensor(seg["arm_q_hold"], dtype=th.float32)
+            q_hold = sampler.ikc.q_locked(st0, right_arm=aq_hold if arm == "right" else None, left_arm=aq_hold if arm == "left" else None)
+            qs = th.stack([sampler.kit.q_at_base_pose(q_hold, *tuple(float(v) for v in b)) for b in seg["base_path"]])
+            n += len(seg["base_path"])
+            ok = sampler.kit.collision_free(qs, margin=P0.COLLISION_MARGIN)
+            if not bool(ok.all()):
+                raise Reject("program_check_failed", f"{where}: the base path with the held arm collides at stride {int(th.nonzero(~ok)[0])}", action="base_follow")
+            for b in seg["base_path"]:
+                b = tuple(float(v) for v in b)
+                if not sampler.kit.trav_free(b[:2]) or not leaf_clear_of_base(leaf_pts, b[:2], float(kn["base_radius_m"])):
+                    raise Reject("program_check_failed", f"{where}: base off the free floor or in the leaf's footprint along the path", action="base_follow")
+            res = sampler.ikc.exact([_as_pose(seg["pre_grasp_eef"]), _as_pose(seg["grasp_eef"])], st1, arm, ignore_for_last=[obj], cache=False)
+            n += 2
+            if not res.ok or res.q is None:
+                raise Reject("program_check_failed", f"{where}: the re-grasp chain fails the exact IK ({res.reason})", action="base_follow")
+            q_pre = sampler.ikc.solutions.get((arm, sampler.ikc._pose_key(_as_pose(seg["pre_grasp_eef"]))))
+            witnesses[f"regrasp[{j}]"] = {"q": [round(float(v), 5) for v in sampler.ikc.canonical_q(res.q, st1).tolist()], "base_pose2d": list(b1), "joint_q": q_i}
+            if q_pre is not None:
+                witnesses[f"regrasp_pre[{j}]"] = {"q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pre, st1).tolist()], "base_pose2d": list(b1), "joint_q": q_i}
+        else:
+            raise Reject("program_check_failed", f"{where}: unknown segment type", action="base_follow")
     return n
 
 

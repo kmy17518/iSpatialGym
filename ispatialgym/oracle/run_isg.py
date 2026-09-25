@@ -342,9 +342,13 @@ class InstanceLoader:
         for i, h in enumerate(list(self.hinges)):
             prim = stage.GetPrimAtPath(h.prim_path)
             if prim is None or not prim.IsValid():
-                rec = (self.tro.meta.extras.get("constraints") or [])[i]
+                rec = self._hinge_records[i]
                 self.hinges[i] = self._create_hinge(rec)
                 out["hinges_recreated"] += 1
+        for rec in getattr(self, "_joint_friction_records", []):
+            self._apply_joint_friction(rec)
+        for rec in getattr(self, "_counterbalance_records", []):
+            self._apply_counterbalance(rec)
         for g in self.grasps:
             obj = self.physical[g["object"]]
             attached = self.robot._ag_obj_in_hand.get(g["arm"]) is obj
@@ -395,14 +399,66 @@ class InstanceLoader:
         return create_hinge(child, th.tensor(rec["anchor_position"], dtype=th.float32), th.tensor(rec["axis"], dtype=th.float32), parent_link=parent_link,
                             friction=friction, damping=damping)
 
+    def _apply_joint_friction(self, rec: dict) -> dict:
+        """``{"type": "joint_friction", "object", "joint", friction | stiffness / damping / max_effort}`` (small articulation,
+        2026-09-18): the resistance of the moved joint as the sampler probed the stable set and the goal settle with it
+        (:func:`ispatialgym.sampling.constraints.apply_joint_brake`; the stock 0.2 friction lets a hinged lid fall to its
+        gravitational equilibrium, damping + max_effort make the joint drive a Coulomb brake). Idempotent; re-applied after
+        every reset."""
+        from ispatialgym.sampling.constraints import apply_joint_brake
+
+        ent = self.physical.get(rec["object"])
+        if ent is None:
+            raise LoadError("error", f"joint_friction constraint names an unbound instance {rec['object']!r}")
+        if rec["joint"] not in ent.joints:
+            raise LoadError("error", f"joint_friction constraint: {rec['object']} has no joint {rec['joint']!r}")
+        spec = {k: rec[k] for k in ("friction", "stiffness", "damping", "max_effort", "lower_limit_rad", "upper_limit_rad") if rec.get(k) is not None}
+        applied = apply_joint_brake(ent.joints[rec["joint"]], spec)
+        if rec.get("openable_joints"):
+            # a flap with an extended lower limit would read as open at its closed position (OG's Open threshold is lower + 5 %
+            # of the range): the record names the joints that decide openness (the target joint), 2026-09-19
+            from ispatialgym.sampling.constraints import restrict_openable_joints
+
+            restrict_openable_joints(ent, list(rec["openable_joints"]))
+        return {"type": "joint_friction", "object": rec["object"], "joint": rec["joint"], **applied}
+
+    def _apply_counterbalance(self, rec: dict) -> dict:
+        """``{"type": "counterbalance", "object", "joint", "links", "damping"}`` (large articulation, owner decision 2026-09-19): the
+        spring-balanced appliance door - gravity off on the leaf assembly, viscous joint damping (:func:`ispatialgym.sampling.constraints.apply_counterbalance`);
+        the sampler probed the stable set and the goal settle with it. Idempotent; re-applied after every reset."""
+        from ispatialgym.sampling.constraints import apply_counterbalance
+
+        ent = self.physical.get(rec["object"])
+        if ent is None:
+            raise LoadError("error", f"counterbalance constraint names an unbound instance {rec['object']!r}")
+        if rec["joint"] not in ent.joints:
+            raise LoadError("error", f"counterbalance constraint: {rec['object']} has no joint {rec['joint']!r}")
+        applied = apply_counterbalance(ent, ent.joints[rec["joint"]], list(rec.get("links") or []), rec.get("damping"))
+        return {"type": "counterbalance", "object": rec["object"], "joint": rec["joint"], **applied}
+
     def _restore_constraints(self, records: List[dict]) -> List[dict]:
         out = []
         self.hinges = []
+        self._hinge_records = []  # the hinge records in self.hinges order (restore_after_reset recreates a lost prim from its record)
+        self._joint_friction_records = []
+        self._counterbalance_records = []
         for rec in records:
-            if rec.get("type", "revolute") != "revolute":
+            kind = rec.get("type", "revolute")
+            if kind == "counterbalance":
+                out.append(self._apply_counterbalance(rec))
+                self._counterbalance_records.append(rec)
+                log.info("counterbalance applied: %s/%s = %s", rec["object"], rec["joint"], out[-1])
+                continue
+            if kind == "joint_friction":
+                out.append(self._apply_joint_friction(rec))
+                self._joint_friction_records.append(rec)
+                log.info("joint resistance applied: %s/%s = %s (stock %s)", rec["object"], rec["joint"], out[-1], rec.get("stock", rec.get("stock_friction")))
+                continue
+            if kind != "revolute":
                 raise LoadError("error", f"unsupported constraint type {rec.get('type')!r}")
             h = self._create_hinge(rec)
             self.hinges.append(h)
+            self._hinge_records.append(rec)
             out.append({"child": rec["child"], "parent": rec.get("parent"), "prim_path": h.prim_path, "friction": h.friction, "damping": h.damping})
             log.info("hinge restored: %s about %s at %s (friction %s N·m, damping %s N·m·s/rad)", rec["child"], [round(v, 3) for v in rec["axis"]],
                      [round(v, 3) for v in rec["anchor_position"]], None if h.friction is None else round(h.friction, 4), None if h.damping is None else round(h.damping, 4))
@@ -657,6 +713,25 @@ def write_tro_updates(tro_path: str, sidecar_path: Optional[str], sidecar: Optio
     return out
 
 
+def _apply_program_hook(spec: str, actions, sidecar, loader):
+    """``ISG_PROGRAM_HOOK``: ``/path/to/file.py:callable`` or ``package.module:callable``; the callable gets
+    ``(actions, sidecar, loader)`` and returns the program to run."""
+    import importlib
+    import importlib.util
+
+    target, _, fn_name = spec.rpartition(":")
+    if target.endswith(".py"):
+        spec_ = importlib.util.spec_from_file_location("isg_program_hook", target)
+        mod = importlib.util.module_from_spec(spec_)
+        sys.modules[spec_.name] = mod  # dataclasses with postponed annotations resolve them through sys.modules
+        spec_.loader.exec_module(mod)  # type: ignore[union-attr]
+    else:
+        mod = importlib.import_module(target)
+    out = getattr(mod, fn_name)(list(actions), sidecar, loader)
+    log.info("program hook %s: %d -> %d actions (%s)", spec, len(actions), len(out), [a.name for a in out])
+    return out
+
+
 def main(argv=None) -> int:
     args = parse_args(argv)
     logging.getLogger("ispatialgym").setLevel(args.log_level)
@@ -711,6 +786,11 @@ def main(argv=None) -> int:
                     actions = expand(alias, sidecar)
                 except SidecarError as e:
                     program_error = f"no program for {alias!r}: {e}"
+                if actions is not None and os.environ.get("ISG_PROGRAM_HOOK"):
+                    # experiments (owner 2026-09-19 night: the door pull-back / push-open study): ``path.py:callable`` or
+                    # ``module:callable`` rewriting the expanded program; recorded in meta, never used by the pilot runs
+                    actions = _apply_program_hook(os.environ["ISG_PROGRAM_HOOK"], actions, sidecar, loader)
+                    meta["program_hook"] = os.environ["ISG_PROGRAM_HOOK"]
                 meta["subtask"] = sidecar.subtask
                 meta["program"] = [a.summary() for a in actions] if actions else None
         log.info("run_isg v2: %s (%s, mode %s, %s actions) -> %s", iid, loader.activity, args.mode, None if actions is None else len(actions), out_dir)

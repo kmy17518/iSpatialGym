@@ -109,7 +109,13 @@ class RobotKit:
     def q_current(self) -> th.Tensor:
         return self.backend.q_full()
 
-    def sync_world(self, ignore_objects=()):
+    def sync_world(self, ignore_objects=(), only_objects=None):
+        """``only_objects``: refresh those objects' meshes alone (cheap; the rest of the world has not moved) - a full
+        sync when the world is not loaded yet or the robot root drifted since the last full sync."""
+        if only_objects is not None and getattr(self.backend, "_world_loaded", False) and getattr(self, "_synced_root", None) is not None \
+                and float(th.linalg.norm(self.backend.root_pose()[0] - self._synced_root)) <= 0.01:
+            self.backend.update_world(ignore_objects=ignore_objects, only_objects=only_objects)
+            return
         self.backend.update_world(ignore_objects=ignore_objects)
         self._synced_root = self.backend.root_pose()[0].clone()
 

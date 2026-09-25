@@ -474,9 +474,12 @@ def axis_angle(s, cam: Pose, point) -> float:
 
 def phase1_scan(s, face: FaceFrame, beta: float, d_min: float, d_max: float, target_extent_fn: Callable[[], Tuple[th.Tensor, th.Tensor]],
                 translates: Sequence[float] = TRANSLATES, in_frame_margin: float = IN_FRAME_MARGIN, stats: Optional[Dict[str, int]] = None,
-                name: str = "init") -> Optional[Stance]:
+                name: str = "init", tilts: Sequence[float] = (0.0,)) -> Optional[Stance]:
     """One bearing β: the d scan of §5.2 Phase 1b. Returns the init stance at (d*, t*) or None when no d is feasible.
-    ``target_extent_fn() -> (corners (N, 3) world, centre (3,))`` of the target in its init state."""
+    ``target_extent_fn() -> (corners (N, 3) world, centre (3,))`` of the target in its init state. ``tilts``: trunk
+    tilts tried per translate, upright first (``generation.prompt0.init_tilts``; a lean forward brings a low, near
+    target into the frame — the open dishwasher door of the close task fits the frame only from 1.15 m upright, where
+    the base backs into the kitchen bar, 0919-232646)."""
     corners, centre = target_extent_fn()
     corners = _t(corners).reshape(-1, 3)
     st_ = stats if stats is not None else {}
@@ -496,13 +499,23 @@ def phase1_scan(s, face: FaceFrame, beta: float, d_min: float, d_max: float, tar
                     st_["room_seen"] = "?"
             continue
         st_["base_ok"] = st_.get("base_ok", 0) + 1
-        cands = [ray_stance(face, beta, d, t, 0.0, name) for t in translates]
+        cands = [ray_stance(face, beta, d, t, float(tilt), name) for t in translates for tilt in tilts]
         cams = camera_poses(s, cands)
         seen = [(st, cam) for st, cam in zip(cands, cams) if in_frame(s, cam, corners, in_frame_margin)]
         if not seen:
             continue
         st_["in_frame"] = st_.get("in_frame", 0) + len(seen)
         free = body_free(s, [st for st, _ in seen])
+        if not bool(free.any()) and "collision_debug" not in st_:
+            # one diagnostic per scan: what the body hits at the first in-frame candidate (door_crtrpa_0 0919-013815: 48 in-frame
+            # stances in the 1.65 m garden strip, 0 collision-free, no culprit in the rejection)
+            st0 = seen[0][0]
+            try:
+                dbg = debug_collision_q(s, s.ikc.q_locked(st0), f"phase1 {name} d={d:.2f}")
+                st_["collision_debug"] = {"d": round(d, 2), "translate": st0.translate, "objects": dbg.get("objects_at_spheres"), "no_ground": dbg.get("no_ground"),
+                                          "margin0": dbg.get("margin0"), "no_self": dbg.get("no_self"), "n_spheres": dbg.get("n_penetrating")}
+            except Exception as e:  # noqa: BLE001 — diagnostics never fail the scan
+                st_["collision_debug"] = {"error": repr(e)[:120]}
         seen = [(st, cam) for (st, cam), f in zip(seen, free.tolist()) if f]
         if not seen:
             continue
@@ -511,7 +524,7 @@ def phase1_scan(s, face: FaceFrame, beta: float, d_min: float, d_max: float, tar
             continue
         st_["sweep_free"] = st_.get("sweep_free", 0) + 1
         t_star = phase1_choice([(st.translate, axis_angle(s, cam, centre)) for st, cam in seen])
-        for st, cam in seen:
+        for st, cam in seen:  # the first tilt of ``tilts`` (upright) at the chosen translate
             if abs(st.translate - t_star) < 1e-9:
                 st.extras["axis_angle_deg"] = math.degrees(axis_angle(s, cam, centre))
                 st.extras["target_centre"] = [round(float(v), 4) for v in _t(centre).tolist()]
@@ -521,7 +534,7 @@ def phase1_scan(s, face: FaceFrame, beta: float, d_min: float, d_max: float, tar
 
 def phase1_init_pose(s, face: FaceFrame, beta_max: float, d_min: float, d_max: float, target_extent_fn: Callable[[], Tuple[th.Tensor, th.Tensor]],
                      rng: np.random.Generator, translates: Sequence[float] = TRANSLATES, in_frame_margin: float = IN_FRAME_MARGIN,
-                     redraws: int = BETA_REDRAWS, name: str = "init") -> Stance:
+                     redraws: int = BETA_REDRAWS, name: str = "init", tilts: Sequence[float] = (0.0,)) -> Stance:
     """§5.2 Phase 1: β ~ U(−β_max, β_max) (radians), the d scan, β redrawn at most ``redraws`` times;
     ``Reject("no_stance")`` with the per-stage counts when every bearing fails."""
     from ispatialgym.sampling.sim_utils import Reject
@@ -531,7 +544,7 @@ def phase1_init_pose(s, face: FaceFrame, beta_max: float, d_min: float, d_max: f
     for _ in range(redraws + 1):
         beta = float(rng.uniform(-beta_max, beta_max)) if beta_max > 0 else 0.0
         betas.append(round(math.degrees(beta), 1))
-        st = phase1_scan(s, face, beta, d_min, d_max, target_extent_fn, translates, in_frame_margin, stats, name)
+        st = phase1_scan(s, face, beta, d_min, d_max, target_extent_fn, translates, in_frame_margin, stats, name, tilts=tilts)
         if st is not None:
             st.arms = "untucked"
             return st
@@ -570,13 +583,15 @@ def phase2_step1(s, face: FaceFrame, d_range: Tuple[float, float], lam_range: Tu
     if cache_scope is not None:
         key = cache_key("prompt0_step1", {**cache_scope, "face": face.to_json(), "d_range": list(d_range), "lam_range": list(lam_range),
                                           "translates": list(translates), "tilts": list(tilts), "arms_excluded": arms_excluded,
-                                          "lattice": [D_STEP, LAMBDA_STEP], "margin": COLLISION_MARGIN, "posture": posture, "fingers": fingers})
+                                          "lattice": [D_STEP, LAMBDA_STEP], "margin": COLLISION_MARGIN, "posture": posture, "fingers": fingers,
+                                          "working_arms": sorted(getattr(s.ikc, "default_working_arms", []) or [])})
         hit = cache_get(key)
         if hit is not None:
             out = []
             for e in hit["survivors"]:
                 st = square_stance(face, e["d"], e["lam"], e["translate"], e["tilt"])
                 st.extras["band"] = list(tilt_band(e["tilt"], e["translate"]))
+                st.idle_posture = e.get("idle_posture")  # A6: the posture step 1 passed with (see phase2_manipulation)
                 out.append(st)
             log.info("Phase 2 step 1: %d survivors from the cache", len(out))
             return out
@@ -597,7 +612,7 @@ def phase2_step1(s, face: FaceFrame, d_range: Tuple[float, float], lam_range: Tu
         flat = [st for st in keep if abs(st.tilt) < 1e-9 and abs(st.translate - 0.5) < 1e-9]
         debug_collisions(s, [flat[i] for i in range(0, len(flat), max(1, len(flat) // 6))][:6], arms_excluded)
     if key is not None and out:  # an empty set is not cached (it is diagnosed, and may come from a transient world state)
-        cache_put(key, {"survivors": [{"d": st.stand_off, "lam": st.lateral, "translate": st.translate, "tilt": st.tilt} for st in out]})
+        cache_put(key, {"survivors": [{"d": st.stand_off, "lam": st.lateral, "translate": st.translate, "tilt": st.tilt, "idle_posture": st.idle_posture} for st in out]})
     return out
 
 
@@ -653,7 +668,8 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
         key = cache_key("prompt0_step123", {**cache_scope, "face": face.to_json(), "d_range": list(d_range), "lam_range": list(lam_range),
                                             "translates": list(translates), "tilts": list(tilts), "arms": sorted(set(arms)),
                                             "contacts": contact_set_key(contact_set), "focus": foc, "margin": IN_FRAME_MARGIN,
-                                            "classes": [AXIS_TIGHT_DEG, AXIS_LOOSE_DEG], "posture": posture, "fingers": fingers})
+                                            "classes": [AXIS_TIGHT_DEG, AXIS_LOOSE_DEG], "posture": posture, "fingers": fingers,
+                                            "working_arms": sorted(getattr(s.ikc, "default_working_arms", []) or [])})
         hit = cache_get(key)
         if hit is not None:
             out = []
@@ -661,6 +677,10 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
                 st = square_stance(face, e["d"], e["lam"], e["translate"], e["tilt"])
                 st.extras.update({"band": list(tilt_band(e["tilt"], e["translate"])), "axis_angle_deg": e["axis_angle_deg"], "angle_class": e["angle_class"]})
                 st.focus = foc.clone()
+                # A6: the idle-arm posture step 1 passed with travels through the cache (a survivor that needed the tucked idle
+                # arm came back untucked and failed every re-check draw by collision: door_crtrpa_0 0919-023637)
+                st.idle_posture = e.get("idle_posture")
+                st.arms = list(arms)
                 out.append(st)
             log.info("Phase 2 steps 1–3: %d survivors from the cache", len(out))
             return out
@@ -672,7 +692,8 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
              st_.get("step3_visible", 0), len(out), st_.get("best_class"))
     if key is not None and out:
         cache_put(key, {"survivors": [{"d": st.stand_off, "lam": st.lateral, "translate": st.translate, "tilt": st.tilt,
-                                       "axis_angle_deg": st.extras["axis_angle_deg"], "angle_class": st.extras["angle_class"]} for st in out]})
+                                       "axis_angle_deg": st.extras["axis_angle_deg"], "angle_class": st.extras["angle_class"],
+                                       "idle_posture": st.idle_posture} for st in out]})
     return out
 
 
@@ -702,7 +723,7 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
                       extra_visibility: Optional[Callable[[Pose], bool]] = None, arms_excluded: Optional[bool] = None,
                       in_frame_margin: float = IN_FRAME_MARGIN, name: str = "manipulation", tilt_draws: int = 3,
                       posture: Optional[str] = None, fingers: Optional[float] = None,
-                      clearance_ignore: Optional[Sequence[Any]] = None) -> Tuple[int, Optional[Stance]]:
+                      clearance_ignore: Optional[Sequence[Any]] = None, stats: Optional[Dict[str, int]] = None) -> Tuple[int, Optional[Stance]]:
     """§5.2 step 4: one survivor drawn uniformly (its index is returned so the caller can drop it) with the tilt drawn
     continuously inside its band; the drawn stance is re-checked (collision, focus in frame, extra visibility, optical
     axis within its class). The tilt is redrawn up to ``tilt_draws`` times inside the band (the grid tilt itself, which
@@ -726,6 +747,11 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
     lo, hi = grid.extras.get("band", tilt_band(grid.tilt, grid.translate))
     excl = (len(set(arms)) > 1) if arms_excluded is None else arms_excluded
     draws = [float(rng.uniform(lo, hi)) if hi > lo else grid.tilt for _ in range(max(1, int(tilt_draws)) - 1)] + [float(grid.tilt)]
+    st_ = stats if stats is not None else {}
+
+    def fail(kind: str) -> None:  # why the drawn tilts fail (door 0919-023637: every draw of 19 survivors failed with no reason)
+        st_[kind] = st_.get(kind, 0) + 1
+
     for tilt in draws:
         st = grid.with_trunk(grid.translate, tilt, name)
         st.focus = grid.focus if focus is None else _t(focus)
@@ -733,6 +759,7 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
         st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class", "clearance_tier", "bar_offset_m")}
         st.extras["grid_tilt"] = grid.tilt
         if not bool(body_free(s, [st], arms_excluded=excl, posture=posture, fingers=fingers)[0]):
+            fail("collision")
             continue
         if posture is not None:
             st.fingers = fingers
@@ -741,13 +768,16 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
         cam = camera_poses(s, [st])[0]
         if st.focus is not None:
             if not in_frame(s, cam, st.focus.reshape(1, 3), in_frame_margin):
+                fail("focus_out_of_frame")
                 continue
             ang = axis_angle(s, cam, st.focus)
             k = angle_class(ang)
             if k is None or k > int(grid.extras.get("angle_class", 1)):
+                fail("axis_class")
                 continue
             st.extras["axis_angle_deg"] = math.degrees(ang)
         if extra_visibility is not None and not extra_visibility(cam):
+            fail("extra_visibility")
             continue
         return i, st
     return i, None

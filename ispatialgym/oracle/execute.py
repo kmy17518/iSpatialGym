@@ -64,7 +64,7 @@ from ispatialgym.oracle.actions import (
     VOCABULARY,
 )
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.motions import ApproachFinish, Motions, SkillError, as_pose2d, as_world_pose
+from ispatialgym.oracle.motions import ApproachFinish, Motions, SkillError, arc_between, as_pose2d, as_world_pose, joint_axis_from_contacts
 from ispatialgym.oracle.sidecar import Pose
 from ispatialgym.robot import conventions as C
 
@@ -133,8 +133,28 @@ class ExecuteConfig:
     follow_stop_at_goal: bool = True
     follow_stop_frac: float = 0.25
     follow_unwind: bool = True
+    #: the unwind is spread over this many steps (hold target -> measured joints, re-read every step): a one-step unwind
+    #: let the wound-up arm snap 0.85 rad/s against the door (dishwasher_wide 0920-002330) and the strain it could not
+    #: shed stayed in the grasp constraint - the release then rocked the torso (base pitch 0.24 rad/s)
+    follow_unwind_steps: int = 12
     follow_still_rad: float = 5e-4
     follow_still_steps: int = 5
+    #: sequential arm segments track the handle arc CLOSED-LOOP (``Motions.arm_arc_closed_loop``: one differential-IK
+    #: step per control step from the measured joints, the target never more than one step ahead of where the door lets
+    #: the arm be) instead of streaming an open-loop joint path between the recorded poses. With the robot's 1e7-stiff,
+    #: effort-capped drives an open-loop path saturates the drives on any mismatch with the grasp constraint (~100 N at
+    #: the hand): the 47.6 kg chassis tipped 0.8 deg, the evaluator's 250 kg one bent torso_joint1 2.6 deg, both snapping
+    #: back at the release (dishwasher_wide 0921-050314 / 0921-235247). The compliance is in the recorded commands, so a
+    #: policy trained on the demo reproduces it on the evaluator's stock drives (owner 2026-09-22 11:19).
+    #: measured 0922-1126xx on the same instance: the per-step closed loop turned the steady wrench into a 30 Hz pulse train
+    #: (every 1.7 mm correction a saturated burst): torso 4.3 deg, eef bursts 0.39 m/s, release snap 38 deg/s - worse than
+    #: the streamed path (2.6 deg / 0.17 / 25). "reanchored" streams the path open-loop within each recorded pose but starts
+    #: every pose's arc from the MEASURED hand pose rotated by the joint delta about the axis, instead of chaining the
+    #: recorded target poses: the grasp offset otherwise becomes a permanent radial mismatch from the second pose on.
+    follow_arm_tracking: str = "reanchored"  # "recorded" (chain the recorded poses) | "reanchored" | "closed_loop"
+    follow_arm_band_rad: float = 0.005  # a recorded pose counts as reached when the joint is within this of its q
+    #: steps held after a handle / object is released before the retreat leg moves (the constraint-removal transient)
+    release_settle_steps: int = 12
     #: push closure (owner rule 2026-09-16, execution accuracy): after the recorded arc / line the pad holds in contact
     #: until the object is still (at least ``push_hold_min_steps``, at most ``push_settle_max_steps``; still = below
     #: ``push_still_pos`` / ``push_still_rot`` per step for ``push_still_steps`` steps), the residual to the goal is
@@ -1914,27 +1934,274 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
         if not targets.get("base_poses"):
             raise SkillError("plan_failed", "base_follow: no recorded base poses in base mode", stage="targets")
         gen = motions.base_follow(targets["base_poses"], action.arm)
+    elif targets["mode"] == "hybrid":
+        # D-011 C: the recorded dense path (base pose + arm joints per <= 10 deg step) is driven and tracked together
+        if not targets.get("follow_path") or len(targets["follow_path"]) < 2:
+            raise SkillError("plan_failed", "base_follow: no recorded follow path in hybrid mode", stage="targets")
+        # the joint axis from the recorded handle contacts: the arm-only steps then follow the true arc between poses
+        contacts = [w.contact if hasattr(w, "contact") else w["contact"] for _, w in sorted(art.waypoints.items(), key=lambda kv: float(kv[0]))] if art.waypoints else []
+        axis = joint_axis_from_contacts(contacts) if len(contacts) >= 3 else None
+        note["arc_axis"] = None if axis is None else {"centre": [round(float(v), 3) for v in axis[0].tolist()], "axis": [round(float(v), 3) for v in axis[1].tolist()]}
+        if targets.get("follow_segments"):
+            note["policy"] = "sequential"
+            gen = _follow_sequential(action, motions, state, targets["follow_segments"], ctx, axis, note)
+        else:
+            gen = motions.base_follow_hybrid(targets["follow_path"], action.arm, axis=axis)
     else:
         gen = motions.arm_along(action.arm, targets["handle_poses"], converge=False)
     k = 0
+    stopping = 0
+    q_phase0 = None
     for a in gen:
         yield a
         k += 1
+        if getattr(motions, "follow_phase", "arm") == "base":
+            # sequential policy: the door must stand still while the base drives (anchored move: the hand stays on the
+            # handle; release / re-grasp: the hand is off it) - a moving joint here is a broken assumption, abort
+            q_now = state.joint_position(art.object, art.joint)
+            if q_phase0 is None:
+                q_phase0 = q_now
+            elif abs(q_now - q_phase0) > max(cfg.follow_still_rad * 20, 0.02):
+                gen.close()
+                raise SkillError("execution", f"base_follow: {art.object}/{art.joint} moved {abs(q_now - q_phase0):.3f} rad while the base drove (door not stationary)", stage="base_move")
+            continue
+        q_phase0 = None
+        if stopping:
+            stopping += 1
+            if stopping > 60:  # the motion did not wind down on its own: cut it
+                gen.close()
+                break
+            continue
         if cfg.follow_stop_at_goal and reached():
             q = state.joint_position(art.object, art.joint)
             log.info("base_follow(%s): %s/%s at %.4f reached the goal band (%.4f ± %.4f) after %d steps -> the follow stops here", action.arm, art.object, art.joint, q,
                      art.q_goal, band, k)
             note["stopped_at_goal"] = {"steps": k, "q": q}
+            if targets["mode"] == "hybrid" and hasattr(motions, "stop_requested"):
+                # cooperative stop: the hybrid follow decelerates the base and freezes the arm target, then returns
+                # (closing the generator cut the base velocity in one step: a 2 m/s^2 jolt at the goal, 0920-164632)
+                motions.stop_requested = True
+                stopping = 1
+                continue
             gen.close()
             break
     note["motion_steps"] = k
+    if targets["mode"] == "arm" and cfg.follow_stop_at_goal and not reached() and (getattr(art, "extra", None) or {}).get("hinge_world") is not None:
+        # owner 2026-09-21: the recorded motion ended short of the goal band (0921-021042: 0.06 rad, the hand a few mm short of the last
+        # pose) - the hand rides ON along the hinge arc by what is missing (+ the band), the live hinge (the object may have shifted),
+        # until the joint reaches the band; the remaining shortfall stays in the record
+        try:
+            ex = art.extra or {}
+            hinge = C.as_tensor(ex["hinge_world"]).reshape(-1)[:3].float()
+            axis = C.unit(C.as_tensor(ex["axis_world"]).reshape(-1)[:3].float())
+            rec = ex.get("object_pose")
+            if isinstance(rec, dict):
+                # the hinge moves with the object: T_live o T_rec^-1 applied to the recorded hinge point / axis
+                live = as_world_pose(state.object_pose(art.object))
+                rec_pose = (C.as_tensor(rec["position"]).float(), C.as_tensor(rec["orientation"]).float())
+                d_pose = C.compose(live, C.invert(rec_pose))
+                dp_, dq_ = C.as_tensor(d_pose[0]).float(), C.as_tensor(d_pose[1]).float()
+                hinge = C.quat_rotate(dq_, hinge) + dp_
+                axis = C.unit(C.quat_rotate(dq_, axis))
+            q_now = float(state.joint_position(art.object, art.joint))
+            d_ext = sign * (abs(art.q_goal - q_now) + band + 0.02)
+            here = as_world_pose(state.eef_pose(action.arm))
+            ext = C.orbit_waypoints(here, hinge, C.quat_from_axis_angle(axis, d_ext), n=3, frame="world")
+            log.info("base_follow(%s): the recorded motion ended at q %.3f (goal %.3f): riding on along the hinge arc by %.3f rad", action.arm, q_now, art.q_goal, d_ext)
+            gen2 = motions.arm_along(action.arm, list(ext), converge=False)
+            k2 = 0
+            for a in gen2:
+                yield a
+                k2 += 1
+                if reached():
+                    gen2.close()
+                    break
+            note["extended"] = {"rad": float(d_ext), "steps": k2, "q": float(state.joint_position(art.object, art.joint))}
+        except Exception as e:  # noqa: BLE001
+            log.warning("base_follow(%s): the extension past the recorded motion failed: %r", action.arm, e)
     if cfg.follow_unwind:
         # the drives stop pressing on the door: the hold target becomes the measured configuration (the wind-up under
-        # the friction load stays in the record); the release then imparts nothing
-        note["unwind_rad"] = motions.unwind(action.arm)
+        # the friction load stays in the record), re-read every step for follow_unwind_steps so the elastic strain bleeds
+        # off gradually instead of snapping; the release then imparts nothing
+        total = motions.unwind(action.arm)
+        for _ in range(max(0, int(cfg.follow_unwind_steps) - 1)):
+            yield from motions.hold(1)
+            total += motions.unwind(action.arm)
+        note["unwind_rad"] = total
     hold_steps, q_end = yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
     note.update({"hold_steps": hold_steps, "q_end": q_end, "shortfall_rad": sign * (art.q_goal - q_end)})
     ctx["follow"] = note
+
+
+def _ramp_arm_to_q(motions: Motions, arm: str, q_arm: Sequence[float], speed: Optional[float] = None, loaded: bool = False) -> Generator[th.Tensor, None, float]:
+    """A straight joint-space ramp of ``arm`` onto the 7-joint configuration ``q_arm`` at ``speed`` rad/s (the follow's
+    arm speed by default), no planner. For a target the sampler recorded and collision-checked a short distance away
+    (the retreat witness after a differential-IK retreat, the pre-grasp witness when the planner refuses a start
+    configuration that is 9 mm inside its self-collision padding: dishwasher_wide 0921-041230). Returns the joint
+    distance (rad)."""
+    robot = motions.robot
+    idx = robot.arm_control_idx[arm]
+    q_now = robot.get_joint_positions().clone().float()
+    q_goal = q_now.clone()
+    q_goal[idx] = C.as_tensor(q_arm).reshape(-1).float()
+    d = float(th.max(th.abs(q_goal[idx] - q_now[idx])))
+    rate = float(speed if speed is not None else motions.cfg.follow_arm_speed)
+    n = max(2, int(math.ceil(d / max(rate * motions.dt, 1e-6))))
+    q_start = q_now.clone()
+    q_start[idx] = motions.state.arm_target[arm].clone().float() if motions.state.arm_target.get(arm) is not None else q_now[idx]
+    traj = th.stack([q_start + (q_goal - q_start) * (k / n) for k in range(1, n + 1)])
+    yield from motions.execute_joint_trajectory(traj, arms=[arm], loaded=loaded, converge=True)
+    return d
+
+
+def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: List[Dict[str, Any]], ctx: Dict[str, Any], axis, note: Dict[str, Any]) -> Iterator[th.Tensor]:
+    """Owner policy 2026-09-20 20:19, strictly one thing at a time: ``arm`` segments track the handle arc between the
+    recorded poses (``arc_between`` about the joint axis, differential IK, no convergence wait); ``release_move_regrasp``
+    segments (the only base move, owner 2026-09-20 23:58) unwind, release, back off, drive with the arm
+    frozen (or in the idle posture), re-grasp from the pre-grasp witness and re-attach. The goal-band stop is
+    cooperative (``motions.stop_requested``) and only honoured between arm poses."""
+    cfg = _cfg(ctx)
+    arm = action.arm
+    art = action.articulation
+    obj = state.object(art.object)
+    robot = motions.robot
+    idx = robot.arm_control_idx[arm]
+    log_moves: List[Dict[str, Any]] = []
+    note["segments"] = log_moves
+    motions.stop_requested = False
+    motions.follow_phase = "arm"
+    # the sense of the fitted hinge axis relative to the joint's positive direction, from two recorded poses of distinct q
+    # (the fit returns a direction only): +1 when a positive joint delta rotates the hand positively about the axis
+    axis_sign = 0.0
+    if axis is not None:
+        rec = [(float(p["q"]), as_world_pose(p["eef"])[0]) for s in segments if s.get("type") == "arm" for p in (s.get("poses") or []) if p.get("eef") is not None and p.get("q") is not None]
+        for (qa, pa), (qb, pb) in zip(rec[:-1], rec[1:]):
+            if abs(qb - qa) > 1e-3:
+                ra = (pa - axis[0]) - axis[1] * float((pa - axis[0]) @ axis[1])
+                rb = (pb - axis[0]) - axis[1] * float((pb - axis[0]) @ axis[1])
+                ang = math.atan2(float(th.cross(ra, rb, dim=0) @ axis[1]), float(ra @ rb))
+                if abs(ang) > 1e-3:
+                    axis_sign = 1.0 if (ang > 0) == (qb > qa) else -1.0
+                    break
+        note["arc_axis_sign"] = axis_sign
+    for j, seg in enumerate(segments):
+        kind = seg.get("type")
+        if kind == "arm":
+            eef_prev = motions.eef_pose(arm)
+            for p in seg.get("poses") or []:
+                if motions.stop_requested:
+                    return
+                if p.get("eef") is None:
+                    continue
+                target = as_world_pose(p["eef"])
+                try:
+                    if cfg.follow_arm_tracking == "closed_loop" and axis is not None and p.get("q") is not None:
+                        info = yield from motions.arm_arc_closed_loop(arm, axis[0], axis[1], target, lambda: float(state.joint_position(art.object, art.joint)), float(p["q"]),
+                                                                     speed=motions.cfg.follow_eef_speed, band_rad=cfg.follow_arm_band_rad)
+                        log_moves.append({"type": "arm_pose_closed_loop", **{k: (round(v, 4) if isinstance(v, float) else v) for k, v in info.items()}})
+                        if info.get("stop") == "door_lags":
+                            log.warning("base_follow: arm pose q = %.3f: the joint did not follow the commanded arc (%.3f rad commanded, joint %.3f -> %.3f)", float(p["q"]),
+                                        info["commanded_rad"], info["q_from"], info["q_end"])
+                            if p.get("arm_q") is not None:  # the recorded IK witness puts the hand on h(q): the open-loop way, as a fallback
+                                d_w = yield from _ramp_arm_to_q(motions, arm, p["arm_q"], loaded=True)
+                                log_moves.append({"type": "arm_witness_ramp", "q": p.get("q"), "rad": round(d_w, 4), "after": "door_lags"})
+                    elif cfg.follow_arm_tracking == "reanchored" and axis is not None and axis_sign != 0.0 and p.get("q") is not None:
+                        # the arc of this pose is the hand's ACTUAL pose (the FK of the measured joints - the wound-up drives'
+                        # own frame) rotated about the fitted hinge by the measured joint delta to the pose's q. The recorded
+                        # target positions are not used: the fingers meet the bar before the recorded grasp pose (dishwasher
+                        # 0921-235247: the hand attached 20 mm above it, radius 0.612 vs 0.592 m), so every recorded follow
+                        # target sat 2 cm off the true handle circle and the drives stayed saturated through the whole pull
+                        q_now = float(state.joint_position(art.object, art.joint))
+                        dq = float(p["q"]) - q_now
+                        q_full = robot.get_joint_positions().clone().float()
+                        pose_fk = as_world_pose(motions.backend.fk([M.EEF_LINK[arm]], q_full)[M.EEF_LINK[arm]])
+                        n_wp = max(1, int(math.ceil(abs(dq) / 0.03)))
+                        wps = C.orbit_waypoints(pose_fk, axis[0], C.quat_from_axis_angle(axis[1], axis_sign * dq), n=n_wp, frame="world") if abs(dq) > 1e-4 else []
+                        if wps:
+                            yield from motions.arm_along(arm, wps, loaded=True, speed=motions.cfg.follow_eef_speed, converge=False)
+                        r_vec = (pose_fk[0] - axis[0]) - axis[1] * float((pose_fk[0] - axis[0]) @ axis[1])
+                        log_moves.append({"type": "arm_pose_reanchored", "q": p.get("q"), "q_from": round(q_now, 4), "n_wps": len(wps), "radius_m": round(float(th.linalg.norm(r_vec)), 4),
+                                          "recorded_target_offset_mm": round(1000 * float(th.linalg.norm(wps[-1][0] - target[0])), 1) if wps else None})
+                    else:
+                        wps = arc_between(eef_prev, target, axis[0], axis[1]) if axis is not None else [target]
+                        yield from motions.arm_along(arm, wps, loaded=True, speed=motions.cfg.follow_eef_speed, converge=False)
+                except SkillError as e:
+                    if e.details.get("stage") != "diff_ik" or p.get("arm_q") is None:
+                        raise
+                    # the differential IK from the loaded (wound-up) configuration gave up on the arc (door 0921-000629:
+                    # 10 mm at waypoint 4/7 with no joint at a limit); the sampler's IK witness of this pose is the
+                    # configuration that puts the hand on h(q) - ramp onto it, the attached handle follows
+                    d_w = yield from _ramp_arm_to_q(motions, arm, p["arm_q"], loaded=True)
+                    log.warning("base_follow: arm segment pose q = %.3f: %s -> ramped onto the recorded IK witness (%.3f rad)", float(p.get("q") or 0.0), (e.message or e.reason)[:140], d_w)
+                    log_moves.append({"type": "arm_witness_ramp", "q": p.get("q"), "rad": round(d_w, 4)})
+                eef_prev = target
+            log_moves.append({"type": "arm", "q_from": seg.get("q_from"), "q_to": seg.get("q_to")})
+        elif kind == "release_move_regrasp":
+            # 1. unwind gradually, hold until the joint is still, release (full opening for a handle), settle
+            total = motions.unwind(arm)
+            for _ in range(max(0, int(cfg.follow_unwind_steps) - 1)):
+                yield from motions.hold(1)
+                total += motions.unwind(arm)
+            yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
+            yield from motions.gripper(arm, close=False, staged=False)
+            _release(motions, state, arm)
+            # the gripper-in-FOV span closes at the release and re-opens at the next pre-grasp (qa.py rule (b): "the
+            # retreat legs and the transit to the next pre-grasp are unmonitored; every grasp -> release pair is its own
+            # span") - door 0921-045829: the retreated hand, 0.32 m below the camera, tripped the monitor during the drive
+            fov_hook = (ctx.get("hooks") or {}).get("fov")
+            if fov_hook is not None:
+                fov_hook(False)
+            yield from motions.hold(int(cfg.release_settle_steps))
+            # 2. back off to the retreat pose (differential IK), then onto the sampler's retreat witness - the same hand
+            # pose, but the configuration the search collision-checked; the differential IK drifts in the null space
+            # and left link5 9 mm inside the trunk's self-collision padding, where no plan may start (0921-041230)
+            yield from motions.arm_along(arm, [as_world_pose(seg["retreat_eef"])], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+            d_ret = 0.0
+            if seg.get("arm_q_retreat"):
+                d_ret = yield from _ramp_arm_to_q(motions, arm, seg["arm_q_retreat"])
+                log.info("base_follow: release at q = %.3f: retreat %.2f m, arm ramped onto the recorded retreat witness (%.3f rad)", float(seg.get("q") or 0.0), float(seg.get("retreat_m") or C.PRE_DIST), d_ret)
+            if seg.get("hold_posture") == "idle" and seg.get("arm_q_hold"):
+                yield from motions.arm_to(arm, q={arm: C.as_tensor(seg["arm_q_hold"]).reshape(-1).float()})
+            motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
+            motions.follow_phase = "base"
+            try:
+                yield from motions.track_path([as_pose2d(b) for b in seg["base_path"]], tracker_cfg=replace(motions.cfg.base_tracker, v_max=(motions.cfg.base_follow_speed, motions.cfg.base_follow_speed, motions.cfg.base_follow_yaw_rate)))
+            finally:
+                motions.follow_phase = "arm"
+            yield from motions.settle(max_steps=20)
+            # 3. re-grasp: pre-grasp (witness), straight approach, ramped closure, attach
+            pre, grasp = as_world_pose(seg["pre_grasp_eef"]), as_world_pose(seg["grasp_eef"])
+            yield from motions.gripper(arm, close=False)
+            try:
+                yield from motions.arm_to(arm, pose=pre, q_hint=_witness(ctx, f"regrasp_pre[{j}]"), ignore_objects=[obj])
+            except SkillError as e:
+                if "start configuration is in collision" not in str(e) or not seg.get("arm_q_pre"):
+                    raise
+                # the planner refuses the start state (its self-collision padding); the recorded pre-grasp witness is a
+                # short free-space move away - ramp onto it in joint space, at the follow's arm speed
+                d_pre = yield from _ramp_arm_to_q(motions, arm, seg["arm_q_pre"])
+                log.warning("base_follow: re-grasp pre-grasp plan refused its start state (%s); ramped onto the recorded pre-grasp witness (%.3f rad) instead", str(e)[:160], d_pre)
+            if fov_hook is not None:
+                fov_hook(True)  # the pre-grasp is reached: the next grasp -> release span opens
+            finish = ApproachFinish(grasp, q_hint=_witness(ctx, f"regrasp[{j}]"), ignore_objects=[obj], max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
+            yield from motions.arm_along(arm, [grasp], finish=finish)
+            fixed_ag = cfg.handle_grasp_fixed_ag
+            if fixed_ag:
+                _patch_ag_joint_type(robot, "FixedJoint")
+            try:
+                yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
+            finally:
+                if fixed_ag:
+                    _patch_ag_joint_type(robot, None)
+            if state.held_object(arm) is not obj:
+                raise SkillError("failed_grasp", f"{art.object} not in the {arm} hand after the re-grasp of segment {j}", stage="regrasp")
+            motions.backend.attach_object(arm, obj)
+            motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
+            log_moves.append({"type": "release_move_regrasp", "q": seg.get("q"), "strides": len(seg["base_path"]), "hold_posture": seg.get("hold_posture"), "unwind_rad": round(total, 4),
+                              "m": round(math.hypot(seg["base_to"][0] - seg["base_from"][0], seg["base_to"][1] - seg["base_from"][1]), 3)})
+        else:
+            raise SkillError("plan_failed", f"base_follow: unknown follow segment type {kind!r}", stage="targets")
+    yield from motions.hold(3)
 
 
 def post_base_follow(action: BaseFollow, state, targets, ctx) -> Optional[str]:

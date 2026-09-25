@@ -129,6 +129,20 @@ def follow_mode(joint_type: str, axis_world) -> str:
 ROOM_DOOR_CATEGORIES = ("door",)
 MIN_REACHABLE_OPENING = {"revolute_deg": 50.0, "prismatic_m": 0.10}
 REACH_GRID_STEP = {"revolute_deg": 10.0, "prismatic_m": 0.05}
+#: A4 reach margin (2026-09-18, dishwasher 0917-213723): the arm's reach boundary along h(q) is refined by bisection
+#: (``reach_refine_steps`` halvings of the last grid step) and the goal is drawn at most ``reach_margin`` INSIDE it. A
+#: goal at the boundary itself left the position drives saturated against the door's joint friction 7 mm short of
+#: the last handle pose (joint4 0.052 rad off its target, 25 N·m cap) - the margin keeps torque authority for the last
+#: centimetres. The margin does not apply when the sweep reaches its end (the joint's own limit stops the link).
+REACH_MARGIN = {"revolute_deg": 3.0, "prismatic_m": 0.02}
+REACH_REFINE_STEPS = 3
+#: §5.3 passive-continuation probe (2026-09-18): a waypoint passes when the link ends within ``passive_tolerance_fraction``
+#: of the EVALUATION tolerance (§8 ``joint_tolerance``) of q_goal AND covered at least ``passive_min_progress`` of the
+#: remaining gap on its own. The former probe tolerance (0.10 rad) exceeded the 25 % waypoint spacing of a 20° span
+#: (0.087 rad), so ``passive_from`` 0.75 passed with the door not moving at all; the friction then held it at 0.25 rad
+#: (0917-212441: layout error 0.098 > 0.05).
+PASSIVE_TOLERANCE_FRACTION = 0.5
+PASSIVE_MIN_PROGRESS = 0.5
 
 
 def door_class(category: str, joint_type: str) -> str:
@@ -198,6 +212,28 @@ def restrict_goal_set(stable: Sequence[float], q_reach: float, lower: float, min
     if q_reach - lower >= min_open - tol:
         return [float(q_reach)]
     return []
+
+
+def reach_with_margin(q_boundary: float, q_from: float, margin: float, ended_at_miss: bool) -> float:
+    """A4 usable reach: ``q_boundary − margin`` (never below ``q_from``) when the sweep ended at a miss — a true reach
+    boundary of the arm —, the boundary itself when the arm reached the sweep's end (the joint limit stops the link;
+    no authority is needed beyond it)."""
+    if not ended_at_miss:
+        return float(q_boundary)
+    return max(float(q_from), float(q_boundary) - abs(float(margin)))
+
+
+def passive_reaches(q_k: float, q_after: float, q_goal: float, tol: float, min_progress: float = PASSIVE_MIN_PROGRESS) -> bool:
+    """§5.3 passive-continuation verdict of one waypoint: released at ``q_k`` the link ended at ``q_after``; it passes
+    when it lies within ``tol`` of ``q_goal`` **and** covered at least ``min_progress`` of the gap ``q_goal − q_k`` on
+    its own. A waypoint already inside the band cannot pass without moving (a vacuous pass sent the follow to 75 % of
+    a 20° dishwasher opening and the friction held the door there)."""
+    if abs(float(q_after) - float(q_goal)) > float(tol):
+        return False
+    gap = float(q_goal) - float(q_k)
+    if abs(gap) < 1e-9:
+        return True
+    return (float(q_after) - float(q_k)) / gap >= float(min_progress)
 
 
 def bar_axis(handle: Dict[str, Any]) -> List[float]:
@@ -444,6 +480,9 @@ class ArticulationLarge(SamplerV2):
         self.pinch_sign = 1.0
         self.hull: Optional[th.Tensor] = None
         self.handle_rows: List[HandleRow] = []
+        #: ``generation.joint_friction``: PhysX articulation joint friction applied to the moved joint (None = the asset's
+        #: stock 0.2); recorded as a TRO ``constraints`` record the loader re-applies (as ``articulation_small``)
+        self.joint_friction: Optional[float] = None
 
     # ------------------------------------------------------------------ roles / bindings
 
@@ -451,12 +490,40 @@ class ArticulationLarge(SamplerV2):
         return {"artic": "target"} if self.target_role == "target" else {}
 
     def bind_scene_roles(self):
-        self.bind_floor_v2()
         req = self.choice.bindings.get(self.target_role)
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
             raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.{self.target_role} must list scene object names")
-        self.bind_scene_object(self.target_role, self.world.obj(names[0]))
+        obj = self.world.obj(names[0])
+        self.bind_scene_object(self.target_role, obj)
+        # the floor the robot will stand on: the ``floors`` object under the approach in front of the target's face (the
+        # inventory record's face centre + outward normal, 1.5 m out), when the binding does not name one explicitly - a room
+        # can hold several overlapping floor objects and the BDDL ``(ontop agent floor)`` is judged against the bound one
+        # (door_crtrpa_0 0919-153516: garden_0's first floor object was not the slab under the stances -> init_false)
+        floor_req = self.choice.bindings.get("floor")
+        chosen = None
+        if not (isinstance(floor_req, list) and floor_req):
+            try:
+                data, _, _ = self._handle_record(obj)
+                joint_name = self.role_option("joint")
+                recs = [j for j in (data or {}).get("joints", []) if joint_name is None or j.get("joint") == joint_name]
+                rec = recs[0] if recs else None
+                if rec is not None and rec.get("face_centre_world") is not None and rec.get("outward_normal_world") is not None:
+                    c = th.as_tensor(rec["face_centre_world"], dtype=th.float32)
+                    n = th.as_tensor(rec["outward_normal_world"], dtype=th.float32)
+                    n[2] = 0.0
+                    n = n / max(float(th.linalg.norm(n)), 1e-9)
+                    xy = (c + 1.5 * n)[:2]
+                    chosen = self.world.floor_object_under(xy) if hasattr(self.world, "floor_object_under") else None
+                    if chosen is not None:
+                        log.info("%s: floor role bound to %s (under the approach at (%.2f, %.2f), rooms %s)", self.gp.alias, chosen.name, float(xy[0]), float(xy[1]),
+                                 getattr(chosen, "in_rooms", None))
+            except Exception as e:  # noqa: BLE001 — fall back to the room's floor
+                log.debug("floor-under-approach lookup failed: %r", e)
+        if chosen is not None:
+            self.bind_scene_object("floor", chosen)
+        else:
+            self.bind_floor_v2()
 
     @property
     def target(self):
@@ -627,11 +694,13 @@ class ArticulationLarge(SamplerV2):
 
     def pose_joint(self, q: float):
         """Put the joint at ``q`` for a geometric / collision query: set, one physics step so the link poses (AABBs, the
-        cuRobo meshes) follow, set again (no residual velocity), then re-sync the collision world."""
+        cuRobo meshes) follow, set again (no residual velocity), then re-sync the collision world - the target's meshes
+        alone (the robot is held still and nothing else moves in that one step; the full pass over the house's 4155
+        meshes made every look-ahead candidate of the door search cost 30 s, 0921-041232)."""
         self.set_joint(q)
         self.world.step_physics(1, still=[self.robot])
         self.set_joint(q)
-        self.kit.sync_world()
+        self.kit.sync_world(only_objects=[self.target])
 
     def outward_world(self) -> th.Tensor:
         p, q = self.obj_pose()
@@ -684,7 +753,42 @@ class ArticulationLarge(SamplerV2):
         self.hull = self.world.local_hull(obj)
         tol_probe = dict(self.gp.gen("stable_probe_tolerances") or {"revolute": 0.10, "prismatic": 0.02})
         self.probe_tol = float(tol_probe["revolute" if self.joint.is_revolute else "prismatic"])
-        self.stable = self.stable_set()
+        # generation.counterbalance (owner decision 2026-09-19): "auto" = horizontal-axis revolute joints (appliance doors that
+        # swing down: dishwasher, oven) get the spring-balanced model - no gravity on the leaf assembly, viscous joint damping
+        # ``counterbalance_damping`` (1/s) - so the leaf holds at any angle with the stock friction and stops where the hand
+        # leaves it; vertical-axis doors / drawers keep the stock physics (no gravity moment). True / False force it either way.
+        # Applied before the stable set and every physics probe below; recorded in the TRO for the loader.
+        self.counterbalance: Optional[Dict[str, Any]] = None
+        cb = self.gp.gen("counterbalance", "auto")
+        axis_world0 = G.rotate(self.obj_pose()[1], th.as_tensor(self.jinfo["axis_dir_obj"], dtype=th.float32))
+        horizontal_revolute = bool(self.joint.is_revolute) and not axis_is_vertical(axis_world0)
+        if cb is True or (cb == "auto" and horizontal_revolute):
+            from ispatialgym.sampling import constraints as CS
+
+            names = list(AH.leaf_links(obj, self.jinfo, self.joint))
+            damping = float(self.gp.gen("counterbalance_damping", 5.0))
+            applied = CS.apply_counterbalance(obj, self.joint, names, damping)
+            self.counterbalance = {"links": applied["links"], "damping": damping}
+            log.info("%s: counterbalance on %s/%s: gravity off on %s, joint damping %.2f (axis %s)", self.gp.alias, obj.name, self.joint_name, applied["links"], damping,
+                     [round(float(v), 3) for v in axis_world0.tolist()])
+        self.template_facts["counterbalance"] = self.counterbalance
+        # generation.joint_friction (2026-09-18; as articulation_small): the PhysX articulation joint friction of the moved
+        # joint, a number or a list of candidates tried in order until an open value holds. The stock 0.2 × (|F| + |T|)
+        # brake holds the ynrhuk dishwasher door (7.5 kg, COM 0.30 m above the bottom hinge) below ≈ 41° only; 0.31+
+        # holds it at any angle (gravity torque 22 N·m at 90°) at the price of a harder pull for the torque-limited arm
+        jf = self.gp.gen("joint_friction", None)
+        cands = [float(v) for v in (jf if isinstance(jf, (list, tuple)) else [jf])] if jf is not None else [None]
+        self.stable = []
+        for cand in cands:
+            if cand is not None:
+                self.joint.friction = cand
+                self.joint_friction = cand
+            self.stable = self.stable_set()
+            log.info("%s: stable set of %s/%s at joint friction %s: %s", self.gp.alias, obj.name, self.joint_name, "stock" if cand is None else cand,
+                     [round(s, 3) for s in self.stable])
+            if self.stable:
+                break
+        self.template_facts["joint_friction"] = self.joint_friction
         if not self.stable:
             raise Reject("no_stable_open", f"{obj.name}/{self.joint_name}: no open fraction of {self.gp.gen('open_fraction_range', [0.5, 0.95])} holds passively")
         # passive continuation per (q_init, q_goal) pair (open: q_init = lower, q_goal ∈ S; close: q_init ∈ S, q_goal = lower)
@@ -722,6 +826,11 @@ class ArticulationLarge(SamplerV2):
             if self.gp.gen("arm", "auto") not in ("left", "right"):
                 self.arm = arm_for_hinge_side(self.hinge_side)
             self.lam_range = hinge_side_lateral(self.hinge_side, lam_max)
+        # the Phase-2 lattice check (prompt0.phase2_step1) re-postures the IDLE arm of the checker's default working arm
+        # (A6) - with the generic default "right" a left-handed door (door_crtrpa_0 0919-031559: handle 0.38 m left of the
+        # face centre -> arm left) had its survivors validated with the LEFT arm tucked as idle, and every draw of the
+        # manipulation stance (left arm working, untucked) collided in the re-check. The working arm is decided here.
+        self.ikc.default_working_arms = [self.arm]
         self.template_facts.update({"joint": self.joint_name, "joint_type": self.jinfo["type"], "limits": [self.lower, self.upper], "direction": self.direction,
                                     "stable_set": self.stable, "stable_fractions": [(s - self.lower) / max(self.upper - self.lower, 1e-9) for s in self.stable],
                                     "passive_from": dict(self.passive), "face_normal": n.tolist(), "face_centre": Pc.tolist(), "P_manip": P_manip.tolist(),
@@ -735,7 +844,9 @@ class ArticulationLarge(SamplerV2):
         it stays within ½ tolerance (the probe tolerance: revolute 0.10 rad, prismatic 0.02 m)."""
         lo, hi = self.gp.gen("open_fraction_range", [0.5, 0.95])
         n = int(self.gp.gen("stable_set_fractions", 7))
-        fracs = [float(f) for f in th.linspace(float(lo), float(hi), n).tolist()] + [1.0]
+        fracs = [float(f) for f in th.linspace(float(lo), float(hi), n).tolist()]
+        if bool(self.gp.gen("stable_set_include_full", True)):  # False: a fully open leaf no follow can reach (the dishwasher at 90 deg) is not drawn
+            fracs.append(1.0)
         steps = int(self.gp.gen("stable_hold_steps", 120))
         drift_frac = float(self.gp.gen("stable_drift_tolerance_fraction", 0.5))
         state = self.world.snapshot()
@@ -756,25 +867,41 @@ class ArticulationLarge(SamplerV2):
             self.kit.sync_world()
         return out
 
+    def passive_tolerance(self, dq: float) -> float:
+        """The passive probe's band about q_goal: ``passive_tolerance_fraction`` (½) of the §8 evaluation tolerance of the
+        instance's span — not the (looser) stable-probe tolerance, which exceeded the waypoint spacing of small spans."""
+        frac = float(self.gp.gen("passive_tolerance_fraction", PASSIVE_TOLERANCE_FRACTION))
+        return frac * joint_tolerance(self.jinfo["type"], dq, dict(self.gp.gen("tolerances") or {}))
+
     def passive_from(self, q_init: float, q_goal: float) -> Optional[float]:
-        """§5.3 required-waypoint probe: the first k whose q_k, held 120 steps, ends within tolerance of q_goal."""
+        """§5.3 required-waypoint probe: the first k whose q_k, released and held ``stable_hold_steps`` steps, ends within
+        the passive band of q_goal **having covered at least ``passive_min_progress`` of the remaining gap on its own**
+        (:func:`passive_reaches`); the per-waypoint outcomes go to ``template_facts.passive_probe``."""
         steps = int(self.gp.gen("stable_hold_steps", 120))
-        tol = self.probe_tol
+        tol = self.passive_tolerance(q_goal - q_init)
+        min_progress = float(self.gp.gen("passive_min_progress", PASSIVE_MIN_PROGRESS))
         state = self.world.snapshot()
         found = None
+        probes: List[Dict[str, Any]] = []
         try:
             for k, qk in waypoint_values(q_init, q_goal, self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS)):
                 if k >= 1.0:
                     break
                 self.set_joint(qk)
                 self.world.step_physics(steps, still=[self.robot])
-                if abs(self.joint_value() - q_goal) <= tol:
+                q_after = self.joint_value()
+                ok = passive_reaches(qk, q_after, q_goal, tol, min_progress)
+                probes.append({"k": k, "q_k": round(qk, 4), "q_after": round(q_after, 4), "ok": ok})
+                log.info("%s: %s released at k=%.2f (%.3f) -> %.3f after %d steps (goal %.3f, band %.3f): %s", self.gp.alias, self.joint_name, k, qk, q_after,
+                         steps, q_goal, tol, "swings on to the goal" if ok else "does not reach the goal on its own")
+                if ok:
                     found = k
                     break
         finally:
             self.world.restore(state)
             self.target.keep_still()
             self.kit.sync_world()
+        self.template_facts.setdefault("passive_probe", {})[f"{q_init:.4f}->{q_goal:.4f}"] = {"tolerance": round(tol, 4), "min_progress": min_progress, "probes": probes}
         return found
 
     # ------------------------------------------------------------------ instance (§5.2 / §5.3)
@@ -795,10 +922,22 @@ class ArticulationLarge(SamplerV2):
         fractions = list(self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS))
         # the target in its init state for every check of this attempt
         self.pose_joint(q_init)
+        if self.direction == "close" and bool(self.gp.gen("manip_face_from_open_handle", True)):
+            # close: the manipulation stances face the *open* handle (its approach axis at q_init, horizontal part), not
+            # the closed frame plane - the reach-volume screen classifies the grasp in the base frame within 20 deg, so a
+            # leaf open 33-49 deg left step2_reach = 0 for every stance (door 0920-000347)
+            h_init = self.h([q_init])[0]
+            a_h = h_init.approach.clone()
+            a_h[2] = 0.0
+            if float(a_h.norm()) > 0.3:
+                self.face_manip = P0.make_face("face", -a_h / a_h.norm(), h_init.contact.clone())
+                log.info("%s: close from %.3f: manipulation face re-aimed at the open handle (normal %s, P %s)", self.gp.alias, q_init,
+                         [round(float(v), 3) for v in self.face_manip.n.tolist()], [round(float(v), 3) for v in h_init.contact.tolist()])
         gen_p0 = dict(self.gp.gen("prompt0") or {})
         beta_max = math.radians(float(gen_p0.get("beta_max_deg", 20.0)))
         d_min, d_max = float(gen_p0.get("d_min_m", 0.5)), float(gen_p0.get("d_max_m", 2.5))
-        init = P0.phase1_init_pose(self, self.face_view, beta_max, d_min, d_max, self.target_extent, rng)
+        init_tilts = [float(v) for v in (gen_p0.get("init_tilts") or [0.0])]  # a lean forward for a low, near init view (the open dishwasher door)
+        init = P0.phase1_init_pose(self, self.face_view, beta_max, d_min, d_max, self.target_extent, rng, tilts=init_tilts)
         init.name = "init"
         self.sidecar.add_stance(init)
         # Phase 2: contact set = the h(q_init) grasp of the handle arm — one Phase 2 per grasp offset along a bar handle
@@ -837,11 +976,15 @@ class ArticulationLarge(SamplerV2):
         if not pool:
             raise Reject("no_manipulation_stance", f"Phase 2 left no survivor for {obj.name}/{self.joint_name} at q_init {q_init:.3f} ({stats_by})")
         errors: List[str] = []
-        for _ in range(min(len(pool), 8)):
-            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=None, extra_visibility=None, clearance_ignore=[self.target])
+        draw_stats: Dict[str, int] = {}
+        # the sequential follow rejects a stance in seconds when it admits no releasable arm pull (the elbow folds past its limit
+        # on the retreat from a near stand-off, door 0921-030920) - every survivor gets its draw there instead of 8 of them
+        sequential = str((self.gp.gen("hybrid_follow") or {}).get("policy", "hybrid")) == "sequential"
+        for _ in range(len(pool) if sequential else min(len(pool), 8)):
+            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=None, extra_visibility=None, clearance_ignore=[self.target], stats=draw_stats)
             pool.pop(i)
             if manip is None:
-                errors.append("drawn tilt fails the re-check")
+                errors.append(f"drawn tilt fails the re-check ({dict(draw_stats)})")
                 continue
             self.bar_offset = float(manip.extras.get("bar_offset_m", 0.0))
             h0 = h0_by[self.bar_offset]
@@ -869,6 +1012,9 @@ class ArticulationLarge(SamplerV2):
                     d = self._solve_from(manip, init, q_init, q_goal, wps, required, contact_s, h0s, goal_set=goal_set, reach_info=reach_info)
                 except Reject as e:
                     errors.append(f"pinch {sign:+.0f}: {e.reason}: {e}")
+                    # a stance that got as far as a full hybrid follow (5 min) and then fell at step 6 was invisible until the
+                    # attempt's summary (door 0919-122043: 5 complete follows, no draft, no line in between)
+                    log.info("%s: stance %s pinch %+.0f rejected: %s: %s", self.gp.alias, self._stance_key(manip), sign, e.reason, str(e)[:300])
                     self.sidecar.stances.pop("manipulation", None)
                     self.sidecar.transitions.clear()
                     self.sidecar.paths.clear()
@@ -880,7 +1026,17 @@ class ArticulationLarge(SamplerV2):
                                   **reach_info})
                 return d
         self.pinch_sign = 1.0
-        raise Reject("handle_unreachable", f"{len(survivors)} Phase-2 survivors, none passes step 5 / base-follow / step 6: " + "; ".join(errors[-4:]))
+        # every distinct reason once (the last 4 alone hid the hybrid search's verdict behind the tilt re-check draws, door 0919-023637)
+        distinct: List[str] = []
+
+        def reason_of(e: str) -> str:  # "pinch +1: <reason>: <message>" -> <reason>; else the text up to the first colon
+            parts = e.split(": ")
+            return parts[1] if len(parts) > 2 and parts[0].startswith("pinch") else parts[0]
+
+        for e in errors:
+            if not any(reason_of(x) == reason_of(e) for x in distinct):
+                distinct.append(e)
+        raise Reject("handle_unreachable", f"{len(survivors)} Phase-2 survivors, none passes step 5 / base-follow / step 6 ({len(errors)} errors): " + " | ".join(distinct[:6]))
 
     def passive_for(self, q_init: float, q_goal: float) -> Optional[float]:
         """The passive-continuation waypoint of a (q_init, q_goal) pair: the template's table, probed on demand for a
@@ -897,11 +1053,14 @@ class ArticulationLarge(SamplerV2):
     def _stance_key(self, manip: Stance) -> str:
         return f"d{manip.stand_off:.2f}_l{manip.lateral:+.2f}_t{manip.translate:.2f}_{manip.tilt:+.2f}_p{self.pinch_sign:+.0f}"
 
-    def arm_reach_limit(self, manip: Stance, q_from: float, q_seed: Optional[th.Tensor], q_to: Optional[float] = None) -> float:
+    def arm_reach_limit(self, manip: Stance, q_from: float, q_seed: Optional[th.Tensor], q_to: Optional[float] = None,
+                        refine: int = 0) -> Tuple[float, bool]:
         """The farthest joint value on the grid ``q_from → q_to`` (default the upper limit; 10° / 5 cm steps, ``q_to``
         included, either direction) whose handle grasp pose the arm reaches from ``manip`` with the world re-synced at
         that value (target ignored for the grasp pose); the sweep stops at the first miss, so every value up to the
-        limit is reachable."""
+        limit is reachable. ``refine`` > 0 then bisects between the last hit and the first miss that many times (the
+        boundary to within step / 2^refine). Returns ``(reach, ended_at_miss)`` — ``ended_at_miss`` False when the arm
+        reached ``q_to`` itself."""
         obj = self.target
         step_cfg = dict(self.gp.gen("reach_grid_step") or REACH_GRID_STEP)
         step = math.radians(float(step_cfg.get("revolute_deg", 10.0))) if self.joint.is_revolute else float(step_cfg.get("prismatic_m", 0.05))
@@ -909,19 +1068,52 @@ class ArticulationLarge(SamplerV2):
         grid = reach_grid(q_from, q_to, step) if q_to >= q_from else [2 * q_from - v for v in reach_grid(q_from, 2 * q_from - q_to, step)]
         q_now = self.joint_value()
         reach, seed = float(q_from), q_seed
+        miss: Optional[float] = None
+        # the program releases the handle where the follow ends and retreats 0.10 m along -a of the *open* handle frame
+        # (``Retreat`` after ``base_follow``); that pose must be reachable with the joint-limit margin too, else the program
+        # check rejects the stance after the whole follow was simulated (dishwasher 0919-195644: 7 of 8 attempts, every
+        # retreat solution within 2-46 mrad of right_arm_joint7's limit). The hybrid tracker checks the same (check_retreat).
+        check_retreat = bool(self.gp.gen("reach_check_retreat", True))
+        self.reach_retreat_miss: Optional[float] = None  # the first joint value whose grasp reaches but whose retreat does not
+
+        def reaches(q: float) -> bool:
+            nonlocal seed
+            self.pose_joint(q)
+            w = self.h([q])[0]
+            res = self.ikc.exact([w.eef], manip, self.arm, ignore_for_last=[obj], q_seed=seed, cache=False)
+            if not (res.ok and res.q is not None):
+                return False
+            seed = res.q
+            if check_retreat:
+                back = self.ikc.exact([C.pre_pose(w.eef, C.PRE_DIST)], manip, self.arm, q_seed=res.q, cache=False)  # RETREAT_DIST == PRE_DIST (0.10 m)
+                if not back.ok:
+                    if self.reach_retreat_miss is None:
+                        self.reach_retreat_miss = float(q)
+                    log.info("%s: the retreat pose from the handle at %.3f is not reachable from %s (%s): reach boundary", self.gp.alias, q, self._stance_key(manip), back.reason)
+                    return False
+            return True
+
         try:
             for q in grid:
-                self.pose_joint(q)
-                w = self.h([q])[0]
-                res = self.ikc.exact([w.eef], manip, self.arm, ignore_for_last=[obj], q_seed=seed, cache=False)
-                if not res.ok:
+                if not reaches(q):
+                    miss = q
                     break
                 reach = q
-                if res.q is not None:
-                    seed = res.q
+            if miss is not None:
+                for _ in range(max(0, int(refine))):
+                    mid = 0.5 * (reach + miss)
+                    if reaches(mid):
+                        reach = mid
+                    else:
+                        miss = mid
         finally:
             self.pose_joint(q_now)
-        return reach
+        return reach, miss is not None
+
+    def reach_margin(self) -> float:
+        """``generation.reach_margin`` (rad / m) for this joint type; see :data:`REACH_MARGIN`."""
+        cfg = dict(self.gp.gen("reach_margin") or REACH_MARGIN)
+        return math.radians(float(cfg.get("revolute_deg", REACH_MARGIN["revolute_deg"]))) if self.joint.is_revolute else float(cfg.get("prismatic_m", REACH_MARGIN["prismatic_m"]))
 
     def debug_handle_ik(self, manip: Stance, contact: P0.ContactSpec) -> None:
         """Diagnostic log when the handle's [pre-grasp, grasp] fails the exact IK from a Phase-2 survivor: the verdict of
@@ -1009,7 +1201,7 @@ class ArticulationLarge(SamplerV2):
         if self.direction == "close":
             # close: the arm must follow the handle from q_init all the way down to the lower limit — sweep downward from
             # q_init; the reachable fraction is the closed part of the swing the arm covers
-            q_low = self.arm_reach_limit(manip, q_init, sol.q, q_to=self.lower)
+            q_low, _ = self.arm_reach_limit(manip, q_init, sol.q, q_to=self.lower)
             frac = (q_init - q_low) / max(q_init - self.lower, 1e-9)
             key = self._stance_key(manip)
             rf = self.template_meta.setdefault("reachable_fraction", {})
@@ -1021,19 +1213,25 @@ class ArticulationLarge(SamplerV2):
                 raise Reject("handle_unreachable", f"closing from {q_init:.3f}: the arm follows the handle only down to {q_low:.3f} (fraction {frac:.2f}) from stance {key}; "
                                                    f"the rest needs a push on the leaf (not implemented)")
             return float(self.lower), [float(self.lower)], info
-        q_reach = self.arm_reach_limit(manip, self.lower, sol.q)
+        # the boundary is refined by bisection and the usable reach stops ``reach_margin`` inside it (REACH_MARGIN: the
+        # goal at the boundary itself left the drives saturated 7 mm short of the last handle pose)
+        q_bound, at_miss = self.arm_reach_limit(manip, self.lower, sol.q, refine=int(self.gp.gen("reach_refine_steps", REACH_REFINE_STEPS)))
+        margin = self.reach_margin()
+        q_reach = reach_with_margin(q_bound, self.lower, margin, at_miss)
         frac = (q_reach - self.lower) / span
         key = self._stance_key(manip)
         rf = self.template_meta.setdefault("reachable_fraction", {})
         rf[key] = round(frac, 4)
         self.template_meta["reachable_fraction_max"] = max(float(v) for v in rf.values())
+        self.template_meta.setdefault("reach_boundary", {})[key] = {"q_boundary": round(q_bound, 4), "ended_at_miss": at_miss, "margin": round(margin, 4), "q_reach": round(q_reach, 4)}
         min_cfg = dict(self.gp.gen("min_reachable_opening") or MIN_REACHABLE_OPENING)
         min_open = math.radians(float(min_cfg.get("revolute_deg", 50.0))) if self.joint.is_revolute else float(min_cfg.get("prismatic_m", 0.10))
         goal_set = restrict_goal_set(self.stable, q_reach, self.lower, min_open)
         if goal_set and goal_set[0] not in self.stable and not self.holds_passively(goal_set[0]):
             goal_set = []
-        info = {"reachable_fraction": frac, "q_reach": q_reach, "goal_set": list(goal_set)}
-        log.info("%s: stance %s reaches %s up to %.3f (fraction %.2f); goal set %s", self.gp.alias, key, self.joint_name, q_reach, frac, [round(s, 3) for s in goal_set])
+        info = {"reachable_fraction": frac, "q_reach": q_reach, "q_reach_boundary": q_bound, "reach_margin": margin if at_miss else 0.0, "goal_set": list(goal_set)}
+        log.info("%s: stance %s reaches %s up to %.3f (boundary %.3f%s, margin %.3f; fraction %.2f); goal set %s", self.gp.alias, key, self.joint_name, q_reach, q_bound,
+                 "" if at_miss else " = the sweep's end", margin if at_miss else 0.0, frac, [round(s, 3) for s in goal_set])
         if not goal_set:
             raise Reject("handle_unreachable", f"the arm reaches {self.joint_name} only up to {q_reach:.3f} (fraction {frac:.2f}) from stance {key}: no goal opens ≥ {min_open:.2f}")
         if self.direction == "open":
@@ -1114,7 +1312,9 @@ class ArticulationLarge(SamplerV2):
                                      "primary_follow_mode": self.mode, "base_follow_blocked": base_follow_reason,
                                      # A4: the class and the stance-side rule behind the follow mode; the goal set of this stance
                                      "door_class": self.door_class, "hinge_side": self.hinge_side, "goal_set": [float(s) for s in (goal_set or self.stable)],
-                                     "reachable_fraction": reach_info.get("reachable_fraction"), "q_reach": reach_info.get("q_reach")}
+                                     "reachable_fraction": reach_info.get("reachable_fraction"), "q_reach": reach_info.get("q_reach"),
+                                     "q_reach_boundary": reach_info.get("q_reach_boundary"), "reach_margin": reach_info.get("reach_margin"),
+                                     "joint_friction": self.joint_friction, "counterbalance": self.counterbalance}
         if follow_path is not None:
             self.sidecar.articulation["base_follow_path"] = follow_path
         self.sidecar.describe(tname, obj.category.replace("_", " "))
@@ -1130,6 +1330,20 @@ class ArticulationLarge(SamplerV2):
         q_goal_vec[names.index(self.joint_name)] = float(q_goal)
         d.object_joints[tname] = q_init_vec
         d.goal_joints[tname] = q_goal_vec
+        constraints: List[Dict[str, Any]] = []
+        if self.counterbalance is not None:
+            # the loader re-applies it (run_isg._restore_constraints); every physics probe above ran with it
+            constraints.append({"type": "counterbalance", "object": tname, "joint": self.joint_name, "links": list(self.counterbalance["links"]),
+                                "damping": float(self.counterbalance["damping"]),
+                                "note": "spring-balanced appliance door (generation.counterbalance): no gravity on the leaf assembly, viscous joint damping - "
+                                        "the leaf holds at any angle with the stock friction and stops where the hand leaves it"})
+        if self.joint_friction is not None:
+            # the loader re-applies it (run_isg._restore_constraints); the stable set / passive probes above ran with it
+            constraints.append({"type": "joint_friction", "object": tname, "joint": self.joint_name, "friction": float(self.joint_friction),
+                                "stock_friction": 0.2, "note": "PhysX articulation joint friction of the moved joint (generation.joint_friction): the brake "
+                                                                  "|F_resist| <= mu (|F| + |T|) that holds the link where the hand leaves it"})
+        if constraints:
+            d.extras["constraints"] = constraints
         tols = dict(self.gp.gen("tolerances") or {})
         d.articulation_targets[tname] = {"joints": {n: {"position": float(q_goal_vec[names.index(n)]),
                                                         "tolerance": joint_tolerance("RevoluteJoint" if obj.joints[n].is_revolute else "PrismaticJoint",

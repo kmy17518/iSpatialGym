@@ -238,6 +238,39 @@ def test_a4_reach_grid_and_goal_set_restriction():
     assert AL.restrict_goal_set(stable, 0.96 - 1e-9, 0.0, min_open) == [0.96]
 
 
+def test_a4_reach_margin_inside_a_true_boundary_only():
+    """The goal is drawn ``reach_margin`` inside the arm's reach boundary (the dishwasher goal AT the boundary left the
+    drives saturated 7 mm short); a sweep that reaches its end (the joint limit) keeps the boundary itself."""
+    m = math.radians(3.0)
+    assert AL.reach_with_margin(math.radians(24.0), 0.0, m, ended_at_miss=True) == pytest.approx(math.radians(21.0))
+    assert AL.reach_with_margin(math.radians(90.0), 0.0, m, ended_at_miss=False) == pytest.approx(math.radians(90.0))
+    # never below the sweep's start
+    assert AL.reach_with_margin(math.radians(2.0), 0.0, m, ended_at_miss=True) == 0.0
+    assert AL.REACH_MARGIN["revolute_deg"] > 0 and AL.REACH_MARGIN["prismatic_m"] > 0
+
+
+def test_passive_probe_needs_a_real_swing_on():
+    """§5.3 passive continuation: released at q_k the link must END within the band of q_goal AND cover at least half the
+    remaining gap on its own - the 0917 dishwasher record's ``passive_from`` 0.75 passed a 0.10 rad band wider than the
+    0.087 rad waypoint spacing without the door moving (the friction then held it 0.098 rad short)."""
+    q_goal, tol = math.radians(20.0), 0.5 * 0.05
+    q75 = 0.75 * q_goal
+    # the door does not move: not a pass, whatever the band says
+    assert not AL.passive_reaches(q75, q75, q_goal, tol)
+    assert not AL.passive_reaches(q75, q75, q_goal, tol=0.10)
+    # it swings on to the goal: a pass
+    assert AL.passive_reaches(q75, q_goal - 0.01, q_goal, tol)
+    # ends in the band but covered less than half the gap (a nudge, not a swing): not a pass
+    q_k = q_goal - 0.04
+    assert not AL.passive_reaches(q_k, q_goal - 0.024, q_goal, tol)
+    assert AL.passive_reaches(q_k, q_goal - 0.015, q_goal, tol)
+    # overshooting past the goal within the band is fine; beyond the band is not
+    assert AL.passive_reaches(q75, q_goal + 0.02, q_goal, tol)
+    assert not AL.passive_reaches(q75, q_goal + 0.03, q_goal, tol)
+    # a waypoint already at the goal passes trivially (nothing to cover)
+    assert AL.passive_reaches(q_goal, q_goal, q_goal, tol)
+
+
 def test_base_follow_composition():
     """b_k = h(q_k) ∘ T_eef→base(q*): with the arm locked, the base follows the handle exactly for a vertical door."""
     obj_pose = (th.tensor([0.0, 0.0, 1.0]), C.IDENTITY_QUAT.clone())
@@ -609,6 +642,34 @@ def test_wall_hinge_resistance_record():
     assert "friction" not in plain and "damping" not in plain and "drive" not in plain  # the axial table hinge stays frictionless
     # the loader's drive: absent keys keep a frictionless hinge (no drive at all)
     assert K.apply_hinge_drive.__doc__ and "π / 180" in K.apply_hinge_drive.__doc__
+
+
+def test_counterbalance_switches_gravity_off_on_the_leaf_assembly_and_damps_the_joint():
+    """Owner decision 2026-09-19 (articulation_open_large_scale): a horizontal-axis appliance door is spring-balanced -
+    gravity off on every link of the leaf assembly (the moving link and the links fixed to it), viscous damping on the
+    joint; links that do not exist or cannot switch are skipped and reported, ``damping`` None leaves the drive alone."""
+    from ispatialgym.sampling import constraints as K
+
+    class Link:
+        def __init__(self):
+            self.gravity = True
+
+        def disable_gravity(self):
+            self.gravity = False
+
+    class Joint:
+        damping = 0.05
+
+    class Target:
+        links = {"leaf": Link(), "glass": Link(), "base_link": Link()}
+
+    t, j = Target(), Joint()
+    applied = K.apply_counterbalance(t, j, ["leaf", "glass", "handle_missing"], 5.0)
+    assert applied == {"links": ["leaf", "glass"], "damping": 5.0}
+    assert not t.links["leaf"].gravity and not t.links["glass"].gravity and t.links["base_link"].gravity
+    assert j.damping == 5.0
+    j2 = Joint()
+    assert K.apply_counterbalance(t, j2, [], None) == {"links": []} and j2.damping == 0.05
 
 
 def test_push_under_attempt_budget_rejects_time_budget_with_the_stage():

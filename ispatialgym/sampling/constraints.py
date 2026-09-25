@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import torch as th
 
@@ -176,3 +176,27 @@ def remove_hinge(hinge: Optional[Hinge]):
         with og.sim.editing_usd():
             stage.RemovePrim(hinge.prim_path)
         og.sim.update_handles()
+
+
+def apply_counterbalance(target, joint, leaf_link_names: Sequence[str], damping: Optional[float]) -> Dict[str, Any]:
+    """A spring-balanced appliance door (owner decision 2026-09-19, ``articulation_open_large_scale``): gravity is switched
+    off on the leaf assembly (the moving link and every link fixed to it) and the joint gets a viscous damping, so the
+    leaf floats where the hand leaves it - as a dishwasher / oven door on its torsion springs does. Why not friction: the
+    PhysX joint friction ``|F_resist| <= mu (|F| + |T|)`` leaks under a sustained load (dishwasher ynrhuk 0918-230708: the
+    door crept 7 % of its angle after being posed at 22-27 deg, fell from 52 deg even at mu 0.35) and every N·m added
+    to the brake is a N·m the 18-25 N·m arm joints must pull through. With no gravity moment nothing creeps, and the arm
+    only works against the damping (acceleration-type drive: ``damping`` in 1/s). Recorded per instance as the TRO
+    ``constraints`` record ``{"type": "counterbalance", "object", "joint", "links", "damping"}`` the loader re-applies.
+    Returns what was applied (``links`` that exist and took the switch, ``damping``)."""
+    applied: Dict[str, Any] = {"links": []}
+    links = getattr(target, "links", {}) or {}
+    for name in leaf_link_names:
+        link = links.get(name)
+        if link is None or not hasattr(link, "disable_gravity"):
+            continue
+        link.disable_gravity()
+        applied["links"].append(str(name))
+    if damping is not None:
+        joint.damping = float(damping)
+        applied["damping"] = float(damping)
+    return applied

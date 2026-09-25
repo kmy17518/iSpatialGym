@@ -408,7 +408,7 @@ class R1ProCuRobo:
         lock_js = kc.lock_jointstate
         for jn, (link_idx, origin, jtype, scale, offset) in entry.lock_info.items():
             val = float(q_full[self._jidx[jn]]) * scale + offset
-            kc.fixed_transforms[link_idx] = (origin @ _joint_motion(jtype, val, self.device_cfg.device))[:3, :4]
+            kc.fixed_transforms[link_idx] = _lock_transform(origin, jtype, val, self.device_cfg.device)
         if lock_js is not None:
             for i, jn in enumerate(lock_js.joint_names):
                 lock_js.position[..., i] = float(q_full[self._jidx[jn]])
@@ -423,18 +423,32 @@ class R1ProCuRobo:
     def _is_ground_like(self, obj) -> bool:
         return getattr(obj, "category", None) in self.GROUND_CATEGORIES
 
-    def _iter_collision_meshes(self, ignore_objects=()):
+    def _iter_collision_meshes(self, ignore_objects=(), ignore_links=(), objects=None):
+        """``objects``: restrict the iteration to these scene objects (a partial world update)."""
         ignore = set()
         for o in ignore_objects or ():
             ignore.add(o if isinstance(o, str) else o.name)
+        # (object name, link name) pairs left out of the world (2026-09-20: the flap a fist presses while the other hand
+        # plans past the box - the box body and the other flap stay obstacles)
+        ign_links, ign_meshes = set(), set()
+        for ent in (ignore_links or ()):
+            o = ent[0] if isinstance(ent[0], str) else ent[0].name
+            if len(ent) >= 3 and ent[2]:
+                ign_meshes.add((o, ent[1], str(ent[2])))  # one collision piece of a link (the wall a braced blade stands against, 2026-09-21)
+            else:
+                ign_links.add((o, ent[1]))
         rp, rq = self.root_pose()
-        for obj in self.robot.scene.objects:
+        for obj in (self.robot.scene.objects if objects is None else objects):
             if obj is self.robot or getattr(obj, "visual_only", False) or obj.name in ignore:
                 continue
             if self.obstacle_filter is not None and not self.obstacle_filter(obj):
                 continue
-            for link in obj.links.values():
+            for link_name, link in obj.links.items():
+                if (obj.name, link_name) in ign_links:
+                    continue
                 for cm in link.collision_meshes.values():
+                    if ign_meshes and (obj.name, link_name, str(cm.prim_path).rsplit("/", 1)[-1]) in ign_meshes:
+                        continue
                     pos, quat = cm.get_position_orientation()
                     pos, quat = T.relative_pose_transform(pos, quat, rp, rq)
                     if self._is_ground_like(obj):
@@ -452,17 +466,28 @@ class R1ProCuRobo:
         scale = cm.get_world_scale().numpy().astype(np.float32)
         return verts, faces, scale
 
-    def update_world(self, ignore_objects=(), ground: bool = True):
+    def update_world(self, ignore_objects=(), ground: bool = True, ignore_links=(), only_objects=None):
         """Synchronise the collision world with the simulator.
 
         First call loads every collision mesh (Warp BVH build, slow); later calls only update
         poses of already-known meshes and add new ones. Meshes of ignored / removed objects are
         disabled rather than deleted so the Warp cache stays valid.
+
+        ``only_objects`` (a loaded world): refresh the poses of these objects' meshes alone and leave the rest as
+        they are - the articulation search poses one joint hundreds of times while nothing else moves, and a full
+        pass over the house's 4155 meshes cost ~5 s each time (door 0921-041232: 30 s per look-ahead candidate).
         """
         t0 = time.time()
+        if self._world_loaded and only_objects is not None:
+            for obj, link, cm, (pos, quat) in self._iter_collision_meshes(ignore_objects, ignore_links, objects=list(only_objects)):
+                name = cm.prim_path
+                if name in self._world_mesh_names:
+                    self._mesh_update_pose(name, CuPose(position=pos.unsqueeze(0).to(self.device_cfg.device),
+                                                        quaternion=quat_xyzw_to_wxyz(quat).unsqueeze(0).to(self.device_cfg.device)))
+            return
         if not self._world_loaded:
             meshes, names = [], set()
-            for obj, link, cm, (pos, quat) in self._iter_collision_meshes(ignore_objects):
+            for obj, link, cm, (pos, quat) in self._iter_collision_meshes(ignore_objects, ignore_links):
                 verts, faces, scale = self._mesh_geometry(cm)
                 meshes.append(
                     Mesh(
@@ -493,7 +518,7 @@ class R1ProCuRobo:
             return
 
         seen = set()
-        for obj, link, cm, (pos, quat) in self._iter_collision_meshes(ignore_objects):
+        for obj, link, cm, (pos, quat) in self._iter_collision_meshes(ignore_objects, ignore_links):
             name = cm.prim_path
             seen.add(name)
             cu_pose = CuPose(
@@ -774,9 +799,11 @@ class R1ProCuRobo:
                 in_coll = in_coll | (ds > 0.0)
         return in_coll.cpu()
 
-    def self_collision_pairs(self, q_full: th.Tensor, emb_name: str = "whole_body") -> List[Dict[str, object]]:
+    def self_collision_pairs(self, q_full: th.Tensor, emb_name: str = "whole_body", margin: float = 0.0) -> List[Dict[str, object]]:
         """The link pairs of cuRobo's self-collision list whose padded spheres overlap at ``q_full``:
-        ``[{"links": (a, b), "penetration": m}]`` (the worst sphere pair per link pair)."""
+        ``[{"links": (a, b), "penetration": m}]`` (the worst sphere pair per link pair). ``margin`` (m): pairs closer
+        than this also count (a sampler witness the demo's trunk, a centimetre off the recorded one, must not push
+        into the padding: dishwasher_wide 0921-044216, link5 - torso_link4 by 9 mm at the recorded retreat)."""
         entry = self.kin_entry(emb_name)
         q_full = as_tensor(q_full).reshape(-1)
         self.refresh_locked_joints(emb_name, q_full)
@@ -788,7 +815,7 @@ class R1ProCuRobo:
             pad = scfg.sphere_padding.to(sp.device)
             i, j = pairs[:, 0], pairs[:, 1]
             d = th.linalg.norm(sp[i, :3] - sp[j, :3], dim=1)
-            pen = (sp[i, 3] + pad[i]) + (sp[j, 3] + pad[j]) - d
+            pen = (sp[i, 3] + pad[i]) + (sp[j, 3] + pad[j]) + float(margin) - d
             active = (sp[i, 3] > 0) & (sp[j, 3] > 0)
             hot = th.nonzero((pen > 0) & active).reshape(-1)
         if hot.numel() == 0:
@@ -1050,6 +1077,18 @@ class R1ProCuRobo:
     def _diagnose_trajopt(result) -> Dict[str, object]:
         d: Dict[str, object] = {}
         try:
+            # cuRobo's own verdict (MotionGenStatus: TrajOpt Fail / IK Fail / Graph Fail / Invalid start ... ) - a plan whose
+            # final pose error is 0.0 mm and that still fails (blender eyedvd pre-grasp 0918-222128) is only readable from it
+            st = getattr(result, "status", None)
+            if st is not None:
+                d["status"] = str(getattr(st, "value", st))
+            if getattr(result, "valid_query", None) is not None:
+                d["valid_query"] = bool(result.valid_query)
+            if getattr(result, "optimized_dt", None) is not None:
+                try:
+                    d["optimized_dt"] = float(th.as_tensor(result.optimized_dt).reshape(-1)[0])
+                except Exception:  # noqa: BLE001
+                    pass
             n = int(result.success.numel())
             d["trajopt_seeds"] = n
             if result.feasible is not None:
@@ -1155,7 +1194,7 @@ class R1ProCuRobo:
         lock_js = kc.lock_jointstate
         for jn, (link_idx, origin, jtype, scale, offset) in entry.lock_info.items():
             val = float(q_full[self._jidx[jn]]) * scale + offset
-            kc.fixed_transforms[link_idx] = (origin @ _joint_motion(jtype, val, self.device_cfg.device))[:3, :4]
+            kc.fixed_transforms[link_idx] = _lock_transform(origin, jtype, val, self.device_cfg.device)
         if lock_js is not None:
             for i, jn in enumerate(lock_js.joint_names):
                 lock_js.position[..., i] = float(q_full[self._jidx[jn]])
@@ -1383,9 +1422,21 @@ class R1ProCuRobo:
 # --------------------------------------------------------------------------------------
 
 
-def _joint_motion(jtype: JointType, val: float, device) -> th.Tensor:
+def _lock_transform(origin: th.Tensor, jtype: JointType, val: float, device) -> th.Tensor:
+    """``(origin @ motion(val))[:3, :4]`` of a locked joint, composed in **float64**. cuRobo (``seed_ik_solver``) and
+    OmniGibson's curobo module switch ``torch.backends.cuda.matmul.allow_tf32`` on process-wide, so a float32 CUDA
+    matmul here runs with a 10-bit mantissa: the R1Pro's articulation root stays at the spawn point (40, 40, 5) while
+    its holonomic base moves through the six virtual joints, so a locked base joint carries 40-60 m and the composed
+    transform was off by ~2^-11 of that - 14 mm at the door_crtrpa_0 stance (probe 0919 fk_probe: arm embodiments vs
+    whole body < 0.4 mm within 4 m of the root, 14.4 mm at 58 m; the whole body keeps those joints active in cuRobo's
+    own kernels and matched the simulator). Every arm IK / polish of the samplers and the oracle went through this."""
+    m = _joint_motion(jtype, val, device, dtype=th.float64)
+    return (origin.double() @ m)[:3, :4].to(origin.dtype)
+
+
+def _joint_motion(jtype: JointType, val: float, device, dtype=th.float32) -> th.Tensor:
     """Homogeneous transform of a 1-DoF joint motion (cuRobo positive-axis convention)."""
-    m = th.eye(4, device=device, dtype=th.float32)
+    m = th.eye(4, device=device, dtype=dtype)
     t = jtype.value if isinstance(jtype, JointType) else int(jtype)
     if t == JointType.FIXED.value:
         return m

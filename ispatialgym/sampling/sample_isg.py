@@ -131,6 +131,16 @@ def world_key(problem: GroundedProblem, scene: str, stable: Optional[dict] = Non
             stable = json.load(f)
     rooms = rooms_for(problem, scene, stable)
     removed = chairs_to_remove(problem, scene, stable, rooms)
+    # generation.remove_objects (2026-09-19, door_crtrpa_0 first demo): scene object names the problem takes out of the stable
+    # scene as a variant (as the chairs near a table), for clutter that leaves the robot no collision-free stance in front of
+    # the target; scene-keyed dict or a flat list; unknown names are ignored by the variant writer
+    extra = problem.gen("remove_objects") or []
+    if isinstance(extra, dict):
+        extra = extra.get(scene) or []
+    init = ((stable.get("objects_info") or {}).get("init_info") or {})
+    for name in extra:
+        if isinstance(name, str) and name in init and name not in removed:
+            removed.append(name)
     return scene, tuple(sorted(rooms)), tuple(removed)
 
 

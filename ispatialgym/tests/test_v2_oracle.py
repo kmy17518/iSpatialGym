@@ -1326,6 +1326,47 @@ def test_track_path_reaches_the_recorded_waypoints():
     assert exported["tracker_index"] is not None and exported["trunk"] == pytest.approx((0.5, 0.0), abs=1e-6)
 
 
+def test_base_follow_hybrid_drives_base_and_ramps_arm_together():
+    """D-011 C hybrid follow: per recorded pose the base drives to ``base_pose2d`` while the arm's hold target ramps to
+    ``arm_q`` by the tracker's progress; an arm-only pose (base unchanged) ramps the joints alone; the last pose is met
+    by both."""
+    robot = FakeRobot(base=(0.0, 0.0, 0.0))
+    env = FakeEnv(robot, {})
+    m = Motions(env, FakeBackend(robot))
+    idx = robot.arm_control_idx["right"]
+    q_start = robot.q[idx].clone()
+    qa = q_start + th.tensor([0.10, -0.05, 0.0, 0.08, 0.0, 0.05, -0.04])
+    qb = qa + th.tensor([0.05, 0.05, -0.05, 0.0, 0.03, 0.0, 0.02])
+    qc = qb + th.tensor([0.0, 0.0, 0.05, 0.05, 0.0, 0.0, 0.0])
+    path = [
+        {"k": 0.0, "q": 0.0, "base_pose2d": [0.0, 0.0, 0.0], "arm_q": q_start.tolist()},
+        {"k": 0.25, "q": 0.4, "base_pose2d": [0.15, 0.05, 0.2], "arm_q": qa.tolist()},   # a base move with an arm ramp
+        {"k": 0.5, "q": 0.8, "base_pose2d": [0.15, 0.05, 0.2], "arm_q": qb.tolist()},    # arm only
+        {"k": 0.75, "q": 1.2, "base_pose2d": [0.30, 0.15, 0.5], "arm_q": qc.tolist()},   # both again
+    ]
+    seen = []
+    orig_emit = m._emit
+
+    def spy():
+        seen.append((m.base_pose2d(), m.state.arm_target["right"].clone()))
+        return orig_emit()
+
+    m._emit = spy
+    n = drive(env, m.base_follow_hybrid(path, "right"))
+    x, y, yaw = m.base_pose2d()
+    assert math.hypot(x - 0.30, y - 0.15) < 0.03 and abs(C.wrap_angle(yaw - 0.5)) < 0.05
+    assert th.allclose(robot.q[idx], qc, atol=1e-3) and n > 20
+    # the arm target moved gradually with the base (no jump to the pose's joints at the start of a segment)
+    jumps = [float(th.max(th.abs(b[1] - a[1]))) for a, b in zip(seen[:-1], seen[1:])]
+    assert max(jumps) < 0.05
+    # while the base was still near its start the arm target was still near its start: the ramp follows the progress
+    early = [t for (b, t) in seen if math.hypot(b[0], b[1]) < 0.02]
+    assert early and float(th.max(th.abs(early[-1] - q_start))) < 0.06
+    assert m.export_state()["tracker_index"] is not None
+    with pytest.raises(SkillError):
+        drive(env, m.base_follow_hybrid([path[0], {"k": 1.0, "q": 1.5, "base_pose2d": [0.3, 0.15, 0.5], "arm_q": [0.0, 0.0]}], "right"))
+
+
 def test_track_path_stays_in_the_corridor_at_corners():
     """Pilot red flag 2: the constant-speed reference + base-frame smoothing cut 45–63° corners by 5–8 cm and drifted
     25 cm after a 90° turn. The corner-aware profile and the world-frame filter must keep the base within ~2 cm of a
@@ -1422,6 +1463,30 @@ def test_arm_to_and_arm_along_toy_kinematics_and_plan_failed():
     drive(env, m.arm_to(("left", "right"), q=robot.untucked_default_joint_pos))
     for a in M.ARMS:
         assert th.allclose(robot.q[robot.arm_control_idx[a]], robot.untucked_default_joint_pos[robot.arm_control_idx[a]], atol=1e-5)
+
+
+def test_arm_along_without_convergence_wait_and_unwind():
+    """The closed-loop articulation follow streams the leg without the joint-convergence hold (``converge=False``: a
+    door held by its friction never lets the loaded arm converge) and ``unwind`` re-targets the arm onto its measured
+    joints so the drives stop pressing before the release."""
+    robot = FakeRobot()
+    env = FakeEnv(robot, {})
+    be = FakeBackend(robot)
+    m = Motions(env, be, MotionsConfig(settle_steps=40, cartesian_step=0.02, cartesian_rot_step=0.2))
+    goal = (robot.pos + th.tensor([0.6, -0.1, 0.9]), C.quat_from_yaw(0.3))
+    drive(env, m.arm_to("right", pose=goal))
+    wps = [(goal[0] + th.tensor([0.0, 0.0, -0.05 * k]), goal[1]) for k in (1, 2)]
+    n_conv = drive(env, m.arm_along("right", wps))
+    drive(env, m.arm_to("right", pose=goal))
+    n_free = drive(env, m.arm_along("right", wps, converge=False))
+    # the same motion, minus the convergence hold (the toy joints converge within a few steps)
+    assert n_free <= n_conv and n_free >= int((0.10 / 0.10) / DT) - 2
+    # unwind: a target displaced from the measured joints (a wound-up arm) snaps back onto them, reporting the deflection
+    idx = robot.arm_control_idx["right"]
+    m.state.arm_target["right"] = robot.q[idx] + 0.05
+    assert m.unwind("right") == pytest.approx(0.05, abs=1e-6)
+    assert th.allclose(m.state.arm_target["right"], robot.q[idx])
+    assert m.unwind("right") == pytest.approx(0.0, abs=1e-9)
 
 
 def test_gripper_and_state_roundtrip():

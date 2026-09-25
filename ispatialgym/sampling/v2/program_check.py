@@ -841,6 +841,31 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             q_seed[sampler.kit.robot.arm_control_idx[arm]] = th.tensor(pq, dtype=th.float32)
     end_q_raw: Optional[th.Tensor] = None
     end_key = _END_KEY.get(name)
+    if name == "retreat" and after_name == "base_follow" and isinstance(targets, dict) and targets.get("retreat"):
+        # the retreat after a hybrid / sequential follow: the search recorded the retreat configuration it found at the final
+        # pose (``base_follow_path.retreat_arm_q``); verify THAT witness (FK residual, collision, margin) instead of re-solving
+        # the retreat as a tracked chain - the two solvers disagreed by 8-17 mrad of margin (0919-213438, 0921-022826)
+        art_ = getattr(action.after, "articulation", None)
+        path_ = (getattr(art_, "extra", None) or {}).get("base_follow_path") if art_ is not None else None
+        aq = (path_ or {}).get("retreat_arm_q")
+        if aq is not None and stance_obj is not None:
+            aq_t = th.tensor([float(v) for v in aq], dtype=th.float32)
+            q_w = sampler.ikc.q_locked(stance, right_arm=aq_t if arm == "right" else None, left_arm=aq_t if arm == "left" else None, fingers=fingers)
+            end_pose = targets["retreat"][-1]
+            end_pose = (th.as_tensor(end_pose[0] if not hasattr(end_pose, "position") else end_pose.position, dtype=th.float32),
+                        th.as_tensor(end_pose[1] if not hasattr(end_pose, "orientation") else end_pose.orientation, dtype=th.float32))
+            q_pol, residual = sampler.ikc.polish_witness(q_w, end_pose, arm, ignore=())
+            from ispatialgym.sampling.v2 import prompt0 as _P0
+            free = bool(sampler.kit.collision_free(q_pol, margin=_P0.COLLISION_MARGIN)[0])
+            margin, jn = sampler.ikc.joint_limit_margin(q_pol, arm)
+            limit = float(sampler.gp.gen("witness_residual_follow_m", 5e-3))
+            if residual <= limit and free and margin >= sampler.ikc.JOINT_LIMIT_MARGIN * 0.5:
+                witnesses["retreat"] = {"pose": {"position": [round(float(v), 5) for v in end_pose[0].tolist()], "orientation": [round(float(v), 6) for v in end_pose[1].tolist()]},
+                                        "q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pol, stance).tolist()], "q_frame": "root at the world origin (identity pose, z = 0)",
+                                        "fk_residual_m": round(residual, 5), "joint_limit_margin_rad": round(margin, 4), "joint_limit_nearest": jn, "source": "search retreat witness"}
+                log.info("program check: retreat after the follow verified from the search's witness (residual %.1f mm, margin %.3f rad at %s)", residual * 1000, margin, jn)
+                return 1, witnesses
+            log.info("program check: the search's retreat witness fails (residual %.1f mm, free %s, margin %.3f at %s): re-solving the retreat", residual * 1000, free, margin, jn)
     where = f"stance {stance_name}, arm {arm}, carried {carried}" + (f", {'/'.join(sorted(locked))} arm locked at its contact" if locked else "")
     if name == "retreat" and getattr(action, "after", None) is not None:
         where += f", after {getattr(action.after, 'name', type(action.after).__name__)}"
