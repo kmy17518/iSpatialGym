@@ -104,6 +104,13 @@ class ExecutorConfig:
     settled_pos_tol: float = 0.005
     settled_rot_tol: float = 0.01
     settled_joint_tol: float = 0.02
+    #: (2026-09-22, 0918-000750) before the no-op window every arm's hold target is relaxed onto its measured joints over
+    #: ``epilogue_relax_steps`` steps (``Motions.relax_arms``; a pressing fist of an open ``press_hold`` is left alone): a
+    #: drive still fighting an unseen contact at the end of the program (the folded elbow on its own upper arm: joint
+    #: velocities of 2.2 rad/s reported for the whole window, ``pose_settled(agent)`` never true) stops pushing, so the
+    #: window judges the robot at rest
+    epilogue_relax_arms: bool = True
+    epilogue_relax_steps: int = 6
     #: also require the evaluator's own ``settled_success`` (PoseSettled of every settled entity) at the last step.
     #: Off by default: PoseSettled's 1 mm/s root-velocity threshold is never met by an object held at the end of a
     #: position-controlled arm (0 / 74 v1 held-object demos ever settled by that measure while being motionless
@@ -1190,6 +1197,26 @@ class Executor:
         self.timings["actions_s"] = time.time() - t0
         return self.epilogue(verdict, self.n)
 
+    def _epilogue_hold(self, steps: int, relax_info: Dict[str, Any]) -> Iterator[th.Tensor]:
+        """The first no-op window of the epilogue (``steps`` steps in all): the arms' hold targets relaxed onto their
+        measured joints over its first ``epilogue_relax_steps`` steps (``epilogue_relax_arms``, program mode - a stream
+        has no Layer-1 targets to relax), then no-op steps. ``relax_info`` receives ``{arm: largest target change (rad)}``."""
+        motions = self.motions
+        n_relax = 0
+        if self.cfg.epilogue_relax_arms and motions is not None and getattr(self, "_last_stream_action", None) is None and hasattr(motions, "relax_arms"):
+            hold = getattr(motions, "press_hold", None) or {}
+            arms = [a for a in M.ARMS if hold.get("arm") != a]
+            n_relax = min(int(self.cfg.epilogue_relax_steps), int(steps))
+            if arms and n_relax > 0:
+                relaxed = yield from motions.relax_arms(arms, steps=n_relax)
+                relax_info.update({a: round(float(v), 5) for a, v in (relaxed or {}).items()})
+                moved = {a: v for a, v in relax_info.items() if v > 1e-3}
+                if moved:
+                    log.info("epilogue: arm hold targets relaxed onto the measured joints by %s rad (a drive was still pressing)", moved)
+            else:
+                n_relax = 0
+        yield from self._noop_actions(int(steps) - n_relax)
+
     def _noop_actions(self, steps: int) -> Iterator[th.Tensor]:
         """The epilogue's no-op: the Layer-1 hold (program mode) or the last streamed action with the base stopped."""
         last = getattr(self, "_last_stream_action", None)
@@ -1424,9 +1451,10 @@ class Executor:
         before = MotionSnapshot(self.robot, self.tracked)
         settle_verdict = None
         windows = [window]
+        relax_info: Dict[str, Any] = {}
         self._reset_predicate_branches()  # D-007: the branch log of the final binary evaluation starts with the settle window
         if verdict is None or verdict.category != "timeout":
-            settle_verdict = self.run_generator(self._noop_actions(window), PHASE_SETTLE)
+            settle_verdict = self.run_generator(self._epilogue_hold(window, relax_info), PHASE_SETTLE)
             if self.recorder is not None:
                 self.recorder.commit()
         after = MotionSnapshot(self.robot, self.tracked)
@@ -1547,6 +1575,8 @@ class Executor:
             "n_settle_steps": self.phase_steps.get(PHASE_SETTLE, 0),
             "settle_window": window,
             "settle_windows": windows,
+            "epilogue_relax": relax_info,
+            "jams": _jsonable(list(getattr(self.motions, "jams", []) or [])),
             "demo_gating": demo_gating,
             "motion_delta": motion,
             "actions": [r.to_dict() for r in self.action_records],

@@ -88,6 +88,10 @@ EVALUATION_PROFILE = "isg-v1"
 
 EXIT_SUCCESS, EXIT_ORACLE_FAILED, EXIT_NO_ORACLE, EXIT_ERROR = 0, 2, 3, 4
 
+#: largest ISG_HINGE_FRICTION_SCALE applied to a wall hinge record (2026-09-22, InstanceLoader._create_hinge): x8 saturated
+#: the push arm's drives (0918-000750); the damping scale is not applied at all
+HINGE_FRICTION_SCALE_MAX = 2.0
+
 #: §6.3 (b): the family-level description shared by every instance of a task family
 FAMILY_DESCRIPTIONS = {
     "camera_relocalization": "Drive and set the torso so that the head camera reproduces the goal view.",
@@ -375,7 +379,7 @@ class InstanceLoader:
     # -- constraints (hinges) -------------------------------------------------------------------------------------
 
     def _create_hinge(self, rec: dict):
-        from ispatialgym.sampling.constraints import create_hinge
+        from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, create_hinge, hinge_brake_damping
 
         child = self.physical.get(rec["child"])
         if child is None:
@@ -392,14 +396,31 @@ class InstanceLoader:
         # rush 2026-09-17 (branch rush-20260917-2100): ISG_HINGE_FRICTION_SCALE / ISG_HINGE_DAMPING_SCALE multiply the record's
         # values at load time (painting 0917-211738: push in tolerance at +0.037 rad, then the departing pads shoved it
         # to -0.39 rad - the record's resistance holds a coasting painting, not a shoved one). Default 1 = the record.
+        # 2026-09-22 (0918-000750, friction x8 / damping x3): the scaled hinge needed ~40 N at the pad instead of the record's
+        # ~9 N (torque = friction + damping * omega at 0.6 rad/s); the elbow drive saturated at its 25 N.m cap (0.097 rad
+        # behind its target), the wrist drives went bang-bang against the contact and the painting shook / was kicked back
+        # 0.8 deg at the stop. The friction scale is therefore capped at HINGE_FRICTION_SCALE_MAX and the damping scale is no
+        # longer applied (the viscous term dominates at push speed); the departing-pad shove is handled by the radial escape
+        # of the retreat. A stiffer hinge belongs in the record, where the sampler's feasibility checks see the same value.
         friction, damping = rec.get("friction"), rec.get("damping")
         f_scale, d_scale = float(os.environ.get("ISG_HINGE_FRICTION_SCALE", "1")), float(os.environ.get("ISG_HINGE_DAMPING_SCALE", "1"))
+        if not (0.0 <= f_scale <= HINGE_FRICTION_SCALE_MAX):
+            log.warning("hinge %s: ISG_HINGE_FRICTION_SCALE=%.2f clamped to [0, %.1f]", rec["child"], f_scale, HINGE_FRICTION_SCALE_MAX)
+            f_scale = min(max(f_scale, 0.0), HINGE_FRICTION_SCALE_MAX)
+        if d_scale != 1.0:
+            log.warning("hinge %s: ISG_HINGE_DAMPING_SCALE=%.2f ignored (the damping of the record is applied as is)", rec["child"], d_scale)
         if friction is not None and f_scale != 1.0:
             friction = friction * f_scale
-        if damping is not None and d_scale != 1.0:
-            damping = damping * d_scale
-        if f_scale != 1.0 or d_scale != 1.0:
-            log.warning("hinge %s: friction x%.1f, damping x%.1f (ISG_HINGE_*_SCALE override)", rec["child"], f_scale, d_scale)
+            log.warning("hinge %s: friction x%.1f (ISG_HINGE_FRICTION_SCALE override)", rec["child"], f_scale)
+        # brake (2026-09-22, sampling.constraints module docstring): a record written before the brake model carries the plain
+        # damper I_n / tau, under which a residual torque (the anchor a millimetre off the COM) creeps the hinge forever (0922-180242:
+        # the levelled painting drifted back 0.25 deg/s out of its tolerance during the settle window) - its damping is raised to
+        # friction / HINGE_BRAKE_OMEGA_RAD_S, the same value the sampler writes now; the friction the pad works against is untouched
+        braked = hinge_brake_damping(friction, damping)
+        if braked is not None and (damping is None or braked > float(damping) + 1e-9):
+            log.warning("hinge %s: record damping %s N·m·s/rad predates the brake model - applied friction / %.4f rad/s = %.1f N·m·s/rad",
+                        rec["child"], None if damping is None else round(float(damping), 3), HINGE_BRAKE_OMEGA_RAD_S, braked)
+            damping = braked
         return create_hinge(child, th.tensor(rec["anchor_position"], dtype=th.float32), th.tensor(rec["axis"], dtype=th.float32), parent_link=parent_link,
                             friction=friction, damping=damping)
 

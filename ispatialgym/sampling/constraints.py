@@ -14,6 +14,13 @@ implicit force-limited damped spring gives torque = clamp(−damping · ω, ±fr
 ω = friction / damping, viscous creep below it. ``physxJoint:jointFriction`` is not used: it applies to articulation
 joints only and the hinge is a plain joint (``excludeFromArticulation``). The sampler sets both from the target's
 inertia about the hinge axis (:func:`hinge_resistance`); the axial table hinge records neither (unchanged).
+
+**Brake** (2026-09-22, alignment-world_vertical 0922-180242): below ω = friction / damping the drive is a plain damper,
+so any residual torque - the anchor a millimetre off the true centre of mass under gravity (0.009 N·m on the 2.25 kg
+painting) - makes the hinge creep at torque / damping forever: with the former damping I_n / 0.02 s (1.99 N·m·s/rad)
+the levelled painting drifted back 0.25 deg/s and left its 0.08 rad tolerance during the settle window. The damping is
+therefore ``friction / HINGE_BRAKE_OMEGA_RAD_S`` (the joint-brake model of :func:`joint_brake_spec`): Coulomb friction
+down to 0.0025 rad/s, the creep under a residual torque ~1e-5 rad/s. The pad still works only against ``friction``.
 """
 
 from __future__ import annotations
@@ -36,9 +43,12 @@ from ispatialgym.sampling import geometry as G
 #: settled in 0.5 / 0.67 s with 0.040 / 0.155 rad of drift, at 10 rad/s² in 0.43 / 0.53 s with 0.022 / 0.080 rad — the second
 #: keeps even a 1 rad/s kick inside the 0.08 rad tolerance; the push arm works against ≈ friction / lever ≈ 1.6 N.
 HINGE_STOP_DECEL_RAD_S2 = 10.0
-#: viscous damping = I_n / HINGE_VISCOUS_TAU_S: the Coulomb regime reaches down to friction / damping = 0.2 rad/s, below it
-#: the exponential creep has a 20 ms time constant (well under the PoseSettled 0.005 rad/s threshold within a step or two)
+#: the former viscous damping I_n / HINGE_VISCOUS_TAU_S (the Coulomb regime down to friction / damping = 0.2 rad/s, a 20 ms
+#: creep time constant below it) - kept as the lower bound of the damping; the brake below decides for every real target
 HINGE_VISCOUS_TAU_S = 0.02
+#: brake (2026-09-22, module docstring): damping = friction / HINGE_BRAKE_OMEGA_RAD_S, the Coulomb regime down to this angular
+#: speed - the joint-brake speed of the small-articulation lids (JOINT_BRAKE_OMEGA_RAD_S), where the implicit drive is stable
+HINGE_BRAKE_OMEGA_RAD_S = 0.0025
 #: the drive model the loader applies (recorded verbatim in the constraints record for the reader)
 HINGE_DRIVE_MODEL = "UsdPhysics angular drive, stiffness 0, target velocity 0: torque = clamp(-damping * omega, +-friction)"
 
@@ -82,12 +92,27 @@ def inertia_about_axis(mass: float, extents_perp: tuple) -> float:
     return float(mass) * (a * a + b * b) / 12.0
 
 
-def hinge_resistance(mass: float, extents_perp: tuple, decel: float = HINGE_STOP_DECEL_RAD_S2, tau: float = HINGE_VISCOUS_TAU_S) -> Dict[str, float]:
+def hinge_resistance(mass: float, extents_perp: tuple, decel: float = HINGE_STOP_DECEL_RAD_S2, tau: float = HINGE_VISCOUS_TAU_S,
+                     omega_brake: float = HINGE_BRAKE_OMEGA_RAD_S) -> Dict[str, float]:
     """(friction N·m, damping N·m·s/rad, inertia kg·m², mass kg) of a wall hinge for a target of ``mass`` whose extents
-    perpendicular to the hinge axis are ``extents_perp``: friction = I_n · decel, damping = I_n / tau (module constants)."""
+    perpendicular to the hinge axis are ``extents_perp``: friction = I_n · decel, damping = max(I_n / tau, friction /
+    omega_brake) - the brake (module docstring): Coulomb friction down to ``omega_brake``, no creep under a residual torque."""
     I_n = inertia_about_axis(mass, extents_perp)
-    return {"friction": I_n * float(decel), "damping": I_n / float(tau), "inertia_kgm2": I_n, "mass_kg": float(mass),
-            "extents_perp_m": [float(v) for v in extents_perp], "stop_decel_rad_s2": float(decel), "viscous_tau_s": float(tau)}
+    friction = I_n * float(decel)
+    damping = max(I_n / float(tau), friction / float(omega_brake)) if omega_brake and omega_brake > 0 else I_n / float(tau)
+    return {"friction": friction, "damping": damping, "inertia_kgm2": I_n, "mass_kg": float(mass),
+            "extents_perp_m": [float(v) for v in extents_perp], "stop_decel_rad_s2": float(decel), "viscous_tau_s": float(tau),
+            "brake_omega_rad_s": float(omega_brake)}
+
+
+def hinge_brake_damping(friction: Optional[float], damping: Optional[float], omega_brake: float = HINGE_BRAKE_OMEGA_RAD_S) -> Optional[float]:
+    """The damping a hinge record's drive should have under the brake model: at least ``friction / omega_brake`` (a record
+    written before 2026-09-22 carries I_n / tau, ~1 % of it - the loader raises it, ``InstanceLoader._create_hinge``).
+    ``damping`` unchanged when the record has no friction (the frictionless axial hinge) or already brakes."""
+    if friction is None or friction <= 0 or not omega_brake or omega_brake <= 0:
+        return damping
+    floor = float(friction) / float(omega_brake)
+    return floor if damping is None or float(damping) < floor else float(damping)
 
 
 def _frame_with_x(axis: th.Tensor, ref_up: th.Tensor) -> th.Tensor:

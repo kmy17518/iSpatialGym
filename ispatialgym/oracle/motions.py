@@ -200,6 +200,17 @@ class MotionsConfig:
     trajectory_max_steps: int = 6000
     settle_max_steps: int = 120
     settle_vel_tol: float = 0.02
+    #: (2026-09-22, 0918-000750) a converged FREE-SPACE leg whose joints keep reporting velocities above ``jam_vel_tol``
+    #: for ``jam_probe_steps`` steps while their positions change by less than ``jam_pos_eps`` (rad) is jammed: a drive
+    #: fighting a contact the differential IK did not see (the elbow folded onto its own upper arm: 0.3-2.2 rad/s reported,
+    #: 0.5 mrad of motion, for the whole 185-step settle window - the evaluator's ``pose_settled`` of the robot never held).
+    #: The hold targets are then re-targeted onto the measured joints over ``jam_relax_steps`` steps (``relax_arms``).
+    #: ``jam_vel_tol`` sits well above the 0.02-0.05 rad/s a freshly converged free arm still reports (0922-180242).
+    jam_relax: bool = True
+    jam_vel_tol: float = 0.1
+    jam_probe_steps: int = 3
+    jam_pos_eps: float = 1e-3
+    jam_relax_steps: int = 6
 
 
 # ==========================================================================================
@@ -380,6 +391,8 @@ class Motions:
         self.follow_phase = "arm"  # sequential follow: "base" while the base drives (the caller watches the door then)
         self.last_relaxed_links: List[str] = []  # held-arm links taken out of the sphere model by the last arm_to plan
         self.last_witness_residual: Optional[Tuple[float, float]] = None  # a witness residual arm_to left unclosed (m, rad)
+        self.last_jam: Optional[Dict[str, Any]] = None  # the last jammed free-space leg relaxed by _relax_if_jammed
+        self.jams: List[Dict[str, Any]] = []
         self._joint_limits = (
             self.robot.joint_lower_limits[self.robot.trunk_control_idx],
             self.robot.joint_upper_limits[self.robot.trunk_control_idx],
@@ -769,8 +782,54 @@ class Motions:
             yield self._emit()
         if converge:
             yield from self._wait_converged(arms, trunk, tol or self.cfg.joint_tol, self.cfg.settle_steps, loose=self.cfg.joint_tol_loaded if loaded else None)
+            if not loaded:
+                yield from self._relax_if_jammed(arms)
         if trunk:
             self.trunk = TrunkState.from_q(self.state.trunk_target, translate_rate=self.cfg.trunk_translate_rate, tilt_rate=self.cfg.trunk_tilt_rate)
+
+    def relax_arms(self, arms: Sequence[str], steps: Optional[int] = None) -> Generator[th.Tensor, None, Dict[str, float]]:
+        """Re-target the hold targets of ``arms`` onto their measured joints over ``steps`` control steps (the measured
+        joints re-read every step, as ``follow_unwind`` does; a one-step unwind let a wound-up arm snap 0.85 rad/s), so
+        the position drives stop pressing against whatever holds the arm. Returns ``{arm: largest target change (rad)}``
+        (read it with ``yield from``); the base is stopped."""
+        steps = self.cfg.jam_relax_steps if steps is None else int(steps)
+        steps = max(int(steps), 1)
+        arms = [a for a in arms if a in M.ARMS]
+        start = {a: (None if self.state.arm_target.get(a) is None else self.state.arm_target[a].clone().float()) for a in arms}
+        out: Dict[str, float] = {a: 0.0 for a in arms}
+        self.state.stop_base()
+        for k in range(1, steps + 1):
+            f = k / steps
+            for a in arms:
+                q = self.robot.get_joint_positions()[self.robot.arm_control_idx[a]].clone().float()
+                q0 = q if start[a] is None else start[a]
+                self.state.arm_target[a] = q0 + (q - q0) * f
+                out[a] = max(out[a], float(th.max(th.abs(q - q0))))
+            yield self._emit()
+        return out
+
+    def _relax_if_jammed(self, arms: Sequence[str]) -> Iterator[th.Tensor]:
+        """After a free-space leg converged: joints still reporting velocities above ``jam_vel_tol`` for
+        ``jam_probe_steps`` steps without moving (``jam_pos_eps``) are a drive fighting an unseen contact - the hold
+        targets are relaxed onto the measured joints (``relax_arms``; the jam is kept in ``last_jam`` for the notes)."""
+        arms = [a for a in arms if a in M.ARMS]
+        if not self.cfg.jam_relax or not arms:
+            return
+        idx = th.cat([self.robot.arm_control_idx[a] for a in arms])
+        q0 = self.robot.get_joint_positions()[idx].clone().float()
+        for _ in range(int(self.cfg.jam_probe_steps)):
+            if float(self.robot.get_joint_velocities()[idx].abs().max()) <= self.cfg.jam_vel_tol:
+                return
+            yield self._emit()
+        v = float(self.robot.get_joint_velocities()[idx].abs().max())
+        dq = float((self.robot.get_joint_positions()[idx].float() - q0).abs().max())
+        if v <= self.cfg.jam_vel_tol or dq > self.cfg.jam_pos_eps:
+            return
+        log.warning("%s arm joints report %.2f rad/s but moved %.2f mrad over %d steps after converging: a drive is fighting a contact the leg did not see - "
+                    "relaxing the hold targets onto the measured joints", "/".join(arms), v, dq * 1000, int(self.cfg.jam_probe_steps))
+        relaxed = yield from self.relax_arms(arms)
+        self.last_jam = {"arms": list(arms), "reported_vel_rad_s": round(v, 4), "moved_rad": round(dq, 6), "relaxed_rad": {a: round(d, 5) for a, d in relaxed.items()}}
+        self.jams.append(self.last_jam)
 
     def unwind(self, arm: str) -> float:
         """Re-target ``arm``'s hold target onto its measured joints so the drives stop pushing. A loaded arm (the hand
@@ -958,12 +1017,20 @@ class Motions:
         return dense
 
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
-                  soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False, converge: bool = True) -> Iterator[th.Tensor]:
+                  soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False, converge: bool = True,
+                  check_collisions: bool = False, limit_margin: float = 0.0, ignore_objects: Sequence[Any] = ()) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
-        resolution and every waypoint is reached in order; no collision veto (contact motions must touch — the QA
-        collision monitor judges contacts). Raises ``plan_failed`` (stage ``diff_ik``) when a waypoint cannot be
+        resolution and every waypoint is reached in order; no collision veto by default (contact motions must touch —
+        the QA collision monitor judges contacts). Raises ``plan_failed`` (stage ``diff_ik``) when a waypoint cannot be
         reached from the current configuration.
+
+        ``check_collisions`` (free-space legs, 2026-09-22): the joint path is validated against the world (minus
+        ``ignore_objects``) and the robot itself; the collision-free prefix is executed and the rest finished by
+        ``arm_to`` when a ``finish`` is given (or kept as is for a ``partial`` leg), else the leg fails ``plan_failed``
+        (stage ``collision``). ``limit_margin`` (rad) keeps the differential IK this far from the joint limits (the
+        0918-000750 retreat folded the elbow into its own upper arm 3 mrad short of the limit and the drive fought that
+        contact for the rest of the episode - the robot never counted as settled).
 
         ``finish`` (owner rule 2026-09-16): when the differential IK **stalls** — no joint at a limit, the residual
         below ``finish.max_stall`` — with at most ``finish.max_remaining`` of the segment left, the converged prefix
@@ -988,16 +1055,23 @@ class Motions:
         if deflection is not None and deflection > self.cfg.unwind_min_deflection:
             log.info("arm_along(%s): the arm is wound up %.1f mm under load (FK of the joints vs the eef link): unwinding onto the link pose first", arm, deflection * 1000)
             dense = [start] + dense
+        if check_collisions:
+            try:
+                self.backend.update_world(ignore_objects=ignore_objects)
+            except Exception as e:  # noqa: BLE001 - a backend without a world model (the test stubs) checks nothing
+                log.debug("arm_along(%s): world update for the collision check failed (%r)", arm, e)
+        extra_kw: Dict[str, Any] = {"limit_margin": float(limit_margin)} if limit_margin > 0.0 else {}
         res = self.backend.solve_ik_path(
             f"{arm}_arm",
             [{frame: wp} for wp in dense],
             pos_tol=self.cfg.diff_ik_pos_tol,
             rot_tol=self.cfg.diff_ik_rot_tol,
             max_iters=self.cfg.diff_ik_max_iters,
-            check_collisions=False,
+            check_collisions=bool(check_collisions),
             sync_world=False,
             soft_pos_tol=self.cfg.diff_ik_soft_pos_tol if soft_pos_tol is None else float(soft_pos_tol),
             soft_rot_tol=self.cfg.diff_ik_soft_rot_tol,
+            **extra_kw,
         )
         if res.success and (res.diagnostics or {}).get("soft_waypoints"):
             log.info("arm_along(%s): %s", arm, res.status)
@@ -1020,6 +1094,32 @@ class Motions:
             k = diag.get("fail_index")
             stall = diag.get("pos_err")
             at_limit = bool(diag.get("at_lower") or diag.get("at_upper"))
+            if diag.get("stage") == "collision":
+                # a straight free-space leg whose later waypoints collide (the robot with itself or the world): the
+                # collision-free prefix is executed; the rest is planned around by arm_to when a finish is given
+                n_ok = int(diag.get("converged", 0))
+                pairs = ", ".join("-".join(p["links"]) for p in (diag.get("self_collision") or []))
+                if n_ok > 0 and res.q_traj is not None and len(res.q_traj) > 1:
+                    yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm], loaded=loaded)
+                if finish is not None:
+                    log.warning("arm_along(%s): %s -> executed the %d collision-free waypoints, finishing with arm_to (cuRobo, collision-checked)%s", arm, res.status, n_ok,
+                                f" [{pairs}]" if pairs else "")
+                    by = "witness" if finish.q_hint is not None else "curobo_ik"
+                    try:
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                    except SkillError as e:
+                        if finish.q_hint is None or e.details.get("excursion") is None:
+                            raise
+                        log.warning("arm_along(%s): finish toward the witness rejected (%s) -> finishing by cuRobo IK in the current branch", arm, e.message)
+                        by = "curobo_ik_fallback"
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=None, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                    finish.used = True
+                    finish.info = {"collision": diag.get("kind"), "self_collision": diag.get("self_collision"), "converged": n_ok, "n_dense": len(dense), "by": by}
+                    return
+                if partial:
+                    log.warning("arm_along(%s): %s -> executed the %d collision-free waypoints only (best-effort leg)", arm, res.status, n_ok)
+                    return
+                raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="collision", n_waypoints=len(waypoints), fail_index=k, self_collision=diag.get("self_collision"))
             # a stall at a joint limit is finished only toward a recorded witness (a known configuration of the end
             # pose; the touching approach slides along right_arm_joint2's limit, as the sampler's own approach witnesses
             # do), a free finish from a limit stall would just pick another branch

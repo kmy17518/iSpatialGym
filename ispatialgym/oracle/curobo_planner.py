@@ -1355,6 +1355,7 @@ class R1ProCuRobo:
         sigma_thr: float = 0.08,
         damping_boost: float = 0.02,
         nullspace_gain: float = 0.0,
+        limit_margin: float = 0.0,
     ) -> PlanResult:
         """Track dense Cartesian ``waypoints`` (each ``{frame: (pos, quat_xyzw)}`` in world) with
         damped-least-squares differential IK on the embodiment's active joints.
@@ -1362,6 +1363,16 @@ class R1ProCuRobo:
         ``soft_pos_tol`` / ``soft_rot_tol``: a waypoint the iterations leave within these (but outside ``pos_tol`` /
         ``rot_tol``) is accepted with its residual instead of failing the path (``diagnostics["soft_waypoints"]`` lists
         them) — a straight approach that stalls 2 mm short of a 2 mm tolerance is not a failed approach.
+
+        ``limit_margin`` (rad): the joint box the solve may use is shrunk by this at both ends (never past the start
+        configuration: a joint already inside the margin may move away from its limit, not toward it). The R1Pro
+        elbow's forearm folds onto its upper arm within the last degree of its range (0918-000750 retreat: joint4 at
+        -2.0912 of -2.0944, link3 - link5 0.5 mm into each other, the drive fighting the contact for the rest of the
+        episode), so free-space legs keep clear of the limits.
+
+        ``check_collisions``: the path is validated for collisions (world + self); on a collision the collision-free
+        prefix is returned as ``q_traj`` with ``diagnostics`` ``{"stage": "collision", "fail_index", "converged", ...}``
+        so a caller may execute it and finish the segment another way (``Motions.arm_along(finish=...)``).
 
         Near a kinematic singularity (smallest singular value of the Jacobian below ``sigma_thr``) the damping is
         raised (``damping + damping_boost·(1 − σ/σ_thr)²``); an optional **nullspace step** toward the joint
@@ -1390,6 +1401,10 @@ class R1ProCuRobo:
         unbounded = (hi - lo) > 100.0
         lo[unbounded] = q_full[aidx][unbounded] - 10.0
         hi[unbounded] = q_full[aidx][unbounded] + 10.0
+        if limit_margin > 0.0:
+            q0a = q_full[aidx]
+            lo = th.where(unbounded, lo, th.minimum(lo + float(limit_margin), q0a))
+            hi = th.where(unbounded, hi, th.maximum(hi - float(limit_margin), q0a))
         n = len(active)
         eps = 1e-4
         dev = self.device_cfg.device
@@ -1508,8 +1523,20 @@ class R1ProCuRobo:
         if check_collisions:
             coll = self.check_collision(q_traj, emb_name=emb_name)
             if bool(coll.any()):
-                first = int(th.nonzero(coll).view(-1)[0])
-                return PlanResult(success=False, status=f"collision at waypoint {first}/{len(waypoints)}", dt=self.control_dt, plan_time=time.time() - t0)
+                first = int(th.nonzero(coll).view(-1)[0])  # index into q_traj: 0 = the start, k = waypoint k - 1
+                kind, pairs = "world", []
+                try:
+                    if not bool(self.check_collision(q_traj[first], emb_name=emb_name, self_collision=False)[0]):
+                        kind = "self"
+                        pairs = [{"links": list(p["links"]), "penetration_mm": round(1000 * float(p["penetration"]), 1)} for p in self.self_collision_pairs(q_traj[first], emb_name)[:3]]
+                except Exception:  # noqa: BLE001 - diagnostics only
+                    pass
+                prefix = q_traj[:first] if first > 1 else None  # the start + the collision-free waypoints
+                diag = {"stage": "collision", "kind": kind, "fail_index": max(first - 1, 0), "n_waypoints": len(waypoints), "converged": max(first - 1, 0),
+                        "self_collision": pairs, "at_lower": [], "at_upper": []}
+                what = f"{kind} collision" + (f" ({', '.join('-'.join(p['links']) for p in pairs)})" if pairs else "")
+                return PlanResult(success=False, q_traj=prefix, status=f"{what} at waypoint {max(first - 1, 0)}/{len(waypoints)}", dt=self.control_dt,
+                                  plan_time=time.time() - t0, diagnostics=diag)
         status = "ok" if not soft else f"ok ({len(soft)} waypoints within the soft tolerance, max {max(w['pos_err'] for w in soft) * 1000:.1f} mm)"
         diag = {"singular_iterations": n_singular}
         if soft:

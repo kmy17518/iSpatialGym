@@ -178,6 +178,47 @@ class ExecuteConfig:
     #: links behind a movable joint (2026-09-18: the lid did not turn with the hand, ghost_hand 29 deg on a 4 cm lever)
     handle_grasp_fixed_ag: bool = True
     push_stop_frac_line: float = 0.0
+    #: (2026-09-22, alignment-world_vertical 0918-000750) pad speed along a push ARC about a hinge (m/s; the approach to the
+    #: first contact keeps ``cartesian_speed``). The hinge torque is friction + damping * omega, so at the former 0.10 m/s
+    #: (0.6 rad/s on the painting) the viscous term alone was 3.6 of the 6.8 N.m the pad had to supply (~40 N at 0.17 m):
+    #: the elbow drive saturated at its 25 N.m cap, the wrist drives went bang-bang against the contact and the painting
+    #: shook. 3.5 cm/s (0.2 rad/s) roughly halves the required force. ``push_speed_line``: straight pushes (None = default).
+    push_speed_arc: float = 0.035
+    push_speed_line: Optional[float] = None
+    #: the arc of a hinged target is tracked CLOSED-LOOP (``Motions.arm_arc_closed_loop``: one differential-IK step per
+    #: control step from the MEASURED joints, the pad target never more than one step ahead of where the hinge lets the
+    #: pad be) instead of streaming the open-loop joint path of the recorded arc: with the 1e7-stiff, effort-capped drives
+    #: an open-loop path accumulates its mismatch with the constraint as drive saturation (0918-000750: joint4 0.097 rad
+    #: behind its target for the whole arc, released as a kick at the stop). ``"streamed"`` = the former open-loop leg.
+    #: Articulated pushes (a lid on its joint, ``contacts.push.articulation``) keep the streamed leg.
+    push_arc_tracking: str = "closed_loop"  # "closed_loop" | "streamed"
+    #: the closed-loop arc stops when the pad has been commanded this many times the recorded arc without the object
+    #: following (a blocked target is not pushed harder)
+    push_arc_lag_factor: float = 1.3
+    #: the object counts as touched by the approaching pad once it has turned this much (rad; logged and recorded, the
+    #: approach continues to the recorded contact pose - see ``_push_arc_closed_loop``)
+    push_contact_detect_rad: float = 0.01
+    #: (2026-09-22) the brace of a HINGED target (``contacts.brace.kind`` side_high / below_high / above_low) stands where
+    #: the braced point of the object will be AT THE GOAL, this far back along the brace direction (m; < 0 = the recorded
+    #: contact at the initial pose). Placed at the initial pose the fist sits in the path of the last degrees of the
+    #: rotation (0918-000750: the painting's edge swept 4.7 cm into the fist while levelling, the pads clamped the painting
+    #: and the stop kicked it back 0.8 deg = the whole final error); at the goal edge + gap it only catches an overshoot.
+    brace_at_goal_gap_m: float = 0.01
+    #: the fractions of the goal rotation tried for the goal-edge brace, in turn, until its pre and contact poses are within
+    #: the arm's reach (collision-aware IK); none reachable = the recorded contact. Only the full goal edge by default: a
+    #: partial fraction still puts the fist in the edge's path before the goal, and the 33 % pose of 0922-234254 stood in the
+    #: push arm's transit (the left arm's trajopt to its pre-pose stand-off failed with start and goal collision-free) while
+    #: the recorded contact is the sampler-validated pair
+    brace_at_goal_fractions: Tuple[float, ...] = (1.0,)
+    #: (2026-09-22) the radial contact escape of a retreat: its end pose is probed for reachability (collision-aware IK) and
+    #: the radial distance shortened by these factors in turn (never below the escape itself) until a solution exists, the
+    #: leg is collision-checked (self + world minus the released object and its supports) with this joint-limit margin
+    #: (rad), and a colliding / stalling straight leg is finished by ``arm_to`` - instead of executing a partial straight
+    #: leg toward an unreachable end pose (0918-000750: the leg folded the elbow into its own upper arm 3 mrad short of
+    #: the joint limit and the drive fought that contact through the settle window)
+    retreat_reach_factors: Tuple[float, ...] = (1.0, 0.75, 0.5)
+    retreat_check_collisions: bool = True
+    retreat_limit_margin_rad: float = 0.05
     #: (rush 2026-09-17) a line push still short after the arm's extension is closed by driving the base along the push
     #: direction with the arm locked, up to this far (m; 0 disables), at this speed (m/s), to this tracker tolerance (m)
     push_base_nudge_max_m: float = 0.06
@@ -1358,6 +1399,44 @@ def post_place(action: Place, state, targets, ctx) -> Optional[str]:
     return None
 
 
+def _retreat_reach(motions: Motions, arm: str, here, d1: th.Tensor, normal_out: th.Tensor, far: float, out: float, ignore: Sequence[Any],
+                   cfg: ExecuteConfig) -> Tuple[float, Dict[str, Any]]:
+    """The radial distance of a contact escape whose end pose ``here + d1 * far + normal_out`` the collision-aware IK
+    (``backend.solve_ik``, world minus ``ignore``) reaches from the current configuration: ``far`` itself, else
+    ``far`` shortened by ``retreat_reach_factors`` in turn (never below the escape ``out`` itself, the leg's first
+    segment); the shortest tried when none is reachable (the leg's finish / partial acceptance then judge it).
+    Returns ``(far, probe record)``; ``far`` unchanged without a backend IK (the test stubs)."""
+    backend = getattr(motions, "backend", None)
+    solve_ik = getattr(backend, "solve_ik", None)
+    robot = getattr(motions, "robot", None)
+    factors = tuple(cfg.retreat_reach_factors) or (1.0,)
+    if solve_ik is None or robot is None:
+        return far, {}
+    try:
+        backend.update_world(ignore_objects=ignore)
+    except Exception as e:  # noqa: BLE001
+        log.debug("retreat: world update for the reach probe failed (%r)", e)
+    q_seed = robot.get_joint_positions()
+    tried: List[Dict[str, Any]] = []
+    for f in factors:
+        d = max(float(far) * float(f), float(out))
+        if tried and abs(d - tried[-1]["far_m"]) < 1e-6:
+            break  # the floor was reached already
+        end = here[0] + d1 * d + normal_out
+        try:
+            sol = solve_ik(f"{arm}_arm", {M.EEF_LINK[arm]: (end, here[1])}, q_seed=q_seed, sync_world=False)
+        except Exception as e:  # noqa: BLE001 - a probe failure keeps the recorded distance
+            log.warning("retreat: reach probe of the escape end pose failed (%r) - keeping %.0f cm", e, far * 100)
+            return far, {"error": repr(e)[:160]}
+        tried.append({"far_m": round(d, 4), "reachable": sol is not None})
+        if sol is not None:
+            if d < far - 1e-6:
+                log.warning("retreat(%s): the escape end pose %.0f cm out is not reachable from here - shortened to %.0f cm", arm, far * 100, d * 100)
+            return d, {"tried": tried}
+    log.warning("retreat(%s): no reachable end pose along the escape (%s) - keeping the shortest, %.0f cm", arm, tried, tried[-1]["far_m"] * 100)
+    return float(tried[-1]["far_m"]), {"tried": tried, "reachable": False}
+
+
 def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
@@ -1432,25 +1511,45 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             if getattr(action, "escape_far", None):  # a pack push's shorter escape (Retreat.escape_far)
                 far = float(action.escape_far)
                 out = min(out, far)
-            end = here[0] + d1 * far + (n * out if (n is not None and radial is not None) else 0.0)
+            normal_out = n * out if (n is not None and radial is not None) else th.zeros(3)
+            # 2026-09-22: the end pose is probed for reachability first and the radial distance shortened when the arm
+            # cannot get there (0918-000750: 13 mm unreachable, the straight leg toward it folded the elbow into the upper arm)
+            far_used, probe = _retreat_reach(motions, arm, here, d1, normal_out, far, out, ignore, cfg)
+            end = here[0] + d1 * far_used + normal_out
             leg = [(here[0] + d1 * out, here[1]), (end, here[1])]
             targets["retreat"] = leg
             finish = _free_leg_finish(state, leg[-1], None, ignore, cfg)
             ctx["retreat_escape"] = {"radial": None if radial is None else [round(float(v), 3) for v in radial.tolist()],
-                                     "normal": None if n is None else [round(float(v), 3) for v in n.tolist()], "distance_m": far}
+                                     "normal": None if n is None else [round(float(v), 3) for v in n.tolist()], "distance_m": far_used}
+            if far_used < far - 1e-6:
+                ctx["retreat_escape"]["recorded_distance_m"] = far
+            if probe:
+                ctx["retreat_escape"]["reach_probe"] = probe
+    start_pose = as_world_pose(state.eef_pose(arm))
     try:
-        yield from motions.arm_along(arm, leg, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        yield from motions.arm_along(arm, leg, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free,
+                                     check_collisions=bool(cfg.retreat_check_collisions), limit_margin=float(cfg.retreat_limit_margin_rad), ignore_objects=ignore)
     except SkillError as e:
         # rush 2026-09-17 (touching 0917-204511): the converged prefix of the leg is executed before the finish is
         # rejected (witness and cuRobo IK both in another branch); a free-space retreat that already stands within
-        # retreat_partial_accept_m of its end pose is accepted as partial and judged with the loaded tolerance
+        # retreat_partial_accept_m of its end pose is accepted as partial and judged with the loaded tolerance.
+        # 2026-09-22 (0922-235343): a contact escape whose pad already stands the escape distance away from where it left
+        # the object is a retreat that did its job, however far the (unreachable) end pose still is - the left pad of the
+        # wall push sits at the arm's reach boundary and no end pose along its escape was reachable at all
         if e.reason != "plan_failed":
             raise
         dp, _ = _pose_error(state.eef_pose(arm), targets["retreat"][-1])
-        if dp > cfg.retreat_partial_accept_m:
+        moved = float(th.linalg.norm(as_world_pose(state.eef_pose(arm))[0] - start_pose[0]))
+        escape = ctx.get("retreat_escape") or {}
+        clear = bool(escape) and "skipped" not in escape and moved >= cfg.contact_retreat_escape_m - 0.005
+        if dp > cfg.retreat_partial_accept_m and not clear:
             raise
-        log.warning("retreat: the leg ends %.1f mm short of its end pose (finish rejected: %s) - accepted as a partial free-space retreat", dp * 1000, e.message)
+        log.warning("retreat: the leg ends %.1f mm short of its end pose, the pad %.1f mm from where it left the object (finish rejected: %s) - accepted as a partial free-space retreat",
+                    dp * 1000, moved * 1000, e.message)
         ctx["retreat_partial_m"] = dp
+        ctx["retreat_moved_m"] = moved
+        if clear and dp > cfg.retreat_partial_accept_m:
+            targets["retreat"] = list(targets["retreat"][:-1]) + [as_world_pose(state.eef_pose(arm))]  # the postcondition judges the pose the escape ended at
     if finish.used:
         ctx["retreat_finish"] = finish.info
 
@@ -1707,26 +1806,17 @@ def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: fl
 
 
 def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[Any], geom: "PushGeometry", pose0, cfg: ExecuteConfig,
-              ctx: Dict[str, Any], label: str, partial: bool = False) -> Iterator[th.Tensor]:
+              ctx: Dict[str, Any], label: str, partial: bool = False, speed: Optional[float] = None) -> Iterator[th.Tensor]:
     """A pad leg with the pushed object watched (owner 2026-09-17 23:39): the leg **stops as soon as the object has
     reached its goal** (``push_stop_at_goal``; residual measured against the TRO target within ``push_stop_frac_*`` of
     its tolerance) instead of driving the pad to the recorded end - the recorded arc rotates the painting further than
     the goal (0917-224633: -0.25 rad), and a pad driven on against a blocked target loads the arm and the base (the
     base sprang forward when the pad left) and squeezes the target against the brace (+0.1 rad relaxation)."""
     sign = 1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)
-    tgt = state.pose_target(obj) if hasattr(state, "pose_target") else None
-    tol = None
-    if tgt is not None:
-        tol = getattr(tgt, "orientation_tolerance" if geom.kind == "arc" else "position_tolerance", None)
-    art = ctx.get("push_articulation")
-    if art is not None and art.get("tolerance") is not None:
-        tol = float(art["tolerance"])  # the joint target's tolerance (small articulation stage 2)
-        if geom.kind == "line":
-            # a straight pad path moving a link (the lever's lift): the residual is in metres of pad travel - so is the tolerance
-            span = abs(float(art["q_to"]) - float(art.get("q_from", 0.0)))
-            tol = tol * float(geom.distance) / span if span > 1e-9 else tol
-    margin = None if tol is None else float(tol) * (cfg.push_stop_frac_arc if geom.kind == "arc" else cfg.push_stop_frac_line)
-    gen = motions.arm_along(arm, waypoints, loaded=True, partial=partial)
+    margin = _push_stop_margin(state, obj, geom, cfg, ctx)
+    if speed is None:
+        speed = cfg.push_speed_arc if geom.kind == "arc" else cfg.push_speed_line
+    gen = motions.arm_along(arm, waypoints, loaded=True, partial=partial, speed=speed)
     k = 0
     for a in gen:
         yield a
@@ -1741,6 +1831,94 @@ def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[A
             ctx.setdefault("push_stopped", []).append({"leg": label, "steps": k, "residual": float(res) * sign})
             gen.close()
             return
+
+
+def _push_stop_margin(state, obj: str, geom: "PushGeometry", cfg: ExecuteConfig, ctx: Dict[str, Any]) -> Optional[float]:
+    """The residual (rad for an arc, m for a line, in the push's sense) at which a push leg stops: ``push_stop_frac_*``
+    of the goal tolerance of the pushed object (the TRO target, or the joint target of an articulated push)."""
+    tgt = state.pose_target(obj) if hasattr(state, "pose_target") else None
+    tol = None
+    if tgt is not None:
+        tol = getattr(tgt, "orientation_tolerance" if geom.kind == "arc" else "position_tolerance", None)
+    art = ctx.get("push_articulation")
+    if art is not None and art.get("tolerance") is not None:
+        tol = float(art["tolerance"])  # the joint target's tolerance (small articulation stage 2)
+        if geom.kind == "line":
+            # a straight pad path moving a link (the lever's lift): the residual is in metres of pad travel - so is the tolerance
+            span = abs(float(art["q_to"]) - float(art.get("q_from", 0.0)))
+            tol = tol * float(geom.distance) / span if span > 1e-9 else tol
+    return None if tol is None else float(tol) * (cfg.push_stop_frac_arc if geom.kind == "arc" else cfg.push_stop_frac_line)
+
+
+def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[Any], geom: "PushGeometry", pose0, cfg: ExecuteConfig,
+                          ctx: Dict[str, Any], label: str = "push") -> Iterator[th.Tensor]:
+    """The recorded arc of a hinged target, tracked closed-loop (``push_arc_tracking = "closed_loop"``, 2026-09-22): the pad
+    first reaches the first contact pose along a straight leg (watched like any push leg), then follows the circle about
+    the arc's axis with ``Motions.arm_arc_closed_loop`` - every control step the FK of the MEASURED joints is rotated by
+    one step's angle at ``push_speed_arc`` and one differential-IK step gives the command, so the target never runs more
+    than a step ahead of where the hinge lets the pad be. The object's rotation about the axis since the push began plays
+    the part of the door joint; the leg stops as soon as the object's residual to its TRO goal is within the stop margin
+    (``push_stop_at_goal``), when the recorded arc has been swept, or when the object stops following (``push_arc_lag_factor``)."""
+    sign = math.copysign(1.0, geom.angle)
+    margin = _push_stop_margin(state, obj, geom, cfg, ctx)
+    q0_obj = as_world_pose(pose0)[1].float()
+    axis = geom.axis
+
+    def swept() -> float:  # the object's rotation about the hinge axis since the push began (the arc's sense)
+        return _rotation_about(q0_obj, C.as_tensor(state.object_pose(obj)[1]).float(), axis)
+
+    # the approach to the recorded first contact pose, at the arc's speed and watched. The recorded pre -> init leg is the
+    # first part of the push itself: the fist comes up diagonally (up and into the wall) under the slanted low edge, its
+    # top meets the edge within the first centimetres and the straight leg carries the object most of the way (0918-000750 /
+    # 0922-180242: the whole rotation happened on that leg at 0.10 m/s). The closed-loop arc takes over only AT ``init`` -
+    # the pose the sampler put the pad centre on the edge, on the recorded circle: handed over at the first touch
+    # (0922-235343) the pad orbited the hinge from a point still in front of the face plane, the orbit has no component
+    # toward the wall, and the edge slipped off the fist (the object turned 2 deg in 86 steps).
+    gen = motions.arm_along(arm, [waypoints[0]], loaded=True, speed=cfg.push_speed_arc)
+    k = 0
+    first_contact: Optional[int] = None
+    for a in gen:
+        yield a
+        k += 1
+        if first_contact is None and abs(swept()) > cfg.push_contact_detect_rad:
+            first_contact = k
+            log.info("%s(%s): first contact after %d approach steps (the object turned %.3f rad)", label, obj, k, abs(swept()))
+        if cfg.push_stop_at_goal and margin is not None:
+            res, src = push_residual(geom, state, obj, pose0, None)
+            if res is not None and src in ("goal_position", "goal_orientation") and float(res) * sign <= margin:
+                log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d approach steps -> the pad stops here", label, obj, src, float(res) * sign, margin, k)
+                ctx.setdefault("push_stopped", []).append({"leg": f"{label}-approach", "steps": k, "residual": float(res) * sign})
+                gen.close()
+                return
+    ctx["push_first_contact"] = {"approach_steps": first_contact, "swept_rad": round(abs(swept()), 4), "approach_total_steps": k}
+
+    motions.stop_requested = False
+    gen = motions.arm_arc_closed_loop(arm, geom.pivot, axis, as_world_pose(waypoints[-1]), swept, float(geom.angle), speed=cfg.push_speed_arc,
+                                      band_rad=float(margin) if margin is not None else 0.005, lag_factor=cfg.push_arc_lag_factor)
+    k = 0
+    info: Optional[Dict[str, Any]] = None
+    try:
+        while True:
+            try:
+                a = next(gen)
+            except StopIteration as e:
+                info = e.value
+                break
+            yield a
+            k += 1
+            if not cfg.push_stop_at_goal or margin is None:
+                continue
+            res, src = push_residual(geom, state, obj, pose0, None)
+            if res is None or src not in ("goal_position", "goal_orientation"):
+                continue
+            if float(res) * sign <= margin:
+                log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d closed-loop steps -> the pad stops here", label, obj, src, float(res) * sign, margin, k)
+                ctx.setdefault("push_stopped", []).append({"leg": label, "steps": k, "residual": float(res) * sign, "closed_loop": True})
+                motions.stop_requested = True
+    finally:
+        motions.stop_requested = False
+    ctx["push_arc_closed_loop"] = {"steps": k, "speed_m_s": cfg.push_speed_arc, **({} if info is None else {kk: (round(v, 4) if isinstance(v, float) else v) for kk, v in info.items()})}
+    log.info("%s(%s): closed-loop arc ended after %d steps (%s)", label, obj, k, None if info is None else info.get("stop"))
 
 
 def _hold_until_still(motions: Motions, state, obj: str, cfg: ExecuteConfig) -> Iterator[th.Tensor]:
@@ -1912,7 +2090,12 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         off = off - geom.axis * float(th.dot(off, geom.axis))
         ctx["push_pivot_offset_m"] = float(th.linalg.norm(off))  # the arc's axis vs the object's COM
         ctx["push_axis"] = [round(float(v), 3) for v in geom.axis.tolist()]
-    yield from _push_leg(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
+    closed_loop = (geom.kind == "arc" and cfg.push_arc_tracking == "closed_loop" and ctx.get("push_articulation") is None
+                   and getattr(getattr(motions, "backend", None), "fk", None) is not None and hasattr(motions, "arm_arc_closed_loop"))
+    if closed_loop:
+        yield from _push_arc_closed_loop(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
+    else:
+        yield from _push_leg(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
     # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
     yield from _hold_until_still(motions, state, obj, cfg)
     residual, source = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
@@ -1920,7 +2103,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
                             "angle_sign": (math.copysign(1.0, geom.angle) if geom.kind == "arc" else 1.0)}
     # the pad's end pose: where it actually stopped when the leg ended at the goal (0917-235415: judged against the
     # recorded arc end, 64 mm / 0.47 rad away -> 'postcondition of push failed'), else the recorded end
-    end_pose = as_world_pose(state.eef_pose(arm)) if ctx.get("push_stopped") else as_world_pose(targets["waypoints"][-1])
+    end_pose = as_world_pose(state.eef_pose(arm)) if (ctx.get("push_stopped") or ctx.get("push_arc_closed_loop")) else as_world_pose(targets["waypoints"][-1])
     # 2. re-push the residual once when it is in the push's sense and the recorded arc / line allows the extension
     if residual is not None:
         forward = residual * (1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)) > 0
@@ -2029,10 +2212,124 @@ def post_push(action: Push, state, targets, ctx) -> Optional[str]:
     return None if dp > cfg.moved_pos or da > cfg.moved_rot else "no_motion"
 
 
+#: ``contacts.brace.kind`` of the hinged (wall / axial alignment) targets whose brace stands at the GOAL edge (``brace_targets_at_goal``)
+HINGE_BRACE_KINDS = ("side_high", "below_high", "above_low")
+
+
+def _pose_reachable(motions: Motions, arm: str, pose, ignore: Sequence[Any] = ()) -> Optional[bool]:
+    """Whether the collision-aware IK of the backend (world minus ``ignore``) reaches ``pose`` with ``arm`` from the current
+    configuration; None without a backend IK (the test stubs - the plan decides then)."""
+    backend = getattr(motions, "backend", None)
+    solve_ik = getattr(backend, "solve_ik", None)
+    robot = getattr(motions, "robot", None)
+    if solve_ik is None or robot is None:
+        return None
+    try:
+        backend.update_world(ignore_objects=ignore)
+        sol = solve_ik(f"{arm}_arm", {M.EEF_LINK[arm]: as_world_pose(pose)}, q_seed=robot.get_joint_positions(), sync_world=False)
+    except Exception as e:  # noqa: BLE001
+        log.debug("reach probe of %s failed (%r)", arm, e)
+        return None
+    return sol is not None
+
+
+def brace_targets_at_goal(contact, state, cfg: ExecuteConfig, fraction: float = 1.0) -> Optional[Dict[str, Any]]:
+    """The brace ``{"pre", "contact", "approach"}`` of a hinged target moved to where the braced point of the object will
+    be AT THE GOAL, ``brace_at_goal_gap_m`` back along the brace direction (2026-09-22, owner: "a brace is a safety stop,
+    not a force"). The recorded contact was placed against the object at its initial pose; the object rotates about
+    its hinge (at its COM: the sampler's constraint anchor = the object's position) by the rotation from its current
+    orientation to its TRO goal orientation, and the braced point (the pad centre, ``CONTACT_CENTER_Z`` along the
+    approach from the eef origin) moves with it - at the initial pose the fist sat in the path of the last degrees of
+    the rotation (0918-000750: 4.7 cm of edge travel into the fist, the two fists clamped the painting, the stop kicked it
+    back 0.8 deg). The fist orientation is kept (the brace direction is the pressing direction); the pre pose keeps its
+    recorded stand-off along that direction. None when not applicable (not a hinged brace kind, no world orientation
+    goal, the object already within 0.01 rad of it, or the gap disabled) - the recorded targets are used then.
+
+    ``fraction`` < 1 places the fist at the edge position of that fraction of the goal rotation (the ladder of
+    ``brace_at_goal_fractions`` when the full goal-edge pose is out of the arm's reach from the stance, 0922-180242:
+    14 mm short for the right arm) - still ahead of the recorded contact, so the edge meets the fist later than at the
+    initial pose, though before the goal."""
+    if cfg.brace_at_goal_gap_m < 0 or getattr(contact, "kind", None) not in HINGE_BRACE_KINDS:
+        return None
+    fraction = min(max(float(fraction), 0.0), 1.0)
+    if fraction <= 0.0:
+        return None
+    obj = contact.object
+    tgt = state.pose_target(obj) if hasattr(state, "pose_target") else None
+    if tgt is None or getattr(tgt, "orientation", None) is None or str(getattr(tgt, "frame", "world")) != "world":
+        return None
+    p_obj, q_obj = state.object_pose(obj)
+    p_obj, q_obj = C.as_tensor(p_obj).reshape(-1)[:3].float(), C.as_tensor(q_obj).reshape(-1)[:4].float()
+    goal_q = C.as_tensor(tgt.orientation).reshape(-1)[:4].float()
+    rel = C.qmul(goal_q, C.qinv(q_obj))  # the world rotation taking the object from where it is to its goal
+    rel = rel / max(float(th.linalg.norm(rel)), 1e-9)
+    if float(rel[3]) < 0:
+        rel = -rel
+    angle = 2.0 * math.atan2(float(th.linalg.norm(rel[:3])), float(rel[3]))
+    if angle < 0.01:
+        return None
+    if fraction < 1.0:
+        rel = C.quat_from_axis_angle(rel[:3] / max(float(th.linalg.norm(rel[:3])), 1e-9), angle * fraction)
+    a = C.as_tensor(contact.direction).reshape(-1)[:3].float()
+    a = a / max(float(th.linalg.norm(a)), 1e-9)
+    c_p, c_q = as_world_pose(contact.contact)
+    pre_p, pre_q = as_world_pose(contact.pre)
+    pad = c_p + a * C.CONTACT_CENTER_Z  # the pad centre = the braced point of the object at its initial pose
+    pad_goal = p_obj + C.quat_rotate(rel, pad - p_obj)  # that material point at the goal (rotation about the hinge at the COM)
+    gap = float(cfg.brace_at_goal_gap_m)
+    new_c = pad_goal - a * C.CONTACT_CENTER_Z - a * gap
+    standoff = float(th.dot(c_p - pre_p, a))
+    if standoff <= 1e-3:
+        standoff = float(C.PRE_DIST)
+    new_pre = new_c - a * standoff
+    n_wp = 3  # actions.N_WAYPOINTS: 2 + the goal
+    approach = [Pose(position=[float(v) for v in (new_pre + (new_c - new_pre) * (k / n_wp)).tolist()], orientation=[float(v) for v in c_q.tolist()]) for k in range(1, n_wp + 1)]
+    return {
+        "pre": Pose(position=[float(v) for v in new_pre.tolist()], orientation=[float(v) for v in pre_q.tolist()]),
+        "contact": Pose(position=[float(v) for v in new_c.tolist()], orientation=[float(v) for v in c_q.tolist()]),
+        "approach": approach,
+        "shift_m": float(th.linalg.norm(new_c - c_p)),
+        "goal_rotation_rad": angle,
+        "fraction": fraction,
+        "gap_m": gap,
+    }
+
+
 def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
     _hook(ctx, "fov")(False)
+    recorded = {k: targets[k] for k in ("pre", "contact", "approach") if k in targets}
+    q_hint_pre = _witness(ctx, "pre")
+    supports = contact_ignores(state, action.contact.object)  # the wall / table the braced object rests against
+    at_goal = None
+    probes: List[Dict[str, Any]] = []
+    try:
+        # the goal-edge brace, at the largest fraction of the goal rotation whose pre and contact poses the collision-aware IK
+        # reaches from this stance (0922-180242: the full goal edge lay 14 mm beyond the right arm's reach)
+        for frac in tuple(cfg.brace_at_goal_fractions) or (1.0,):
+            cand = brace_targets_at_goal(action.contact, state, cfg, fraction=float(frac))
+            if cand is None:
+                break
+            ok = [_pose_reachable(motions, arm, cand[k], supports) for k in ("pre", "contact")]
+            probes.append({"fraction": float(frac), "shift_m": round(cand["shift_m"], 4), "reachable": None if any(o is None for o in ok) else all(ok)})
+            if all(o is not False for o in ok):
+                at_goal = cand
+                break
+    except Exception as e:  # noqa: BLE001 - the recorded brace stands when the goal edge cannot be computed
+        log.warning("brace(%s): goal-edge brace not computed (%r) - bracing at the recorded contact", action.contact.object, e)
+        at_goal = None
+    if probes and at_goal is None:
+        log.warning("brace(%s): no goal-edge brace pose within reach (%s) - bracing at the recorded contact", action.contact.object, probes)
+        ctx["brace_at_goal"] = {"fallback": "recorded contact", "reason": "no reachable goal-edge pose", "probes": probes}
+    if at_goal is not None:
+        targets.update({k: at_goal[k] for k in ("pre", "contact", "approach")})
+        q_hint_pre = None  # the recorded witness belongs to the recorded pre-pose; cuRobo plans the moved one
+        ctx["brace_at_goal"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in at_goal.items() if k in ("shift_m", "goal_rotation_rad", "fraction", "gap_m")}
+        if len(probes) > 1:
+            ctx["brace_at_goal"]["probes"] = probes
+        log.info("brace(%s): the fist stands where the braced edge will be at %.0f %% of the goal rotation (%.1f deg) + %.0f mm gap: contact moved %.1f cm",
+                 action.contact.object, at_goal["fraction"] * 100, math.degrees(at_goal["goal_rotation_rad"]), at_goal["gap_m"] * 1000, at_goal["shift_m"] * 100)
     opening = (getattr(action.contact, "extra", None) or {}).get("fingers_opening_m")
     if opening is not None:
         # a WIDE stop (owner 2026-09-19 00:49): the fingers pre-shaped to the recorded opening so both tips land on the braced
@@ -2041,9 +2338,17 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
         yield from motions.gripper_opening(arm, float(opening))
     else:
         yield from motions.gripper(arm, close=True)
-    supports = contact_ignores(state, action.contact.object)  # the wall / table the braced object rests against
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
-    yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
+    try:
+        yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], q_hint_pre, ctx, cfg)
+    except SkillError as e:
+        if at_goal is None or e.reason != "plan_failed":
+            raise
+        # the goal-edge pre pose is out of this stance's reach: the recorded brace (validated by the sampler) stands instead
+        log.warning("brace(%s): the goal-edge pre pose is not reachable (%s) - bracing at the recorded contact", action.contact.object, e.message)
+        targets.update(recorded)
+        ctx["brace_at_goal"] = {**ctx.get("brace_at_goal", {}), "fallback": "recorded contact", "reason": e.message[:160]}
+        yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
     obj = action.contact.object
     if cfg.brace_touch_stop_m > 0:

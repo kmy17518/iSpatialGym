@@ -20,7 +20,7 @@ from types import SimpleNamespace
 import h5py
 import os
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -2767,3 +2767,247 @@ def test_push_under_retreat_leaves_the_floor_straight_up():
     radial = here - target.pos
     radial = radial - n * float(th.dot(radial, n))
     assert float(radial[2]) < -0.01
+
+
+# ==========================================================================================
+# 2026-09-22: alignment-world_vertical 0918-000750 (the shaking painting / the robot never settled)
+# ==========================================================================================
+
+
+def test_brace_of_a_hinged_target_stands_at_the_goal_edge_with_a_gap():
+    """``brace_targets_at_goal``: the brace of a hinged target is moved to where the braced point of the object will be at
+    its goal (the pad centre rotated about the hinge at the COM by the rotation from the current to the goal orientation),
+    ``brace_at_goal_gap_m`` back along the brace direction; the fist keeps its orientation and the recorded stand-off of
+    the pre pose. Not applicable (None) for a non-hinged brace kind, without a world orientation goal, for an object
+    already at its goal, or with the gap disabled."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "alignment-world_vertical.json"))
+    actions = expand(sc.alias, sc)
+    push = [a for a in actions if isinstance(a, Push)][0]
+    brace = [a for a in actions if isinstance(a, QA_Brace)][0]
+    geom = EX.push_geometry(push.contact.waypoints, push.contact.direction)
+    assert brace.contact.kind in EX.HINGE_BRACE_KINDS
+    a = C.unit(th.tensor(brace.contact.direction, dtype=th.float32))
+    # the painting hangs the arc's angle off its goal (the recorded arc swings it back); the hinge is at its COM = the arc pivot
+    q_cur = C.quat_from_axis_angle(geom.axis, -geom.angle)
+    goal_q = C.IDENTITY_QUAT.clone()
+    tgt = SimpleNamespace(frame="world", orientation=goal_q, position=None, orientation_tolerance=0.08, orientation_equivalences=[])
+    state = SimpleNamespace(object_pose=lambda n: (geom.pivot.clone(), q_cur.clone()), pose_target=lambda n: tgt)
+    cfg = EX.ExecuteConfig()
+    out = EX.brace_targets_at_goal(brace.contact, state, cfg)
+    assert out is not None and abs(out["goal_rotation_rad"] - geom.angle) < 1e-4
+    c_p, c_q = brace.contact.contact.tensors()
+    pre_p, _ = brace.contact.pre.tensors()
+    new_c, new_q = out["contact"].tensors()
+    new_pre, _ = out["pre"].tensors()
+    pad = c_p + a * C.CONTACT_CENTER_Z  # the braced point of the painting at its initial pose
+    pad_goal = geom.pivot + C.quat_rotate(C.quat_from_axis_angle(geom.axis, geom.angle), pad - geom.pivot)
+    assert th.allclose(new_c + a * C.CONTACT_CENTER_Z, pad_goal - a * cfg.brace_at_goal_gap_m, atol=1e-5)
+    assert th.allclose(new_q, c_q)
+    assert abs(float(th.dot(new_c - new_pre, a)) - float(th.dot(c_p - pre_p, a))) < 1e-5
+    assert len(out["approach"]) == 3 and th.allclose(out["approach"][-1].tensors()[0], new_c, atol=1e-6)
+    assert abs(out["shift_m"] - float(th.linalg.norm(new_c - c_p))) < 1e-6 and out["shift_m"] > 0.02
+    assert EX.brace_targets_at_goal(replace(brace.contact, kind="stop_edge"), state, cfg) is None
+    assert EX.brace_targets_at_goal(brace.contact, SimpleNamespace(object_pose=state.object_pose, pose_target=lambda n: None), cfg) is None
+    at_goal = SimpleNamespace(object_pose=lambda n: (geom.pivot.clone(), goal_q.clone()), pose_target=lambda n: tgt)
+    assert EX.brace_targets_at_goal(brace.contact, at_goal, cfg) is None
+    assert EX.brace_targets_at_goal(brace.contact, state, replace(cfg, brace_at_goal_gap_m=-1.0)) is None
+
+
+def _wall_push_retreat_world():
+    sc = Sidecar.load(os.path.join(SIDECARS, "alignment-world_vertical.json"))
+    actions = expand(sc.alias, sc)
+    push = [a for a in actions if isinstance(a, Push)][0]
+    retreat = [a for a in actions[actions.index(push) + 1:] if a.name == "retreat" and a.arm == push.contact.arm][0]
+    assert retreat.after is push
+    geom = EX.push_geometry(push.contact.waypoints, push.contact.direction)
+    here = push.contact.goal.tensors()  # the pad at the recorded arc end
+    painting = FakeObject("painting_0", [float(v) for v in geom.pivot.tolist()], category="painting", extent=(0.4, 0.03, 0.35))
+    state = SimpleNamespace(eef_pose=lambda arm: (here[0].clone(), here[1].clone()), object_pose=lambda n: (painting.pos.clone(), painting.quat.clone()),
+                            object=lambda n: painting, held_object=lambda arm: None, robot=None)
+    return sc, retreat, state, here, geom
+
+
+class _RetreatStubMotions:
+    """Records the legs ``execute_retreat`` asks for; ``reach`` decides which escape end poses the fake IK reaches."""
+
+    cfg = MotionsConfig()
+    press_hold = None
+
+    def __init__(self, reach=None, with_ik=True):
+        self.legs: List[Any] = []
+        self.kwargs: List[Dict[str, Any]] = []
+        self.probed: List[float] = []
+        self.robot = SimpleNamespace(get_joint_positions=lambda: th.zeros(28))
+        backend = SimpleNamespace(update_world=lambda **kw: None)
+        if with_ik:
+            def solve_ik(emb, targets, q_seed=None, sync_world=True):
+                (pos, _quat), = targets.values()
+                self.probed.append(float(th.linalg.norm(pos)))
+                return th.zeros(28) if reach(pos) else None
+
+            backend.solve_ik = solve_ik
+        self.backend = backend
+
+    def arm_along(self, arm, leg, finish=None, soft_pos_tol=None, **kw):
+        self.legs.append([as_world_pose(p)[0].clone() for p in leg])
+        self.kwargs.append(dict(kw))
+        if False:
+            yield None
+
+    def gripper(self, *a, **k):
+        if False:
+            yield None
+
+    def hold(self, n):
+        if False:
+            yield None
+
+
+def test_retreat_escape_is_shortened_to_a_reachable_end_pose_and_collision_checked():
+    """The radial escape after a wall push probes its end pose with the collision-aware IK and shortens the radial
+    distance by ``retreat_reach_factors`` until it is reachable (0918-000750: the leg toward a 13 mm unreachable end
+    pose folded the elbow into the upper arm); the leg is executed collision-checked with the joint-limit margin. Without
+    a backend IK the recorded distance stands."""
+    sc, retreat, state, here, geom = _wall_push_retreat_world()
+    cfg = EX.ExecuteConfig()
+    out = cfg.contact_retreat_escape_m
+    far = max(retreat.distance, 2 * out)
+    radial = here[0] - geom.pivot
+    radial = radial / float(th.linalg.norm(radial))  # no supports in this world: the escape is purely radial
+
+    def run(motions):
+        ctx: Dict[str, Any] = {"cfg": cfg, "witnesses": {}, "hooks": {}}
+        targets = retreat.targets(sc, state)
+        list(EX.execute_retreat(retreat, motions, state, targets, ctx))
+        return ctx
+
+    # (a) the full escape is out of reach, 75 % of it is not
+    m = _RetreatStubMotions(reach=lambda pos: float(th.linalg.norm(pos - here[0])) <= 0.75 * far + 1e-4)
+    ctx = run(m)
+    esc = ctx["retreat_escape"]
+    assert abs(esc["distance_m"] - 0.75 * far) < 1e-6 and abs(esc["recorded_distance_m"] - far) < 1e-9
+    assert [t["reachable"] for t in esc["reach_probe"]["tried"]] == [False, True]
+    leg = m.legs[-1]
+    assert th.allclose(leg[0], here[0] + radial * out, atol=1e-5) and th.allclose(leg[-1], here[0] + radial * 0.75 * far, atol=1e-5)
+    assert m.kwargs[-1]["check_collisions"] is True and abs(m.kwargs[-1]["limit_margin"] - cfg.retreat_limit_margin_rad) < 1e-9
+    assert any(o is state.object("x") for o in m.kwargs[-1]["ignore_objects"])
+    # (b) nothing is reachable: the shortest tried (the escape itself) stands, judged by the leg's finish / partial acceptance
+    m = _RetreatStubMotions(reach=lambda pos: False)
+    esc = run(m)["retreat_escape"]
+    assert abs(esc["distance_m"] - out) < 1e-6 and esc["reach_probe"]["reachable"] is False and len(esc["reach_probe"]["tried"]) == 3
+    # (c) no IK on the backend (the test stubs): the recorded distance
+    m = _RetreatStubMotions(with_ik=False)
+    esc = run(m)["retreat_escape"]
+    assert abs(esc["distance_m"] - far) < 1e-9 and "recorded_distance_m" not in esc and "reach_probe" not in esc
+
+
+def test_free_leg_jam_is_relaxed_onto_the_measured_joints():
+    """``Motions._relax_if_jammed``: after a free-space leg converged, joints that keep reporting velocities above
+    ``settle_vel_tol`` without moving (a drive fighting an unseen contact: the folded elbow of 0918-000750) get their hold
+    targets relaxed onto the measured joints over ``jam_relax_steps`` steps; a still arm costs no step, a moving arm is
+    not a jam."""
+    sc, env = iors_world()
+    robot = env.robot
+    motions = Motions(env, FakeBackend(robot), MotionsConfig(settle_steps=5))
+    idx = robot.arm_control_idx["left"]
+    q_meas = robot.q[idx].clone()
+    motions.state.arm_target["left"] = q_meas + th.tensor([0.0, 0.0, 0.0, -0.0166, 0.0, 0.0, 0.0])  # the elbow 16.6 mrad short of its target
+    robot.dq[:] = 0.0
+    robot.dq[idx[3:]] = th.tensor([0.29, 2.2, 0.49, 0.70])  # what the jammed left arm reported for the whole settle window
+    acts = list(motions._relax_if_jammed(["left"]))  # no env.step: the robot stays where it is
+    assert len(acts) == motions.cfg.jam_probe_steps + motions.cfg.jam_relax_steps
+    assert th.allclose(motions.state.arm_target["left"], q_meas, atol=1e-7)
+    assert th.allclose(acts[-1][robot.controller_action_idx["arm_left"]], q_meas, atol=1e-6)
+    assert motions.last_jam is not None and motions.last_jam["arms"] == ["left"] and motions.jams == [motions.last_jam]
+    assert motions.last_jam["relaxed_rad"]["left"] == pytest.approx(0.0166, abs=1e-4)
+    # a still arm: nothing emitted
+    robot.dq[:] = 0.0
+    assert list(motions._relax_if_jammed(["left"])) == []
+    # a moving arm (velocity with motion) is not a jam: the joints advance while the probe holds
+    robot.dq[idx] = 0.5
+    n = 0
+    for _ in motions._relax_if_jammed(["left"]):
+        robot.q[idx] += 0.5 * DT
+        n += 1
+    assert n == motions.cfg.jam_probe_steps and len(motions.jams) == 1
+
+
+def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):
+    """The epilogue's first no-op window starts with the arms' hold targets relaxed onto their measured joints
+    (``epilogue_relax_arms``): a target left pressing against an unseen contact stops pushing before ``pose_settled`` is
+    judged. The window keeps its length (the relax steps are its first steps) and the relax is reported."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    relaxed_from: Dict[str, th.Tensor] = {}
+    orig_relax = motions.relax_arms
+
+    def relax_spy(arms, steps=None):
+        relaxed_from.update({a: motions.state.arm_target[a].clone() for a in arms})
+        return (yield from orig_relax(arms, steps=steps))
+
+    motions.relax_arms = relax_spy
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    assert result["n_settle_steps"] == result["settle_window"]  # the relax steps are the window's first steps
+    assert set(result["epilogue_relax"]) == {"left", "right"} == set(relaxed_from)
+    # the relaxed targets equal the measured joints (the fake joints follow their targets exactly: nothing to relax, 0 rad)
+    for arm in M.ARMS:
+        assert th.allclose(motions.state.arm_target[arm], env.robot.q[env.robot.arm_control_idx[arm]], atol=1e-6)
+        assert result["epilogue_relax"][arm] < 1e-3
+    assert result["jams"] == []
+    # with the relax off the window is pure no-op and nothing is reported
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    ex2, _, _, _ = make_executor(env2, sc2, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, epilogue_relax_arms=False))
+    result2 = ex2.run_program(expand(sc2.alias, sc2))
+    assert result2["success"] and result2["epilogue_relax"] == {} and result2["n_settle_steps"] == result2["settle_window"]
+
+
+class _FkBackend(FakeBackend):
+    """The fake backend with the FK ``arm_arc_closed_loop`` needs (the toy kinematics of the fake robot)."""
+
+    def fk(self, frames, q_full=None, emb_name="whole_body"):
+        q = self.robot.q if q_full is None else q_full
+        out = {}
+        for f in frames:
+            arm = M.arm_of_eef_link(f)
+            qa = q[self.robot.arm_control_idx[arm]]
+            rel = ARM_OFFSET[arm] + ARM_SCALE * qa[:3]
+            out[f] = (self.robot.pos + C.quat_rotate(self.robot.quat, rel), C.qmul(self.robot.quat, _quat_norm(qa[3:7])))
+        return out
+
+
+def test_arc_push_of_a_hinged_target_is_tracked_closed_loop_and_stops_at_the_goal_band():
+    """``push_arc_tracking = "closed_loop"``: the pad reaches the first contact along a straight leg, then follows the arc
+    about the hinge with ``arm_arc_closed_loop`` (one differential-IK step per control step from the measured joints, at
+    ``push_speed_arc``) and stops as soon as the object's residual to its TRO goal is within the stop margin; the end pose
+    of the push is where the pad actually stopped. The streamed leg is kept for the ``"streamed"`` setting."""
+    for tracking in ("closed_loop", "streamed"):
+        sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, tol=0.10)
+        robot = env.robot
+        backend = _FkBackend(robot)
+        motions = Motions(env, backend, MotionsConfig(settle_steps=5, gripper_steps=5, cartesian_step=0.05, cartesian_rot_step=0.3))
+        state = SimState(env, env.task, robot)
+        cfg = EX.ExecuteConfig(push_arc_tracking=tracking, push_backoff_m=0.02)
+        ctx: Dict[str, Any] = {"cfg": cfg, "witnesses": {}, "hooks": {}}
+        targets = push.targets(sc, state)
+        n = 0
+        for a in EX.run_action(push, motions, state, targets, ctx):
+            env.step(a)
+            n += 1
+        goal_q = env.task._tro.meta.pose_targets[push.contact.object].orientation
+        err = C.quat_angle(goal_q, board.quat)
+        assert err < 0.10, (tracking, err)
+        stopped = ctx.get("push_stopped") or []
+        assert stopped and stopped[-1]["residual"] <= 0.10 * cfg.push_stop_frac_arc + 1e-6, (tracking, stopped)
+        if tracking == "closed_loop":
+            cl = ctx["push_arc_closed_loop"]
+            assert stopped[-1].get("closed_loop") is True and cl["stop"] == "goal_band" and cl["steps"] == stopped[-1]["steps"]
+            assert cl["speed_m_s"] == cfg.push_speed_arc
+        else:
+            assert "push_arc_closed_loop" not in ctx and not stopped[-1].get("closed_loop")
+        # the pad backed off from where it actually stopped and the postcondition holds
+        end = state.eef_pose(push.contact.arm)
+        assert float(th.linalg.norm(end[0] - ctx["push_end_pose"][0])) < 1e-3
+        assert EX.check_postcondition(push, state, targets, ctx) is None
