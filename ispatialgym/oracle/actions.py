@@ -555,10 +555,19 @@ class Grasp(Action):
         if self.kind == "cube":
             b = self.block
             centre = block_centre_pose(state, b)  # the cube grasp is defined about the block's centre, not its root link
-            cube = C.cube_grasp(centre.tensors(), face_pair=b.face_pair, tilt_pick_deg=float(b.tilt_pick_deg), yaw=math.radians(b.yaw_deg))
+            # the pinch depth follows the recorded tip clearance (``blocks[].tip_clearance_m``, the sampler's ladder /
+            # lean-dependent finger clearance); the conventions default (3 mm) when the record carries none
+            extra = b.extra if isinstance(b.extra, dict) else {}
+            kw = {}
+            if extra.get("tip_clearance_m") is not None:
+                kw["tip_clearance"] = float(extra["tip_clearance_m"])
+            if extra.get("edge_m") is not None:
+                kw["edge"] = float(extra["edge_m"])
+            cube = C.cube_grasp(centre.tensors(), face_pair=b.face_pair, tilt_pick_deg=float(b.tilt_pick_deg), yaw=math.radians(b.yaw_deg), **kw)
             return _as_pose(cube.eef)
         art = self.articulation
-        return _handle_eef(C, art.waypoints[art.key_at(0.0)])
+        delta = _handle_delta(art, state)
+        return _handle_eef(C, art.waypoints[art.key_at(0.0)], delta=delta, joint_rot=_handle_joint_rot(art, state, delta))
 
     def targets(self, sidecar, state):
         C = _conventions()

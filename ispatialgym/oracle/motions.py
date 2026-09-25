@@ -130,6 +130,10 @@ class MotionsConfig:
     #: pre-shaped opening before a grasp descent: fingers at pinch width / 2 + this margin (m) so the lower pad of a
     #: tilted grasp clears the table (the fully open pad stood on it); None = fully open
     gripper_preshape_margin: Optional[float] = 0.010
+    #: block design (owner 2026-09-19): the first release stage of a cube opens each pad only this far past the cube's face
+    #: (a placed neighbour stands 6 mm + the 5 mm place margin away, the 8.4 mm fingertip beside it; demo 0919-121912: the
+    #: full opening shoved the neighbour 4 cm along the table)
+    cube_release_margin_m: float = 0.0045  # 8.4 mm fingertip + 4.5 mm = 12.9 mm <= the 10 mm gap + 3 mm place margin: no nudge of the neighbour
     #: hold steps of the pre-shaped opening before the descent
     gripper_preshape_steps: int = 12
     #: opening ramp (m per control step; None = the step command): every opening move is rate-limited like the grasp
@@ -336,6 +340,8 @@ class Motions:
         self.preshape_opening: Dict[str, float] = {}
         self.release_opening: Dict[str, float] = {}
         self.deferred_open: Dict[str, Dict[str, Any]] = {}
+        #: arm -> the object a staged release lets go of, woken once the assisted grasp has released it (``_wake_released``)
+        self.pending_wake: Dict[str, Any] = {}
         self.release_events: List[Dict[str, Any]] = []
 
     # ------------------------------------------------------------------ privileged reads (state, never decisions)
@@ -450,8 +456,24 @@ class Motions:
                 del self.deferred_open[arm]
                 self.preshape_opening.pop(arm, None)
                 self.release_opening.pop(arm, None)
+                if arm in self.pending_wake:
+                    self._wake_released(arm, self.pending_wake[arm])
             else:
                 self.state.gripper_cmd[arm] = self.gripper_command(arm, q_next)
+
+    def _wake_released(self, arm: str, obj) -> None:
+        """Wake a body the assisted grasp just let go of: the AG constraint held it static, PhysX may have put it to sleep, and
+        OmniGibson's ``_release_grasp`` only deletes the joint - a sleeping block released 1 cm above the table stayed there
+        (block design 0919-183037: the second block floated at its release height, 1.2 cm off its slot, 'not_reached')."""
+        if obj is None or self.held_object(arm) is obj:
+            return  # still held (a release that has not gone through yet): woken when it has
+        try:
+            if hasattr(obj, "wake"):
+                obj.wake()
+                log.info("gripper(%s): released %s woken", arm, getattr(obj, "name", obj))
+        except Exception as e:  # noqa: BLE001 - best effort
+            log.debug("wake of the released %s failed: %r", getattr(obj, "name", obj), e)
+        self.pending_wake.pop(arm, None)
 
     def hold(self, steps: int = 1) -> Iterator[th.Tensor]:
         """Emit hold actions (zero base velocity, current targets)."""
@@ -546,6 +568,7 @@ class Motions:
         self.deferred_open.pop(arm, None)  # a new command supersedes a pending deferred opening
         self.gripper_intent_closed[arm] = bool(close)
         q_now = float(self.robot.get_joint_positions()[idx].float().mean())
+        held_before = None if close else self.held_object(arm)
         if close:
             self.release_opening.pop(arm, None)  # the pre-shape of the grasp this closure completes stays: the release's first stage
             contact_hold = None
@@ -622,6 +645,11 @@ class Motions:
                 if float(self.robot.get_joint_velocities()[idx].abs().max()) < 1e-3:
                     break
         yield from self.hold(5)
+        if held_before is not None:
+            if self.held_object(arm) is held_before:
+                self.pending_wake[arm] = held_before  # released later (the deferred full opening): woken then
+            else:
+                self._wake_released(arm, held_before)
 
     # ------------------------------------------------------------------ trunk
 

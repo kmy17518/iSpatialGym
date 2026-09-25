@@ -884,6 +884,17 @@
    "mode": "representative"
   },
   {
+   "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+   "id": 82,
+   "grounded": "2026-09-19",
+   "by": "hand-grounded (agent-blockflip, owner 21:47 option 2)",
+   "subtask": "configuration_matching-block_design",
+   "iddl": "configuration_matching/block_design.iddl",
+   "pick": "configuration_matching-block_design#01",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
    "alias": "configuration_matching-attachment-cork-wine_bottle-breakfast_table",
    "id": 83,
    "grounded": "2026-09-20",

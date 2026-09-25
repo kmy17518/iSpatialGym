@@ -592,7 +592,24 @@ def camera_goal(targets: Dict[str, Any], cam_in_zed=None) -> Tuple[th.Tensor, th
 
 
 def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
-    yield from motions.track_path(targets["waypoints"], posture=targets.get("posture"))
+    # a path driven with EMPTY hands was validated by the sampler at the departing stance's arm posture (``paths[].posture``,
+    # ``untucked``); after a place + retreat the working arm still hangs over the table, so every arm holding nothing is
+    # brought back to that posture before the base moves (block design's per-block stances, owner 2026-09-19). A carried
+    # object keeps its grasp and arm (the carried paths were swept with the lift configuration).
+    posture = targets.get("posture")
+    if posture == "untucked" and not targets.get("carried") and all(state.held_object(arm) is None for arm in M.ARMS):
+        q_now = state.robot.get_joint_positions()
+        want = state.robot.untucked_default_joint_pos
+        move = {}
+        for arm in M.ARMS:
+            idx = state.robot.arm_control_idx[arm]
+            qa = C.as_tensor(want[idx]).reshape(-1).float()
+            if float(th.max(th.abs(q_now[idx].float() - qa))) > IDLE_ARM_TOL:
+                move[arm] = qa
+        ctx["navigate_arms_reposed"] = sorted(move)
+        if move:
+            yield from motions.arm_to(tuple(sorted(move)), q=move)
+    yield from motions.track_path(targets["waypoints"], posture=posture)
 
 
 def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:
@@ -671,6 +688,16 @@ def post_set_torso(action: SetTorso, state, targets, ctx) -> Optional[str]:
 def grasp_pinch_width(action: Grasp) -> Optional[float]:
     """The pinch width (m) of a library grasp — ``Grasp.meta["width"]`` of the library candidate (15.9 mm for
     ``marker__xakoic/grasp_1``); None for a cube / handle grasp or an older library entry without it (fully open)."""
+    if action.kind == "cube":
+        # block design (owner 2026-09-19): the pinch width is the cube's edge (``blocks[].edge_m``, else the conventions'
+        # default) - without a pre-shape the fully open release beside a placed neighbour 6 mm away shoved it 4 cm along
+        # the table (demo 0919-121912: both left-column blocks 3.6 cm off, 'not_reached')
+        w = (getattr(getattr(action, "block", None), "extra", None) or {}).get("edge_m")
+        try:
+            w = float(w) if w is not None else float(C.BLOCK_EDGE)
+        except (TypeError, ValueError):
+            return None
+        return w if math.isfinite(w) and w > 0 else None
     if action.kind != "library" or action.grasp is None:
         return None
     # the sampler's own measurement of the object's width at the pads (``grasps[].pinch_width_m``, attachment 2026-09-19) wins over
@@ -1288,6 +1315,9 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             d1 = radial if radial is not None else n
             out = cfg.contact_retreat_escape_m
             far = max(float(getattr(action, "distance", 0.0) or 0.0), 2 * out)
+            if getattr(action, "escape_far", None):  # a pack push's shorter escape (Retreat.escape_far)
+                far = float(action.escape_far)
+                out = min(out, far)
             end = here[0] + d1 * far + (n * out if (n is not None and radial is not None) else 0.0)
             leg = [(here[0] + d1 * out, here[1]), (end, here[1])]
             targets["retreat"] = leg

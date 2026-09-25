@@ -671,8 +671,42 @@ class R1ProCuRobo:
             inv = {v: k for k, v in kc.link_name_to_idx_map.items()}
             link_of_sphere = [inv.get(int(i), "") for i in kc.link_sphere_idx_map.cpu().tolist()]
             ground_contact = th.tensor([l in self.ground_contact_links for l in link_of_sphere], device=self.device_cfg.device)
-            entry.rsc = {"self": SelfCollisionCost(self_cfg), "batch": 0, "buffer": None, "ground_contact": ground_contact}
+            entry.rsc = {"self": SelfCollisionCost(self_cfg), "batch": 0, "buffer": None, "ground_contact": ground_contact, "link_of_sphere": link_of_sphere}
         return entry.rsc
+
+    def link_proximity(self, q_batch: th.Tensor, links: Sequence[str], margin: float, emb_name: str = "whole_body", sync_world: bool = False) -> th.Tensor:
+        """``(N,)`` bool tensor: True where a sphere of one of ``links`` lies within ``margin`` (m) of a world obstacle (the ignored
+        / attached obstacles excluded as in :meth:`check_collision`). A per-link proximity check: the block-design sampler keeps
+        the ARM links (not the pinching fingers, which work 1 mm above the table by design) clear of the table (demo
+        0919-164732: ``right_arm_link5`` brushed the table during a 45 deg pitched pinch the margin-0 checks had passed)."""
+        from curobo._src.geom.collision.buffer_collision import CollisionBuffer
+        from curobo._src.robot.kinematics.kinematics_state import KinematicsState
+
+        entry = self.kin_entry(emb_name)
+        if sync_world:
+            self.update_world()
+        q_batch = as_tensor(q_batch)
+        if q_batch.ndim == 1:
+            q_batch = q_batch.unsqueeze(0)
+        n = q_batch.shape[0]
+        self.refresh_locked_joints(emb_name, q_batch[0])
+        js = self._active_js(entry, q_batch)
+        costs = self._collision_costs(entry)
+        state = entry.fk.compute_kinematics(js)
+        spheres = state.robot_spheres.reshape(n, 1, -1, 4).contiguous()
+        if costs["batch"] != n:
+            costs["self"].setup_batch_tensors(n, 1)
+            costs["buffer"] = CollisionBuffer.from_shape(spheres.shape, self.device_cfg)
+            costs["batch"] = n
+        dev = self.device_cfg.device
+        wanted = set(links)
+        mask = th.tensor([l in wanted for l in costs["link_of_sphere"]], device=dev).unsqueeze(0)
+        weight = th.ones(1, device=dev)
+        with th.no_grad():
+            qstate = KinematicsState(robot_spheres=spheres)
+            dm = self.checker.get_sphere_collision(qstate, costs["buffer"], weight, th.full((1,), float(margin), device=dev)).reshape(n, -1)
+            near = ((dm > 0.0) & mask).any(dim=1)
+        return near.cpu()
 
     def _ground_obstacles_enabled(self, enabled: bool):
         """Enable / disable every ground-like obstacle (slab + floor/carpet/... meshes).

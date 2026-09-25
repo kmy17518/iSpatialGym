@@ -168,6 +168,14 @@ class RobotKit:
 
     # ------------------------------------------------------------------ collision
 
+    def links_clear(self, qs: th.Tensor, links: Sequence[str], margin: float) -> th.Tensor:
+        """``(N,)`` bool: True where none of ``links``' spheres lies within ``margin`` of a world obstacle (ignored objects excluded)."""
+        qs = G.t(qs)
+        if qs.ndim == 1:
+            qs = qs.unsqueeze(0)
+        self._ensure_synced()
+        return ~self.backend.link_proximity(qs, list(links), float(margin), emb_name="whole_body", sync_world=False)
+
     def collision_free(self, qs: th.Tensor, margin: float = 0.01, sync: bool = False) -> th.Tensor:
         qs = G.t(qs)
         if qs.ndim == 1:

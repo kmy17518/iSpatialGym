@@ -857,6 +857,17 @@ class Executor:
         falls back to the remembered pre-shape, else opens fully."""
         g = next((g for g in (getattr(self.sidecar, "grasps", None) or []) if g.object == action.object), None)
         if g is None:
+            blk = next((b for b in (getattr(self.sidecar, "blocks", None) or []) if getattr(b, "instance", None) == action.object), None)
+            if blk is not None:
+                # a block (owner 2026-09-19): the first stage opens each pad only ``cube_release_margin_m`` past the cube's face -
+                # a placed neighbour stands 6 mm + the 5 mm place margin from the released block, the 8.4 mm fingertip beside it
+                # (demo 0919-121912: the full opening shoved the neighbour 4 cm; the pre-shape's 1 cm margin would still push it ~7 mm)
+                try:
+                    edge = float((blk.extra or {}).get("edge_m") or C.BLOCK_EDGE)
+                except (TypeError, ValueError):
+                    return None
+                margin = float(getattr(self.motions.cfg, "cube_release_margin_m", 0.0045) if self.motions is not None else 0.0045)
+                return 0.5 * edge + margin
             return None
         try:
             width = (C.grasp_entry(g.grasp_key, g.grasp_name).meta or {}).get("width")

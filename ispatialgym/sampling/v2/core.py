@@ -728,7 +728,7 @@ class SamplerV2(TaskSampler):
         return self.sidecar.add_transition(tr)
 
     def record_departure_transition(self, frm: Stance, to: Stance, travel_trunk: Tuple[float, float], carried: Optional[str] = None,
-                                    arm: Optional[str] = None, arm_q: Optional[Dict[str, th.Tensor]] = None) -> Transition:
+                                    arm: Optional[str] = None, arm_q: Optional[Dict[str, th.Tensor]] = None, min_standoff: Optional[float] = None) -> Transition:
         """Owner 2026‑09‑19 21:56: the departure transition at ``frm`` (drive back along its own -forward to s_T, sweep
         the trunk to ``travel_trunk``, no drive-in); the path ``frm -> to`` recorded after it must start at
         ``NAV.departure_pose(frm, tr.stand_off)`` and be driven at ``travel_trunk`` (:meth:`record_path` ``start_pose2d``
@@ -738,9 +738,11 @@ class SamplerV2(TaskSampler):
         if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
             arm_q = {arm: self.carry_arm_q[carried]}
         margin = float(self.gp.gen("carry_collision_margin_m", 0.04)) if (carried and obj is not None) else 0.01
-        tr = NAV.departure_transition(self.kit, frm, to, travel_trunk, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, margin=margin)
+        tr = NAV.departure_transition(self.kit, frm, to, travel_trunk, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, margin=margin,
+                                      min_standoff=min_standoff)
         if tr is None:
-            raise Reject("no_transition", f"{frm.name} -> {to.name} (departure): no s_T in {NAV.transition_standoffs(frm.stand_off or 0.0)} admits the drive-back + "
+            raise Reject("no_transition", f"{frm.name} -> {to.name} (departure): no s_T in {NAV.transition_standoffs(frm.stand_off or 0.0)}"
+                                          + (f" >= {float(min_standoff):.2f}" if min_standoff is not None else "") + " admits the drive-back + "
                                           f"trunk sweep {(frm.translate, round(frm.tilt, 2))} -> {tuple(round(float(v), 2) for v in travel_trunk)}")
         tr.holding = carried or tr.holding
         return self.sidecar.add_transition(tr)

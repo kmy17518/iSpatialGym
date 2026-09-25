@@ -32,6 +32,7 @@ from dataclasses import replace
 from typing import Callable, Dict, List, Optional, Tuple
 
 from ispatialgym.oracle.actions import (
+    RETREAT_DIST,
     RETREAT_LITTLE,
     Action,
     BaseFollow,
@@ -47,7 +48,7 @@ from ispatialgym.oracle.actions import (
     Transition,
     block_reorients,
 )
-from ispatialgym.oracle.sidecar import ARMS, GraspRecord, Pose, Sidecar, SidecarError, subtask_of_alias
+from ispatialgym.oracle.sidecar import ARMS, BraceContact, GraspRecord, Pose, PushContact, Sidecar, SidecarError, subtask_of_alias
 
 # ----------------------------------------------------------------------------------------------------------------
 # Shared pieces
@@ -115,6 +116,23 @@ def _working_arm(sc: Sidecar, stance: str = "manipulation") -> str:
     return arms[0]
 
 
+def _block_working_arm(sc: Sidecar, stance: str) -> str:
+    """The arm that picks / places the blocks at ``stance`` (block design): the stance's single working arm, or - at a stance
+    whose arms list the brace arm too (``stances[].arms == ["right", "left"]`` where a block carries a brace) - the arm
+    that is not any recorded brace's arm (the sampler lists the working arm first; pod run 0919-144520: the first
+    two-arm stance broke the single-arm rule)."""
+    arms = sc.stance(stance).working_arms
+    if len(arms) == 1:
+        return arms[0]
+    if not arms:
+        raise SidecarError(f"stances[{stance!r}].arms: no working arm recorded")
+    brace_arms = {getattr(getattr(b, k, None), "arm", None) for b in sc.blocks for k in ("brace_row", "brace_col")} - {None}
+    rest = [a for a in arms if a not in brace_arms]
+    if len(rest) == 1:
+        return rest[0]
+    return arms[0]
+
+
 def _push_contact(sc: Sidecar):
     if sc.contacts is None or sc.contacts.push is None:
         raise SidecarError("contacts.push: required for this subtask")
@@ -139,6 +157,29 @@ def _place_and_retreat(g: GraspRecord, kind: str, relation: str = "on") -> List[
 
 # annotation relation word of the IORS place per relation (the partner ends under the target for under_small)
 _IORS_RELATION_WORDS = {"ontop": "on", "under": "under", "under_small": "on", "inside": "into", "nextto": "next to", "touching": "next to"}
+
+
+def _pack_stage_actions(sc: Sidecar, brace, pushes, base_yaw: float) -> List[Action]:
+    """Block design packing stage (owner 2026-09-19 21:47): the wide brace (fingers pre-shaped to ``fingers_opening_m`` so a
+    finger side rests on each of the two braced cubes) is placed and held, every listed push closes one cube's gap against it
+    (the push arm retreats a little between pushes), then the brace arm releases and retreats."""
+    out: List[Action] = []
+    b = None
+    if brace is not None:
+        b = Brace(contact=brace, base_yaw=base_yaw)
+        out.append(b)
+    for push in pushes:
+        if brace is not None and push.arm == brace.arm:
+            raise SidecarError(f"pack: brace and push both use the {brace.arm} arm")
+        p = Push(contact=push, base_yaw=base_yaw)
+        # the pad leaves a pack push 5 cm opposite the push and 5 cm up (Retreat.escape_far; the sampler validates that pose)
+        out += [p, Retreat(arm=push.arm, object=push.object, after=p, distance=0.05, escape_far=0.05)]
+    if b is not None:
+        # a wide brace holds nothing: its fingers stay at the recorded opening while the arm lifts off (a release would slide the
+        # finger sides along the cubes' faces first); a closed-blade brace releases as before
+        wide = (getattr(brace, "extra", None) or {}).get("fingers_opening_m") is not None
+        out.append(Retreat(arm=brace.arm, object=brace.object, after=b, release=not wide))
+    return out
 
 
 def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float) -> List[Action]:
@@ -237,12 +278,21 @@ def table_flip_record(b) -> Optional[Dict[str, object]]:
     for key in ("face_pair", "tilt_pick_deg", "yaw_deg", "pick"):
         if key not in rg:
             raise SidecarError(f"{where}.regrasp.{key}: required")
+    extra = {k: v for k, v in (b.extra or {}).items() if k != "table_flip"}
+    # the re-grasp's own pinch depth (its tip clearance) replaces leg 1's; the yaw-align is done (leg 2 keeps the orientation)
+    for key in ("tip_clearance_m", "grasp_class", "stance"):
+        if rg.get(key) is not None:
+            extra[key] = rg[key]
+    extra["yaw_align_deg"] = 0.0
     block = replace(b, face_pair=str(rg["face_pair"]), tilt_pick_deg=float(rg["tilt_pick_deg"]), yaw_deg=float(rg["yaw_deg"]),
                     carry_height=float(rg.get("carry_height", b.carry_height)), pick=Pose.from_dict(rg["pick"], f"{where}.regrasp.pick"),
-                    flip_sign=0, flip_axis=None, waypoints=None, extra={k: v for k, v in (b.extra or {}).items() if k != "table_flip"})
+                    flip_sign=0, flip_axis=None, waypoints=None, extra=extra)
     return {"place": Pose.from_dict(raw["place"], f"{where}.place"),
             "pre_place": Pose.from_dict(raw["pre_place"], f"{where}.pre_place") if raw.get("pre_place") else None,
-            "block": block}
+            "block": block, "relation": raw.get("relation"),
+            # "flip in place, then move" (owner 2026-09-19): leg 1 turns the block in hand before the set-down; the 2026-09-16
+            # flip-on-the-table record (no in-hand reorient, the turn happens through the re-grasp) leaves the flag unset
+            "in_hand_flip": bool(raw.get("in_hand_flip", False))}
 
 
 def program_block_design(sc: Sidecar) -> List[Action]:
@@ -266,30 +316,59 @@ def program_block_design(sc: Sidecar) -> List[Action]:
     pose that sets the block down on a free cell in the intermediate orientation, then the cube grasp of the other
     pitch class that picks it up again (recorded like any grasp / place, all poses in frame). The program emits
     grasp → lift → place(intermediate) → retreat → grasp(re-grasp) → lift → place(slot) → retreat; each grasp →
-    release pair is its own gripper-in-FOV span (QA rule (b))."""
+    release pair is its own gripper-in-FOV span (QA rule (b)).
+
+    **Per-block stances** (owner 2026-09-19: the robot may move between blocks for IK feasibility): a block whose record
+    names a ``stance`` other than the one the robot stands at is preceded by the recorded travel (path and / or
+    transition, hands empty) from the current stance to it; the first block's stance defaults to ``manipulation``. The
+    working arm and the base yaw of the brace / push tail are those of the block's own stance."""
     if not sc.blocks:
         raise SidecarError("blocks: required for block design")
-    arm = _working_arm(sc)
-    base_yaw = sc.stance("manipulation").base_pose2d[2]
-    actions = _travel(sc, "init", "manipulation")
+    current = "manipulation"
+    actions = _travel(sc, "init", current)
     for b in sorted(sc.blocks, key=lambda blk: blk.order):
+        wanted = str((b.extra or {}).get("stance") or "manipulation")
+        if wanted != current:
+            actions += _travel(sc, current, wanted)
+            current = wanted
+        arm = _block_working_arm(sc, current)
+        base_yaw = sc.stance(current).base_pose2d[2]
         grasp = Grasp(kind="cube", arm=arm, object=b.instance, block=b)
         lift = Lift(arm=arm, object=b.instance, carry_height=b.carry_height, after=grasp)
         actions += [grasp, lift]
         last: Action = lift
         flip = table_flip_record(b)
         if flip is not None:
+            # two legs (owner 2026-09-19, "flip in place, then move"): leg 1 turns the block in hand (the record's flip fields:
+            # the steep side pick, the recorded flip waypoints) and sets it down again — on its own cell in the goal orientation
+            # (``table_flip.place``) — leg 2 re-grasps it with a plain pitched pinch (``table_flip.regrasp``) and places it at
+            # the slot; the in-hand flip's place left of the pick cell was the one step no stance passed
+            if flip.get("in_hand_flip") and block_reorients(b):
+                last = Reorient(mode="flip", arm=arm, object=b.instance, after=lift, block=b, waypoints=b.waypoints)
+                actions.append(last)
             mid = Place(kind="support", arm=arm, object=b.instance, place=flip["place"], pre_place=flip.get("pre_place"),
-                        relation="on a free cell of the table, turned onto its side for the re-grasp")
+                        relation=str(flip.get("relation") or "back on its own cell, turned to its goal face, for the re-grasp"))
+            actions += [mid, Retreat(arm=arm, object=b.instance, after=mid, distance=RETREAT_LITTLE)]
+            # the re-grasp may work from another recorded stance (``table_flip.regrasp.stance``): travel with empty hands first
+            wanted2 = str((flip["block"].extra or {}).get("stance") or current)
+            if wanted2 != current:
+                actions += _travel(sc, current, wanted2)
+                current = wanted2
+                arm = _block_working_arm(sc, current)
+                base_yaw = sc.stance(current).base_pose2d[2]
             regrasp = Grasp(kind="cube", arm=arm, object=b.instance, block=flip["block"])
             relift = Lift(arm=arm, object=b.instance, carry_height=flip["block"].carry_height, after=regrasp)
-            actions += [mid, Retreat(arm=arm, object=b.instance, after=mid, distance=RETREAT_LITTLE), regrasp, relift]
+            actions += [regrasp, relift]
             last = relift
         elif block_reorients(b):
             last = Reorient(mode="flip", arm=arm, object=b.instance, after=lift, block=b, waypoints=b.waypoints)
             actions.append(last)
         slot = "at its initial position (the anchor)" if b.order == 0 else "at its slot in the goal grid"
-        place = Place(kind="support", arm=arm, object=b.instance, place=b.place, relation=slot)
+        # the recorded pre-place when the sampler wrote one (``blocks[k].pre_place``: the flip classes pass a 5 cm descent
+        # where the 10 cm default does not), else the conventions' PRE_DIST back along the approach
+        pre_raw = (b.extra or {}).get("pre_place")
+        pre_place = Pose.from_dict(pre_raw, f"blocks[{b.order}].pre_place") if isinstance(pre_raw, dict) else None
+        place = Place(kind="support", arm=arm, object=b.instance, place=b.place, pre_place=pre_place, relation=slot)
         actions += [place, Retreat(arm=arm, object=b.instance, after=place, distance=RETREAT_LITTLE)]
         for kind in ("row", "col"):
             brace, push = getattr(b, f"brace_{kind}"), getattr(b, f"push_{kind}")
@@ -300,6 +379,21 @@ def program_block_design(sc: Sidecar) -> List[Action]:
             if push.arm != arm:
                 raise SidecarError(f"blocks[{b.order}].push_{kind}: the working arm is {arm!r}, the push is recorded for {push.arm!r}")
             actions += _brace_push_retreat(sc, brace, push, base_yaw)
+    # packing tail (owner 2026-09-19 21:47, ``sidecar.pack``): with every block at its (loose) place, the columns are closed
+    # against the wide-braced left column, then the rows against the wide-braced far (or near) row - the blocks end packed
+    pack = (sc.extra or {}).get("pack") if isinstance(getattr(sc, "extra", None), dict) else None
+    if isinstance(pack, dict) and pack.get("stages"):
+        wanted = str(pack.get("stance") or "manipulation")
+        if wanted != current:
+            actions += _travel(sc, current, wanted)
+            current = wanted
+        base_yaw = sc.stance(current).base_pose2d[2]
+        for i, stage in enumerate(pack["stages"]):
+            brace = BraceContact.from_dict(stage["brace"], f"pack.stages[{i}].brace") if stage.get("brace") else None  # None: pushes only
+            pushes = [PushContact.from_dict(p, f"pack.stages[{i}].pushes[{j}]") for j, p in enumerate(stage.get("pushes") or [])]
+            if not pushes:
+                raise SidecarError(f"pack.stages[{i}]: no pushes")
+            actions += _pack_stage_actions(sc, brace, pushes, base_yaw)
     return actions
 
 

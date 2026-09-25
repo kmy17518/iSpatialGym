@@ -336,9 +336,139 @@ class _Tracker:
         self.sidecar = sidecar
         #: arm -> its 7 arm-joint values while it braces (from the brace action's ``contact`` witness)
         self.arm_q: Dict[str, th.Tensor] = {}
+        #: arm -> the (sampler-frame, 28-D) configuration the previous arm action ended in (block design chaining); reset by
+        #: every base motion
+        self.arm_end_q: Dict[str, th.Tensor] = {}
         #: where the robot stands after a hybrid ``base_follow`` (the base moved off the manipulation stance): the in-memory
         #: stance the following actions (the retreat) are checked from, until the next navigate / transition
         self.stance_obj: Optional[Stance] = None
+        #: sim objects moved by :meth:`advance_block` (name -> init (pos, quat)), restored by :meth:`restore_moved`
+        self.moved: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+
+    def advance_block(self, action, sampler) -> None:
+        """Block design (owner 2026-09-19): after the intermediate ``Place`` of a flip-in-place block (``table_flip.place``) the
+        sim object is moved to ``table_flip.block_pose_after`` (turned, on its own cell), so the re-grasp — ``Grasp[cube]``
+        derives its pose from the live block — is checked on the block the program leaves; after the final ``Place`` to the
+        record's ``goal_pose`` (the world the later blocks are checked in). Restored by :meth:`restore_moved`."""
+        name = getattr(action, "object", None)
+        blocks = getattr(self.sidecar, "blocks", None) or []
+        rec = next((b for b in blocks if isinstance(b, dict) and b.get("instance") == name), None)
+        if rec is None or sampler is None or name not in getattr(sampler, "objects", {}):
+            return
+        place = getattr(action, "place", None)
+        target = None
+        tf = rec.get("table_flip") if isinstance(rec.get("table_flip"), dict) else None
+        if tf is not None and place is not None and tf.get("place") and tf.get("block_pose_after"):
+            p_mid = tf["place"].get("position") if isinstance(tf["place"], dict) else None
+            if p_mid is not None and float(th.linalg.norm(th.tensor([float(v) for v in place.position]) - th.tensor([float(v) for v in p_mid]))) < 1e-3:
+                target = tf["block_pose_after"]
+        # the FINAL place advances the block to its recorded goal pose (``blocks[].goal_pose``, the sampler's world after the
+        # place): the later blocks' grasps / lifts / reorients see the placed blocks where they are, not at their emptied init cells
+        # (0919-164732 attempt 0: a set-down retreat 'had no solution' with a placed block still standing 11 cm away at its init
+        # cell). The adjacency artefact of the coarse cube sphere fit at the next block's place - the reason the final place was
+        # not advanced before - is handled by ``blocks[].ignore_place`` (the sampler's placed-neighbour rule, ``_ignore_for``)
+        if target is None and place is not None and isinstance(rec.get("goal_pose"), dict) and isinstance(rec.get("place"), dict):
+            p_fin = rec["place"].get("position")
+            if p_fin is not None and float(th.linalg.norm(th.tensor([float(v) for v in place.position]) - th.tensor([float(v) for v in p_fin]))) < 1e-3:
+                target = rec["goal_pose"]
+        if not (isinstance(target, dict) and target.get("position") and target.get("orientation")):
+            return
+        obj = sampler.objects[name]
+        if name not in self.moved:
+            p0, q0 = obj.get_position_orientation()
+            self.moved[name] = (p0.clone(), q0.clone())
+        obj.set_position_orientation(th.tensor([float(v) for v in target["position"]]), th.tensor([float(v) for v in target["orientation"]]))
+        obj.keep_still()
+        sampler.kit.sync_world()
+
+    def advance_push(self, action, sampler) -> None:
+        """Block design packing tail (owner 2026-09-19 21:47): a push of ``sidecar.pack`` moves its cube (and, for a wall push, the
+        cube it drives ahead of it) by the recorded travel minus the blade's stand-off, so the next push's blade is checked
+        against the cubes where the program leaves them (a pack push of 18 mm otherwise overlaps the un-moved neighbour in this
+        static world). Restored by :meth:`restore_moved`."""
+        contact = getattr(action, "contact", None)
+        name = getattr(action, "object", None) or getattr(contact, "object", None)
+        # the tracker holds the sampler's SidecarDraft (``pack`` attribute); the F6 Sidecar keeps it under ``extra``
+        pack = getattr(self.sidecar, "pack", None)
+        if not isinstance(pack, dict):
+            pack = (self.sidecar.extra or {}).get("pack") if isinstance(getattr(self.sidecar, "extra", None), dict) else None
+        if not isinstance(pack, dict) or sampler is None or name not in getattr(sampler, "objects", {}) or contact is None:
+            if isinstance(pack, dict):
+                log.warning("program check: pack push of %s not advanced (object unknown or no contact)", name)
+            return
+        rec, best = None, 1e9
+        try:
+            p_init = th.tensor([float(v) for v in contact.init.position])
+        except Exception:  # noqa: BLE001
+            return
+        for stage in pack.get("stages") or []:
+            for p_ in stage.get("pushes") or []:
+                if p_.get("object") != name or not isinstance(p_.get("init"), dict):
+                    continue
+                d_ = float(th.linalg.norm(th.tensor([float(v) for v in p_["init"].get("position", [0, 0, 0])]) - p_init))
+                if d_ < best:
+                    rec, best = p_, d_
+        if rec is None or best > 1e-3:
+            log.warning("program check: no pack push record matches push of %s (nearest %.4f m) - the world is not advanced", name, best)
+            return
+        travel = float(rec.get("distance_m", 0.0)) - float(rec.get("standoff_m", 0.0))
+        d = th.tensor([float(v) for v in rec.get("direction", [0, 0, 0])])
+        if travel <= 0.0 or float(th.linalg.norm(d)) < 1e-6:
+            return
+        d = d / th.linalg.norm(d)
+        d2 = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
+        # the cubes ahead of the pushed one along the direction (the wall pushes drive the neighbour column / row along) - in the
+        # table plane: a turned cube's ROOT sits an edge higher than an unturned one's (0920-173048: the driven right column was
+        # missed on the 25 mm root-z difference and stayed 9 mm short of the sampler's world)
+        pushed = sampler.objects[name]
+        p_c, _ = pushed.get_position_orientation()
+        edge = float(getattr(sampler, "edge", 0.0254))
+        for other, obj in sampler.objects.items():
+            if other == name or not any(other == b.get("instance") for b in (getattr(self.sidecar, "blocks", None) or [])):
+                continue
+            p_o, _ = obj.get_position_orientation()
+            rel = (p_o - p_c)[:2]
+            along = float(th.dot(rel, d2))
+            across = float(th.linalg.norm(rel - along * d2))
+            if 0.0 < along < travel + edge and across < 0.6 * edge:
+                # it moves by what the pushed cube's travel leaves after closing the gap between them down to the sampler's packed
+                # gap (its world model keeps ``block_gap_m`` between packed cubes; 0920-093727: 1 mm off put a hand 2.7 mm from
+                # the neighbour where the sampler had 3.7)
+                g_pack = float(sampler.g("block_gap_m")) if hasattr(sampler, "g") else 0.0
+                gap = max(0.0, along - edge - g_pack)
+                move = max(0.0, travel - gap)
+                if move > 1e-4:
+                    self._shift(other, obj, d * move, sampler)
+        self._shift(name, pushed, d * travel, sampler)
+        sampler.kit.sync_world()
+
+    def _shift(self, name: str, obj, delta: th.Tensor, sampler) -> None:
+        p0, q0 = obj.get_position_orientation()
+        if name not in self.moved:
+            self.moved[name] = (p0.clone(), q0.clone())
+        obj.set_position_orientation(p0 + delta, q0)
+        obj.keep_still()
+
+    def restore_moved(self, sampler) -> None:
+        if not self.moved or sampler is None:
+            return
+        for name, (p0, q0) in self.moved.items():
+            obj = sampler.objects.get(name)
+            if obj is not None:
+                obj.set_position_orientation(p0, q0)
+                obj.keep_still()
+        self.moved.clear()
+        sampler.kit.sync_world()
+
+    def note_arm_end(self, action, end_q: Optional[th.Tensor]) -> None:
+        """Remember where an arm action left the acting arm (``check_action_targets``' raw end witness); a base motion forgets it."""
+        name = getattr(action, "name", "")
+        if name in ("navigate", "transition", "base_follow", "set_torso"):
+            self.arm_end_q.clear()
+            return
+        arms = list(getattr(action, "arms", ()) or [])
+        if end_q is not None and arms:
+            self.arm_end_q[arms[0]] = end_q.clone()
 
     def locked_arms(self, action) -> Dict[str, th.Tensor]:
         """The arms held at a contact configuration while ``action`` runs (never the acting arm itself)."""
@@ -383,6 +513,9 @@ class _Tracker:
             self.carried = getattr(action, "object", None) if getattr(action, "kind", "library") != "handle" else None
         elif name == "place":
             self.carried = None
+            self.advance_block(action, sampler)
+        elif name == "push":
+            self.advance_push(action, sampler)
         arms = list(getattr(action, "arms", ()) or [])
         if name == "brace" and arms and witnesses and sampler is not None:
             # the brace hand stays at its contact until its own retreat: its solved contact configuration locks the arm for
@@ -442,15 +575,34 @@ def check_base_follow_handles(sidecar: SidecarDraft, sampler, action, targets: D
     return n
 
 
-def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], List[Any]]:
+def _ignore_for(action, sampler, carried: Optional[str], sidecar=None) -> Tuple[List[Any], List[Any]]:
     """(objects removed for the final pose only, objects removed for every waypoint) per §3.6: the support for grasp /
     place / contact end poses; the pushed object along a push; the braced object at the brace contact; the object placed
-    on at the place pose (the carried object rests on it 1 cm above)."""
+    on at the place pose (the carried object rests on it 1 cm above).
+
+    Block design (``sidecar.blocks[]``, owner 2026-09-19): a block record's ``ignore_place`` (instance names) is removed for
+    the block's final ``place`` and the ``retreat`` after it - the blocks already at their slots beside it, which the sampler
+    ignored with the finger clearance guaranteed geometrically (block_design ``placed_neighbours``); the checker's world
+    keeps them at their init cells, where the anchor's cell IS its slot (0919-093852: 'place: exact IK failed at pose 1 of 1'
+    on the second block, 3 cm from the anchor)."""
     name = getattr(action, "name", "")
     supports = list(sampler.support_objects())
     objs = sampler.objects
     last: List[Any] = []
     every: List[Any] = []
+    if sidecar is not None and name in ("place", "retreat"):
+        place_action = action if name == "place" else getattr(action, "after", None)
+        if getattr(place_action, "name", "") == "place":
+            obj_name = getattr(action, "object", None)
+            rec = next((b for b in (getattr(sidecar, "blocks", None) or []) if isinstance(b, dict) and b.get("instance") == obj_name), None)
+            final = (rec or {}).get("place") if isinstance((rec or {}).get("place"), dict) else None
+            p_act = getattr(getattr(place_action, "place", None), "position", None)
+            if final is not None and p_act is not None:
+                d = th.linalg.norm(th.tensor([float(v) for v in final["position"]]) - th.tensor([float(v) for v in p_act]))
+                if float(d) < 0.002:  # the FINAL place (not the flip-in-place set-down on the block's own cell)
+                    for n_ in rec.get("ignore_place") or []:
+                        if n_ in objs:
+                            every.append(objs[n_])
     # a module may record exactly what it ignored while solving a chain (names of bddl instances or "supports") on the
     # sidecar record the action carries: ``ignore_every`` / ``ignore_last`` in ``contacts.*`` / ``grasps[]`` extras
     rec = getattr(action, "contact", None) or getattr(action, "grasp", None)
@@ -468,9 +620,14 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
         if place_on in objs:
             every.append(objs[place_on])
     if name == "push":
-        obj = getattr(getattr(action, "contact", None), "object", None)
+        c_ = getattr(action, "contact", None)
+        obj = getattr(c_, "object", None)
         if obj in objs:
             every.append(objs[obj])  # the pushed object moves with the pads
+        # a pack push drives the cubes in line ahead of the pushed one along (``driven`` on the record): out of the blade's way
+        for n_ in ((getattr(c_, "extra", None) or {}).get("driven") or []):
+            if n_ in objs and all(objs[n_] is not o for o in every):
+                every.append(objs[n_])
         every += supports
     if name == "brace":
         # the support(s) are removed along the *whole* approach chain, as for a push: a wall / stop brace approaches
@@ -485,7 +642,25 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
         if obj in objs:
             every.append(objs[obj])  # the retreat starts with the pads around the released object
         every += supports
+        # a retreat from a wide brace / pack push starts with a finger side on EVERY braced cube (``braced`` on the contact record)
+        c_after = getattr(getattr(action, "after", None), "contact", None)
+        for n_ in ((getattr(c_after, "extra", None) or {}).get("braced") or []):
+            if n_ in objs and all(objs[n_] is not o for o in every):
+                every.append(objs[n_])
     return last, every
+
+
+def _is_pack_push(sidecar, action) -> bool:
+    """A push of the block-design packing tail (``sidecar.pack`` stages; the draft's attribute or the F6 ``extra``)."""
+    if getattr(action, "name", "") != "push":
+        return False
+    pack = getattr(sidecar, "pack", None)
+    if not isinstance(pack, dict):
+        pack = (sidecar.extra or {}).get("pack") if isinstance(getattr(sidecar, "extra", None), dict) else None
+    if not isinstance(pack, dict):
+        return False
+    obj = getattr(getattr(action, "contact", None), "object", None)
+    return any(p_.get("object") == obj for st_ in (pack.get("stages") or []) for p_ in (st_.get("pushes") or []))
 
 
 def _approached_for(action, sampler) -> Optional[List[Any]]:
@@ -504,6 +679,51 @@ def _approached_for(action, sampler) -> Optional[List[Any]]:
     if cand is None:
         return None
     return [objs[cand]] if cand in objs else []
+
+
+def _block_eef_in_object(sidecar, sampler, carried: str) -> Optional[Tuple[th.Tensor, th.Tensor]]:
+    """``T_block->eef`` of the cube grasp that holds block ``carried`` (block design, ``blocks[]`` records): the record's
+    ``pick`` eef pose relative to the block's *current* root pose - the init pose for the first leg, the turned set-down pose
+    (``table_flip.block_pose_after``, where :meth:`_Tracker.advance_block` moved it) with the ``table_flip.regrasp.pick`` for
+    the second leg. None without a record."""
+    from ispatialgym.sampling import geometry as G
+
+    blocks = getattr(sidecar, "blocks", None) or []
+    rec = next((b for b in blocks if isinstance(b, dict) and b.get("instance") == carried), None)
+    obj = sampler.objects.get(carried)
+    if rec is None or obj is None or not isinstance(rec.get("pick"), dict):
+        return None
+    p, q = obj.get_position_orientation()
+    pick = rec["pick"]
+    tf = rec.get("table_flip") or {}
+    after = tf.get("block_pose_after") if isinstance(tf, dict) else None
+    regrasp_pick = (tf.get("regrasp") or {}).get("pick") if isinstance(tf, dict) else None
+    if isinstance(after, dict) and isinstance(regrasp_pick, dict) and after.get("position") is not None:
+        if float(th.linalg.norm(th.tensor([float(v) for v in after["position"]]) - p.float())) < 0.02:
+            pick = regrasp_pick
+    eef = (th.tensor([float(v) for v in pick["position"]]), th.tensor([float(v) for v in pick["orientation"]]))
+    rel = G.relative(eef, (p.float(), q.float()))
+    return (th.as_tensor(rel[0], dtype=th.float32), th.as_tensor(rel[1], dtype=th.float32))
+
+
+def _block_pick_q(sidecar, sampler, name: str) -> Optional[List[float]]:
+    """The sampler's right-arm pick configuration (7 joints) of block ``name``: ``blocks[].pick_q`` for the first grasp,
+    ``table_flip.regrasp.pick_q`` once the block lies turned on its own cell (``advance_block`` moved it there). The grasp IK is
+    seeded there so the witnesses - and the oracle's whole chain from them - run in the branch the sampler tracked."""
+    blocks = getattr(sidecar, "blocks", None) or []
+    rec = next((b for b in blocks if isinstance(b, dict) and b.get("instance") == name), None)
+    obj = sampler.objects.get(name)
+    if rec is None or obj is None:
+        return None
+    q = rec.get("pick_q")
+    tf = rec.get("table_flip") or {}
+    after = tf.get("block_pose_after") if isinstance(tf, dict) else None
+    rq = (tf.get("regrasp") or {}).get("pick_q") if isinstance(tf, dict) else None
+    if isinstance(after, dict) and rq and after.get("position") is not None:
+        p, _ = obj.get_position_orientation()
+        if float(th.linalg.norm(th.tensor([float(v) for v in after["position"]]) - p.float())) < 0.02:
+            q = rq
+    return [float(v) for v in q] if isinstance(q, list) and len(q) == 7 else None
 
 
 def _explicit_ignores(rec, sampler) -> Optional[Tuple[List[Any], List[Any]]]:
@@ -529,8 +749,13 @@ def _explicit_ignores(rec, sampler) -> Optional[Tuple[List[Any], List[Any]]]:
     return _resolve(src.get("ignore_last")), _resolve(src.get("ignore_every"))
 
 
+#: the target key whose witness is where an action leaves the acting arm (the retreat leg of a place, the chain end of a lift)
+_END_KEY = {"grasp": "grasp", "lift": "lift", "reorient": "waypoints", "place": "retreat", "retreat": "retreat"}
+
+
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
-                         locked_arms: Optional[Dict[str, th.Tensor]] = None, stance_obj: Optional[Stance] = None) -> Tuple[int, Dict[str, Any]]:
+                         locked_arms: Optional[Dict[str, th.Tensor]] = None, stance_obj: Optional[Stance] = None,
+                         q_seed_prev: Optional[th.Tensor] = None) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
     (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
     object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
@@ -559,9 +784,16 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     carried_obj = sampler.objects.get(carried) if carried else None
     g = sidecar.grasp_of(carried) if carried else None
     eef_in_object = g.eef_in_object if g is not None else None
+    if g is None and carried_obj is not None:
+        # a block (``blocks[]`` carries no grasps[] record): the cube grasp's eef in the block frame from the record's pick and
+        # the block where it lies now. Without it ``attached`` used the CURRENT object-eef offset - the block on the table
+        # against the idle hand - and every attached pose was checked with a phantom cube a hand-to-block vector away
+        # (0919-093852 attempt 1: 'place: exact IK failed at pose 1 of 1 ... carried toy_dice.n.01_4' where the sampler's
+        # own check of that place passed)
+        eef_in_object = _block_eef_in_object(sidecar, sampler, carried)
     if carried_obj is not None and g is not None and g.arm and name in ("lift", "reorient", "place", "navigate", "transition", "set_torso"):
         arm = g.arm
-    ignore_last, ignore_all = _ignore_for(action, sampler, carried)
+    ignore_last, ignore_all = _ignore_for(action, sampler, carried, sidecar)
     approached = _approached_for(action, sampler)
     # push / brace contacts are made with closed pads (§3.6 contact eef poses; the gripper closes before the pre-contact); the
     # push arm retreats still closed (the brace arm releases first: ``_brace_push_retreat``) - checked open, the spread pads
@@ -641,13 +873,49 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all + list(approached or []), cache=False, fingers=fingers,
                                         approached=approached, q_seed=q_seed)
             else:
+                # block design (owner 2026-09-19): the reorient chains (yaw-align orbit, in-hand flip) are tracked at the oracle's
+                # densification as the sampler tracked them (``IKChecker.track_chain``; demo 0919-140558 'joint jump 0.23 rad')
+                track = name == "reorient" and bool(getattr(sidecar, "blocks", None))
                 res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers, approached=approached,
-                                               q_seed=q_seed)
+                                               q_seed=q_seed, track_dense=track)
+                if not res.ok and name == "push" and q_seed_prev is not None and not locked:
+                    # a push's pre-contact pose is reached by the oracle's planned ``arm_to`` from wherever the arm is, so the
+                    # branch the previous retreat ended in need not hold it: re-solve the chain from the stance posture (the
+                    # sampler's seed) before failing (0920-080331: a pack push the sampler's identical chain check had passed)
+                    res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers,
+                                                   approached=approached, q_seed=sampler.ikc.q_locked(stance, fingers=fingers).clone(), track_dense=track)
             n += len(poses)
             if not res.ok:
                 # a straight approach without a configuration in the pre pose's IK branch is its own reason (the oracle
                 # cannot track it: plan_failed); everything else is program_check_failed
-                raise Reject(res.code or "program_check_failed", f"{key}: {res.reason} ({where})", action=name)
+                extra_why = ""
+                if name == "push" and len(poses) >= 1:
+                    # diagnostic (0920-083827: a pack push chain the sampler's identical check passed): is the first pose reachable with
+                    # every spawned object removed, and if so what does its configuration collide with in this world?
+                    try:
+                        spawned = list(getattr(sampler.kit.world, "spawned", {}).values())
+                        with sampler.ikc.ignoring(spawned):
+                            r_free = sampler.ikc.exact([poses[0]], stance, arm, cache=False, fingers=fingers, q_seed=sampler.ikc.q_locked(stance, fingers=fingers).clone())
+                        if r_free.ok and r_free.q is not None:
+                            extra_why = "; the first pose is reachable in an empty world and there " + sampler.ikc._collision_blame(r_free.q, ignore_all + ignore_last)
+                        else:
+                            extra_why = "; the first pose has no IK solution even in an empty world"
+                        b_ = stance.world_to_base(poses[0][0][:2]) if hasattr(stance, "world_to_base") else None
+                        if b_ is not None:
+                            extra_why += f" (first pose at base depth {float(b_[0]):.2f}, lateral {float(b_[1]):+.2f}, z {float(poses[0][0][2]):.3f})"
+                        # the world the check ran in: every block's position (base frame, mm) - compared with the sampler's pack world log
+                        blocks_ = [b.get("instance") for b in (getattr(sidecar, "blocks", None) or []) if isinstance(b, dict)]
+                        cells_ = []
+                        for n_ in blocks_:
+                            o_ = sampler.objects.get(n_)
+                            if o_ is not None:
+                                p_o, _ = o_.get_position_orientation()
+                                bb = stance.world_to_base(p_o[:2])
+                                cells_.append(f"{n_[-1]}:({float(bb[0]) * 1000:.0f},{float(bb[1]) * 1000:+.0f},{float(p_o[2]) * 1000:.0f})")
+                        extra_why += "; check world blocks (base mm) " + " ".join(cells_)
+                    except Exception as exc:  # noqa: BLE001
+                        extra_why = f"; (diagnostic failed: {exc})"
+                raise Reject(res.code or "program_check_failed", f"{key}: {res.reason} ({where}){extra_why}", action=name)
             if res.q is not None:
                 last = poses[-1]
                 # the witness the oracle re-uses (primary oracle 2026-09-16 23:06): polished onto the recorded pose (FK residual
@@ -665,8 +933,10 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     limit = float(sampler.gp.gen("witness_residual_pre_m", limit))
                 if residual > limit:
                     raise Reject("program_check_failed", f"{key}: witness FK residual {residual * 1000:.1f} mm > {limit * 1000:.0f} mm "
-                                                         f"after polishing (stance {stance_name}, arm {arm})", action=name)
+                                                         f"after polishing ({where})", action=name)
                 margin, joint = sampler.ikc.joint_limit_margin(q_pol, arm)
+                if end_key is not None and (str(key) == end_key or end_q_raw is None):
+                    end_q_raw = q_pol.clone()
                 witnesses[key] = {"pose": {"position": [round(float(v), 5) for v in last[0].tolist()], "orientation": [round(float(v), 6) for v in last[1].tolist()]},
                                   "q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pol, stance).tolist()],
                                   "q_frame": "root at the world origin (identity pose, z = 0): FK(q) puts base_link at base_pose2d on the measured floor",

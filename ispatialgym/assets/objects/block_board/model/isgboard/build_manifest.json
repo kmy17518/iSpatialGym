@@ -1,0 +1,67 @@
+{
+  "category": "tray",
+  "model": "isgboard",
+  "kind": "puzzle_board",
+  "edge_m": 0.0254,
+  "plate_m": 0.09079999999999999,
+  "plate_thickness_m": 0.008,
+  "pocket_floor_z_m": 0.008,
+  "pocket_pitch_m": 0.0314,
+  "seat_inner_m": 0.0274,
+  "outer_mouth_m": 0.0474,
+  "wall_h_m": 0.006,
+  "chamfer_h_m": 0.012,
+  "outer_chamfer_w_m": 0.01,
+  "rim_flat_m": 0.006,
+  "divider_w_m": 0.004,
+  "divider_h_m": 0.01,
+  "ridge_apex_z_m": 0.012,
+  "rim_top_z_m": 0.026000000000000002,
+  "rim_top_above_floor_m": 0.018000000000000002,
+  "wall_height_m": 0.018000000000000002,
+  "pocket_centres": [
+    [
+      -0.0157,
+      0.0157
+    ],
+    [
+      0.0157,
+      0.0157
+    ],
+    [
+      -0.0157,
+      -0.0157
+    ],
+    [
+      0.0157,
+      -0.0157
+    ]
+  ],
+  "outer_corner_sign": [
+    [
+      -1,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      -1,
+      -1
+    ],
+    [
+      1,
+      -1
+    ]
+  ],
+  "mass_kg": 1.5,
+  "bbox_m": [
+    0.09079999999999999,
+    0.09079999999999999,
+    0.026000000000000002
+  ],
+  "frame": "+x = the robot's right, +y = away from the robot when table-aligned; pocket order 0 far-left, 1 far-right, 2 near-left, 3 near-right",
+  "collision": "compound convex prisms (plate, four chamfered outer walls, two chamfered dividers)",
+  "urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/block_board/model/isgboard/isgboard.urdf"
+}
