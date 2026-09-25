@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-17 01:11 PDT",
+ "updated": "2026-09-17 02:21 PDT",
  "entries": [
   {
    "id": "configuration_matching-block_design:0917-003920",
@@ -21,46 +21,6 @@
    "launched_at": "2026-09-17 00:39 PDT",
    "pid": 2699972,
    "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-block_design-block_4-breakfast_table.sched-003924.log"
-  },
-  {
-   "id": "configuration_matching-attachment:0917-010829",
-   "priority": 56,
-   "subtask": "configuration_matching-attachment",
-   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
-   "kind": "run",
-   "tro": null,
-   "scene": null,
-   "local": false,
-   "state": "running",
-   "added_by": "rule",
-   "added_at": "2026-09-17 01:08 PDT",
-   "note": "auto: new fix(es) 41782c9 since the last run",
-   "missing_fixes": [
-    "41782c9"
-   ],
-   "launched_at": "2026-09-17 01:08 PDT",
-   "pid": 2774908,
-   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-attachment-lid-teapot-breakfast_table.sched-010834.log"
-  },
-  {
-   "id": "configuration_matching-articulation_open_small_scale:0917-000950",
-   "priority": 57,
-   "subtask": "configuration_matching-articulation_open_small_scale",
-   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
-   "kind": "run",
-   "tro": null,
-   "scene": null,
-   "local": false,
-   "state": "running",
-   "added_by": "rule",
-   "added_at": "2026-09-17 00:09 PDT",
-   "note": "auto: new fix(es) dde4f11 since the last run",
-   "missing_fixes": [
-    "dde4f11"
-   ],
-   "launched_at": "2026-09-17 00:09 PDT",
-   "pid": 2576292,
-   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table.sched-000953.log"
   },
   {
    "id": "configuration_matching-articulation_open_large_scale:0916-171926",
@@ -681,6 +641,39 @@
     "failed": null,
     "meta": null,
     "commit": "16c079b"
+   }
+  },
+  {
+   "id": "configuration_matching-articulation_close_large_scale:0917-011146",
+   "priority": 11,
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-17 01:11 PDT",
+   "note": "auto: new fix(es) 7c7bac8 since the last run",
+   "missing_fixes": [
+    "7c7bac8"
+   ],
+   "launched_at": "2026-09-17 01:17 PDT",
+   "pid": 2810050,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_large_scale-bottom_cabinet.sched-011734.log",
+   "finished_at": "2026-09-17 01:52 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "program_check_failed": 6,
+     "handle_unreachable": 2
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "ce94970"
    }
   },
   {
@@ -2891,6 +2884,39 @@
    }
   },
   {
+   "id": "configuration_matching-attachment:0917-010829",
+   "priority": 56,
+   "subtask": "configuration_matching-attachment",
+   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-17 01:08 PDT",
+   "note": "auto: new fix(es) 41782c9 since the last run",
+   "missing_fixes": [
+    "41782c9"
+   ],
+   "launched_at": "2026-09-17 01:08 PDT",
+   "pid": 2774908,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-attachment-lid-teapot-breakfast_table.sched-010834.log",
+   "finished_at": "2026-09-17 01:58 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "target_placement": 2,
+     "program_check_failed": 6
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "41782c9"
+   }
+  },
+  {
    "id": "configuration_matching-articulation_open_small_scale:0916-172358",
    "priority": 57,
    "subtask": "configuration_matching-articulation_open_small_scale",
@@ -2982,6 +3008,38 @@
     },
     "meta": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_small_scale/0916-230216/demo/configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table__house_single_floor__target-hinged_jar-gqtsam__0000/meta.json",
     "commit": "0457795"
+   }
+  },
+  {
+   "id": "configuration_matching-articulation_open_small_scale:0917-000950",
+   "priority": 57,
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-17 00:09 PDT",
+   "note": "auto: new fix(es) dde4f11 since the last run",
+   "missing_fixes": [
+    "dde4f11"
+   ],
+   "launched_at": "2026-09-17 00:09 PDT",
+   "pid": 2576292,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table.sched-000953.log",
+   "finished_at": "2026-09-17 01:23 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "missing_handle": 2
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "41782c9"
    }
   },
   {

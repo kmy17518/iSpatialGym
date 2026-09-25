@@ -1,15 +1,15 @@
 {
  "camera_relocalization-standard": {
   "pre_fix_demo": true,
-  "blocking": "-",
+  "blocking": "VALID 0922-125805 (face_travel, 4bb48aa3); re-run 0924-193720 on d1b61e77 success + settled",
   "owner": "-",
   "artefact": "runlogs/pilot_20260915/demos/camera_relocalization-standard__house_single_floor__0000/\u2026/meta.json",
   "last_change": "2026-09-16 03:00 PDT"
  },
  "camera_relocalization-obstructed": {
   "pre_fix_demo": true,
-  "blocking": "tracker corner fix d4a1745 not yet re-demoed",
-  "owner": "oracle",
+  "blocking": "VALID 0922-130611 (face_travel, 4bb48aa3); re-run 0924-194133 on d1b61e77 success + settled (drift rule 9a113f96)",
+  "owner": "-",
   "artefact": "runlogs/runpod/pilot/*/demo__v2__camera_relocalization-obstructed-*/\u2026/meta.json",
   "last_change": "2026-09-16 01:40 PDT"
  },
@@ -32,32 +32,32 @@
   "owner": "-"
  },
  "configuration_matching-block_design": {
-  "blocking": "D-006 default A applied 21:17 (block_gap_m 0.006, 8c2a2bc) \u2014 loop runs next tick; flip-on-table prep 0ec0153d (sampler) + 0ee927f6 (program) behind switches",
-  "owner": "loop / tabletop"
+  "blocking": "VALID block_4 board 0921-050358 (code 60197b46: puzzle board, packed / board programs); 8c2a2bc block_gap, 0ec0153d / 0ee927f6 flip prep before it",
+  "owner": "-"
  },
  "configuration_matching-attachment": {
   "blocking": "VALID at HEAD (owner 2026-09-20 23:39, attachment only; STOPPED - owner decides on generalising the tight correction): cap demo-only 0921-021839 of 213721's instance (regime from the customs): attach residual 1.1 mm / 0.0036 rad at joint creation, 0 passes, table 0 steps / 0 N, bottle 0.4 mm before / 0.5 mm + 0.22 deg during the place, settled 9, 0 verdicts; cork re-sample 0921-030246 (regime from the sidecar): residual 0.92 mm / 0.0052 rad, 0 passes, table 0 / 0 N, bottle 0.2 mm before / 0.0 mm + 0.04 deg during, group 0.64 mm, settled 9, 0 verdicts, 0 robot-bottle contacts (was 7 mm / 4.3 deg in 212757). Fixes (all attachment-targeted): 88151372 in-hand re-aim + lift-lateral-descend correction; 9f1d2136 generation.attach_correction regime (1.5 mm leg tol, <= 4 passes, stop < 0.5 mm, target 2 mm / 0.02 rad; lid / cap / cork aliases + lid pair customs) + partner-present attach IK + 5 mm fingertip clearance above the partner (cork: fingertip pinch at its top, lift 31 mm); 703a3837 / a8d0b663 / 1f74eccf fingertip floor + geometric pinch re-centring (9.4 mm at 30 deg). Cork rest: convex tapered end, rest_unstable on ~5 of 6 sampler attempts (nudge test) - a stable yaw exists; 24 attempts allowed. Pods attach5 (TTL) / attach6 / attach7 all terminated; no band files lost. 0920-164504 does NOT count (owner 18:25).",
   "owner": "attachment-agent"
  },
  "configuration_matching-articulation_open_small_scale": {
-  "blocking": "D-008 A applied (e5fbced: brace_optional on the hinged_jar aliases; program 59f6426f) \u2014 handle-only loop runs next tick",
-  "owner": "loop"
+  "blocking": "VALID carton lever 0922-153357 (v7g, code 4bb48aa3; carton work 9ec87bae, blender 0919-005804 with 19d52a76 data). Re-run 0924-195220 on d1b61e77 FAILED: plan_failed at the final retreat[left] - the attached carton (28 spheres) self-collides with the left gripper; push ran 359 vs 298 steps (the c9e84988 closed-loop arc / retreat ladder) -> owner",
+  "owner": "owner"
  },
  "configuration_matching-articulation_close_small_scale": {
-  "blocking": "same as open",
-  "owner": "loop"
+  "blocking": "VALID carton push-close 0922-120145 (v16b, code ~ 4bb48aa3; 9ec87bae) and blender 0920-174043 (19d52a76 data); not yet re-run on c9e84988",
+  "owner": "-"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "first instance + demo through grasp(handle) on the Rs_int drawer bamfsz_1 (probe; pick applied 0589d9d) \u2014 needs core program_check (handle grasp must not set carried) + oracle ghost_hand on the handle link; door units = yields under arm-only follow (9\u201333 %) \u2192 D-011 (chat, default A 23:45)",
-  "owner": "core / oracle / owner (D-011)"
+  "blocking": "demos of record 0922-115754-dishwasher_wide_reanchored_local / 0922-120634-door_seq_reanchored_local (250 kg, follow_arm_tracking reanchored; code ~ 4bb48aa3, work committed in e43b3935); 0924-194634 dishwasher_wide re-run on d1b61e77 success. Experiment aliases live in runlogs/smoke_inputs/artic_large_exp/customs.json",
+  "owner": "-"
  },
  "configuration_matching-articulation_close_large_scale": {
-  "blocking": "same pick (bamfsz_1); close waits on the open fixes",
-  "owner": "loop"
+  "blocking": "demos 0920-014713-dishwasher_close (inverse of the shallow open) and 0921-003144-door_pushclose_seq3 (ISG_PROGRAM_HOOK door_pull_push.py, 5 push chunks) - experiment customs + hook, not first_demo.py runs; code e43b3935 (the pod trees of 09-20 / 09-21 carried it uncommitted)",
+  "owner": "-"
  },
  "alignment-world_vertical": {
-  "blocking": "painting demo in tolerance, not_settled (undamped hook) \u2192 large-scale-B: hinge friction/damping in the constraints record + TRO loader (owner 22:05), demo-only re-run",
-  "owner": "large-scale-B"
+  "blocking": "VALID painting_s070 0923-000539-fixes4 (c9e84988: goal-edge brace, closed-loop arc, retreat ladder, hinge model); 0924-200912 on d1b61e77 success, settled_success True with the drift rule 9a113f96",
+  "owner": "-"
  },
  "alignment-world_horizontal": {
   "blocking": "owner 22:55: hang frame bug \u2014 no wall alias carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) \u2192 the plate hangs table-flat; large-scale-B: ground_isg writes the reviewed icl frames per model, Reject(missing_frame), unit test, re-sample; + push witness with the brace arm at contact",
@@ -84,15 +84,15 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "plan_failed at grasp = sampler witnesses off by a constant world offset (9\u201313 mm) and on joint-2's limit \u2192 core: witnesses at the recorded base_pose2d + fk_residual fact + 0.05 rad limit margin; push Retreat push-through 27.6 mm \u2192 primary oracle",
-  "owner": "core / oracle"
+  "blocking": "VALID 0919-011307 (36b5bafa). Re-run 0924-200220 on d1b61e77 FAILED: plan_failed at the final retreat[right], base_link in collision with the tissue box + a left-finger contact verdict during the push (c9e84988 closed-loop arc / retreat ladder) -> owner",
+  "owner": "owner"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
-  "blocking": "countertop-floor: setup fixed (c5040c8/b931b31/729a1ec/1dd3820/f0684cb), now B\u2194C coupling F_init \u2229 F_goal empty \u2192 large-scale; sofa-bar limit 514ad3f",
+  "blocking": "VALID 0920-014411 (demo-only on the 0920-011106 instance, 28d5cfe2): shampoo_dispenser-countertop-floor - upright A, torso-then-navigate A->B (the utility room admits no s_T for the arrival sweep), floor grasp at the crouch, departure transition (straighten to (0.25, 0)), carry, arrival at C, place, retreat; ontop true (omnigibson), 0 QA verdicts, 1600 steps. Search fixes: relative carry yaw, 16 object yaws + F_init pre-screen, dense sweeps, achievable-trunk post-condition. Exclusive pod s8svta3m06slk8 (iors-ontop-4090).",
   "owner": "large-scale"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
-  "blocking": "D-010 (default C 23:30): sandal/bed F_goal 0 (matches B3); apple-desk-desk no_init_surface at setup; apple-desk-floor + pencil-sofa-sofa launched 23:09; briefcase pick would need a grounded alias",
-  "owner": "owner (D-010) / large-scale"
+  "blocking": "VALID 0921-021333 (seed 0, 1c4d649d) / retreat-fix re-run 0922-001931 (250 kg, 069fcc4e + 4e0e084d): sandal-breakfast_table-breakfast_table (problem88, chairs removed) - 12/12 actions, 0 QA verdicts, under true, final retreat rises straight up, no base rock. The 09-19 probe text that kept coming back is gone.",
+  "owner": "large-scale"
  }
 }

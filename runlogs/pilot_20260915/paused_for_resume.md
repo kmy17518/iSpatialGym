@@ -30,3 +30,55 @@ Everything here resumes without recomputation: the manifests and progress ledger
 - 2026-09-16 17:24 PDT pod_scheduler: role change bands -> pool: 1qzna64k3s9t8s (pilot2-l40s-1); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
 
 - 2026-09-16 18:08 PDT pod_scheduler: role change pool -> bands: uilwpybjxnekg0 (smoke2-a40-2), xnam1nh3y2706e (smoke-l40s-3), oliefq3ymuexna (pilot2-a40-1), bl91tuqop45ila (pilot2-l40s-2), cy0f5t6i58i08v (pilot2-l40s-3), s7m4h2ay2slau4 (pilot2-l40s-4); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 18:13 PDT pod_scheduler: role change pool -> bands: 4udkfzz52mzpih (pilot2-a40-7), 8lp72savyk8co4 (pilot2-a40-8), gvua02xnwm4ti6 (pilot2-a40-9), 29s7u374iifjbj (pilot2-a40-10), z830mv63m0wjt7 (pilot2-a40-11), 1qzna64k3s9t8s (pilot2-l40s-1); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 18:21 PDT pod_scheduler: PREEMPTION bl91tuqop45ila (pilot2-l40s-2): band job(s) none running stopped for first-demo work (started 18:11); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 18:21 PDT pod_scheduler: role change bands -> pool: bl91tuqop45ila (pilot2-l40s-2); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 18:44 PDT pod_scheduler: role change pool -> bands: bpu6l9bffwaf1y (pilot2-l40s-11), usqruny80uunl6 (pilot2-l40s-9); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 18:51 PDT pod_scheduler: role change pool -> bands: 6c5712ggii2ihf (pilot2-a40-2); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 18:54 PDT pod_scheduler: role change pool -> bands: 88hr6mw4y5i1h8 (smoke2-l40s-1); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 19:11 PDT pod_scheduler: role change pool -> bands: z2qdfyfyrgcjys (pilot2-a40-0), h7thjdjnyh8qcx (pilot2-l40s-0); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 19:19 PDT pod_scheduler: role change pool -> bands: nfgjwzgjajpr5u (pilot2-l40s-7), rzcqsre0b89792 (pilot2-a40-5); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 19:26 PDT pod_scheduler: PREEMPTION oliefq3ymuexna (pilot2-a40-1): band job(s) none running stopped for first-demo work (started 18:30); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 19:26 PDT pod_scheduler: PREEMPTION s7m4h2ay2slau4 (pilot2-l40s-4): band job(s) none running stopped for first-demo work (started 19:19); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 19:26 PDT pod_scheduler: PREEMPTION gvua02xnwm4ti6 (pilot2-a40-9): band job(s) none running stopped for first-demo work (started 19:02); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 19:26 PDT pod_scheduler: PREEMPTION 29s7u374iifjbj (pilot2-a40-10): band job(s) none running stopped for first-demo work (started 19:09); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 19:26 PDT pod_scheduler: role change bands -> pool: oliefq3ymuexna (pilot2-a40-1), s7m4h2ay2slau4 (pilot2-l40s-4), gvua02xnwm4ti6 (pilot2-a40-9), 29s7u374iifjbj (pilot2-a40-10); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 19:36 PDT pod_scheduler: role change bands -> pool: xnam1nh3y2706e (smoke-l40s-3), cy0f5t6i58i08v (pilot2-l40s-3), bpu6l9bffwaf1y (pilot2-l40s-11), nfgjwzgjajpr5u (pilot2-l40s-7), rzcqsre0b89792 (pilot2-a40-5); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 19:40 PDT pod_scheduler: role change bands -> pool: 8lp72savyk8co4 (pilot2-a40-8), 1qzna64k3s9t8s (pilot2-l40s-1), usqruny80uunl6 (pilot2-l40s-9), 6c5712ggii2ihf (pilot2-a40-2), 88hr6mw4y5i1h8 (smoke2-l40s-1), h7thjdjnyh8qcx (pilot2-l40s-0); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 19:46 PDT pod_scheduler: role change bands -> pool: 4udkfzz52mzpih (pilot2-a40-7), z830mv63m0wjt7 (pilot2-a40-11), z2qdfyfyrgcjys (pilot2-a40-0); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 21:37 PDT pod_scheduler: role change pool -> bands: m48tuedy95bu05 (smoke2-l40s-0), rzcqsre0b89792 (pilot2-a40-5), 8lp72savyk8co4 (pilot2-a40-8), 1qzna64k3s9t8s (pilot2-l40s-1); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 21:43 PDT pod_scheduler: role change pool -> bands: z2qdfyfyrgcjys (pilot2-a40-0); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 21:50 PDT pod_scheduler: role change pool -> bands: xnam1nh3y2706e (smoke-l40s-3), cy0f5t6i58i08v (pilot2-l40s-3); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 22:01 PDT pod_scheduler: PREEMPTION xnam1nh3y2706e (smoke-l40s-3): band job(s) none running stopped for first-demo work (started 21:50); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 22:01 PDT pod_scheduler: role change bands -> pool: xnam1nh3y2706e (smoke-l40s-3); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 22:02 PDT pod_scheduler: role change bands -> pool: cy0f5t6i58i08v (pilot2-l40s-3); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 22:13 PDT pod_scheduler: PREEMPTION z2qdfyfyrgcjys (pilot2-a40-0): band job(s) ['rb__tabletop__office_cubicles_right__desk_pfsjbc_0__teacup-cpozxi'] stopped for first-demo work (started 21:43); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 22:13 PDT pod_scheduler: role change bands -> pool: z2qdfyfyrgcjys (pilot2-a40-0); queued jobs moved: ['rb__tabletop__office_cubicles_right__desk_pfsjbc_0__teacup-cpozxi']; files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
+
+- 2026-09-16 22:20 PDT pod_scheduler: PREEMPTION uilwpybjxnekg0 (smoke2-a40-2): band job(s) ['rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia'] stopped for first-demo work (started 21:43); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
+
+- 2026-09-16 22:20 PDT pod_scheduler: role change bands -> pool: uilwpybjxnekg0 (smoke2-a40-2); queued jobs moved: ['rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia']; files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
