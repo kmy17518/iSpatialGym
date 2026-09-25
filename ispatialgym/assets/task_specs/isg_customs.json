@@ -13100,7 +13100,6 @@
  "configuration_matching-articulation_close_large_scale-dishwasher": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
   "definition_id": 9,
-  "superseded_by": true,
   "roles": {
    "target": {
     "category": "dishwasher",
@@ -13147,10 +13146,10 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.18,
+    0.21
    ],
-   "stable_set_fractions": 7,
+   "stable_set_fractions": 2,
    "stable_hold_steps": 120,
    "stable_drift_tolerance_fraction": 0.5,
    "stable_probe_tolerances": {
@@ -13177,7 +13176,14 @@
     "beta_max_deg": 20.0,
     "d_min_m": 0.5,
     "d_max_m": 2.5,
-    "d_scan_max_m": 1.1
+    "d_scan_max_m": 1.1,
+    "init_tilts": [
+     0.0,
+     -0.2,
+     -0.35,
+     -0.5
+    ],
+    "_init_tilts_note": "2026-09-19: the open leaf fits the frame only from 1.15 m upright (base into the kitchen bar): let the init view lean forward"
    },
    "lateral_range_m": {
     "right": [
@@ -13196,14 +13202,31 @@
     "revolute_deg": 20.0,
     "prismatic_m": 0.1
    },
-   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open",
+   "_counterbalance_note": "2026-09-19: generation.counterbalance defaults to auto (horizontal-axis revolute joint -> gravity off on the leaf, joint damping 5); witness relaxations removed - the 8-19 mm residuals were the TF32 lock-transform bug",
+   "follow_mode_override": "hybrid",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 120,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 5,
+    "lookahead_steps": 8,
+    "budget_s": 900.0
+   },
+   "joint_limit_margin_rad": 0.025,
+   "_wide_note": "2026-09-19 overnight: open wider than the arm-only ~21 deg - hybrid base+arm follow with the counterbalance; S = 36/40.5/45/49.5 deg + full",
+   "_close_note": "2026-09-20 01:25: q_init 16-19 deg - the reach-volume class tolerates 20 deg of pitch and the wrist little more (the arm-mode open demo is 21 deg): the close is its inverse",
+   "stable_set_include_full": false
   },
-  "constraints": []
+  "constraints": [],
+  "chain_note": "2026-09-25 large_articulation_integration_20260925: live. c161a045 (2026-09-16 re-grounding on the A3 roomy picks) marked this alias superseded with true (pick #06 left the selection); no alias replaced it. generation is the experiment alias of runlogs/smoke_inputs/artic_large_exp/customs.json behind the demo of record 0920-014713-dishwasher_close (the inverse of the shallow open, 18.7 -> 0.6 deg)."
  },
  "configuration_matching-articulation_close_large_scale-door": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
   "definition_id": 4,
-  "superseded_by": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
   "roles": {
    "target": {
     "category": "door",
@@ -13233,7 +13256,7 @@
       "door_crtrpa_0"
      ],
      "floor": {
-      "room": "sauna_0"
+      "room": "garden_0"
      }
     },
     "whitelist": {},
@@ -13251,8 +13274,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.3,
+    0.45
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -13268,7 +13291,7 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
@@ -13280,8 +13303,13 @@
    "prompt0": {
     "beta_max_deg": 20.0,
     "d_min_m": 0.5,
-    "d_max_m": 2.5,
-    "d_scan_max_m": 1.1
+    "d_max_m": 3.5,
+    "d_scan_max_m": 1.1,
+    "init_tilts": [
+     0.0,
+     -0.2,
+     -0.35
+    ]
    },
    "lateral_range_m": {
     "right": [
@@ -13295,9 +13323,39 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "_door_note": "2026-09-19: door_crtrpa_0 / j_leaf (vertical axis -> A4 room_door class -> hybrid base+arm follow); copied unchanged from the shared customs for the door sample",
+   "remove_objects": {
+    "house_single_floor": [
+     "armchair_qhcrgb_3",
+     "armchair_qhcrgb_4",
+     "coffee_table_wgtaip_0",
+     "pot_plant_lligdl_0",
+     "armchair_qhcrgb_2"
+    ]
+   },
+   "_remove_objects_note": "2026-09-19 door_crtrpa_0 (run 0919-021001): the 2.33 m door is in frame only from d >= 2.1 m in front of its garden face, and there the base stands in the garden armchairs / coffee table (Phase-1 collision debug: armchair_qhcrgb_4 x10, _3 x3, coffee_table_wgtaip_0 x3 spheres); removed as a scene variant like the chairs near a table; 0919-122043: with the hybrid follow complete, step 6 (path init -> manipulation, drive-in, trunk sweep) collided in the 0.75-1.4 m band - pot_plant_lligdl_0 (0.6 m in front of the face, 0.9 m beside the lane, 1.5 m tall) and armchair_qhcrgb_2 removed too",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 120,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 5,
+    "lookahead_steps": 8,
+    "budget_s": 900.0
+   },
+   "_hybrid_follow_note": "2026-09-19 experiment: hard joint-limit margin of a follow pose lowered 0.05 -> 0.03 rad (the program check's own floor is 0.025): at 17 deg every IK solution for the vertical-bar pinch was rejected by the margin (run 0919-074439)",
+   "_arm_note": "2026-09-19 experiment: the handle-side rule picks the LEFT arm (handle 0.38 m left of the face centre), but this door pulls open toward the robot and its handle sweeps to the robot's right; at 17-26 deg every left-arm IK solution sat on a joint limit (joint4 0.002 rad, run 0919-083006) -> right arm",
+   "_hybrid_follow_note2": "2026-09-19: the 40 IK calls per step went to the nearest lattice candidates, whose solutions all sat on right_arm_joint4's extension limit (run 0919-090231) -> only comfortably-reaching candidates (reach_fraction 0.85) and 120 IK calls per step",
+   "_open_fraction_note": "2026-09-19 experiment: the door's stable set spans 55-109 deg (every fraction of the 109 deg limit holds), and the hybrid follow from the 1.65 m garden strip stalls at 8-26 deg on joint limits (runs 0919-083006 / 090231 / 095306); a 33-50 deg opening is the first-demo goal (owner D-011 B: 20 deg minimum for door units)",
+   "_floor_note": "2026-09-19: the door's handle face looks onto garden_0 (room_in_front), so every stance stands on the garden floor; the shared alias binds floor.n.01_1 to sauna_0 and (ontop agent floor) was false after settling (0919-143618, attempts 3-4: init_false unsatisfied [1]) -> garden_0",
+   "joint_limit_margin_rad": 0.025,
+   "_close_note": "2026-09-20 01:25: init view of the open door needs d > 2.5 m (0920-000347: no (d,t) in frame up to 2.5); manipulation face re-aimed at the open handle (manip_face_from_open_handle)"
   },
-  "constraints": []
+  "constraints": [],
+  "chain_note": "2026-09-25 large_articulation_integration_20260925: live. c161a045 (2026-09-16 re-grounding on the A3 roomy picks) marked this alias superseded by configuration_matching-articulation_close_large_scale-bottom_cabinet (pick #01 moved to office_cubicles_right/bottom_cabinet_rvunhj_0), and D-004 B (f8e9aa7) blacklisted that unit. generation and the garden_0 floor binding are the experiment alias of runlogs/smoke_inputs/artic_large_exp/customs.json behind 0920-011636-door_close (sampled, hybrid follow) -> 0921-003144-door_pushclose_seq3 (the door closed by pushing its outer face; ran under ISG_PROGRAM_HOOK door_pull_push.py:hook_close, now program_articulation_large's push-close for a room door, oracle.programs)."
  },
  "configuration_matching-articulation_close_large_scale-fridge": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
@@ -16192,7 +16250,6 @@
  "configuration_matching-articulation_open_large_scale-dishwasher": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
   "definition_id": 20,
-  "superseded_by": true,
   "roles": {
    "target": {
     "category": "dishwasher",
@@ -16239,10 +16296,10 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.3,
+    0.35
    ],
-   "stable_set_fractions": 7,
+   "stable_set_fractions": 2,
    "stable_hold_steps": 120,
    "stable_drift_tolerance_fraction": 0.5,
    "stable_probe_tolerances": {
@@ -16288,14 +16345,31 @@
     "revolute_deg": 20.0,
     "prismatic_m": 0.1
    },
-   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open",
+   "_counterbalance_note": "2026-09-19: generation.counterbalance defaults to auto (horizontal-axis revolute joint -> gravity off on the leaf, joint damping 5); witness relaxations removed - the 8-19 mm residuals were the TF32 lock-transform bug",
+   "follow_mode_override": "hybrid",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 90,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 4,
+    "lookahead_steps": 6,
+    "budget_s": 2700.0,
+    "policy": "sequential"
+   },
+   "joint_limit_margin_rad": 0.025,
+   "_wide_note": "2026-09-20 00:30: 36-50 deg is kinematically out of reach for the rigid pinch grasp (wrist pitch; 0919-232626: every base pose fails IK past ~22-28 deg) - S = 27/31.5/36 deg + full; wider needs a re-grasp at ~25 deg",
+   "stable_set_include_full": false
   },
-  "constraints": []
+  "constraints": [],
+  "chain_note": "2026-09-25 large_articulation_integration_20260925: live. c161a045 (2026-09-16 re-grounding on the A3 roomy picks) marked this alias superseded with true (pick #06 left the selection); no alias replaced it. generation is the experiment alias configuration_matching-articulation_open_large_scale-dishwasher_wide of runlogs/smoke_inputs/artic_large_exp/customs.json, folded in here (same BDDL problem, definition_id 20; the stock arm-only 50-95 % opening never produced an instance: the rigid pinch tops out near 31 deg, see _wide_note) - demos of record 0921-050314-dishwasher_wide (sampled, sequential follow, 1 base move) -> 0922-115754-dishwasher_wide_reanchored_local -> 0924-194634 (d1b61e77). dishwasher_wide is not a separate shipped alias."
  },
  "configuration_matching-articulation_open_large_scale-door": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
   "definition_id": 15,
-  "superseded_by": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
   "roles": {
    "target": {
     "category": "door",
@@ -16325,7 +16399,7 @@
       "door_crtrpa_0"
      ],
      "floor": {
-      "room": "sauna_0"
+      "room": "garden_0"
      }
     },
     "whitelist": {},
@@ -16343,8 +16417,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.3,
+    0.45
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -16360,7 +16434,7 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
@@ -16387,9 +16461,39 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "_door_note": "2026-09-19: door_crtrpa_0 / j_leaf (vertical axis -> A4 room_door class -> hybrid base+arm follow); copied unchanged from the shared customs for the door sample",
+   "remove_objects": {
+    "house_single_floor": [
+     "armchair_qhcrgb_3",
+     "armchair_qhcrgb_4",
+     "coffee_table_wgtaip_0",
+     "pot_plant_lligdl_0",
+     "armchair_qhcrgb_2"
+    ]
+   },
+   "_remove_objects_note": "2026-09-19 door_crtrpa_0 (run 0919-021001): the 2.33 m door is in frame only from d >= 2.1 m in front of its garden face, and there the base stands in the garden armchairs / coffee table (Phase-1 collision debug: armchair_qhcrgb_4 x10, _3 x3, coffee_table_wgtaip_0 x3 spheres); removed as a scene variant like the chairs near a table; 0919-122043: with the hybrid follow complete, step 6 (path init -> manipulation, drive-in, trunk sweep) collided in the 0.75-1.4 m band - pot_plant_lligdl_0 (0.6 m in front of the face, 0.9 m beside the lane, 1.5 m tall) and armchair_qhcrgb_2 removed too",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 90,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 4,
+    "lookahead_steps": 6,
+    "budget_s": 2700.0,
+    "policy": "sequential"
+   },
+   "_hybrid_follow_note": "2026-09-19 experiment: hard joint-limit margin of a follow pose lowered 0.05 -> 0.03 rad (the program check's own floor is 0.025): at 17 deg every IK solution for the vertical-bar pinch was rejected by the margin (run 0919-074439)",
+   "_arm_note": "2026-09-19 experiment: the handle-side rule picks the LEFT arm (handle 0.38 m left of the face centre), but this door pulls open toward the robot and its handle sweeps to the robot's right; at 17-26 deg every left-arm IK solution sat on a joint limit (joint4 0.002 rad, run 0919-083006) -> right arm",
+   "_hybrid_follow_note2": "2026-09-19: the 40 IK calls per step went to the nearest lattice candidates, whose solutions all sat on right_arm_joint4's extension limit (run 0919-090231) -> only comfortably-reaching candidates (reach_fraction 0.85) and 120 IK calls per step",
+   "_open_fraction_note": "2026-09-19 experiment: the door's stable set spans 55-109 deg (every fraction of the 109 deg limit holds), and the hybrid follow from the 1.65 m garden strip stalls at 8-26 deg on joint limits (runs 0919-083006 / 090231 / 095306); a 33-50 deg opening is the first-demo goal (owner D-011 B: 20 deg minimum for door units)",
+   "_floor_note": "2026-09-19: the door's handle face looks onto garden_0 (room_in_front), so every stance stands on the garden floor; the shared alias binds floor.n.01_1 to sauna_0 and (ontop agent floor) was false after settling (0919-143618, attempts 3-4: init_false unsatisfied [1]) -> garden_0",
+   "joint_limit_margin_rad": 0.025
   },
-  "constraints": []
+  "constraints": [],
+  "chain_note": "2026-09-25 large_articulation_integration_20260925: live. c161a045 (2026-09-16 re-grounding on the A3 roomy picks) marked this alias superseded by configuration_matching-articulation_open_large_scale-bottom_cabinet (pick #01 moved to office_cubicles_right/bottom_cabinet_rvunhj_0), and D-004 B (f8e9aa7) blacklisted that unit, so no live alias carried a room door. generation and the garden_0 floor binding are the experiment alias of runlogs/smoke_inputs/artic_large_exp/customs.json (sequential follow) behind the demos of record 0921-045829-door (sampled) -> 0921-055946-door_seq_replay -> 0922-120634-door_seq_reanchored_local (250 kg base, re-anchored arm follow)."
  },
  "configuration_matching-articulation_open_large_scale-fridge": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",

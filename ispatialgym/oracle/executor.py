@@ -354,6 +354,8 @@ def _jsonable(x):
 
 #: attachment (2026-09-20 22:30): the place re-aimed for the part's live in-hand pose at the pre-place (execute._reaim_for_inhand_pose)
 NOTE_KEYS = NOTE_KEYS + ("inhand_reaim",)
+#: room door push-close: the per-chunk record of execute.execute_push_close
+NOTE_KEYS = NOTE_KEYS + ("push_close",)
 
 
 @dataclass

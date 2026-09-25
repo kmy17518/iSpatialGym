@@ -630,6 +630,29 @@ def test_postcondition_base_follow_progress():
     assert EX.joint_tolerance(art) == pytest.approx(max(0.05, 0.1 * abs(art.q_goal - art.q_init)))
 
 
+def test_push_close_leaf_frame_and_postcondition():
+    sc = Sidecar.load(os.path.join(VARIANTS, "configuration_matching-articulation_close_large_scale__room_door.json"))
+    push = expand(sc.alias, sc)[-1]
+    d0, m0, sgn = EX.leaf_frame(push.hinge_xy, push.handle_xy_closed, push.approach_closed)
+    assert float(d0.norm()) == pytest.approx(1.0) and float(m0.norm()) == pytest.approx(1.0) and abs(float(d0 @ m0)) < 1e-6
+    assert float(m0[0]) * -push.approach_closed[0] + float(m0[1]) * -push.approach_closed[1] > 0.9  # the outer face looks at the robot
+    assert sgn in (1.0, -1.0) and EX.leaf_width(push.handle_radius_m) == pytest.approx(math.sqrt(push.handle_radius_m ** 2 - EX.HANDLE_STANDOFF_M ** 2) + 0.035)
+
+    class St:
+        def __init__(self, q):
+            self.q = q
+
+        def joint_position(self, name, joint):
+            assert (name, joint) == (push.object, push.joint)
+            return self.q
+
+    tol = max(0.05, 0.10 * push.q_from)
+    assert EX.check_postcondition(push, St(0.0), {}, {}) is None
+    assert EX.check_postcondition(push, St(0.9 * tol), {}, {}) is None
+    assert EX.check_postcondition(push, St(0.5 * push.q_from), {}, {}) == "tolerance"
+    assert EX.check_postcondition(push, St(0.95 * push.q_from), {}, {}) == "no_motion"
+
+
 def test_postcondition_push_no_motion():
     sc = Sidecar.load(os.path.join(SIDECARS, "alignment-axial.json"))
     push = [a for a in expand(sc.alias, sc) if isinstance(a, Push)][0]

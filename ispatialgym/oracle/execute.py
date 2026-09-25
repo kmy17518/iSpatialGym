@@ -32,6 +32,8 @@ Behaviour per action (§3.6 / §6.1):
 * ``Brace``      ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(pre → contact)``; held (no further command).
 * ``BaseFollow`` ``base_follow(b_k)`` with the arm locked, or ``arm_along(h(q_k))`` in arm mode; post: joint at
   ``q_goal`` (spec §8 tolerance) or ``passive_from`` reached.
+* ``PushClose``  per chunk: stance by backend IK → ``track_path`` → ``gripper(close)`` → ``arm_to(pre)`` → guarded
+  approach → ``arm_along(arc)`` → back off; post: joint within the spec §8 tolerance of the lower limit.
 * ``Retreat``    ``gripper(open)`` (+ release / detach) when ``release`` → ``arm_along(retreat)``.
 
 Tolerance categories: an eef / base / trunk that did not reach its recorded target is ``execution`` (a motion did
@@ -57,6 +59,7 @@ from ispatialgym.oracle.actions import (
     Navigate,
     Place,
     Push,
+    PushClose,
     Reorient,
     Retreat,
     SetTorso,
@@ -2716,6 +2719,312 @@ def post_base_follow(action: BaseFollow, state, targets, ctx) -> Optional[str]:
 
 
 # ==========================================================================================
+# push-close (room door, outer face)
+# ==========================================================================================
+
+HANDLE_STANDOFF_M = 0.06  # a bar / lever handle's grasp contact sits about this far in front of the leaf's outer face
+
+
+def rot_z(v: th.Tensor, ang: float) -> th.Tensor:
+    c, s = math.cos(ang), math.sin(ang)
+    return th.tensor([c * float(v[0]) - s * float(v[1]), s * float(v[0]) + c * float(v[1]), float(v[2])], dtype=th.float32)
+
+
+def leaf_frame(hinge_xy: Sequence[float], handle_xy_closed: Sequence[float], approach_closed: Sequence[float], standoff_m: float = HANDLE_STANDOFF_M):
+    """Unit horizontal directions of the closed leaf: ``d0`` from the hinge along the **leaf plane** toward the free edge,
+    ``m0`` = the outer-face normal (toward the robot: −approach), and the swing sign ``s`` such that the leaf direction at
+    opening angle q is ``rot(s·q)·d0`` about +z (the outer face swings toward the robot). The handle contact lies
+    ``standoff_m`` in front of the outer face, so the hinge→handle direction is tilted toward m by atan(standoff / r);
+    it is rotated back (0920-024158 … 051131: the uncorrected plane put every push 5–6 cm in front of the leaf)."""
+    dh = th.tensor([handle_xy_closed[0] - hinge_xy[0], handle_xy_closed[1] - hinge_xy[1], 0.0], dtype=th.float32)
+    r = float(dh.norm())
+    dh = dh / r
+    m_ref = -th.tensor([approach_closed[0], approach_closed[1], 0.0], dtype=th.float32)
+    m_ref = m_ref / m_ref.norm()
+    plus = th.tensor([-dh[1], dh[0], 0.0])  # dh rotated +90° about z
+    s = 1.0 if float(th.dot(plus, m_ref)) > 0 else -1.0
+    alpha = math.atan2(float(standoff_m), max(r, 1e-6))
+    d0 = rot_z(dh, -s * alpha)
+    m0 = rot_z(d0, s * math.pi / 2)
+    return d0, m0, s
+
+
+def leaf_width(handle_radius_m: float, standoff_m: float = HANDLE_STANDOFF_M, edge_m: float = 0.035) -> float:
+    """Hinge → free edge along the leaf: the handle's in-plane radius plus its distance to the edge (the leaf link's AABB
+    at an open angle is inflated by the thickness projection)."""
+    return math.sqrt(max(handle_radius_m ** 2 - standoff_m ** 2, 0.0)) + edge_m
+
+
+def _leaf_dims(obj, hinge_xy, d0: th.Tensor, m0: th.Tensor, leaf_link: str) -> Tuple[float, float]:
+    """(width from the hinge to the free edge, thickness) of the leaf from its link AABB, in the frame ``d0`` / ``m0``."""
+    link = (getattr(obj, "links", {}) or {}).get(leaf_link)
+    if link is None:
+        return 0.0, 0.04
+    lo, hi = link.aabb
+    corners = th.tensor([[float(x), float(y)] for x in (lo[0], hi[0]) for y in (lo[1], hi[1])])
+    rel = corners - th.tensor([[hinge_xy[0], hinge_xy[1]]])
+    width = float(th.max(rel @ d0[:2]))
+    thick = float(th.max(rel @ m0[:2]) - th.min(rel @ m0[:2]))
+    return width, min(max(thick, 0.03), 0.08)
+
+
+def _arms_ready(motions: Motions, rep: Dict[str, Any], ignore_objects=()) -> Iterator[th.Tensor]:
+    """Both arms to "ready" before the base drives beside the leaf ("tucked" self-collides with the base on this robot,
+    owner 2026-09-20 18:43)."""
+    try:
+        yield from motions.arm_to(("left", "right"), q={"left": posture_q(motions.robot, "ready", "left"), "right": posture_q(motions.robot, "ready", "right")},
+                                  ignore_objects=list(ignore_objects))
+        rep["tucked"] = "ready"
+    except SkillError as e:
+        rep["tucked"] = f"ready failed: {(e.message or e.reason)[:120]}"
+        log.warning("push_close: arms to ready failed: %s", e)
+
+
+def guarded_approach(motions: Motions, arm: str, approach: th.Tensor, q_of, step_m: float = 0.02, max_m: float = 0.30,
+                     move_rad: float = math.radians(0.4), deflect_m: float = 0.012):
+    """Advance the hand along ``approach`` in ``step_m`` increments until the leaf starts to move (``q_of`` changes by
+    ``move_rad``) or the eef deflects ``deflect_m`` against the surface (loaded arm): the *actual* contact pose — the
+    leaf's face plane is only known to the handle stand-off. Yields actions; returns ``(contact_pose or None,
+    travelled_m, how)`` through the generator's return value."""
+    a = C.unit(approach)
+    q0 = float(q_of())
+    travelled = 0.0
+    how = "no contact"
+    while travelled < max_m - 1e-6:
+        eef = motions.eef_pose(arm)
+        target = (C.as_tensor(eef[0]) + step_m * a, C.as_tensor(eef[1]))
+        try:
+            yield from motions.arm_along(arm, [target], loaded=True)
+        except SkillError as e:
+            det = getattr(e, "details", {}) or {}
+            msg = str(e.message or "")
+            pos_err = float(det.get("pos_err", 0.0) or 0.0)
+            pos_err = pos_err / 1000.0 if pos_err > 1.0 else pos_err  # mm in some diagnostics
+            limit_free = ("at_lower=[]" in msg and "at_upper=[]" in msg) or ("at_lower" not in msg)
+            if limit_free and pos_err >= 0.006:  # the differential IK stalled with no joint at a limit: the hand presses on the surface
+                return motions.eef_pose(arm), travelled, f"arm blocked at the surface ({e.message or e.reason})"
+            how = f"arm stalled: {e.message or e.reason}"
+            break
+        travelled += step_m
+        yield from motions.hold(2)
+        if abs(float(q_of()) - q0) >= move_rad:
+            return motions.eef_pose(arm), travelled, "leaf moved"
+        d = motions._deflection(arm)
+        if d is not None and d >= deflect_m:
+            return motions.eef_pose(arm), travelled, f"eef deflected {d * 1000:.0f} mm"
+    return None, travelled, how
+
+
+def _q_at_base(motions: Motions, q_full: th.Tensor, x: float, y: float, yaw: float) -> th.Tensor:
+    """``q_full`` with the base virtual joints set to the world pose (x, y, yaw)."""
+    q = q_full.clone()
+    jidx = motions.backend._jidx
+    p_root, q_root = motions.backend.world_to_root((th.tensor([x, y, float(q[jidx["base_footprint_z_joint"]])]), C.quat_from_yaw(yaw)))
+    q[jidx["base_footprint_x_joint"]] = float(p_root[0])
+    q[jidx["base_footprint_y_joint"]] = float(p_root[1])
+    q[jidx["base_footprint_rz_joint"]] = C.yaw_of(q_root)
+    return q
+
+
+def pushable_arc_from(motions: Motions, arm: str, base: Tuple[float, float, float], pre, contact, arc: List[Any]) -> Tuple[int, Optional[th.Tensor]]:
+    """The backend's collision-aware IK from a candidate base pose BEFORE driving there: the pre pose, the contact pose,
+    then the arc waypoints with chained seeds. ``(n reachable arc waypoints, q at the pre pose)``, ``(-1, None)`` when
+    the pre or the contact pose is unreachable."""
+    emb = f"{arm}_arm"
+    link = M.EEF_LINK[arm]
+    q_seed = _q_at_base(motions, motions.backend.q_full(), *base)
+    q_pre = motions.backend.solve_ik(emb, {link: (C.as_tensor(pre[0]), C.as_tensor(pre[1]))}, q_seed=q_seed, sync_world=False)
+    if q_pre is None:
+        return -1, None
+    q = motions.backend.solve_ik(emb, {link: (C.as_tensor(contact[0]), C.as_tensor(contact[1]))}, q_seed=q_pre, sync_world=False)
+    if q is None:
+        return -1, None
+    n = 0
+    for wp in arc:
+        q_w = motions.backend.solve_ik(emb, {link: (C.as_tensor(wp[0]), C.as_tensor(wp[1]))}, q_seed=q, sync_world=False)
+        if q_w is None:
+            break
+        q = q_w
+        n += 1
+    return n, q_pre
+
+
+def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    """Owner decision B (2026-09-20 20:19), sequential: per chunk - pick the stance on the +m side of the leaf by the
+    backend's IK of the contact pose and the arc waypoints (front and side candidates, longest pushable arc wins), drive
+    there (arms "ready"), then arm only: guarded approach along −m onto the outer face (a diff-IK stall counts as contact
+    only if the door moves under a 1 cm further push), push along the arc about the hinge to the arm's limit (the base
+    drags along −m when the arc gains < 2°), back off; repeat until closed or a chunk gains nothing."""
+    arm, name = action.arm, action.object
+    rep: Dict[str, Any] = {"chunks": []}
+    ctx["push_close"] = rep
+    _hook(ctx, "fov")(False)  # the hand leaves the camera frame at the side stances: the contact span is not a grasp span
+
+    def q_now() -> float:
+        return float(state.joint_position(name, action.joint))
+
+    obj = state.object(name)
+    d0, m0, sgn = leaf_frame(action.hinge_xy, action.handle_xy_closed, action.approach_closed)
+    q0 = q_now()
+    _w_aabb, thick = _leaf_dims(obj, action.hinge_xy, rot_z(d0, sgn * q0), rot_z(m0, sgn * q0), action.leaf_link)
+    width = leaf_width(action.handle_radius_m)
+    rep["geometry"] = {"hinge_xy": list(action.hinge_xy), "leaf_width_m": round(width, 3), "thickness_m": round(thick, 3), "q_start_deg": round(math.degrees(q0), 2)}
+    hinge = th.tensor([action.hinge_xy[0], action.hinge_xy[1], 0.0])
+    z_c = action.handle_z - action.push_height_drop_m
+    robot = motions.robot
+    idx = robot.arm_control_idx[arm]
+    motions.backend.update_world()
+    for chunk in range(action.max_chunks):
+        q = q_now()
+        if q - action.q_lower <= action.closed_tol_rad:
+            break
+        d1, m1 = rot_z(d0, sgn * q), rot_z(m0, sgn * q)
+        edge = hinge + width * d1
+        p_contact = hinge + (width - action.push_inset_m) * d1 + 0.5 * thick * m1 + th.tensor([0.0, 0.0, z_c])
+        contact_pose = C.contact_eef(p_contact, -m1, closing=th.tensor([0.0, 0.0, 1.0]))  # a = -m: pushing toward the inside (closing)
+        pre = C.pre_pose(contact_pose, action.push_pre_m)
+        delta = -sgn * min(math.radians(action.chunk_deg), max(q - action.q_lower, 0.0))
+        n_arc = max(int(round(abs(delta) / math.radians(2.0))), 4)  # scored at the execution's density (2° per waypoint)
+        arc = C.arc_waypoints(contact_pose, hinge + th.tensor([0.0, 0.0, z_c]), th.tensor([0.0, 0.0, 1.0]), delta, n=n_arc)
+        rec: Dict[str, Any] = {"q_before_deg": round(math.degrees(q), 2), "contact": [round(float(v), 3) for v in p_contact], "free_edge_xy": [round(float(v), 3) for v in edge[:2]],
+                               "delta_deg": round(math.degrees(abs(delta)), 1)}
+        # front stances (base on the +m side facing the contact) and side stances (beside the leaf's swing area, heading
+        # along the wall, the arm extended laterally toward the outer face), scored before driving
+        perp = th.tensor([-float(m1[1]), float(m1[0]), 0.0])
+        cands: List[Tuple[str, th.Tensor, float]] = []
+        for dist in (0.50, 0.60, 0.44):
+            for lat in (0.0, -0.20, 0.20, -0.35):
+                b = C.as_tensor(pre[0]) + dist * m1 + lat * perp
+                aim = C.as_tensor(pre[0]) - b
+                cands.append(("front", b, math.atan2(float(aim[1]), float(aim[0]))))
+        for side_dir in (perp, -perp):
+            for dist in (0.55, 0.65):
+                for out in (0.10, 0.25):
+                    b = C.as_tensor(pre[0]) + dist * side_dir + out * m1
+                    cands.append(("side", b, math.atan2(float(-side_dir[1]), float(-side_dir[0]))))
+        scored = []
+        here = motions.base_pose2d()
+        for kind_c, b, yaw in cands:
+            base = (float(b[0]), float(b[1]), yaw)
+            n_ok, _ = pushable_arc_from(motions, arm, base, pre, contact_pose, arc)
+            scored.append((n_ok, -math.hypot(base[0] - here[0], base[1] - here[1]), base, kind_c))
+        scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
+        rec["stance_scores"] = [{"base": [round(v, 2) for v in t[2]], "arc_ok": f"{t[0]}/{len(arc)}", "kind": t[3]} for t in scored[:6]]
+        best = scored[0]
+        if best[0] < 0:
+            rec["result"] = "no stance reaches the contact pose (backend IK)"
+            rep["chunks"].append(rec)
+            log.warning("push_close chunk %d: %s", chunk, rec["result"])
+            break
+        target = best[2]
+        n_reach = max(best[0], 0)
+        delta_exec = delta * (n_reach / len(arc)) if n_reach > 0 else delta * (1.0 / len(arc))
+        rec["plan"] = {"stance_kind": best[3], "waypoints_reachable": f"{n_reach}/{len(arc)}", "predicted_landing_deg": round(math.degrees(q + delta_exec), 2)}
+        log.info("push_close chunk %d: %s stance %s reaches the contact and %d/%d arc waypoints (best of %d); predicted landing %.1f deg", chunk, best[3],
+                 [round(v, 2) for v in target], n_reach, len(arc), len(scored), math.degrees(q + delta_exec))
+        yield from _arms_ready(motions, rec)
+        try:
+            yield from motions.track_path([target])
+            yield from motions.settle(max_steps=20)
+        except SkillError as e:
+            rec["result"] = f"drive to the stance failed: {e.message or e.reason}"
+            rep["chunks"].append(rec)
+            break
+        rec["stance"] = [round(v, 3) for v in target]
+        motions.backend.update_world()
+        yield from motions.gripper(arm, close=True)
+        try:
+            yield from motions.arm_to(arm, pose=pre, ignore_objects=[obj])
+        except SkillError as e:
+            rec["result"] = f"pre pose unreachable after the drive: {(e.message or e.reason)[:140]}"
+            rep["chunks"].append(rec)
+            break
+        found, travelled, how = yield from guarded_approach(motions, arm, -m1, q_now)
+        rec["approach"] = {"travelled_m": round(travelled, 3), "how": how}
+        if found is not None and "blocked" in how:
+            # contact evidence: a further 1 cm push must move the door, else the stall was the reach limit
+            q_a = q_now()
+            try:
+                eef = motions.eef_pose(arm)
+                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - 0.01 * m1, C.as_tensor(eef[1]))], loaded=True)
+            except SkillError:
+                pass
+            yield from motions.hold(3)
+            moved = abs(q_now() - q_a) >= math.radians(0.3)
+            rec["approach"]["evidence"] = {"door_moved_deg": round(math.degrees(q_now() - q_a), 2), "contact": moved}
+            if not moved:
+                found = None
+                how = "stall at the reach limit (door did not move under a 1 cm push)"
+        if found is None:
+            rec["result"] = f"no contact ({how})"
+            rep["chunks"].append(rec)
+            log.warning("push_close chunk %d: %s", chunk, rec["result"])
+            break
+        cpose = motions.eef_pose(arm)
+        cpose = (C.as_tensor(cpose[0]), C.as_tensor(cpose[1]))
+        n_exec = max(int(round(abs(delta_exec) / math.radians(2.0))), 1)
+        arc2 = C.arc_waypoints(cpose, hinge + th.tensor([0.0, 0.0, float(cpose[0][2])]), th.tensor([0.0, 0.0, 1.0]), delta_exec, n=n_exec)
+        try:
+            yield from motions.arm_along(arm, list(arc2), loaded=True, partial=True)
+            rec["arc"] = "complete"
+        except SkillError as e:
+            rec["arc"] = f"stopped: {e.message or e.reason}"
+        yield from motions.settle(max_steps=40)
+        q_after = q_now()
+        rec["q_after_deg"] = round(math.degrees(q_after), 2)
+        rec["plan"]["actual_landing_deg"] = round(math.degrees(q_after), 2)
+        if sgn * (q - q_after) < math.radians(2.0):
+            # the arm's arc gained little: drive the base along -m with the fist on the face (the base does the pushing)
+            motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
+            bx, by, byaw = motions.base_pose2d()
+            tgt = (bx - action.drag_m * float(m1[0]), by - action.drag_m * float(m1[1]), byaw)
+            motions.follow_phase = "base"
+            try:
+                yield from motions.track_path([tgt], tracker_cfg=replace(motions.cfg.base_tracker, v_max=(0.06, 0.06, 0.3)))
+                rec["base_drag"] = f"{action.drag_m:.2f} m toward the frame"
+            except SkillError as e:
+                rec["base_drag"] = f"stopped: {(e.message or e.reason)[:120]}"
+            finally:
+                motions.follow_phase = "arm"
+            yield from motions.settle(max_steps=40)
+            q_after = q_now()
+            rec["q_after_drag_deg"] = round(math.degrees(q_after), 2)
+        try:  # off the face (+m), then let it settle
+            eef = motions.eef_pose(arm)
+            yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + 0.10 * m1, C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        except SkillError as e:
+            rec["back_off_failed"] = e.message or e.reason
+        yield from motions.settle(max_steps=40)
+        rec["q_settled_deg"] = round(math.degrees(q_now()), 2)
+        motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
+        rep["chunks"].append(rec)
+        log.info("push_close chunk %d: door %.1f -> %.1f deg (settled %.1f), %s", chunk, math.degrees(q), math.degrees(q_after), math.degrees(q_now()), rec.get("arc"))
+        if sgn * (q - q_now()) < math.radians(0.5):
+            rec["result"] = "no progress"
+            break
+    q_end = q_now()
+    rep["final_q_deg"] = round(math.degrees(q_end), 2)
+    rep["closed"] = bool(q_end - action.q_lower <= action.closed_tol_rad)
+    rep["verdict"] = "closed by pushing" if rep["closed"] else f"stopped at {math.degrees(q_end):.1f} deg"
+    mon = ctx.get("monitors")
+    if mon is not None:
+        rep["contacts"] = [dict(e) for e in getattr(mon, "collision_events", [])[-40:]]
+    log.info("push_close done: %s (%d chunks); contacts %s", rep["verdict"], len(rep["chunks"]), rep.get("contacts"))
+
+
+def post_push_close(action: PushClose, state, targets, ctx) -> Optional[str]:
+    """Judged on the joint, as ``post_base_follow``: within the spec §8 tolerance of ``q_lower`` (revolute max(0.05 rad,
+    0.10·|Δq|)), ``no_motion`` below 10 % of the span, else ``tolerance``."""
+    q = state.joint_position(action.object, action.joint)
+    ctx["q"] = q
+    span = abs(action.q_from - action.q_lower)
+    closed = abs(q - action.q_lower)
+    if closed <= max(0.05, 0.10 * span):
+        return None
+    return "no_motion" if span - closed < 0.10 * span else "tolerance"
+
+
+# ==========================================================================================
 # dispatch
 # ==========================================================================================
 
@@ -2730,6 +3039,7 @@ EXECUTORS: Dict[type, Tuple[ExecuteFn, PostconditionFn]] = {
     Push: (execute_push, post_push),
     Brace: (execute_brace, post_brace),
     BaseFollow: (execute_base_follow, post_base_follow),
+    PushClose: (execute_push_close, post_push_close),
     Retreat: (execute_retreat, post_retreat),
 }
 
