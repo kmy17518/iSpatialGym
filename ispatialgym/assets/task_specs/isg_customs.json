@@ -18826,7 +18826,10 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push_brace": true,
+   "close_push_brace_opening_m": 0.04,
+   "close_push_brace_height_frac": 0.6
   },
   "constraints": []
  },
@@ -18977,7 +18980,10 @@
     0.55
    ],
    "brace_optional": true,
-   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)",
+   "close_push_brace": true,
+   "close_push_brace_opening_m": 0.04,
+   "close_push_brace_height_frac": 0.6
   },
   "constraints": []
  },
@@ -21526,6 +21532,133 @@
    "stage2_push": true,
    "focus_at_handle": true,
    "stage2_max_follow_k": 0.75
+  },
+  "constraints": []
+ },
+ "configuration_matching-articulation_open_small_scale-carton_msfzpz_s035-breakfast_table": {
+  "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+  "definition_id": 79,
+  "roles": {
+   "target": {
+    "category": "carton",
+    "sampleable": true,
+    "require": {
+     "handle": true
+    },
+    "representative": "msfzpz",
+    "joint": {
+     "carton/msfzpz": "j_link_0"
+    },
+    "handle_key": {
+     "carton/msfzpz": "carton__msfzpz"
+    },
+    "scale": {
+     "carton/msfzpz": 0.35,
+     "default": 0.35
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton": [
+       "msfzpz"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1,
+    "position": 0.03,
+    "orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.4,
+    0.55
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.004,
+    0.08
+   ],
+   "direction": "open",
+   "floor_support_height_m": 0.6,
+   "yaw_jitter_rad": 0.1,
+   "handle_arm_side_threshold_m": 0.05,
+   "push_horizontal_min_fraction": 0.3,
+   "brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "brace_face_shift_fraction": 0.25,
+   "brace_swept_clearance_m": 0.02,
+   "view_margin_m": 0.03,
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-19 TEST alias (owner 01:10: carton demos): carton msfzpz scaled 0.35 (body 0.37 x 0.36 x 0.27 m, one-piece lid 0.39 m long, 5 mm thick, free edge overhanging 4.5 cm) on the breakfast table - the unscaled 0.78 m carton needs the unimplemented floor-support init; BDDL problem990 (hand copy of problem52 with carton.n.02); edge pinch at the overhanging free edge (F record, pinch min 4 mm); lid_facing hinge_left (hinge line along the line of sight, free edge on the robot's right for the right hand); USD brake ladder from 0.15 N.m; goal 0.4-0.55 of the 170 deg range (68-93 deg) with stage2_push (fist on the underside from the reach limit on); brace optional/off; margin 0 + residual gates 15 mm",
+   "lid_facing": "hinge_left",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true
   },
   "constraints": []
  },
@@ -62324,6 +62457,299 @@
   },
   "constraints": []
  },
+ "configuration_matching-articulation_open_small_scale-carton_msfzpz_s025-breakfast_table": {
+  "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+  "definition_id": 79,
+  "roles": {
+   "target": {
+    "category": "carton",
+    "sampleable": true,
+    "require": {
+     "handle": true
+    },
+    "representative": "msfzpz",
+    "joint": {
+     "carton/msfzpz": "j_link_0"
+    },
+    "handle_key": {
+     "carton/msfzpz": "carton__msfzpz"
+    },
+    "scale": {
+     "carton/msfzpz": 0.25,
+     "default": 0.25
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton": [
+       "msfzpz"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1,
+    "position": 0.03,
+    "orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.4,
+    0.55
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.002,
+    0.08
+   ],
+   "direction": "open",
+   "floor_support_height_m": 0.6,
+   "yaw_jitter_rad": 0.1,
+   "handle_arm_side_threshold_m": 0.05,
+   "push_horizontal_min_fraction": 0.3,
+   "brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "brace_face_shift_fraction": 0.25,
+   "brace_swept_clearance_m": 0.02,
+   "view_margin_m": 0.03,
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-19 TEST: carton msfzpz at 0.25 (lid 0.28 m, 3.7 mm thick, box top 0.94 m): at 0.35 the right hand reached the edge pinch (4-25 cells) but the first follow waypoint at 23 deg in 0-1 (the hand climbs 15 cm per 23 deg on a 0.39 m lid, 0919-014043); same TEST settings as the 0.35 alias",
+   "lid_facing": "hinge_left",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true
+  },
+  "constraints": []
+ },
+ "configuration_matching-articulation_open_small_scale-carton_cdmmwy-breakfast_table": {
+  "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+  "definition_id": 80,
+  "roles": {
+   "target": {
+    "category": "carton",
+    "sampleable": true,
+    "require": {
+     "handle": true
+    },
+    "representative": "cdmmwy",
+    "joint": {
+     "carton/cdmmwy": "j_right_lid"
+    },
+    "handle_key": {
+     "carton/cdmmwy": "carton__cdmmwy"
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton": [
+       "cdmmwy"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1,
+    "position": 0.03,
+    "orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.3,
+    0.38
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.0005,
+    0.08
+   ],
+   "direction": "open",
+   "floor_support_height_m": 0.6,
+   "yaw_jitter_rad": 0.1,
+   "handle_arm_side_threshold_m": 0.05,
+   "push_horizontal_min_fraction": 0.3,
+   "brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "brace_face_shift_fraction": 0.25,
+   "brace_swept_clearance_m": 0.02,
+   "view_margin_m": 0.03,
+   "stand_offs_m": [
+    0.15,
+    0.25,
+    0.35
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-19 TEST alias (owner 01:10/01:33: two-flap carton demo, cdmmwy instead of causya whose link_0 frame is broken): 0.23 x 0.31 x 0.19 m box, flaps j_left_lid / j_right_lid 0.8 mm thick meeting at the seam; target = the right flap (lid_facing hinge_right puts its hinge on the robot's right); owner sequence: the left fist presses the LEFT flap down 0.3 rad at the seam (prep_push other_flap_down; that joint gets a -0.35 rad lower limit and a spring to 0: joint_drives) and holds -> the right hand pinches the right flap's free edge -> the left hand leaves (the flap springs back) and braces the box top at the left hinge line (prep_brace) -> follow -> release -> stage-2 fist from inside if short; target joint held by the USD Coulomb brake; BDDL problem80 (was 991); lid_facing hinge_left (0919-015031: with the target hinge on the right the right hand points right toward it - the awkward side, 0-2 band cells); the pressed flap is then on the robot's right but its seam edge is at the box centre; phase2_loose_class_deg 40 (0919-030747: the pitched-approach band cells put the box 0.24-0.32 m to the robot's right, focus 32 deg off the optical axis, no class-1 survivor at 25); prep press 5 cm from the seam and the pinch approach 45 deg (0919-031952: fist and pads collided at the seam), stage2_pre_dist 0.04 (the fist's pre-contact 10 cm below the underside of a flap 18 deg open lies inside the box); back to hinge_right with the front pinch (0919-041118: in hinge_left the pressed flap lies on the robot's right, out of the left arm's reach - only the handle arm could press); the pinch's front end follows the robot's side (front_end_along_hinge); prep press 8 cm from the seam (0919-044845: at 5 cm the left fist sat at its reach boundary and collided with the pinching right hand); stage2_max_follow_k 0.5 (0919-050714: the program check's retreat after a follow to k 0.75 - the flap at 48 deg, the hand 1.05 m up - has no IK solution); goal 0.25-0.3 of the range (34-40 deg) so the hand follow alone completes it (0919-051826: the stage-2 fist under a flap 37 deg open has no IK - the forearm would lie through the other flap; the blender lid stood at 56 deg over an open mouth); brake ladder from 0.5 N.m (0919-062149: the whole program ran - press, pinch on the 2nd try, follow to 0.709 rad - and the flap sagged to 0.457 after the release: the pads rubbing the 0.8 mm edge on the way out overcome a 0.15 N.m brake); 2026-09-19 14:34 owner sequence v2 (prep_push two_flap_v2): right fist presses the left flap at its far end -> left hand pinches the right flap's free edge on the seam's centre line and opens it to 0.45 rad, releases -> right fist leaves -> left fist presses the left flap (mid) -> right hand pinches the ajar flap's edge near the robot (along the hinge, 20 deg down) and opens to the goal 0.3-0.38 of the range; both finger assignments tried per pinch; nearest Phase-2 survivors first (prefer_near); stand_offs_m 0.15/0.25/0.35 (0919-150059: from the 0.35+ stances the seam's centre line lies 0.80 m ahead of the base - beyond the left hand's reach - and the near-end pinch's approach is only marginally trackable at 0.84 m); stand-offs down to 0.05 (0919-152410: at 0.15-0.35 the seam centre is still 0.81 m ahead of the base, the far press point 0.92-0.97 m; only the near-end pinch is in reach); v2_first_axial_frac 0.4 (0919-161851: the exact centre line lies 0.76-0.78 m ahead of the base from every survivor, the left hand across the seam reaches ~0.70); 16:55 owner: the first pinch = a firm across-the-seam pinch with the left hand pointing right (yaw 0 preferred, diagonals only as fallback), on the centre line again; phase 1 and phase 2 may use two stances with a transition (v2_phase1 search around the phase-2 stance); 19:52 owner: the first pinch by the RIGHT hand pointing right across the seam over the pressed left flap, the LEFT fist holding the left flap (its own side, no crossing) - when it passes at the phase-2 stance the fist keeps pressing through both openings (single_press); 20:15: with the right hand the across pinch also passes only at yaw 65 with 3-76 mrad margins (0919-195559, rejected by the program check) -> back to the LEFT hand's diagonal pinch, the crossing right fist pressing at the NEAR end of the left flap (0.6 m ahead instead of 0.85); 22:25: first v2 instance written and program-checked (0919-220112); press 1 at 3 cm from the seam missed the left flap (no_motion) -> 4.5 cm, pad long side along the hinge; 23:40: square-on instance ran (0919-231459) - the tilted fist press shoved the box 4.9 cm and the pinch missed: vertical fist first, spring 1.0 N.m/rad; 03:30: press 1 pad across the seam (2 cm along the hinge), 5 cm from the near end (0920-031614: the fist's bulk penetrated the box body 4 cm from the wall)",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0"
+   ],
+   "stage2_push": false,
+   "focus_at_handle": true,
+   "stage2_edge_inset_m": 0.03,
+   "prep_push": "two_flap_v2",
+   "prep_push_joint": "j_left_lid",
+   "prep_push_angle_rad": 0.3,
+   "prep_push_edge_inset_m": 0.08,
+   "prep_brace": false,
+   "joint_drives": {
+    "j_left_lid": {
+     "stiffness": 1.0,
+     "damping": 0.15,
+     "max_effort": 5.0,
+     "lower_limit_rad": -0.35
+    }
+   },
+   "phase2_loose_class_deg": 40.0,
+   "stage2_pre_dist_m": 0.04,
+   "prefer_near": true,
+   "v2_ajar_rad": 0.35,
+   "v2_press1_axial": "near",
+   "v2_press2_axial": "mid",
+   "v2_first_pitch_deg": 25.0,
+   "v2_second_pitch_deg": 20.0,
+   "v2_edge_inset_m": 0.015,
+   "v2_second_axial_inset_m": 0.03,
+   "candidates_per_attempt": 6,
+   "prep_push_tilts_deg": [
+    0.0,
+    25.0,
+    40.0,
+    55.0,
+    70.0
+   ],
+   "attempt_budget_s": 900,
+   "v2_first_axial_frac": 0.5,
+   "v2_first_yaws_deg": [
+    0.0,
+    20.0,
+    40.0,
+    65.0
+   ],
+   "v2_min_margin_rad": 0.05,
+   "v2_first_arm": "left",
+   "v2_accept_margin_rad": 0.03,
+   "v2_press1_edge_inset_m": 0.045,
+   "prep_push_axial_inset_m": 0.05
+  },
+  "constraints": []
+ },
  "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table": {
   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
   "definition_id": 88,
@@ -62625,6 +63051,153 @@
    "init_surface": "floor"
   }
  },
+ "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table": {
+  "iddl": "configuration_matching/articulation_close_small_scale.iddl",
+  "definition_id": 81,
+  "fallbacks": [
+   "configuration_matching-articulation_close_small_scale-blender_eyedvd-breakfast_table"
+  ],
+  "roles": {
+   "target": {
+    "category": "carton",
+    "sampleable": true,
+    "require": {
+     "handle": true
+    },
+    "representative": "cdmmwy",
+    "joint": {
+     "carton/cdmmwy": "j_right_lid"
+    },
+    "handle_key": {
+     "carton/cdmmwy": "carton__cdmmwy"
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton": [
+       "cdmmwy"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1,
+    "position": 0.03,
+    "orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.5,
+    0.95
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.0005,
+    0.08
+   ],
+   "direction": "close",
+   "floor_support_height_m": 0.6,
+   "yaw_jitter_rad": 0.0,
+   "handle_arm_side_threshold_m": 0.05,
+   "push_horizontal_min_fraction": 0.3,
+   "brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "brace_face_shift_fraction": 0.25,
+   "brace_swept_clearance_m": 0.02,
+   "view_margin_m": 0.03,
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 60.0,
+   "close_tolerance_rad": 0.05,
+   "prefer_near": true,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 1500,
+   "close_init_fraction": 0.7,
+   "joint_friction": [
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close of the two-flap carton cdmmwy - the right flap starts at 0.9 of its range (122 deg, leaning outward past vertical, held by the brake), the right fist pushes its tip near the centre line along the closing arc to 0 (fixed); the arc's tangent flips at vertical, so the sampler records push segments from successive stances with a transition between them (the owner's re-stance-and-continue demo); BDDL problem81; joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); close_init_fraction 0.7 (95 deg; 0920-140636: at 122 deg the fist under the outward-leaning tip pointing up drove right_arm_joint7 into its limit from every stance)",
+   "lid_facing": "hinge_right",
+   "close_push_max_segments": 3,
+   "close_push_brace": true,
+   "close_push_brace_opening_m": 0.04,
+   "close_push_brace_height_frac": 0.8,
+   "close_push_brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "close_push_stance_eval": 10,
+   "close_push_brace_corner_inset_m": 0.05,
+   "_owner_2320_note": "owner 2026-09-20 23:20: the left open-gripper brace on segment 1 only (stance ranked brace-first, required); re-stances unbraced, coverage-first; <= 3 segments",
+   "close_push_brace_retreat_m": 0.06,
+   "close_push_overshoot_rad": 0.03,
+   "_overshoot_note": "0921-015439: the 0.15 rad arc end past the closed limit failed the program check's IK (its clearance) at the second stance; 0.06 rad - the oracle re-pushes the lag",
+   "close_push_brace_clearance_m": 0.015,
+   "_owner_2323_note": "owner 2026-09-21 23:23: box aligned with the table (no yaw jitter); the brace pads stop 6 mm off the face (the box rose 5 mm and the base rocked at 0921-030848); the box as near as the frame allows (loose class 60 deg, nearest Phase-2 cells first)",
+   "_owner_2227_note": "owner 2026-09-22 11:27: the brace is a safety stop - pads 1.5 cm off the face, the approach stops on first touch (executor brace_touch_stop_m), the idle hand keeps its opening after the brace"
+  },
+  "constraints": []
+ },
  "configuration_matching-block_design-block_4-breakfast_table_board": {
   "iddl": "configuration_matching/block_design.iddl",
   "definition_id": 82,
@@ -62789,6 +63362,424 @@
   },
   "constraints": []
  },
+ "configuration_matching-articulation_open_small_scale-carton_cdmmwy_rightfirst-breakfast_table": {
+  "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+  "definition_id": 80,
+  "roles": {
+   "target": {
+    "category": "carton",
+    "sampleable": true,
+    "require": {
+     "handle": true
+    },
+    "representative": "cdmmwy",
+    "joint": {
+     "carton/cdmmwy": "j_right_lid"
+    },
+    "handle_key": {
+     "carton/cdmmwy": "carton__cdmmwy"
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton": [
+       "cdmmwy"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1,
+    "position": 0.03,
+    "orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.3,
+    0.38
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.0005,
+    0.08
+   ],
+   "direction": "open",
+   "floor_support_height_m": 0.6,
+   "yaw_jitter_rad": 0.1,
+   "handle_arm_side_threshold_m": 0.05,
+   "push_horizontal_min_fraction": 0.3,
+   "brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "brace_face_shift_fraction": 0.25,
+   "brace_swept_clearance_m": 0.02,
+   "view_margin_m": 0.03,
+   "stand_offs_m": [
+    0.15,
+    0.25,
+    0.35
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-20 13:50 owner suggestion 2 test: the LEFT fist presses the left flap (own side) and the RIGHT hand pinches the right flap's seam on the centre line pointing right (pads above / below the sheet), the box placed on the robot's LEFT (v2_first_lat_pref_m +0.15) - the earlier right-hand across pinch (0919-195559) was tried with the box centred / right; phase 2 = the v2 near-end re-grasp for now (the 'open until limit, then push' continuation is next)",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0"
+   ],
+   "stage2_push": false,
+   "focus_at_handle": true,
+   "stage2_edge_inset_m": 0.03,
+   "prep_push": "two_flap_v2",
+   "prep_push_joint": "j_left_lid",
+   "prep_push_angle_rad": 0.3,
+   "prep_push_edge_inset_m": 0.08,
+   "prep_brace": false,
+   "joint_drives": {
+    "j_left_lid": {
+     "stiffness": 1.0,
+     "damping": 0.15,
+     "max_effort": 5.0,
+     "lower_limit_rad": -0.35
+    }
+   },
+   "phase2_loose_class_deg": 40.0,
+   "stage2_pre_dist_m": 0.04,
+   "prefer_near": true,
+   "v2_ajar_rad": 0.35,
+   "v2_press1_axial": "mid",
+   "v2_press2_axial": "mid",
+   "v2_first_pitch_deg": 25.0,
+   "v2_second_pitch_deg": 20.0,
+   "v2_edge_inset_m": 0.015,
+   "v2_second_axial_inset_m": 0.03,
+   "candidates_per_attempt": 6,
+   "prep_push_tilts_deg": [
+    0.0,
+    25.0,
+    40.0,
+    55.0,
+    70.0
+   ],
+   "attempt_budget_s": 900,
+   "v2_first_axial_frac": 0.5,
+   "v2_first_yaws_deg": [
+    0.0,
+    20.0,
+    40.0
+   ],
+   "v2_min_margin_rad": 0.05,
+   "v2_first_arm": "right",
+   "v2_accept_margin_rad": 0.03,
+   "v2_press1_edge_inset_m": 0.08,
+   "prep_push_axial_inset_m": 0.05,
+   "v2_first_lat_pref_m": 0.15,
+   "v2_press1_tilts_deg": [
+    0.0,
+    25.0,
+    40.0,
+    55.0
+   ]
+  },
+  "constraints": []
+ },
+ "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table": {
+  "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+  "definition_id": 80,
+  "roles": {
+   "target": {
+    "category": "carton",
+    "sampleable": true,
+    "require": {
+     "handle": true
+    },
+    "representative": "cdmmwy",
+    "joint": {
+     "carton/cdmmwy": "j_right_lid"
+    },
+    "handle_key": {
+     "carton/cdmmwy": "carton__cdmmwy"
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton": [
+       "cdmmwy"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1,
+    "position": 0.03,
+    "orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.3,
+    0.38
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.0005,
+    0.08
+   ],
+   "direction": "open",
+   "floor_support_height_m": 0.6,
+   "yaw_jitter_rad": 0.0,
+   "handle_arm_side_threshold_m": 0.05,
+   "push_horizontal_min_fraction": 0.3,
+   "brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "brace_face_shift_fraction": 0.25,
+   "brace_swept_clearance_m": 0.02,
+   "view_margin_m": 0.03,
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-20 15:21 owner lever sequence (two_flap_v4): the LEFT arm over the box, forearm level, closed gripper pointing right - presses the left flap 5 cm left of the seam (spring joint), slides right into the seam opening under the right flap (fingertips 2.5 cm in) and lifts it to 0.35 rad; the RIGHT hand pinches the raised edge near the robot (handle B) and opens to the goal (stage-2 fist push when its reach ends); the left fist slides 8 cm back to the left and hovers above the box while the right hand works; brake on the right flap, spring on the left",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.2",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true,
+   "stage2_edge_inset_m": 0.03,
+   "prep_push": "two_flap_v4",
+   "prep_push_joint": "j_left_lid",
+   "prep_push_angle_rad": 0.5,
+   "prep_push_edge_inset_m": 0.08,
+   "joint_drives": {
+    "j_left_lid": {
+     "stiffness": 1.0,
+     "damping": 0.15,
+     "max_effort": 5.0,
+     "lower_limit_rad": -0.55
+    }
+   },
+   "phase2_loose_class_deg": 40.0,
+   "stage2_pre_dist_m": 0.04,
+   "prefer_near": false,
+   "v2_ajar_rad": 0.35,
+   "v2_first_pitch_deg": 25.0,
+   "v2_second_pitch_deg": 20.0,
+   "v2_edge_inset_m": 0.015,
+   "v2_second_axial_inset_m": 0.03,
+   "candidates_per_attempt": 8,
+   "prep_push_tilts_deg": [
+    0.0,
+    25.0,
+    40.0,
+    55.0,
+    70.0
+   ],
+   "attempt_budget_s": 2400,
+   "v2_accept_margin_rad": 0.03,
+   "prep_push_axial_inset_m": 0.05,
+   "v4_axial": [
+    "mid",
+    "far"
+   ],
+   "v4_press_seam_offset_m": 0.05,
+   "v4_lift_insert_m": 0.02,
+   "v4_fist_half_height_m": 0.014,
+   "v4_retreat_m": 0.08,
+   "v4_axial_inset_m": 0.06,
+   "v2_stance_max": 12,
+   "v2_first_lat_pref_m": 0.17,
+   "v4_stance_max": 24,
+   "_v4_fist_half_height_note": "0920-170545: the closed fingers are 1.4 cm half-wide near the palm (FINGER_SIDE_PROFILE); 0.012 left 0.6 mm under the flap on the slide",
+   "v4_fist_pitches_deg": [
+    30.0,
+    20.0,
+    40.0,
+    15.0
+   ],
+   "v4_fist_yaws_deg": [
+    0.0,
+    30.0,
+    50.0
+   ],
+   "_v4_pitch_note": "0920-173005: pitched >= 20 deg lifts the palm (5.9-13.6 cm behind the eef origin, 3 cm half-height) off the pressed flap and the box wall",
+   "v2_second_sites": [
+    "deep",
+    "near_edge"
+   ],
+   "v2_near_edge_width_fracs": [
+    0.74,
+    0.6
+   ],
+   "_v2_second_sites_note": "0920-180506: at the lever stance (seam 10-20 cm left) the right hand cannot reach the seam; the flap near-edge pinch sits up to 8 cm closer to the hinge",
+   "v2_second_yaws_deg": [
+    90.0,
+    65.0,
+    115.0
+   ],
+   "_v2_second_yaws_note": "> 90: the approach turned AWAY from the hinge (the hand comes from the hinge side / right-rear, clear of the lever arm over the seam)",
+   "v4_lever_seed_postures": [
+    "ready",
+    "tucked"
+   ],
+   "v4_lift_path": "vertical",
+   "v2_second_preshape_margin_m": 0.02,
+   "_v4_lift_note": "0920-193159: press + slide + lift worked (flap to 0.35 rad) but the arc shoved the box 3 cm and the pinch at 0.25 of the flap width (1.3 cm of lift) closed on nothing; vertical lift, 3.5 cm insertion, pinch at 0.6 / 0.5 of the width",
+   "v4_slide_lift_m": 0.01,
+   "v4_fist_half_height_edge_m": 0.018,
+   "v4_lift_clearance_m": 0.012,
+   "_v4_geometry_note": "r1pro.urdf: closed fingers 0.84-1.8 cm half-thick (edge) / 0.7-1.4 cm half-wide (flat); palm 6 x 10.8 x 7.7 cm from 5.9 cm behind the eef origin",
+   "_press_depth_note": "0920-205958: the pitched fingertips rode on the pressed flap edge at the seam (0.33 rad = 5 cm gap); the flap swings 0.5 rad into the open box (7.4 cm gap)",
+   "v2_deep_inset_m": 0.04,
+   "v2_deep_axial_inset_m": 0.035,
+   "v2_deep_pitches_deg": [
+    0.0,
+    10.0,
+    20.0
+   ],
+   "v2_deep_yaws_deg": [
+    0.0,
+    20.0,
+    -20.0
+   ],
+   "v4_brace": true,
+   "v4_brace_height_frac": 0.85,
+   "v4_brace_corner_inset_m": 0.04,
+   "v4_brace_opening_m": 0.04,
+   "v4_retreat_lift_m": 0.03,
+   "_owner_2120_note": "owner 2026-09-20 21:20: right-hand open-gripper brace on the hinge-side face through press/slide/lift; deep grasp of the raised flap (live joint angle); fist retreat lifts off then slides left",
+   "v4_brace_pre_m": 0.05,
+   "_prefer_near_note": "0920-215301: the box stood 0.33 m into the table (its hinge-side face 0.79 m from the base) - out of the right arm's reach for the brace; the nearest Phase-2 cells first",
+   "prefer_depth_m": 0.74,
+   "prep_push_pre_dist_m": 0.06,
+   "v4_brace_kind": "blade_down",
+   "v4_brace_tip_below_rim_m": 0.025,
+   "_owner_2320_note": "owner 2026-09-20 23:20: the right brace is a top-down closed blade beside the hinge-side face below the rim at the near corner (the horizontal face stop had no IK)",
+   "v2_second_pitches_deg": [
+    20.0,
+    35.0
+   ],
+   "_deep_grasp_note": "0921-010831: the across-the-seam deep grasp (owner 21:20) is a cross-body reach for the right hand from every lever stance (fails at rest); the same 4 cm-deep straddle of the flap at its near side edge, approached along the hinge from the robot, is the fallback",
+   "_owner_2323_note": "owner 2026-09-21 23:23: box aligned with the table (no yaw jitter); a 0.2 N.m brake on the target flap so the lift force does not tilt the box",
+   "v4_brace_retreat_m": 0.08,
+   "v4_brace_pitches_deg": [
+    60.0,
+    45.0,
+    30.0,
+    0.0
+   ],
+   "_brace_pitch_note": "owner 2026-09-22 11:27: the hand swung 70 cm to the right between the blade and the grasp (a straight-down blade is far from the grasp configuration in joint space) - the forward-leaning blade first, an 8 cm straight lift-off",
+   "_owner_2227_note": "owner 2026-09-22 11:27: edge-on blade brace first (pure pitch to the pinch, no swing out of the frame), short straight lift-off; the braced wall named by geometry; other IK seeds when only the branch meets the body"
+  },
+  "constraints": []
+ },
  "configuration_matching-attachment-cork-wine_bottle-breakfast_table": {
   "iddl": "configuration_matching/attachment.iddl",
   "definition_id": 83,
@@ -62892,6 +63883,155 @@
     "target_rot_rad": 0.02
    },
    "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+  },
+  "constraints": []
+ },
+ "configuration_matching-articulation_close_small_scale-carton_cdmmwy_near-breakfast_table": {
+  "iddl": "configuration_matching/articulation_close_small_scale.iddl",
+  "definition_id": 81,
+  "fallbacks": [
+   "configuration_matching-articulation_close_small_scale-blender_eyedvd-breakfast_table"
+  ],
+  "roles": {
+   "target": {
+    "category": "carton",
+    "sampleable": true,
+    "require": {
+     "handle": true
+    },
+    "representative": "cdmmwy",
+    "joint": {
+     "carton/cdmmwy": "j_right_lid"
+    },
+    "handle_key": {
+     "carton/cdmmwy": "carton__cdmmwy"
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton": [
+       "cdmmwy"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1,
+    "position": 0.03,
+    "orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.5,
+    0.95
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.0005,
+    0.08
+   ],
+   "direction": "close",
+   "floor_support_height_m": 0.6,
+   "yaw_jitter_rad": 0.0,
+   "handle_arm_side_threshold_m": 0.05,
+   "push_horizontal_min_fraction": 0.3,
+   "brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "brace_face_shift_fraction": 0.25,
+   "brace_swept_clearance_m": 0.02,
+   "view_margin_m": 0.03,
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 60.0,
+   "close_tolerance_rad": 0.05,
+   "prefer_near": true,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 1500,
+   "close_init_fraction": 0.7,
+   "joint_friction": [
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close of the two-flap carton cdmmwy - the right flap starts at 0.9 of its range (122 deg, leaning outward past vertical, held by the brake), the right fist pushes its tip near the centre line along the closing arc to 0 (fixed); the arc's tangent flips at vertical, so the sampler records push segments from successive stances with a transition between them (the owner's re-stance-and-continue demo); BDDL problem81; joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); close_init_fraction 0.7 (95 deg; 0920-140636: at 122 deg the fist under the outward-leaning tip pointing up drove right_arm_joint7 into its limit from every stance)",
+   "lid_facing": "hinge_right",
+   "close_push_max_segments": 3,
+   "close_push_brace": true,
+   "close_push_brace_opening_m": 0.04,
+   "close_push_brace_height_frac": 0.8,
+   "close_push_brace_kinds": [
+    "opposite_face",
+    "top_press"
+   ],
+   "close_push_stance_eval": 10,
+   "close_push_brace_corner_inset_m": 0.05,
+   "_owner_2320_note": "owner 2026-09-20 23:20: the left open-gripper brace on segment 1 only (stance ranked brace-first, required); re-stances unbraced, coverage-first; <= 3 segments",
+   "close_push_brace_retreat_m": 0.06,
+   "close_push_overshoot_rad": 0.03,
+   "_overshoot_note": "0921-015439: the 0.15 rad arc end past the closed limit failed the program check's IK (its clearance) at the second stance; 0.06 rad - the oracle re-pushes the lag",
+   "close_push_brace_clearance_m": 0.015,
+   "_owner_2323_note": "owner 2026-09-21 23:23: box aligned with the table (no yaw jitter); the brace pads stop 6 mm off the face (the box rose 5 mm and the base rocked at 0921-030848); the box as near as the frame allows (loose class 60 deg, nearest Phase-2 cells first)",
+   "phase2_tight_class_deg": 25.0,
+   "_near_note": "owner 2026-09-21 23:23 question: the box as near as the frame allows - the Phase-2 tight class (8 deg: the focus on the optical axis) relaxed to 25 deg; the loose class alone changed nothing (class 0 survivors are used first)",
+   "_owner_2227_note": "owner 2026-09-22 11:27: the brace is a safety stop - pads 1.5 cm off the face, the approach stops on first touch (executor brace_touch_stop_m), the idle hand keeps its opening after the brace"
   },
   "constraints": []
  }

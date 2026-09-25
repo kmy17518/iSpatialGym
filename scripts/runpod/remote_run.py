@@ -36,10 +36,15 @@ sys.path.insert(0, HERE)
 import rp  # noqa: E402
 
 POOL = os.path.join(rp.REPO, "runlogs", "runpod", "smoke")
-PODS_FILE = os.path.join(POOL, "pods.txt")
+#: ``ISG_SMOKE_PODS_FILE``: an alternative pod list (a pod rented for one workstream, kept out of the shared pool); the
+#: locks stay in the shared directory so the pod is still one job at a time
+PODS_FILE = os.environ.get("ISG_SMOKE_PODS_FILE") or os.path.join(POOL, "pods.txt")
 LOCKS = os.path.join(POOL, "locks")
 SYNC_DIRS = ["ispatialgym", "scripts", "runlogs/smoke_inputs", "runlogs/reach_volume_20260915", "runlogs/reach_bands_20260915", "runlogs/scene_inventory_20260915",
-             "runlogs/symmetry_20260915", "runlogs/held_visibility_20260915"]
+             "runlogs/symmetry_20260915", "runlogs/held_visibility_20260915",
+             # the handle annotations the articulation samplers read (grasp_library.library_root()/artic/handles; 100 small JSON files) -
+             # a re-annotated handle in the working tree must reach the pod like a re-computed band (2026-09-18 blender ring)
+             "runlogs/grasp_library_20260905/artic/handles"]
 EXCLUDES = ["__pycache__", "*.pyc", "behavior-vision-suite.github.io", "data_collection", ".pytest_cache", "renders", "strips", "*.png", "*.jpg", "*.mp4"]
 
 

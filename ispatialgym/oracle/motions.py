@@ -793,7 +793,7 @@ class Motions:
         return "both_arms" if len(arms) == 2 else f"{arms[0]}_arm"
 
     def arm_to(self, arms: Union[str, Sequence[str]], pose: Any = None, q: Any = None, ignore_objects=(), q_hint: Any = None,
-               max_excursion: Optional[float] = None) -> Iterator[th.Tensor]:
+               max_excursion: Optional[float] = None, ignore_links=()) -> Iterator[th.Tensor]:
         """cuRobo trajopt of the arm(s) with the trunk locked, then streamed. Exactly one of ``pose`` (a world pose
         for one arm, or ``{arm: pose}``) or ``q`` (a 28-D vector, ``{joint_name: value}`` or ``{arm: q7}``) is the
         target. Raises ``plan_failed`` when no trajectory is found (the sampler proved the key poses, not the
@@ -807,7 +807,10 @@ class Motions:
         flip (the pilot's french-fries finish swung the hand out of the camera frame)."""
         arms = (arms,) if isinstance(arms, str) else tuple(arms)
         emb = self._emb_for(arms)
-        self.backend.update_world(ignore_objects=ignore_objects)
+        try:
+            self.backend.update_world(ignore_objects=ignore_objects, ignore_links=ignore_links)
+        except TypeError:  # a backend without link-level ignores (the test stubs)
+            self.backend.update_world(ignore_objects=ignore_objects)
         q_start = self.backend.q_full()
         if (pose is None) == (q is None):
             raise ValueError("arm_to needs exactly one of pose / q")
@@ -844,7 +847,24 @@ class Motions:
             else:
                 res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
             if not res.success:
-                raise SkillError("plan_failed", f"arm_to({arm}, witness q): {res.status}", diagnostics=dict(res.diagnostics), stage="trajopt")
+                # 2026-09-18 (blender eyedvd pod demo 0918-222128): the joint-space plan to the witness failed twice with a final pose
+                # error of 0.0 mm - the goal is fine, the path to that configuration is not (a witness on a joint limit under the
+                # margin-0 test setting, or a sweep through the target). Fall back to the pose goal in cuRobo's own branch before
+                # giving up; the legs that follow start from wherever the hand is (arm_along tracks from the current configuration)
+                diag_js = dict(res.diagnostics)
+                targets = {M.EEF_LINK[arm]: as_world_pose(pose)}
+                if relax is not None:
+                    with relax(emb, q_start, arms) as relaxed:
+                        self.last_relaxed_links = list(relaxed)
+                        res = self.backend.plan_pose(emb, targets, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+                else:
+                    res = self.backend.plan_pose(emb, targets, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+                if not res.success:
+                    raise SkillError("plan_failed", f"arm_to({arm}, witness q): {diag_js.get('trajopt_verdict') or 'joint-space plan failed'}; pose-goal fallback: {res.status}",
+                                     diagnostics={"joint_goal": diag_js, "pose_goal": dict(res.diagnostics)}, stage="trajopt")
+                q_goal = C.as_tensor(res.q_traj[-1]).reshape(-1) if res.q_traj is not None and len(res.q_traj) else q_goal
+                log.warning("arm_to(%s): joint-space plan to the witness failed (%s); planned to the pose in cuRobo's own branch instead (joint distance to the witness %.2f rad)",
+                            arm, diag_js.get("trajopt_verdict"), float(th.max(th.abs(q_goal[idx] - q28[idx]))))
             if max_excursion is not None:
                 idx = self.robot.arm_control_idx[arm]
                 exc = float(th.max(th.abs(q_goal[idx] - q_start[idx])))

@@ -194,12 +194,73 @@ def _tensor(v: Sequence[float]):
     return th.tensor([float(x) for x in v], dtype=th.float32)
 
 
-def _handle_eef(C, wp) -> Pose:
+def _handle_eef(C, wp, delta: Optional[Tuple[List[float], List[float]]] = None, joint_rot: Optional[Tuple[Any, Any, float]] = None) -> Pose:
     """eef pose of a recorded handle waypoint h(q_k) (sidecar ``HandleWaypoint``: the world-frame ``contact`` /
     ``approach`` / ``pinch`` the sampler wrote with ``conventions.HandleWaypoint.to_sidecar()``) through
     ``conventions.handle_eef(contact, approach=, closing=)`` — the same eef ``handle_waypoints(handle, joint_info,
-    q_values, obj_pose)`` computed for the sampler (its inputs are not in the sidecar, its outputs are)."""
-    return _as_pose(C.handle_eef(_tensor(wp.contact), approach=_tensor(wp.approach), closing=_tensor(wp.pinch)))
+    q_values, obj_pose)`` computed for the sampler (its inputs are not in the sidecar, its outputs are). ``delta``
+    (``_handle_delta``: the object's displacement since the record) moves the record with the object; ``joint_rot``
+    (``_handle_joint_rot``: ``(hinge, axis, angle)`` in the live world) turns it with the link about its hinge."""
+    contact, approach, pinch = _tensor(wp.contact), _tensor(wp.approach), _tensor(wp.pinch)
+    if delta is not None:
+        dp, dq = _tensor(delta[0]), _tensor(delta[1])
+        contact = C.quat_rotate(dq, contact) + dp
+        approach, pinch = C.quat_rotate(dq, approach), C.quat_rotate(dq, pinch)
+    if joint_rot is not None:
+        hinge, axis, ang = joint_rot
+        rq = C.quat_from_axis_angle(axis, float(ang))
+        contact = hinge + C.quat_rotate(rq, contact - hinge)
+        approach, pinch = C.quat_rotate(rq, approach), C.quat_rotate(rq, pinch)
+    return _as_pose(C.handle_eef(contact, approach=approach, closing=pinch))
+
+
+def _handle_joint_rot(art, state, delta: Optional[Tuple[List[float], List[float]]] = None) -> Optional[Tuple[Any, Any, float]]:
+    """Owner 2026-09-20 21:20: a handle grasp is derived from the link's LIVE joint angle, not the recorded one - the lever's
+    lift under-delivers (0.2 of 0.35 rad, 0920-211200) and the recorded pinch closed above the edge. The waypoint at k = 0
+    belongs to ``articulation.q_init``; the record's ``hinge_world`` / ``axis_world`` (moved with the object by ``delta``)
+    and the state's joint value give the rotation ``(hinge, axis, q_live - q_init)``. None without the record / a state."""
+    extra = getattr(art, "extra", None) or {}
+    if extra.get("hinge_world") is None or extra.get("axis_world") is None or state is None or not hasattr(state, "joint_position"):
+        return None
+    try:
+        q_live = float(state.joint_position(art.object, art.joint))
+    except Exception:  # noqa: BLE001
+        return None
+    dq_j = q_live - float(art.q_init)
+    if abs(dq_j) < 0.01:
+        return None
+    C = _conventions()
+    hinge, axis = _tensor(extra["hinge_world"]), C.unit(_tensor(extra["axis_world"]))
+    if delta is not None:
+        dp, dq = _tensor(delta[0]), _tensor(delta[1])
+        hinge = C.quat_rotate(dq, hinge) + dp
+        axis = C.quat_rotate(dq, axis)
+    return hinge, axis, dq_j
+
+
+def _handle_delta(art, state) -> Optional[Tuple[List[float], List[float]]]:
+    """The articulated object's rigid displacement since the sampler's record, ``T_live ∘ T_rec⁻¹`` as ``(dp, dq)`` (2026-09-19
+    23:55: the fist pressing the other flap shoved the carton 5 cm and the recorded pinch closed on air, 0919-231459 /
+    233259): ``articulation.object_pose`` (the root pose the waypoints were computed at) against ``state.object_pose``.
+    None without the record or a state (the program check's stub), or when the displacement is negligible."""
+    rec = (getattr(art, "extra", None) or {}).get("object_pose")
+    if not isinstance(rec, dict) or state is None or not hasattr(state, "object_pose"):
+        return None
+    try:
+        live = _as_pose(state.object_pose(art.object))
+        p_rec, q_rec = [float(v) for v in rec["position"]], [float(v) for v in rec["orientation"]]
+    except Exception:  # noqa: BLE001
+        return None
+    dq = _qmul(list(live.orientation), _qconj(q_rec))
+    n = math.sqrt(sum(v * v for v in dq)) or 1.0
+    dq = [v / n for v in dq]
+    C = _conventions()
+    rp = C.quat_rotate(_tensor(dq), _tensor(p_rec))
+    dp = [float(live.position[i]) - float(rp[i]) for i in range(3)]
+    ang = 2.0 * math.acos(max(-1.0, min(1.0, abs(dq[3]))))
+    if math.sqrt(sum(v * v for v in dp)) < 0.002 and ang < 0.01:
+        return None
+    return dp, dq
 
 
 def _qmul(a: Sequence[float], b: Sequence[float]) -> List[float]:
@@ -1100,12 +1161,37 @@ class Retreat(Action):
     after: Action
     distance: float = RETREAT_DIST
     release: bool = False
+    #: block design packing tail (owner 2026-09-19 21:47): the radial distance of the contact escape (``execute_retreat``) when
+    #: it must be shorter than ``max(distance, 2 x contact_retreat_escape_m)`` - the 10 cm escape opposite a wall push ran the
+    #: arm 14 mm past its reach (0920-192950 action 33)
+    escape_far: Optional[float] = None
+    #: owner 2026-09-20 21:20 (the lever's fist leaving the flaps): first straight UP by ``lift_first_m`` (off the flap the palm
+    #: presses), then ``distance`` along ``slide_dir`` (world unit vector; the leg along -a when None) - so the palm does not drag
+    #: the box against the other hand's grasp
+    lift_first_m: Optional[float] = None
+    slide_dir: Optional[List[float]] = None
     TARGET_KEYS = ("retreat",)
 
     def __post_init__(self):
         self.arms = (self.arm,)
         self.objects = (self.object,)
         super().__post_init__()
+
+    def _lifted_path(self, C, start: Pose, recorded: Pose) -> Optional[List[Pose]]:
+        """The two-leg retreat: up ``lift_first_m`` from where the hand is, then ``distance`` along ``slide_dir`` (or -a)."""
+        if self.lift_first_m is None:
+            return None
+        up = _tensor([0.0, 0.0, float(self.lift_first_m)])
+        p0 = _tensor(start.position).reshape(-1)[:3].float()
+        p1 = p0 + up
+        mid = Pose([float(v) for v in p1.tolist()], list(start.orientation))
+        if self.slide_dir is not None:
+            d = C.unit(_tensor(self.slide_dir).reshape(-1)[:3].float())
+            p2 = p1 + d * float(self.distance)
+            end = Pose([float(v) for v in p2.tolist()], list(start.orientation))
+        else:
+            end = _pre(C, Pose([float(v) for v in (_tensor(recorded.position).reshape(-1)[:3].float() + up).tolist()], list(recorded.orientation)), self.distance)
+        return _line(C, start, mid) + _line(C, mid, end)[1:]
 
     def _segment(self, sidecar, state) -> Tuple[Pose, Pose]:
         """From where the hand **is** (``state.eef_pose`` at run time: a brace / push pad pressing on its object sits
@@ -1133,9 +1219,43 @@ class Retreat(Action):
     def targets(self, sidecar, state):
         C = _conventions()
         start, end = self._segment(sidecar, state)
+        lifted = self._lifted_path(C, start, self.after.end_pose(sidecar, state) or start)
+        if lifted is not None:
+            return {"retreat": lifted}
+        slide = self._edge_escape(C, start)
+        if slide is not None:
+            return {"retreat": _line(C, start, slide) + _line(C, slide, end)[1:]}
         return {"retreat": _line(C, start, end)}
 
+    EDGE_ESCAPE_M: ClassVar[float] = 0.04  # the pads sit 1.2 cm past a contact 1.5 cm inside the edge: 4 cm clears (6 cm was untrackable, 0919-065124)
+
+    def _edge_escape(self, C, start: Pose) -> Optional[Pose]:
+        """A released **edge pinch** (a flap / lid pinched across its thickness, ``articulation.handle_kind`` ``edge_lid``)
+        first slides ``EDGE_ESCAPE_M`` radially away from the hinge in the flap's plane so the open pads clear the free
+        edge; the clear leg along the approach axis alone moved the upper pad over the rising side of the tilted flap and
+        pressed it down 0.25 rad (cdmmwy 0919-062149 / 063134). Needs ``articulation.hinge_world`` / ``axis_world``."""
+        after = self.after
+        art = getattr(after, "articulation", None) if after is not None and after.name == "base_follow" else None
+        extra = (getattr(art, "extra", None) or {}) if art is not None else {}
+        if extra.get("handle_kind") != "edge_lid" or extra.get("hinge_world") is None or extra.get("axis_world") is None:
+            return None
+        hinge = C.as_tensor(extra["hinge_world"]).reshape(-1)[:3].float()
+        axis = C.unit(C.as_tensor(extra["axis_world"]).reshape(-1)[:3].float())
+        p = _tensor(start.position).reshape(-1)[:3].float()
+        radial = p - hinge
+        radial = radial - axis * float(radial @ axis)
+        if float(radial.norm()) < 1e-6:
+            return None
+        radial = radial / radial.norm()
+        return Pose([float(v) for v in (p + radial * self.EDGE_ESCAPE_M).tolist()], list(start.orientation))
+
     def end_pose(self, sidecar, state):
+        if self.lift_first_m is not None:
+            C = _conventions()
+            start, _ = self._segment(sidecar, state)
+            path = self._lifted_path(C, start, self.after.end_pose(sidecar, state) or start)
+            if path:
+                return path[-1]
         return self._segment(sidecar, state)[1]
 
     def annotate(self, sidecar):

@@ -257,7 +257,11 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
             after = getattr(action, "after", None)
             if getattr(after, "name", "") == "push":
                 a = (getattr(getattr(after, "contact", None), "extra", None) or {}).get("articulation")
-                if a and a.get("q_from") is not None:
+                # the pressed link springs back when the fist leaves - unless the other hand holds the object by then (the lever's
+                # lift, two-flap v4: the main hand has pinched the raised flap before the fist slides out) or the record says the
+                # brake HOLDS the link where the fist leaves it (``holds``: the push-close segments - 0920-171442: the re-stance
+                # transition was checked with the flap sprung back open and the arriving fist ran into it)
+                if a and a.get("q_from") is not None and not a.get("holds") and tracker.carried != getattr(after.contact, "object", None):
                     _set_joint(getattr(after.contact, "object", None), a.get("joint"), a["q_from"])
         elif nm == "base_follow":
             art = getattr(action, "articulation", None)
@@ -488,9 +492,22 @@ class _Tracker:
         elif name == "transition" and getattr(action, "transition", None) is not None:
             stance = action.transition.to
         elif name == "base_follow" and getattr(action, "stance", None) is not None:
-            for k, v in self.sidecar.stances.items():
-                if list(v.base_pose2d) == list(action.stance.base_pose2d):
-                    stance = k
+            # the action's stance by NAME when it is a recorded one (two-flap v2: "manipulation" and "manipulation2" may share the
+            # base pose and differ in trunk only - the base-pose match picked the wrong one, 0919-235259); else by base pose
+            nm = getattr(action.stance, "name", None)
+            if nm in self.sidecar.stances:
+                stance = nm
+            else:
+                best = None
+                for k, v in self.sidecar.stances.items():
+                    if list(v.base_pose2d) == list(action.stance.base_pose2d):
+                        same_trunk = abs(float(v.translate) - float(action.stance.translate)) < 1e-6 and abs(float(v.tilt) - float(action.stance.tilt)) < 1e-6
+                        if best is None or same_trunk:
+                            best = k
+                            if same_trunk:
+                                break
+                if best is not None:
+                    stance = best
         return stance, carried
 
     def after(self, action, witnesses: Optional[Dict[str, Any]] = None, sampler=None) -> None:
@@ -1004,7 +1021,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             elif goal is not None:
                 checks.append((goal, to_trunk))
         for pose2d, trunk in checks:
-            r_arm, l_arm, _ = sampler.ikc.arm_vectors(stance)
+            r_arm, l_arm, fingers_st = sampler.ikc.arm_vectors(stance)
             q_arms = {"right": r_arm, "left": l_arm}
             drive_ctx = attached(sampler.kit, None, None)
             if carried_obj is not None and g is not None and attach_arm and name in ("navigate", "transition"):
@@ -1028,10 +1045,14 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                         q_arms[attach_arm] = r_lift.q[sampler.kit.robot.arm_control_idx[attach_arm]].clone()
                 drive_ctx = attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object)
             with drive_ctx:
-                ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk, q_arms=q_arms)
+                # the stance's recorded finger opening too (a push-close re-stance records the closed fist at its pre-contact: checked
+                # open, the spread pads reached the flap - 0920-191145 'base pose ... collides at trunk')
+                ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk, q_arms=q_arms, fingers=fingers_st)
             n += 1
             if not ok:
                 raise Reject("program_check_failed", f"base pose {tuple(round(v, 3) for v in pose2d)} collides at trunk {trunk}"
                                                      f"{' (carried ' + str(carried) + ' in the lifted hand)' if carried_obj is not None and name in ('navigate', 'transition') else ''}",
                              action=name)
+    if end_q_raw is not None:
+        witnesses["__arm_end_q__"] = end_q_raw  # popped by ``run`` (not a recorded witness)
     return n, witnesses

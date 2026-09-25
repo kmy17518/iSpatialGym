@@ -938,10 +938,23 @@ class R1ProCuRobo:
                     if isinstance(psc, dict):
                         out.status += f" [self-collision along the path: {psc['links'][0]} - {psc['links'][1]} by {1000 * psc['penetration']:.0f} mm at waypoint {psc['waypoint']}/{psc['of']}]"
                 if out.diagnostics.get("start_in_collision"):
-                    out.status += " [start configuration is in collision]"
+                    out.status += " [start configuration is in collision" + self._start_detail(out.diagnostics) + "]"
         finally:
             self._restore_criteria(entry)
         return out
+
+    @staticmethod
+    def _start_detail(diag: Dict[str, object]) -> str:
+        parts = []
+        if diag.get("start_world_collision"):
+            parts.append("world")
+        sc = diag.get("start_self_collision")
+        if sc:
+            parts.append("self: " + ", ".join(f"{p['links'][0]}-{p['links'][1]} {p['penetration_mm']:.0f} mm" for p in sc))
+        off = diag.get("start_world_offenders")
+        if off:
+            parts.append("offenders: " + ", ".join(str(o).split("/")[-3:][0] + "/" + str(o).split("/")[-1] if "/" in str(o) else str(o) for o in off))
+        return (": " + "; ".join(parts)) if parts else ""
 
     def plan_joint(self, emb_name: str, q_goal_full: th.Tensor, q_start: Optional[th.Tensor] = None, max_attempts: int = 4, sync_world: bool = True) -> PlanResult:
         """Plan a collision-free trajectory to a joint-space goal (active joints of the embodiment)."""
@@ -970,7 +983,7 @@ class R1ProCuRobo:
             if goal_coll:
                 out.status += " [goal configuration is in collision]"
             if out.diagnostics.get("start_in_collision"):
-                out.status += " [start configuration is in collision]"
+                out.status += " [start configuration is in collision" + self._start_detail(out.diagnostics) + "]"
         return out
 
     def _result_from_trajopt(self, entry: _PlannerEntry, result, q_ref: th.Tensor, plan_time: float) -> PlanResult:
@@ -986,9 +999,94 @@ class R1ProCuRobo:
 
     def _diagnose_start(self, emb_name: str, q_start: th.Tensor) -> Dict[str, object]:
         try:
-            return {"start_in_collision": bool(self.check_collision(q_start, emb_name=emb_name)[0])}
+            d: Dict[str, object] = {"start_in_collision": bool(self.check_collision(q_start, emb_name=emb_name)[0])}
         except Exception as e:  # diagnostics must never mask the original failure
             return {"start_in_collision": f"unknown ({e})"}
+        if d["start_in_collision"]:
+            # which kind (2026-09-19, a locked arm pressing an object while the other plans): world penetration vs self-collision
+            try:
+                d["start_world_collision"] = bool(self.check_collision(q_start, emb_name=emb_name, self_collision=False)[0])
+                pairs = self.self_collision_pairs(q_start, emb_name=emb_name)
+                if pairs:
+                    d["start_self_collision"] = [{"links": list(p["links"]), "penetration_mm": round(1000 * float(p["penetration"]), 1)} for p in pairs[:4]]
+                if d["start_world_collision"]:
+                    d["start_world_offenders"] = self.world_collision_offenders(q_start, emb_name=emb_name)
+            except Exception as e:  # noqa: BLE001
+                d["start_collision_detail"] = f"unknown ({e})"
+        return d
+
+    def world_collision_offenders(self, q_full: th.Tensor, emb_name: str = "whole_body", limit: int = 6) -> List[str]:
+        """The enabled world meshes (and the ground slab) whose removal clears the penetration at ``q_full``: each enabled
+        obstacle is disabled in turn and the world check re-run (2026-09-19 diagnostic; the world is restored)."""
+        out: List[str] = []
+        names = [n for n in sorted(self._world_mesh_names) if n not in self._disabled_obstacles]
+        for name in names:
+            self._mesh_enable(name, False)
+            try:
+                hit = bool(self.check_collision(q_full, emb_name=emb_name, self_collision=False)[0])
+            finally:
+                self._mesh_enable(name, True)
+            if not hit:
+                out.append(name)
+                if len(out) >= limit:
+                    return out
+        cub = getattr(self.checker.data, "cuboids", None)
+        if cub is not None and self.GROUND_SLAB_NAME in cub.names[0]:
+            cub.set_enabled(self.GROUND_SLAB_NAME, False)
+            try:
+                hit = bool(self.check_collision(q_full, emb_name=emb_name, self_collision=False)[0])
+            finally:
+                cub.set_enabled(self.GROUND_SLAB_NAME, True)
+            if not hit:
+                out.append(self.GROUND_SLAB_NAME)
+        if out:
+            return out
+        # several penetrate: greedy - keep disabling the mesh whose removal reduces the penetration most until the check clears
+        disabled: List[str] = []
+        try:
+            remaining = list(names)
+            for _ in range(min(limit, len(remaining))):
+                best, best_pen = None, None
+                for name in remaining:
+                    self._mesh_enable(name, False)
+                    try:
+                        pen = self._world_penetration(q_full, emb_name)
+                    finally:
+                        self._mesh_enable(name, True)
+                    if best is None or pen < best_pen:
+                        best, best_pen = name, pen
+                if best is None:
+                    break
+                disabled.append(best)
+                remaining.remove(best)
+                self._mesh_enable(best, False)
+                if not bool(self.check_collision(q_full, emb_name=emb_name, self_collision=False)[0]):
+                    break
+        finally:
+            for name in disabled:
+                self._mesh_enable(name, True)
+        return [f"together: {', '.join(disabled)}"] if disabled else ["(no single obstacle clears it: several penetrate)"]
+
+    def _world_penetration(self, q_full: th.Tensor, emb_name: str) -> float:
+        """Summed world penetration of the robot's spheres at ``q_full`` (diagnostic)."""
+        from curobo._src.geom.collision.buffer_collision import CollisionBuffer
+        from curobo._src.robot.kinematics.kinematics_state import KinematicsState
+
+        entry = self.kin_entry(emb_name)
+        q = as_tensor(q_full).reshape(1, -1)
+        self.refresh_locked_joints(emb_name, q[0])
+        js = self._active_js(entry, q)
+        costs = self._collision_costs(entry)
+        state = entry.fk.compute_kinematics(js)
+        spheres = state.robot_spheres.reshape(1, 1, -1, 4).contiguous()
+        if costs["batch"] != 1:
+            costs["self"].setup_batch_tensors(1, 1)
+            costs["buffer"] = CollisionBuffer.from_shape(spheres.shape, self.device_cfg)
+            costs["batch"] = 1
+        weight = th.ones(1, device=self.device_cfg.device)
+        with th.no_grad():
+            d0 = self.checker.get_sphere_collision(KinematicsState(robot_spheres=spheres), costs["buffer"], weight, th.zeros(1, device=self.device_cfg.device)).reshape(-1)
+        return float(d0.clamp(min=0).sum())
 
     def _diagnose_ik(self, entry: _PlannerEntry, goal, cur) -> Dict[str, object]:
         """Classify an IK failure: unreachable pose vs. reachable but infeasible (collision / limits).
@@ -1102,6 +1200,8 @@ class R1ProCuRobo:
                 parts.append(f"{d['trajopt_feasible_seeds']}/{n} trajectories collision/limit feasible")
             if "trajopt_best_final_pos_err_m" in d:
                 parts.append(f"best final pose error {d['trajopt_best_final_pos_err_m']*1000:.1f} mm / {d.get('trajopt_best_final_rot_err_rad', float('nan')):.3f} rad")
+            if d.get("status"):
+                parts.append(f"cuRobo status {d['status']}")
             d["trajopt_verdict"] = "; ".join(parts) if parts else "no per-seed metrics available"
             if d.get("trajopt_feasible_seeds", 1) == 0:
                 d["trajopt_verdict"] += " -> the path between start and goal is blocked (collision), not the goal itself"

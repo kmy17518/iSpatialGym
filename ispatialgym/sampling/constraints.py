@@ -101,30 +101,145 @@ def _frame_with_x(axis: th.Tensor, ref_up: th.Tensor) -> th.Tensor:
     return th.stack([x, y, z], dim=1)
 
 
-def apply_hinge_drive(prim_path: str, friction: Optional[float], damping: Optional[float]) -> Dict[str, Any]:
+_OPENABLE_OVERRIDE: Dict[str, List[str]] = {}
+
+
+def restrict_openable_joints(obj, joint_names: Sequence[str]) -> None:
+    """Make OmniGibson's ``Open`` state of ``obj`` look at ``joint_names`` only (2026-09-19, two-flap cartons): its threshold
+    is ``lower + 5 % of the range`` per joint, so a flap whose lower limit was extended below its closed position (the
+    pressed non-target flap, ``apply_joint_brake`` with ``lower_limit_rad``) counts as *open* while shut and the BDDL
+    ``(not (open carton))`` init fails (0919-041120). Patches ``open_state._get_relevant_joints`` once (a per-object
+    registry) and resets an already initialised state."""
+    from omnigibson.object_states import open_state as OS
+
+    if not getattr(OS, "_isg_openable_patched", False):
+        orig = OS._get_relevant_joints
+
+        def patched(o):
+            names = _OPENABLE_OVERRIDE.get(getattr(o, "name", None))
+            if names:
+                return False, [o.joints[n] for n in names], [1] * len(names)
+            return orig(o)
+
+        OS._get_relevant_joints = patched
+        OS._isg_openable_patched = True
+    names = [str(n) for n in joint_names if n in obj.joints]
+    if not names:
+        return
+    _OPENABLE_OVERRIDE[obj.name] = names
+    try:
+        from omnigibson.object_states import Open
+
+        st = obj.states.get(Open) if hasattr(obj, "states") else None
+        if st is not None and getattr(st, "relevant_joints_info", None) is not None:
+            st.relevant_joints_info = (False, [obj.joints[n] for n in names], [1] * len(names))
+    except Exception:  # noqa: BLE001  (the registry alone covers a state initialised later)
+        pass
+
+
+def apply_hinge_drive(prim_path: str, friction: Optional[float], damping: Optional[float], stiffness: Optional[float] = None,
+                      lower_limit_deg: Optional[float] = None, upper_limit_deg: Optional[float] = None) -> Dict[str, Any]:
     """Put the friction / damping of a hinge record on the joint prim as a ``UsdPhysics.DriveAPI`` angular drive
     (stiffness 0, target velocity 0; USD's angular damping is per degree/s, so damping [N·m·s/rad] is written as
-    damping · π / 180; ``maxForce`` = the Coulomb torque in N·m, ``inf`` when frictionless). Returns what was written."""
+    damping · π / 180; ``maxForce`` = the Coulomb torque in N·m, ``inf`` when frictionless). ``stiffness`` [N·m/rad]
+    (2026-09-19, carton flaps) adds a spring toward target position 0; ``lower_limit_deg`` / ``upper_limit_deg`` rewrite
+    the joint's limits (a flap pressed below its closed position). Returns what was written."""
     from pxr import UsdPhysics
 
-    if friction is None and damping is None:
+    if friction is None and damping is None and stiffness is None and lower_limit_deg is None and upper_limit_deg is None:
         return {}
     stage = og.sim.stage
     prim = stage.GetPrimAtPath(prim_path)
     if prim is None or not prim.IsValid():
         raise RuntimeError(f"hinge prim {prim_path} not found for its drive")
     d_usd = 0.0 if damping is None else float(damping) * math.pi / 180.0
+    k_usd = 0.0 if stiffness is None else float(stiffness) * math.pi / 180.0
     f_usd = math.inf if friction is None else float(friction)
     with og.sim.editing_usd():
         drive = UsdPhysics.DriveAPI.Apply(prim, "angular")
         drive.CreateTypeAttr().Set("force")
-        drive.CreateStiffnessAttr().Set(0.0)
+        drive.CreateStiffnessAttr().Set(k_usd)
         drive.CreateDampingAttr().Set(d_usd)
         drive.CreateTargetPositionAttr().Set(0.0)
         drive.CreateTargetVelocityAttr().Set(0.0)
         drive.CreateMaxForceAttr().Set(f_usd)
+        if lower_limit_deg is not None:
+            prim.GetAttribute("physics:lowerLimit").Set(float(lower_limit_deg))
+        if upper_limit_deg is not None:
+            prim.GetAttribute("physics:upperLimit").Set(float(upper_limit_deg))
     og.sim.update_handles()
-    return {"damping_usd_per_deg_s": d_usd, "max_force_nm": f_usd}
+    out = {"damping_usd_per_deg_s": d_usd, "max_force_nm": f_usd}
+    if stiffness is not None:
+        out["stiffness_usd_per_deg"] = k_usd
+    if lower_limit_deg is not None or upper_limit_deg is not None:
+        out["limits_deg"] = [lower_limit_deg, upper_limit_deg]
+    return out
+
+
+#: Coulomb regime of a joint brake starts at this angular speed (damping = max_effort / JOINT_BRAKE_OMEGA_RAD_S). Below it the
+#: drive is viscous and the lid creeps at gravity torque / damping: the first blender demo (0918-233145, 0.5 N·m / damping 10)
+#: held its 47.5 deg within tolerance but drifted 0.014 rad over the 132-step settle window (``settled_success`` false) -
+#: 0.0025 rad/s makes the creep of a 0.03 N·m lid ~1e-4 rad/s (damping 200 at 0.5 N·m; the implicit drive stays stable)
+JOINT_BRAKE_OMEGA_RAD_S = 0.0025
+
+
+def joint_brake_spec(max_effort: float, stiffness: float = 0.0) -> Dict[str, Any]:
+    """Brake record for :func:`apply_joint_brake`: the joint drive as a Coulomb brake of ``max_effort`` N·m (damping =
+    max_effort / :data:`JOINT_BRAKE_OMEGA_RAD_S`, stiffness 0, target velocity 0 → torque = clamp(−damping·ω, ±max_effort))."""
+    return {"stiffness": float(stiffness), "damping": float(max_effort) / JOINT_BRAKE_OMEGA_RAD_S, "max_effort": float(max_effort)}
+
+
+def apply_joint_brake(joint, spec) -> Dict[str, Any]:
+    """Resistance of an articulated object's **own** joint (small articulation, owner 2026-09-18 22:38: "add damping / friction
+    to the hinges so that they hold at any angle"). ``spec``: a number = the PhysX ``jointFriction`` coefficient, or a dict
+    with any of ``friction`` (that coefficient), ``stiffness`` / ``damping`` (N·m/rad, N·m·s/rad) and ``max_effort`` (N·m).
+
+    Pod probe 2026-09-18 23:00 (``/tmp/probe_lid_brake.py``, blender cwkvib lid 74 g): the dataset joints carry an
+    ``acceleration``-type drive with damping 0.05 per deg/s and no force cap; OmniGibson's ``JointPrim`` setters (articulation
+    view gains / max effort / friction coefficient) and the ``physxJoint:jointFriction`` attribute change nothing - the lid
+    falls closed from 50 % of its range in every case, even at friction 5.0 or damping 50 / max effort 2. A
+    ``UsdPhysics.DriveAPI`` **force** drive written on the joint prim inside ``og.sim.editing_usd()`` (stiffness 0, target
+    velocity 0, damping, ``maxForce`` = the Coulomb torque; :func:`apply_hinge_drive`, the wall hinges' mechanism) holds
+    it with zero drift at 50 % and 90 %. So ``damping`` / ``max_effort`` go through :func:`apply_hinge_drive` (torque =
+    clamp(−damping·ω, ±max_effort)); ``friction`` still uses the setter (kept for the record, ineffective on these joints).
+    Returns what was applied."""
+    out: Dict[str, Any] = {}
+    if spec is None:
+        return out
+    if isinstance(spec, (int, float)):
+        joint.friction = float(spec)
+        return {"friction": float(spec)}
+    if not isinstance(spec, dict):
+        raise TypeError(f"joint brake spec must be a number or a dict, got {type(spec).__name__}")
+    if spec.get("friction") is not None:
+        joint.friction = float(spec["friction"])
+        out["friction"] = float(spec["friction"])
+    lo, hi = spec.get("lower_limit_rad"), spec.get("upper_limit_rad")
+    if spec.get("damping") is not None or spec.get("max_effort") is not None or spec.get("stiffness") not in (None, 0, 0.0) or lo is not None or hi is not None:
+        # stiffness > 0 (2026-09-19, carton flaps): a spring toward target position 0 - the non-target flap of a two-flap carton is
+        # pressed down (below its closed position: lower_limit_rad extends the range) to open the seam and must come back
+        # when the fist leaves; the light damping only steadies the return
+        k_usd = 0.0 if spec.get("stiffness") is None else float(spec["stiffness"]) * math.pi / 180.0
+        d_usd = 0.0 if spec.get("damping") is None else float(spec["damping"]) * math.pi / 180.0
+        f_usd = math.inf if spec.get("max_effort") is None else float(spec["max_effort"])
+        prim = joint.prim
+        get = lambda name: prim.GetAttribute(name).Get() if prim.HasAttribute(name) else None  # noqa: E731
+        cur_type, cur_d, cur_f, cur_k = get("drive:angular:physics:type"), get("drive:angular:physics:damping"), get("drive:angular:physics:maxForce"), get("drive:angular:physics:stiffness")
+        cur_lo, cur_hi = get("physics:lowerLimit"), get("physics:upperLimit")
+        lo_deg = None if lo is None else math.degrees(float(lo))
+        hi_deg = None if hi is None else math.degrees(float(hi))
+        same = (cur_type == "force" and cur_d is not None and abs(float(cur_d) - d_usd) < 1e-6 and cur_k is not None and abs(float(cur_k) - k_usd) < 1e-6
+                and cur_f is not None and (math.isinf(f_usd) and float(cur_f) > 1e30 or abs(float(cur_f) - f_usd) < 1e-6)
+                and (lo_deg is None or (cur_lo is not None and abs(float(cur_lo) - lo_deg) < 1e-3)) and (hi_deg is None or (cur_hi is not None and abs(float(cur_hi) - hi_deg) < 1e-3)))
+        # idempotent: the USD edit stops / restarts the simulation, so a re-application after a reset only happens when needed
+        if same:
+            written = {"damping_usd_per_deg_s": d_usd, "stiffness_usd_per_deg": k_usd, "max_force_nm": f_usd, "already_applied": True}
+        else:
+            written = apply_hinge_drive(joint.prim_path, friction=spec.get("max_effort"), damping=spec.get("damping"), stiffness=spec.get("stiffness"),
+                                        lower_limit_deg=lo_deg, upper_limit_deg=hi_deg)
+        out.update({"stiffness": 0.0 if spec.get("stiffness") is None else float(spec["stiffness"]), "damping": None if spec.get("damping") is None else float(spec["damping"]),
+                    "max_effort": None if spec.get("max_effort") is None else float(spec["max_effort"]), "lower_limit_rad": lo, "upper_limit_rad": hi, "usd": written})
+    return out
 
 
 def create_hinge(child_obj, anchor_world, axis_world, parent_link=None, name: str = "isg_hinge", friction: Optional[float] = None,

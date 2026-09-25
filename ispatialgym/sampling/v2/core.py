@@ -26,6 +26,7 @@ pose), ``v1_role_aliases()`` (facade BDDL rendering until D1).
 from __future__ import annotations
 
 import json
+import contextlib
 import logging
 import math
 import os
@@ -607,10 +608,11 @@ class SamplerV2(TaskSampler):
             # arm at its lift configuration when the task recorded one (``carry_arm_q``: the object rides where the oracle holds it)
             obj, arm, eef_in_object = self.carried_attachment(st.carried)
             arm_q = {f"{arm}_arm": self.carry_arm_q[st.carried]} if (obj is not None and st.carried in self.carry_arm_q) else {}
-            with NAV.attached(self.kit, arm if obj is not None else None, obj, eef_in_object=eef_in_object):
-                with self.ikc.ignoring([obj] if obj is not None else []):
-                    if not self.ikc.stance_collision_free(st, **arm_q):
-                        bad.append(st.name)
+            with self.object_joints_of(st):  # a stance the task recorded with an articulated object's joint held elsewhere (push-close re-stance)
+                with NAV.attached(self.kit, arm if obj is not None else None, obj, eef_in_object=eef_in_object):
+                    with self.ikc.ignoring([obj] if obj is not None else []):
+                        if not self.ikc.stance_collision_free(st, **arm_q):
+                            bad.append(st.name)
         if bad:
             raise Reject("stance_collision_with_objects", f"stances {bad} collide with the objects placed (trunks {[(s.translate, round(s.tilt, 2)) for s in stances if s.name in bad]})")
         # §3.8 with the objects placed: the recorded transitions are swept again — trunk sweep and drive-in with the
@@ -624,7 +626,7 @@ class SamplerV2(TaskSampler):
             obj, arm, eef_in_object = self.carried_attachment(carried_name)
             q_carry = self.carry_arm_q.get(carried_name) if (obj is not None and carried_name) else None
             override = {arm: q_carry} if q_carry is not None else None
-            with self.ikc.ignoring([obj] if obj is not None else []):
+            with self.object_joints_of(to), self.ikc.ignoring([obj] if obj is not None else []):
                 if tr.departure:
                     # a departure transition is re-swept at its recorded stand-off only (the recorded path starts at that pose)
                     new = NAV.departure_transition(self.kit, frm, to, tr.trunk_to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
@@ -646,6 +648,40 @@ class SamplerV2(TaskSampler):
             if abs(new.stand_off - tr.stand_off) > 1e-6:
                 log.info("%s -> %s: transition stand-off %.2f -> %.2f with the objects placed", tr.frm, tr.to, tr.stand_off, new.stand_off)
             self.sidecar.transitions[i] = new
+
+    @contextlib.contextmanager
+    def object_joints_of(self, st: Optional[Stance]):
+        """The articulated objects' joints as the task recorded them for a stance (``stance.extras["object_joints"] =
+        {instance: {joint: value}}``: a push-close re-stance is made with the flap held part-way by the brake; the settled
+        world has it at q_init) - set kinematically for the checks under the block, restored after. No-op without the field."""
+        oj = (getattr(st, "extras", None) or {}).get("object_joints") if st is not None else None
+        if not oj:
+            yield
+            return
+        saved = []
+        try:
+            for name, joints in oj.items():
+                obj = self.objects.get(name)
+                if obj is None or not getattr(obj, "n_joints", 0):
+                    continue
+                qs = obj.get_joint_positions().clone()
+                saved.append((obj, qs.clone()))
+                names = list(obj.joints)
+                for jn, v in (joints or {}).items():
+                    if jn in names:
+                        qs[names.index(jn)] = float(v)
+                obj.set_joint_positions(qs)
+                obj.set_joint_velocities(th.zeros_like(qs))
+                obj.keep_still()
+            self.kit.sync_world()
+            yield
+        finally:
+            for obj, qs in saved:
+                obj.set_joint_positions(qs)
+                obj.set_joint_velocities(th.zeros_like(qs))
+                obj.keep_still()
+            if saved:
+                self.kit.sync_world()
 
     def departure_of(self, frm: str, to: str) -> Optional[Transition]:
         """The recorded departure transition ``frm -> to`` (None when the pair has only the §3.8 arrival one)."""
@@ -858,6 +894,12 @@ class SamplerV2(TaskSampler):
             st.extras["arms_q"] = {"right": [round(float(v), 5) for v in r.tolist()], "left": [round(float(v), 5) for v in l.tolist()]}
             if abs(f - float(C.FINGER_OPEN)) > 1e-6:
                 st.extras["fingers"] = f
+            if getattr(st, "q", None) is not None:
+                # the opening per arm as the recorded configuration has it (owner 2026-09-22 11:27: a re-stance recorded with the fist
+                # closed must not close the idle hand too)
+                robot = self.kit.robot
+                working = set(getattr(st, "working_arms", []) or [])
+                st.extras["fingers_by_arm"] = {a: (round(float(st.q[robot.gripper_control_idx[a]][0]), 4) if (not working or a in working) else None) for a in ("right", "left")}
 
     def constraints_write_back(self, draft: Draft, iid: str) -> List[Dict[str, Any]]:
         """§2.3 / §9: append the task module's records (+ the stance record core derives) with ``source``."""

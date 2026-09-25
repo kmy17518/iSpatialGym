@@ -240,6 +240,14 @@ class ExecuteConfig:
     retreat_partial_accept_m: float = 0.04
     #: a pad leaving a brace / push contact first moves this far straight away from the supports (escape_direction) (m; 0 = off)
     contact_retreat_escape_m: float = 0.05
+    #: owner 2026-09-22 11:27: a pinching hand that comes from its own brace beside the object reaches the pre-grasp by a tracked
+    #: Cartesian detour (up ``grasp_transit_lift_m``, across, down) instead of a joint-space plan that swung it out of the frame
+    grasp_transit_cartesian: bool = True
+    grasp_transit_lift_m: float = 0.06
+    #: owner 2026-09-22 11:27: a brace is a safety stop, not a force - its approach leg stops as soon as the braced object has moved
+    #: this far (m; 0 = off) and then backs off ``brace_touch_backoff_m`` along its approach
+    brace_touch_stop_m: float = 0.002
+    brace_touch_backoff_m: float = 0.004
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
@@ -336,20 +344,21 @@ def support_clearance(state, pose, objects: Sequence[Any]) -> Optional[float]:
     return best
 
 
-def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Iterator[th.Tensor]:
+def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any], cfg: "ExecuteConfig",
+                   ignore_links: Sequence[Any] = ()) -> Iterator[th.Tensor]:
     """Reach a contact pre-pose that the sampler checked with its supports ignored (a wall / table 2 cm from the
     pads). The supports leave the collision world only for the **last straight leg**: the trajopt goes to a standoff
     ``pre + standoff · n`` (``n`` away from the supports) with the supports present — a trajopt with the wall ignored
     planned the hand *through* the wall region and the arm jammed against it (1.39 rad joint error on the painting
     push) — then a straight ``arm_along`` closes the standoff. ``through`` (the pushed target) is ignored for both."""
     if not supports:
-        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through))
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links))
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
     n = escape_direction(state, pre, supports)
     if n is None:
-        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through))
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through), ignore_links=list(ignore_links))
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
@@ -359,7 +368,7 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
         # above the table) is planned directly with the supports present - the standoff excursion (up 8 cm, then down
         # again) was a redundant raise before the descent; the wall contacts (pre-pose 2-5 cm off the wall) keep it
         ctx["pre_pose_standoff"] = {"skipped": True, "clearance_m": round(clearance, 3)}
-        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through))
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links))
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
@@ -372,10 +381,10 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
         # short leg, then a joint-space plan there - a pose plan let cuRobo pick its own branch and the whole contact
         # chain (arc, back-off, retreat) ran 3.18 rad away from the sampler's witnesses (axial retreat 0916-202403)
         ctx["pre_pose_standoff"]["branch"] = "witness"
-        yield from motions.arm_to(arm, q=q_standoff, ignore_objects=list(through))
+        yield from motions.arm_to(arm, q=q_standoff, ignore_objects=list(through), ignore_links=list(ignore_links))
     else:
         ctx["pre_pose_standoff"]["branch"] = "planner"
-        yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(through))
+        yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(through), ignore_links=list(ignore_links))
     if getattr(motions, "last_relaxed_links", None):
         ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
     yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
@@ -579,7 +588,19 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any]) -> Iter
     holding = [arm for arm in M.ARMS if state.held_object(arm) is not None]
     fingers = stance_fingers(record)
     set_fingers = []
-    if fingers is not None:
+    # owner 2026-09-22 11:27: a stance may record the opening PER ARM (``fingers_by_arm``, the push-close re-stance: the fist closed,
+    # the idle hand as it is) - the single ``fingers`` value applies to every free arm as before (item 5, the wall two-arm stance)
+    by_arm = (getattr(record, "extra", None) or {}).get("fingers_by_arm")
+    if isinstance(by_arm, dict) and by_arm:
+        for arm in M.ARMS:
+            if arm in holding or by_arm.get(arm) is None:
+                continue
+            want_close = float(by_arm[arm]) <= 0.5 * float(C.FINGER_OPEN)
+            if motions.gripper_closed(arm) != want_close:
+                set_fingers.append(arm)
+                yield from motions.gripper(arm, close=want_close)
+        ctx["fingers_set"] = {"arms": set_fingers, "by_arm": {a: float(v) for a, v in by_arm.items() if v is not None}}
+    elif fingers is not None:
         want_close = fingers <= 0.5 * float(C.FINGER_OPEN)
         for arm in M.ARMS:
             if arm in holding:
@@ -587,7 +608,9 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any]) -> Iter
             if motions.gripper_closed(arm) != want_close:
                 set_fingers.append(arm)
                 yield from motions.gripper(arm, close=want_close)
-    ctx["fingers_set"] = {"arms": set_fingers, "closed": (fingers is not None and fingers <= 0.5 * float(C.FINGER_OPEN))} if fingers is not None else None
+        ctx["fingers_set"] = {"arms": set_fingers, "closed": want_close}
+    else:
+        ctx["fingers_set"] = None
     targets = stance_arm_targets(record, state, include_working=True)
     q = state.robot.get_joint_positions()
     move = {arm: qa for arm, qa in targets.items() if arm not in holding and float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
@@ -708,6 +731,15 @@ def post_set_torso(action: SetTorso, state, targets, ctx) -> Optional[str]:
 def grasp_pinch_width(action: Grasp) -> Optional[float]:
     """The pinch width (m) of a library grasp — ``Grasp.meta["width"]`` of the library candidate (15.9 mm for
     ``marker__xakoic/grasp_1``); None for a cube / handle grasp or an older library entry without it (fully open)."""
+    if action.kind == "handle" and action.articulation is not None:
+        # 2026-09-19 (two-flap carton): the sampler records the handle's pinch width (articulation.handle_width_m) so the approach
+        # is pre-shaped like a library grasp - a fully open lower pad (5 cm below the flap) passes through the neighbouring flap
+        w = (action.articulation.extra or {}).get("handle_width_m")
+        try:
+            w = float(w)
+        except (TypeError, ValueError):
+            return None
+        return w if math.isfinite(w) and w > 0 else None
     if action.kind == "cube":
         # block design (owner 2026-09-19): the pinch width is the cube's edge (``blocks[].edge_m``, else the conventions'
         # default) - without a pre-shape the fully open release beside a placed neighbour 6 mm away shoved it 4 cm along
@@ -745,10 +777,58 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     # when recorded) leaves the collision world for the grasp poses, like the sampler's check (spec §3.6)
     grasp_from = (getattr(action.grasp, "extra", None) or {}).get("grasp_from") if action.grasp is not None else None
     supports = contact_ignores(state, action.object, extra=(grasp_from,) if grasp_from else ())
-    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
+    hold = getattr(motions, "press_hold", None)  # ctx is per action (executor.attempt): the held press lives on the Motions
+    ignore_links = []
+    if hold and hold.get("object") == action.object and hold.get("arm") != arm:
+        # the other hand is pressing this very object (a two-flap carton's prep press, 2026-09-19): its fist in contact makes
+        # the start configuration "in collision" for cuRobo (0919-061328: offender left_lid). Only the PRESSED LINK leaves the
+        # world for the transit (0920-021937: with the whole box gone the plan ran through its body, the arm did not converge)
+        obj_h = state.object(action.object)
+        if hold.get("link"):
+            # the pressed link and every other MOVING link of the object (the sheets a fist may touch: the other flap's edge at
+            # the seam); the base link (the box body) stays an obstacle
+            moving = [ln for ln in getattr(obj_h, "links", {}) if ln != getattr(getattr(obj_h, "root_link", None), "body_name", None) and ln != "base_link"]
+            ignore_links = [(obj_h, ln) for ln in ({hold["link"]} | set(moving))]
+            log.info("grasp(%s): links %s of %s leave the collision world for the transit (the %s fist presses %s)", arm, sorted(ln for _, ln in ignore_links), action.object,
+                     hold.get("arm"), hold["link"])
+        else:
+            supports = list(supports) + [obj_h]
+            log.info("grasp(%s): %s leaves the collision world for the transit (the %s hand holds its press)", arm, action.object, hold.get("arm"))
+    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports] + [f"{getattr(o, 'name', o)}:{ln}" for o, ln in ignore_links]
     standoff_m = _grasp_extra_float(action, "approach_standoff_m")
     if standoff_m:
         yield from reach_via_standoff(motions, arm, targets["pre_grasp"], standoff_m, _witness(ctx, "pre_grasp"), supports, ctx)
+    elif ignore_links:
+        # the other hand presses the object (the lever): the pinching hand comes from its brace beside the box. Owner 2026-09-22 11:27
+        # (0921-232806 / 0922-113512: the joint-space plan from the blade pose swung the hand 70 cm to the right and out of the frame):
+        # first a tracked Cartesian detour - straight up, across at that height, down onto the pre-grasp - the planner only when
+        # the tracking has no solution
+        done = False
+        if _cfg(ctx).grasp_transit_cartesian:
+            try:
+                here = as_world_pose(state.eef_pose(arm))
+                pre_p, pre_q = as_world_pose(targets["pre_grasp"])
+                lift = float(_cfg(ctx).grasp_transit_lift_m)
+                z_top = max(float(here[0][2]), float(pre_p[2])) + lift
+                up = (th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1])
+                over = (th.tensor([float(pre_p[0]), float(pre_p[1]), z_top]), pre_q)
+                legs = [here, up, over, (pre_p, pre_q)]
+                yield from motions.arm_along(arm, legs)
+                ctx["pre_grasp_transit"] = f"cartesian detour {lift * 100:.0f} cm above"
+                done = True
+            except SkillError as e:
+                log.info("grasp(%s): the Cartesian detour to the pre-grasp has no solution (%s) - planning it", arm, e.message[:80])
+        if not done:
+            # the pose goal in cuRobo's OWN branch first (trajopt picks the goal configuration with the path: the branch nearest the blade
+            # pose; 0922-150937: the joint-space plan to the sampler's witness - another branch - swung the hand 70 cm out to the right),
+            # the witness branch when that fails
+            try:
+                yield from motions.arm_to(arm, pose=targets["pre_grasp"], ignore_objects=supports, ignore_links=ignore_links)
+                ctx["pre_grasp_transit"] = "pose goal, cuRobo's own branch"
+            except SkillError as e:
+                log.info("grasp(%s): the pose-goal plan to the pre-grasp failed (%s) - planning to the witness branch", arm, e.message[:80])
+                yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports, ignore_links=ignore_links)
+                ctx["pre_grasp_transit"] = "witness branch"
     else:
         # the transit to the pre-grasp is planned with the supports PRESENT (owner 2026-09-20 18:25; the contact pre-poses' rule
         # ``reach_pre_pose``: a low pre-pose is reached through a standoff away from the support, the support leaves the collision
@@ -771,8 +851,13 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     # so the lower pad of a tilted grasp clears the table (the fully open pad stood on it: approach 9 mm short, one pad 3
     # steps late, the cylinder rolled 19-77 deg) and the tap-to-pinch gap is <= 1 cm per side
     width = grasp_pinch_width(action)
-    if width is not None and motions.cfg.gripper_preshape_margin is not None:
-        opening = 0.5 * width + float(motions.cfg.gripper_preshape_margin)
+    margin = motions.cfg.gripper_preshape_margin
+    if action.kind == "handle" and action.articulation is not None and (action.articulation.extra or {}).get("preshape_margin_m") is not None:
+        # a record's own pre-shape margin (two-flap carton 2026-09-20: a pinch approaching ACROSS a sheet's edge at 25 deg needs a
+        # wider gap than 1 cm - the edge met the lower pad head-on and the approach stalled 6 cm short, 0920-011416)
+        margin = float(action.articulation.extra["preshape_margin_m"])
+    if width is not None and margin is not None:
+        opening = 0.5 * width + float(margin)
         yield from motions.gripper_opening(arm, opening)
         ctx["preshape_opening_m"] = opening
     yield from motions.arm_along(arm, targets["approach"], finish=finish)
@@ -1281,9 +1366,18 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         if held is not None:
             articulated = bool(getattr(held, "n_joints", 0) or len(getattr(held, "joints", {}) or {}))
             # a handle of an articulated object is released with the full opening at once (no staged release: the assisted
-            # grasp would re-grasp the handle during the retreat and the door cannot follow the hand)
-            yield from motions.gripper(arm, close=False, staged=not articulated)
+            # grasp would re-grasp the handle during the retreat and the door cannot follow the hand) - except a SHEET pinched
+            # across its thickness (handle_kind edge_lid, a carton flap 2026-09-19): the full 10 cm opening swept a finger
+            # against the 0.8 mm flap and pressed it down 0.25 rad in lockstep with the fingers (0919-070252); it opens to the
+            # pre-shape width, slides off the free edge (Retreat._edge_escape) and completes the opening once clear
+            art = getattr(getattr(action, "after", None), "articulation", None)
+            sheet = bool(art is not None and (getattr(art, "extra", None) or {}).get("handle_kind") == "edge_lid")
+            yield from motions.gripper(arm, close=False, staged=(not articulated) or sheet)
             _release(motions, state, arm)
+            if articulated and cfg.release_settle_steps > 0:
+                # let the constraint-removal transient die before the arm moves off the handle (the leaf keeps its angle
+                # through the counterbalance / friction; the torso rock of 0920-002330 happened while the leg started)
+                yield from motions.hold(int(cfg.release_settle_steps))
         # a brace holds nothing: its closed fist leaves as it is (owner 2026-09-17 23:39: no gripper opening at the
         # brace retreat); the contact span still closes here
         _hook(ctx, "fov")(False)
@@ -1295,7 +1389,7 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             ignore = []
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
     leg = list(targets["retreat"])
-    after_x = (getattr(getattr(getattr(action, "after", None), "contact", None), "extra", None) or {}) if isinstance(getattr(action, "after", None), Push) else {}
+    after_x = (getattr(getattr(getattr(action, "after", None), "contact", None), "extra", None) or {}) if isinstance(getattr(action, "after", None), (Push, Brace)) else {}
     if after_x.get("hold"):
         motions.press_hold = None
         held_press = True  # the pressing fist leaves a springy flap straight back along its approach, no radial slide on the paper
@@ -1485,8 +1579,23 @@ def push_residual(geom: PushGeometry, state, obj: str, pose0, art: Optional[Dict
     body is a **link** of ``obj`` on its own joint - the root does not move, the residual is the joint's remaining travel
     ``q_to − q`` in the arc's sense (the pad and the lid turn about the same hinge by the same angle)."""
     if art is not None and geom.kind == "arc":
+        # the pad's swept angle maps onto the joint's travel q_from -> q_to (either direction: a lid opened, a flap pressed
+        # down); the residual is the unswept part of the recorded arc, in the arc's own sense
         q_now = float(state.joint_position(obj, art["joint"]))
-        return math.copysign(1.0, geom.angle) * (float(art["q_to"]) - q_now), "goal_orientation"
+        q_from, q_to = float(art.get("q_from", 0.0)), float(art["q_to"])
+        q_arc = float(art.get("q_arc_end", q_to))  # the recorded arc may run past the goal (a push-close's final segment)
+        if abs(q_arc - q_from) < 1e-9:
+            return 0.0, "goal_orientation"
+        return float(geom.angle) * (q_to - q_now) / (q_arc - q_from), "goal_orientation"
+    if art is not None:
+        # a straight pad path that moves a link on its joint (the lever's vertical lift under a flap edge, 0920-195611: judged by the
+        # root's position target the push 'reached its goal' after 7 steps and the flap never moved): the pad's distance maps onto
+        # the joint's travel q_from -> q_to; the residual is the unswept part in the line's own sense (metres)
+        q_now = float(state.joint_position(obj, art["joint"]))
+        q_from, q_to = float(art.get("q_from", 0.0)), float(art["q_to"])
+        if abs(q_to - q_from) < 1e-9:
+            return 0.0, "goal_orientation"
+        return float(geom.distance) * (q_to - q_now) / (q_to - q_from), "goal_orientation"
     p, q = state.object_pose(obj)
     p, q = C.as_tensor(p).float(), C.as_tensor(q).float()
     tgt = getattr(state, "pose_target", lambda name: None)(obj)
@@ -1612,6 +1721,10 @@ def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[A
     art = ctx.get("push_articulation")
     if art is not None and art.get("tolerance") is not None:
         tol = float(art["tolerance"])  # the joint target's tolerance (small articulation stage 2)
+        if geom.kind == "line":
+            # a straight pad path moving a link (the lever's lift): the residual is in metres of pad travel - so is the tolerance
+            span = abs(float(art["q_to"]) - float(art.get("q_from", 0.0)))
+            tol = tol * float(geom.distance) / span if span > 1e-9 else tol
     margin = None if tol is None else float(tol) * (cfg.push_stop_frac_arc if geom.kind == "arc" else cfg.push_stop_frac_line)
     gen = motions.arm_along(arm, waypoints, loaded=True, partial=partial)
     k = 0
@@ -1753,7 +1866,43 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             pre_pose = Pose(position=[float(v) for v in (p_init - a_dir * cfg.push_pre_dist_m).tolist()], orientation=[float(v) for v in q_pre.tolist()])
             q_hint_pre = None  # the recorded witness belongs to the recorded pre-pose; cuRobo plans the lowered one
             ctx["push_pre_dist_m"] = cfg.push_pre_dist_m
-    yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg)
+    hold_here = getattr(motions, "press_hold", None)
+    if extra.get("approach_is_slide") and hold_here and hold_here.get("arm") == arm:
+        # the lever's lift (two-flap v4, owner 2026-09-20 15:21): this pre-contact IS the press's end pose where the fist already is,
+        # in contact with the flap (a cuRobo transit would start "in collision"); the approach leg below slides it into the gap
+        log.info("push(%s): the %s fist starts the slide from the press it holds (no transit)", obj, arm)
+        ctx["push_pre_skipped"] = True
+    else:
+        link_ign = []
+        if ctx.get("push_articulation") is not None:
+            # a push that moves a link on its joint (two-flap carton: the fist on a flap while the other hand's blade stands beside the
+            # box): the object's MOVING links (the sheets) leave the planner's world for the transit - 0921-013757: 'start configuration
+            # is in collision: right_lid' with the braced blade's padded spheres at the flap's hinge edge; the box body stays an obstacle
+            try:
+                obj_p = state.object(obj)
+                root = getattr(getattr(obj_p, "root_link", None), "body_name", None) or "base_link"
+                link_ign = [(obj_p, ln) for ln in getattr(obj_p, "links", {}) if ln != root and ln != "base_link"]
+                # the body pieces the OTHER hand's held brace stands in (its padded spheres inside the wall read as a start collision,
+                # 0921-015434): the world meshes of this object whose removal clears the current configuration
+                try:
+                    q_now = state.robot.get_joint_positions()
+                    backend = getattr(motions, "backend", None)
+                    if backend is not None and hasattr(backend, "world_collision_offenders"):
+                        backend.update_world(ignore_objects=list(supports) + list(through), ignore_links=link_ign)
+                        offs = backend.world_collision_offenders(q_now, limit=4)
+                        for o_ in offs:
+                            if f"/{getattr(obj_p, 'name', obj)}/" in str(o_):
+                                parts = str(o_).split("/")
+                                ln_i = parts.index(getattr(obj_p, "name", obj)) + 1 if getattr(obj_p, "name", obj) in parts else None
+                                if ln_i is not None and ln_i < len(parts):
+                                    link_ign.append((obj_p, parts[ln_i], parts[-1]))
+                except Exception as e:  # noqa: BLE001
+                    log.info("push(%s): start-collision offenders not resolved (%r)", obj, e)
+                if link_ign:
+                    ctx["plan_ignored_links"] = sorted(str(e[1]) + ("/" + str(e[2]) if len(e) > 2 else "") for e in link_ign)
+            except Exception:  # noqa: BLE001
+                link_ign = []
+        yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
@@ -1782,10 +1931,18 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         cap = cfg.push_residual_max_fraction * geom.total
         tgt = getattr(state, "pose_target", lambda name: None)(obj)
         tol = getattr(tgt, "orientation_tolerance" if geom.kind == "arc" else "position_tolerance", None) if tgt is not None else None
-        if ctx.get("push_articulation") is not None and ctx["push_articulation"].get("tolerance") is not None:
-            tol = float(ctx["push_articulation"]["tolerance"])
+        art_c = ctx.get("push_articulation")
+        # a straight pad path moving a link (the lever's lift): the joint quantities (rad) map onto pad metres by distance / span
+        m_per_rad = 1.0
+        if art_c is not None and geom.kind == "line":
+            span = abs(float(art_c["q_to"]) - float(art_c.get("q_from", 0.0)))
+            m_per_rad = float(geom.distance) / span if span > 1e-9 else 1.0
+        if art_c is not None and art_c.get("tolerance") is not None:
+            tol = float(art_c["tolerance"]) * m_per_rad
         if tol is not None:
             cap = max(cap, 2.0 * float(tol))
+        if art_c is not None and art_c.get("repush_cap_rad") is not None:
+            cap = max(cap, float(art_c["repush_cap_rad"]) * m_per_rad)  # a push-close segment: the link lags the pad ~0.12 rad
         ctx["push_residual"]["repush_cap"] = cap
         if forward and rmin <= abs(residual) <= cap:
             ext = extend_push(geom, end_pose, residual)
@@ -1804,7 +1961,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         #     moved the box 0 mm, 3 cm short) is closed with the base: the arm locked at its joints, the base driven
         #     along the push direction by what is still missing (the door base-follow mechanism), pad in contact
         left, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
-        if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m:
+        if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m and ctx.get("push_articulation") is None:
+            # (no base nudge for a link on its joint: the lever's vertical lift 0920-201652 drove the base 51 mm with the fist under the flap)
             yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push")
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))
@@ -1815,7 +1973,11 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     #    measure the residual the object is left with (a swung painting settles back onto the backed-off pad)
     tangent = push_tangent(geom, end_pose)
     back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
-    if cfg.push_backoff_m > 0:
+    if extra.get("hold"):
+        back = end_pose  # a preparatory press (two-flap carton, 2026-09-19): the pad stays on the flap until its Retreat, after the other hand's grasp
+        ctx["push_hold"] = True
+        motions.press_hold = {"arm": arm, "object": action.contact.object, "link": (extra.get("articulation") or {}).get("link")}
+    elif cfg.push_backoff_m > 0:
         yield from motions.arm_along(arm, [back], loaded=True)
     else:
         back = end_pose  # rush: ISG_PUSH_BACKOFF_M=0 keeps the pad on the target (the brace retreats first, ISG_BRACE_RETREATS_FIRST)
@@ -1829,7 +1991,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     #     needs less push each round), back off, measure; up to push_renudge_rounds
     rounds = 0
     while (geom.kind == "line" and cfg.push_renudge_rounds > rounds and final is not None and cfg.push_base_nudge_min_m <= final <= cfg.push_base_nudge_max_m
-           and cfg.push_backoff_m > 0):
+           and cfg.push_backoff_m > 0 and not extra.get("hold")):
         rounds += 1
         log.info("push(%s): %.1f mm reopened after the back-off -> re-nudge round %d", obj, final * 1000, rounds)
         _hook(ctx, "fov")(True)
@@ -1883,11 +2045,35 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
     yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
-    yield from motions.arm_along(arm, targets["approach"], loaded=True)
+    obj = action.contact.object
+    if cfg.brace_touch_stop_m > 0:
+        # owner 2026-09-22 11:27: the brace must not act on the object - the approach leg is watched and stops the moment the braced
+        # object moves (0921-234836: the stop's approach shoved the box 2.4 cm; 0921-030848: the pads 5 mm into the face rocked the
+        # base), then backs off a little along the approach so the pads rest just off the face
+        p0 = C.as_tensor(state.object_pose(obj)[0]).float().clone()
+        gen = motions.arm_along(arm, targets["approach"], loaded=True)
+        k = 0
+        for a in gen:
+            yield a
+            k += 1
+            moved = float(th.linalg.norm(C.as_tensor(state.object_pose(obj)[0]).float() - p0))
+            if moved > cfg.brace_touch_stop_m:
+                gen.close()
+                here = as_world_pose(state.eef_pose(arm))
+                a_dir = C.approach_axis(here[1])
+                back = (here[0] - a_dir * cfg.brace_touch_backoff_m, here[1])
+                log.info("brace(%s): the object moved %.1f mm after %d steps of the approach - the stop is in touch; backing off %.0f mm", obj, moved * 1000, k, cfg.brace_touch_backoff_m * 1000)
+                ctx["brace_touch_stop"] = {"steps": k, "moved_m": moved, "backoff_m": cfg.brace_touch_backoff_m}
+                yield from motions.arm_along(arm, [here, back])
+                break
+    else:
+        yield from motions.arm_along(arm, targets["approach"], loaded=True)
     _hook(ctx, "fov")(False)  # the contact span ends with the contact leg (the brace then holds still)
 
 
 def post_brace(action: Brace, state, targets, ctx) -> Optional[str]:
+    if ctx.get("brace_touch_stop"):
+        return None  # the stop met the object before its recorded pose: it stands where the object is
     return _eef_reached(state, action.contact.arm, targets["contact"], _cfg(ctx), "brace", loaded=True)
 
 

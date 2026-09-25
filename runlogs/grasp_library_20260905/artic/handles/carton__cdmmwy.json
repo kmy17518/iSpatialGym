@@ -61,8 +61,8 @@
    "fallback": {
     "kind": "edge_lid",
     "contact": [
-     0.0757,
-     0.0365,
+     0.08,
+     0.015,
      0.129
     ],
     "pinch_axis": [
@@ -71,18 +71,29 @@
      1.0
     ],
     "approach_dir": [
-     -0.0,
-     1.0,
-     0.0029
+     -0.7071,
+     0.0,
+     -0.7071
     ],
     "width": 0.0008,
     "exposed": true,
-    "note": "pinch the lid/flap across its thickness at the free edge",
+    "note": "pinch the flap across its 0.8 mm thickness 1.5 cm inside the seam, 3 cm from the FRONT end of the free edge (|x| 0.08 along the hinge; front_end_along_hinge: the sampler puts it on the robot's side of the hinge line, which runs along the line of sight); approach from the front-above at 45 deg (-x, -z) through the seam gap opened by pressing the other flap down - 2026-09-19 after 0919-032941: an approach ACROSS the seam toward the hinge needs the box in front of the right shoulder (focus 41-55 deg off the head camera's axis, no stance); from the front the hand rolls about the hinge like the blender rings",
     "pull_dir": [
      0.0,
      -0.0019,
      1.0
-    ]
+    ],
+    "contact_detected": [
+     0.0757,
+     0.0365,
+     0.129
+    ],
+    "approach_dir_detected": [
+     -0.0,
+     1.0,
+     0.0029
+    ],
+    "front_end_along_hinge": true
    },
    "sub_links": [],
    "status": "edge"
@@ -127,9 +138,9 @@
    "fallback": {
     "kind": "edge_lid",
     "contact": [
-     -0.1132,
-     -0.0345,
-     0.1304
+     0.08,
+     -0.015,
+     0.1305
     ],
     "pinch_axis": [
      0.0,
@@ -137,18 +148,29 @@
      1.0
     ],
     "approach_dir": [
-     -0.0,
-     -1.0,
-     -0.0056
+     -0.7071,
+     0.0,
+     -0.7071
     ],
     "width": 0.0008,
     "exposed": true,
-    "note": "pinch the lid/flap across its thickness at the free edge",
+    "note": "pinch the flap across its 0.8 mm thickness 1.5 cm inside the seam, 3 cm from the FRONT end of the free edge (|x| 0.08 along the hinge; front_end_along_hinge: the sampler puts it on the robot's side of the hinge line, which runs along the line of sight); approach from the front-above at 45 deg (-x, -z) through the seam gap opened by pressing the other flap down - 2026-09-19 after 0919-032941: an approach ACROSS the seam toward the hinge needs the box in front of the right shoulder (focus 41-55 deg off the head camera's axis, no stance); from the front the hand rolls about the hinge like the blender rings",
     "pull_dir": [
      0.0,
      -0.0028,
      1.0
-    ]
+    ],
+    "contact_detected": [
+     -0.1132,
+     -0.0345,
+     0.1304
+    ],
+    "approach_dir_detected": [
+     -0.0,
+     -1.0,
+     -0.0056
+    ],
+    "front_end_along_hinge": true
    },
    "sub_links": [],
    "status": "edge"

@@ -447,17 +447,208 @@ def program_articulation_small(sc: Sidecar, direction: str = "move") -> List[Act
         raise SidecarError(f"articulation.follow_mode: small-scale articulation moves the arm, got {art.follow_mode!r}")
     brace = sc.contacts.brace if sc.contacts is not None else None
     arm = _handle_arm(sc, brace)
+    lever_braced = bool(((art.extra or {}).get("lever") or {}).get("brace"))  # two-flap v4 (owner 23:20): the pinching hand braces FIRST, then grasps
     if brace is not None:
-        if brace.arm != _other_arm(arm):
+        if brace.arm != _other_arm(arm) and not lever_braced:
             raise SidecarError(f"contacts.brace.arm: the handle arm is {arm!r}, the brace must use {_other_arm(arm)!r}")
         if brace.object != art.object:
             raise SidecarError("contacts.brace.object: the brace must act on the articulated object's base link")
     grasp = Grasp(kind="handle", arm=arm, object=art.object, articulation=art)
     follow = BaseFollow(arm=arm, articulation=art, stance=sc.stance("manipulation"), grasp_action=grasp, direction=direction)
     head = _travel(sc, "init", "manipulation")
+    base_yaw = sc.stance("manipulation").base_pose2d[2]
+    # stage 2 (owner 2026-09-18 22:38; sampler ``stage2_push``): the handle follow ends at ``articulation.follow_to`` where the
+    # arm's reach ends, the joint brake holds the lid there, the hand lets go, closes, and ``contacts.push`` (a fist on the lid's
+    # underside inside the opening) rides the hinge arc to q_goal - the push then retreats
+    push = sc.contacts.push if sc.contacts is not None else None
+    # two-flap carton (owner 2026-09-19 01:10; sampler ``prep_push: other_flap_down``): ``contacts.push_prep`` = the free hand's
+    # closed-gripper press of the OTHER flap down at the seam, held while the handle hand pinches the target flap's edge; the
+    # free hand then leaves the flap (it springs back) and, when recorded, braces the box top at that flap's hinge line;
+    # then the follow, the release, the optional stage-2 fist push, and every hand retreats
+    prep_d = (sc.contacts.extra or {}).get("push_prep") if sc.contacts is not None else None
+    # two-flap carton v2 (owner 2026-09-19 14:34; sampler ``prep_push: two_flap_v2``): ``articulation.first`` = a first, small
+    # opening by the OTHER hand pinching the target flap's free edge on the centre line of the seam while the main hand's fist
+    # presses the other flap down (``contacts.push_prep``, held); the first hand releases and retreats, the fist leaves (the
+    # flap springs back), then the first hand's fist presses the other flap down (``contacts.push_prep2``, held) while the main
+    # hand pinches the now-ajar flap's edge near the robot (``articulation``, from q_ajar) and opens it to the goal; both retreat
+    # push-close (owner 2026-09-19 22:59; sampler ``close_push``): no grasp - the closed fist rides the closing arc at the link's tip
+    # in segments (``contacts.push``, ``push2``, ...), each from its own stance (a recorded transition in between, the brake
+    # holding the link), each followed by its retreat
+    cp = (art.extra or {}).get("close_push")
+    if cp is not None:
+        from ispatialgym.oracle.sidecar import PushContact
+
+        segs = list(cp.get("segments") or [])
+        if not segs:
+            raise SidecarError("articulation.close_push: needs at least one segment")
+        from ispatialgym.oracle.sidecar import BraceContact
+
+        cx = sc.contacts.extra or {}
+        prev = "init"
+        actions: List[Action] = []
+        for seg in segs:
+            st_name = str(seg.get("stance") or "manipulation")
+            if st_name != prev:
+                actions += _travel(sc, prev, st_name)
+                prev = st_name
+            slot = str(seg.get("push") or "push")
+            pc = push if slot == "push" else (PushContact.from_dict(cx[slot], f"contacts.{slot}") if cx.get(slot) is not None else None)
+            if pc is None:
+                raise SidecarError(f"articulation.close_push: contacts.{slot} missing")
+            if (pc.extra or {}).get("articulation") is None:
+                raise SidecarError(f"contacts.{slot}: a push-close segment needs its 'articulation' record (joint, q_from, q_to)")
+            yaw = sc.stance(st_name).base_pose2d[2]
+            # owner 2026-09-20 16:24: the pushes shove the box along the push direction - the other hand's OPEN gripper braces the
+            # face the box slides toward (``contacts.brace`` / ``brace2`` ...; the touching demo's wide stop) for the segment, and
+            # lifts off (fingers stay at the opening) after the fist's retreat, before the base moves on
+            b = None
+            b_slot = seg.get("brace")
+            if b_slot is not None:
+                bd = sc.contacts.brace if b_slot == "brace" else (BraceContact.from_dict(cx[b_slot], f"contacts.{b_slot}") if cx.get(b_slot) is not None else None)
+                if bd is None:
+                    raise SidecarError(f"articulation.close_push: contacts.{b_slot} missing")
+                if bd.arm == pc.arm:
+                    raise SidecarError(f"push-close: brace and push both use the {pc.arm} arm")
+                b = Brace(contact=bd, base_yaw=yaw)
+                actions.append(b)
+            p = Push(contact=pc, base_yaw=yaw)
+            # the retreat as far as the segment's pre-contact (the sampler checked that pose; a 10 cm leg along the fist's axis had
+            # no solution at the segment ends, 0920-064524)
+            d_r = float((pc.extra or {}).get("retreat_m") or 0.06)
+            actions += [p, Retreat(arm=pc.arm, object=art.object, after=p, distance=d_r)]
+            if b is not None:
+                bx = getattr(b.contact, "extra", None) or {}
+                wide = bx.get("fingers_opening_m") is not None
+                actions.append(Retreat(arm=b.contact.arm, object=art.object, after=b, release=not wide, distance=float(bx.get("retreat_m") or RETREAT_DIST)))
+        return actions
+    # two-flap v4, the lever (owner 2026-09-20 15:21; sampler ``prep_push: two_flap_v4``): the free hand's flat fist presses the
+    # other flap near the seam (``contacts.push_prep``, held), slides into the opening under the target flap's edge and lifts it
+    # to q_ajar (``contacts.push_lift``, held; its pre-contact is the press's end pose); the main hand pinches the raised edge
+    # (``articulation`` from q_ajar); the fist slides back out to the left and hovers; the main hand opens the flap to the goal,
+    # a stage-2 fist push when its reach ends; retreats
+    lever = (art.extra or {}).get("lever")
+    if lever is not None:
+        from ispatialgym.oracle.sidecar import PushContact
+
+        cx = sc.contacts.extra or {}
+        if cx.get("push_prep") is None or cx.get("push_lift") is None:
+            raise SidecarError("articulation.lever needs contacts.push_prep (the press) and contacts.push_lift (the slide + lift)")
+        prep = PushContact.from_dict(cx["push_prep"], "contacts.push_prep")
+        lift = PushContact.from_dict(cx["push_lift"], "contacts.push_lift")
+        if prep.arm == arm or lift.arm != prep.arm:
+            raise SidecarError(f"two-flap v4: the lever must be the hand opposite to the pinching {arm!r} (press {prep.arm!r}, lift {lift.arm!r})")
+        for nm, pc in (("push_prep", prep), ("push_lift", lift)):
+            if (pc.extra or {}).get("articulation") is None:
+                raise SidecarError(f"contacts.{nm}: needs its 'articulation' record (joint, q_from, q_to)")
+        p_press = Push(contact=prep, base_yaw=base_yaw)
+        p_lift = Push(contact=lift, base_yaw=base_yaw)
+        d_lever = float(lever.get("retreat_m") or 0.08)
+        # owner 2026-09-20 21:20: the main hand's OPEN gripper braces the box's face on the hinge side (``contacts.brace``, the
+        # touching demo's wide stop) through the press / slide / lift - the lever shoved the box 3-4 cm sideways - and lifts off
+        # (fingers stay open) before it grasps; the fist's retreat lifts off the pressed flap first, then slides away from the seam
+        b = None
+        if sc.contacts.brace is not None and lever.get("brace"):
+            bd = sc.contacts.brace
+            if bd.arm != arm or bd.arm == lift.arm:
+                raise SidecarError(f"two-flap v4: the brace must be the pinching {arm!r} hand (recorded {bd.arm!r})")
+            b = Brace(contact=bd, base_yaw=base_yaw)
+        lever_retreat = Retreat(arm=lift.arm, object=art.object, after=p_lift, distance=d_lever,
+                                lift_first_m=(float(lever["retreat_lift_m"]) if lever.get("retreat_lift_m") is not None else None),
+                                slide_dir=(list(lever["retreat_dir"]) if lever.get("retreat_dir") is not None else None))
+        actions: List[Action] = list(head)
+        if b is not None:
+            actions.append(b)
+        actions += [p_press, p_lift]
+        if b is not None:
+            # the blade lifts off with its fingers as they are (0921-021042: opening them 2 mm from the wall shoved the box 1.2 cm);
+            # the grasp that follows opens the gripper itself
+            bx = getattr(bd, "extra", None) or {}
+            actions.append(Retreat(arm=bd.arm, object=art.object, after=b, release=False, distance=float(bx.get("retreat_m") or RETREAT_DIST)))
+        actions += [grasp, lever_retreat, follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]
+        if push is not None and (art.extra or {}).get("follow_to") is not None:
+            if (push.extra or {}).get("articulation") is None:
+                raise SidecarError("contacts.push: a small-articulation stage-2 push needs its 'articulation' record (joint, q_from, q_to)")
+            p2 = Push(contact=push, base_yaw=base_yaw)
+            actions += [p2, Retreat(arm=push.arm, object=art.object, after=p2)]
+        return actions
+    first_d = (art.extra or {}).get("first")
+    if first_d is not None:
+        from ispatialgym.oracle.sidecar import Articulation, PushContact
+
+        first = Articulation.from_dict(first_d, "articulation.first")
+        arm1 = str((first.extra or {}).get("handle_arm") or _other_arm(arm))
+        if arm1 not in ARMS:
+            raise SidecarError(f"articulation.first.handle_arm: unknown arm {arm1!r}")
+        cx = sc.contacts.extra or {}
+        single = bool((art.extra or {}).get("single_press"))
+        if cx.get("push_prep") is None or (cx.get("push_prep2") is None and not single):
+            raise SidecarError("articulation.first needs contacts.push_prep (the press held during the first opening) and contacts.push_prep2 (the press held during the main opening), or one continuous press (single_press)")
+        prep1 = PushContact.from_dict(cx["push_prep"], "contacts.push_prep")
+        prep2 = prep1 if single else PushContact.from_dict(cx["push_prep2"], "contacts.push_prep2")
+        if prep1.arm == arm1 or prep2.arm == arm:
+            raise SidecarError(f"two-flap v2: a press must use the hand opposite to the pinching one (push_prep {prep1.arm!r} vs first hand {arm1!r}; push_prep2 {prep2.arm!r} vs main hand {arm!r})")
+        for nm, pc in (("push_prep", prep1), ("push_prep2", prep2)):
+            if (pc.extra or {}).get("articulation") is None:
+                raise SidecarError(f"contacts.{nm}: needs its 'articulation' record (the pressed flap's joint, q_from, q_to)")
+        # owner 2026-09-19 16:55: the two phases may use two stances - "manipulation" for the first opening, "manipulation2" for
+        # the main one, with a recorded transition between them (the flap ajar, held by the brake, nothing in hand)
+        m1 = sc.stance("manipulation")
+        try:
+            m2 = sc.stance("manipulation2")
+        except SidecarError:
+            m2 = m1
+        p1 = Push(contact=prep1, base_yaw=m1.base_pose2d[2])
+        g1 = Grasp(kind="handle", arm=arm1, object=art.object, articulation=first)
+        f1 = BaseFollow(arm=arm1, articulation=first, stance=m1, grasp_action=g1, direction=direction)
+        follow2 = BaseFollow(arm=arm, articulation=art, stance=m2, grasp_action=grasp, direction=direction)
+        # a press's retreat is as long as its pre-contact (the sampler's 6 cm, prep_push_pre_dist_m): the fist's tilted axis makes a
+        # 10 cm leg untrackable where the 6 cm approach passed (0920-003018)
+        d_press = 0.06
+        d_first = float((first.extra or {}).get("retreat_m") or 0.10)  # the first hand's release retreat as the sampler checked it
+        phase1 = [p1, g1, f1, Retreat(arm=arm1, object=art.object, after=f1, release=True, distance=d_first)]
+        if single and m2 is m1:
+            # owner 2026-09-19 19:52: the other hand's fist keeps pressing through both openings; the main hand lets go of the
+            # ajar flap and re-grasps it at its near end
+            return head + phase1 + [grasp, follow2, Retreat(arm=arm, object=art.object, after=follow2, release=True), Retreat(arm=prep1.arm, object=art.object, after=p1, distance=d_press)]
+        p2 = Push(contact=prep2, base_yaw=m2.base_pose2d[2])
+        mid = _travel(sc, "manipulation", "manipulation2") if m2 is not m1 else []
+        return head + phase1 + [Retreat(arm=prep1.arm, object=art.object, after=p1, distance=d_press)] + mid + \
+            [p2, grasp, follow2, Retreat(arm=arm, object=art.object, after=follow2, release=True), Retreat(arm=prep2.arm, object=art.object, after=p2, distance=d_press)]
+    if prep_d is not None:
+        from ispatialgym.oracle.sidecar import PushContact
+
+        prep = PushContact.from_dict(prep_d, "contacts.push_prep")
+        if prep.arm not in ARMS:
+            raise SidecarError(f"contacts.push_prep.arm: unknown arm {prep.arm!r}")
+        if (prep.extra or {}).get("articulation") is None:
+            raise SidecarError("contacts.push_prep: needs its 'articulation' record (the pressed flap's joint, q_from, q_to)")
+        p0 = Push(contact=prep, base_yaw=base_yaw)
+        actions: List[Action] = head + [p0, grasp, Retreat(arm=prep.arm, object=art.object, after=p0, distance=0.06)]
+        if brace is not None:
+            if brace.arm == arm:
+                raise SidecarError(f"contacts.brace.arm: the handle arm is {arm!r}, the brace must use the other hand")
+            b = Brace(contact=brace, base_yaw=base_yaw)
+            actions.append(b)
+        actions += [follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]
+        if push is not None and (art.extra or {}).get("follow_to") is not None:
+            if (push.extra or {}).get("articulation") is None:
+                raise SidecarError("contacts.push: a small-articulation stage-2 push needs its 'articulation' record (joint, q_from, q_to)")
+            p = Push(contact=push, base_yaw=base_yaw)
+            actions += [p, Retreat(arm=push.arm, object=art.object, after=p)]
+        if brace is not None:
+            actions.append(Retreat(arm=brace.arm, object=brace.object, after=b, release=True))
+        return actions
+    if push is not None and (art.extra or {}).get("follow_to") is not None:
+        if push.arm not in ARMS:
+            raise SidecarError(f"contacts.push.arm: unknown arm {push.arm!r}")
+        if (push.extra or {}).get("articulation") is None:
+            raise SidecarError("contacts.push: a small-articulation stage-2 push needs its 'articulation' record (joint, q_from, q_to)")
+        if brace is not None:
+            raise SidecarError("contacts.brace: a braced two-arm instance cannot carry a stage-2 push (the brace arm would have to let go first)")
+        p = Push(contact=push, base_yaw=base_yaw)  # either arm: the other hand's fist is the natural one for a hinge on the handle arm's side
+        return head + [grasp, follow, Retreat(arm=arm, object=art.object, after=follow, release=True), p, Retreat(arm=push.arm, object=art.object, after=p)]
     if brace is None:
         return head + [grasp, follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]
-    base_yaw = sc.stance("manipulation").base_pose2d[2]
     b = Brace(contact=brace, base_yaw=base_yaw)
     return head + [
         b,
