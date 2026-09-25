@@ -66,6 +66,17 @@ def subtask_of(alias, customs):
     if e.get("subtask"):
         return e["subtask"]
     iddl = e.get("iddl", "")
+    if not e:
+        # an alias that is not (or no longer) in the customs - an experiment alias such as
+        # configuration_matching-articulation_open_large_scale-dishwasher_wide (0921-050314): resolve it from the iddl alias
+        # templates the way run_isg does (Sidecar.subtask), instead of filing the run under first_demo/<empty>/<run id>
+        try:
+            sys.path.insert(0, REPO)
+            from ispatialgym.oracle.sidecar import subtask_of_alias
+
+            return subtask_of_alias(alias)
+        except Exception as ex:  # noqa: BLE001
+            print(f"first_demo: alias {alias!r} is not in the customs and does not match an iddl alias template ({ex})", file=sys.stderr)
     fam, fn = iddl.split("/", 1) if "/" in iddl else ("", iddl)
     fn = os.path.splitext(fn)[0]
     return fam if fam in ("object_scaling", "mental_rotation", "disembedding") and fn == fam else (f"{fam}-{fn}" if fam else fn)
