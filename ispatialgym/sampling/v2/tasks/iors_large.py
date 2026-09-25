@@ -1083,11 +1083,12 @@ class IORSLarge(SamplerV2):
                 feas.append((st, P0.axis_angle(self, cam, focus)))
             if not feas:
                 continue
-            for st, _ in feas:
-                # floor class: A spawns TUCKED (documented exception to the untucked init, §3.3) — driven at A's crouch the
-                # untucked hands hang at floor level and swept the target on the floor at c_t (countertop-floor 19:45:
-                # path collides at stride 8/9 at trunk (0.95, 0)); the path A -> B is recorded at that posture
-                st.arms = "tucked"
+            # floor class: A spawns UNTUCKED like every other family's init (owner 2026-09-24; ``Stance.arms`` default). 1dd3820b
+            # (2026-09-16) spawned it tucked because A then stood at B's crouch (0.95, 0) and the untucked hands hanging at floor
+            # level swept the floor target on the A -> B drive; A is now chosen among the straight trunks by camera angle
+            # (0921-045713: translate 0.25) and the crouch happens at the transition, where the arms were untucked again anyway
+            # (arm_to(left,right), 161 steps). The A -> B path sweep still judges the hands: a low A whose untucked hands reach
+            # the target is rejected ``path_collision`` and the init is re-drawn.
             free = P0.body_free(self, [st for st, _ in feas])
             feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
             if not feas or not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
