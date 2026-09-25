@@ -112,7 +112,7 @@ INIT_SURFACE_FALLBACK_SUBTASKS = {
     "inter_object_relation_satisfaction-under_large_scale": ("partner", "floor"),
     "inter_object_relation_satisfaction-ontop_large_scale": ("floor",),
 }
-SCALE_FALLBACK_SUBTASKS = ("alignment-world_vertical", "alignment-world_horizontal", "alignment-axial")
+SCALE_FALLBACK_SUBTASKS = ("alignment-world_vertical", "alignment-axial")
 NEXT_MODEL_FALLBACK_SUBTASKS = ("configuration_matching-articulation_open_small_scale", "configuration_matching-articulation_close_small_scale")
 NEXT_MODEL_SLOT_ORDER = ("variation_geometry", "variation_texture", "heldout")
 #: The single scale step used when the pilot left no ``template_meta.scale_hint`` for the primary alias.
@@ -400,18 +400,18 @@ def _is_ready(row: Dict[str, str]) -> bool:
         return True
 
 
-WALL_SUBTASKS = ("alignment-world_vertical", "alignment-world_horizontal")
+WALL_SUBTASKS = ("alignment-world_vertical",)
 #: §5.5 frame of a wall target: ``generation.<key>`` (per-model dict form) <- icl ``roles/candidates.csv`` column
-WALL_FRAME_KEYS = (("front_axis", "frame_front"), ("up_axis", "frame_up"), ("level_axis", "frame_level"))
+WALL_FRAME_KEYS = (("front_axis", "frame_front"), ("up_axis", "frame_up"))
 
 
 def _frame_ok(subtask: str, row: Dict[str, str], strict_symmetric_180: bool) -> Optional[str]:
     """§2.2: alignment targets need a reviewed frame record; wall targets ``symmetric_180`` (strict mode)."""
-    front, up, level, long_ = (row.get(k) or "" for k in ("frame_front", "frame_up", "frame_level", "frame_long"))
+    front, up, long_ = (row.get(k) or "" for k in ("frame_front", "frame_up", "frame_long"))
     if subtask == "alignment-axial":
         ok = bool(front or up) and bool(long_)
     elif subtask in WALL_SUBTASKS:
-        ok = bool(front) and bool(up or level)
+        ok = bool(front) and bool(up)
         if ok and strict_symmetric_180 and (row.get("symmetric_180") or "") not in ("0", "1"):
             ok = False
     else:
@@ -420,13 +420,11 @@ def _frame_ok(subtask: str, row: Dict[str, str], strict_symmetric_180: bool) -> 
 
 
 def wall_frame_of(row: Dict[str, str], subtask: str) -> Dict[str, str]:
-    """The reviewed frame of a wall target row as ``generation`` keys: ``front_axis`` / ``up_axis`` (and ``level_axis``
-    for world horizontal) from the icl ``frame_front`` / ``frame_up`` / ``frame_level`` columns; empty columns are left
-    out (the sampler rejects an alias without a frame — ``missing_frame`` — instead of defaulting one)."""
+    """The reviewed frame of a wall target row as ``generation`` keys: ``front_axis`` / ``up_axis`` from the icl
+    ``frame_front`` / ``frame_up`` columns; empty columns are left out (the sampler rejects an alias without a frame —
+    ``missing_frame`` — instead of defaulting one)."""
     out: Dict[str, str] = {}
     for gen_key, col in WALL_FRAME_KEYS:
-        if gen_key == "level_axis" and subtask != "alignment-world_horizontal":
-            continue
         val = (row.get(col) or "").strip()
         if val:
             out[gen_key] = val if val[0] in "+-" else "+" + val
@@ -435,8 +433,8 @@ def wall_frame_of(row: Dict[str, str], subtask: str) -> Dict[str, str]:
 
 def write_wall_frame(generation: Dict[str, Any], subtask: str, cat: str, model: str, row: Dict[str, str]) -> Dict[str, str]:
     """Owner 2026-09-16 22:55 (spec §5.5 / §6.9): the reviewed icl frame of a whitelisted wall target is written into the
-    alias as ``generation.front_axis`` / ``up_axis`` / ``level_axis`` in the per-model dict form ``{"<category>/<model>":
-    "+z", ...}`` (``AlignmentWall.target_param`` resolves it) — no wall alias carried the keys before, so every target
+    alias as ``generation.front_axis`` / ``up_axis`` in the per-model dict form ``{"<category>/<model>": "+z", ...}``
+    (``AlignmentWall.target_param`` resolves it) — no wall alias carried the keys before, so every target
     hung in the painting-shaped default (+x / +z: the license plate table-flat, run 0916-212037). Other models' entries
     of the dict are kept; a non-dict value left by hand is replaced by the dict (the sampler never defaults). Returns
     the frame written."""
@@ -1685,9 +1683,9 @@ class Grounder:
                     self._model_facts(entry.roles[role], iddl, role, cat, m, r, v, rp)
                     if subtask in WALL_SUBTASKS and role == "target":
                         # §5.5 frame per model (owner 22:55): the reviewed icl frame goes into generation.front_axis / up_axis
-                        # / level_axis (dict form); the sampler rejects an alias without it instead of defaulting
+                        # (dict form); the sampler rejects an alias without it instead of defaulting
                         frame = write_wall_frame(entry.generation, subtask, cat, m, r)
-                        if len(frame) < (3 if subtask == "alignment-world_horizontal" else 2):
+                        if len(frame) < len(WALL_FRAME_KEYS):
                             comb.notes.append(f"{cat}/{m}: incomplete reviewed frame in the icl ({frame}); the sampler will reject missing_frame")
                     for p in v.pending:
                         rec = Constraint("blacklist", {"scene": sc, role: C.model_key(cat, m)}, False,
@@ -1796,7 +1794,7 @@ class Grounder:
             return None
         if subtask == "inter_object_relation_satisfaction-inside" and role == "target":
             return None
-        if subtask in ("alignment-world_vertical", "alignment-world_horizontal"):
+        if subtask in WALL_SUBTASKS:
             if (row.get("symmetric_180") or "") == "1" and row.get("frame_front"):
                 return [C.half_turn_tag(row["frame_front"])]
             return []

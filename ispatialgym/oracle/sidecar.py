@@ -68,7 +68,6 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     # cell after that is the instance brace-less (``summary.brace: none``), so ``contacts.brace`` is optional here
     "configuration_matching-attachment": _TABLE + ("grasps",),
     "alignment-world_vertical": _TABLE + ("contacts.push", "contacts.brace"),
-    "alignment-world_horizontal": _TABLE + ("contacts.push", "contacts.brace"),
     # axial is push-only (owner decision 2026-09-16 08:10): ``contacts.brace`` is recorded only when the joint two-arm
     # placement exists and is optional here; the oracle's push closure is the stop otherwise
     "alignment-axial": _TABLE + ("contacts.push",),

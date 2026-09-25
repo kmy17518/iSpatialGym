@@ -30,7 +30,6 @@ SUBTASKS = [
     "configuration_matching-articulation_open_large_scale",
     "configuration_matching-articulation_open_small_scale",
     "alignment-world_vertical",
-    "alignment-world_horizontal",
     "alignment-axial",
     "inter_object_relation_satisfaction-under_small_scale",
     "inter_object_relation_satisfaction-under_large_scale",
@@ -245,27 +244,26 @@ def test_wall_support_bindings(grounded):
 
 def test_wall_frames_are_written_per_model(grounded):
     """Owner 2026‑09‑16 22:55 (spec §5.5): every whitelisted wall target carries its reviewed icl frame in the alias as
-    ``generation.front_axis`` / ``up_axis`` (/ ``level_axis`` for world horizontal) in the per-model dict form the
-    sampler's ``target_param`` resolves — the sampler never defaults a frame (``Reject("missing_frame")``)."""
-    for st in ("alignment-world_vertical", "alignment-world_horizontal"):
-        for gp in _entries(grounded, st):
-            gen = gp.entry.generation
-            whitelisted = {f"{cat}/{m}" for sc in gp.entry.scenes.values() for cat, models in sc.whitelist.get("target", {}).items() for m in models}
-            assert whitelisted, gp.alias
-            for key in whitelisted:
-                assert isinstance(gen.get("front_axis"), dict) and gen["front_axis"].get(key), f"{gp.alias}: no front_axis for {key}"
-                assert isinstance(gen.get("up_axis"), dict) and gen["up_axis"].get(key), f"{gp.alias}: no up_axis for {key}"
-                if st == "alignment-world_horizontal":
-                    assert isinstance(gen.get("level_axis"), dict) and gen["level_axis"].get(key), f"{gp.alias}: no level_axis for {key}"
-                else:
-                    assert "level_axis" not in gen or key not in gen["level_axis"]
-                row = grounded.icl.row(st, "target", *key.split("/", 1))
-                assert gen["front_axis"][key] == GI.wall_frame_of(row, st)["front_axis"]
-    plate = [gp for gp in _entries(grounded, "alignment-world_horizontal") if gp.entry.roles["target"].category == "license_plate"]
-    if plate:  # the representative pick of the horizontal license plate: reviewed +z / +y / +x (not the painting-shaped +x / +z)
+    ``generation.front_axis`` / ``up_axis`` in the per-model dict form the sampler's ``target_param`` resolves — the
+    sampler never defaults a frame (``Reject("missing_frame")``)."""
+    st = "alignment-world_vertical"
+    entries = _entries(grounded, st)
+    assert entries
+    for gp in entries:
+        gen = gp.entry.generation
+        whitelisted = {f"{cat}/{m}" for sc in gp.entry.scenes.values() for cat, models in sc.whitelist.get("target", {}).items() for m in models}
+        assert whitelisted, gp.alias
+        for key in whitelisted:
+            assert isinstance(gen.get("front_axis"), dict) and gen["front_axis"].get(key), f"{gp.alias}: no front_axis for {key}"
+            assert isinstance(gen.get("up_axis"), dict) and gen["up_axis"].get(key), f"{gp.alias}: no up_axis for {key}"
+            assert "level_axis" not in gen
+            row = grounded.icl.row(st, "target", *key.split("/", 1))
+            assert gen["front_axis"][key] == GI.wall_frame_of(row, st)["front_axis"]
+    plate = [gp for gp in entries if gp.entry.roles["target"].category == "license_plate"]
+    if plate:  # the representative pick of the license plate: reviewed +z / +y (not the painting-shaped +x / +z)
         gen = plate[0].entry.generation
         key = next(k for k in gen["front_axis"] if k.startswith("license_plate/"))
-        assert (gen["front_axis"][key], gen["up_axis"][key], gen["level_axis"][key]) == ("+z", "+y", "+x")
+        assert (gen["front_axis"][key], gen["up_axis"][key]) == ("+z", "+y")
 
 
 def test_groups(grounded):
@@ -599,10 +597,9 @@ def test_scale_fallbacks(grounded, tmp_path):
 
 def test_wall_deviation_defaults_and_reseed():
     # owner decision 2026-09-16 A8: delta = sign * U(15, 25) deg, template filter +-25 deg; A6 tucked two-arm stance posture
-    for st in ("alignment-world_vertical", "alignment-world_horizontal"):
-        gen = G.defaults_for(st)
-        assert gen["deviation_range_deg"] == [15.0, 25.0] and gen["max_deviation_deg"] == 25.0
-        assert gen["template_filter_deviation_deg"] == 25.0 and gen["stance_arm_posture"] == "tucked"
+    gen = G.defaults_for("alignment-world_vertical")
+    assert gen["deviation_range_deg"] == [15.0, 25.0] and gen["max_deviation_deg"] == 25.0
+    assert gen["template_filter_deviation_deg"] == 25.0 and gen["stance_arm_posture"] == "tucked"
     assert G.defaults_for("alignment-axial")["deviation_range_deg"] == [20.0, 70.0]  # §6.10 unchanged
     old = {"generation": {"deviation_range_deg": [15.0, 45.0], "templates_max": 3, "legacy_key": 1}}
     kept = G.seed_generation("alignment-world_vertical", old)
@@ -645,11 +642,11 @@ def test_pilot_blacklist_gives_the_next_model_fallback(tmp_path):
     reason in every scene block, the primary keeps its alias with an empty whitelist and gets the next model of the
     category as its rank-1 fallback; the blacklist and the fallback survive a re-run without the flag."""
     icl = GI.ICL()
-    bl = {("alignment-world_vertical", "target", "hanger", "agrpio"): "unstable_init", ("alignment-world_horizontal", "target", "hanger", "nadesv"): "unstable_init"}
+    bl = {("alignment-world_vertical", "target", "hanger", "agrpio"): "unstable_init"}
     g = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
                     options=GI.Options(representative_test=False, blacklist=bl))
-    g.run(["alignment-world_vertical", "alignment-world_horizontal"])
-    for st, model, nxt in (("alignment-world_vertical", "agrpio", "nagryh"), ("alignment-world_horizontal", "nadesv", "lymqks")):
+    g.run(["alignment-world_vertical"])
+    for st, model, nxt in (("alignment-world_vertical", "agrpio", "nagryh"),):
         primary = g.customs.entries[f"{st}-hanger-walls"]
         sc = primary.scenes["house_single_floor"]
         assert not sc.whitelist.get("target") and sc.blacklist["target"]["hanger"][model] == f"pilot {g.today}: unstable_init"

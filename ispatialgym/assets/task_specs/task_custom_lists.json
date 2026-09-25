@@ -265,27 +265,6 @@
     }
   },
 
-  "world_alignment-2": {
-    "alias": "world_horizontal",
-    "roles": {
-      "target": {"models": {"towel_rack": ["kqrmrh", "crivoa"]}},
-      "wall": {"fixed": true},
-      "floor": {"fixed": true}
-    },
-    "scenes": {
-      "house_single_floor": {"rooms": ["living_room_0"], "fixed": {"floor": {"room": "living_room_0"}}}
-    },
-    "generation": {
-      "instances_per_template": 3, "height": 1.45,
-      "front_axis": "+x", "up_axis": "+z", "level_axis": "y",
-      "symmetric_180": {"default": false, "towel_rack/kqrmrh": true},
-      "swept_patch": true, "deviation_range_deg": [15.0, 45.0],
-      "arc_radius_range": [0.6, 0.95], "arc_half_angle_deg": 35.0, "min_visible_objects": 5,
-      "tolerances": {"orientation": 0.08},
-      "_note": "towel bar (kqrmrh: plain bar, level either way -> symmetric_180; crivoa: hook rail, hooks down). Rounds 1-3 and per-model frames: runlogs/world_horizontal_selection_20260912/spec_fragments.json."
-    }
-  },
-
   "inter_object_relation_satisfaction-0": {
     "alias": "ontop",
     "roles": {

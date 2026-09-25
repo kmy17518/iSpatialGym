@@ -68,7 +68,7 @@ ARTICULATION_COMMON: Dict[str, Any] = {
     "pinch_width_range_m": [0.015, 0.080],  # §5.3 pinch width after scaling
 }
 
-#: §5.5 wall alignment (world vertical / horizontal) shared numbers.
+#: §5.5 wall alignment (world vertical) numbers.
 ALIGNMENT_WALL_COMMON: Dict[str, Any] = {
     "hang_height_m": 1.45,  # §5.5 centre at height 1.45 m
     "wall_offset_extra_m": 0.01,  # §5.5 thickness/2 + 0.01 off the wall
@@ -80,6 +80,9 @@ ALIGNMENT_WALL_COMMON: Dict[str, Any] = {
     # target's inertia about the hinge axis; the COM hinge has no restoring torque, so a frictionless one never settles
     "hinge_stop_decel_rad_s2": 10.0,
     "hinge_viscous_tau_s": 0.02,
+    # 2026-09-22 brake: damping = friction / this speed (Coulomb friction down to 0.0025 rad/s) - the plain damper I_n / tau let a
+    # residual gravity torque (anchor ~1 mm off the COM) creep the levelled painting back 0.25 deg/s out of tolerance
+    "hinge_brake_omega_rad_s": 0.0025,
     "min_visible_objects": 5,  # §5.5 ≥ 5 objects with ≥ 200 px in the init render
     "min_object_pixels": 200,  # §5.5
     "region_seed_step_m": 0.25,  # §5.5 wall spots from support_regions (0.25 m seeding)
@@ -300,15 +303,6 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "path_buckets": None,
         **ALIGNMENT_WALL_COMMON,
         "goal": "upright",  # §6.9 orientation = aligned (upright)
-    },
-    "alignment-world_horizontal": {
-        **COMMON,
-        "tolerances": {"orientation": 0.08},  # §8 alignment horizontal 0.08 rad
-        "groups": {},
-        "path_buckets": None,
-        **ALIGNMENT_WALL_COMMON,
-        "goal": "level",  # §6.9 orientation = aligned (level)
-        "swept_patch": True,  # §5.5 horizontal: swept extents over the max deviation
     },
     "alignment-axial": {
         **COMMON,

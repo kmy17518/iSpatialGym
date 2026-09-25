@@ -2,7 +2,7 @@
  "_comment": "iSpatialGym task customs list (docs/instance_sampling_spec.md 2.3), written by ground_isg; one entry per grounded alias: roles, per-scene bindings / whitelist / blacklist, generation (seeded from sampling/generation_defaults.py), constraints.",
  "alignment-axial-bag_of_chips-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 9,
+  "definition_id": 8,
   "fallbacks": [
    "alignment-axial-bag_of_chips_s070-breakfast_table"
   ],
@@ -106,7 +106,7 @@
  },
  "alignment-axial-bag_of_chips-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 65,
+  "definition_id": 54,
   "fallbacks": [
    "alignment-axial-bag_of_chips_s070-conference_table"
   ],
@@ -210,7 +210,7 @@
  },
  "alignment-axial-bag_of_chips-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 63,
+  "definition_id": 52,
   "fallbacks": [
    "alignment-axial-bag_of_chips_s070-countertop"
   ],
@@ -314,7 +314,7 @@
  },
  "alignment-axial-bag_of_chips_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 67,
+  "definition_id": 56,
   "fallback_of": "alignment-axial-bag_of_chips-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -426,7 +426,7 @@
  },
  "alignment-axial-bag_of_chips_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 66,
+  "definition_id": 55,
   "fallback_of": "alignment-axial-bag_of_chips-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -538,7 +538,7 @@
  },
  "alignment-axial-bag_of_chips_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 64,
+  "definition_id": 53,
   "fallback_of": "alignment-axial-bag_of_chips-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -650,7 +650,7 @@
  },
  "alignment-axial-board_game-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 5,
+  "definition_id": 4,
   "fallbacks": [
    "alignment-axial-board_game_s070-breakfast_table"
   ],
@@ -754,7 +754,7 @@
  },
  "alignment-axial-board_game-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 45,
+  "definition_id": 34,
   "fallbacks": [
    "alignment-axial-board_game_s070-conference_table"
   ],
@@ -858,7 +858,7 @@
  },
  "alignment-axial-board_game-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 43,
+  "definition_id": 32,
   "fallbacks": [
    "alignment-axial-board_game_s070-countertop"
   ],
@@ -962,7 +962,7 @@
  },
  "alignment-axial-board_game_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 47,
+  "definition_id": 36,
   "fallback_of": "alignment-axial-board_game-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -1074,7 +1074,7 @@
  },
  "alignment-axial-board_game_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 46,
+  "definition_id": 35,
   "fallback_of": "alignment-axial-board_game-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -1186,7 +1186,7 @@
  },
  "alignment-axial-board_game_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 44,
+  "definition_id": 33,
   "fallback_of": "alignment-axial-board_game-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -1298,7 +1298,7 @@
  },
  "alignment-axial-catalog-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 12,
+  "definition_id": 11,
   "fallbacks": [
    "alignment-axial-catalog_s070-breakfast_table"
   ],
@@ -1396,7 +1396,7 @@
  },
  "alignment-axial-catalog-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 80,
+  "definition_id": 69,
   "fallbacks": [
    "alignment-axial-catalog_s070-conference_table"
   ],
@@ -1494,7 +1494,7 @@
  },
  "alignment-axial-catalog-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 78,
+  "definition_id": 67,
   "fallbacks": [
    "alignment-axial-catalog_s070-countertop"
   ],
@@ -1592,7 +1592,7 @@
  },
  "alignment-axial-catalog_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 82,
+  "definition_id": 71,
   "fallback_of": "alignment-axial-catalog-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -1698,7 +1698,7 @@
  },
  "alignment-axial-catalog_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 81,
+  "definition_id": 70,
   "fallback_of": "alignment-axial-catalog-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -1804,7 +1804,7 @@
  },
  "alignment-axial-catalog_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 79,
+  "definition_id": 68,
   "fallback_of": "alignment-axial-catalog-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -1910,7 +1910,7 @@
  },
  "alignment-axial-frying_pan-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 10,
+  "definition_id": 9,
   "fallbacks": [
    "alignment-axial-frying_pan_s070-breakfast_table"
   ],
@@ -2014,7 +2014,7 @@
  },
  "alignment-axial-frying_pan-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 70,
+  "definition_id": 59,
   "fallbacks": [
    "alignment-axial-frying_pan_s070-conference_table"
   ],
@@ -2118,7 +2118,7 @@
  },
  "alignment-axial-frying_pan-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 68,
+  "definition_id": 57,
   "fallbacks": [
    "alignment-axial-frying_pan_s070-countertop"
   ],
@@ -2222,7 +2222,7 @@
  },
  "alignment-axial-frying_pan_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 72,
+  "definition_id": 61,
   "fallback_of": "alignment-axial-frying_pan-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -2334,7 +2334,7 @@
  },
  "alignment-axial-frying_pan_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 71,
+  "definition_id": 60,
   "fallback_of": "alignment-axial-frying_pan-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -2446,7 +2446,7 @@
  },
  "alignment-axial-frying_pan_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 69,
+  "definition_id": 58,
   "fallback_of": "alignment-axial-frying_pan-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -2558,7 +2558,7 @@
  },
  "alignment-axial-gym_shoe-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 6,
+  "definition_id": 5,
   "fallbacks": [
    "alignment-axial-gym_shoe_s070-breakfast_table"
   ],
@@ -2662,7 +2662,7 @@
  },
  "alignment-axial-gym_shoe-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 50,
+  "definition_id": 39,
   "fallbacks": [
    "alignment-axial-gym_shoe_s070-conference_table"
   ],
@@ -2766,7 +2766,7 @@
  },
  "alignment-axial-gym_shoe-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 48,
+  "definition_id": 37,
   "fallbacks": [
    "alignment-axial-gym_shoe_s070-countertop"
   ],
@@ -2870,7 +2870,7 @@
  },
  "alignment-axial-gym_shoe_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 52,
+  "definition_id": 41,
   "fallback_of": "alignment-axial-gym_shoe-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -2982,7 +2982,7 @@
  },
  "alignment-axial-gym_shoe_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 51,
+  "definition_id": 40,
   "fallback_of": "alignment-axial-gym_shoe-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -3094,7 +3094,7 @@
  },
  "alignment-axial-gym_shoe_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 49,
+  "definition_id": 38,
   "fallback_of": "alignment-axial-gym_shoe-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -3206,7 +3206,7 @@
  },
  "alignment-axial-hardback-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 7,
+  "definition_id": 6,
   "fallbacks": [
    "alignment-axial-hardback_s070-breakfast_table"
   ],
@@ -3310,7 +3310,7 @@
  },
  "alignment-axial-hardback-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 55,
+  "definition_id": 44,
   "fallbacks": [
    "alignment-axial-hardback_s070-conference_table"
   ],
@@ -3414,7 +3414,7 @@
  },
  "alignment-axial-hardback-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 53,
+  "definition_id": 42,
   "fallbacks": [
    "alignment-axial-hardback_s070-countertop"
   ],
@@ -3518,7 +3518,7 @@
  },
  "alignment-axial-hardback_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 57,
+  "definition_id": 46,
   "fallback_of": "alignment-axial-hardback-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -3630,7 +3630,7 @@
  },
  "alignment-axial-hardback_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 56,
+  "definition_id": 45,
   "fallback_of": "alignment-axial-hardback-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -3742,7 +3742,7 @@
  },
  "alignment-axial-hardback_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 54,
+  "definition_id": 43,
   "fallback_of": "alignment-axial-hardback-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -3854,7 +3854,7 @@
  },
  "alignment-axial-keyboard-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 11,
+  "definition_id": 10,
   "fallbacks": [
    "alignment-axial-keyboard_s070-breakfast_table"
   ],
@@ -3958,7 +3958,7 @@
  },
  "alignment-axial-keyboard-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 75,
+  "definition_id": 64,
   "fallbacks": [
    "alignment-axial-keyboard_s070-conference_table"
   ],
@@ -4062,7 +4062,7 @@
  },
  "alignment-axial-keyboard-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 73,
+  "definition_id": 62,
   "fallbacks": [
    "alignment-axial-keyboard_s070-countertop"
   ],
@@ -4166,7 +4166,7 @@
  },
  "alignment-axial-keyboard_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 77,
+  "definition_id": 66,
   "fallback_of": "alignment-axial-keyboard-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -4278,7 +4278,7 @@
  },
  "alignment-axial-keyboard_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 76,
+  "definition_id": 65,
   "fallback_of": "alignment-axial-keyboard-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -4390,7 +4390,7 @@
  },
  "alignment-axial-keyboard_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 74,
+  "definition_id": 63,
   "fallback_of": "alignment-axial-keyboard-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -4502,7 +4502,7 @@
  },
  "alignment-axial-letter-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 8,
+  "definition_id": 7,
   "fallbacks": [
    "alignment-axial-letter_s070-breakfast_table"
   ],
@@ -4606,7 +4606,7 @@
  },
  "alignment-axial-letter-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 60,
+  "definition_id": 49,
   "fallbacks": [
    "alignment-axial-letter_s070-conference_table"
   ],
@@ -4710,7 +4710,7 @@
  },
  "alignment-axial-letter-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 58,
+  "definition_id": 47,
   "fallbacks": [
    "alignment-axial-letter_s070-countertop"
   ],
@@ -4814,7 +4814,7 @@
  },
  "alignment-axial-letter_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 62,
+  "definition_id": 51,
   "fallback_of": "alignment-axial-letter-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -4926,7 +4926,7 @@
  },
  "alignment-axial-letter_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 61,
+  "definition_id": 50,
   "fallback_of": "alignment-axial-letter-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -5038,7 +5038,7 @@
  },
  "alignment-axial-letter_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 59,
+  "definition_id": 48,
   "fallback_of": "alignment-axial-letter-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -5150,7 +5150,7 @@
  },
  "alignment-axial-magazine-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 4,
+  "definition_id": 3,
   "fallbacks": [
    "alignment-axial-magazine_s070-breakfast_table"
   ],
@@ -5254,7 +5254,7 @@
  },
  "alignment-axial-magazine-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 40,
+  "definition_id": 29,
   "fallbacks": [
    "alignment-axial-magazine_s070-conference_table"
   ],
@@ -5358,7 +5358,7 @@
  },
  "alignment-axial-magazine-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 38,
+  "definition_id": 27,
   "fallbacks": [
    "alignment-axial-magazine_s070-countertop"
   ],
@@ -5462,7 +5462,7 @@
  },
  "alignment-axial-magazine_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 42,
+  "definition_id": 31,
   "fallback_of": "alignment-axial-magazine-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -5574,7 +5574,7 @@
  },
  "alignment-axial-magazine_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 41,
+  "definition_id": 30,
   "fallback_of": "alignment-axial-magazine-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -5686,7 +5686,7 @@
  },
  "alignment-axial-magazine_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 39,
+  "definition_id": 28,
   "fallback_of": "alignment-axial-magazine-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -5798,7 +5798,7 @@
  },
  "alignment-axial-paperback_book-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 3,
+  "definition_id": 2,
   "fallbacks": [
    "alignment-axial-paperback_book_s070-breakfast_table"
   ],
@@ -5904,7 +5904,7 @@
  },
  "alignment-axial-paperback_book-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 35,
+  "definition_id": 24,
   "fallbacks": [
    "alignment-axial-paperback_book_s070-conference_table"
   ],
@@ -6010,7 +6010,7 @@
  },
  "alignment-axial-paperback_book-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 33,
+  "definition_id": 22,
   "fallbacks": [
    "alignment-axial-paperback_book_s070-countertop"
   ],
@@ -6116,7 +6116,7 @@
  },
  "alignment-axial-paperback_book_s070-breakfast_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 37,
+  "definition_id": 26,
   "fallback_of": "alignment-axial-paperback_book-breakfast_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -6230,7 +6230,7 @@
  },
  "alignment-axial-paperback_book_s070-conference_table": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 36,
+  "definition_id": 25,
   "fallback_of": "alignment-axial-paperback_book-conference_table",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -6344,7 +6344,7 @@
  },
  "alignment-axial-paperback_book_s070-countertop": {
   "iddl": "alignment/axial.iddl",
-  "definition_id": 34,
+  "definition_id": 23,
   "fallback_of": "alignment-axial-paperback_book-countertop",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -6456,4371 +6456,9 @@
    }
   ]
  },
- "alignment-world_horizontal-decorative_sign-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 19,
-  "fallbacks": [
-   "alignment-world_horizontal-decorative_sign_s070-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "decorative_sign",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "rypeha",
-    "orientation_equivalences": {
-     "decorative_sign/rypeha": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "decorative_sign": [
-       "rypeha"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "decorative_sign": {
-       "xzsmxq": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "decorative_sign/rypeha": "+x"
-   },
-   "up_axis": {
-    "decorative_sign/rypeha": "+z"
-   },
-   "level_axis": {
-    "decorative_sign/rypeha": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "decorative_sign/rypeha"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-decorative_sign_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 89,
-  "fallback_of": "alignment-world_horizontal-decorative_sign-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "default_step"
-  },
-  "roles": {
-   "target": {
-    "category": "decorative_sign",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "rypeha",
-    "scale": {
-     "decorative_sign/rypeha": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "decorative_sign/rypeha": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "decorative_sign": [
-       "rypeha"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "decorative_sign": {
-       "xzsmxq": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "decorative_sign/rypeha": "+x"
-   },
-   "up_axis": {
-    "decorative_sign/rypeha": "+z"
-   },
-   "level_axis": {
-    "decorative_sign/rypeha": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "decorative_sign/rypeha"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-hanger-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 20,
-  "fallbacks": [
-   "alignment-world_horizontal-hanger_lymqks-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "hanger",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "nadesv",
-    "orientation_equivalences": {
-     "hanger/nadesv": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {},
-    "blacklist": {
-     "target": {
-      "hanger": {
-       "ffecvd": "ground_isg 2026-09-16: heldout",
-       "nadesv": "pilot 2026-09-16: unstable_init"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "hanger/nadesv"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-hanger_lymqks-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 105,
-  "fallback_of": "alignment-world_horizontal-hanger-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "next_model",
-  "fallback_params": {
-   "model": "lymqks",
-   "slot": "variation_geometry",
-   "primary_model": "nadesv"
-  },
-  "roles": {
-   "target": {
-    "category": "hanger",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "lymqks",
-    "orientation_equivalences": {
-     "hanger/lymqks": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "hanger": [
-       "lymqks"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "hanger": {
-       "ffecvd": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "front_axis": {
-    "hanger/lymqks": "+z"
-   },
-   "up_axis": {
-    "hanger/lymqks": "-x"
-   },
-   "level_axis": {
-    "hanger/lymqks": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "hanger/lymqks"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-hanger_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 90,
-  "fallback_of": "alignment-world_horizontal-hanger-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "default_step"
-  },
-  "superseded_by": true,
-  "roles": {
-   "target": {
-    "category": "hanger",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "nadesv",
-    "scale": {
-     "hanger/nadesv": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "hanger/nadesv": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "hanger": [
-       "nadesv"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "hanger": {
-       "ffecvd": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "hanger/nadesv": "+z"
-   },
-   "up_axis": {
-    "hanger/nadesv": "-x"
-   },
-   "level_axis": {
-    "hanger/nadesv": "+y"
-   }
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "hanger/nadesv"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-license_plate-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 22,
-  "fallbacks": [
-   "alignment-world_horizontal-license_plate_s070-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "license_plate",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "nwfbxn",
-    "orientation_equivalences": {
-     "license_plate/nwfbxn": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "license_plate": [
-       "nwfbxn"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "license_plate": {
-       "naclac": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "license_plate/nwfbxn": "+z"
-   },
-   "up_axis": {
-    "license_plate/nwfbxn": "+y"
-   },
-   "level_axis": {
-    "license_plate/nwfbxn": "+x"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "license_plate/nwfbxn"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-license_plate_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 92,
-  "fallback_of": "alignment-world_horizontal-license_plate-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "default_step"
-  },
-  "roles": {
-   "target": {
-    "category": "license_plate",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "nwfbxn",
-    "scale": {
-     "license_plate/nwfbxn": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "license_plate/nwfbxn": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "license_plate": [
-       "nwfbxn"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "license_plate": {
-       "naclac": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "license_plate/nwfbxn": "+z"
-   },
-   "up_axis": {
-    "license_plate/nwfbxn": "+y"
-   },
-   "level_axis": {
-    "license_plate/nwfbxn": "+x"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "license_plate/nwfbxn"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-picture-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 18,
-  "fallbacks": [
-   "alignment-world_horizontal-picture_s070-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "picture",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "qavxsz",
-    "orientation_equivalences": {
-     "picture/qavxsz": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "picture": [
-       "qavxsz"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "picture": {
-       "chfljy": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "picture/qavxsz": "+z"
-   },
-   "up_axis": {
-    "picture/qavxsz": "+y"
-   },
-   "level_axis": {
-    "picture/qavxsz": "+x"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "picture/qavxsz"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-picture_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 88,
-  "fallback_of": "alignment-world_horizontal-picture-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "template_meta.scale_hint"
-  },
-  "roles": {
-   "target": {
-    "category": "picture",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "qavxsz",
-    "scale": {
-     "picture/qavxsz": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "picture/qavxsz": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "picture": [
-       "qavxsz"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "picture": {
-       "chfljy": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "picture/qavxsz": "+z"
-   },
-   "up_axis": {
-    "picture/qavxsz": "+y"
-   },
-   "level_axis": {
-    "picture/qavxsz": "+x"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "picture/qavxsz"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-radiator-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 14,
-  "fallbacks": [
-   "alignment-world_horizontal-radiator_s070-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "radiator",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "arfdpk",
-    "orientation_equivalences": {
-     "radiator/arfdpk": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "radiator": [
-       "arfdpk"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "radiator": {
-       "wntwxx": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "radiator/arfdpk": "+x"
-   },
-   "up_axis": {
-    "radiator/arfdpk": "+z"
-   },
-   "level_axis": {
-    "radiator/arfdpk": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "radiator/arfdpk"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-radiator_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 84,
-  "fallback_of": "alignment-world_horizontal-radiator-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "default_step"
-  },
-  "roles": {
-   "target": {
-    "category": "radiator",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "arfdpk",
-    "scale": {
-     "radiator/arfdpk": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "radiator/arfdpk": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "radiator": [
-       "arfdpk"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "radiator": {
-       "wntwxx": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "radiator/arfdpk": "+x"
-   },
-   "up_axis": {
-    "radiator/arfdpk": "+z"
-   },
-   "level_axis": {
-    "radiator/arfdpk": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "radiator/arfdpk"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-shelf-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 15,
-  "fallbacks": [
-   "alignment-world_horizontal-shelf_s060-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "shelf",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "xogqqm",
-    "orientation_equivalences": {
-     "shelf/xogqqm": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "shelf": [
-       "xogqqm"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "shelf": {
-       "kxvbui": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "shelf/xogqqm": "-z"
-   },
-   "up_axis": {
-    "shelf/xogqqm": "+x"
-   },
-   "level_axis": {
-    "shelf/xogqqm": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "shelf/xogqqm"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-shelf_s060-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 85,
-  "fallback_of": "alignment-world_horizontal-shelf-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.6,
-   "scale_source": "template_meta.scale_hint"
-  },
-  "roles": {
-   "target": {
-    "category": "shelf",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "xogqqm",
-    "scale": {
-     "shelf/xogqqm": 0.6,
-     "default": 0.6
-    },
-    "orientation_equivalences": {
-     "shelf/xogqqm": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "shelf": [
-       "xogqqm"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "shelf": {
-       "kxvbui": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "shelf/xogqqm": "-z"
-   },
-   "up_axis": {
-    "shelf/xogqqm": "+x"
-   },
-   "level_axis": {
-    "shelf/xogqqm": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "shelf/xogqqm"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-signpost-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 21,
-  "fallbacks": [
-   "alignment-world_horizontal-signpost_s070-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "signpost",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "ivvjfv",
-    "orientation_equivalences": {
-     "signpost/ivvjfv": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "signpost": [
-       "ivvjfv"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "signpost": {
-       "mexzmk": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "signpost/ivvjfv": "+x"
-   },
-   "up_axis": {
-    "signpost/ivvjfv": "+z"
-   },
-   "level_axis": {
-    "signpost/ivvjfv": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "signpost/ivvjfv"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-signpost_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 91,
-  "fallback_of": "alignment-world_horizontal-signpost-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "default_step"
-  },
-  "roles": {
-   "target": {
-    "category": "signpost",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "ivvjfv",
-    "scale": {
-     "signpost/ivvjfv": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "signpost/ivvjfv": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "signpost": [
-       "ivvjfv"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "signpost": {
-       "mexzmk": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "signpost/ivvjfv": "+x"
-   },
-   "up_axis": {
-    "signpost/ivvjfv": "+z"
-   },
-   "level_axis": {
-    "signpost/ivvjfv": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "signpost/ivvjfv"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-towel_rack-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 13,
-  "fallbacks": [
-   "alignment-world_horizontal-towel_rack_s070-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "towel_rack",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "kqrmrh",
-    "orientation_equivalences": {
-     "towel_rack/kqrmrh": [
-      "x2"
-     ]
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "towel_rack": [
-       "kqrmrh"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "towel_rack": {
-       "nhlijv": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "towel_rack/kqrmrh": "+x"
-   },
-   "up_axis": {
-    "towel_rack/kqrmrh": "+z"
-   },
-   "level_axis": {
-    "towel_rack/kqrmrh": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "towel_rack/kqrmrh"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-towel_rack_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 83,
-  "fallback_of": "alignment-world_horizontal-towel_rack-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "default_step"
-  },
-  "roles": {
-   "target": {
-    "category": "towel_rack",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "kqrmrh",
-    "scale": {
-     "towel_rack/kqrmrh": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "towel_rack/kqrmrh": [
-      "x2"
-     ]
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "towel_rack": [
-       "kqrmrh"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "towel_rack": {
-       "nhlijv": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "towel_rack/kqrmrh": "+x"
-   },
-   "up_axis": {
-    "towel_rack/kqrmrh": "+z"
-   },
-   "level_axis": {
-    "towel_rack/kqrmrh": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "towel_rack/kqrmrh"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-umbrella-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 16,
-  "fallbacks": [
-   "alignment-world_horizontal-umbrella_s070-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "umbrella",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "frpfnc",
-    "orientation_equivalences": {
-     "umbrella/frpfnc": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "umbrella": [
-       "frpfnc"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "umbrella": {
-       "zxnjwz": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "umbrella/frpfnc": "+z"
-   },
-   "up_axis": {
-    "umbrella/frpfnc": "+y"
-   },
-   "level_axis": {
-    "umbrella/frpfnc": "+x"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "umbrella/frpfnc"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-umbrella_s070-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 86,
-  "fallback_of": "alignment-world_horizontal-umbrella-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.7,
-   "scale_source": "default_step"
-  },
-  "roles": {
-   "target": {
-    "category": "umbrella",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "frpfnc",
-    "scale": {
-     "umbrella/frpfnc": 0.7,
-     "default": 0.7
-    },
-    "orientation_equivalences": {
-     "umbrella/frpfnc": []
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "umbrella": [
-       "frpfnc"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "umbrella": {
-       "zxnjwz": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "umbrella/frpfnc": "+z"
-   },
-   "up_axis": {
-    "umbrella/frpfnc": "+y"
-   },
-   "level_axis": {
-    "umbrella/frpfnc": "+x"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "umbrella/frpfnc"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-wall_mounted_tv-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 17,
-  "fallbacks": [
-   "alignment-world_horizontal-wall_mounted_tv_s080-walls"
-  ],
-  "roles": {
-   "target": {
-    "category": "wall_mounted_tv",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "ggfznh",
-    "orientation_equivalences": {
-     "wall_mounted_tv/ggfznh": [
-      "x2"
-     ]
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "wall_mounted_tv": [
-       "ggfznh"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "wall_mounted_tv": {
-       "ylvjhb": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "wall_mounted_tv/ggfznh": "+x"
-   },
-   "up_axis": {
-    "wall_mounted_tv/ggfznh": "+z"
-   },
-   "level_axis": {
-    "wall_mounted_tv/ggfznh": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "wall_mounted_tv/ggfznh"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-15"
-    }
-   }
-  ]
- },
- "alignment-world_horizontal-wall_mounted_tv_s080-walls": {
-  "iddl": "alignment/world_horizontal.iddl",
-  "definition_id": 87,
-  "fallback_of": "alignment-world_horizontal-wall_mounted_tv-walls",
-  "fallback_rank": 1,
-  "fallback_kind": "scale",
-  "fallback_params": {
-   "scale": 0.8,
-   "scale_source": "template_meta.scale_hint"
-  },
-  "roles": {
-   "target": {
-    "category": "wall_mounted_tv",
-    "sampleable": true,
-    "require": {
-     "contacts": true
-    },
-    "representative": "ggfznh",
-    "scale": {
-     "wall_mounted_tv/ggfznh": 0.8,
-     "default": 0.8
-    },
-    "orientation_equivalences": {
-     "wall_mounted_tv/ggfznh": [
-      "x2"
-     ]
-    }
-   },
-   "support": {
-    "category": "walls",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "walls_dhsptd_0",
-      "walls_urngpl_0"
-     ],
-     "support_regions": [
-      {
-       "id": "living_room_0/walls_dhsptd_0/r00",
-       "wall": "walls_dhsptd_0",
-       "room": "living_room_0",
-       "p0": [
-        17.637,
-        2.109
-       ],
-       "p1": [
-        17.637,
-        1.59
-       ],
-       "normal": [
-        -1.0,
-        0.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.77,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r01",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        16.847,
-        3.947
-       ],
-       "p1": [
-        17.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.91,
-       "max_object_m": 0.5
-      },
-      {
-       "id": "living_room_0/walls_urngpl_0/r02",
-       "wall": "walls_urngpl_0",
-       "room": "living_room_0",
-       "p0": [
-        14.207,
-        3.947
-       ],
-       "p1": [
-        14.507,
-        3.947
-       ],
-       "normal": [
-        0.0,
-        -1.0
-       ],
-       "hang_z": 1.45,
-       "length_m": 0.55,
-       "max_object_m": 0.7
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "wall_mounted_tv": [
-       "ggfznh"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "wall_mounted_tv": {
-       "ylvjhb": "ground_isg 2026-09-16: heldout"
-      }
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "orientation": 0.08
-   },
-   "groups": {},
-   "path_buckets": null,
-   "hang_height_m": 1.45,
-   "wall_offset_extra_m": 0.01,
-   "deviation_range_deg": [
-    15.0,
-    25.0
-   ],
-   "hinge_drift_max_rad": 0.03,
-   "min_visible_objects": 5,
-   "min_object_pixels": 200,
-   "region_seed_step_m": 0.25,
-   "spot_search_rays": 24,
-   "flat_patch_rays": [
-    5,
-    5
-   ],
-   "flat_patch_tolerance_m": 0.01,
-   "flat_patch_margin_m": 0.1,
-   "front_clearance_m": 0.35,
-   "in_room_test_m": 0.8,
-   "prompt0": {
-    "beta_max_deg": 35.0,
-    "d_min_m": 0.5,
-    "d_max_m": 1.5
-   },
-   "lateral_range_m": [
-    -0.4,
-    0.4
-   ],
-   "contact_extreme_band_m": 0.03,
-   "brace_offset_m": 0.005,
-   "brace_clearance_m": 0.02,
-   "brace_kinds": [
-    "below_high",
-    "above_low",
-    "side_high"
-   ],
-   "template_filter_deviation_deg": 25.0,
-   "scale_hint_steps": [
-    0.9,
-    0.8,
-    0.7,
-    0.6,
-    0.5
-   ],
-   "settle_free": [],
-   "goal": "level",
-   "swept_patch": true,
-   "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked",
-   "front_axis": {
-    "wall_mounted_tv/ggfznh": "+x"
-   },
-   "up_axis": {
-    "wall_mounted_tv/ggfznh": "+z"
-   },
-   "level_axis": {
-    "wall_mounted_tv/ggfznh": "+y"
-   },
-   "hinge_stop_decel_rad_s2": 10.0,
-   "hinge_viscous_tau_s": 0.02
-  },
-  "constraints": [
-   {
-    "scope": {
-     "scene": "house_single_floor",
-     "target": "wall_mounted_tv/ggfznh"
-    },
-    "type": "blacklist",
-    "reason": "missing_contacts_pending_B6",
-    "pending": true,
-    "hard": false,
-    "source": {
-     "sampler": "ground_isg 2.0.0",
-     "date": "2026-09-16"
-    }
-   }
-  ]
- },
  "alignment-world_vertical-fire_extinguisher-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 29,
+  "definition_id": 18,
   "fallbacks": [
    "alignment-world_vertical-fire_extinguisher_s070-walls"
   ],
@@ -11020,7 +6658,7 @@
  },
  "alignment-world_vertical-fire_extinguisher_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 99,
+  "definition_id": 78,
   "fallback_of": "alignment-world_vertical-fire_extinguisher-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -11228,7 +6866,7 @@
  },
  "alignment-world_vertical-guitar-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 32,
+  "definition_id": 21,
   "fallbacks": [
    "alignment-world_vertical-guitar_s090-walls"
   ],
@@ -11428,7 +7066,7 @@
  },
  "alignment-world_vertical-guitar_s090-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 102,
+  "definition_id": 81,
   "fallback_of": "alignment-world_vertical-guitar-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -11636,7 +7274,7 @@
  },
  "alignment-world_vertical-hanger-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 25,
+  "definition_id": 14,
   "fallbacks": [
    "alignment-world_vertical-hanger_nagryh-walls"
   ],
@@ -11825,7 +7463,7 @@
  },
  "alignment-world_vertical-hanger_nagryh-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 104,
+  "definition_id": 83,
   "fallback_of": "alignment-world_vertical-hanger-walls",
   "fallback_rank": 1,
   "fallback_kind": "next_model",
@@ -12030,7 +7668,7 @@
  },
  "alignment-world_vertical-hanger_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 95,
+  "definition_id": 74,
   "fallback_of": "alignment-world_vertical-hanger-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -12237,7 +7875,7 @@
  },
  "alignment-world_vertical-license_plate-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 27,
+  "definition_id": 16,
   "fallbacks": [
    "alignment-world_vertical-license_plate_s070-walls"
   ],
@@ -12437,7 +8075,7 @@
  },
  "alignment-world_vertical-license_plate_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 97,
+  "definition_id": 76,
   "fallback_of": "alignment-world_vertical-license_plate-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -12645,7 +8283,7 @@
  },
  "alignment-world_vertical-painting-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 24,
+  "definition_id": 13,
   "fallbacks": [
    "alignment-world_vertical-painting_s080-walls"
   ],
@@ -12845,7 +8483,7 @@
  },
  "alignment-world_vertical-painting_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 94,
+  "definition_id": 73,
   "fallback_of": "alignment-world_vertical-painting-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -13052,7 +8690,7 @@
  },
  "alignment-world_vertical-painting_s080-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 103,
+  "definition_id": 82,
   "fallback_of": "alignment-world_vertical-painting-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -13260,7 +8898,7 @@
  },
  "alignment-world_vertical-paper_towel_dispenser-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 31,
+  "definition_id": 20,
   "fallbacks": [
    "alignment-world_vertical-paper_towel_dispenser_s080-walls"
   ],
@@ -13454,7 +9092,7 @@
  },
  "alignment-world_vertical-paper_towel_dispenser_s080-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 101,
+  "definition_id": 80,
   "fallback_of": "alignment-world_vertical-paper_towel_dispenser-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -13656,7 +9294,7 @@
  },
  "alignment-world_vertical-picture-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 23,
+  "definition_id": 12,
   "fallbacks": [
    "alignment-world_vertical-picture_s090-walls"
   ],
@@ -13856,7 +9494,7 @@
  },
  "alignment-world_vertical-picture_frame-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 30,
+  "definition_id": 19,
   "fallbacks": [
    "alignment-world_vertical-picture_frame_s070-walls"
   ],
@@ -14056,7 +9694,7 @@
  },
  "alignment-world_vertical-picture_frame_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 100,
+  "definition_id": 79,
   "fallback_of": "alignment-world_vertical-picture_frame-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -14264,7 +9902,7 @@
  },
  "alignment-world_vertical-picture_s090-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 93,
+  "definition_id": 72,
   "fallback_of": "alignment-world_vertical-picture-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -14472,7 +10110,7 @@
  },
  "alignment-world_vertical-signpost-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 26,
+  "definition_id": 15,
   "fallbacks": [
    "alignment-world_vertical-signpost_s070-walls"
   ],
@@ -14672,7 +10310,7 @@
  },
  "alignment-world_vertical-signpost_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 96,
+  "definition_id": 75,
   "fallback_of": "alignment-world_vertical-signpost-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",
@@ -14880,7 +10518,7 @@
  },
  "alignment-world_vertical-wall_clock-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 28,
+  "definition_id": 17,
   "fallbacks": [
    "alignment-world_vertical-wall_clock_s070-walls"
   ],
@@ -15080,7 +10718,7 @@
  },
  "alignment-world_vertical-wall_clock_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
-  "definition_id": 98,
+  "definition_id": 77,
   "fallback_of": "alignment-world_vertical-wall_clock-walls",
   "fallback_rank": 1,
   "fallback_kind": "scale",

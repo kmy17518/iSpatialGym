@@ -3,9 +3,8 @@
   "built": "2026-09-16 20:07",
   "survey": "runlogs/symmetry_20260915/symmetry.json",
   "rule": "a body-of-revolution tag (xinf / yinf / zinf) about the model's long axis (largest native extent >= 1.5 x the middle one) in any of ['symmetry', 'symmetry_near', 'geom_exact', 'geom_near', 'symmetry_scaled', 'symmetry_near_scaled']; the placed_orientation demo gate compares such an object modulo rotation about that axis (owner 2026-09-16 17:10 item 4 fallback), every other object keeps the full error",
-  "n_models": 262,
+  "n_models": 253,
   "categories": {
-   "baseball_bat": 2,
    "beer_glass": 2,
    "beeswax_candle": 5,
    "bottle_of_antihistamines": 1,
@@ -58,7 +57,6 @@
    "deodorant_atomizer": 1,
    "deodorant_stick": 1,
    "dip_candle": 3,
-   "drumstick": 2,
    "jar_of_mayonnaise": 1,
    "jar_of_spaghetti_sauce": 4,
    "lemonade_bottle": 1,
@@ -68,7 +66,6 @@
    "pencil": 13,
    "pepper_shaker": 2,
    "public_trash_can": 2,
-   "rolling_pin": 2,
    "salt_shaker": 3,
    "shampoo_dispenser": 2,
    "soap_dispenser": 4,
@@ -76,50 +73,12 @@
    "soda_water_bottle": 1,
    "spray_can": 3,
    "tomato_paste_can": 1,
-   "towel_rack": 1,
-   "umbrella": 2,
    "vase": 4,
    "wall_nail": 1,
    "water_bottle": 1,
    "wine_bottle": 1,
    "wineglass": 10
   }
- },
- "baseball_bat/spcxrt": {
-  "axis": "x",
-  "ratio": 13.889,
-  "tags": [
-   "xinf"
-  ],
-  "sources": [
-   "geom_exact"
-  ],
-  "bbox": [
-   0.75475,
-   0.05414,
-   0.05434
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
- },
- "baseball_bat/yalgei": {
-  "axis": "x",
-  "ratio": 12.184,
-  "tags": [
-   "xinf"
-  ],
-  "sources": [
-   "geom_exact"
-  ],
-  "bbox": [
-   0.8128,
-   0.06584,
-   0.06671
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
  },
  "beer_glass/lymciz": {
   "axis": "z",
@@ -3410,45 +3369,6 @@
    "configuration_matching-attachment/target"
   ]
  },
- "drumstick/jauzlc": {
-  "axis": "x",
-  "ratio": 25.32,
-  "tags": [
-   "xinf",
-   "y2"
-  ],
-  "sources": [
-   "geom_exact"
-  ],
-  "bbox": [
-   0.37524,
-   0.01482,
-   0.01405
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
- },
- "drumstick/lkvzmj": {
-  "axis": "x",
-  "ratio": 33.587,
-  "tags": [
-   "xinf",
-   "y2"
-  ],
-  "sources": [
-   "symmetry_near",
-   "geom_exact"
-  ],
-  "bbox": [
-   0.4064,
-   0.0121,
-   0.0121
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
- },
  "jar_of_mayonnaise/ktmjvg": {
   "axis": "z",
   "ratio": 1.543,
@@ -4353,46 +4273,6 @@
    "camera_relocalization-obstructed/obstacles"
   ]
  },
- "rolling_pin/mwrdae": {
-  "axis": "y",
-  "ratio": 6.706,
-  "tags": [
-   "x2",
-   "yinf"
-  ],
-  "sources": [
-   "symmetry_near",
-   "geom_exact"
-  ],
-  "bbox": [
-   0.0622,
-   0.41714,
-   0.0622
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
- },
- "rolling_pin/smnklu": {
-  "axis": "y",
-  "ratio": 7.24,
-  "tags": [
-   "x2",
-   "yinf"
-  ],
-  "sources": [
-   "symmetry_near",
-   "geom_exact"
-  ],
-  "bbox": [
-   0.05504,
-   0.39847,
-   0.05504
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
- },
  "salt_shaker/fonexa": {
   "axis": "z",
   "ratio": 3.058,
@@ -4698,61 +4578,6 @@
   ],
   "uses": [
    "configuration_matching-attachment/partner"
-  ]
- },
- "towel_rack/quznqx": {
-  "axis": "y",
-  "ratio": 13.67,
-  "tags": [
-   "yinf"
-  ],
-  "sources": [
-   "geom_near"
-  ],
-  "bbox": [
-   0.0191,
-   0.40736,
-   0.0298
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
- },
- "umbrella/hdfkbc": {
-  "axis": "x",
-  "ratio": 13.437,
-  "tags": [
-   "xinf"
-  ],
-  "sources": [
-   "geom_exact"
-  ],
-  "bbox": [
-   0.93949,
-   0.06992,
-   0.06992
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
-  ]
- },
- "umbrella/zxnjwz": {
-  "axis": "x",
-  "ratio": 13.582,
-  "tags": [
-   "xinf",
-   "y2"
-  ],
-  "sources": [
-   "geom_exact"
-  ],
-  "bbox": [
-   1.02708,
-   0.0731,
-   0.07562
-  ],
-  "uses": [
-   "alignment-world_horizontal/target"
   ]
  },
  "vase/aegxpb": {

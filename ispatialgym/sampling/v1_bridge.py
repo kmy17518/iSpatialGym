@@ -62,7 +62,6 @@ V1_KEY = {
     f"{CM}-attachment": ("configuration_matching-3", "configuration_matching/attachment.iddl"),
     "alignment-axial": ("world_alignment-0", "alignment/axial.iddl"),
     "alignment-world_vertical": ("world_alignment-1", "alignment/world_vertical.iddl"),
-    "alignment-world_horizontal": ("world_alignment-2", "alignment/world_horizontal.iddl"),
     f"{IORS}-ontop_small_scale": (f"{IORS}-0", "inter_object_relation_satisfaction/ontop_small_scale.iddl"),
     f"{IORS}-ontop_large_scale": (f"{IORS}-0", "inter_object_relation_satisfaction/ontop_large_scale.iddl"),
     f"{IORS}-under_small_scale": (f"{IORS}-1", "inter_object_relation_satisfaction/under_small_scale.iddl"),
@@ -74,7 +73,7 @@ V1_KEY = {
 #: relative sampling cost (job ordering on the fleet)
 WEIGHT = {"camera_relocalization-standard": 1.5, "camera_relocalization-obstructed": 2.5, "object_scaling": 1.0, "mental_rotation": 1.0,
           "disembedding": 4.0, f"{CM}-block_design": 3.0, f"{CM}-attachment": 3.0, "alignment-world_vertical": 3.0,
-          "alignment-world_horizontal": 3.0, "alignment-axial": 3.0}
+          "alignment-axial": 3.0}
 
 
 def read_csv(path: str) -> List[dict]:
@@ -157,17 +156,12 @@ class Grounder:
     def axis_dicts(self, subtask: str, cat: str, model: str, gen: dict) -> None:
         c = self.cand(subtask, "target", cat, model)
         key = f"{cat}/{model}"
-        for col, gkey in (("frame_front", "front_axis"), ("frame_up", "up_axis"), ("frame_level", "level_axis"), ("frame_long", "long_axis")):
+        for col, gkey in (("frame_front", "front_axis"), ("frame_up", "up_axis"), ("frame_long", "long_axis")):
             if c.get(col):
                 d = gen.get(gkey)
                 d = d if isinstance(d, dict) else {"default": d} if d is not None else {}
                 d[key] = c[col]
                 gen[gkey] = d
-        if subtask == "alignment-world_horizontal":
-            d = gen.get("symmetric_180")
-            d = d if isinstance(d, dict) else {"default": bool(d)} if d is not None else {"default": False}
-            d[key] = c.get("symmetric_180", "") == "1"
-            gen["symmetric_180"] = d
 
     def scale_of(self, subtask: str, role: str, cat: str, model: str) -> Optional[list]:
         c = self.cand(subtask, role, cat, model)
@@ -293,7 +287,7 @@ class Grounder:
             spawned("target", target, None)
             self.axis_dicts(subtask, target["category"], target["model"], entry["generation"])
             alias_fill["target"] = target["category"]
-        elif subtask in ("alignment-world_vertical", "alignment-world_horizontal"):
+        elif subtask == "alignment-world_vertical":
             rooms = [HELD_ROOM]
             fixed["floor"] = {"room": HELD_ROOM}
             entry["roles"]["floor"] = {"fixed": True}

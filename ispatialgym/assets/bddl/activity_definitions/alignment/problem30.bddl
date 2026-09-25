@@ -1,30 +1,33 @@
 (define (problem alignment-30)
     (:domain ispatialgym)
-    (:alias alignment-world_vertical-picture_frame-walls)
+    (:alias alignment-axial-magazine_s070-conference_table)
 
-    ; ground_isg 2.0.0: alignment-world_vertical-picture_frame-walls (alignment/world_vertical.iddl; alignment-world_vertical#08/representative)
-    ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
-    ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted
-    ; 15-45 deg in the wall plane and must be pushed upright (tangential push at the low end + brace at the high end).
-    ; Orientation-only target; the position is fixed by the hinge. Push / brace contacts from
-    ; contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
+    ; ground_isg 2.0.0: alignment-axial-magazine_s070-conference_table (alignment/axial.iddl; alignment-axial#02~T3/representative/fallback1:scale)
+    ; fallback 1 (scale) of alignment-axial-magazine-conference_table: scale = 0.7, scale_source = default_step
+    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
+    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
+    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
+    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
+    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        picture_frame.n.01_1 - picture_frame.n.01
-        wall.n.01_1 - wall.n.01
+        magazine.n.02_1 - magazine.n.02
+        conference_table.n.01_1 - conference_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
+        (ontop magazine.n.02_1 conference_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (pose_reached ?picture_frame.n.01_1)
-            (not (grasped ?agent.n.01_1 ?picture_frame.n.01_1))
-            (pose_settled ?picture_frame.n.01_1)
+            (ontop ?magazine.n.02_1 ?conference_table.n.01_1)
+            (pose_reached ?magazine.n.02_1)
+            (not (grasped ?agent.n.01_1 ?magazine.n.02_1))
+            (pose_settled ?magazine.n.02_1)
             (pose_settled ?agent.n.01_1)
         )
     )

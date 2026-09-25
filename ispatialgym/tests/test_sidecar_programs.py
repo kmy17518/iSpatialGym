@@ -77,7 +77,6 @@ EXPECTED_SEQUENCE = {
     "configuration_matching-articulation_close_small_scale": _TABLE_IN + ["brace", "grasp", "base_follow", "retreat", "retreat"],
     "configuration_matching-attachment": _TABLE_IN + _PICK + ["reorient", "brace", "place", "retreat", "retreat"],
     "alignment-world_vertical": _WALL_IN + _BRACE_PUSH,
-    "alignment-world_horizontal": _WALL_IN + _BRACE_PUSH,
     "alignment-axial": _TABLE_IN + _BRACE_PUSH,
     "inter_object_relation_satisfaction-ontop_large_scale": ["transition"] + _PICK + ["navigate", "transition"] + _PLACE,
     "inter_object_relation_satisfaction-under_large_scale": ["transition"] + _PICK + ["navigate"] + _PLACE,  # B and C share the floor-band trunk
@@ -171,7 +170,7 @@ class StubState:
 def test_fixture_set_covers_every_subtask():
     files = {os.path.basename(p)[: -len(".json")] for p in glob.glob(os.path.join(DATA, "*.json"))}
     assert files == set(SUBTASKS)
-    assert len(SUBTASKS) == 21
+    assert len(SUBTASKS) == 20
 
 
 def test_subtask_registry_is_consistent():

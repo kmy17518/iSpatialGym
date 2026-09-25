@@ -103,7 +103,7 @@ CM = "configuration_matching"
 TABLETOP_SUBTASKS = ["disembedding", f"{CM}-block_design", f"{CM}-articulation_open_small_scale", f"{CM}-articulation_close_small_scale",
                      f"{CM}-attachment", "alignment-axial", f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside",
                      f"{IORS}-nextto", f"{IORS}-touching", f"{IORS}-ontop_large_scale", f"{IORS}-under_large_scale"]
-WALL_SUBTASKS = ["alignment-world_vertical", "alignment-world_horizontal"]
+WALL_SUBTASKS = ["alignment-world_vertical"]
 ONTOP_LARGE_PARTNERS = ("bed", "sofa", "desk", "breakfast_table", "countertop")
 UNDER_LARGE_PARTNERS = ("bed", "sofa", "desk", "breakfast_table")
 SCENE_ARTIC_CATEGORIES = ("bottom_cabinet", "bottom_cabinet_no_top", "top_cabinet", "fridge", "oven", "dishwasher", "door")
@@ -176,7 +176,6 @@ PINS: Dict[str, Dict[str, List[str]]] = {
     f"{CM}-attachment": {"target": ["cap/xxqyrt"], "partner": ["lemonade_bottle/yprkek"], "support": [_SUP]},
     "alignment-axial": {"target": ["keyboard/hgtbot", "keyboard/injrgc"], "support": [_SUP]},
     "alignment-world_vertical": {"target": ["painting/dacihj", "painting/ljabhq"], "support": [_WALLS]},
-    "alignment-world_horizontal": {"target": ["towel_rack/kqrmrh", "towel_rack/crivoa"], "support": [_WALLS]},
     f"{IORS}-ontop_small_scale": {"target": ["pack_of_kielbasa/dgodnn"], "partner": ["platter/csanbr"], "support": [_SUP]},
     f"{IORS}-under_large_scale": {"target": ["toy_figure/cobfpg"], "partner": ["house_single_floor:bed_rrcvaq_0"],
                                   "support": ["house_single_floor:desk_xhjsub_0"]},
@@ -537,8 +536,7 @@ class Builder:
         return out
 
     def build_alignment(self):
-        for old, new in (("world_alignment-0 (table_surface)", "alignment-axial"), ("world_alignment-1 (world_vertical)", "alignment-world_vertical"),
-                         ("world_alignment-2 (world_horizontal)", "alignment-world_horizontal")):
+        for old, new in (("world_alignment-0 (table_surface)", "alignment-axial"), ("world_alignment-1 (world_vertical)", "alignment-world_vertical")):
             for cat, row in self.blocks[(old, "target")]:
                 self.add_object(new, "target", cat, row, **self._frame_axes(row.get("pair", "")))
         for st in WALL_SUBTASKS:

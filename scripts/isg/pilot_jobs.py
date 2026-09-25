@@ -27,7 +27,7 @@ CUSTOMS = os.path.join(REPO, "ispatialgym", "assets", "task_specs", "isg_customs
 WEIGHT = {"disembedding": 4.0, "inter_object_relation_satisfaction-ontop_large_scale": 4.0, "inter_object_relation_satisfaction-under_large_scale": 4.0,
           "configuration_matching-articulation_open_large_scale": 3.5, "configuration_matching-articulation_close_large_scale": 3.5,
           "configuration_matching-block_design": 3.0, "configuration_matching-attachment": 3.0, "alignment-world_vertical": 3.0,
-          "alignment-world_horizontal": 3.0, "alignment-axial": 0.5, "camera_relocalization-obstructed": 2.0}
+          "alignment-axial": 0.5, "camera_relocalization-obstructed": 2.0}
 SAMPLE_CMD = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && "
               "OMNIGIBSON_HEADLESS=1 timeout {timeout} python -m ispatialgym.sampling.sample_isg --alias {alias} --templates {templates} "
               "--instances-per-template {instances} --max-attempts {max_attempts} --seed {seed} --no-write-back --out \"$OUT\" --log-level INFO")
@@ -121,7 +121,7 @@ def cmd_demo(args):
 
 
 #: expected minutes per alias at 10 attempts (pilot medians incl. the per-alias share of the scene load; C5 decision)
-MINUTES = {"alignment-axial": 35.0, "alignment-world_vertical": 25.0, "alignment-world_horizontal": 25.0, "camera_relocalization-standard": 15.0,
+MINUTES = {"alignment-axial": 35.0, "alignment-world_vertical": 25.0, "camera_relocalization-standard": 15.0,
            "camera_relocalization-obstructed": 15.0, "mental_rotation": 8.0, "object_scaling": 7.0, "disembedding": 20.0,
            "configuration_matching-block_design": 45.0, "configuration_matching-attachment": 30.0,
            "configuration_matching-articulation_open_small_scale": 20.0, "configuration_matching-articulation_close_small_scale": 20.0,

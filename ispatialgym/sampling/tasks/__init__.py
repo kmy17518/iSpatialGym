@@ -43,14 +43,12 @@ def get_sampler_class(problem_name: str):
 
             return AttachmentSampler
     if activity == "alignment":
-        from ispatialgym.sampling.tasks.world_alignment import TableSurfaceSampler, WorldHorizontalSampler, WorldVerticalSampler
+        from ispatialgym.sampling.tasks.world_alignment import TableSurfaceSampler, WorldVerticalSampler
 
         if did == 0:
             return TableSurfaceSampler
         if did == 1:
             return WorldVerticalSampler
-        if did == 2:
-            return WorldHorizontalSampler
     if activity == "inter_object_relation_satisfaction":
         from ispatialgym.sampling.tasks.iors import IORSSampler
 

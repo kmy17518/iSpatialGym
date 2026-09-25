@@ -1,17 +1,5 @@
 [
  {
-  "id": "alignment-world_horizontal-shelf-walls__representative__target-xogqqm",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/alignment-world_horizontal-shelf-walls__representative__target-xogqqm.json",
-  "problem": "world_alignment-2",
-  "scene": "house_single_floor",
-  "n_instances": 2,
-  "max_templates": 1,
-  "weight": 3.0,
-  "subtask": "alignment-world_horizontal",
-  "slot": "representative",
-  "alias": "alignment-world_horizontal-shelf-walls"
- },
- {
   "id": "alignment-world_vertical-fire_extinguisher-walls__representative__target-bejaeu",
   "spec": "ispatialgym/assets/task_specs/isg_reps/specs/alignment-world_vertical-fire_extinguisher-walls__representative__target-bejaeu.json",
   "problem": "world_alignment-1",

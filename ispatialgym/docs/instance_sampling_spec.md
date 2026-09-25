@@ -135,7 +135,7 @@ the reason in parentheses; the selection runlogs applied these by hand, here the
   that makes their thinnest extent 20 mm: pencil, garlic_clove, french_fries, cinnamon_stick, two caps) is spawned at
   exactly that scale (`roles.<role>.scale` in the customs list, written by `ground_isg`), never at the canonical
   scale, and its rest pose, symmetry (3.13) and every per-model cache (3.10) are keyed by the scale vector.
-- Alignment targets need a reviewed frame record (`frame_front` / `frame_up` or `frame_level`, `frame_long`) —
+- Alignment targets need a reviewed frame record (`frame_front` / `frame_up`, `frame_long`) —
   otherwise `missing_frame`; wall targets additionally need `symmetric_180` filled (0 or 1).
 
 ### 2.3 Task customs list
@@ -738,8 +738,8 @@ check (draw the next element of F otherwise).
 ## 5. Large-scale initialization (shared robot init for scene targets)
 
 Applies to every task whose target is a fixed scene object or is hinged to a fixed support: articulation
-(large-scale, open / close) — the scene articulated object is the target; world vertical / horizontal — the target
-hung on the wall support. Arms untucked, grippers open; trunk JoyLo (t, k). Face frame as in 3.3. Untucked hands sit
+(large-scale, open / close) — the scene articulated object is the target; world vertical — the target hung on the
+wall support. Arms untucked, grippers open; trunk JoyLo (t, k). Face frame as in 3.3. Untucked hands sit
 0.64 m ahead of the base at 1.20 m, so a single-arm stance closer than ≈ 0.7 m to a face fails the whole-body check;
 rely on the check, not on a bound.
 
@@ -945,7 +945,10 @@ on a band cell of the top), h(q), waypoints and the auto required-waypoint rule 
 Removed from v1: `lateral_center` −0.15, `lateral_half` 0.15, `depth_range` (band), `view_prefer_translate` 0,
 `approach_forward`, `stand_offs` [0.45, 0.55].
 
-### 5.5 Alignment — world vertical and world horizontal
+### 5.5 Alignment — world vertical
+
+(The world-horizontal sibling — an elongated wall item pushed back to level on the same hinge, with swept patch
+extents and a `level_axis` — was retired on 2026-09-23; this section describes world vertical only.)
 
 Roles: `target` (hung; iddl `(contacts target)`), scene `support` (the wall: `bindings.support` = allowed wall object
 names, `bindings.support_regions` = the surveyed wall segments). The hinge below is an initialization rule of this
@@ -954,20 +957,20 @@ point on the wall at hang height). Arc lattice, single right-arm push into the w
 replaced by the Phase 1 ray + Phase 2 lattice and the tangential push + brace below.
 
 Kept (target side): wall spots from `bindings.support_regions` (0.25 m seeding) or the 24-ray search; flat patch 5 × 5
-rays within 1 cm over (w + 0.10) × (h + 0.10) (horizontal: swept extents over the max deviation, `swept_patch`);
+rays within 1 cm over (w + 0.10) × (h + 0.10);
 front clearance 0.35 m; in-room test 0.8 m in front; one wall per template (most spots); frame from `front_axis` /
-`up_axis` / `level_axis` (dict form), `symmetric_180`; hang pose (up axis along world z, front axis along n, centre at
+`up_axis` (dict form), `symmetric_180`; hang pose (up axis along world z, front axis along n, centre at
 height 1.45 m, thickness/2 + 0.01 off the wall); hinge at the COM with axis n, parent = the support's wall link (TRO
 `constraints`, with the §7 hinge friction / damping); init in-plane angle δ = sign · U(15°, 25°) (owner decision 2026‑09‑16, A8: |δ| > 25° is beyond the
 one-stroke push of the R1Pro; a two-stroke push for larger tilts is recommended later); the template filter uses
-δ = ±25°; goal = level pose (rotation 0), orientation tolerance
+δ = ±25°; goal = upright pose (rotation 0), orientation tolerance
 0.08, equivalences (`symmetric_180` half turn + explicit); `settle_free = []`; hinge drift ≤ 0.03 rad after settling;
 ≥ `min_visible_objects` (5) objects with ≥ 200 px, structure included, in the init render; whole tilted target in frame
 at init (5 %).
 
 **Frame** (reviewed, never defaulted; owner 2026‑09‑16 22:55): `ground_isg` writes the icl frame of every whitelisted
-wall target (`roles/candidates.csv` `frame_front` / `frame_up`, and `frame_level` for world horizontal) into the alias as
-`generation.front_axis` / `up_axis` / `level_axis` in the per-model dict form (`{"license_plate/nwfbxn": "+z", …}`;
+wall target (`roles/candidates.csv` `frame_front` / `frame_up`) into the alias as
+`generation.front_axis` / `up_axis` in the per-model dict form (`{"license_plate/hjdaqn": "+z", …}`;
 dormant / superseded aliases of the subtask included). The sampler builds the hang pose from that record only —
 `Reject("missing_frame")` when the alias carries no entry for the spawned model (no default frame inside the sampler:
 the painting-shaped `+x` / `+z` default hung the `+z` / `+y` / `+x` license plate table-flat, run 0916‑212037) — and
@@ -976,8 +979,8 @@ target the hang quaternion puts the up axis along world +z and the front axis al
 ends horizontal.
 
 **Scale** (configured, not searched): `roles.target.scale` in the customs list ([sx, sy, sz] per model, or the dict
-form keyed by `<category>/<model>`, `<category>`, `default`; uniform recommended). Hull, COM, dimensions, swept
-extents and wall spots are computed from the spawned (scaled) target; the reach cache is robot-only, pushing needs no
+form keyed by `<category>/<model>`, `<category>`, `default`; uniform recommended). Hull, COM, dimensions and wall
+spots are computed from the spawned (scaled) target; the reach cache is robot-only, pushing needs no
 grasp re-validation. When the template fails with `push_unreachable` / `no_stance`, a diagnostic pass over uniform
 s ∈ {0.9, 0.8, …, 0.5} on the same spots puts the first feasible s into the rejection message and
 `template_meta.scale_hint`; it is never applied automatically — it is copied into the customs list by hand (or by the
@@ -1029,8 +1032,8 @@ fails. The closing axis may lie in the wall plane (the gripper's thin side towar
 the wall at either wrist turn); the brace / push approach is pitched 30° / 45° off the wall toward the room (0° last;
 with the approach in the wall plane the forearm lies along the wall 2 cm from it and penetrates it). Brace / push key
 poses require the fingertips in the head camera frame (5 %) from the manipulation stance. The loose angle class stays
-as the step‑5 fall‑back pool behind the best class. `[pilot]`: `painting_s070` writes an instance in 2 attempts,
-`license_plate` (horizontal) at attempt 0.
+as the step‑5 fall‑back pool behind the best class. `[pilot]`: `painting_s070` writes an instance in 2 attempts
+(the retired horizontal `license_plate` alias did at attempt 0).
 
 **Two-arm stance posture (A6).** The manipulation stance records the idle-arm / drive-in posture it was checked with
 (`arms_q`, `idle_posture`, `fingers`; the wall uses `tucked` with closed pads: hanging arms clear the wall at
@@ -1377,13 +1380,13 @@ slabs match) writes `orientation_equivalences` for **both** group members; a par
 is not a candidate (2.2). Only the male is grasped; the attachment grasp rows (`__a`) keep every gripper sphere
 ≥ 1 cm from the male meta-link and the contact off the mating side.
 
-### 6.9 Alignment — world vertical / world horizontal
+### 6.9 Alignment — world vertical
 
-Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright / level), tolerance 0.08 rad. The
-aligned orientation is defined by the target's **reviewed frame** (`generation.front_axis` / `up_axis` / `level_axis`
-per model, written by `ground_isg` from the icl; §5.5 "Frame"): upright / level = the reviewed up axis along world +z
-with the front axis along the wall normal. An alias without the frame record for its model is rejected
-(`missing_frame`), never sampled with a default.
+Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright), tolerance 0.08 rad. The aligned
+orientation is defined by the target's **reviewed frame** (`generation.front_axis` / `up_axis` per model, written by
+`ground_isg` from the icl; §5.5 "Frame"): upright = the reviewed up axis along world +z with the front axis along the
+wall normal. An alias without the frame record for its model is rejected (`missing_frame`), never sampled with a
+default. (World horizontal — the level goal of an elongated wall item — was retired on 2026-09-23.)
 
 ### 6.10 Alignment — axial
 

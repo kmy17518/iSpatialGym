@@ -66,7 +66,6 @@ SUBTASK_FAMILY = {
     "configuration_matching-articulation_small_scale-close": ("configuration_matching", "configuration_matching"),
     "configuration_matching-attachment": ("configuration_matching", "configuration_matching"),
     "alignment-world_vertical": ("alignment", "alignment"),
-    "alignment-world_horizontal": ("alignment", "alignment"),
     "alignment-axial": ("alignment", "alignment"),
     "inter_object_relation_satisfaction-ontop_small_scale": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),
     "inter_object_relation_satisfaction-under_small_scale": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),

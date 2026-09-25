@@ -18,9 +18,9 @@ consecutive stances the program emits ``Navigate`` when ``paths[]`` records the 
 in — spec §3.7 / §3.8). Two stances that differ in trunk without a recorded transition, or in base pose without a
 path or transition, are an error.
 
-The 14 rows of §6.2 map to 13 functions: camera relocalization standard / obstructed share
+The rows of §6.2 map to 13 functions: camera relocalization standard / obstructed share
 ``program_camera_relocalization`` (flag ``obstructed``), articulation open / close share the large- and the
-small-scale programs, the two wall alignments share ``program_alignment_wall``, IORS ontop / under (large) share
+small-scale programs, world vertical is ``program_alignment_wall``, IORS ontop / under (large) share
 ``program_iors_large``, IORS ontop / under / inside / nextto (small) share ``program_iors_small``.
 """
 
@@ -751,10 +751,10 @@ def program_attachment(sc: Sidecar) -> List[Action]:
     ]
 
 
-def program_alignment_wall(sc: Sidecar, axis: str = "vertical") -> List[Action]:
+def program_alignment_wall(sc: Sidecar) -> List[Action]:
     """init → manipulation stance → close both grippers → brace at the recorded stop (below_high / above_low /
-    side_high) → push at E_low along the arc (δ/2, goal) with the arm only until the upright (vertical) / level
-    (horizontal) orientation → retreat both."""
+    side_high) → push at E_low along the arc (δ/2, goal) with the arm only until the upright orientation → retreat
+    both."""
     push, brace = _push_contact(sc), _brace_contact(sc)
     if push.mid is None:
         raise SidecarError("contacts.push.mid: the wall alignment push is an arc (δ/2 waypoint required)")
@@ -890,8 +890,7 @@ PROGRAMS: Dict[str, Tuple[Callable[..., List[Action]], Dict[str, object]]] = {
     "configuration_matching-articulation_open_small_scale": (program_articulation_small, {"direction": "open"}),
     "configuration_matching-articulation_close_small_scale": (program_articulation_small, {"direction": "close"}),
     "configuration_matching-attachment": (program_attachment, {}),
-    "alignment-world_vertical": (program_alignment_wall, {"axis": "vertical"}),
-    "alignment-world_horizontal": (program_alignment_wall, {"axis": "horizontal"}),
+    "alignment-world_vertical": (program_alignment_wall, {}),
     "alignment-axial": (program_alignment_axial, {}),
     "inter_object_relation_satisfaction-ontop_large_scale": (program_iors_large, {"relation": "ontop"}),
     "inter_object_relation_satisfaction-under_large_scale": (program_iors_large, {"relation": "under"}),

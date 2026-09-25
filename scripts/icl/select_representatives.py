@@ -102,7 +102,6 @@ SUBTASKS: Dict[str, dict] = {
     f"{CM}-attachment": {"family": CM, "roles": {"target": {"kind": "sampleable", "pipeline": "attachment", "partner_model": True},
                                                   "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
     "alignment-world_vertical": {"family": "alignment", "roles": {"target": {"kind": "sampleable", "frame": "wall"}, "support": {"kind": "wall"}}},
-    "alignment-world_horizontal": {"family": "alignment", "roles": {"target": {"kind": "sampleable", "frame": "wall"}, "support": {"kind": "wall"}}},
     "alignment-axial": {"family": "alignment", "roles": {"target": {"kind": "sampleable", "frame": "axial"}, "support": {"kind": "scene"}}},
     f"{IORS}-ontop_small_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
     f"{IORS}-under_small_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},

@@ -12,13 +12,8 @@
    "legacy": true
   },
   {
-   "alias": "world_horizontal",
-   "id": 2,
-   "legacy": true
-  },
-  {
    "alias": "alignment-axial-paperback_book-breakfast_table",
-   "id": 3,
+   "id": 2,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -29,7 +24,7 @@
   },
   {
    "alias": "alignment-axial-magazine-breakfast_table",
-   "id": 4,
+   "id": 3,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -40,7 +35,7 @@
   },
   {
    "alias": "alignment-axial-board_game-breakfast_table",
-   "id": 5,
+   "id": 4,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -51,7 +46,7 @@
   },
   {
    "alias": "alignment-axial-gym_shoe-breakfast_table",
-   "id": 6,
+   "id": 5,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -62,7 +57,7 @@
   },
   {
    "alias": "alignment-axial-hardback-breakfast_table",
-   "id": 7,
+   "id": 6,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -73,7 +68,7 @@
   },
   {
    "alias": "alignment-axial-letter-breakfast_table",
-   "id": 8,
+   "id": 7,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -84,7 +79,7 @@
   },
   {
    "alias": "alignment-axial-bag_of_chips-breakfast_table",
-   "id": 9,
+   "id": 8,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -95,7 +90,7 @@
   },
   {
    "alias": "alignment-axial-frying_pan-breakfast_table",
-   "id": 10,
+   "id": 9,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -106,7 +101,7 @@
   },
   {
    "alias": "alignment-axial-keyboard-breakfast_table",
-   "id": 11,
+   "id": 10,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -117,7 +112,7 @@
   },
   {
    "alias": "alignment-axial-catalog-breakfast_table",
-   "id": 12,
+   "id": 11,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -127,118 +122,8 @@
    "mode": "representative"
   },
   {
-   "alias": "alignment-world_horizontal-towel_rack-walls",
-   "id": 13,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#01",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-radiator-walls",
-   "id": 14,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#02",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-shelf-walls",
-   "id": 15,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#03",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-umbrella-walls",
-   "id": 16,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#04",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-wall_mounted_tv-walls",
-   "id": 17,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#05",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-picture-walls",
-   "id": 18,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#06",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-decorative_sign-walls",
-   "id": 19,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#07",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-hanger-walls",
-   "id": 20,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#08",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-signpost-walls",
-   "id": 21,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#09",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "alignment-world_horizontal-license_plate-walls",
-   "id": 22,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#10",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
    "alias": "alignment-world_vertical-picture-walls",
-   "id": 23,
+   "id": 12,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -249,7 +134,7 @@
   },
   {
    "alias": "alignment-world_vertical-painting-walls",
-   "id": 24,
+   "id": 13,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -260,7 +145,7 @@
   },
   {
    "alias": "alignment-world_vertical-hanger-walls",
-   "id": 25,
+   "id": 14,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -271,7 +156,7 @@
   },
   {
    "alias": "alignment-world_vertical-signpost-walls",
-   "id": 26,
+   "id": 15,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -282,7 +167,7 @@
   },
   {
    "alias": "alignment-world_vertical-license_plate-walls",
-   "id": 27,
+   "id": 16,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -293,7 +178,7 @@
   },
   {
    "alias": "alignment-world_vertical-wall_clock-walls",
-   "id": 28,
+   "id": 17,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -304,7 +189,7 @@
   },
   {
    "alias": "alignment-world_vertical-fire_extinguisher-walls",
-   "id": 29,
+   "id": 18,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -315,7 +200,7 @@
   },
   {
    "alias": "alignment-world_vertical-picture_frame-walls",
-   "id": 30,
+   "id": 19,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -326,7 +211,7 @@
   },
   {
    "alias": "alignment-world_vertical-paper_towel_dispenser-walls",
-   "id": 31,
+   "id": 20,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -337,7 +222,7 @@
   },
   {
    "alias": "alignment-world_vertical-guitar-walls",
-   "id": 32,
+   "id": 21,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -348,7 +233,7 @@
   },
   {
    "alias": "alignment-axial-paperback_book-countertop",
-   "id": 33,
+   "id": 22,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -359,7 +244,7 @@
   },
   {
    "alias": "alignment-axial-paperback_book_s070-countertop",
-   "id": 34,
+   "id": 23,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -373,7 +258,7 @@
   },
   {
    "alias": "alignment-axial-paperback_book-conference_table",
-   "id": 35,
+   "id": 24,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -384,7 +269,7 @@
   },
   {
    "alias": "alignment-axial-paperback_book_s070-conference_table",
-   "id": 36,
+   "id": 25,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -398,7 +283,7 @@
   },
   {
    "alias": "alignment-axial-paperback_book_s070-breakfast_table",
-   "id": 37,
+   "id": 26,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -412,7 +297,7 @@
   },
   {
    "alias": "alignment-axial-magazine-countertop",
-   "id": 38,
+   "id": 27,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -423,7 +308,7 @@
   },
   {
    "alias": "alignment-axial-magazine_s070-countertop",
-   "id": 39,
+   "id": 28,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -437,7 +322,7 @@
   },
   {
    "alias": "alignment-axial-magazine-conference_table",
-   "id": 40,
+   "id": 29,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -448,7 +333,7 @@
   },
   {
    "alias": "alignment-axial-magazine_s070-conference_table",
-   "id": 41,
+   "id": 30,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -462,7 +347,7 @@
   },
   {
    "alias": "alignment-axial-magazine_s070-breakfast_table",
-   "id": 42,
+   "id": 31,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -476,7 +361,7 @@
   },
   {
    "alias": "alignment-axial-board_game-countertop",
-   "id": 43,
+   "id": 32,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -487,7 +372,7 @@
   },
   {
    "alias": "alignment-axial-board_game_s070-countertop",
-   "id": 44,
+   "id": 33,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -501,7 +386,7 @@
   },
   {
    "alias": "alignment-axial-board_game-conference_table",
-   "id": 45,
+   "id": 34,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -512,7 +397,7 @@
   },
   {
    "alias": "alignment-axial-board_game_s070-conference_table",
-   "id": 46,
+   "id": 35,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -526,7 +411,7 @@
   },
   {
    "alias": "alignment-axial-board_game_s070-breakfast_table",
-   "id": 47,
+   "id": 36,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -540,7 +425,7 @@
   },
   {
    "alias": "alignment-axial-gym_shoe-countertop",
-   "id": 48,
+   "id": 37,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -551,7 +436,7 @@
   },
   {
    "alias": "alignment-axial-gym_shoe_s070-countertop",
-   "id": 49,
+   "id": 38,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -565,7 +450,7 @@
   },
   {
    "alias": "alignment-axial-gym_shoe-conference_table",
-   "id": 50,
+   "id": 39,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -576,7 +461,7 @@
   },
   {
    "alias": "alignment-axial-gym_shoe_s070-conference_table",
-   "id": 51,
+   "id": 40,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -590,7 +475,7 @@
   },
   {
    "alias": "alignment-axial-gym_shoe_s070-breakfast_table",
-   "id": 52,
+   "id": 41,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -604,7 +489,7 @@
   },
   {
    "alias": "alignment-axial-hardback-countertop",
-   "id": 53,
+   "id": 42,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -615,7 +500,7 @@
   },
   {
    "alias": "alignment-axial-hardback_s070-countertop",
-   "id": 54,
+   "id": 43,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -629,7 +514,7 @@
   },
   {
    "alias": "alignment-axial-hardback-conference_table",
-   "id": 55,
+   "id": 44,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -640,7 +525,7 @@
   },
   {
    "alias": "alignment-axial-hardback_s070-conference_table",
-   "id": 56,
+   "id": 45,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -654,7 +539,7 @@
   },
   {
    "alias": "alignment-axial-hardback_s070-breakfast_table",
-   "id": 57,
+   "id": 46,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -668,7 +553,7 @@
   },
   {
    "alias": "alignment-axial-letter-countertop",
-   "id": 58,
+   "id": 47,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -679,7 +564,7 @@
   },
   {
    "alias": "alignment-axial-letter_s070-countertop",
-   "id": 59,
+   "id": 48,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -693,7 +578,7 @@
   },
   {
    "alias": "alignment-axial-letter-conference_table",
-   "id": 60,
+   "id": 49,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -704,7 +589,7 @@
   },
   {
    "alias": "alignment-axial-letter_s070-conference_table",
-   "id": 61,
+   "id": 50,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -718,7 +603,7 @@
   },
   {
    "alias": "alignment-axial-letter_s070-breakfast_table",
-   "id": 62,
+   "id": 51,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -732,7 +617,7 @@
   },
   {
    "alias": "alignment-axial-bag_of_chips-countertop",
-   "id": 63,
+   "id": 52,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -743,7 +628,7 @@
   },
   {
    "alias": "alignment-axial-bag_of_chips_s070-countertop",
-   "id": 64,
+   "id": 53,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -757,7 +642,7 @@
   },
   {
    "alias": "alignment-axial-bag_of_chips-conference_table",
-   "id": 65,
+   "id": 54,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -768,7 +653,7 @@
   },
   {
    "alias": "alignment-axial-bag_of_chips_s070-conference_table",
-   "id": 66,
+   "id": 55,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -782,7 +667,7 @@
   },
   {
    "alias": "alignment-axial-bag_of_chips_s070-breakfast_table",
-   "id": 67,
+   "id": 56,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -796,7 +681,7 @@
   },
   {
    "alias": "alignment-axial-frying_pan-countertop",
-   "id": 68,
+   "id": 57,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -807,7 +692,7 @@
   },
   {
    "alias": "alignment-axial-frying_pan_s070-countertop",
-   "id": 69,
+   "id": 58,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -821,7 +706,7 @@
   },
   {
    "alias": "alignment-axial-frying_pan-conference_table",
-   "id": 70,
+   "id": 59,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -832,7 +717,7 @@
   },
   {
    "alias": "alignment-axial-frying_pan_s070-conference_table",
-   "id": 71,
+   "id": 60,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -846,7 +731,7 @@
   },
   {
    "alias": "alignment-axial-frying_pan_s070-breakfast_table",
-   "id": 72,
+   "id": 61,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -860,7 +745,7 @@
   },
   {
    "alias": "alignment-axial-keyboard-countertop",
-   "id": 73,
+   "id": 62,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -871,7 +756,7 @@
   },
   {
    "alias": "alignment-axial-keyboard_s070-countertop",
-   "id": 74,
+   "id": 63,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -885,7 +770,7 @@
   },
   {
    "alias": "alignment-axial-keyboard-conference_table",
-   "id": 75,
+   "id": 64,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -896,7 +781,7 @@
   },
   {
    "alias": "alignment-axial-keyboard_s070-conference_table",
-   "id": 76,
+   "id": 65,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -910,7 +795,7 @@
   },
   {
    "alias": "alignment-axial-keyboard_s070-breakfast_table",
-   "id": 77,
+   "id": 66,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -924,7 +809,7 @@
   },
   {
    "alias": "alignment-axial-catalog-countertop",
-   "id": 78,
+   "id": 67,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -935,7 +820,7 @@
   },
   {
    "alias": "alignment-axial-catalog_s070-countertop",
-   "id": 79,
+   "id": 68,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -949,7 +834,7 @@
   },
   {
    "alias": "alignment-axial-catalog-conference_table",
-   "id": 80,
+   "id": 69,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -960,7 +845,7 @@
   },
   {
    "alias": "alignment-axial-catalog_s070-conference_table",
-   "id": 81,
+   "id": 70,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -974,7 +859,7 @@
   },
   {
    "alias": "alignment-axial-catalog_s070-breakfast_table",
-   "id": 82,
+   "id": 71,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-axial",
@@ -987,148 +872,8 @@
    "fallback_kind": "scale"
   },
   {
-   "alias": "alignment-world_horizontal-towel_rack_s070-walls",
-   "id": 83,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#01",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-towel_rack-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-radiator_s070-walls",
-   "id": 84,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#02",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-radiator-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-shelf_s060-walls",
-   "id": 85,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#03",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-shelf-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-umbrella_s070-walls",
-   "id": 86,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#04",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-umbrella-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-wall_mounted_tv_s080-walls",
-   "id": 87,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#05",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-wall_mounted_tv-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-picture_s070-walls",
-   "id": 88,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#06",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-picture-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-decorative_sign_s070-walls",
-   "id": 89,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#07",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-decorative_sign-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-hanger_s070-walls",
-   "id": 90,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#08",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-hanger-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-signpost_s070-walls",
-   "id": 91,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#09",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-signpost-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
-   "alias": "alignment-world_horizontal-license_plate_s070-walls",
-   "id": 92,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#10",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-license_plate-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "scale"
-  },
-  {
    "alias": "alignment-world_vertical-picture_s090-walls",
-   "id": 93,
+   "id": 72,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1142,7 +887,7 @@
   },
   {
    "alias": "alignment-world_vertical-painting_s070-walls",
-   "id": 94,
+   "id": 73,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1156,7 +901,7 @@
   },
   {
    "alias": "alignment-world_vertical-hanger_s070-walls",
-   "id": 95,
+   "id": 74,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1170,7 +915,7 @@
   },
   {
    "alias": "alignment-world_vertical-signpost_s070-walls",
-   "id": 96,
+   "id": 75,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1184,7 +929,7 @@
   },
   {
    "alias": "alignment-world_vertical-license_plate_s070-walls",
-   "id": 97,
+   "id": 76,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1198,7 +943,7 @@
   },
   {
    "alias": "alignment-world_vertical-wall_clock_s070-walls",
-   "id": 98,
+   "id": 77,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1212,7 +957,7 @@
   },
   {
    "alias": "alignment-world_vertical-fire_extinguisher_s070-walls",
-   "id": 99,
+   "id": 78,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1226,7 +971,7 @@
   },
   {
    "alias": "alignment-world_vertical-picture_frame_s070-walls",
-   "id": 100,
+   "id": 79,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1240,7 +985,7 @@
   },
   {
    "alias": "alignment-world_vertical-paper_towel_dispenser_s080-walls",
-   "id": 101,
+   "id": 80,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1254,7 +999,7 @@
   },
   {
    "alias": "alignment-world_vertical-guitar_s090-walls",
-   "id": 102,
+   "id": 81,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1268,7 +1013,7 @@
   },
   {
    "alias": "alignment-world_vertical-painting_s080-walls",
-   "id": 103,
+   "id": 82,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1282,7 +1027,7 @@
   },
   {
    "alias": "alignment-world_vertical-hanger_nagryh-walls",
-   "id": 104,
+   "id": 83,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "alignment-world_vertical",
@@ -1291,20 +1036,6 @@
    "slot": "representative",
    "mode": "representative",
    "fallback_of": "alignment-world_vertical-hanger-walls",
-   "fallback_rank": 1,
-   "fallback_kind": "next_model"
-  },
-  {
-   "alias": "alignment-world_horizontal-hanger_lymqks-walls",
-   "id": 105,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "alignment-world_horizontal",
-   "iddl": "alignment/world_horizontal.iddl",
-   "pick": "alignment-world_horizontal#08",
-   "slot": "representative",
-   "mode": "representative",
-   "fallback_of": "alignment-world_horizontal-hanger-walls",
    "fallback_rank": 1,
    "fallback_kind": "next_model"
   }

@@ -1,11 +1,10 @@
 # ground_isg (v1 bridge) output
 
-200 grounded problems (slots: representative); one spec per alias under `specs/`, jobs in `jobs.json`.
+190 grounded problems (slots: representative); one spec per alias under `specs/`, jobs in `jobs.json`.
 
 | subtask | problems |
 |---|---|
 | alignment-axial | 10 |
-| alignment-world_horizontal | 10 |
 | alignment-world_vertical | 10 |
 | camera_relocalization-obstructed | 17 |
 | camera_relocalization-standard | 1 |

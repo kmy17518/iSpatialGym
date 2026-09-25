@@ -1,29 +1,32 @@
 (define (problem alignment-22)
     (:domain ispatialgym)
-    (:alias alignment-world_horizontal-license_plate-walls)
+    (:alias alignment-axial-paperback_book-countertop)
 
-    ; ground_isg 2.0.0: alignment-world_horizontal-license_plate-walls (alignment/world_horizontal.iddl; alignment-world_horizontal#10/representative)
-    ; Alignment - world horizontal. Same wall hinge as world vertical (installed by the sampler, spec 5.5); the target is an
-    ; elongated wall item whose long axis / reference edge must end level. Models that look the same upside down carry the
-    ; 180 deg equivalence (symmetric_180, roles/candidates.csv). The support is a wall region (roles/candidates.csv kind scene). Push / brace
-    ; contacts from contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
+    ; ground_isg 2.0.0: alignment-axial-paperback_book-countertop (alignment/axial.iddl; alignment-axial#01~T2/representative)
+    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
+    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
+    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
+    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
+    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        license_plate.n.01_1 - license_plate.n.01
-        wall.n.01_1 - wall.n.01
+        paperback_book.n.01_1 - paperback_book.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
+        (ontop paperback_book.n.01_1 countertop.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (pose_reached ?license_plate.n.01_1)
-            (not (grasped ?agent.n.01_1 ?license_plate.n.01_1))
-            (pose_settled ?license_plate.n.01_1)
+            (ontop ?paperback_book.n.01_1 ?countertop.n.01_1)
+            (pose_reached ?paperback_book.n.01_1)
+            (not (grasped ?agent.n.01_1 ?paperback_book.n.01_1))
+            (pose_settled ?paperback_book.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

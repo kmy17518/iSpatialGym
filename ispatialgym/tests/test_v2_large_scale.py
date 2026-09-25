@@ -354,9 +354,6 @@ def test_frame_axes_and_hang_quat():
     assert th.allclose(s, th.tensor([0.0, 1.0, 0.0]))
     with pytest.raises(ValueError):
         AW.frame_axes("+x", "+x")
-    with pytest.raises(ValueError):
-        AW.frame_axes("+x", "+z", level="z")
-    AW.frame_axes("+x", "+z", level="y")
     q = AW.hang_quat([0.0, -1.0, 0.0], f, s, u)
     # the front axis maps onto the wall normal, the up axis onto world z
     assert th.allclose(C.quat_rotate(q, f), th.tensor([0.0, -1.0, 0.0]), atol=1e-5)
@@ -392,14 +389,13 @@ def test_hang_quat_puts_every_reviewed_wall_frame_upright():
     reps = [r for r in rows if r[3]]
     assert len(reps) >= 15, f"expected the wall representatives in the icl, found {len(reps)}"
     non_default = [r for r in reps if r[4].get("front_axis") != "+x" or r[4].get("up_axis") != "+z"]
-    assert {(r[1]) for r in non_default} >= {"license_plate", "picture", "umbrella", "hanger", "shelf", "fire_extinguisher", "guitar"}
+    assert {(r[1]) for r in non_default} >= {"license_plate", "picture", "umbrella", "hanger", "fire_extinguisher", "guitar"}
     normals = [th.tensor([0.0, -1.0, 0.0]), th.tensor([1.0, 0.0, 0.0]), th.tensor([-0.6, 0.8, 0.0])]
     z = th.tensor([0.0, 0.0, 1.0])
     for subtask, cat, model, _rep, frame, bbox in rows:
         assert frame.get("front_axis") and frame.get("up_axis"), f"{subtask} {cat}/{model}: the icl row has no complete frame {frame}"
-        if subtask == "alignment-world_horizontal":
-            assert frame.get("level_axis"), f"{cat}/{model}: horizontal rows carry frame_level"
-        front, side, up = AW.frame_axes(frame["front_axis"], frame["up_axis"], frame.get("level_axis"))
+        assert set(frame) == {"front_axis", "up_axis"}, f"{cat}/{model}: unexpected frame keys {frame}"
+        front, side, up = AW.frame_axes(frame["front_axis"], frame["up_axis"])
         for n in normals:
             q = AW.hang_quat(n, front, side, up)
             assert th.allclose(C.quat_rotate(q, up), z, atol=1e-5), f"{cat}/{model}: up {frame['up_axis']} not along world +z"
@@ -416,27 +412,25 @@ def test_hang_quat_puts_every_reviewed_wall_frame_upright():
 
 
 def test_wall_frame_written_per_model_and_never_defaulted():
-    """``ground_isg.write_wall_frame`` writes the dict form the sampler's ``target_param`` resolves; ``level_axis`` only
-    for world horizontal; a hand-set scalar is replaced by the dict; empty columns write nothing."""
+    """``ground_isg.write_wall_frame`` writes the dict form the sampler's ``target_param`` resolves (``front_axis`` /
+    ``up_axis`` only; a bare axis letter gets its sign); a hand-set scalar is replaced by the dict; empty columns write
+    nothing."""
     from ispatialgym.sampling import ground_isg as GI
 
     gen = {"front_axis": "+x"}
-    row = {"frame_front": "+z", "frame_up": "+y", "frame_level": "+x"}
-    assert GI.write_wall_frame(gen, "alignment-world_horizontal", "license_plate", "nwfbxn", row) == {"front_axis": "+z", "up_axis": "+y", "level_axis": "+x"}
-    assert gen == {"front_axis": {"license_plate/nwfbxn": "+z"}, "up_axis": {"license_plate/nwfbxn": "+y"}, "level_axis": {"license_plate/nwfbxn": "+x"}}
-    GI.write_wall_frame(gen, "alignment-world_horizontal", "hanger", "agrpio", {"frame_front": "z", "frame_up": "-x", "frame_level": "+y"})
-    assert gen["front_axis"] == {"license_plate/nwfbxn": "+z", "hanger/agrpio": "+z"} and gen["up_axis"]["hanger/agrpio"] == "-x"
+    row = {"frame_front": "+z", "frame_up": "+y"}
+    assert GI.write_wall_frame(gen, "alignment-world_vertical", "license_plate", "hjdaqn", row) == {"front_axis": "+z", "up_axis": "+y"}
+    assert gen == {"front_axis": {"license_plate/hjdaqn": "+z"}, "up_axis": {"license_plate/hjdaqn": "+y"}}
+    GI.write_wall_frame(gen, "alignment-world_vertical", "hanger", "agrpio", {"frame_front": "z", "frame_up": "-x"})
+    assert gen["front_axis"] == {"license_plate/hjdaqn": "+z", "hanger/agrpio": "+z"} and gen["up_axis"]["hanger/agrpio"] == "-x"
     gen_v: dict = {}
     assert GI.write_wall_frame(gen_v, "alignment-world_vertical", "painting", "dacihj", {"frame_front": "+x", "frame_up": "+z", "frame_level": "+y"}) == {
         "front_axis": "+x", "up_axis": "+z"}
-    assert "level_axis" not in gen_v
+    assert "level_axis" not in gen_v  # the icl's frame_level column is not a sampler parameter
     assert GI.write_wall_frame({}, "alignment-world_vertical", "x", "y", {"frame_front": "", "frame_up": ""}) == {}
 
 
-def test_swept_extent_and_brace_order():
-    assert AW.swept_extent(1.0, 0.1, 0.0) == 1.0
-    assert AW.swept_extent(1.0, 0.1, math.radians(30)) == pytest.approx(math.hypot(1.0, 0.1))  # atan(0.1) = 5.7° <= 30°: the diagonal
-    assert AW.swept_extent(1.0, 1.0, math.radians(30)) == pytest.approx(math.cos(math.radians(30)) + math.sin(math.radians(30)))  # atan(1) = 45° > 30°
+def test_brace_order():
     assert AW.brace_candidate_order(height=0.6, width=0.8) == ["below_high", "above_low", "side_high"]
     assert AW.brace_candidate_order(height=0.1, width=0.8) == ["below_high", "above_low"]  # side_high needs height >= width/2
     assert AW.brace_candidate_order(0.6, 0.8, kinds=["above_low", "side_high"]) == ["above_low", "side_high"]
@@ -624,15 +618,23 @@ def test_bar_axis_and_offsets():
 
 def test_wall_hinge_resistance_record():
     """Owner 2026‑09‑16 22:05 (spec §7): the wall hinge record carries a Coulomb friction torque and a viscous damping from
-    the target's inertia about the hinge axis (I_n = m (w² + h²) / 12): friction = I_n · 10 rad/s², damping = I_n / 0.02 s;
-    the frictionless (axial) record has neither key; the loader-side drive reads them back as the drive's max force and
-    per-degree damping."""
+    the target's inertia about the hinge axis (I_n = m (w² + h²) / 12): friction = I_n · 10 rad/s²; the damping is the brake
+    of 2026-09-22, friction / 0.0025 rad/s (the plain damper I_n / 0.02 s let a residual gravity torque creep the levelled
+    painting 0.25 deg/s out of tolerance, 0922-180242) - a legacy record's damping is raised to that floor by
+    ``hinge_brake_damping``. The frictionless (axial) record has neither key; the loader-side drive reads them back as the
+    drive's max force and per-degree damping."""
     from ispatialgym.sampling import constraints as K
 
     res = K.hinge_resistance(2.25, (0.354, 0.2946))  # the painting_s070 of demo 0916-150205 (probe 2026-09-16 23:24)
     assert res["inertia_kgm2"] == pytest.approx(2.25 * (0.354**2 + 0.2946**2) / 12)
-    assert res["friction"] == pytest.approx(res["inertia_kgm2"] * 10.0) and res["damping"] == pytest.approx(res["inertia_kgm2"] / 0.02)
-    assert 0.3 < res["friction"] < 0.5 and 1.5 < res["damping"] < 2.5  # the painting: ~0.4 N·m (≈ 1.6 N at the pad), Coulomb down to 0.2 rad/s
+    assert res["friction"] == pytest.approx(res["inertia_kgm2"] * 10.0) and res["damping"] == pytest.approx(res["friction"] / K.HINGE_BRAKE_OMEGA_RAD_S)
+    assert 0.3 < res["friction"] < 0.5 and 150 < res["damping"] < 200  # the painting: ~0.4 N·m (≈ 1.6 N at the pad), Coulomb down to 0.0025 rad/s
+    assert res["brake_omega_rad_s"] == K.HINGE_BRAKE_OMEGA_RAD_S == 0.0025
+    legacy = K.hinge_resistance(2.25, (0.354, 0.2946), omega_brake=0.0)  # the record as written before the brake
+    assert legacy["damping"] == pytest.approx(legacy["inertia_kgm2"] / 0.02) and 1.5 < legacy["damping"] < 2.5
+    assert K.hinge_brake_damping(legacy["friction"], legacy["damping"]) == pytest.approx(res["damping"])
+    assert K.hinge_brake_damping(res["friction"], res["damping"]) == pytest.approx(res["damping"])  # a braking record is left alone
+    assert K.hinge_brake_damping(None, None) is None and K.hinge_brake_damping(None, 1.5) == 1.5  # the frictionless axial hinge
     h = K.Hinge("/World/x/isg_hinge", "painting", "walls", "base_link", th.tensor([1.0, 2.0, 1.45]), th.tensor([0.0, -1.0, 0.0]),
                 friction=res["friction"], damping=res["damping"], facts={k: v for k, v in res.items() if k not in ("friction", "damping")})
     rec = h.to_tro("painting.n.01_1", "wall.n.01_1")

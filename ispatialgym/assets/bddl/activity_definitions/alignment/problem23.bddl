@@ -1,30 +1,33 @@
 (define (problem alignment-23)
     (:domain ispatialgym)
-    (:alias alignment-world_vertical-picture-walls)
+    (:alias alignment-axial-paperback_book_s070-countertop)
 
-    ; ground_isg 2.0.0: alignment-world_vertical-picture-walls (alignment/world_vertical.iddl; alignment-world_vertical#01/representative)
-    ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
-    ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted
-    ; 15-45 deg in the wall plane and must be pushed upright (tangential push at the low end + brace at the high end).
-    ; Orientation-only target; the position is fixed by the hinge. Push / brace contacts from
-    ; contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
+    ; ground_isg 2.0.0: alignment-axial-paperback_book_s070-countertop (alignment/axial.iddl; alignment-axial#01~T2/representative/fallback1:scale)
+    ; fallback 1 (scale) of alignment-axial-paperback_book-countertop: scale = 0.7, scale_source = default_step
+    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
+    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
+    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
+    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
+    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        photograph.n.01_1 - photograph.n.01
-        wall.n.01_1 - wall.n.01
+        paperback_book.n.01_1 - paperback_book.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
+        (ontop paperback_book.n.01_1 countertop.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (pose_reached ?photograph.n.01_1)
-            (not (grasped ?agent.n.01_1 ?photograph.n.01_1))
-            (pose_settled ?photograph.n.01_1)
+            (ontop ?paperback_book.n.01_1 ?countertop.n.01_1)
+            (pose_reached ?paperback_book.n.01_1)
+            (not (grasped ?agent.n.01_1 ?paperback_book.n.01_1))
+            (pose_settled ?paperback_book.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

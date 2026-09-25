@@ -1,9 +1,9 @@
 (define (problem alignment-36)
     (:domain ispatialgym)
-    (:alias alignment-axial-paperback_book_s070-conference_table)
+    (:alias alignment-axial-board_game_s070-breakfast_table)
 
-    ; ground_isg 2.0.0: alignment-axial-paperback_book_s070-conference_table (alignment/axial.iddl; alignment-axial#01~T3/representative/fallback1:scale)
-    ; fallback 1 (scale) of alignment-axial-paperback_book-conference_table: scale = 0.7, scale_source = default_step
+    ; ground_isg 2.0.0: alignment-axial-board_game_s070-breakfast_table (alignment/axial.iddl; alignment-axial#03~T1/representative/fallback1:scale)
+    ; fallback 1 (scale) of alignment-axial-board_game-breakfast_table: scale = 0.7, scale_source = default_step
     ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
     ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
     ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
@@ -11,23 +11,23 @@
     ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        paperback_book.n.01_1 - paperback_book.n.01
-        conference_table.n.01_1 - conference_table.n.01
+        board_game.n.01_1 - board_game.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop paperback_book.n.01_1 conference_table.n.01_1)
+        (ontop board_game.n.01_1 breakfast_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?paperback_book.n.01_1 ?conference_table.n.01_1)
-            (pose_reached ?paperback_book.n.01_1)
-            (not (grasped ?agent.n.01_1 ?paperback_book.n.01_1))
-            (pose_settled ?paperback_book.n.01_1)
+            (ontop ?board_game.n.01_1 ?breakfast_table.n.01_1)
+            (pose_reached ?board_game.n.01_1)
+            (not (grasped ?agent.n.01_1 ?board_game.n.01_1))
+            (pose_settled ?board_game.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

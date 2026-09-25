@@ -1,4 +1,4 @@
-"""The iddl parser (``sampling/iddl.py``) on the 21 shipped files and on malformed input (no simulator)."""
+"""The iddl parser (``sampling/iddl.py``) on the 20 shipped files and on malformed input (no simulator)."""
 
 import os
 
@@ -23,7 +23,6 @@ EXPECTED = {
     "configuration_matching-attachment": (["target", "partner", "support"], ["grasps:attachment"], ["target", "partner", "support"], {"assembly": ["target", "partner"]}),
     "alignment-axial": (["target", "support"], ["contacts"], ["target", "support"], {}),
     "alignment-world_vertical": (["target", "support"], ["contacts"], ["target", "support"], {}),
-    "alignment-world_horizontal": (["target", "support"], ["contacts"], ["target", "support"], {}),
     "inter_object_relation_satisfaction-ontop_small_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-under_small_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-inside": (["target", "partner", "support"], ["grasps:insert"], ["target", "partner", "support"], {}),
@@ -34,8 +33,8 @@ EXPECTED = {
 }
 
 
-def test_all_21_files_load_keyed_by_subtask_id():
-    assert len(IDDLS) == 21
+def test_all_20_files_load_keyed_by_subtask_id():
+    assert len(IDDLS) == 20
     assert set(IDDLS) == set(EXPECTED)
     for subtask, iddl in IDDLS.items():
         assert iddl.subtask == subtask

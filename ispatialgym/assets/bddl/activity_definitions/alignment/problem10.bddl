@@ -1,8 +1,8 @@
 (define (problem alignment-10)
     (:domain ispatialgym)
-    (:alias alignment-axial-frying_pan-breakfast_table)
+    (:alias alignment-axial-keyboard-breakfast_table)
 
-    ; ground_isg 2.0.0: alignment-axial-frying_pan-breakfast_table (alignment/axial.iddl; alignment-axial#08~T1/representative)
+    ; ground_isg 2.0.0: alignment-axial-keyboard-breakfast_table (alignment/axial.iddl; alignment-axial#09~T1/representative)
     ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
     ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
     ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
@@ -10,23 +10,23 @@
     ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        frying_pan.n.01_1 - frying_pan.n.01
+        keyboard.n.01_1 - keyboard.n.01
         breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop frying_pan.n.01_1 breakfast_table.n.01_1)
+        (ontop keyboard.n.01_1 breakfast_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?frying_pan.n.01_1 ?breakfast_table.n.01_1)
-            (pose_reached ?frying_pan.n.01_1)
-            (not (grasped ?agent.n.01_1 ?frying_pan.n.01_1))
-            (pose_settled ?frying_pan.n.01_1)
+            (ontop ?keyboard.n.01_1 ?breakfast_table.n.01_1)
+            (pose_reached ?keyboard.n.01_1)
+            (not (grasped ?agent.n.01_1 ?keyboard.n.01_1))
+            (pose_settled ?keyboard.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

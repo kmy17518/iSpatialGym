@@ -1,16 +1,17 @@
 (define (problem alignment-83)
     (:domain ispatialgym)
-    (:alias alignment-world_horizontal-towel_rack_s070-walls)
+    (:alias alignment-world_vertical-hanger_nagryh-walls)
 
-    ; ground_isg 2.0.0: alignment-world_horizontal-towel_rack_s070-walls (alignment/world_horizontal.iddl; alignment-world_horizontal#01/representative/fallback1:scale)
-    ; fallback 1 (scale) of alignment-world_horizontal-towel_rack-walls: scale = 0.7, scale_source = default_step
-    ; Alignment - world horizontal. Same wall hinge as world vertical (installed by the sampler, spec 5.5); the target is an
-    ; elongated wall item whose long axis / reference edge must end level. Models that look the same upside down carry the
-    ; 180 deg equivalence (symmetric_180, roles/candidates.csv). The support is a wall region (roles/candidates.csv kind scene). Push / brace
-    ; contacts from contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
+    ; ground_isg 2.0.0: alignment-world_vertical-hanger_nagryh-walls (alignment/world_vertical.iddl; alignment-world_vertical#03/representative/fallback1:next_model)
+    ; fallback 1 (next_model) of alignment-world_vertical-hanger-walls: model = nagryh, slot = variation_geometry, primary_model = agrpio
+    ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
+    ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted
+    ; 15-45 deg in the wall plane and must be pushed upright (tangential push at the low end + brace at the high end).
+    ; Orientation-only target; the position is fixed by the hinge. Push / brace contacts from
+    ; contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        towel_rack.n.01_1 - towel_rack.n.01
+        hanger.n.02_1 - hanger.n.02
         wall.n.01_1 - wall.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
@@ -22,9 +23,9 @@
 
     (:goal
         (and
-            (pose_reached ?towel_rack.n.01_1)
-            (not (grasped ?agent.n.01_1 ?towel_rack.n.01_1))
-            (pose_settled ?towel_rack.n.01_1)
+            (pose_reached ?hanger.n.02_1)
+            (not (grasped ?agent.n.01_1 ?hanger.n.02_1))
+            (pose_settled ?hanger.n.02_1)
             (pose_settled ?agent.n.01_1)
         )
     )

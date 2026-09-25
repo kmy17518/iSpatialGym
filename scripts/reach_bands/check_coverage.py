@@ -42,7 +42,7 @@ PIPELINE = {"disembedding": "tabletop", "inter_object_relation_satisfaction-onto
             "inter_object_relation_satisfaction-ontop_large_scale": "tabletop", "inter_object_relation_satisfaction-under_large_scale": "tabletop"}
 GENERIC = {"alignment-axial", "configuration_matching-block_design"}
 BRACE = {"configuration_matching-articulation_open_small_scale", "configuration_matching-articulation_close_small_scale"}
-NO_BAND = ("camera_relocalization", "object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-world_horizontal",
+NO_BAND = ("camera_relocalization", "object_scaling", "mental_rotation", "alignment-world_vertical",
            "configuration_matching-articulation_open_large_scale", "configuration_matching-articulation_close_large_scale")
 
 

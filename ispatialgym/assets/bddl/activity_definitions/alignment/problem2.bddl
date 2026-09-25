@@ -1,29 +1,32 @@
 (define (problem alignment-2)
     (:domain ispatialgym)
+    (:alias alignment-axial-paperback_book-breakfast_table)
 
-    (:alias world_horizontal)
+    ; ground_isg 2.0.0: alignment-axial-paperback_book-breakfast_table (alignment/axial.iddl; alignment-axial#01~T1/representative)
+    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
+    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
+    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
+    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
+    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        towel_rack.n.01_1 - towel_rack.n.01
-        wall.n.01_1 - wall.n.01
+        paperback_book.n.01_1 - paperback_book.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
+        (ontop paperback_book.n.01_1 breakfast_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
-    ; The towel rack hangs flat on the wall through a TRO revolute constraint at its centre of mass (not a BDDL
-    ; literal) and starts tilted in the wall plane. Binary success: the rack is released and its orientation is within
-    ; tolerance of the level (world horizontal) goal (TRO pose_targets["towel_rack.n.01_1"]: orientation_metric =
-    ; "full", position_metric = null; models that look the same upside down list the 180-degree flip about the wall
-    ; normal in orientation_equivalences).
     (:goal
         (and
-            (pose_reached ?towel_rack.n.01_1)
-            (not (grasped ?agent.n.01_1 ?towel_rack.n.01_1))
-            (pose_settled ?towel_rack.n.01_1)
+            (ontop ?paperback_book.n.01_1 ?breakfast_table.n.01_1)
+            (pose_reached ?paperback_book.n.01_1)
+            (not (grasped ?agent.n.01_1 ?paperback_book.n.01_1))
+            (pose_settled ?paperback_book.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

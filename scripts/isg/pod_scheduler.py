@@ -69,7 +69,7 @@ PRIORITY = {
     "configuration_matching-articulation_open_large_scale": 10, "configuration_matching-articulation_close_large_scale": 11,
     "inter_object_relation_satisfaction-ontop_large_scale": 12,
     "inter_object_relation_satisfaction-ontop_small_scale": 20, "disembedding": 21, "inter_object_relation_satisfaction-under_small_scale": 22,
-    "inter_object_relation_satisfaction-touching": 30, "alignment-world_vertical": 31, "alignment-world_horizontal": 32,
+    "inter_object_relation_satisfaction-touching": 30, "alignment-world_vertical": 31,
 }
 # default loop alias per subtask (the first-demo alias) and the sample_isg scene restriction where one is needed
 DEFAULT_ALIAS = {
@@ -82,7 +82,7 @@ DEFAULT_ALIAS = {
     "configuration_matching-articulation_close_small_scale": "configuration_matching-articulation_close_small_scale-toolbox-breakfast_table",
     "configuration_matching-articulation_open_large_scale": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
     "configuration_matching-articulation_close_large_scale": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
-    "alignment-world_vertical": "alignment-world_vertical-painting_s070-walls", "alignment-world_horizontal": "alignment-world_horizontal-license_plate-walls",
+    "alignment-world_vertical": "alignment-world_vertical-painting_s070-walls",
     "alignment-axial": "alignment-axial-board_game-breakfast_table",
     "inter_object_relation_satisfaction-ontop_small_scale": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
     "inter_object_relation_satisfaction-under_small_scale": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",

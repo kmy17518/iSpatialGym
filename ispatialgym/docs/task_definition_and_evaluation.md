@@ -448,7 +448,6 @@ Required settlement entities are:
 | Configuration Matching — attachment | both attached objects, agent |
 | World Alignment — table surface | manipulated object, agent |
 | World Alignment — world vertical | hinged object, agent |
-| World Alignment — world horizontal | hinged object, agent |
 | Inter-object Relation Satisfaction | both manipulated objects, agent |
 
 Each `pose_settled` atom should be an explicit top-level BDDL goal. A group form
@@ -606,17 +605,14 @@ These are cross-task decisions only; each task still needs a dedicated review.
   `attached` as the semantic guard; absolute placement (`target_slots`) is
   measured only.
 - Alignment (activity `alignment`, previously World Alignment / Rod and Frame)
-  has three variants. Axial (previously table surface): the object starts and
+  has two variants. Axial (previously table surface): the object starts and
   stays `ontop` the table while reaching its target orientation. World vertical: an object (e.g. a painting) hangs on a wall
   through a revolute joint at its center of mass and must be rotated to the
   straight orientation; the hinge is restored from a TRO constraint record rather
   than expressed with `attached`, because BEHAVIOR attachment aligns meta links
-  and would not pivot at the center of mass. World horizontal: the same wall
-  hinge, but the object is an elongated wall item with one clear horizontal
-  direction (a towel bar, a hook rail, a shelf, a wide sign) that starts tilted
-  and must be rotated back to level; because "horizontal" is undirected, models
-  that look the same upside down list the 180-degree flip about the wall normal
-  in `orientation_equivalences`.
+  and would not pivot at the center of mass. (A third variant, world horizontal
+  — an elongated wall item pushed back to level on the same hinge — was retired
+  on 2026-09-23.)
 - Inter-object Relation Satisfaction, previously called Relation Satisfaction,
   gates success on the intended spatial-relation predicate and release; the
   exact pictured poses are measured only. `open` remains excluded from this

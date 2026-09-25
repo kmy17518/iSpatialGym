@@ -623,8 +623,8 @@ def stage_report(args):
     # symmetric_180 disagreements
     L.append("## `symmetric_180` (alignment targets) vs the survey\n")
     L.append("The half turn that matters is about the alignment axis: the wall normal = the frame's front axis for the wall subtasks, the\n"
-             "vertical (`frame_up`, else the canonical `z`) for `alignment-axial` (the object is yawed on the table). `symmetric_180` is only\n"
-             "set for `alignment-world_horizontal` targets in the selection sheet (empty = the reviewer did not call the object symmetric),\n"
+             "vertical (`frame_up`, else the canonical `z`) for `alignment-axial` (the object is yawed on the table). `symmetric_180` was\n"
+             "reviewed for the (retired) world-horizontal selection sheet only (empty = the reviewer did not call the object symmetric),\n"
              "so every axial / vertical row below is a symmetry the reviewers did not record rather than a contradiction.\n")
     L.append("| subtask | category | model | half-turn axis | `symmetric_180` | survey half turn | survey `symmetry` | `symmetry_near` |\n|---|---|---|---|---|---|---|---|")
     n_dis = 0

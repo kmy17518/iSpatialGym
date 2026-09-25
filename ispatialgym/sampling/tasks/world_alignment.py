@@ -1,9 +1,7 @@
-"""World alignment: table surface (``world_alignment-0``), world vertical (``world_alignment-1``) and world horizontal
-(``world_alignment-2``).
+"""World alignment: table surface (``world_alignment-0``) and world vertical (``world_alignment-1``).
 
-All three hinge the target at its centre of mass (TRO ``constraints``) so that only its orientation can change; the
-goal is the aligned orientation (table axes / world vertical / level along the wall) and the init is a sampled
-deviation from it.
+Both hinge the target at its centre of mass (TRO ``constraints``) so that only its orientation can change; the goal
+is the aligned orientation (table axes / world vertical) and the init is a sampled deviation from it.
 """
 
 from __future__ import annotations
@@ -64,10 +62,9 @@ class _HingedSampler(TaskSampler):
         return v
 
     def axis_param(self, key: str, default: str) -> str:
-        """``generation.<key>`` (``front_axis`` / ``long_axis`` / ``up_axis`` / ``level_axis``) as an axis name
-        (``"+x"``), per target through :meth:`target_param` (the canonical frames differ per category: books lie with
-        the cover text bottom at +x, pictures lie flat with their up at -x, ...; see
-        runlogs/world_alignment_selection_20260911/selection.md and runlogs/world_horizontal_selection_20260912/selection.md)."""
+        """``generation.<key>`` (``front_axis`` / ``long_axis`` / ``up_axis``) as an axis name (``"+x"``), per target
+        through :meth:`target_param` (the canonical frames differ per category: books lie with the cover text bottom at
+        +x, pictures lie flat with their up at -x, ...; see runlogs/world_alignment_selection_20260911/selection.md)."""
         return str(self.target_param(key, default))
 
     def com_world(self, obj) -> th.Tensor:
@@ -451,8 +448,7 @@ class WorldVerticalSampler(_HingedSampler):
         return tuple(float((pts @ a).max() - (pts @ a).min()) for a in (front, side, up))
 
     def _patch_extents(self) -> Tuple[float, float]:
-        """(width along the wall, height) the wall patch must accommodate: the aligned object's extents here; the
-        horizontal problem overrides this with the extents swept over the deviation range."""
+        """(width along the wall, height) the wall patch must accommodate: the aligned object's extents."""
         _, width, height = self._object_dims()
         return width, height
 
@@ -677,83 +673,3 @@ class WorldVerticalSampler(_HingedSampler):
         path = super().write_instance(draft, index, seed)
         self._clear_hinge()
         return path
-
-
-# ----------------------------------------------------------------------------------------------------------------
-# World horizontal
-# ----------------------------------------------------------------------------------------------------------------
-
-
-def _swept_extent(p: float, q: float, delta: float) -> float:
-    """max over ``a in [0, delta]`` of ``p cos a + q sin a``: the extent along one wall axis of a ``p x q`` rectangle
-    swept between the aligned pose and a tilt of ``delta`` (the diagonal when the tilt reaches ``atan(q / p)``)."""
-    if delta <= 0:
-        return p
-    if math.atan2(q, p) <= delta:
-        return math.hypot(p, q)
-    return p * math.cos(delta) + q * math.sin(delta)
-
-
-class WorldHorizontalSampler(WorldVerticalSampler):
-    """``world_alignment-2``: the target hangs on the wall hinge like in world vertical, but it is an elongated wall
-    item (towel bar, hook rail, shelf, wide sign / screen, a rod on display hooks) that starts tilted in the wall plane
-    and must be pushed back to **level**. Spec (``generation``): ``front_axis`` / ``up_axis`` as for world vertical, the
-    optional ``level_axis`` (the reviewers' reading of the axis that lies along the wall; checked against the frame),
-    ``symmetric_180`` (bool or per-model dict: the object looks the same upside down, so the half turn about its front
-    axis becomes an orientation equivalence of the goal) and ``swept_patch`` (default true: the wall patch must be flat
-    and clear for the extents the tilted object sweeps between its largest init tilt and level)."""
-
-    tag = "world_horizontal"
-
-    def _frame_axes(self) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
-        front, side, up = super()._frame_axes()
-        lv = self.target_param("level_axis", None)
-        if lv is not None:
-            want = str(lv).strip().lstrip("+-").lower()
-            got = "xyz"[int(th.argmax(side.abs()))]
-            if want != got:
-                raise Reject("spec", f"level_axis {lv} is not the axis along the wall implied by front_axis "
-                                     f"{self.axis_param('front_axis', '+x')} / up_axis {self.axis_param('up_axis', '+z')} ({got})")
-        return front, side, up
-
-    def _max_deviation(self) -> float:
-        lo, hi = self.gen("deviation_range_deg", [15.0, 45.0])
-        return math.radians(float(max(abs(float(lo)), abs(float(hi)))))
-
-    def _patch_extents(self) -> Tuple[float, float]:
-        _, width, height = self._object_dims()
-        if not bool(self.gen("swept_patch", True)):
-            return width, height
-        d = self._max_deviation()
-        return _swept_extent(width, height, d), _swept_extent(height, width, d)
-
-    def _symmetric_180(self) -> bool:
-        return bool(self.target_param("symmetric_180", False))
-
-    def _goal_equivalences(self) -> List[List[float]]:
-        eqs = super()._goal_equivalences()
-        if self._symmetric_180():
-            front, _, _ = self._frame_axes()
-            eqs.append([float(round(float(v), 6)) or 0.0 for v in G.quat_about_axis(front, math.pi)])  # exact (1, 0, 0, 0) for +x
-        return eqs
-
-    def prepare_bindings(self):
-        # frame / swept extents first (recorded even when no wall spot admits the object)
-        target = self.obj("target")
-        self.hull = self.world.local_hull(target)
-        self.com_local = self._com_local(target)
-        front, side, up = self._frame_axes()
-        _, width, height = self._object_dims()
-        sw, sh = self._patch_extents()
-        self.template_meta["frame"] = {"front_axis": self.axis_param("front_axis", "+x"), "up_axis": self.axis_param("up_axis", "+z"),
-                                       "level_axis": "xyz"[int(th.argmax(side.abs()))], "symmetric_180": self._symmetric_180()}
-        self.template_meta["swept_dims"] = {"level_width": round(width, 4), "level_height": round(height, 4), "patch_width": round(sw, 4),
-                                            "patch_height": round(sh, 4), "max_deviation_deg": round(math.degrees(self._max_deviation()), 2)}
-        log.info("%s: %s level %.2f x %.2f m, wall patch %.2f x %.2f m (+0.10 margin), symmetric_180=%s", self.tag,
-                 self.bindings.one("target").name, width, height, sw, sh, self._symmetric_180())
-        super().prepare_bindings()
-
-    def sample(self, rng: np.random.Generator) -> Draft:
-        d = super().sample(rng)
-        d.summary["symmetric_180"] = self._symmetric_180()
-        return d

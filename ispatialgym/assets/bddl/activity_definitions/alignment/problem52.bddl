@@ -1,9 +1,8 @@
 (define (problem alignment-52)
     (:domain ispatialgym)
-    (:alias alignment-axial-gym_shoe_s070-breakfast_table)
+    (:alias alignment-axial-bag_of_chips-countertop)
 
-    ; ground_isg 2.0.0: alignment-axial-gym_shoe_s070-breakfast_table (alignment/axial.iddl; alignment-axial#04~T1/representative/fallback1:scale)
-    ; fallback 1 (scale) of alignment-axial-gym_shoe-breakfast_table: scale = 0.7, scale_source = default_step
+    ; ground_isg 2.0.0: alignment-axial-bag_of_chips-countertop (alignment/axial.iddl; alignment-axial#07~T2/representative)
     ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
     ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
     ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
@@ -11,23 +10,23 @@
     ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        gym_shoe.n.01_1 - gym_shoe.n.01
-        breakfast_table.n.01_1 - breakfast_table.n.01
+        bag__of__chips.n.01_1 - bag__of__chips.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop gym_shoe.n.01_1 breakfast_table.n.01_1)
+        (ontop bag__of__chips.n.01_1 countertop.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?gym_shoe.n.01_1 ?breakfast_table.n.01_1)
-            (pose_reached ?gym_shoe.n.01_1)
-            (not (grasped ?agent.n.01_1 ?gym_shoe.n.01_1))
-            (pose_settled ?gym_shoe.n.01_1)
+            (ontop ?bag__of__chips.n.01_1 ?countertop.n.01_1)
+            (pose_reached ?bag__of__chips.n.01_1)
+            (not (grasped ?agent.n.01_1 ?bag__of__chips.n.01_1))
+            (pose_settled ?bag__of__chips.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

@@ -92,14 +92,6 @@ EXPECTED = {
         [],
         [],
     ),
-    ("alignment", 2): (
-        "world_horizontal",
-        ["pose_reached", "not grasped"],
-        ["towel_rack.n.01_1", "agent.n.01_1"],
-        ["towel_rack.n.01_1"],
-        [],
-        [],
-    ),
 }
 for i, rel in enumerate(["ontop", "under", "inside", "nextto", "touching"]):
     EXPECTED[("inter_object_relation_satisfaction", i)] = (
@@ -362,7 +354,7 @@ def test_legacy_activity_name_loads_renamed_templates():
     assert activity_dir("world_alignment").endswith(os.sep + "alignment")
     ids = list_problem_ids("alignment")
     assert list_problem_ids("world_alignment") == ids
-    assert ids[:3] == [0, 1, 2] and ids == list(range(len(ids)))  # the v1 templates stay 0-2; ground_isg appends contiguous ids
+    assert ids[:2] == [0, 1] and ids == list(range(len(ids)))  # the v1 templates stay 0-1; ground_isg appends contiguous ids
     problem = load_problem("world_alignment", 0)
     assert problem.activity == "alignment" and problem.name == "alignment-0" and problem.canonical_name == "alignment-0"
     assert problem.alias == "table_surface"
@@ -447,7 +439,7 @@ def test_v1_bddl_writer_and_sampler_dispatch_accept_both_names(monkeypatch):
 
     # the v1 sampler module imports OmniGibson; stub it so that only the dispatch is exercised here
     stub = types.ModuleType("ispatialgym.sampling.tasks.world_alignment")
-    for cls_name in ("TableSurfaceSampler", "WorldVerticalSampler", "WorldHorizontalSampler"):
+    for cls_name in ("TableSurfaceSampler", "WorldVerticalSampler"):
         setattr(stub, cls_name, type(cls_name, (), {}))
     monkeypatch.setitem(sys.modules, "ispatialgym.sampling.tasks.world_alignment", stub)
 
@@ -462,11 +454,11 @@ def test_v1_bddl_writer_and_sampler_dispatch_accept_both_names(monkeypatch):
         assert problem.text.startswith(f"(define (problem {activity}-0)")
         assert problem.alias == "table_surface"
         assert get_sampler_class(f"{activity}-0").__name__ == "TableSurfaceSampler"
-        assert get_sampler_class(f"{activity}-2").__name__ == "WorldHorizontalSampler"
-    with pytest.raises(ValueError, match="world_alignment has no definition 3"):
-        build_problem("world_alignment", 3, b)
+        assert get_sampler_class(f"{activity}-1").__name__ == "WorldVerticalSampler"
+    with pytest.raises(ValueError, match="world_alignment has no definition 2"):  # world horizontal was retired
+        build_problem("world_alignment", 2, b)
     with pytest.raises(KeyError):
-        get_sampler_class("alignment-3")
+        get_sampler_class("alignment-2")
 
 
 # ----------------------------------------------------------------------------------------------------------------

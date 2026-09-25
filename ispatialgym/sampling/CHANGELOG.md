@@ -4,6 +4,15 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
 
 ## 1.5.0 (unreleased) - one arm pose per task, scene variants without chairs, goal check without the robot
 
+- **World horizontal retired** (2026-09-23). The `alignment-world_horizontal` subtask (v1 `world_alignment-2`, alias
+  `world_horizontal`) is removed everywhere: the v2 sampler `alignment_wall.py` registers world vertical only (the
+  horizontal `swept_patch` extents, `level_axis` frame key and the `V1_DEFINITION_ID` 2 are gone), the v1
+  `WorldHorizontalSampler` / `bddl_writer` definition 2, the oracle program / sidecar / program-check registries,
+  `generation_defaults`, `v2.problem.SUBTASK_FAMILY`, `v1_bridge`, `ground_isg` (`WALL_SUBTASKS`,
+  `SCALE_FALLBACK_SUBTASKS`, `frame_level` is no longer read), the iddl file, the 22 alignment BDDL problems
+  (legacy `problem2` + 21 grounded aliases; the remaining alignment problems are renumbered contiguously and the
+  customs `definition_id`s follow), the 21 customs entries, the `isg_reps` v1-bridge snapshot, the icl candidate /
+  representative rows (+ report) and the revolution-axes table entries only that subtask used. 20 subtasks remain.
 - **Neighbouring rooms loaded while sampling, nothing hidden for renders** (B10). `SimWorld.load_adjacent` defaults
   to on (`ISG_LOAD_ADJACENT=0` opts out), so the sampler, evaluation and the oracle load the same room set (collision
   and visual world parity). The v1 `seg_instance` crash (light fixture + glass in view; kitchen / garden with the

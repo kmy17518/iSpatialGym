@@ -1,15 +1,15 @@
-"""Alignment — world vertical / world horizontal (spec §5.5 / §6.9; oracle doc §6.2 row "alignment — world vertical /
-horizontal"): the target hangs on a wall through a COM hinge (TRO ``constraints``), starts tilted by δ in the wall
-plane and is pushed level / upright with a tangential push at its low end while the other hand braces.
+"""Alignment — world vertical (spec §5.5 / §6.9; oracle doc §6.2 row "alignment — world vertical"): the target hangs
+on a wall through a COM hinge (TRO ``constraints``), starts tilted by δ in the wall plane and is pushed upright with a
+tangential push at its low end while the other hand braces.
 
 Roles: ``target`` (spawned at ``roles.target.scale``), the wall (scene role ``support``; ``bindings.support`` = allowed
 wall names, ``bindings.support_regions`` = surveyed wall segments; the v1 facade calls them ``wall`` / ``wall_regions``),
 ``floor``. Prompt 0 with the wall as the face (n = wall normal, P = the hinge point on the wall at hang height).
 
 Template (:meth:`AlignmentWall.prepare_bindings` / :meth:`sample_template`): the target's §5.5 frame from the alias'
-per-model ``generation.front_axis`` / ``up_axis`` (/ ``level_axis``) record — the reviewed icl frame ``ground_isg``
-writes; an alias without it is ``Reject("missing_frame")``, never a default (owner 2026‑09‑16 22:55) —, wall spots from
-the regions (0.25 m seeding) or the 24-ray search, flat 5 × 5 patch within 1 cm over (w + 0.10) × (h + 0.10) (horizontal: swept extents),
+per-model ``generation.front_axis`` / ``up_axis`` record — the reviewed icl frame ``ground_isg`` writes; an alias
+without it is ``Reject("missing_frame")``, never a default (owner 2026‑09‑16 22:55) —, wall spots from the regions
+(0.25 m seeding) or the 24-ray search, flat 5 × 5 patch within 1 cm over (w + 0.10) × (h + 0.10),
 front clearance 0.35 m, in-room test 0.8 m in front, one wall per template (most spots); per spot the Phase-2 step-1
 survivors (arms excluded: δ-, target- and scale-independent, cached per (scene, spot)); the template filter keeps a
 spot when steps 1–3 pass for δ = +30° and δ = −30° at the configured scale; none → ``Reject("no_stance")`` with the
@@ -20,7 +20,7 @@ d 0.5–1.5 m, the whole tilted target in frame), Phase 2 steps 2–4 (contacts 
 waypoints δ/2 and goal, brace kinds ``below_high`` → ``above_low`` → ``side_high``; focus C; C, E_low and B in frame),
 step 5 (brace arm first with the target not ignored, then the push arm with the brace locked and the target ignored
 for the contact poses, combined whole-body check), step 6 path + transition; the hinge at the COM after apply; hinge
-drift ≤ 0.03 rad and ≥ 5 visible objects after settling; goal = the level pose, tolerance 0.08 rad, equivalences from
+drift ≤ 0.03 rad and ≥ 5 visible objects after settling; goal = the upright pose, tolerance 0.08 rad, equivalences from
 ``symmetric_180`` (half turn about the front axis) and the icl symmetry tags.
 
 Stand-ins (reported): the combined whole-body check places the push arm at its **pre-contact** solution (the contact
@@ -38,7 +38,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
-from ispatialgym.sampling.constraints import HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, Hinge, create_hinge, hinge_resistance, remove_hinge
+from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, Hinge, create_hinge, hinge_resistance, remove_hinge
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import pose_target
@@ -48,9 +48,9 @@ from ispatialgym.sampling.v2.stances import ContactRecord, FaceFrame, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
-SUBTASKS = ("alignment-world_vertical", "alignment-world_horizontal")
+SUBTASKS = ("alignment-world_vertical",)
 #: v1 ``bddl_writer`` definition ids (facade)
-V1_DEFINITION_ID = {"alignment-world_vertical": 1, "alignment-world_horizontal": 2}
+V1_DEFINITION_ID = {"alignment-world_vertical": 1}
 #: §5.5 brace candidates in order (first reachable wins)
 BRACE_KINDS = ("below_high", "above_low", "side_high")
 #: A8 (owner decision 2026‑09‑16): |δ| ≤ 25° until the two-stroke push for larger tilts exists (TODO: two strokes with a
@@ -72,19 +72,14 @@ def axis_vec(name: str) -> th.Tensor:
     return th.tensor(AXES[name], dtype=th.float32)
 
 
-def frame_axes(front: str, up: str, level: Optional[str] = None) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
-    """Object-frame (front, side, up) unit vectors from the reviewed axis names (``front_axis`` / ``up_axis``; the
-    optional ``level_axis`` must be the axis along the wall implied by the two). No defaults: the sampler passes the
-    alias' per-model record (:meth:`AlignmentWall.reviewed_frame`)."""
+def frame_axes(front: str, up: str) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    """Object-frame (front, side, up) unit vectors from the reviewed axis names (``front_axis`` / ``up_axis``; the side
+    axis is the axis along the wall implied by the two). No defaults: the sampler passes the alias' per-model record
+    (:meth:`AlignmentWall.reviewed_frame`)."""
     f, u = axis_vec(front), axis_vec(up)
     if abs(float(th.dot(f, u))) > 1e-6:
         raise ValueError(f"front_axis {front} and up_axis {up} are not orthogonal")
     side = th.cross(u, f, dim=0)
-    if level is not None:
-        want = str(level).strip().lstrip("+-").lower()
-        got = "xyz"[int(th.argmax(side.abs()))]
-        if want != got:
-            raise ValueError(f"level_axis {level} is not the axis along the wall implied by front {front} / up {up} ({got})")
     return f, side, u
 
 
@@ -98,16 +93,6 @@ def hang_quat(normal, front, side, up) -> th.Tensor:
     W = th.stack([n, t, z], dim=1)
     O = th.stack([front, side, up], dim=1)
     return C.mat_to_quat(W @ O.T)
-
-
-def swept_extent(p: float, q: float, delta: float) -> float:
-    """max over a ∈ [0, δ] of p·cos a + q·sin a: the extent along one wall axis of a p × q rectangle swept between the
-    aligned pose and a tilt of δ."""
-    if delta <= 0:
-        return p
-    if math.atan2(q, p) <= delta:
-        return math.hypot(p, q)
-    return p * math.cos(delta) + q * math.sin(delta)
 
 
 def brace_candidate_order(height: float, width: float, kinds: Sequence[str] = BRACE_KINDS) -> List[str]:
@@ -207,11 +192,10 @@ def half_turn_equivalence(front) -> List[float]:
 
 @register(*SUBTASKS)
 class AlignmentWall(SamplerV2):
-    """World vertical (upright goal) and world horizontal (level goal) share everything but the patch extents."""
+    """World vertical: the wall-hung target is pushed back to its upright goal."""
 
     def __init__(self, ctx):
         super().__init__(ctx)
-        self.horizontal = "horizontal" in self.subtask
         if self.gp.bddl is None:
             self.definition_id = V1_DEFINITION_ID[self.subtask]
         self.wall_role = "support" if "support" in self.gp.roles else ("wall" if "wall" in self.gp.roles else "support")
@@ -268,19 +252,18 @@ class AlignmentWall(SamplerV2):
     def symmetric_180(self) -> bool:
         return bool(self.target_param("symmetric_180", False))
 
-    def reviewed_frame(self) -> Dict[str, Optional[str]]:
-        """§5.5 frame of the target from the alias: ``generation.front_axis`` / ``up_axis`` (/ ``level_axis``, horizontal),
-        per model (dict form) as ``ground_isg`` writes the reviewed icl ``frame_*`` columns. **Never defaulted** (owner
-        2026‑09‑16 22:55: the painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) —
-        an alias without the keys for the spawned model is ``Reject("missing_frame")`` (re-ground the alias)."""
+    def reviewed_frame(self) -> Dict[str, str]:
+        """§5.5 frame of the target from the alias: ``generation.front_axis`` / ``up_axis``, per model (dict form) as
+        ``ground_isg`` writes the reviewed icl ``frame_*`` columns. **Never defaulted** (owner 2026‑09‑16 22:55: the
+        painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) — an alias without the keys
+        for the spawned model is ``Reject("missing_frame")`` (re-ground the alias)."""
         c = self.choice.models["target"]
         front, up = self.target_param("front_axis"), self.target_param("up_axis")
-        level = self.target_param("level_axis") if self.horizontal else None
         missing = [k for k, v in (("front_axis", front), ("up_axis", up)) if v is None]
         if missing:
             raise Reject("missing_frame", f"{self.gp.alias}: generation.{' / '.join(missing)} carries no entry for {c.category}/{c.model} "
                                           f"(the reviewed icl frame is written per model by ground_isg; the sampler does not default a frame)")
-        return {"front_axis": str(front), "up_axis": str(up), "level_axis": None if level is None else str(level)}
+        return {"front_axis": str(front), "up_axis": str(up)}
 
     # ------------------------------------------------------------------ roles
 
@@ -335,11 +318,9 @@ class AlignmentWall(SamplerV2):
         return tuple(float((pts @ a).max() - (pts @ a).min()) for a in (self.front, self.side, self.up))
 
     def patch_extents(self, hull: Optional[th.Tensor] = None) -> Tuple[float, float]:
+        """(width along the wall, height) the wall patch must be flat and clear for."""
         _, w, h = self.dims(hull)
-        if not (self.horizontal and bool(self.param("swept_patch", True))):
-            return w, h
-        d = max(abs(a) for a in self.deviation_range())
-        return swept_extent(w, h, d), swept_extent(h, w, d)
+        return w, h
 
     def hang_pose(self, spot: Dict[str, Any], delta: float, hull: Optional[th.Tensor] = None, com: Optional[th.Tensor] = None) -> G.Pose:
         """§5.5 hang pose: up axis along world z, front axis along n, centre at hang height, thickness/2 + 0.01 off the
@@ -641,7 +622,7 @@ class AlignmentWall(SamplerV2):
         self.com_local = self._com_local(target)
         frame = self.reviewed_frame()
         try:
-            self.front, self.side, self.up = frame_axes(frame["front_axis"], frame["up_axis"], frame["level_axis"])
+            self.front, self.side, self.up = frame_axes(frame["front_axis"], frame["up_axis"])
         except (ValueError, KeyError) as e:
             raise Reject("missing_frame", f"{self.gp.alias}: the recorded frame {frame} is not a valid §5.5 frame: {e}")
         self.frame = frame
@@ -929,14 +910,16 @@ class AlignmentWall(SamplerV2):
     def hinge_resistance(self) -> Dict[str, float]:
         """§7 hinge friction / damping of the wall hinge (owner 2026‑09‑16 22:05): from the target's inertia about the
         hinge axis (its mass and the canonical extents perpendicular to the front axis = width along the wall × height),
-        friction = I_n · ``generation.hinge_stop_decel_rad_s2`` (5 rad/s²), damping = I_n / ``generation.
-        hinge_viscous_tau_s`` (0.02 s) — :func:`ispatialgym.sampling.constraints.hinge_resistance`."""
+        friction = I_n · ``generation.hinge_stop_decel_rad_s2`` (10 rad/s²), damping = max(I_n / ``generation.
+        hinge_viscous_tau_s`` (0.02 s), friction / ``generation.hinge_brake_omega_rad_s`` (0.0025 rad/s, the brake of
+        2026-09-22)) — :func:`ispatialgym.sampling.constraints.hinge_resistance`."""
         _, w, h = self.dims()
         mass = float(self.target.mass)
         if not (mass > 0):
             raise Reject("spec", f"{self.tname}: the spawned target reports mass {mass} (the hinge resistance needs its inertia)")
         return hinge_resistance(mass, (w, h), decel=float(self.param("hinge_stop_decel_rad_s2", HINGE_STOP_DECEL_RAD_S2)),
-                                tau=float(self.param("hinge_viscous_tau_s", HINGE_VISCOUS_TAU_S)))
+                                tau=float(self.param("hinge_viscous_tau_s", HINGE_VISCOUS_TAU_S)),
+                                omega_brake=float(self.param("hinge_brake_omega_rad_s", HINGE_BRAKE_OMEGA_RAD_S)))
 
     def apply_draft_extras(self, draft: Draft):
         target, wall = self.target, self.wall
