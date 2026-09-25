@@ -1561,6 +1561,7 @@ class Executor:
             # owner 2026-09-16 23:00 (fact, no verdict): the support's pose drift and the finger-support contact loading
             "support_disturbance": self.support_load.report() if self.support_load is not None else {},
             "settled_success": settled_task,
+            "pose_settled_config": isg.get("pose_settled_config"),
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
             "first_success_step": isg.get("first_success_step"),
             "first_settled_success_step": isg.get("first_settled_success_step"),

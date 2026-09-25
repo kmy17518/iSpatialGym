@@ -43,8 +43,24 @@ OmniGibson's ``PoseSettled`` needs the root velocity below 1 mm/s on every step 
 63 / 144 window steps above the threshold, total drift 0.015 mm / 0.000 deg) - the velocity gate can never pass, so the
 settle metric was unmeasurable for every attachment. After an OmniGibson False the **drift** branch decides from the state's
 own window (``n_steps`` samples, the configured tolerances): the buffer full and every sample's root pose (and joints)
-within tolerance of the window anchor - the velocity gate alone is dropped. Objects without an attachment joint keep the
-stock rule.
+within tolerance of the window anchor - the velocity gate alone is dropped.
+
+``pose_settled`` of the **robot** (owner 2026-09-24): the same drift rule. The R1Pro chassis stands on its three wheel spheres
+(gravity on the base-fixed links only, the z / rx / ry virtual joints free) and the base-footprint velocity PoseSettled reads
+is the contact solver's per-substep correction residual, not motion: 0.96 mm/s median with the stock 47.6 kg chassis, 1.43
+with the evaluator's 250 kg, on every step of a window in which the base moves 2 um and no joint 0.05 mrad (pod probe
+``scripts/experiments/probe_base_velocity_artifact.py``, house_single_floor; more velocity iterations or softer base drives
+make it worse, only 64 position iterations or no chassis weight remove it). The 1 mm/s gate therefore never holds for the
+agent (30 of the 153 successful first-demo runs, every base-only and held-object task among them) while the robot is at rest.
+
+``pose_settled`` of **every object** (owner 2026-09-24): the same residual makes 86 of the 228 settled-object atoms of those
+runs fail while the object moves <= 0.24 mm / 2.5 mrad over the window (25 / 26 ontop-small, 10 / 10 under-small and inside:
+objects resting on or in other objects, the supports themselves, articulated lids, held objects), so the drift rule applies to
+all entities (``DRIFT_SETTLED_ENTITIES`` = ``all``; ``ISG_DRIFT_SETTLED`` narrows it). The rest criterion then lives in the
+PoseSettled window the task configures - 45 steps (1.5 s), 2 mm / 5 mrad / 5 mrad joints, ``tasks.ispatialgym_task.
+DEFAULT_POSE_SETTLED_CONFIG`` - chosen as the tightest round values every settled entity of the 28 latest first-demo
+successes clears at its last step (their 1.5 s drift: <= 0.074 mm, <= 0.98 mrad = the float32 quaternion resolution,
+<= 0.036 mrad of joint), while a hinge creeping 0.25 deg/s (6.5 mrad over the window) or an object rolling 3 mm/s (4.5 mm) fails.
 
 Every evaluation appends ``{"predicate", "entities", "branch", "ok", "detail"}`` to the branch log (``reset_branches`` /
 ``branches``); the callers copy it into ``goal_check.binary_branch`` (sampler) and ``meta.binary_branch`` (evaluator) so the
@@ -67,6 +83,11 @@ TOUCHING_GAP_MAX_M = float(os.environ.get("ISG_TOUCHING_GAP_MAX_M", "0.003"))
 #: attachment alignment (OmniGibson ``AttachedTo``'s own thresholds: m.DEFAULT_POSITION_THRESHOLD / m.DEFAULT_ORIENTATION_THRESHOLD)
 ATTACH_POS_MAX_M = 0.05
 ATTACH_ORN_MAX_RAD = math.radians(15.0)
+#: ``pose_settled`` entities judged by configuration drift after an OmniGibson False (module docstring): ``attached`` (the
+#: members of an attachment joint), ``robot`` (the agent), ``all`` (every object - the default since 2026-09-24, with the
+#: tightened drift window ``tasks.ispatialgym_task.DEFAULT_POSE_SETTLED_CONFIG``). ``ISG_DRIFT_SETTLED`` overrides (comma
+#: list; ``attached,robot`` = the 2026-09-20 / 09-24 stages, ``attached`` = the 09-20 rule alone).
+DRIFT_SETTLED_ENTITIES = frozenset(s.strip() for s in os.environ.get("ISG_DRIFT_SETTLED", "all").split(",") if s.strip())
 
 _BRANCHES: List[Dict[str, Any]] = []
 #: (child object name, parent object name) -> {"child_link", "parent_link", "equivalences": [[x, y, z, w], ...]} — the task's
@@ -218,12 +239,35 @@ def joined_by_attachment(obj: Any) -> bool:
     return any(c is not None for c in (getattr(st, "children", None) or {}).values())
 
 
+def is_robot(obj: Any) -> bool:
+    """``obj`` is a robot (an OmniGibson ``Robot``; a stand-in with ``is_robot`` or a ``controller_action_idx`` in the tests)."""
+    try:
+        from omnigibson.robots import Robot
+
+        if isinstance(obj, Robot):
+            return True
+    except Exception:  # noqa: BLE001 - no simulator module (the test stubs)
+        pass
+    return bool(getattr(obj, "is_robot", False)) or hasattr(obj, "controller_action_idx")
+
+
+def drift_settled_kind(obj: Any) -> Optional[str]:
+    """The ``DRIFT_SETTLED_ENTITIES`` class of ``obj`` when its ``pose_settled`` is judged by drift after an OmniGibson False:
+    ``"robot"``, ``"attached"`` or ``"all"`` (any other object, when enabled); None = the stock velocity-gated rule stands."""
+    kind = "robot" if is_robot(obj) else ("attached" if joined_by_attachment(obj) else "all")
+    if kind in DRIFT_SETTLED_ENTITIES or "all" in DRIFT_SETTLED_ENTITIES:
+        return kind
+    return None
+
+
 def settled_by_drift(obj: Any) -> Dict[str, Any]:
     """``pose_settled`` by configuration drift alone, read from the object's ``PoseSettled`` window: active, the buffer
     full (``n_steps`` distinct simulator steps) and every sample's root pose (and joint positions) within the state's own
     tolerances of the window anchor — OmniGibson's rule minus the per-step velocity gate that a fixed attachment joint's
-    solver residual (1-3 mm/s at 0.0x mm of motion) never lets pass. Returns ``{"ok", "n", "n_steps", "max_pos_drift_m",
-    "max_ori_drift_rad", "velocity_still_steps"}``."""
+    solver residual (1-3 mm/s at 0.0x mm of motion) or the robot chassis' wheel-contact residual (1-2.5 mm/s at 2 um of
+    motion) never lets pass. For the robot the joints include the six virtual base joints, so the base's planar drift is
+    checked twice (root pose and joints). Returns ``{"ok", "n", "n_steps", "max_pos_drift_m", "max_ori_drift_rad",
+    "max_joint_drift", "velocity_still_steps"}``."""
     from omnigibson.object_states import PoseSettled
 
     st = obj.states.get(PoseSettled) if hasattr(obj.states, "get") else None
@@ -356,13 +400,15 @@ def evaluate_predicate(predicate_cls, *entities) -> bool:
         if ok:
             _log(name, entities, "omnigibson", True)
             return True
-        if not joined_by_attachment(entities[0]):
+        kind = drift_settled_kind(entities[0])
+        if kind is None:
             _log(name, entities, "omnigibson", False)
             return False
         try:
             s = settled_by_drift(entities[0])
         except Exception as e:  # noqa: BLE001 - a read failure must not turn into a verdict
             s = {"ok": False, "error": repr(e)}
+        s["entity"] = kind
         _log(name, entities, "drift" if s.get("ok") else "none", bool(s.get("ok")), s)
         return bool(s.get("ok"))
     if name not in ("under", "ontop", "touching", "attached") or len(entities) != 2 or any(e is None or not _is_object(e) for e in entities):

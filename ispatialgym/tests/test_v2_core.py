@@ -459,6 +459,75 @@ def test_robust_under_ontop_wrapper_branches(monkeypatch):
     assert PRED.evaluate_predicate(NextTo, cup, saucer) is True and PRED.branches()[-1]["branch"] == "omnigibson"
 
 
+def test_pose_settled_of_the_robot_is_judged_by_configuration_drift(monkeypatch):
+    """Owner 2026-09-24: PoseSettled's 1 mm/s root-velocity gate never holds for the R1Pro at rest (the wheel-contact solver
+    residual, pod probe), so after an OmniGibson False the robot's ``pose_settled`` is decided by the drift of its PoseSettled
+    window - the rule the attached objects already had. A plain object keeps the stock rule unless ``DRIFT_SETTLED_ENTITIES``
+    says ``all``; the deciding branch and the entity class are logged."""
+    import omnigibson.utils.bddl_utils as BU
+    from omnigibson.object_states import AttachedTo, PoseSettled
+    from ispatialgym.sampling import predicates as PRED
+
+    class Settled:  # the PoseSettled window as the wrapper reads it
+        def __init__(self, drift_pos=0.0, drift_joint=0.0, n=10, joints=28):
+            self.is_active, self.n_steps = True, n
+            self._pos_tolerance, self._ori_tolerance, self._joint_tolerance = 0.01, 0.05, 0.05
+            q = th.zeros(joints)
+            self._history = [(t, th.tensor([drift_pos * t / (n - 1), 0.0, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]), q + drift_joint * t / (n - 1), False) for t in range(n)]
+
+    class Obj:
+        def __init__(self, name, states, robot=False):
+            self.name, self.links, self.states = name, {}, states
+            if robot:
+                self.controller_action_idx = {"base": th.arange(3)}  # what marks a robot for the wrapper without a simulator
+
+        def get_position_orientation(self):
+            return th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0])
+
+    class pose_settled:  # bddl's predicate class stand-in (the wrapper keys on the class name)
+        pass
+
+    monkeypatch.setattr(BU, "evaluate_bddl_predicate", lambda cls, *ents: False)  # the velocity gate fails, as it does for the robot at rest
+    robot = Obj("robot_r1", {PoseSettled: Settled()}, robot=True)
+    PRED.reset_branches()
+    assert PRED.evaluate_predicate(pose_settled, robot) is True
+    last = PRED.branches()[-1]
+    assert last["branch"] == "drift" and last["detail"]["entity"] == "robot" and last["detail"]["velocity_still_steps"] == 0
+    assert PRED.decided_by() == {"pose_settled(robot_r1)": "drift"}
+    # a robot whose joints drift beyond the window tolerance is not settled (a creeping joint), and the window must be full
+    assert PRED.evaluate_predicate(pose_settled, Obj("robot_r1", {PoseSettled: Settled(drift_joint=0.1)}, robot=True)) is False
+    assert PRED.branches()[-1]["branch"] == "none"
+    short = Settled()
+    short._history = short._history[:5]
+    assert PRED.evaluate_predicate(pose_settled, Obj("robot_r1", {PoseSettled: short}, robot=True)) is False
+    assert PRED.branches()[-1]["detail"]["reason"] == "window not full"
+    # every object gets the drift rule by default (owner 2026-09-24: the resting-contact residual fails 86 / 228 still objects);
+    # ``ISG_DRIFT_SETTLED=attached,robot`` restores the stock velocity-gated verdict for a plain object
+    plain = Obj("platter_0", {PoseSettled: Settled()})
+    assert "all" in PRED.DRIFT_SETTLED_ENTITIES
+    assert PRED.evaluate_predicate(pose_settled, plain) is True and PRED.branches()[-1]["detail"]["entity"] == "all"
+    monkeypatch.setattr(PRED, "DRIFT_SETTLED_ENTITIES", frozenset({"attached", "robot"}))
+    assert PRED.evaluate_predicate(pose_settled, plain) is False and PRED.branches()[-1]["branch"] == "omnigibson"
+    assert PRED.evaluate_predicate(pose_settled, robot) is True and PRED.branches()[-1]["detail"]["entity"] == "robot"
+    # the attached child keeps its drift rule (owner 2026-09-20)
+    attached = Obj("lid_0", {PoseSettled: Settled(), AttachedTo: type("AT", (), {"parent": object(), "children": {}})()})
+    assert PRED.evaluate_predicate(pose_settled, attached) is True and PRED.branches()[-1]["detail"]["entity"] == "attached"
+    # a drifting plain object under the default rule is not settled: the window carries the rest criterion
+    monkeypatch.setattr(PRED, "DRIFT_SETTLED_ENTITIES", frozenset({"all"}))
+    assert PRED.evaluate_predicate(pose_settled, Obj("ball_0", {PoseSettled: Settled(drift_pos=0.02)})) is False
+    assert PRED.branches()[-1]["branch"] == "none" and PRED.branches()[-1]["detail"]["max_pos_drift_m"] == pytest.approx(0.02)
+    # the task's default window: the keys PoseSettled.set_config accepts, 1.5 s at 30 Hz, tolerances tighter than the stock state
+    import inspect
+    from ispatialgym.tasks.ispatialgym_task import DEFAULT_POSE_SETTLED_CONFIG
+
+    assert set(DEFAULT_POSE_SETTLED_CONFIG) <= set(inspect.signature(PoseSettled.set_config).parameters)
+    assert DEFAULT_POSE_SETTLED_CONFIG["n_steps"] == 45 and DEFAULT_POSE_SETTLED_CONFIG["pos_tolerance"] == 0.002
+    assert DEFAULT_POSE_SETTLED_CONFIG["ori_tolerance"] == 0.005 and DEFAULT_POSE_SETTLED_CONFIG["joint_tolerance"] == 0.005
+    # OmniGibson True ends the evaluation for everyone
+    monkeypatch.setattr(BU, "evaluate_bddl_predicate", lambda cls, *ents: True)
+    assert PRED.evaluate_predicate(pose_settled, robot) is True and PRED.branches()[-1]["branch"] == "omnigibson"
+
+
 def test_straight_approach_detection_and_reject_code():
     """Branch consistency (oracle finding): pre -> end segments are tracked from the pre solution; the failure carries the
     distinct ``approach_untrackable`` code for the callers' Reject."""

@@ -52,6 +52,22 @@ from ispatialgym.eval.tro import (
 
 log = logging.getLogger(__name__)
 
+#: ``PoseSettled`` configuration of every settled entity when the task gets none (owner 2026-09-24). The stock state
+#: (10 steps = 0.33 s, drift 10 mm / 50 mrad / 50 mrad) was gated by its per-step velocity thresholds; those never hold for
+#: a body in resting contact or on a driven joint (the contact-solver residual reads 1-2.5 mm/s on the robot's base and
+#: 0.02-0.04 rad/s on its wrists, ~1-3 mm/s on an attached or resting object, with micrometres of motion), so the
+#: evaluator decides ``pose_settled`` by the window's configuration drift alone (``sampling.predicates``,
+#: ``DRIFT_SETTLED_ENTITIES``) and this window carries the rest criterion:
+#:
+#: * ``n_steps`` 45 control steps (1.5 s) - the longest window that fits the executor's shortest settle phase
+#:   (``settle_min_steps`` 50; two of the 28 latest first-demo successes have 76 settle steps);
+#: * ``pos_tolerance`` 2 mm, ``ori_tolerance`` 5 mrad, ``joint_tolerance`` 5 mrad (metres for prismatic joints) - the tightest
+#:   round values every settled entity of those 28 demos clears at its last step with margin: their end-of-episode drift
+#:   over 1.5 s is at most 0.074 mm, 0.98 mrad (the float32 quaternion resolution) and 0.036 rad/1000 on the robot's
+#:   joints, with no measurable creep. A painting creeping 0.25 deg/s on its hinge (run 0922-180242) drifts 6.5 mrad over
+#:   the window and fails; an object rolling 3 mm/s drifts 4.5 mm and fails.
+DEFAULT_POSE_SETTLED_CONFIG: Dict[str, float] = {"n_steps": 45, "pos_tolerance": 0.002, "ori_tolerance": 0.005, "joint_tolerance": 0.005}
+
 
 def _compact(expr) -> str:
     return " ".join(to_bddl(expr).split())
@@ -75,7 +91,9 @@ class ISpatialGymTask(BehaviorTask):
             binary success (reached at any step of the episode).
         terminate_on_binary_success (bool): end the episode at the first binary success instead of waiting for
             the settled success (settle latency is then not measurable).
-        pose_settled_config (None or dict): kwargs forwarded to ``PoseSettled.activate`` for every settled entity.
+        pose_settled_config (None or dict): kwargs forwarded to ``PoseSettled.activate`` for every settled entity
+            (None = :data:`DEFAULT_POSE_SETTLED_CONFIG`, the drift window of the ``isg-v1`` settle criterion; ``{}`` =
+            OmniGibson's stock state).
         highlight_task_relevant_objects, termination_config, reward_config, include_obs: see ``BehaviorTask``.
     """
 
@@ -134,7 +152,7 @@ class ISpatialGymTask(BehaviorTask):
         self.groups: Dict[str, list] = {}
         self.require_pose_settled = bool(require_pose_settled)
         self.terminate_on_binary_success = bool(terminate_on_binary_success)
-        self.pose_settled_config = dict(pose_settled_config or {})
+        self.pose_settled_config = dict(DEFAULT_POSE_SETTLED_CONFIG if pose_settled_config is None else pose_settled_config)
         self._config_object_bindings = dict(object_bindings) if object_bindings else None
         self._tro: Optional[TROFile] = None
         self._tro_path = tro_path
@@ -639,6 +657,7 @@ class ISpatialGymTask(BehaviorTask):
             "task_variant": self.task_variant,
             "official_success": self.official_success,
             "require_pose_settled": self.require_pose_settled,
+            "pose_settled_config": dict(self.pose_settled_config),
             "binary_success": bool(binary),
             "binary_success_ever": first >= 0,
             "first_success_step": first,
