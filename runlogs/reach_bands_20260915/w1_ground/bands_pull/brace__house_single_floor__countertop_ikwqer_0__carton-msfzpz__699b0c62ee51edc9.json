@@ -1,0 +1,356 @@
+{
+ "scene": "house_single_floor",
+ "rooms": [
+  "utility_room_0"
+ ],
+ "support": "countertop_ikwqer_0",
+ "removed_chairs": [],
+ "lattice": 0.08,
+ "stand_off": 0.45,
+ "arms": "untucked",
+ "grid": {
+  "translates": [
+   0.0,
+   0.25,
+   0.5,
+   0.75,
+   0.95
+  ],
+  "tilts": [
+   0.0,
+   -0.3,
+   -0.6,
+   -0.9
+  ],
+  "low_top_tilt": -1.2
+ },
+ "seeds": 12,
+ "pre_grasp": 0.1,
+ "yaws": [
+  0.0,
+  0.7853981633974483,
+  1.5707963267948966,
+  2.356194490192345,
+  3.141592653589793,
+  3.9269908169872414,
+  4.71238898038469,
+  5.497787143782138
+ ],
+ "mode": "brace",
+ "smoke": false,
+ "scale": null,
+ "placed_specs": [],
+ "schedule": {
+  "chunk": 8,
+  "ik_batch": 128,
+  "max_rounds_without_pre": 1,
+  "coarse": 0.0,
+  "pose_prune": "eef and pre-grasp origin within arm_len + 0.03 of the shoulder",
+  "obstacle_radius_m": 1.6,
+  "obstacle_z_above_m": 2.1
+ },
+ "stance": {
+  "edge": "+u",
+  "edge_mid": [
+   24.18724250793457,
+   -0.05612495541572571
+  ],
+  "inward": [
+   0.9999967813491821,
+   -0.0025433592963963747
+  ],
+  "tangent": [
+   0.0025433592963963747,
+   0.9999967813491821
+  ],
+  "length_m": 4.441613674163818,
+  "base_pose2d": [
+   23.73724365234375,
+   -0.05498044192790985,
+   -0.002543361998520354
+  ],
+  "stand_off": 0.45,
+  "overhang": 0.0,
+  "edge_depth": 0.4500003159046173
+ },
+ "top": {
+  "name": "countertop_ikwqer_0",
+  "z": 0.9275420904159546,
+  "yaw": 3.1390492916107178,
+  "local_bounds": [
+   -24.831832885742188,
+   -24.187307357788086,
+   -2.22619891166687,
+   2.2154147624969482
+  ],
+  "n_free_cells": 6620,
+  "occupants": [
+   "fixed_window_qvqecb_0",
+   "tabletop_sink_vekaaf_0"
+  ],
+  "resolution": 0.02
+ },
+ "z_support": 0.9275420904159546,
+ "target": "carton/msfzpz",
+ "handle_key": "carton__msfzpz",
+ "joint": "j_link_0",
+ "joint_values": [
+  0.0,
+  1.4835,
+  2.2253,
+  2.8187,
+  2.9671
+ ],
+ "face_yaw_offset": -0.007320893872883261,
+ "handle_arm": "left",
+ "brace_arm": "right",
+ "handle": {
+  "kind": "edge_lid",
+  "contact": [
+   -0.6304,
+   -0.1611,
+   0.3665
+  ],
+  "pinch_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "approach_dir": [
+   0.9955,
+   0.0087,
+   0.0947
+  ],
+  "width": 0.0149,
+  "exposed": true,
+  "note": "pinch the lid/flap across its thickness at the free edge",
+  "pull_dir": [
+   -0.0981,
+   0.0144,
+   0.9951
+  ]
+ },
+ "trunks": [
+  {
+   "translate": 0.0,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 147.39,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 41,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.0,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 116.6,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 37,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.0,
+   "tilt": -0.6,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 130.33,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 36,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.0,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.25,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 115.32,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 57,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.25,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 123.49,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 46,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.25,
+   "tilt": -0.6,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 132.37,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 41,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.25,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.5,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 131.98,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 108,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.5,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 146.07,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 66,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.5,
+   "tilt": -0.6,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.5,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.75,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 136.77,
+   "feasible": [],
+   "n_after_prune": 180,
+   "n_handle_only_pairs": 66,
+   "n_all_q": 0
+  },
+  {
+   "translate": 0.75,
+   "tilt": -0.3,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.75,
+   "tilt": -0.6,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.75,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.95,
+   "tilt": 0.0,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.95,
+   "tilt": -0.3,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.95,
+   "tilt": -0.6,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  },
+  {
+   "translate": 0.95,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 180,
+   "n_reachable": 0,
+   "time_s": 0.0,
+   "feasible": []
+  }
+ ],
+ "union_extent": null,
+ "n_reachable_total": 0,
+ "key": "699b0c62ee51edc9",
+ "time_s": 1447.1,
+ "kit_stats": {
+  "ik_calls": 0,
+  "ik_s": 0.0,
+  "ik_batch_calls": 219,
+  "ik_batch_problems": 25868,
+  "ik_batch_s": 1141.8030161857605,
+  "collision_calls": 24,
+  "collision_configs": 24,
+  "collision_s": 0.4687991142272949
+ }
+}
