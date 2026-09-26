@@ -727,3 +727,13 @@ def test_exact_checks_thresholds_and_sidecar_comparison():
     far["stances"]["init"]["hold"]["start_depth_m"] = 0.31
     assert not V.exact_checks(snap(), snap(), stored, far, {"goal": {"init_depth_m": 0.31}})["ok"]
     assert V.quat_angle64(q_id, [0.0, 0.0, math.sin(0.0005), math.cos(0.0005)]) == pytest.approx(0.001, rel=1e-6)
+
+
+def test_validation_sampler_carries_the_alias_generation():
+    """The program check reads per-problem witness overrides through ``sampler.gp.gen`` (``'ValidationSampler' object has
+    no attribute 'gp'`` failed every held-object reload); unknown aliases fall back to the defaults."""
+    s = V.ValidationSampler(None, None, {}, [], "object_scaling", {"witness_residual_max_m": 0.004})
+    assert s.gp.gen("witness_residual_max_m", 0.002) == 0.004 and s.gp.gen("witness_residual_pre_m", 0.002) == 0.002
+    assert s.grasp_ignore_objects() == [] and V.ValidationSampler(None, None, {}, [], "x").gp.gen("k", 1) == 1
+    assert V.customs_generation("object_scaling-canned_food")["min_depth_change_m"] == 0.05
+    assert V.customs_generation("no-such-alias") == {}

@@ -681,20 +681,45 @@ def draft_from_sidecar(d: Mapping[str, Any]) -> LoadedSidecar:
     return sd
 
 
+class _GenerationView:
+    """``sampler.gp`` for the program check: ``gen(key, default)`` over the alias's customs ``generation`` (its per-problem
+    witness-residual overrides), as ``GroundedProblem.gen``."""
+
+    def __init__(self, generation: Optional[Mapping[str, Any]] = None):
+        self.generation = dict(generation or {})
+
+    def gen(self, key: str, default=None):
+        return self.generation.get(key, default)
+
+
+def customs_generation(alias: Optional[str]) -> Dict[str, Any]:
+    """The ``generation`` of ``alias`` in the tree's customs list (empty when the alias or the file is missing)."""
+    from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH
+
+    try:
+        return dict((_read_json(DEFAULT_CUSTOMS_PATH).get(alias or "") or {}).get("generation") or {})
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 class ValidationSampler:
     """What ``program_check.run`` needs from "the sampler" (its docstring): ``ikc`` (``IKChecker``), ``kit``
-    (``RobotKit``), ``objects`` (bddl instance -> sim object), ``support_objects()`` and ``subtask``, over the
-    evaluator's loaded instance."""
+    (``RobotKit``), ``objects`` (bddl instance -> sim object), ``support_objects()`` / ``grasp_ignore_objects()``,
+    ``subtask`` and ``gp.gen`` (the alias's generation), over the evaluator's loaded instance."""
 
-    def __init__(self, kit, ikc, objects: Mapping[str, Any], supports: Sequence[Any], subtask: str):
+    def __init__(self, kit, ikc, objects: Mapping[str, Any], supports: Sequence[Any], subtask: str, generation: Optional[Mapping[str, Any]] = None):
         self.kit = kit
         self.ikc = ikc
         self.objects = dict(objects)
         self._supports = list(supports)
         self.subtask = subtask
+        self.gp = _GenerationView(generation)
 
     def support_objects(self) -> List[Any]:
         return list(self._supports)
+
+    def grasp_ignore_objects(self) -> List[Any]:
+        return []
 
 
 def run_program_check(alias: str, draft, sampler, subtask: str) -> Dict[str, Any]:
@@ -1206,7 +1231,7 @@ def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] =
                     report["loader"]["planner_build_s"] = round(time.time() - t0, 1)
                 else:
                     kit.sync_world()
-                sampler = ValidationSampler(kit, ikc, objects, [objects[s] for s in supports if s in objects], subtask)
+                sampler = ValidationSampler(kit, ikc, objects, [objects[s] for s in supports if s in objects], subtask, customs_generation(alias))
                 pc = run_program_check(alias, draft_from_sidecar(sc_dict), sampler, subtask)
                 rec["checks"]["program_check"] = pc
                 if not pc["ok"]:
