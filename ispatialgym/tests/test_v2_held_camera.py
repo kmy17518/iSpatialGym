@@ -406,10 +406,10 @@ def test_orbit_key_poses_rotate_about_the_pivot():
 def test_generation_waypoints_default_is_three():
     from ispatialgym.sampling import generation_defaults as GD
 
-    for st in ("object_scaling", "mental_rotation"):
+    for st, roll in (("object_scaling", 90.0), ("mental_rotation", 15.0)):
         d = GD.defaults_for(st)
         assert d["waypoints"] == 3
-        assert d["hold"] == {"depth_m": 0.50, "trunk": [0.5, 0.0], "roll_deg": 15.0}
+        assert d["hold"] == {"depth_m": 0.50, "trunk": [0.5, 0.0], "roll_deg": roll}
         assert d["min_visible_fraction"] == pytest.approx(0.40)
 
 
@@ -458,6 +458,18 @@ def test_hold_eef_pose_geometry():
     assert float(o0[1]) == pytest.approx(-C.CONTACT_CENTER_Z, abs=1e-6)  # origin = pad − CONTACT_CENTER_Z·a
 
 
+def test_object_scaling_hold_closes_the_fingers_horizontally():
+    """Object scaling's roll 90°: the closing axis is horizontal and points back at the robot, so a cylinder pinched
+    across its diameter (axis = approach × closing) stands upright and faces the camera with its side."""
+    yaw = 0.7
+    base_q = C.quat_from_yaw(yaw)
+    cam = (C.quat_rotate(base_q, th.tensor([0.24, 0.0, 1.39])), C.quat_with_z_axis(C.quat_rotate(base_q, th.tensor([-1.0, 0.0, 0.0])), base_q))
+    (_, quat), _ = HO.hold_eef_pose(cam, yaw, HO.HoldConstants(0.50, 0.5, 0.0, 90.0))
+    a, c = C.approach_axis(quat), C.closing_axis(quat)
+    assert th.allclose(c, C.quat_rotate(base_q, th.tensor([-1.0, 0.0, 0.0])), atol=1e-5)
+    assert th.allclose(th.cross(a, c, dim=0), th.tensor([0.0, 0.0, 1.0]), atol=1e-5)
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # B7 prior
 # ----------------------------------------------------------------------------------------------------------------
@@ -478,6 +490,19 @@ def test_visibility_prior_roundtrip(tmp_path):
     assert HO.prior_admits(prior, "banana__znakxm", "grasp_3", 0.4) is None
     assert HO.prior_admits(prior, "banana__znakxm", "grasp_9", 0.4) is None
     assert HO.load_visibility_prior(str(tmp_path / "missing.json")) == {}
+
+
+def test_visibility_prior_applies_only_at_its_hold(tmp_path):
+    path = tmp_path / "visibility.json"
+    rec = {"grasp_key": "banana__znakxm", "grasp_name": "grasp_0", "visible_fraction": 0.2, "in_frame": True}
+    path.write_text(json.dumps({"hold": {"depth_m": 0.5, "trunk": [0.5, 0.0], "roll_deg": 15.0}, "records": [rec]}))
+    at_15 = HO.load_visibility_prior(str(path), HO.HoldConstants(0.50, 0.5, 0.0, 15.0))
+    assert HO.prior_admits(at_15, "banana__znakxm", "grasp_0", 0.4) is False
+    assert HO.load_visibility_prior(str(path), HO.HoldConstants(0.50, 0.5, 0.0, 90.0)) == {}
+    assert HO.load_visibility_prior(str(path), HO.HoldConstants(0.55, 0.5, 0.0, 15.0)) == {}
+    assert len(HO.load_visibility_prior(str(path))) == 1  # no hold given: the survey as is
+    path.write_text(json.dumps({"records": [rec]}))
+    assert HO.load_visibility_prior(str(path), HO.HoldConstants(0.50, 0.5, 0.0, 15.0)) == {}  # a survey without a hold record
 
 
 # ----------------------------------------------------------------------------------------------------------------

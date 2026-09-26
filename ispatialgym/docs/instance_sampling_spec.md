@@ -1252,8 +1252,12 @@ must stay connected). The obstacle is not a look-alike of any object the init vi
 
 - Agent init: base = random free cell (eroded map) + yaw ~ U(−π, π); trunk + left arm = JoyLo reset joint pos; right
   arm = the **fixed hold** solved once per robot: pad centre on the head camera's optical axis at depth 0.50 m, trunk
-  (0.5, 0), closing axis rolled 15° from vertical `[pilot]` (no depth or trunk fallbacks: the hold is a constant
-  written into the customs list as a `hold` constraint). Grasp = a library grasp (floating pipeline) realised as in v1
+  (0.5, 0), closing axis rolled from vertical about the approach (the robot's left) by `hold.roll_deg`: **90° for
+  object scaling** (fingers horizontal, closing toward the robot, so an object pinched across its side faces the
+  camera with that side, e.g. a can's label rather than its lid; owner 2026-09-26) and 15° for mental rotation
+  `[pilot]` (no depth or trunk fallbacks: the hold is a constant written into the customs list as a `hold` constraint).
+  The B7 visibility survey is a prior only at the hold it was rendered at (15°); at any other hold every library row
+  is realised and measured. Grasp = a library grasp (floating pipeline) realised as in v1
   §5.2 (finger advance 1 mm/step, 4 mm press), pose written to `grasps[0].object_pose_in_eef_frame`; both init and
   goal need ≥ 40 % of the object visible (self-occlusion render) and the whole object in frame.
 - Goal (object scaling): depth d1 on a 5 cm grid over [0.35, 0.85] m with |d1 − d0| ≥ 0.10 m, same orientation; target
@@ -1628,7 +1632,7 @@ path buckets; every success appends constraints; rejections are counted per reas
 
 x_c(t), z_c(t), camera pitch at tilt 0, hand height below the camera (FK tables); band extents with untucked idle arms
 per support height; brace reach of the second arm (blocks, attachment, axial, touching, alignment); base-follow
-corridors; the held-object hold (depth 0.50, roll 15°); `goal_translate_range` / `goal_tilt_range` of camera
+corridors; the held-object hold (depth 0.50; roll 90° object scaling, 15° mental rotation); `goal_translate_range` / `goal_tilt_range` of camera
 relocalization; the 45° cube-grasp tilts vs 30/60; `max_partner_geodesic`; the 0.437 disembedding margin.
 
 ## 11. Changes from v1 (summary)

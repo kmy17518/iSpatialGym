@@ -124,7 +124,7 @@ IORS_SMALL_COMMON: Dict[str, Any] = {
 }
 
 _HELD_OBJECT_COMMON: Dict[str, Any] = {
-    "hold": {"depth_m": 0.50, "trunk": [0.5, 0.0], "roll_deg": 15.0},  # §6.3 fixed hold [pilot] (depth 0.50, roll 15°)
+    "hold": {"depth_m": 0.50, "trunk": [0.5, 0.0], "roll_deg": 15.0},  # §6.3 fixed hold [pilot] (depth 0.50, roll 15°); object scaling overrides the roll
     "min_visible_fraction": 0.40,  # §6.3 ≥ 40 % of the object visible at init and goal
     "in_frame_margin": 0.05,  # §3.4 / §6.3 whole object in frame (5 %)
     "waypoints": 3,  # §6.3 / §3.9 motion checked at 3 intermediate waypoints
@@ -174,6 +174,9 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {},
         "path_buckets": None,
         **_HELD_OBJECT_COMMON,
+        # §6.3 fingers horizontal (closing axis turned toward the robot): a side-gripped object shows its side / label to
+        # the camera instead of its lid (owner 2026-09-26)
+        "hold": {"depth_m": 0.50, "trunk": [0.5, 0.0], "roll_deg": 90.0},
         "goal_depth_range_m": [0.35, 0.85],  # §6.3 depth d1 over [0.35, 0.85] m
         "goal_depth_grid_m": 0.05,  # §6.3 on a 5 cm grid
         "min_depth_change_m": 0.10,  # §6.3 |d1 − d0| ≥ 0.10 m

@@ -3,7 +3,9 @@
 Init: base = random free cell of the eroded map in the task room + yaw ~ U(−π, π); trunk and left arm at the JoyLo
 reset pose; right arm at the **fixed hold** solved once per robot (§6.3, §10 ``[pilot]``): pad centre on the head
 camera's optical axis at depth ``hold.depth_m`` (0.50), trunk ``hold.trunk`` (0.5, 0), approach axis = base +y (the
-robot's left), closing axis = world down rolled ``hold.roll_deg`` (15°) about the approach axis. The hold is a
+robot's left), closing axis = world down rolled ``hold.roll_deg`` about the approach axis: 90° for object scaling
+(fingers horizontal, closing toward the robot, so a side-gripped object faces the camera with its side; owner
+2026-09-26), 15° for mental rotation. The hold is a
 constant: it is cached under ``~/.cache/ispatialgym/held_hold.json`` (key = robot + hold constants) and written into
 the customs entry as a ``hold`` constraint through the core's constraints write-back. There are no depth or trunk
 fallbacks (v1 ``init_depth_fallbacks`` / ``hold_trunks`` are gone): a hold without an IK solution rejects the template
@@ -28,7 +30,8 @@ instance draws a (grasp, goal) from the feasible set and confirms it once with t
 Visibility: ≥ ``min_visible_fraction`` (40 %) of the object visible at init and at the goal (segmentation render with
 and without the robot) and the whole object in frame. The B7 prior (``runlogs/held_visibility_20260915/visibility.json``,
 ``scripts/held_visibility/survey.py``) skips library rows whose surveyed visible fraction is below the threshold
-before they are realised.
+before they are realised; it applies only at the hold it was rendered at (its ``hold`` record, roll 15°), so at any
+other hold every row is realised and measured by the renders.
 
 TRO: ``grasps[0]`` (agent, arm, object, key, name, ``object_pose_in_eef_frame``, ``finger_q``); ``pose_targets[target]``
 = depth metric in the camera frame (scaling; tolerance max(0.02, 0.20·|Δd|), §8) or the world orientation with the
@@ -218,13 +221,28 @@ def visible_fraction(visible_px: int, reference_px: int) -> float:
     return min(1.0, float(visible_px) / float(reference_px))
 
 
-def load_visibility_prior(path: str = VISIBILITY_PRIOR_PATH) -> Dict[Tuple[str, str], Dict[str, Any]]:
+def survey_matches_hold(surveyed: Optional[Dict[str, Any]], hold: HoldConstants) -> bool:
+    """The survey's ``hold`` record (depth, trunk, roll) equals ``hold``; a survey without one matches no hold."""
+    if not surveyed:
+        return False
+    try:
+        s = HoldConstants.from_generation(surveyed)
+    except (KeyError, TypeError, ValueError):
+        return False
+    return all(math.isclose(a, b, abs_tol=1e-6) for a, b in ((s.depth_m, hold.depth_m), (s.translate, hold.translate),
+                                                              (s.tilt, hold.tilt), (s.roll_deg, hold.roll_deg)))
+
+
+def load_visibility_prior(path: str = VISIBILITY_PRIOR_PATH, hold: Optional[HoldConstants] = None) -> Dict[Tuple[str, str], Dict[str, Any]]:
     """The B7 survey (``visibility.json``): ``{(grasp_key, grasp_name): {"visible_fraction", "in_frame", ...}}``; an empty
-    dict when the file does not exist."""
+    dict when the file does not exist, or when ``hold`` is given and the survey was rendered at another hold (a visible
+    fraction measured with the fingers at one roll says nothing about another)."""
     if not path or not os.path.exists(path):
         return {}
     with open(path) as f:
         data = json.load(f)
+    if hold is not None and not survey_matches_hold(data.get("hold"), hold):
+        return {}
     out: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for rec in data.get("records", []):
         out[(rec["grasp_key"], rec["grasp_name"])] = rec
@@ -275,7 +293,7 @@ class HeldObjectV2(SamplerV2):
         self.options: Dict[str, List[Dict[str, Any]]] = {}  # grasp name -> feasible goal options (base frame)
         self.grasp_stats: Dict[str, Dict[str, int]] = {}
         self.grasp_debug: Dict[str, Any] = {}
-        self.prior = load_visibility_prior()
+        self.prior: Dict[Tuple[str, str], Dict[str, Any]] = {}  # loaded with the hold (sample_template)
         self.equivalences: Optional[List[List[float]]] = None
 
     # ------------------------------------------------------------------ generation numbers
@@ -411,9 +429,13 @@ class HeldObjectV2(SamplerV2):
         self.equivalences = self.gp.orientation_equivalences("target", choice.category, choice.model)
         self.check_symmetry()
         self.solve_hold()
+        self.prior = load_visibility_prior(VISIBILITY_PRIOR_PATH, self.hold)
+        if not self.prior:
+            log.info("%s: no B7 visibility prior for this hold (roll %.0f deg); every library row is realised and measured", self.gp.alias, self.hold.roll_deg)
         self.precompute_options()
         self.template_facts.update({"hold": self.hold_solution, "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
-                                    "orientation_equivalences": None if self.equivalences is None else len(self.equivalences)})
+                                    "orientation_equivalences": None if self.equivalences is None else len(self.equivalences),
+                                    "visibility_prior_rows": len(self.prior)})
         self.template_meta["hold"] = self.hold_solution
 
     def check_symmetry(self):
