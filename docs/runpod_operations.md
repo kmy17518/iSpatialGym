@@ -22,6 +22,10 @@ python scripts/runpod/rp.py run <pod id> "nvidia-smi; python -c 'import torch; p
 - `bootstrap` installs the env, datasets and the grasp library from the repo ref, then writes `/root/BOOTSTRAP_DONE` (`/root/BOOTSTRAP_FAILED`
   on error). Pitfall: one pod had no usable CUDA device after a successful bootstrap — always verify with `nvidia-smi` + the torch probe
   before adding a pod to any pod file.
+- Verify the thread cap too (§9): after `conda activate ispatialgym` on the pod, `taskset -cp $$` must list `0-<floor(quota)-1>` and
+  `$ISG_THREAD_CAP` must be set: `rp.py run <pod> "bash -c 'source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && echo \$ISG_THREAD_CAP && taskset -cp \$\$'"`.
+  `bootstrap.sh` does not install the hook yet (pending as of 2026-09-25): install it by hand. If the first Isaac launch segfaults, run it
+  once under gdb (§9) before judging the host.
 - Pods do **not** have the local `~/.cache/ispatialgym` caches or anything under `/tmp`; inputs a run needs go under
   `runlogs/smoke_inputs/` (git-ignored, synced by `remote_run.py`) and are referenced repo-relative.
 - Cost: A40 $0.49/h, L40S $1.09/h (SECURE, Sep 2026). 27 pods ran at ≈ $21/h; the owner recharges the RunPod balance in small amounts —
@@ -150,3 +154,15 @@ runners exit when their queue is empty → `/root/JOB_DONE` → `collect.py --pu
 - 4090 / driver 610 hosts segfault Isaac Sim; EUR pods pull GitHub at 120 KB/s; vCPU allotment varies 9–36 per pod; one process per pod is
   the throughput optimum (the sampler is CPU-bound).
 - The B4 inventory's `front_free_m` for cabinets came from the no-object traversability map (bamfsz_0: 3.0 m claimed, 0.0 m real).
+- **CPU quota vs visible CPUs** (2026-09-25, large_articulation_integration_20260925): a pod container runs under a CFS CPU quota
+  (`/sys/fs/cgroup/cpu/cpu.cfs_quota_us` / `cpu.cfs_period_us`: 13.6 CPUs on most L40S / 4090 hosts, 10.2-27.2 seen) but sees every host CPU
+  (96-256), so torch / numba / OpenBLAS / Kit size their pools to the host and the container was throttled in 57-100 % of its 100-ms windows
+  (`nr_throttled` / `nr_periods` in `cpu.stat`). Pinning to floor(quota) CPUs plus library caps: 0 % throttling, instance load 570 -> 331 s,
+  sim step 0.59 -> 0.25 s/step (`runlogs/runpod/artic_integration/threads_ab/README.md`); library caps alone leave Kit's `carb.tasking` /
+  `tbb.worker` pools at full size. Mechanism: the conda activation hook `/root/miniforge3/envs/ispatialgym/etc/conda/activate.d/isg_threads.sh`
+  (thread caps floor(quota) - 1, `taskset -cp 0-<floor(quota)-1> $$`, `ISG_THREAD_CAP`), sourced by every `remote_run` command; a capped demo
+  records `ISG_THREAD_CAP` in `meta.json` `rush_env`.
+- **The first Isaac launch on a fresh pod can segfault** (2026-09-25): right after the bootstrap, launches segfaulted in
+  `SimulationApp._start_app` within ~10 s, before any Kit log (two L40S hosts, drivers 580.159 / 570.124), for plain `isaacsim.SimulationApp`
+  and OmniGibson alike. One launch of each under gdb (`gdb -batch -ex run --args python <smoke script>`) warmed its caches, and every later launch
+  worked. Not a bad host: do not terminate the pod for it.

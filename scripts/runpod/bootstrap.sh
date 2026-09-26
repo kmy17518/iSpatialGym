@@ -80,6 +80,36 @@ python -c "import curobo, os; assert os.path.exists(os.path.join(os.path.dirname
 python -c "from ispatialgym.sampling import grasp_library as GL; print(len(GL.load_grasps('pack_of_kielbasa__dgodnn__t')), 'grasps')" \
   || { phase "grasp library verify failed"; touch /root/BOOTSTRAP_FAILED; exit 1; }
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+
+# 5b. thread cap (owner 2026-09-25, docs/runpod_operations.md §9): the container runs under a CFS CPU quota (10-27 CPUs) but sees every
+# host CPU, so torch / numba / BLAS / Kit size their pools to the host and the container is throttled in 57-100 % of its 100-ms
+# windows; pinning to floor(quota) CPUs + library caps: 0 % throttling, instance load 570 -> 331 s, sim step 0.59 -> 0.25 s/step
+# (runlogs/runpod/artic_integration/threads_ab/README.md). Installed as a conda activation hook so every `conda activate ispatialgym`
+# (remote_run runs it before each job) exports the caps, pins the shell and its children and sets ISG_THREAD_CAP; written atomically.
+phase "thread cap"
+_hookdir=/root/miniforge3/envs/ispatialgym/etc/conda/activate.d
+mkdir -p "$_hookdir"
+cat > "$_hookdir/.isg_threads.sh.tmp" <<'EOF_ISG_THREADS'
+# isg_threads.sh - cap the thread pools and pin the CPUs to the container's CFS quota (does nothing without a quota)
+_isg_q=""; _isg_p=""
+if [ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -r /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then
+  _isg_q=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null); _isg_p=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us 2>/dev/null)
+elif [ -r /sys/fs/cgroup/cpu.max ]; then
+  read -r _isg_q _isg_p < /sys/fs/cgroup/cpu.max
+fi
+if [ -n "$_isg_q" ] && [ "$_isg_q" != "-1" ] && [ "$_isg_q" != "max" ] && [ -n "$_isg_p" ] && [ "$_isg_p" -gt 0 ] 2>/dev/null; then
+  _isg_n=$(( _isg_q / _isg_p )); [ "$_isg_n" -lt 1 ] && _isg_n=1
+  _isg_t=$(( _isg_n - 1 )); [ "$_isg_t" -lt 1 ] && _isg_t=1
+  export OMP_NUM_THREADS=$_isg_t MKL_NUM_THREADS=$_isg_t OPENBLAS_NUM_THREADS=$_isg_t NUMBA_NUM_THREADS=$_isg_t
+  taskset -cp 0-$(( _isg_n - 1 )) $$ > /dev/null 2>&1
+  export ISG_THREAD_CAP="cpus=0-$(( _isg_n - 1 )) threads=$_isg_t quota=$(awk -v q="$_isg_q" -v p="$_isg_p" 'BEGIN{printf "%.1f", q/p}')"
+fi
+unset _isg_q _isg_p _isg_n _isg_t
+EOF_ISG_THREADS
+mv -f "$_hookdir/.isg_threads.sh.tmp" "$_hookdir/isg_threads.sh"
+chmod 644 "$_hookdir/isg_threads.sh"
+_cap_check=$(bash -c 'source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && echo "${ISG_THREAD_CAP:-no quota}"')
+phase "thread cap: ${_cap_check}"
 phase "install ok"
 touch /root/BOOTSTRAP_DONE
 
