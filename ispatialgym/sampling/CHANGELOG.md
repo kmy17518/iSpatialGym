@@ -58,6 +58,17 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   ground handling (floor class: slab and ground meshes off) instead of a fresh end-pose IK. And `reorient.derived` is no
   longer checked as a second chain when the recorded key poses exist (`_skipped_target_keys`): the oracle tracks the
   recorded `waypoints`; the re-derived list from a fresh IK seed rejected the floor-class carry (0925-210939).
+- **face_travel base-path style for uncarried multi-corner drives** (owner 2026-09-26, overnight plan item 6, after the
+  all-green recorded wave). `navigation.plan_path(style=...)` with `generation.base_path_style` (default `"recorded"`; opted
+  in: IORS large, the four large articulations, the alignment families): `"face_travel"` builds the shared
+  `robot.base_path.BasePath` schedule of the path and whole-body-checks its `stride_poses(STRIDE_M)` with the same posture,
+  carried object, margin and yaw-lag envelope as the polyline (`yaw_lag_envelope`, `face_travel_poses`); a schedule that
+  clears is recorded `paths[].style = "face_travel"` (the oracle drives it as such), one whose stride collides falls back to
+  the polyline check and is recorded `"recorded"` - never a rejection because of the schedule, so acceptance does not drop.
+  Applies to the uncarried legs (`core.record_path`: IORS large init -> B; `prompt0.connect`: the large-articulation and
+  wall-alignment approach); carried legs stay recorded, their schedule only probed at 1 cm and tallied
+  (`FACE_TRAVEL_CARRIED_PROBE`, log `FACE_TRAVEL carried-leg probe`); transitions, base-follow and the drive with an arm
+  schedule are untouched. `first_demo.py run --sample-only` re-samples an alias for the sidecar comparison.
 - **IORS large: the A -> B drive is re-swept with the target placed** (owner 2026-09-26; shampoo 0926-015905, wave 8 phase 1:
   navigate[0] failed twice, 'wheel_motor_link1 in contact with the shampoo dispenser' - the recorded A -> B line passed 5.6 cm
   from the dispenser standing on the floor). `record_leg_a_b` runs before the target has a pose (it is parked), so the drive

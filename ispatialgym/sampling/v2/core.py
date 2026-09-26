@@ -811,8 +811,13 @@ class SamplerV2(TaskSampler):
             # 0921-040940: the idle arm brushed a wardrobe on a 0.54 m carry the 1 cm check had passed) - a local path that fails it
             # falls back to the eroded global map in the callers' path_collision retry
             margin = float(self.gp.gen("carry_path_margin_m", 0.01)) if (carried and obj is not None) else 0.01
+            # owner 2026-09-26: ``generation.base_path_style`` (default "recorded") - a family that opts in has its UNCARRIED drives checked
+            # and recorded as the face_travel schedule (recorded fallback when the schedule collides); carried legs stay recorded, the
+            # schedule only probed at 1 cm for the morning report
+            is_carried = bool(carried and obj is not None)
+            style = "recorded" if is_carried else str(self.gp.gen("base_path_style", "recorded") or "recorded")
             p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
-                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q, margin=margin)
+                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q, margin=margin, style=style, probe_face_travel=is_carried)
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

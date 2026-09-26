@@ -704,6 +704,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -8609,6 +8611,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -13136,6 +13140,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -13264,6 +13270,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -16286,6 +16294,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -16407,6 +16417,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -48755,6 +48767,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -58555,6 +58569,8 @@
    }
   },
   "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {

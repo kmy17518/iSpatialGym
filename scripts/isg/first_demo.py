@@ -185,11 +185,12 @@ def cmd_run(args):
     cmd = (f"python -m ispatialgym.sampling.sample_isg --alias {args.alias}{scene}{customs_opt} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
            f"--seed {args.seed} --no-write-back --out $SMOKE_OUT/inst --log-level INFO; echo SAMPLE_EXIT $?; "
            f"tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json 2>/dev/null | head -1); "
-           f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540; echo DEMO_EXIT $?; fi")
+           + ("if [ -n \"$tro\" ]; then echo TRO=$tro; fi" if getattr(args, "sample_only", False) else
+              f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540; echo DEMO_EXIT $?; fi"))
     rc = run_local(cmd, out_dir, args.timeout) if args.local else run_remote(cmd, out_dir, args.timeout)
     samp = parse_sampling(os.path.join(out_dir, "inst"))
     demo = parse_meta(os.path.join(out_dir, "demo"))
-    rec = {"time": now(), "kind": "sample+demo" + (" (local)" if args.local else ""), "subtask": st, "alias": args.alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
+    rec = {"time": now(), "kind": ("sample-only" if getattr(args, "sample_only", False) else "sample+demo") + (" (local)" if args.local else ""), "subtask": st, "alias": args.alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
            "wall_s": round(time.time() - t0), "code_commit": commit, "dirty": dirty, "sampler_version": samp["sampler_version"],
            "sampling": {k: samp[k] for k in ("n_written", "rejections", "error", "time_s")}, "tro": samp["tro"] and os.path.relpath(samp["tro"], REPO),
            "demo": demo and {**demo, "meta": os.path.relpath(demo["meta"], REPO)}, "note": args.note}
@@ -394,6 +395,7 @@ def main():
     s.add_argument("--timeout", type=int, default=5400)
     s.add_argument("--note", default="")
     s.add_argument("--customs", default=None, help="experiment copy of the customs for sample_isg (repo-relative, under runlogs/smoke_inputs/)")
+    s.add_argument("--sample-only", action="store_true", help="sample the instance, no demo (owner 2026-09-26: compare a re-sampled sidecar with its record)")
     s.set_defaults(fn=cmd_run)
     s = sub.add_parser("demo-only")
     s.add_argument("--tro", required=True)

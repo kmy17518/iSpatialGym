@@ -452,12 +452,19 @@ def test_camera_relocalization_program_details():
     # the long drives of this family are the shared face_travel schedule, also for records without a ``style``
     assert nav_s.style == BP.FACE_TRAVEL and nav_s.targets(std, None)["style"] == BP.FACE_TRAVEL
     assert nav_o.targets(obs, None)["style"] == BP.FACE_TRAVEL
-    # every other family drives its record as recorded unless the record says otherwise
+    # every other family's program pins no style: the record decides (owner 2026-09-26: the families that opt in with
+    # generation.base_path_style record their uncarried drives as ``face_travel`` - IORS large init -> B, the large-articulation
+    # and wall-alignment approaches - and every carried leg as recorded); a record without a style is driven as recorded
     iors = load("inter_object_relation_satisfaction-ontop_large_scale")
     navs = [a for a in expand(iors.alias, iors) if a.name == "navigate"]
-    assert navs and all(a.style is None and a.targets(iors, None)["style"] == BP.RECORDED for a in navs)
-    navs[0].path.extra["style"] = BP.FACE_TRAVEL
+    assert navs and all(a.style is None for a in navs)
+    assert all(a.targets(iors, None)["style"] == (BP.FACE_TRAVEL if (a.path.extra or {}).get("style") == BP.FACE_TRAVEL else BP.RECORDED) for a in navs)
+    navs[0].path.extra["style"] = BP.FACE_TRAVEL  # an init -> B record written by a face_travel family
     assert navs[0].targets(iors, None)["style"] == BP.FACE_TRAVEL
+    carried = [a for a in navs if (a.path.extra or {}).get("carried") or getattr(a.path, "carried", None)]
+    for a in carried:  # a carried leg recorded as "recorded" stays recorded
+        a.path.extra["style"] = BP.RECORDED
+        assert a.targets(iors, None)["style"] == BP.RECORDED
     with pytest.raises(ValueError, match="style"):
         A.Navigate(path=nav_s.path, style="sideways")
     assert torso_s.goal.arms == "same" and torso_s.arms == ()

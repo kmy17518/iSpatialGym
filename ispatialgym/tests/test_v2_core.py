@@ -232,6 +232,60 @@ def test_stride_poses_yaw_envelope_covers_the_trackers_lag_on_a_turn():
     assert max(yaws) <= math.degrees(interp) + 12.0 + 1e-6 and min(yaws) >= math.degrees(interp) - 12.0 - 1e-6, (yaws, math.degrees(interp))
 
 
+def test_plan_path_face_travel_style_records_the_schedule_or_falls_back_to_recorded(monkeypatch):
+    """Owner 2026-09-26 (item 6): ``style="face_travel"`` checks the shared base_path schedule (with the yaw-lag envelope, same
+    posture / margin) and records ``face_travel`` when it clears; when a stride of the schedule collides the polyline check
+    decides and the record says ``recorded`` - never a rejection because of the schedule. A carried leg stays recorded and
+    its schedule is only probed at 1 cm (log + tally)."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("ISG_ATTACHED_CHECKS", "off")
+    # an L-shaped grid path (0,0) -> (0,20) -> (20,20) on a 5 cm grid: a 90 deg corner at (1.0, 0.0)
+    monkeypatch.setattr(NAV, "local_map", lambda kit, rooms=None, blocked=(): th.ones(30, 30, dtype=th.bool))
+    monkeypatch.setattr(NAV, "_to_map", lambda kit, xy: (int(round(float(xy[1]) / 0.05)), int(round(float(xy[0]) / 0.05))))
+    monkeypatch.setattr(NAV, "_to_world", lambda kit, ij: th.tensor([ij[1] * 0.05, ij[0] * 0.05]))
+    monkeypatch.setattr(NAV, "nearest_free_cell", lambda free, ij, r=15: ij)
+    monkeypatch.setattr(NAV, "same_region", lambda free, a, b: True)
+    monkeypatch.setattr(NAV, "grid_shortest_path", lambda free, a, b: [(0, 0), (0, 20), (20, 20)])
+    monkeypatch.setattr(NAV, "simplify_path", lambda cells, free: list(cells))
+    calls = []
+    verdicts = {"face_travel": True}
+
+    def fake_free(kit, poses, trunk, posture="untucked", margin=0.01, q_arms=None, fingers=None):
+        n = len(calls)
+        calls.append((len(poses), margin))
+        ok = verdicts["face_travel"] if n == 0 else True
+        return ok, (0 if ok else 3)
+
+    monkeypatch.setattr(NAV, "path_collision_free", fake_free)
+    st = lambda name, x, y, yaw: SimpleNamespace(name=name, base_xy=th.tensor([x, y]), yaw=yaw, base_pose2d=(x, y, yaw), translate=0.0, tilt=0.0)  # noqa: E731
+    a, b = st("init", 0.0, 0.0, 0.0), st("manipulation", 1.0, 1.0, 1.5708)
+    rec = NAV.plan_path(None, a, b, arm_q={}, style="face_travel")
+    assert rec.style == "face_travel" and len(calls) == 1 and rec.n_checked > 0
+    assert rec.to_sidecar()["style"] == "face_travel"
+    # the schedule collides: the polyline decides and the record says "recorded"
+    calls.clear()
+    verdicts["face_travel"] = False
+    rec = NAV.plan_path(None, a, b, arm_q={}, style="face_travel")
+    assert rec.style == "recorded" and len(calls) == 2 and rec.to_sidecar()["style"] == "recorded"
+    # the default style is untouched: no style key, one (polyline) check
+    calls.clear()
+    verdicts["face_travel"] = True
+    rec = NAV.plan_path(None, a, b, arm_q={})
+    assert rec.style is None and "style" not in rec.to_sidecar() and len(calls) == 1
+    # a carried leg stays recorded; the schedule is probed at 1 cm after the polyline check, tallied, never used
+    calls.clear()
+    before = dict(NAV.FACE_TRAVEL_CARRIED_PROBE)
+    verdicts["face_travel"] = True
+    rec = NAV.plan_path(None, a, b, arm_q={}, carried="sandal.n.01_1", carried_obj=object(), style="recorded", probe_face_travel=True, margin=0.03)
+    assert rec.style is None and len(calls) == 2 and calls[0][1] == 0.03 and calls[1][1] == 0.01
+    assert NAV.FACE_TRAVEL_CARRIED_PROBE["checked"] == before["checked"] + 1
+    # the schedule's poses carry the yaw-lag envelope like the polyline's
+    ft = NAV.face_travel_poses(rec.waypoints)
+    env = NAV.yaw_lag_envelope(ft)
+    assert len(env) >= len(ft) and set(ft) <= set(env)
+
+
 def test_stride_poses_and_grid_path():
     poses = NAV.stride_poses([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)], 0.1)
     assert len(poses) == 11 and poses[-1] == (1.0, 0.0, 0.0)

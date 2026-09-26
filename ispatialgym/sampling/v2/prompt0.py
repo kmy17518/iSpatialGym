@@ -893,8 +893,12 @@ def connect(s, init: Stance, manip: Stance, path_max_m: float = PATH_MAX_M, carr
         back_stance = Stance(manip.name, (bx, by, yaw), manip.translate, manip.tilt, s_T, manip.edge, manip.face, manip.lateral, manip.focus, manip.arms,
                              list(manip.contacts), None, manip.carried, dict(manip.extras), manip.fingers)
         try:
+            # owner 2026-09-26: ``generation.base_path_style`` - the approach of an opted-in family (large articulation, alignment) is checked and
+            # recorded as the face_travel schedule when uncarried (recorded fallback when the schedule collides); a carried approach stays recorded
+            is_carried = carried_obj is not None
             path = NAV.plan_path(s.kit, init, back_stance, carried=carried, carried_obj=carried_obj, carried_arm=arm, rooms=rooms, blocked=blocked,
-                                 max_length_m=path_max_m, trunk=tf, eef_in_object=eef_in_object)
+                                 max_length_m=path_max_m, trunk=tf, eef_in_object=eef_in_object,
+                                 style="recorded" if is_carried else str(s.gp.gen("base_path_style", "recorded") or "recorded"), probe_face_travel=is_carried)
         except NAV.NavigationError as e:
             why.append(f"s_T {s_T:.2f}: {e.reason}")
             path_err = e

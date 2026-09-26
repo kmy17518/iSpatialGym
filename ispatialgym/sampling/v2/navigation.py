@@ -146,6 +146,48 @@ def stride_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M,
     return out
 
 
+def yaw_lag_envelope(poses: Sequence[Tuple[float, float, float]]) -> List[Tuple[float, float, float]]:
+    """The yaw-lag envelope of :func:`stride_poses` over an arbitrary drive-ordered pose sequence (the ``face_travel``
+    schedule's ``BasePath.stride_poses``: the arc length is the travelled xy distance, a dwell's on-the-spot sweep adds
+    none): every pose repeated at the yaws the sequence held over the last :data:`YAW_LAG_LOOKBACK_M`, each capped at
+    :data:`YAW_LAG_MAX_RAD`, every :data:`YAW_ENVELOPE_STEP_RAD` - so the schedule and the polyline are checked alike."""
+    pts = [tuple(float(v) for v in p) for p in poses]
+    arc: List[float] = []
+    s_ = 0.0
+    for i, p in enumerate(pts):
+        if i:
+            s_ += math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1])
+        arc.append(s_)
+    out: List[Tuple[float, float, float]] = []
+    for j, (x, y, yaw) in enumerate(pts):
+        out.append((x, y, yaw))
+        offs = [0.0]
+        for k in range(j - 1, -1, -1):
+            if arc[j] - arc[k] > YAW_LAG_LOOKBACK_M:
+                break
+            o = (pts[k][2] - yaw + math.pi) % (2 * math.pi) - math.pi
+            offs.append(max(-YAW_LAG_MAX_RAD, min(YAW_LAG_MAX_RAD, o)))
+        for o in (min(offs), max(offs)):
+            m = int(math.ceil(abs(o) / YAW_ENVELOPE_STEP_RAD))
+            for k in range(1, m + 1):
+                out.append((x, y, yaw + o * min(1.0, k / m)))
+    return out
+
+
+def face_travel_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M) -> List[Tuple[float, float, float]]:
+    """The whole-body-checked poses of the ``face_travel`` schedule of ``waypoints`` (owner 2026-09-26: the shared
+    ``robot.base_path`` schedule the oracle drives for ``style = "face_travel"``, built with the module's default config)."""
+    from ispatialgym.robot import base_path as BP
+
+    sched = BP.BasePath.build([tuple(float(v) for v in w) for w in waypoints], BP.BasePathConfig())
+    return [tuple(float(v) for v in p) for p in sched.stride_poses(stride)]
+
+
+#: owner 2026-09-26: per-process tally of the log-only face_travel probe of CARRIED legs (they stay ``recorded``): how often the
+#: schedule fails the 1 cm check where the recorded polyline passed - reported in the morning
+FACE_TRAVEL_CARRIED_PROBE = {"checked": 0, "collides": 0}
+
+
 def grid_shortest_path(free: th.Tensor, start: Tuple[int, int], goal: Tuple[int, int]) -> Optional[List[Tuple[int, int]]]:
     """A* on a boolean grid (8-connected, no corner cutting through blocked cells); None when disconnected."""
     h, w = free.shape
@@ -425,7 +467,7 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
               carried_obj: Any = None, carried_arm: str = "right", rooms: Optional[Sequence[str]] = None, blocked: Sequence[Any] = (),
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
               eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None,
-              margin: float = 0.01) -> PathRecord:
+              margin: float = 0.01, style: str = "recorded", probe_face_travel: bool = False) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
     ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
     attached to ``carried_arm`` (posed in the hand per ``eef_in_object``, the grasp record's T_obj→eef). ``trunk``
@@ -433,7 +475,14 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     so the path is driven at the trunk the robot leaves with. ``arm_q`` (per arm) fixes the arm posture of the drive
     (default: the departing stance's recorded arms when it has a configuration, else ``posture``). ``force_global``
     plans on the eroded map end to end (camera relocalization). Raises ``NavigationError`` with reason ``no_path`` /
-    ``path_collision`` / ``path_too_long``."""
+    ``path_collision`` / ``path_too_long``.
+
+    ``style`` (owner 2026-09-26, ``generation.base_path_style``): ``"face_travel"`` checks the shared ``robot.base_path``
+    schedule of the path (:func:`face_travel_poses`) with the same posture, carried object, margin and yaw-lag envelope
+    as the polyline check and records ``style = "face_travel"`` when it clears; when a stride of the schedule collides the
+    polyline check decides and the record says ``"recorded"`` (never a rejection because of the schedule). ``probe_face_travel``
+    (carried legs, which stay recorded): the schedule is checked at 1 cm, logged and tallied in
+    :data:`FACE_TRAVEL_CARRIED_PROBE`, never used."""
     trunk = (stance_from.translate, stance_from.tilt) if trunk is None else trunk
     if arm_q is None:
         from ispatialgym.sampling.v2.ik import stance_arm_vectors
@@ -477,6 +526,19 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     length = path_length(filled)
     if max_length_m is not None and length > max_length_m:
         raise NavigationError("path_too_long", f"{length:.2f} m > {max_length_m:.2f} m")
+    record_style: Optional[str] = None
+    if style == "face_travel":
+        ft = face_travel_poses(filled, stride)
+        ft_swept = yaw_lag_envelope(ft)
+        with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+            ok_ft, bad_ft = path_collision_free(kit, ft_swept, trunk, posture, margin=float(margin), q_arms=arm_q)
+        if ok_ft:
+            log.info("face_travel: %s path %s -> %s %.2f m recorded as the face_travel schedule (%d schedule poses, %d swept with the yaw-lag envelope)",
+                     mode, stance_from.name, stance_to.name, length, len(ft), len(ft_swept))
+            return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(ft), style="face_travel")
+        log.info("face_travel: %s path %s -> %s: the schedule collides at swept pose %d/%d (%s) - the polyline is checked and recorded instead",
+                 mode, stance_from.name, stance_to.name, bad_ft, len(ft_swept), tuple(round(v, 3) for v in ft_swept[bad_ft]))
+        record_style = "recorded"
     poses = stride_poses(filled, stride)
     swept = stride_poses(filled, stride, yaw_envelope=True)  # the strides + the tracker's yaw lag on the turns (owner 2026-09-25)
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
@@ -485,7 +547,19 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         raise NavigationError("path_collision", f"{mode} path {stance_from.name} -> {stance_to.name} collides at swept pose {bad}/{len(swept)} ({tuple(round(v, 3) for v in swept[bad])}, "
                                                 f"{len(poses)} strides + the yaw-lag envelope) at trunk {trunk}"
                                                 + (f" (margin {float(margin):.3f})" if float(margin) > 0.011 else ""))
-    return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(poses))
+    if probe_face_travel and carried_obj is not None:
+        try:
+            ft_swept = yaw_lag_envelope(face_travel_poses(filled, stride))
+            with attached(kit, carried_arm, carried_obj, eef_in_object=eef_in_object):
+                ok_p, bad_p = path_collision_free(kit, ft_swept, trunk, posture, margin=0.01, q_arms=arm_q)
+            FACE_TRAVEL_CARRIED_PROBE["checked"] += 1
+            FACE_TRAVEL_CARRIED_PROBE["collides"] += 0 if ok_p else 1
+            log.info("FACE_TRAVEL carried-leg probe (log only, the leg stays recorded): %s path %s -> %s carrying %s: schedule %s at 1 cm (tally %d / %d collide)",
+                     mode, stance_from.name, stance_to.name, carried, "clear" if ok_p else f"collides at swept pose {bad_p}/{len(ft_swept)}",
+                     FACE_TRAVEL_CARRIED_PROBE["collides"], FACE_TRAVEL_CARRIED_PROBE["checked"])
+        except Exception as e:  # noqa: BLE001 - a probe never fails the path
+            log.info("FACE_TRAVEL carried-leg probe unavailable (%r)", e)
+    return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(poses), style=record_style)
 
 
 def travel_length(kit: "RobotKit", a_xy, b_xy, cache: Optional[Dict[Any, float]] = None) -> float:
