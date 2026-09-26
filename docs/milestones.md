@@ -2,6 +2,27 @@
 
 Tagged states of this repository and what passed on them.
 
+## `first-demo-v1.2` — held-object demos end without the wrist sag (2026-09-26)
+
+- **Tag / commit:** `first-demo-v1.2` → `d53060db` on `rush-20260917-2100` (`first-demo-v1.1` + its docs commit + `d53060db`).
+- **Change** (owner decision 2026-09-26 15:45): when the program's last action moves an arm that holds an object and does not
+  place it (the held-object reorient), that arm keeps its hold: neither the jam probe nor the epilogue relaxes it. Before,
+  each relax let the payload sag by the wrist's steady offset under the load: the SPAM demo's hand turned about 4° at the
+  end, and the 0.022 rad this put into the first still window triggered the 100-step second window (150 still steps).
+- **Evidence on this commit** (job `held_keep_hold_20260926`, demo-only replays of the v1.1 instances; the sampler is
+  unchanged since `6c9873a4`):
+
+  | alias | demo on this code | instance (v1.1 run) | steps: move + still |
+  |---|---|---|---|
+  | `object_scaling-canned_food` | 0926-154820 | 0926-151156 | 47 + 50 (was 56 + 150) |
+  | `mental_rotation-banana` | 0926-155334 | 0926-152026 | 58 + 50 (unchanged; the banana barely sagged) |
+
+  After the move the SPAM hand now moves at most 0.2 mm / 0.06° (was 5 mm / 4°); both demos succeed and settle.
+- **The other 26 aliases** end with a free arm (23 retreat, 2 set_torso, 1 push_close), which the change does not touch;
+  their `first-demo-v1.0` runs stand.
+- **Unit tests** on this commit: 1233 passed; the same 4 known failures.
+- **Collected demos:** `runlogs/first-demo-v1.2/` (the two replays copied, the 26 others linked into `runlogs/first-demo-v1.0/`).
+
 ## `first-demo-v1.1` — object scaling held with the fingers horizontal; the SPAM tin replaces the beaker (2026-09-26)
 
 - **Tag / commit:** `first-demo-v1.1` → `6c9873a4` on `rush-20260917-2100` (`first-demo-v1.0` + the milestone docs commits +
