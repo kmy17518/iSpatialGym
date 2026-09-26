@@ -369,6 +369,148 @@ def settle_drift(loaded: Mapping[str, Any], settled: Mapping[str, Any]) -> Dict[
     return out
 
 
+#: ``--exact``: tight thresholds for the state right after the loader returns and after the free settle, reported under
+#: ``checks.exact`` next to the standard verdict (which they do not change)
+EXACT_TOLERANCES: Dict[str, float] = {
+    "load_joint_rad": 1e-4, "load_base_m": 1e-4, "load_object_m": 1e-4, "load_object_rad": 1e-3,
+    "settle_hand_m": 1e-3, "settle_hand_rad": 5e-3, "settle_arm_joint_rad": 2e-3, "settle_object_m": 1e-3, "settle_object_rad": 5e-3,
+    "camera_m": 1e-4, "camera_rad": 1e-3, "sidecar_joint_rad": 1e-4, "sidecar_base_m": 1e-4, "start_depth_m": 1e-3,
+}
+
+
+def quat_angle64(q0, q1) -> float:
+    """Angle (rad) between two xyzw quaternions in float64 (``_quat_angle``'s float32 arccos resolves ~7e-4 rad)."""
+    a, b = np.asarray(q0, dtype=np.float64), np.asarray(q1, dtype=np.float64)
+    a, b = a / np.linalg.norm(a), b / np.linalg.norm(b)
+    w = a[3] * b[3] + float(np.dot(a[:3], b[:3]))
+    v = a[3] * b[:3] - b[3] * a[:3] - np.cross(a[:3], b[:3])
+    return float(2.0 * np.arctan2(np.linalg.norm(v), abs(w)))
+
+
+def pose_deviation64(p0, q0, p1, q1) -> Tuple[float, float]:
+    return float(np.linalg.norm(np.asarray(p1, dtype=np.float64) - np.asarray(p0, dtype=np.float64))), quat_angle64(q0, q1)
+
+
+def _head_camera_pose(robot, cam_key: str):
+    for name, sensor in (getattr(robot, "sensors", None) or {}).items():
+        if name in cam_key or cam_key.endswith(name):
+            p, q = sensor.get_position_orientation()
+            return p.tolist(), q.tolist()
+    return None
+
+
+def exact_snapshot(robot, physical: Mapping[str, Any], cam_key: str, agent_instance: str) -> Dict[str, Any]:
+    """:func:`current_state` plus the right-hand (eef) pose and the head-camera pose (``--exact``)."""
+    snap = current_state(robot, physical, agent_instance)
+    ep, eq = robot.eef_links["right"].get_position_orientation()
+    snap["right_eef"] = (ep.tolist(), eq.tolist())
+    snap["head_camera"] = _head_camera_pose(robot, cam_key)
+    zed = (getattr(robot, "links", None) or {}).get("zed_link")
+    snap["zed_link"] = tuple(x.tolist() for x in zed.get_position_orientation()) if zed is not None else None
+    return snap
+
+
+def _max_joint_error(cur: Mapping[str, float], ref: Mapping[str, float], prefix: str = "") -> Tuple[float, Optional[str]]:
+    errs = {n: abs(float(cur[n]) - float(v)) for n, v in ref.items() if n in cur and n.startswith(prefix)}
+    if not errs:
+        return 0.0, None
+    worst = max(errs, key=errs.get)
+    return errs[worst], worst
+
+
+def _depth_along_camera(obj_pos, cam) -> Optional[float]:
+    from ispatialgym.robot.conventions import quat_rotate
+
+    if cam is None:
+        return None
+    axis = quat_rotate(th.as_tensor(cam[1], dtype=th.float32), th.tensor([0.0, 0.0, -1.0])).double().numpy()
+    return float(np.dot(np.asarray(obj_pos, dtype=np.float64) - np.asarray(cam[0], dtype=np.float64), axis))
+
+
+def exact_checks(loaded: Mapping[str, Any], settled: Mapping[str, Any], stored: Mapping[str, Any], sidecar: Optional[Mapping[str, Any]],
+                 summary: Optional[Mapping[str, Any]], tol: Mapping[str, float] = EXACT_TOLERANCES) -> Dict[str, Any]:
+    """``--exact``: (1) right after the loader, every robot joint, the base and the held object against the TRO; (2) after
+    the settle, the right hand against the sidecar's recorded start pose and against (1), the right-arm joints and the object
+    against the TRO, the head camera against (1); (3) the sidecar's init configuration (arm joints, base) and start depth
+    against the TRO / the summary / the loaded scene. Both snapshots are kept for a load-to-load comparison."""
+    fails: List[str] = []
+    held = ((sidecar or {}).get("grasps") or [{}])[0].get("object")
+    out: Dict[str, Any] = {"tolerances": dict(tol), "held_object": held, "snapshots": {"loaded": loaded, "settled": settled}}
+    # (1) right after the loader
+    je, jw = _max_joint_error(loaded["robot_joints"], stored["robot_joints"])
+    load: Dict[str, Any] = {"joint_rad": je, "worst_joint": jw}
+    if je > tol["load_joint_rad"]:
+        fails.append(f"after load: joint {jw} off by {je:.2e} rad")
+    if stored.get("robot_base") and loaded.get("robot_base"):
+        load["base_m"], load["base_rad"] = pose_deviation64(*loaded["robot_base"], *stored["robot_base"])
+        if load["base_m"] > tol["load_base_m"]:
+            fails.append(f"after load: base off by {load['base_m'] * 1000:.3f} mm")
+    if held in stored["objects"] and held in loaded["objects"]:
+        load["object_m"], load["object_rad"] = pose_deviation64(*loaded["objects"][held], *stored["objects"][held])
+        if load["object_m"] > tol["load_object_m"] or load["object_rad"] > tol["load_object_rad"]:
+            fails.append(f"after load: {held} off by {load['object_m'] * 1000:.3f} mm / {load['object_rad']:.2e} rad")
+    out["after_load"] = load
+    # (2) after the settle
+    st: Dict[str, Any] = {}
+    grasp = ((sidecar or {}).get("grasps") or [{}])[0].get("grasp")
+    if grasp:
+        st["hand_vs_sidecar_m"], st["hand_vs_sidecar_rad"] = pose_deviation64(*settled["right_eef"], grasp["position"], grasp["orientation"])
+        if st["hand_vs_sidecar_m"] > tol["settle_hand_m"] or st["hand_vs_sidecar_rad"] > tol["settle_hand_rad"]:
+            fails.append(f"after settle: right hand {st['hand_vs_sidecar_m'] * 1000:.3f} mm / {st['hand_vs_sidecar_rad']:.2e} rad from the recorded start")
+        load["hand_vs_sidecar_m"], load["hand_vs_sidecar_rad"] = pose_deviation64(*loaded["right_eef"], grasp["position"], grasp["orientation"])
+    st["hand_drift_m"], st["hand_drift_rad"] = pose_deviation64(*loaded["right_eef"], *settled["right_eef"])
+    ae, aw = _max_joint_error(settled["robot_joints"], stored["robot_joints"], "right_arm_joint")
+    st["right_arm_joint_rad"], st["worst_right_arm_joint"] = ae, aw
+    if ae > tol["settle_arm_joint_rad"]:
+        fails.append(f"after settle: {aw} off by {ae:.2e} rad")
+    st["joint_rad"], st["worst_joint"] = _max_joint_error(settled["robot_joints"], stored["robot_joints"])
+    if held in stored["objects"] and held in settled["objects"]:
+        st["object_m"], st["object_rad"] = pose_deviation64(*settled["objects"][held], *stored["objects"][held])
+        if st["object_m"] > tol["settle_object_m"] or st["object_rad"] > tol["settle_object_rad"]:
+            fails.append(f"after settle: {held} off by {st['object_m'] * 1000:.3f} mm / {st['object_rad']:.2e} rad")
+    cam_key = "zed_link" if loaded.get("zed_link") and settled.get("zed_link") else "head_camera"
+    if loaded.get(cam_key) and settled.get(cam_key):
+        st["camera_m"], st["camera_rad"] = pose_deviation64(*loaded[cam_key], *settled[cam_key])
+        st["camera_measured_on"] = cam_key
+        if st["camera_m"] > tol["camera_m"] or st["camera_rad"] > tol["camera_rad"]:
+            fails.append(f"after settle: head camera moved {st['camera_m'] * 1000:.3f} mm / {st['camera_rad']:.2e} rad")
+    out["after_settle"] = st
+    # (3) sidecar versus instance file
+    sc: Dict[str, Any] = {}
+    init = ((sidecar or {}).get("stances") or {}).get("init") or {}
+    arms_q = init.get("arms_q") or {}
+    errs = {}
+    for arm, vals in arms_q.items():
+        for k, v in enumerate(vals):
+            n = f"{arm}_arm_joint{k + 1}"
+            if n in stored["robot_joints"]:
+                errs[n] = abs(float(v) - float(stored["robot_joints"][n]))
+    if errs:
+        worst = max(errs, key=errs.get)
+        sc["arm_joint_rad"], sc["worst_arm_joint"] = errs[worst], worst
+        if errs[worst] > tol["sidecar_joint_rad"]:
+            fails.append(f"sidecar init arms_q: {worst} {errs[worst]:.2e} rad from the TRO")
+    if init.get("base_pose2d") and stored.get("robot_base"):
+        bx, by = init["base_pose2d"][0], init["base_pose2d"][1]
+        sc["base_m"] = float(np.hypot(float(stored["robot_base"][0][0]) - bx, float(stored["robot_base"][0][1]) - by))
+        if sc["base_m"] > tol["sidecar_base_m"]:
+            fails.append(f"sidecar init base {sc['base_m'] * 1000:.3f} mm from the TRO")
+    sc["fingers"] = {"sidecar": init.get("fingers_by_arm") or init.get("fingers"),
+                     "tro": {n: v for n, v in stored["robot_joints"].items() if "gripper_finger" in n}}
+    d_side = (init.get("hold") or {}).get("start_depth_m")
+    d_sum = ((summary or {}).get("goal") or {}).get("init_depth_m")
+    d_load = _depth_along_camera(loaded["objects"][held][0], loaded.get("head_camera")) if held in loaded["objects"] else None
+    sc["start_depth_m"] = {"sidecar": d_side, "summary": d_sum, "loaded": d_load}
+    if d_side is not None and d_sum is not None and abs(float(d_side) - float(d_sum)) > 1e-9:
+        fails.append(f"start depth: sidecar {d_side} vs summary {d_sum}")
+    if d_side is not None and d_load is not None and abs(float(d_side) - d_load) > tol["start_depth_m"]:
+        fails.append(f"start depth: sidecar {float(d_side):.4f} m vs {d_load:.4f} m in the loaded scene")
+    out["sidecar_vs_instance"] = sc
+    out["failures"] = fails
+    out["ok"] = not fails
+    return out
+
+
 # ==========================================================================================
 # report schema
 # ==========================================================================================
@@ -944,9 +1086,11 @@ def _program_arms(sidecar_dicts: Iterable[Mapping[str, Any]]) -> List[str]:
 
 def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] = None, settle_steps: int = DEFAULT_SETTLE_STEPS, render: bool = True,
                          check_goal: bool = True, program_check: bool = True, render_iters: int = RENDER_ITERS, image_size: int = DEFAULT_IMAGE_SIZE,
-                         head_aperture: float = DEFAULT_HEAD_APERTURE_MM, delete_failed: bool = False, report_path: Optional[str] = None) -> Dict[str, Any]:
+                         head_aperture: float = DEFAULT_HEAD_APERTURE_MM, delete_failed: bool = False, report_path: Optional[str] = None,
+                         exact: bool = False) -> Dict[str, Any]:
     """Reload validation of one v2 template directory in this process (see the module docstring). Writes
-    ``<template>/validation/report.json`` (or ``report_path``) and returns the report."""
+    ``<template>/validation/report.json`` (or ``report_path``) and returns the report. ``exact`` adds
+    :func:`exact_checks` per instance (``checks.exact``)."""
     from ispatialgym.oracle import run_isg as RI  # imports the cuRobo planner before omnigibson (warp pinning)
 
     import omnigibson as og
@@ -1010,16 +1154,21 @@ def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] =
             rec["checks"]["trav_cells_blocked"] = loader.report.get("trav_cells_blocked")
             # -- §3.5: settle without anything held, then reproduce the stored state ------------------------------
             loaded = current_state(robot, physical, AGENT_INSTANCE)  # right after the loader (diagnostic: load error vs settle drift)
+            ex_loaded = exact_snapshot(robot, physical, cam_key, AGENT_INSTANCE) if exact else None
             for _ in range(int(settle_steps)):
                 og.sim.step_physics()
             _wake_and_step(og, task, physical, 3)
             current = current_state(robot, physical, AGENT_INSTANCE)
+            ex_settled = exact_snapshot(robot, physical, cam_key, AGENT_INSTANCE) if exact else None
             stored = stored_state(tro.object_states, tro.robot_poses, tro.meta.robot_state,
                                   {inst: list(ent.joints.keys()) for inst, ent in physical.items() if getattr(ent, "joints", None)})
             checks, failures = evaluate_state(stored, current, joint_tolerances_for(tro.meta, physical, AGENT_INSTANCE))
             checks["settle_drift"] = settle_drift(loaded, current)
             rec["checks"]["state"] = checks
             rec["failures"] += failures
+            if exact:
+                rec["checks"]["exact"] = exact_checks(ex_loaded, ex_settled, stored, _read_json(inst.sidecar_path) if inst.sidecar_path else None,
+                                                      _read_json(inst.summary_path) if inst.summary_path else None)
             # -- :init true, binary goal false ---------------------------------------------------------------------
             ok_init, status = task.compiled_task.check_initial_conditions(task._evaluate_predicate)
             rec["checks"]["init_true"] = bool(ok_init)
@@ -1371,7 +1520,7 @@ def _worker_argv(args, template_dir: str, iid: Optional[str] = None) -> List[str
             "--log-level", str(args.log_level)]
     if iid:
         argv += ["--instance", iid]
-    for flag, on in (("--no-render", args.no_render), ("--no-goal", args.no_goal), ("--no-program-check", args.no_program_check)):
+    for flag, on in (("--no-render", args.no_render), ("--no-goal", args.no_goal), ("--no-program-check", args.no_program_check), ("--exact", args.exact)):
         if on:
             argv.append(flag)
     return argv
@@ -1448,7 +1597,7 @@ def _worker_main(args) -> int:
     try:
         report = validate_template_v2(tdir, instances=[iid] if iid else None, settle_steps=args.settle_steps, render=not args.no_render, check_goal=not args.no_goal,
                                       program_check=not args.no_program_check, render_iters=args.render_iters, image_size=args.image_size,
-                                      report_path=_worker_report_path(tdir, iid))
+                                      report_path=_worker_report_path(tdir, iid), exact=args.exact)
         print("VALIDATION_WORKER " + json.dumps({"template": tdir, "instance": iid, "n_ok": report["n_ok"], "reload_failed": report["reload_failed"],
                                                  "n_error": report["n_error"], "error": report.get("error")}, default=str), flush=True)
     except BaseException as e:  # noqa: BLE001
@@ -1479,6 +1628,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-goal", action="store_true", help="skip the goal materialisation (teleport) and the goal view")
     parser.add_argument("--no-program-check", action="store_true", help="skip the program check re-run (no cuRobo)")
     parser.add_argument("--fresh-process-per-instance", action="store_true", help="one simulator process per instance instead of per template")
+    parser.add_argument("--exact", action="store_true", help="also record the state right after the loader and after the settle and check it with "
+                                                               "EXACT_TOLERANCES (checks.exact; the standard verdict is unchanged)")
     parser.add_argument("--settle-steps", type=int, default=DEFAULT_SETTLE_STEPS, help="physics steps of the free settle before the state comparison (§3.5: 60)")
     parser.add_argument("--render-iters", type=int, default=RENDER_ITERS)
     parser.add_argument("--image-size", type=int, default=DEFAULT_IMAGE_SIZE)

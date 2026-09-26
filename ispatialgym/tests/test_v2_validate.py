@@ -692,3 +692,38 @@ def test_main_without_v2_workers_writes_aggregate(tmp_path, monkeypatch):
     assert V.list_instances(tdir) == []  # the failed instance was deleted (TRO, sidecar, summary)
     per_template = V._read_json(os.path.join(tdir, "validation", "report.json"))
     assert per_template["deleted"] == [iid] and len(per_template["deleted_paths"]) == 3
+
+
+def test_exact_checks_thresholds_and_sidecar_comparison():
+    """``exact_checks`` (``--exact``): a reload that reproduces the TRO passes; a joint 2e-4 rad off right after the loader, a
+    right hand drifting 2 mm in the settle, a sidecar arms_q entry 5e-4 rad from the TRO and a start depth off the loaded
+    scene each fail on their own."""
+    q_id = [0.0, 0.0, 0.0, 1.0]
+    joints = {"torso_joint1": 1.025, **{f"right_arm_joint{k}": 0.1 * k for k in range(1, 8)}, **{f"left_arm_joint{k}": 0.0 for k in range(1, 8)}}
+    cam = ([0.0, 0.0, 1.0], [0.0, -0.7071068, 0.0, 0.7071068])  # looks along world +x (its -z)
+    obj = ([0.30, 0.0, 1.0], q_id)
+    stored = {"robot_base": ([1.0, 2.0, 0.0], q_id), "robot_joints": dict(joints), "objects": {"can.n.01_1": obj}, "object_joints": {}}
+
+    def snap(joint_off=0.0, hand_dx=0.0):
+        j = dict(joints)
+        j["right_arm_joint5"] += joint_off
+        return {"robot_base": stored["robot_base"], "robot_joints": j, "objects": {"can.n.01_1": obj}, "object_joints": {},
+                "right_eef": ([0.25 + hand_dx, 0.0, 1.0], q_id), "head_camera": cam, "zed_link": cam}
+
+    sidecar = {"grasps": [{"object": "can.n.01_1", "grasp": {"position": [0.25, 0.0, 1.0], "orientation": q_id}}],
+               "stances": {"init": {"base_pose2d": [1.0, 2.0, 0.0], "hold": {"start_depth_m": 0.30},
+                                    "arms_q": {"right": [0.1 * k for k in range(1, 8)], "left": [0.0] * 7}}}}
+    summary = {"goal": {"init_depth_m": 0.30}}
+    ok = V.exact_checks(snap(), snap(), stored, sidecar, summary)
+    assert ok["ok"], ok["failures"]
+    assert ok["sidecar_vs_instance"]["start_depth_m"]["loaded"] == pytest.approx(0.30, abs=1e-6)
+    assert not V.exact_checks(snap(joint_off=2e-4), snap(), stored, sidecar, summary)["ok"]
+    assert not V.exact_checks(snap(), snap(hand_dx=0.002), stored, sidecar, summary)["ok"]
+    bad = copy.deepcopy(sidecar)
+    bad["stances"]["init"]["arms_q"]["right"][4] += 5e-4
+    res = V.exact_checks(snap(), snap(), stored, bad, summary)
+    assert not res["ok"] and res["sidecar_vs_instance"]["worst_arm_joint"] == "right_arm_joint5"
+    far = copy.deepcopy(sidecar)
+    far["stances"]["init"]["hold"]["start_depth_m"] = 0.31
+    assert not V.exact_checks(snap(), snap(), stored, far, {"goal": {"init_depth_m": 0.31}})["ok"]
+    assert V.quat_angle64(q_id, [0.0, 0.0, math.sin(0.0005), math.cos(0.0005)]) == pytest.approx(0.001, rel=1e-6)

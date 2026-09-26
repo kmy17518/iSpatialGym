@@ -1069,6 +1069,14 @@ class ObjectScalingV2(HeldObjectV2):
         q_rel[[self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
         return q_rel, C.relative(eef_w, base3), C.relative(obj_w, base3)
 
+    def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        # the sidecar's init configuration is the state the TRO records: the held arm settles by a few 1e-4 rad under the
+        # payload between the grasp and the write, and demo and evaluator must start from one pose
+        st = self.sidecar.stances.get("init")
+        if st is not None:
+            st.q = self.kit.q_current()
+        return super().write_instance(draft, index, seed)
+
     def sample_start_base(self, rng: np.random.Generator, q_rel: th.Tensor) -> Tuple[float, float, float]:
         """``sample_base`` for the instance's start configuration ``q_rel`` instead of the reference hold."""
         pts = self.kit.random_free_points(rng, 30, room_filter=self.in_room)
