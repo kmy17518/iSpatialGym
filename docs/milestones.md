@@ -2,6 +2,36 @@
 
 Tagged states of this repository and what passed on them.
 
+## `first-demo-v1.1` — object scaling held with the fingers horizontal; the SPAM tin replaces the beaker (2026-09-26)
+
+- **Tag / commit:** `first-demo-v1.1` → `6c9873a4` on `rush-20260917-2100` (`first-demo-v1.0` + the milestone docs commits +
+  `6c9873a4`).
+- **Change** (owner decision 2026-09-26 15:00): object scaling's fixed hold rolls the closing axis 90° (fingers horizontal,
+  closing toward the robot) on all 30 object_scaling aliases, so an object pinched across its side faces the camera with that
+  side; mental rotation keeps 15°. The object_scaling demo of the set is `object_scaling-canned_food` (the SPAM tin, its logo
+  face toward the camera) instead of `object_scaling-beaker` (a plain white cup). The B7 visibility survey, rendered at 15°,
+  applies only at that hold; at 90° every grasp row is measured by the renders.
+- **Evidence on this commit** (job `object_scaling_p90_rep_20260926`, `first_demo.py run`, 250 kg chassis, both sampled at
+  attempt 0):
+
+  | alias | sampling + demo run on this code | replaces |
+  |---|---|---|
+  | `object_scaling-canned_food` | 0926-151156 | `object_scaling-beaker` (v1.0 run 0926-075332) |
+  | `mental_rotation-banana` | 0926-152026 | its v1.0 run 0926-072342 (re-run because `held_object.py` changed) |
+
+- **The other 26 aliases** keep their `first-demo-v1.0` runs (table below): between `b7234b1b` and `6c9873a4` only the 30
+  object_scaling customs entries (`generation.hold.roll_deg`), the object_scaling defaults, `held_object.py` (held-object tasks
+  only), its tests and the spec changed.
+- **How the hold and the object were chosen:** `runlogs/hold_roll_20260926/` (roll +90 / −90 vs 15 on can_of_soda and beaker:
+  the hold solves from the default posture at both rolls, 4/4 demos succeed, reachable goal depths unchanged), textured
+  candidates at 15° in `runlogs/first-demo-v1.0/object_scaling_candidates/` and at +90° in
+  `runlogs/hold_roll_20260926/candidates_p90/`.
+- **Unit tests** on this commit: 1231 passed; the same 4 known failures as v1.0.
+- **Collected demos:** `runlogs/first-demo-v1.1/` (the two new runs copied, the 26 others linked into `runlogs/first-demo-v1.0/`).
+- **Known limits (beyond v1.0's):** from the 0.50 m hold only the goal depths 0.35 / 0.40 m pass the screening IK, at every
+  roll (0.60–0.85 m fail for every grasp), so object scaling only brings the object 10–15 cm closer; the front finger crosses
+  the held object (≥ 40 % stays visible, checked at init and goal).
+
 ## `first-demo-v1.0` — all 28 first-demo aliases pass sampling + demo (2026-09-26)
 
 - **Tag / commit:** `first-demo-v1.0` → `b7234b1b` on `rush-20260917-2100`.
