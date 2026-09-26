@@ -30,7 +30,7 @@ import torch as th
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
-from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow, Place, Brace as QA_Brace
+from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow, Place, Reorient, Brace as QA_Brace
 from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, SimState, apply_goal_override
 from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError, as_world_pose
 from ispatialgym.oracle.programs import expand
@@ -3080,6 +3080,46 @@ def test_free_leg_jam_is_relaxed_onto_the_measured_joints():
         robot.q[idx] += 0.5 * DT
         n += 1
     assert n == motions.cfg.jam_probe_steps and len(motions.jams) == 1
+
+
+def test_jam_probe_leaves_a_kept_hold_alone():
+    """An arm in ``keep_hold_arms`` (it carries its object to the end of the episode) is not relaxed by the jam probe: the
+    wrist's steady offset under the payload is not a contact, and relaxing it lets the payload sag."""
+    sc, env = iors_world()
+    robot = env.robot
+    motions = Motions(env, FakeBackend(robot), MotionsConfig(settle_steps=5))
+    idx = robot.arm_control_idx["right"]
+    target = robot.q[idx].clone() + th.tensor([0.0, 0.0, 0.0, 0.0, 0.0, -0.008, 0.0])  # the wrist 8 mrad below its target
+    motions.state.arm_target["right"] = target.clone()
+    robot.dq[:] = 0.0
+    robot.dq[idx[5]] = 0.2163  # what the loaded wrist reported while static
+    motions.keep_hold_arms = {"right"}
+    assert list(motions._relax_if_jammed(["right"])) == []
+    assert th.allclose(motions.state.arm_target["right"], target) and motions.jams == []
+    # the same arm without a kept hold is a jam and relaxed
+    motions.keep_hold_arms = set()
+    assert len(list(motions._relax_if_jammed(["right"]))) == motions.cfg.jam_probe_steps + motions.cfg.jam_relax_steps
+    assert len(motions.jams) == 1
+
+
+def test_final_reorient_keeps_the_hold_and_the_epilogue_leaves_it(tmp_path):
+    """A program whose last action moves an arm holding an object without placing it (the held-object reorient) keeps
+    that hold: the arm joins ``keep_hold_arms`` and the epilogue relaxes only the other arm. An empty hand or a place
+    keeps nothing."""
+    sc, env = iors_world()
+    ex, motions, _, _ = make_executor(env, sc, tmp_path)
+    pose = ([0.5, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0])
+    reorient = Reorient(mode="line", arm="right", object="apple.n.01_1", start_pose=pose, waypoints=[pose])
+    ex._keep_final_hold(reorient)
+    assert motions.keep_hold_arms == set()  # the hand is empty
+    env.robot._ag_obj_in_hand["right"] = env.objects["apple.n.01_1"]
+    ex._keep_final_hold(Place(kind="support", arm="right", object="apple.n.01_1", place=pose))
+    assert motions.keep_hold_arms == set()  # a place releases the object
+    ex._keep_final_hold(reorient)
+    assert motions.keep_hold_arms == {"right"}
+    info: Dict[str, Any] = {}
+    assert len(list(ex._epilogue_hold(10, info))) == 10
+    assert set(info) == {"left"}
 
 
 def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):

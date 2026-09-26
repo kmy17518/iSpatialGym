@@ -44,7 +44,7 @@ import logging
 import math
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Set, Tuple, Union
 
 import torch as th
 
@@ -406,6 +406,10 @@ class Motions:
         self.last_witness_residual: Optional[Tuple[float, float]] = None  # a witness residual arm_to left unclosed (m, rad)
         self.last_jam: Optional[Dict[str, Any]] = None  # the last jammed free-space leg relaxed by _relax_if_jammed
         self.jams: List[Dict[str, Any]] = []
+        # arms that keep their object to the end of the episode (set by the executor for the program's last action): a
+        # wrist carrying a payload sits a steady offset below its target, which the jam probe reads as a jam; relaxing
+        # it only lets the payload sag in front of the camera
+        self.keep_hold_arms: Set[str] = set()
         # the protected-object transit check (owner 2026-09-26, oracle.protection): the active context (set by the execute
         # functions around a transit) and every firing of it this episode (task, action, object, clearance, remedy)
         self._protect: Optional[Dict[str, Any]] = None
@@ -831,8 +835,9 @@ class Motions:
     def _relax_if_jammed(self, arms: Sequence[str]) -> Iterator[th.Tensor]:
         """After a free-space leg converged: joints still reporting velocities above ``jam_vel_tol`` for
         ``jam_probe_steps`` steps without moving (``jam_pos_eps``) are a drive fighting an unseen contact - the hold
-        targets are relaxed onto the measured joints (``relax_arms``; the jam is kept in ``last_jam`` for the notes)."""
-        arms = [a for a in arms if a in M.ARMS]
+        targets are relaxed onto the measured joints (``relax_arms``; the jam is kept in ``last_jam`` for the notes).
+        Arms in ``keep_hold_arms`` are never relaxed."""
+        arms = [a for a in arms if a in M.ARMS and a not in self.keep_hold_arms]
         if not self.cfg.jam_relax or not arms:
             return
         idx = th.cat([self.robot.arm_control_idx[a] for a in arms])

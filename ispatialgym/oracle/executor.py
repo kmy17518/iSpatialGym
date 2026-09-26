@@ -1231,10 +1231,14 @@ class Executor:
             except Exception:  # noqa: BLE001
                 continue
         self.state.init_poses = init_poses
+        if self.motions is not None:
+            self.motions.keep_hold_arms = set()
         verdict: Optional[Verdict] = None
         i = 0
         while i < len(actions):
             action = actions[i]
+            if i == len(actions) - 1:
+                self._keep_final_hold(action)
             if isinstance(action, Brace) and i + 1 < len(actions) and isinstance(actions[i + 1], Push) and self.cfg.brace_retries > 0:
                 verdict = self.run_braced_push(i, action, actions[i + 1])
                 i += 2
@@ -1426,15 +1430,24 @@ class Executor:
         self.timings["actions_s"] = time.time() - t0
         return self.epilogue(verdict, self.n)
 
+    def _keep_final_hold(self, action: Action) -> None:
+        """The program's last action moves an arm that holds an object and does not place it (the held-object
+        reorient): that hand keeps its object to the end, so neither the leg's jam probe nor the epilogue relaxes it."""
+        arm = getattr(action, "arm", None)
+        if self.motions is None or arm not in M.ARMS or isinstance(action, Place) or self.state.held_object(arm) is None:
+            return
+        self.motions.keep_hold_arms.add(arm)
+
     def _epilogue_hold(self, steps: int, relax_info: Dict[str, Any]) -> Iterator[th.Tensor]:
         """The first no-op window of the epilogue (``steps`` steps in all): the arms' hold targets relaxed onto their
         measured joints over its first ``epilogue_relax_steps`` steps (``epilogue_relax_arms``, program mode - a stream
-        has no Layer-1 targets to relax), then no-op steps. ``relax_info`` receives ``{arm: largest target change (rad)}``."""
+        has no Layer-1 targets to relax), then no-op steps. An arm still holding an object is not relaxed (the payload
+        would sag). ``relax_info`` receives ``{arm: largest target change (rad)}``."""
         motions = self.motions
         n_relax = 0
         if self.cfg.epilogue_relax_arms and motions is not None and getattr(self, "_last_stream_action", None) is None and hasattr(motions, "relax_arms"):
             hold = getattr(motions, "press_hold", None) or {}
-            arms = [a for a in M.ARMS if hold.get("arm") != a]
+            arms = [a for a in M.ARMS if hold.get("arm") != a and a not in getattr(motions, "keep_hold_arms", ()) and self.state.held_object(a) is None]
             n_relax = min(int(self.cfg.epilogue_relax_steps), int(steps))
             if arms and n_relax > 0:
                 relaxed = yield from motions.relax_arms(arms, steps=n_relax)
@@ -1806,6 +1819,7 @@ class Executor:
             "settle_window": window,
             "settle_windows": windows,
             "epilogue_relax": relax_info,
+            "kept_hold_arms": sorted(getattr(self.motions, "keep_hold_arms", ()) or ()),
             "jams": _jsonable(list(getattr(self.motions, "jams", []) or [])),
             "witness_branch_accepted": _jsonable(list(getattr(self.motions, "witness_branch_accepted_events", []) or [])),
             "protection": _jsonable({"protected": [getattr(o, "name", n) for n, o in self.protected_goal], "plan_checks": int(getattr(self.motions, "protect_checks", 0) or 0),
