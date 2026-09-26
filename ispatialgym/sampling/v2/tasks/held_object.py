@@ -17,15 +17,19 @@ pads touch, 4 mm press through the assisted-grasp window, gravity re-enabled, st
 grasp (finger joints, object pose in the eef frame, key / name) is what the TRO ``grasps[0]`` stores (loader
 contract §3.14).
 
-Goal sets are precomputed **once per template** (they depend on the hold and the object, not on the base pose):
-object scaling = the 5 cm depth grid over ``goal_depth_range_m`` with ``|d1 − d0| ≥ min_depth_change_m`` (same
-orientation); mental rotation = 13 rotation axes (face / edge / corner directions of the base frame, one per antipodal
-pair) × signed angles on a 15° grid inside ``goal_angle_range_deg`` (position unchanged). Each candidate is screened
-with the right-arm embodiment only (the oracle moves the arm, not the torso) at the three intermediate waypoints of
-§3.9 (straight line along the camera ray / SLERP about the object root, ``conventions.line_waypoints`` /
-``orbit_waypoints``) with the object attached to the planner, and the whole object must stay in frame (5 %). Each
-instance draws a (grasp, goal) from the feasible set and confirms it once with the exact IK at its base pose
-(principle 3), with the held object attached, whole-body collision-free at every checked pose.
+Goal sets are precomputed **once per template** (they depend on the hold and the object, not on the base pose). Mental
+rotation = 13 rotation axes (face / edge / corner directions of the base frame, one per antipodal pair) × signed angles
+on a 15° grid inside ``goal_angle_range_deg`` (position unchanged), each candidate screened with the right-arm
+embodiment only (the oracle moves the arm, not the torso) at the three intermediate waypoints of §3.9 (SLERP about the
+object root, ``conventions.orbit_waypoints``) with the object attached to the planner, the whole object in frame (5 %);
+each instance draws a (grasp, goal) from the feasible set and confirms it once with the exact IK at its base pose
+(principle 3), with the held object attached, whole-body collision-free at every checked pose. Object scaling (owner
+2026-09-26) = per grasp the reachable **depth window**: the object at the reference hold slid along the optical axis
+over the ``depth_search_grid_m`` grid of ``depth_search_range_m``, a depth passing when the object is in frame and the
+screening IK reaches the hand pose, the continuous run through the reference depth shrunk by ``depth_margin_m``; each
+instance draws a start depth and a goal depth uniformly in the window with ``|d1 − d0| ≥ min_depth_change_m`` (toward
+or away from the camera), solves the start configuration by IK from the default posture and confirms the straight
+move (``conventions.line_waypoints``) with the exact IK at its base pose.
 
 Visibility: ≥ ``min_visible_fraction`` (40 %) of the object visible at init and at the goal (segmentation render with
 and without the robot) and the whole object in frame. The B7 prior (``runlogs/held_visibility_20260915/visibility.json``,
@@ -145,19 +149,55 @@ def hold_eef_pose(cam_pose: C.Pose, base_yaw: float, hold: HoldConstants) -> Tup
     return (origin, quat), pad
 
 
-def depth_goal_set(d0: float, depth_range: Sequence[float], grid_m: float, min_change_m: float) -> List[float]:
-    """Object-scaling goal depths: the ``grid_m`` grid over ``depth_range`` (inclusive) with ``|d1 − d0| ≥ min_change_m``,
-    ascending. Grid values are snapped to the grid step so 0.35 + k·0.05 reads as 0.35, 0.40, ... exactly."""
+def depth_grid(depth_range: Sequence[float], grid_m: float) -> List[float]:
+    """The ``grid_m`` grid over ``depth_range`` (inclusive, ascending), snapped so 0.15 + k·0.01 reads as 0.15, 0.16, ..."""
     lo, hi = float(depth_range[0]), float(depth_range[1])
     n = int(round((hi - lo) / grid_m))
-    out = []
-    for k in range(n + 1):
-        d1 = round(lo + k * grid_m, 6)
-        if d1 > hi + 1e-9:
-            break
-        if abs(d1 - d0) + 1e-9 >= min_change_m:
-            out.append(d1)
-    return out
+    return [round(lo + k * grid_m, 6) for k in range(n + 1) if lo + k * grid_m <= hi + 1e-9]
+
+
+def depth_window(depths: Sequence[float], passed: Sequence[bool], anchor: float,
+                 margin_m: float) -> Tuple[Optional[Tuple[float, float]], Optional[Tuple[float, float]]]:
+    """One grasp's object-scaling depth window: the continuous run of passing ``depths`` (an ascending grid) that contains
+    ``anchor`` (the reference hold's depth; the longest run when none does), shrunk by ``margin_m`` at both ends.
+    Returns ``(window, run)``; ``window`` is None when the shrunk run is empty, both are None without a passing depth."""
+    runs: List[Tuple[float, float]] = []
+    start = None
+    for i, ok in enumerate(passed):
+        if ok and start is None:
+            start = i
+        if start is not None and (not ok or i == len(passed) - 1):
+            runs.append((float(depths[start]), float(depths[i if ok else i - 1])))
+            start = None
+    if not runs:
+        return None, None
+    containing = [r for r in runs if r[0] - 1e-9 <= anchor <= r[1] + 1e-9]
+    run = containing[0] if containing else max(runs, key=lambda r: r[1] - r[0])
+    lo, hi = round(run[0] + margin_m, 6), round(run[1] - margin_m, 6)
+    return ((lo, hi) if hi >= lo else None), run
+
+
+def draw_start_goal(rng: np.random.Generator, window: Sequence[float], min_change_m: float, max_draws: int = 10000) -> Tuple[float, float]:
+    """Object-scaling start and goal depths: both uniform in ``window``, redrawn until ``|d1 − d0| ≥ min_change_m`` - the
+    object moves toward or away from the camera alike."""
+    lo, hi = float(window[0]), float(window[1])
+    if hi - lo <= min_change_m:
+        raise ValueError(f"depth window [{lo:.3f}, {hi:.3f}] m does not admit a {min_change_m:.3f} m move")
+    for _ in range(int(max_draws)):
+        d0, d1 = float(rng.uniform(lo, hi)), float(rng.uniform(lo, hi))
+        if abs(d1 - d0) >= min_change_m:
+            return d0, d1
+    raise RuntimeError(f"no start / goal pair {min_change_m:.3f} m apart in [{lo:.3f}, {hi:.3f}] m after {max_draws} draws")
+
+
+def slide_to_depth(eef: C.Pose, eef_in_object: C.Pose, cam_pos, axis: th.Tensor, depth: float) -> Tuple[C.Pose, C.Pose]:
+    """The hand pose ``eef`` slid along the camera's unit optical ``axis`` so that the held object's root sits at
+    ``depth`` along it (the success target's measure), orientation kept. Returns ``(eef, object root pose)`` there."""
+    eef_p, eef_q = (G.t(x).float() for x in eef)
+    obj = C.compose((eef_p, eef_q), C.invert(eef_in_object))
+    obj_p, obj_q = G.t(obj[0]).float(), G.t(obj[1]).float()
+    shift = axis.float() * (float(depth) - float(th.dot(obj_p - G.t(cam_pos).float(), axis.float())))
+    return (eef_p + shift, eef_q.clone()), (obj_p + shift, obj_q.clone())
 
 
 def rotation_axes() -> th.Tensor:
@@ -928,18 +968,203 @@ class HeldObjectV2(SamplerV2):
 
 @register("object_scaling")
 class ObjectScalingV2(HeldObjectV2):
-    """§6.3 goal: depth d1 on the 5 cm grid over ``goal_depth_range_m`` with |d1 − d0| >= ``min_depth_change_m``,
-    orientation unchanged; target frame = camera sensor, ``position_metric = depth``, tolerance max(0.02, 0.20·|Δd|)."""
+    """§6.3 (owner 2026-09-26): per instance a start depth d0 and a goal depth d1 of the object root along the head
+    camera's optical axis, both uniform in the grasp's reachable depth window with |d1 − d0| >= ``min_depth_change_m``,
+    orientation unchanged. The start is the reference hold (``solve_hold``) slid along the axis, its configuration solved
+    by IK from the default posture; target frame = camera sensor, ``position_metric = depth``, tolerance
+    max(0.02, 0.20·|Δd|)."""
 
-    def goal_candidates(self, cam: C.Pose, obj0: C.Pose) -> List[Tuple[C.Pose, Dict[str, Any]]]:
+    def precompute_options(self):
+        """Per library grasp (B7 prior first): the depth window. The object at the reference hold is slid along the
+        optical axis over the ``depth_search_grid_m`` grid of ``depth_search_range_m``; a depth passes when the whole
+        object is in frame (5 %) and the screening IK (right arm from the default posture, object attached, robot +
+        object only) reaches the hand pose. The window is the continuous run of passing depths through the reference
+        depth, shrunk by ``depth_margin_m`` at both ends; a grasp whose window does not admit a ``min_depth_change_m``
+        move gets no options. Base-frame quantities: the windows hold at any base pose."""
+        target = self.obj("target")
+        ref = self.kit.world_base_pose2d()
+        self.ref_base2d = ref
+        base3 = self.base_pose3d(ref)
+        cam = C.compose(base3, self.cam_in_base)
         axis = self.world.camera_model.optical_axis(cam)
+        eef_ref = C.compose(base3, self.eef_in_base)
+        q_hold = self.q_init_at(ref)
+        q_default = self.default_q_at(ref)
+        min_vis = float(self.g("min_visible_fraction"))
+        grid = depth_grid(self.g("depth_search_range_m"), float(self.g("depth_search_grid_m")))
+        margin = float(self.g("depth_margin_m"))
+        min_change = float(self.g("min_depth_change_m"))
+        stats = {"grasps": len(self.grasps), "prior_skipped": 0, "prior_unknown": 0, "held_out_of_view": 0, "depths": len(grid), "too_narrow": 0,
+                 "windows": 0}
+        self.options = {}
+        windows: Dict[str, Any] = {}
+        skipped = []
+        for g in self.grasps:
+            admits = prior_admits(self.prior, g.key, g.name, min_vis)
+            if admits is False:
+                stats["prior_skipped"] += 1
+                skipped.append(g.name)
+                continue
+            if admits is None:
+                stats["prior_unknown"] += 1
+            obj_ref = C.compose(eef_ref, C.invert(g.pose))
+            if not self.whole_in_frame(cam, obj_ref):
+                stats["held_out_of_view"] += 1
+                windows[g.name] = {"held_out_of_view": True}
+                continue
+            d_ref = float(th.dot(G.t(obj_ref[0]) - G.t(cam[0]), axis))
+            poses, in_view = [], []
+            for depth in grid:
+                eef_d, obj_d = slide_to_depth(eef_ref, g.pose, cam[0], axis, depth)
+                poses.append(eef_d)
+                in_view.append(bool(self.whole_in_frame(cam, obj_d)))
+            reach = [False] * len(grid)
+            idx = [i for i, v in enumerate(in_view) if v]
+            if idx:
+                # the object at the reference hold in the simulation so the planner attaches it with the right transform
+                self.kit.apply(q_hold, ref)
+                target.set_position_orientation(obj_ref[0], obj_ref[1])
+                target.keep_still()
+                self.kit.sync_world()
+                with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, ARM, target):
+                    ok = self.kit.ik_batch([poses[i] for i in idx], q_default, arm=ARM)
+                for i, s in zip(idx, ok.tolist()):
+                    reach[i] = bool(s)
+            window, run = depth_window(grid, [v and r for v, r in zip(in_view, reach)], d_ref, margin)
+            windows[g.name] = {"reference_depth": round(d_ref, 4), "run": run, "window": window,
+                               "ik_failed": [dd for dd, v, r in zip(grid, in_view, reach) if v and not r],
+                               "out_of_view": [dd for dd, v in zip(grid, in_view) if not v]}
+            if window is None or window[1] - window[0] <= min_change:
+                stats["too_narrow"] += 1
+                continue
+            self.options[g.name] = {"window": window, "reference_depth": d_ref}
+            stats["windows"] += 1
+        self.world.park(target, list(self.world.spawned).index(target.name))
+        self.kit.sync_world()
+        self.template_facts["goal_options"] = {**stats, "grasps_with_options": len(self.options), "prior_skipped_names": skipped,
+                                               "per_grasp": {k: list(v["window"]) for k, v in self.options.items()}}
+        self.template_facts["depth_windows"] = windows
+        if not self.options:
+            raise Reject("goal_infeasible", f"no library grasp has a depth window admitting a {min_change:.2f} m move ({stats}; {windows})")
+        log.info("%s: depth windows per grasp %s (%s)", self.gp.alias, {k: v["window"] for k, v in self.options.items()}, stats)
+
+    def default_q_at(self, base2d) -> th.Tensor:
+        """The default posture (arms zero, trunk ``hold.trunk``) at a base pose: the seed of every hold IK."""
+        return self.kit.q_at_base_pose(self.kit.q_config(arms=IDLE_ARMS, translate=self.hold.translate, tilt=self.hold.tilt), *base2d)
+
+    def start_config(self, g: GL.Grasp, d0: float) -> Optional[Tuple[th.Tensor, C.Pose, C.Pose]]:
+        """The start of an instance: ``g``'s object with its root at depth ``d0`` (the reference hold slid along the optical
+        axis) and the configuration holding it, solved by IK from the default posture with the scene ignored and checked
+        free of self-collision (as ``solve_hold``). Returns ``(q with the base virtual joints zero, eef in the base frame,
+        object root in the base frame)`` or None."""
+        ref = self.ref_base2d
+        base3 = self.base_pose3d(ref)
+        cam = C.compose(base3, self.cam_in_base)
+        eef_w, obj_w = slide_to_depth(C.compose(base3, self.eef_in_base), g.pose, cam[0], self.world.camera_model.optical_axis(cam), d0)
+        with self.kit.ignoring(self.scene_obstacles()):
+            q = self.kit.ik(eef_w, self.default_q_at(ref), arm=ARM)
+            if q is None or not bool(self.kit.collision_free(q, margin=0.01)[0]):
+                return None
+        q_rel = q.clone()
+        q_rel[[self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
+        return q_rel, C.relative(eef_w, base3), C.relative(obj_w, base3)
+
+    def sample_start_base(self, rng: np.random.Generator, q_rel: th.Tensor) -> Tuple[float, float, float]:
+        """``sample_base`` for the instance's start configuration ``q_rel`` instead of the reference hold."""
+        pts = self.kit.random_free_points(rng, 30, room_filter=self.in_room)
+        if not pts:
+            raise Reject("no_stance", "no free eroded cell in the task room")
+        cands = [(float(xy[0]), float(xy[1]), float(rng.uniform(-math.pi, math.pi))) for xy in pts]
+        free = self.kit.collision_free(th.stack([self.kit.q_at_base_pose(q_rel, *b) for b in cands]), margin=0.02)
+        for b, f in zip(cands, free.tolist()):
+            if f:
+                return b
+        raise Reject("no_stance", "no collision-free base pose for the start configuration")
+
+    def sample_instance(self, rng: np.random.Generator) -> Draft:
+        d = Draft()
+        tname = self.target_name
+        target = self.obj("target")
+        hc = self.hold
+        n_wp = int(self.g("waypoints"))
+        min_change = float(self.g("min_depth_change_m"))
+        chosen = None
+        errors = []
+        for gname in self.grasp_order(rng)[:4]:
+            g = next(x for x in self.grasps if x.name == gname)
+            opt = self.options[gname]
+            d0, d1 = draw_start_goal(rng, opt["window"], min_change)
+            start = self.start_config(g, d0)
+            if start is None:
+                errors.append(f"{gname}: no start configuration at {d0:.3f} m")
+                continue
+            q_rel, eef0_b, obj0_b = start
+            try:
+                base2d = self.sample_start_base(rng, q_rel)
+            except Reject as e:
+                errors.append(f"{gname} at {d0:.3f} m: {e}")
+                continue
+            base3 = self.base_pose3d(base2d)
+            q_init = self.kit.q_at_base_pose(q_rel, *base2d)
+            cam = self.camera_at(base2d)
+            axis = self.world.camera_model.optical_axis(cam)
+            eef0, obj0 = C.compose(base3, eef0_b), C.compose(base3, obj0_b)
+            if not self.whole_in_frame(cam, obj0):
+                errors.append(f"{gname}: start at {d0:.3f} m out of frame")
+                continue
+            self.kit.apply(q_init, base2d)
+            target.set_position_orientation(obj0[0], obj0[1])
+            target.keep_still()
+            self.kit.sync_world()
+            init = Stance("init", base2d, hc.translate, hc.tilt, arms=[ARM], carried=tname)
+            init.q = q_init
+            with attached(self.kit, ARM, target):
+                if not bool(self.kit.collision_free(q_init, margin=0.01)[0]):
+                    errors.append(f"{gname}: start at {d0:.3f} m collides with the object attached")
+                    continue
+                eef1, goal = slide_to_depth(eef0, g.pose, cam[0], axis, d1)
+                wps = self.key_poses(eef0, eef1, obj0)
+                res = self.ikc.waypoints_ok([eef0] + wps, init, ARM, q_seed=q_init, scale_key=self.choice.models["target"].scale)
+                if not res.ok:
+                    errors.append(f"{gname} {d0:.3f} -> {d1:.3f} m: {res.reason}")
+                    continue
+            if not self.whole_in_frame(cam, goal):
+                errors.append(f"{gname}: goal at {d1:.3f} m out of frame")
+                continue
+            chosen = (g, obj0, eef0, goal, wps, res.q, base2d, cam, axis, init, opt)
+            break
+        if chosen is None:
+            raise Reject("goal_infeasible", "no (grasp, start, goal) confirmed: " + "; ".join(errors[-4:]))
+        g, obj0, eef0, goal, wps, q_goal, base2d, cam, axis, init, opt = chosen
         d0 = float(th.dot(G.t(obj0[0]) - G.t(cam[0]), axis))
-        depths = depth_goal_set(d0, self.g("goal_depth_range_m"), float(self.g("goal_depth_grid_m")), float(self.g("min_depth_change_m")))
-        out = []
-        for d1 in depths:
-            goal = (G.t(obj0[0]) + axis * (d1 - d0), G.t(obj0[1]).clone())
-            out.append((goal, {"init_depth_m": d0, "goal_depth_m": d1, "depth_change_m": d1 - d0}))
-        return out
+        d1 = float(th.dot(G.t(goal[0]) - G.t(cam[0]), axis))
+        info = {"init_depth_m": d0, "goal_depth_m": d1, "depth_change_m": d1 - d0, "direction": "away" if d1 > d0 else "toward",
+                "window_m": list(opt["window"])}
+        # the hold of this instance: the reference hold's pad slid with the object (depth_m = pad depth, as HoldConstants)
+        hold = {**hc.to_json(), "depth_m": round(hc.depth_m + d0 - float(opt["reference_depth"]), 6), "start_depth_m": d0,
+                "reference_depth_m": hc.depth_m}
+        init.extras.update({"posture": {"left_arm": "reset", "right_arm": "hold"}, "hold": hold})
+        d.object_poses[tname] = obj0
+        d.goal_poses[tname] = goal
+        d.robot_q = init.q
+        d.base_pose2d = base2d
+        d.settle_free = []
+        obj_in_eef = C.invert(g.pose)
+        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": ARM, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
+                               "object_pose_in_eef_frame": {"position": obj_in_eef[0].tolist(), "orientation": obj_in_eef[1].tolist()}}]
+        d.extras["goal_robot_q"] = q_goal
+        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{ARM}_arm"},
+                          "hold": hold})
+        d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
+        self.sidecar.add_stance(init)
+        rec = GraspRecord(tname, ARM, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0, finger_q=list(g.finger_q),
+                          eef_in_object=g.pose, stance="init", waypoints=wps)
+        self.sidecar.add_grasp(rec)
+        goal_block = self.sidecar.set_goal(base2d, hc.translate, hc.tilt, arms="same")
+        goal_block.update({"right_arm_q": q_goal[self.robot.arm_control_idx[ARM]].tolist(), "embodiment": f"{ARM}_arm",
+                           "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}, "hold": hold})
+        self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), **self.goal_numbers(info))
+        return d
 
     def key_poses(self, eef0: C.Pose, eef1: C.Pose, obj0: C.Pose) -> List[C.Pose]:
         return line_key_poses(eef0, eef1, int(self.g("waypoints")))
@@ -950,7 +1175,11 @@ class ObjectScalingV2(HeldObjectV2):
         return pose_target(position=p_cam.tolist(), position_metric="depth", position_tolerance=tol, frame=f"{AGENT_INSTANCE}::{self.world.cam_key}")
 
     def goal_numbers(self, info: Dict[str, Any]) -> Dict[str, float]:
-        return {"depth_change_cm": 100.0 * float(info["depth_change_m"]), "goal_depth_cm": 100.0 * float(info["goal_depth_m"])}
+        """Signed change (< 0 toward the camera), goal and start depths, and ``direction`` +1 away from / −1 toward the
+        camera (the language block holds numbers only)."""
+        change = float(info["depth_change_m"])
+        return {"depth_change_cm": 100.0 * change, "goal_depth_cm": 100.0 * float(info["goal_depth_m"]),
+                "start_depth_cm": 100.0 * float(info["init_depth_m"]), "direction": 1.0 if change > 0 else -1.0}
 
 
 # ----------------------------------------------------------------------------------------------------------------

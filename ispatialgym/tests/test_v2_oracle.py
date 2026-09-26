@@ -3122,6 +3122,27 @@ def test_final_reorient_keeps_the_hold_and_the_epilogue_leaves_it(tmp_path):
     assert set(info) == {"left"}
 
 
+def test_object_scaling_move_text_names_the_direction():
+    """``Reorient`` (line) annotation: the sampler's signed ``depth_change_cm`` (< 0 toward the camera) names the
+    direction; a sidecar without it keeps the direction-free text."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle.sidecar import Pose as SPose
+
+    start, end = SPose([0.60, 0.0, 1.20], [0.0, 0.0, 0.0, 1.0]), SPose([0.48, 0.0, 1.25], [0.0, 0.0, 0.0, 1.0])
+    act = Reorient(mode="line", arm="right", object="can.n.01_1", start_pose=start, waypoints=[end])
+
+    def sidecar(numbers):
+        return SimpleNamespace(language=SimpleNamespace(phrase=lambda inst: "the can", goal_numbers=numbers))
+
+    fine, numbers = act.annotate(sidecar({"depth_change_cm": -13.0}))
+    assert fine == "move the can toward the camera to the goal distance, keeping its orientation" and numbers == "move the can 13 cm toward the camera"
+    fine, numbers = act.annotate(sidecar({"depth_change_cm": 13.0}))
+    assert "away from the camera" in fine and numbers == "move the can 13 cm away from the camera"
+    fine, numbers = act.annotate(sidecar({}))
+    assert numbers == "move the can 13 cm along the camera axis"
+
+
 def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):
     """The epilogue's first no-op window starts with the arms' hold targets relaxed onto their measured joints
     (``epilogue_relax_arms``): a target left pressing against an unseen contact stops pushing before ``pose_settled`` is

@@ -886,9 +886,12 @@ class Reorient(Action):
             numbers = f"rotate {obj} {_deg(angle)} in hand about its centre" if angle is not None else fine
             return fine, numbers
         if self.mode == "line":
-            fine = f"move {obj} along the camera axis to the goal distance, keeping its orientation"
+            # the sampler's signed depth change (< 0: toward the camera); sidecars written before it name no direction
+            change = (getattr(sidecar.language, "goal_numbers", None) or {}).get("depth_change_cm")
+            way = "along the camera axis" if change is None else ("away from the camera" if float(change) > 0 else "toward the camera")
+            fine = f"move {obj} {way} to the goal distance, keeping its orientation"
             dist = _distance(start.position, end.position) if start is not None else None
-            numbers = f"move {obj} {_cm(dist)} along the camera axis" if dist is not None else fine
+            numbers = f"move {obj} {_cm(dist)} {way}" if dist is not None else fine
             return fine, numbers
         fine = f"turn {obj} in hand toward the attach orientation while bringing it to the pre-attach pose"
         numbers = f"{fine} at {_xyz(end.position)} ({len(self.waypoints)} recorded key poses)"

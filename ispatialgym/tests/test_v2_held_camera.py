@@ -324,15 +324,60 @@ def test_heading_between_axes():
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_depth_goal_set_grid_and_min_change():
-    depths = HO.depth_goal_set(0.50, [0.35, 0.85], 0.05, 0.10)
-    assert depths == [0.35, 0.40, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
-    assert all(abs(d - 0.50) >= 0.10 - 1e-9 for d in depths)
-    assert 0.45 not in depths and 0.55 not in depths and 0.50 not in depths
-    # a root depth off the grid (the object root is not the pad centre)
-    depths = HO.depth_goal_set(0.52, [0.35, 0.85], 0.05, 0.10)
-    assert all(abs(d - 0.52) >= 0.10 - 1e-9 for d in depths)
-    assert 0.40 in depths and 0.65 in depths and 0.45 not in depths and 0.60 not in depths
+def test_depth_grid_is_snapped_and_inclusive():
+    grid = HO.depth_grid([0.15, 0.55], 0.01)
+    assert len(grid) == 41 and grid[0] == 0.15 and grid[-1] == 0.55 and grid[7] == 0.22
+
+
+def test_depth_window_takes_the_run_through_the_reference_and_its_margin():
+    grid = HO.depth_grid([0.15, 0.55], 0.01)
+    # the measured shape: IK fails below 0.21 and above 0.52
+    passed = [0.21 - 1e-9 <= d <= 0.52 + 1e-9 for d in grid]
+    window, run = HO.depth_window(grid, passed, 0.501, 0.02)
+    assert run == (0.21, 0.52) and window == (0.23, 0.50)
+    # a hole splits the runs: the run through the reference depth wins over a longer one elsewhere
+    holed = [p and not (0.40 - 1e-9 <= d <= 0.41 + 1e-9) for d, p in zip(grid, passed)]
+    window, run = HO.depth_window(grid, holed, 0.501, 0.02)
+    assert run == (0.42, 0.52) and window == (0.44, 0.50)
+    # the reference depth in no run: the longest run
+    window, run = HO.depth_window(grid, holed, 0.60, 0.02)
+    assert run == (0.21, 0.39) and window == (0.23, 0.37)
+    # a run shorter than the two margins leaves no window; no passing depth leaves nothing
+    short = [0.30 - 1e-9 <= d <= 0.33 + 1e-9 for d in grid]
+    assert HO.depth_window(grid, short, 0.31, 0.02) == (None, (0.30, 0.33))
+    assert HO.depth_window(grid, [False] * len(grid), 0.5, 0.02) == (None, None)
+
+
+def test_draw_start_goal_moves_both_ways_inside_the_window():
+    rng = np.random.default_rng(0)
+    draws = [HO.draw_start_goal(rng, (0.23, 0.49), 0.05) for _ in range(2000)]
+    assert all(0.23 <= d0 <= 0.49 and 0.23 <= d1 <= 0.49 for d0, d1 in draws)
+    assert all(abs(d1 - d0) >= 0.05 for d0, d1 in draws)
+    away = sum(d1 > d0 for d0, d1 in draws)
+    assert 0.4 < away / len(draws) < 0.6  # toward and away alike
+    starts = sorted(d0 for d0, _ in draws)
+    assert starts[0] < 0.24 and starts[-1] > 0.48  # the whole window is used
+    with pytest.raises(ValueError):
+        HO.draw_start_goal(rng, (0.30, 0.34), 0.05)
+
+
+def test_slide_to_depth_puts_the_object_root_at_the_depth():
+    """The start / goal hand pose at any depth: the object root lands at the depth along the optical axis, its lateral
+    offset from the axis and the hand orientation are kept, and the hand-object transform is unchanged."""
+    cam_pos = th.tensor([0.24, 0.0, 1.39])
+    axis = th.tensor([math.cos(math.radians(22.6)), 0.0, -math.sin(math.radians(22.6))])
+    eef = (th.tensor([0.70, 0.03, 1.20]), C.quat_from_axis_angle([0.0, 0.0, 1.0], 0.4))
+    eef_in_object = (th.tensor([0.01, -0.02, 0.03]), C.quat_from_axis_angle([1.0, 0.0, 0.0], 1.2))
+    obj_ref = C.compose(eef, C.invert(eef_in_object))
+    lateral_ref = (obj_ref[0] - cam_pos) - axis * float(th.dot(obj_ref[0] - cam_pos, axis))
+    for depth in (0.21, 0.35, 0.52):
+        (e_p, e_q), (o_p, o_q) = HO.slide_to_depth(eef, eef_in_object, cam_pos, axis, depth)
+        assert float(th.dot(o_p - cam_pos, axis)) == pytest.approx(depth, abs=1e-6)
+        lateral = (o_p - cam_pos) - axis * float(th.dot(o_p - cam_pos, axis))
+        assert th.allclose(lateral, lateral_ref, atol=1e-6)
+        assert C.quat_angle(e_q, eef[1]) == pytest.approx(0.0, abs=1e-6) and C.quat_angle(o_q, obj_ref[1]) == pytest.approx(0.0, abs=1e-6)
+        rel = C.relative((e_p, e_q), (o_p, o_q))
+        assert th.allclose(rel[0], eef_in_object[0], atol=1e-5) and C.quat_angle(rel[1], eef_in_object[1]) == pytest.approx(0.0, abs=1e-5)
 
 
 def test_rotation_axes_one_per_antipodal_pair():
@@ -411,6 +456,10 @@ def test_generation_waypoints_default_is_three():
         assert d["waypoints"] == 3
         assert d["hold"] == {"depth_m": 0.50, "trunk": [0.5, 0.0], "roll_deg": roll}
         assert d["min_visible_fraction"] == pytest.approx(0.40)
+    osc = GD.defaults_for("object_scaling")
+    assert (osc["depth_search_range_m"], osc["depth_search_grid_m"], osc["depth_margin_m"], osc["min_depth_change_m"]) == ([0.15, 0.55], 0.01, 0.02, 0.05)
+    assert "goal_depth_range_m" not in osc and "goal_depth_grid_m" not in osc
+    assert "depth_search_range_m" not in GD.defaults_for("mental_rotation")
 
 
 # ----------------------------------------------------------------------------------------------------------------

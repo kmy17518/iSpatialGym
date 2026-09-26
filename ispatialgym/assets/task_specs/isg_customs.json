@@ -58094,12 +58094,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58170,12 +58171,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58246,12 +58248,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58322,12 +58325,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58398,12 +58402,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58474,12 +58479,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58550,12 +58556,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58626,12 +58633,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58702,12 +58710,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58778,12 +58787,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58854,12 +58864,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -58930,12 +58941,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59006,12 +59018,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59082,12 +59095,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59158,12 +59172,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59234,12 +59249,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59310,12 +59326,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59386,12 +59403,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59462,12 +59480,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59538,12 +59557,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59614,12 +59634,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59690,12 +59711,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59766,12 +59788,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59842,12 +59865,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59918,12 +59942,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -59994,12 +60019,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -60070,12 +60096,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -60146,12 +60173,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -60222,12 +60250,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },
@@ -60298,12 +60327,13 @@
    "waypoints": 3,
    "grasp_finger_advance_m_per_step": 0.001,
    "grasp_press_m": 0.004,
-   "goal_depth_range_m": [
-    0.35,
-    0.85
+   "depth_search_range_m": [
+    0.15,
+    0.55
    ],
-   "goal_depth_grid_m": 0.05,
-   "min_depth_change_m": 0.1
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05
   },
   "constraints": []
  },

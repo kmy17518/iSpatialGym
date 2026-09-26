@@ -177,9 +177,13 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         # §6.3 fingers horizontal (closing axis turned toward the robot): a side-gripped object shows its side / label to
         # the camera instead of its lid (owner 2026-09-26)
         "hold": {"depth_m": 0.50, "trunk": [0.5, 0.0], "roll_deg": 90.0},
-        "goal_depth_range_m": [0.35, 0.85],  # §6.3 depth d1 over [0.35, 0.85] m
-        "goal_depth_grid_m": 0.05,  # §6.3 on a 5 cm grid
-        "min_depth_change_m": 0.10,  # §6.3 |d1 − d0| ≥ 0.10 m
+        # §6.3 depth window per grasp: the reference hold's object slid over this range on this grid (in frame + screening
+        # IK), the continuous run through the reference depth shrunk by the margin at both ends; start and goal are drawn
+        # uniformly in it (owner 2026-09-26: the arm reaches ~0.21-0.52 m at roll 90)
+        "depth_search_range_m": [0.15, 0.55],
+        "depth_search_grid_m": 0.01,
+        "depth_margin_m": 0.02,
+        "min_depth_change_m": 0.05,  # §6.3 |d1 − d0| ≥ 0.05 m, toward or away from the camera
     },
     "mental_rotation": {
         **COMMON,

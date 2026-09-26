@@ -1257,17 +1257,26 @@ must stay connected). The obstacle is not a look-alike of any object the init vi
   camera with that side, e.g. a can's label rather than its lid; owner 2026-09-26) and 15° for mental rotation
   `[pilot]` (no depth or trunk fallbacks: the hold is a constant written into the customs list as a `hold` constraint).
   The B7 visibility survey is a prior only at the hold it was rendered at (15°); at any other hold every library row
-  is realised and measured. Grasp = a library grasp (floating pipeline) realised as in v1
+  is realised and measured. **Object scaling starts at a depth drawn per instance** (owner 2026-09-26): the fixed hold
+  is its *reference* hold, the init right arm holds the object with its root at the drawn start depth d0 — the
+  reference hold slid along the optical axis — in a configuration solved by IK directly from the default posture (arms
+  zero, trunk (0.5, 0)), relative to the base, collision-free with the object attached; the `hold` blocks of the
+  sidecar and summary record the start depth. Grasp = a library grasp (floating pipeline) realised as in v1
   §5.2 (finger advance 1 mm/step, 4 mm press), pose written to `grasps[0].object_pose_in_eef_frame`; both init and
   goal need ≥ 40 % of the object visible (self-occlusion render) and the whole object in frame.
-- Goal (object scaling): depth d1 on a 5 cm grid over [0.35, 0.85] m with |d1 − d0| ≥ 0.10 m, same orientation; target
-  frame = camera sensor, `position_metric = depth`, tolerance 20 % of |Δd| with a 2 cm floor (section 8).
+- Goal (object scaling): depth = the object root along the head camera's optical axis. Per grasp and template the
+  **depth window**: the object at the reference hold slid over [0.15, 0.55] m on a 1 cm grid, a depth passing when the
+  whole object is in frame (5 %) and the screening IK (right arm from the default posture, object attached) reaches the
+  hand pose; the continuous run through the reference depth, shrunk by 2 cm at both ends (~0.23–0.49 m for the
+  measured objects at roll 90). Per instance d0 and d1 are drawn uniformly in the window, redrawn until
+  |d1 − d0| ≥ 0.05 m — toward or away from the camera; same orientation; target frame = camera sensor,
+  `position_metric = depth`, tolerance 20 % of |Δd| with a 2 cm floor (section 8), so the goal never holds at the start.
 - Goal (mental rotation): rotation about a sampled axis by U(30°, 120°), position unchanged; world orientation target,
   tolerance 0.15 rad, equivalences per model (3.13; symmetric models are not admitted as mental-rotation targets).
 - Feasibility: the goal arm configuration is solved with the **right-arm embodiment only** (the oracle moves the arm,
   not the torso); the motion between init and goal (straight line along the camera ray / SLERP about the object) is
   checked at 3 intermediate waypoints (3.9); whole-body collision-free with the object attached at every checked pose.
-- Kept from v1 §5.2: the goal options (depth grid × orientation set, or axis × angle set) are precomputed **once per
+- Kept from v1 §5.2: the goal options (the depth windows, or the axis × angle set) are precomputed **once per
   template** — they depend on the hold and the object, not on the base pose — and each instance draws from the
   precomputed feasible set; an assisted-grasp attach that fails at the hold for a library row is a rejection of that
   row (`grasp_failed`, the next row is tried), never a fallback to an AABB heuristic; the realised grasp (finger
@@ -1632,7 +1641,8 @@ path buckets; every success appends constraints; rejections are counted per reas
 
 x_c(t), z_c(t), camera pitch at tilt 0, hand height below the camera (FK tables); band extents with untucked idle arms
 per support height; brace reach of the second arm (blocks, attachment, axial, touching, alignment); base-follow
-corridors; the held-object hold (depth 0.50; roll 90° object scaling, 15° mental rotation); `goal_translate_range` / `goal_tilt_range` of camera
+corridors; the held-object hold (depth 0.50; roll 90° object scaling, 15° mental rotation); the object-scaling depth
+window (search 0.15–0.55 m on 1 cm, 2 cm margins, 5 cm minimum move); `goal_translate_range` / `goal_tilt_range` of camera
 relocalization; the 45° cube-grasp tilts vs 30/60; `max_partner_geodesic`; the 0.437 disembedding margin.
 
 ## 11. Changes from v1 (summary)
