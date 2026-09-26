@@ -475,6 +475,58 @@ def height_of(hull: th.Tensor, rest_quat) -> float:
     return float(hull_extents(hull, rest_quat)[2])
 
 
+#: facet snap (owner 2026-09-24): a lying body of revolution whose convex hull is a coarse prism is placed rolled onto a
+#: facet. Search window about the long axis, step, coplanarity of the two lowest vertex lines, and the minimum width of
+#: the support line the mass centre must lie inside (with ``FACET_COM_MARGIN`` to spare on both sides)
+FACET_SNAP_MAX_DEG = 25.0
+FACET_SNAP_STEP_DEG = 0.25
+FACET_COPLANAR_TOL = 2e-4
+FACET_MIN_WIDTH = 0.004
+FACET_COM_MARGIN = 0.001
+
+
+def prism_rest_quat(hull: th.Tensor, rest_quat, com=None) -> Tuple[th.Tensor, float]:
+    """Rest orientation of a **lying prism** (owner 2026-09-24): the roll about its horizontal long axis, nearest to
+    ``rest_quat``, at which the hull stands on a *facet* - its lowest vertex lines coplanar (``FACET_COPLANAR_TOL``) and at
+    least ``FACET_MIN_WIDTH`` apart with the mass centre ``com`` (local, default the root origin = OmniGibson's authored
+    centre of mass of these assets) strictly between them - instead of on an *edge*. The bottles' collision hulls are
+    18-56-vertex prisms; ``bottle_of_milk/mrejrs`` at its canonical roll rests on two vertex lines 2 mm apart at y = +5 mm,
+    so it tipped 7-8 deg onto the next facet at every release and kept rolling (0924-235434 attempt 15: 7.8 deg net). Not
+    lying (the up extent is not the smallest, or the body is not elongated) or already facet-down: ``rest_quat``
+    unchanged. Returns ``(quat, roll_rad)``."""
+    q0 = _t(rest_quat)
+    pts0 = C.transform_points((th.zeros(3), q0), hull)
+    ext = pts0.max(dim=0).values - pts0.min(dim=0).values
+    horiz = max(float(ext[0]), float(ext[1]))
+    if not (float(ext[2]) <= min(float(ext[0]), float(ext[1])) * 1.05 and horiz > 1.5 * float(ext[2])):
+        return q0, 0.0  # standing / flat objects: no roll axis
+    ax = 0 if float(ext[0]) >= float(ext[1]) else 1  # the long axis (world-aligned after rest_quat)
+    lat = 1 - ax
+    axis = th.zeros(3)
+    axis[ax] = 1.0
+    c = th.zeros(3) if com is None else _t(com)
+    c0 = C.quat_rotate(q0, c)
+
+    def facet_down(theta: float) -> bool:
+        q = C.quat_from_axis_angle(axis, theta)
+        pts = C.quat_rotate(q, pts0)
+        cc = C.quat_rotate(q, c0)
+        z = pts[:, 2]
+        low = pts[z < float(z.min()) + FACET_COPLANAR_TOL]
+        lo, hi = float(low[:, lat].min()), float(low[:, lat].max())
+        return (hi - lo) >= FACET_MIN_WIDTH and lo + FACET_COM_MARGIN <= float(cc[lat]) <= hi - FACET_COM_MARGIN
+
+    if facet_down(0.0):
+        return q0, 0.0
+    step = math.radians(FACET_SNAP_STEP_DEG)
+    n = int(round(math.radians(FACET_SNAP_MAX_DEG) / step))
+    for k in range(1, n + 1):
+        for theta in (k * step, -k * step):
+            if facet_down(theta):
+                return C.qmul(C.quat_from_axis_angle(axis, theta), q0), float(theta)
+    return q0, 0.0
+
+
 def hull_corners_world(hull: th.Tensor, pose: Pose) -> th.Tensor:
     pts = C.transform_points(pose, hull)
     lo, hi = pts.min(dim=0).values, pts.max(dim=0).values
@@ -1636,8 +1688,9 @@ def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: 
     """§4.6 step 3 / §6.4: each ``(name, hull, rest_quat)`` item on the ``raster`` (``cells()`` world xy, ``polygon_supported
     (fp, margin)``, ``area()``) at a random cell and yaw, footprint supported (``margin``), >= ``gap`` from every placed
     footprint and >= ``spacing`` from the target along ``spacing_axis`` (the drawn grasp's pinch axis, world xy unit):
-    the projections of the two footprints on the axis stay ``spacing`` apart. With ``budget`` the footprints grown by
-    ``grow[name]`` may cover at most that fraction of the raster area (``tray_budget``). ``Reject("distractor_placement")``."""
+    the projections of the two footprints on the axis stay ``spacing`` apart. With ``budget`` the footprints (each model's
+    bbox at its rest orientation, grown by ``grow[name]`` on both axes - the rectangle ``ground_isg._distractor_budget``
+    counted) may cover at most that fraction of the raster area (``tray_budget``). ``Reject("distractor_placement")``."""
     placed: Dict[str, Pose] = {}
     fps: Dict[str, th.Tensor] = {"__target__": s.world.footprint(target_hull, target_pose)}
     t_fp = fps["__target__"]
@@ -1671,7 +1724,10 @@ def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: 
         placed[name], fps[name] = ok
         if budget is not None and hasattr(raster, "area"):
             g = float((grow or {}).get(name, 0.0))
-            ext = ok[1].max(dim=0).values - ok[1].min(dim=0).values
+            # the model's own footprint at its rest orientation (yaw-invariant), grown on both axes: the rectangle the
+            # grounding budgeted (ground_isg._distractor_budget); the yawed world AABB used before inflated a long thin
+            # object up to (long + short)²/2 at 45 deg and rejected sets the grounding had admitted
+            ext = hull_extents(hull, rest)
             used_area += (float(ext[0]) + 2 * g) * (float(ext[1]) + 2 * g)
             if used_area > float(budget) * float(raster.area()):
                 _reject("distractor_placement", f"distractor footprints (grown by pad_clearance) cover {used_area / max(raster.area(), 1e-9):.2f} > {budget} of the floor")

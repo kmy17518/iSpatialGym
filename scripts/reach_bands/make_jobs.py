@@ -37,7 +37,7 @@ REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 REPS = os.path.join(REPO, "ispatialgym", "assets", "icl", "roles", "representatives.csv")
 HANDLES = os.path.join(REPO, "runlogs", "grasp_library_20260905", "artic", "handles")
 STABLE = os.path.join(REPO, "Behavior-1K", "datasets", "2026-challenge-task-instances", "scenes", "{scene}", "json", "{scene}_stable.json")
-SOURCE_TRAY = "tray/gsxbym"
+SOURCE_TRAY = "tray/uekqey"  # 2026-09-24: replaces tray/gsxbym (build_icl.TRAY_OVERRIDES)
 JOINT_FRACTIONS = (0.5, 0.75, 0.95)
 
 TABLETOP_SUBTASKS = {

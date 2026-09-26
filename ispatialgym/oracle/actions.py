@@ -509,6 +509,18 @@ class Navigate(Action):
         else:
             fine = f"drive to {dest}"
         x, y, yaw = self.path.goal
+        if self.path.mode == "edge_slide" and len(self.path.waypoints) >= 2:
+            # the §3.7 edge slide (sampler 2026-09-24): the body faces the table throughout, the base slides along the edge;
+            # the lateral displacement in the robot's frame (+ = its left) and the stand-off change (along its forward axis)
+            x0, y0, yaw0 = (float(v) for v in self.path.waypoints[0])
+            lat = -(x - x0) * math.sin(yaw0) + (y - y0) * math.cos(yaw0)
+            fwd = (x - x0) * math.cos(yaw0) + (y - y0) * math.sin(yaw0)
+            side = "left" if lat >= 0 else "right"
+            fine = fine.replace("carry ", "slide sideways carrying ", 1) if self.path.carried else fine.replace("drive to", "slide sideways to", 1)
+            numbers = (f"{fine} ({abs(lat):.2f} m to the {side} along the edge facing the table"
+                       + (f", stand-off {'+' if fwd < 0 else '-'}{abs(fwd):.2f} m" if abs(fwd) > 0.005 else "")
+                       + f", {self.path.length_m:.2f} m path, yaw held at {math.degrees(yaw):.0f}°)")
+            return fine, numbers
         numbers = f"{fine} ({self.path.length_m:.2f} m recorded path to x={x:.2f} m, y={y:.2f} m, yaw={math.degrees(yaw):.0f}°)"
         return fine, numbers
 

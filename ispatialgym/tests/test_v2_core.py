@@ -309,6 +309,43 @@ def test_path_record_schema():
     assert set(d) == {"from", "to", "mode", "waypoints", "length_m", "posture", "carried"}
     assert not PathRecord.schema_ok({**d, "mode": "teleport"})
     assert not PathRecord.schema_ok({k: v for k, v in d.items() if k != "carried"})
+    assert PathRecord.schema_ok({**d, "mode": "edge_slide"})  # owner 2026-09-24: the same-edge slide is a third planning mode
+
+
+def test_edge_slide_waypoints():
+    """Owner 2026-09-24 (disembedding carry): two stances at the same edge are joined by a slide with the body facing the
+    edge - every waypoint after the first carries the arriving yaw; equal stand-offs give a straight two-point slide, a
+    stand-off difference an L (drive back to the larger stand-off, slide, drive in); ``back_m`` adds clearance; a
+    different edge, a different support or a turned body is not an edge slide."""
+    # edge "-u" of a table: midpoint (5, 3), inward +y (the robot stands at y < 3 facing +y = yaw 90 deg)
+    edge = EdgeFrame("-u", th.tensor([5.0, 3.0]), th.tensor([0.0, 1.0]), 2.0)
+    yaw = math.pi / 2
+    manip = Stance("manipulation", (4.6, 3.0 - 0.45, yaw), 0.25, 0.0, stand_off=0.45, edge=edge, lateral=-0.4)
+    place = Stance("placement", (5.6, 3.0 - 0.45, yaw), 0.25, 0.0, stand_off=0.45, edge=edge, lateral=0.6)
+    assert NAV.same_edge(manip, place)
+    wps = NAV.edge_slide_waypoints(manip, place)
+    assert len(wps) == 2 and wps[0] == pytest.approx((4.6, 2.55, yaw)) and wps[1] == pytest.approx((5.6, 2.55, yaw))
+    assert all(w[2] == pytest.approx(yaw) for w in wps)  # no heading change anywhere: the tracker slides
+    assert path_length(wps) == pytest.approx(1.0)
+    # the stride poses keep the yaw too (what the whole-body check validates = what the oracle drives)
+    assert all(p[2] == pytest.approx(yaw) for p in NAV.stride_poses(wps, 0.1))
+    # a deeper placement stance: back to the larger stand-off, slide, drive in
+    place2 = Stance("placement", (5.6, 3.0 - 0.60, yaw), 0.25, 0.0, stand_off=0.60, edge=edge, lateral=0.6)
+    wps2 = NAV.edge_slide_waypoints(manip, place2)
+    assert len(wps2) == 3 and wps2[1] == pytest.approx((4.6, 2.40, yaw)) and wps2[2] == pytest.approx((5.6, 2.40, yaw))
+    manip2 = Stance("manipulation", (4.6, 3.0 - 0.60, yaw), 0.25, 0.0, stand_off=0.60, edge=edge, lateral=-0.4)
+    wps3 = NAV.edge_slide_waypoints(manip2, place)
+    assert len(wps3) == 3 and wps3[1] == pytest.approx((5.6, 2.40, yaw)) and wps3[2] == pytest.approx((5.6, 2.55, yaw))
+    # extra clearance for the slide
+    wps4 = NAV.edge_slide_waypoints(manip, place, back_m=0.1)
+    assert len(wps4) == 4 and wps4[1] == pytest.approx((4.6, 2.45, yaw)) and wps4[2] == pytest.approx((5.6, 2.45, yaw)) and wps4[3] == pytest.approx((5.6, 2.55, yaw))
+    # not the same edge: another edge name, another support (midpoint), or a body that does not face the edge
+    other = EdgeFrame("+v", th.tensor([6.0, 4.0]), th.tensor([-1.0, 0.0]), 1.0)
+    assert not NAV.same_edge(manip, Stance("placement", (6.45, 4.0, math.pi), 0.25, 0.0, stand_off=0.45, edge=other))
+    far = EdgeFrame("-u", th.tensor([9.0, 3.0]), th.tensor([0.0, 1.0]), 2.0)
+    assert not NAV.same_edge(manip, Stance("placement", (9.0, 2.55, yaw), 0.25, 0.0, stand_off=0.45, edge=far))
+    assert not NAV.same_edge(manip, Stance("placement", (5.6, 2.55, yaw + math.radians(10)), 0.25, 0.0, stand_off=0.45, edge=edge))
+    assert not NAV.same_edge(manip, Stance("init", (5.6, 2.55, yaw), 0.25, 0.0, stand_off=0.45))  # no edge frame
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1244,6 +1281,20 @@ def test_record_arms_q_reads_the_oracle_side_record():
     assert list(got) == ["right"] and got["right"].shape == (7,)  # the malformed left entry is skipped
     assert PC._record_arms_q(Side(name="transition", transition=Side(extra={}))) == {}
     assert PC._record_arms_q(Side(name="grasp")) == {}
+
+
+def test_instance_id_stays_within_the_file_name_limit():
+    from ispatialgym.sampling.tasks.base import INSTANCE_ID_MAX, make_instance_id
+
+    alias = "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_coconut_milk_1-breakfast_table"
+    tpl = "house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bottle_of_milk-mrejrs__distractors-bottle_of_coconut_milk_1-bottle_of_milk_2"
+    short = make_instance_id("alias", "tpl", 3)
+    assert short == "alias__tpl__0003"
+    iid = make_instance_id(alias, tpl, 0)
+    assert len(iid.encode()) <= INSTANCE_ID_MAX and len((iid + "-tro_state.json").encode()) <= 255
+    assert iid.split("__")[0] == alias and iid.endswith("__0000")
+    assert iid == make_instance_id(alias, tpl, 0)  # deterministic
+    assert make_instance_id(alias, tpl + "-bottle_of_milk_3", 0) != iid  # distinct templates keep distinct ids
 
 
 def test_flipped_push_chain_check_rejects_only_a_witness_in_another_branch():

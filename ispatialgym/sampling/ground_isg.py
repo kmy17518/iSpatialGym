@@ -1006,6 +1006,10 @@ class Grounder:
         """§3.12 rule 1: same-category pool minus the target and its look-alikes, other-category pools (tier order);
         the ``--distractors`` pattern fixes the member counts of the alias."""
         excluded = {(tcat, tmodel)} | self.icl.lookalikes(tcat, tmodel) | self.icl.heldout_models
+        # pilot rejections of distractor models (``--blacklist disembedding:distractors:<cat>/<model>=...``) leave the pools too
+        # (2026-09-25): applied only per scene below, a category whose every model is rejected kept its member slot in the
+        # alias with an empty whitelist (bottle_of_apple_juice/xvrbdy, the two-body asset)
+        excluded |= {(c, m) for (st, role, c, m) in getattr(self.adm, "extra_blacklist", {}) if st == "disembedding" and role == "distractors"}
         same = [(r["category_b"], r["model_b"]) for r in self.icl.distractor_rows(tcat, "distractor_same_category")]
         same = [cm for cm in same if cm not in excluded and _is_ready(self.icl.row("disembedding", "distractors", *cm) or {"kind": "group", "model": cm[1]})]
         other_rows = sorted(self.icl.distractor_rows(tcat, "distractor_other_category"), key=lambda r: (int(r.get("tier") or 9), r["category_b"], r["model_b"]))
@@ -1059,18 +1063,22 @@ class Grounder:
         if sum(members.values()) < lo:
             raise Skip("empty_distractor_pool", f"target {tcat}/{tmodel}: pools too small after the look-alike / held-out exclusions")
         # owner decision 2026-09-16 4a: the §6.4 tray budget is applied here -- the grown footprints of the member set must
-        # fit 45 % of the source tray's inner floor; drop members (last pattern slot first) until they do
+        # fit ``tray_budget`` (0.60 since 2026-09-24) of the source tray's inner floor; drop members (last pattern slot first) until they do
         rp.budget = self._distractor_budget(tcat, tmodel, members, pools, lo)
         rp.members = members
         rp.pools = pools
         rp.models = [(c, m) for c, ms in pools.items() for m in ms]
 
     def _distractor_budget(self, tcat: str, tmodel: str, members: Dict[str, int], pools: Dict[str, List[str]], lo: int) -> Dict[str, Any]:
-        """§6.4 / owner decision 2026-09-16 4a. Footprint of a distractor = a conservative square of side ``max(bbox_x, bbox_y)
-        + 2 · pad_clearance`` (icl dims; the pad clearance of the target's tightest tabletop grasp, grown along the pinch
-        axis); per category the largest model of the pool counts (any draw fits). The set must cover ≤ ``tray_budget`` of the
-        source tray's inner floor (``source_tray_inner_floor_m2`` at scale 1 × ``source_tray_scale``²); otherwise members are
-        dropped from the end of the pattern (other-category first, then the second same-category one) down to ``lo``."""
+        """§6.4 / owner decision 2026-09-16 4a, footprint rule and fraction revised 2026-09-24. Footprint of a distractor = the
+        grown rectangle ``(max(bbox_x, bbox_y) + 2c) · (min(bbox_x, bbox_y) + 2c)`` (icl dims; ``c`` = the pad clearance of the
+        target's tightest tabletop grasp) - the yaw-invariant area the sampler's ``place_distractors`` budgets with the same
+        growth; per category the largest model of the pool counts (any draw fits). The set must cover ≤ ``tray_budget`` of
+        the source tray's inner floor (``source_tray_inner_floor_m2`` at scale 1 × ``source_tray_scale``²); otherwise
+        members are dropped from the end of the pattern (other-category first, then the second same-category one) down to
+        ``lo``. Until 2026-09-24 the rule was the conservative square ``(long + 2c)²`` (any yaw's axis-aligned box) at
+        0.45: it charged a 22 cm bottle 0.0725 m² for a 0.016 m² footprint and left the milk tray at one distractor with
+        86 % of the floor empty."""
         gen = G.defaults_for("disembedding")
         tray_scale = float(gen.get("source_tray_scale") or 1.0)
         floors = gen.get("source_tray_inner_floor_m2") or {}
@@ -1078,14 +1086,13 @@ class Grounder:
         tray_key = f"{source_rows[0]['category']}/{source_rows[0]['model']}" if source_rows else None
         floor_native = float(floors.get(tray_key, 0.0)) if tray_key else 0.0
         floor_m2 = floor_native * tray_scale * tray_scale
-        fraction = float(gen.get("tray_budget") or 0.45)
+        fraction = float(gen.get("tray_budget") or 0.60)
         # pad clearance of the target's tightest admissible tabletop grasp (conventions.pad_clearance; icl width_m)
         widths = [float(g["width_m"]) for g in self.icl.admissible_grasps(tcat, tmodel, "tabletop") if g.get("width_m")]
         clearance = _pad_clearance(min(widths)) if widths else 0.0
 
-        def footprint(cat: str, rule: str) -> Tuple[float, str]:
-            """Largest grown footprint of the category's pool: ``square`` = (long + 2c)², ``rectangle`` = (long + 2c) · short
-            (the pinch axis of a thin object runs across its short side; used when the square admits no member at all)."""
+        def footprint(cat: str) -> Tuple[float, str]:
+            """Largest grown rectangle ``(long + 2c) · (short + 2c)`` of the category's pool and the model it belongs to."""
             best, best_m = 0.0, ""
             for m in pools.get(cat, []):
                 row = self.icl.row("disembedding", "distractors", cat, m) or {}
@@ -1094,36 +1101,27 @@ class Grounder:
                 except ValueError:
                     x, y = 0.0, 0.0
                 long_, short = max(x, y), min(x, y)
-                area = (long_ + 2.0 * clearance) ** 2 if rule == "square" else (long_ + 2.0 * clearance) * short
+                area = (long_ + 2.0 * clearance) * (short + 2.0 * clearance)
                 if area > best:
                     best, best_m = area, m
             return best, best_m
 
-        original = dict(members)
         budget: Dict[str, Any] = {"tray": tray_key, "tray_scale": tray_scale, "tray_floor_m2": round(floor_m2, 4), "budget_fraction": fraction,
-                                  "pad_clearance_m": round(clearance, 4), "footprint_rule": "square", "dropped": []}
+                                  "pad_clearance_m": round(clearance, 4), "footprint_rule": "rectangle", "dropped": []}
         if floor_m2 > 0:
-            # the conservative square decides the member count (3 -> 2 -> 1); when it admits not even one member, the
-            # single remaining member is re-measured with the pinch-axis rectangle (thin objects: forks, spoons, chilies)
-            for rule in ("square", "rectangle"):
-                if rule == "square":
-                    members.clear()
-                    members.update(original)
-                areas = {cat: footprint(cat, rule) for cat in members}
-                used = lambda: sum(areas[c][0] * n for c, n in members.items())  # noqa: E731
-                while used() > fraction * floor_m2 and sum(members.values()) > max(lo, 1):
-                    cat = list(members)[-1]  # last pattern slot first (other-category, then the second same-category member)
-                    members[cat] -= 1
-                    budget["dropped"].append(cat)
-                    if members[cat] == 0:
-                        del members[cat]
-                budget.update({"footprint_rule": rule, "footprints_m2": {c: round(a, 4) for c, (a, _) in areas.items() if c in members},
-                               "largest_models": {c: m for c, (_, m) in areas.items() if c in members}})
-                if used() <= fraction * floor_m2:
-                    break
-            else:
+            areas = {cat: footprint(cat) for cat in members}
+            used = lambda: sum(areas[c][0] * n for c, n in members.items())  # noqa: E731
+            while used() > fraction * floor_m2 and sum(members.values()) > max(lo, 1):
+                cat = list(members)[-1]  # last pattern slot first (other-category, then the second same-category member)
+                members[cat] -= 1
+                budget["dropped"].append(cat)
+                if members[cat] == 0:
+                    del members[cat]
+            budget.update({"footprints_m2": {c: round(a, 4) for c, (a, _) in areas.items() if c in members},
+                           "largest_models": {c: m for c, (_, m) in areas.items() if c in members}})
+            if used() > fraction * floor_m2:
                 raise Skip("distractor_budget", f"target {tcat}/{tmodel}: even one distractor ({list(members)}) exceeds {fraction:.0%} of the "
-                                                f"{floor_m2:.3f} m2 source tray floor ({used():.3f} m2, rectangle rule)")
+                                                f"{floor_m2:.3f} m2 source tray floor ({used():.3f} m2, grown rectangle)")
             for cat in list(pools):
                 if cat not in members:
                     del pools[cat]

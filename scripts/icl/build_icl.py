@@ -169,7 +169,7 @@ PINS: Dict[str, Dict[str, List[str]]] = {
     "camera_relocalization-obstructed": {"room": [_ROOM]},
     "object_scaling": {"target": ["bottle_of_beer/gxxbhh"], "room": [_ROOM]},
     "mental_rotation": {"target": ["toy_figure/zuntus"], "room": [_ROOM]},
-    "disembedding": {"target": ["box_of_cereal/iucshm"], "source": ["tray/gsxbym"], "destination": ["tray/hvlfig"], "support": [_SUP]},
+    "disembedding": {"target": ["box_of_cereal/iucshm"], "source": ["tray/uekqey"], "destination": ["tray/hvlfig"], "support": [_SUP]},
     f"{CM}-block_design": {"targets": ["toy_dice/isgblk"], "support": [_SUP]},
     f"{CM}-articulation_open_small_scale": {"target": ["toolbox/redmtl"], "support": [_SUP]},
     f"{CM}-articulation_close_small_scale": {"target": ["toolbox/redmtl"], "support": [_SUP]},
@@ -188,6 +188,17 @@ for _st in TABLETOP_SUBTASKS:  # the test support is the representative support 
     _sups = PINS.setdefault(_st, {}).setdefault("support", [])
     if _SUP not in _sups:
         _sups.append(_SUP)
+
+#: (role, category, v1 model) -> (model, note): the disembedding tray models replaced after the v1 selection sheet.
+#: Decision 2026-09-24: the v1 source tray ``tray/gsxbym`` has a collision floor of four convex-hull slabs with a 1.6 mm
+#: step between them (2 mm at the 1.25 spawn scale); objects lying across the seams (the milk bottles, canonically on
+#: their sides) never come to rest - PhysX contact chatter, 10-50 mm/s residual velocity, visible trembling in the
+#: demos (pilot_20260915 disembedding 0916-141051 / 0916-181259) - and the chrome material mirrors the scene.
+#: ``tray/uekqey`` has a single-slab floor (asleep at zero velocity in the same drop test), a matte white material and an
+#: inner floor of 0.1673 m2 at scale 1 = the 0.107 m2 of gsxbym x 1.25^2, so it spawns unscaled with the same budget.
+TRAY_OVERRIDES: Dict[Tuple[str, str, str], Tuple[str, str]] = {
+    ("source", "tray", "gsxbym"): ("uekqey", "single-slab collision floor + matte material (decision 2026-09-24; gsxbym's 4-slab floor made lying objects tremble)"),
+}
 
 DISPLAY_OVERRIDES = {
     "toy_dice": "block", "pot_plant": "potted plant", "bottom_cabinet_no_top": "cabinet", "bottom_cabinet": "cabinet",
@@ -438,6 +449,9 @@ class Builder:
                                                             "duplicates": row.get("duplicates", "")}, kind=KIND_GROUP)
         for old_role, new_role in (("tray_source", "source"), ("tray_dest", "destination")):
             for cat, row in self.blocks[("disembedding-0", old_role)]:
+                override = TRAY_OVERRIDES.get((new_role, cat, row.get("model", "")))
+                if override is not None:
+                    row = dict(row, model=override[0], note=override[1] + " | was " + row.get("model", "") + ": " + row.get("note", ""))
                 self.add_object(st, new_role, cat, row, note="fixed model for now (decision 2026-09-14); " + row.get("note", ""))
 
     def build_block_design(self):

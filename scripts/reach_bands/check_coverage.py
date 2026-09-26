@@ -29,10 +29,10 @@ sys.path.insert(0, REPO)
 from ispatialgym.sampling.reach_bands import PLACED_MODE_FOCUS, ReachBands, placed_spec  # noqa: E402
 
 GRASPS_CSV = os.path.join(REPO, "ispatialgym", "assets", "icl", "require", "grasps.csv")
-SOURCE_TRAY = "tray/gsxbym"
-#: owner decision 2026-09-16 item 4b: the disembedding source tray spawns at scale 1.25 (``roles.source.scale``); the
-#: customs value wins when present, this is the default until D1 writes it
-SOURCE_TRAY_SCALE = 1.25
+SOURCE_TRAY = "tray/uekqey"  # 2026-09-24: replaces tray/gsxbym x 1.25 (build_icl.TRAY_OVERRIDES: single-slab floor, same inner area)
+#: the disembedding source tray spawn scale (``roles.source.scale``); the customs value wins when present, this is the default
+#: until D1 writes it (owner decision 2026-09-16 item 4b was gsxbym x 1.25; uekqey spawns at its canonical size)
+SOURCE_TRAY_SCALE = 1.0
 POD_PREFIX = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && "
               "OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands ")
 

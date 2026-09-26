@@ -35,6 +35,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import generation_defaults as GD
+from ispatialgym.sampling.constraints import apply_mass
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
@@ -58,10 +59,26 @@ SUBTASK = "disembedding"
 #: within ``REST_TILT_MAX_DEG`` of vertical after the measurement settle
 REST_Z_TOL = 0.01
 REST_TILT_MAX_DEG = 3.0
-#: floor cells = tray hits within this band of the floor level (10 % quantile of the hit heights); at least ``FLOOR_MIN_CELLS``
-FLOOR_BAND = 0.004
+#: floor cells = tray hits within this band of the floor level (10 % quantile of the hit heights); at least ``FLOOR_MIN_CELLS``.
+#: 2026-09-24: 4 mm -> 1.5 mm and the raster eroded by one cell (``FLOOR_ERODE_CELLS``): the 4 mm band (kept for the 1.6 mm
+#: step of the retired gsxbym floor) admitted the first rows of the rim fillet of uekqey / hvlfig (0.5-4 mm up, ~5 % of the
+#: cells at the short ends); objects placed over them slid / rolled toward the centre and the tall apple-juice bottle
+#: toppled (roll test 0924: 111 mm of travel from the end zone, <= 1.5 mm from the centre)
+FLOOR_BAND = 0.0015
+FLOOR_ERODE_CELLS = 0  # a one-cell erosion starved the placement of 4 objects (17/24 attempts without a free position, 0925-000707)
 FLOOR_QUANTILE = 0.10
 FLOOR_MIN_CELLS = 40
+#: 2026-09-24: release height of the objects above the tray floor = the §3.2 3 mm (``TT.Z_OFFSET``). Measured in the headless
+#: crowding test (4 facet-snapped objects, 1 cm gaps, 10 trials each): 3 mm passes the trembling gate 8/10, 1 mm 5/10, 0.2 mm
+#: 2/4, 5 mm 6/10 - a release inside PhysX's contact offset turns the +-0.5-1.5 mm height variation of the raycast floor into
+#: penetration kicks, while the drop itself is benign once the prism hulls land on a facet
+RELEASE_GAP_M = TT.Z_OFFSET
+#: 2026-09-25: the TRAYS are released at contact with the table top instead of the §3.2 3 mm above it. Reproduced in the
+#: sampler's own world (house_single_floor, robot present; /tmp/isg_droptest/inworld_test.py): trays dropped 3 mm -> the
+#: source tray chatters on the table top for seconds (0.4-2 mm per frame) and every bottle on it moves 2-150 mm; trays placed
+#: at contact -> every object <= 0.15 mm per frame. Holding the table or the robot's stance made no difference; bottles set
+#: directly on the table are still. 0.2 mm is inside PhysX's 1 mm contact offset: the contact exists from the first step.
+TRAY_RELEASE_GAP_M = 0.0002
 #: owner item 3 (2026-09-16 10:15): release this far above the actual surface under the footprint centre (``surface_z_under``)
 RELEASE_ABOVE_SURFACE = 0.01
 
@@ -92,8 +109,7 @@ class TrayFloor:
     """Inner floor of a tray measured once in the tray's root frame (cells = local xy of the floor raster, ``z_local`` =
     floor height above the root origin); ``at(pose)`` gives the world view used for placements."""
 
-    def __init__(self, cells_local: th.Tensor, z_local: float, res: float, rim_local: float):
-        self.cells_local = cells_local
+    def __init__(self, cells_local: th.Tensor, z_local: float, res: float, rim_local: float, erode: int = FLOOR_ERODE_CELLS):
         self.z_local = float(z_local)
         self.res = float(res)
         self.rim_local = float(rim_local)  # top of the tray walls above the root origin
@@ -102,9 +118,19 @@ class TrayFloor:
         self.origin = lo.clone()
         nx = int(round(float(hi[0] - lo[0]) / res)) + 1
         ny = int(round(float(hi[1] - lo[1]) / res)) + 1
-        self.grid = th.zeros(nx, ny, dtype=th.bool)
+        grid = th.zeros(nx, ny, dtype=th.bool)
         idx = th.round((cells_local - lo) / res).long()
-        self.grid[idx[:, 0], idx[:, 1]] = True
+        grid[idx[:, 0], idx[:, 1]] = True
+        # erode the boundary ring(s): the outermost floor cells border the rim fillet (2026-09-24, see ``FLOOR_BAND``)
+        for _ in range(int(erode)):
+            g = grid.float()[None, None]
+            inner = -th.nn.functional.max_pool2d(-g, 3, stride=1, padding=1)[0, 0] > 0.5  # min-pool: all 8 neighbours are floor
+            if int(inner.sum()) < FLOOR_MIN_CELLS:
+                break
+            grid = inner
+        self.grid = grid
+        ij = th.nonzero(grid)
+        self.cells_local = lo + ij.float() * res
 
     @property
     def n_cells(self) -> int:
@@ -328,11 +354,11 @@ class Disembedding(SamplerV2):
         return None if val is None else float(val)
 
     def _tray_budget(self) -> float:
-        """§6.4 distractor budget: D1's ``generation.distractor_budget`` (the grounding's maths: its ``budget`` / ``fraction``
-        value, or a bare number) when present, else the ``tray_budget`` default (0.45)."""
+        """§6.4 distractor budget: D1's ``generation.distractor_budget`` (the grounding's maths: its ``budget_fraction`` /
+        ``budget`` / ``fraction`` value, or a bare number) when present, else the ``tray_budget`` default (0.60)."""
         db = self.gen("distractor_budget", None)
         if isinstance(db, dict):
-            for k in ("budget", "fraction", "max_fraction", "tray_budget"):
+            for k in ("budget_fraction", "budget", "fraction", "max_fraction", "tray_budget"):
                 if db.get(k) is not None:
                     return float(db[k])
         elif isinstance(db, (int, float)):
@@ -378,15 +404,33 @@ class Disembedding(SamplerV2):
         # every hull below is read off a parked body: re-park first (consistent PhysX / render-side transforms, gravity
         # off again after the spawns' stop / play), see ``repark_spawned``
         repark_spawned(self)
+        # owner 2026-09-25: the trays get ``tray_mass_kg`` (2 kg; 0 = the dataset's category mass) - a 0.39 kg tray under 4 kg
+        # of bottles is a 10:1 inverted mass ratio that PhysX resolves with contact chatter (``constraints.apply_mass``);
+        # recorded per instance as a TRO ``constraints`` record so the demo loads the same physics
+        self.tray_mass = {}
+        for key, o in ((self.src_role, src), (self.dst_role, dst)):
+            self.tray_mass[o.name] = apply_mass(o, float(self.g("tray_mass_kg") or 0.0))
+            if abs(self.tray_mass[o.name]["after_kg"] - self.tray_mass[o.name]["before_kg"]) > 1e-6:
+                log.info("%s: %s (%s) mass %.3f -> %.3f kg (generation.tray_mass_kg)", self.gp.alias, o.name, key, self.tray_mass[o.name]["before_kg"], self.tray_mass[o.name]["after_kg"])
+        self.template_facts["tray_mass_kg"] = {n: round(v["after_kg"], 4) for n, v in self.tray_mass.items()}
         self.grasps, self.grasp_key, self.rest["target"] = TT.library_grasps(self, "target", "tabletop")
         for key, o in (("target", tgt), (self.src_role, src), (self.dst_role, dst)):
             self.hull[key] = self.world.local_hull(o)
             self.rest.setdefault(key, C.IDENTITY_QUAT.clone())
+        # owner 2026-09-24: a lying prism-hulled object (the bottles) is placed rolled onto a facet of its hull, not on an edge
+        # (``TT.prism_rest_quat``): bottle_of_milk/mrejrs at its canonical roll stood on two vertex lines 2 mm apart beside its
+        # mass centre and tipped ~7 deg at every release, then kept rolling
+        self.rest["target"], roll = TT.prism_rest_quat(self.hull["target"], self.rest["target"])
+        if roll:
+            log.info("%s: target rests on a hull facet at roll %+.2f deg from its library rest orientation", self.gp.alias, math.degrees(roll))
+        for key in ("target", self.src_role, self.dst_role):
             self.height[key] = TT.height_of(self.hull[key], self.rest[key])
         for b in self.bindings.many("distractors"):
             o = self.objects[b.name]
             self.hull[b.name] = self.world.local_hull(o)
-            self.rest[b.name] = C.IDENTITY_QUAT.clone()
+            self.rest[b.name], roll = TT.prism_rest_quat(self.hull[b.name], C.IDENTITY_QUAT.clone())
+            if roll:
+                log.info("%s: %s rests on a hull facet at roll %+.2f deg", self.gp.alias, b.name, math.degrees(roll))
             self.height[b.name] = TT.height_of(self.hull[b.name], self.rest[b.name])
         support = self.obj("support")
         self.top = self.support_top(support)
@@ -527,7 +571,8 @@ class Disembedding(SamplerV2):
         items = [(n, self.hull[n], self.rest[n]) for n in dnames]
         grow = {n: TT.distractor_spacing(width if width is not None else 0.0, 0.0) for n in dnames}
         dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, spacing_axis=pinch_axis[:2], spacing=spacing,
-                                          margin=float(self.g("tray_footprint_margin_m")), gap=0.01, cam=cam_init, budget=self._tray_budget(), grow=grow)
+                                          margin=float(self.g("tray_footprint_margin_m")), gap=0.01, cam=cam_init, budget=self._tray_budget(), grow=grow,
+                                          n_tries=int(self.g("distractor_place_tries") or 80))
         objects = {tname: t_pose, sname: s_pose, dname: d_pose, **dist_poses}
         # §4.6 step 4: every object in frame (5 %) in the init image except the destination tray
         items_all = [(tname, self.hull["target"], t_pose), (sname, self.hull[self.src_role], s_pose)] + [(n, self.hull[n], dist_poses[n]) for n in dnames]
@@ -553,8 +598,11 @@ class Disembedding(SamplerV2):
             rim_h = src_w.rim_z - src_w.z
             tallest = max([self.height[n] for n in dnames] + [rim_h])
             grasp.carry_height = float(tallest + float(self.g("carry_height_extra_m")))
-            # §3.7 path manipulation -> placement (straight lateral segment) with the object attached
-            self.record_path(manip, place_st, carried=tname, arm="right")
+            # §3.7 path manipulation -> placement with the object attached: the edge slide (owner 2026-09-24, ``generation.
+            # carry_edge_slide``) - the body keeps facing the table and slides along the edge (drive back / slide / drive in when
+            # the stand-offs differ), the grid path with its turn-drive-turn only when the strip collides
+            self.record_path(manip, place_st, carried=tname, arm="right", edge_slide=bool(self.g("carry_edge_slide")),
+                             edge_slide_back_m=float(self.g("carry_edge_slide_back_m") or 0.0))
         cam_manip = self.camera_pose_at(manip)
         if not self.ikc.eef_in_frame(grasp.grasp, cam_manip):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
@@ -572,6 +620,12 @@ class Disembedding(SamplerV2):
         d.goal_poses[tname] = goal
         d.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
         d.extras["initial_occlusion"] = occ
+        # the trays' mass (sample_template): the loader re-applies it (run_isg._restore_constraints), the settle / stillness gate ran with it
+        masses = [{"type": "mass", "object": n, "mass_kg": round(float(self.tray_mass[self.objects[n].name]["after_kg"]), 4), "stock_kg": round(float(self.tray_mass[self.objects[n].name]["before_kg"]), 4),
+                   "note": "generation.tray_mass_kg: a tray at its 0.4-0.6 kg category mass under 1 kg bottles is an inverted mass ratio PhysX resolves with contact chatter"}
+                  for n in (sname, dname) if self.objects[n].name in getattr(self, "tray_mass", {}) and abs(self.tray_mass[self.objects[n].name]["after_kg"] - self.tray_mass[self.objects[n].name]["before_kg"]) > 1e-6]
+        if masses:
+            d.extras["constraints"] = masses
         d.summary.update({"manipulation_candidate": k, "grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "pinch_width": width},
                           "dest_side": "left" if side > 0 else "right", "destination": dest_diag, "distractor_spacing_m": spacing, "occlusion": occ,
                           "carry_height": grasp.carry_height, "placement_stance": place_st.to_meta()})
@@ -711,6 +765,78 @@ class Disembedding(SamplerV2):
     def goal(self, draft: Draft):
         manip = self.sidecar.stance("manipulation")
         self.sidecar.set_goal(manip.base_pose2d, manip.translate, manip.tilt, arms="same")
+
+    #: owner 2026-09-24: physics steps the trays get alone before the objects are released onto them (released at contact
+    #: since 2026-09-25, so this only lets the contacts form)
+    TRAY_LANDING_STEPS = 20
+    #: 2026-09-24: 2.5 s of settle (90 -> 300 physics steps, + 10) before the stability / trembling judgement: the sway of
+    #: the tall upright apple-juice bottle after its release decays from 0.3-1.4 mm per frame at 1.5-3 s to ~0.1 mm later
+    DEFAULT_SETTLE_STEPS = 300
+
+    def apply_draft(self, draft: Draft):
+        """The trays land first, the objects after (owner 2026-09-24). The base ``apply_draft`` releases every object 3 mm
+        above its support at once, so the bottles landed on trays that were themselves still dropping / rocking and rolled
+        away (a lying cylinder has no restoring torque): 5 of 8 attempts of the 3-distractor milk alias (0924-233604) were
+        ``unstable_init`` with v ≈ r·ω. Here the trays get ``TRAY_LANDING_STEPS`` physics steps by themselves, then the
+        objects are released at their recorded heights **above the settled source tray** (its landing shifted it by up to
+        the 3 mm drop); the trays' settled poses are recorded by ``settle_and_validate`` as before."""
+        trays = [n for n in (self.bindings.one(self.src_role).name, self.bindings.one(self.dst_role).name) if n in draft.object_poses]
+        objects = [n for n in draft.object_poses if n not in trays]
+        if not trays or not objects:
+            return super().apply_draft(draft)
+        for name in trays:
+            obj = self.objects[name]
+            pos, quat = TT._t(draft.object_poses[name][0]).clone(), TT._t(draft.object_poses[name][1])
+            pos[2] -= max(0.0, TT.Z_OFFSET - float(self.gen("tray_release_gap_m", TRAY_RELEASE_GAP_M)))  # at contact, not dropped
+            obj.set_position_orientation(pos, quat)
+            if obj.name in self.world.spawned:
+                self.world.activate(obj)
+            obj.keep_still()
+        import omnigibson as og
+
+        for _ in range(int(self.TRAY_LANDING_STEPS)):
+            og.sim.step_physics()
+            self.robot.keep_still()
+        src_name = self.bindings.one(self.src_role).name
+        dz = float(self.objects[src_name].get_position_orientation()[0][2]) - float(draft.object_poses[src_name][0][2]) if src_name in trays else 0.0
+        for name in objects:
+            obj = self.objects[name]
+            pos, quat = TT._t(draft.object_poses[name][0]).clone(), TT._t(draft.object_poses[name][1])
+            # the source tray landed (dz): keep the recorded height above its floor, minus the §3.2 drop down to RELEASE_GAP_M
+            pos[2] += dz - max(0.0, TT.Z_OFFSET - float(self.gen("release_gap_m", RELEASE_GAP_M)))
+            obj.set_position_orientation(pos, quat)
+            if obj.name in self.world.spawned:
+                self.world.activate(obj)
+            obj.keep_still()
+        for name, q in draft.object_joints.items():
+            obj = self.objects[name]
+            obj.set_joint_positions(TT._t(q))
+            obj.set_joint_velocities(th.zeros_like(TT._t(q)))
+            obj.keep_still()
+        self.kit.apply(draft.robot_q, draft.base_pose2d)
+        for name in draft.object_poses:
+            self.objects[name].keep_still()
+        # diagnostic (2026-09-25): the geometric clearances the release starts from - pairwise footprint gaps of the placed
+        # objects (their collision hulls at the actual poses) and each hull's height above the source floor
+        try:
+            from ispatialgym.sampling.v2.tabletop import polygon_gap
+
+            src_z = float(self.objects[src_name].get_position_orientation()[0][2]) + self.src_floor.z_local
+            fps, bottoms = {}, {}
+            for name in objects:
+                p, q = self.objects[name].get_position_orientation()
+                hull = self.hull.get("target" if name == self.tname else name)
+                if hull is None:
+                    continue
+                fps[name] = self.world.footprint(hull, (p.float(), q.float()))
+                bottoms[name] = round((float(p[2]) - self.world.bottom_offset(hull, q.float()) - src_z) * 1000.0, 2)
+            names = list(fps)
+            gaps = {f"{a}|{b}": round(float(polygon_gap(fps[a], fps[b])) * 1000.0, 1) for i, a in enumerate(names) for b in names[i + 1:]}
+            draft.summary["release_geometry"] = {"bottom_above_floor_mm": bottoms, "footprint_gap_mm": gaps, "tray_dz_mm": round(dz * 1000.0, 2)}
+            log.info("%s: release geometry: bottoms above the source floor %s mm; footprint gaps %s mm; tray dz %.2f mm", self.gp.alias, bottoms, gaps, dz * 1000.0)
+        except Exception as e:  # noqa: BLE001 - a diagnostic must never fail the attempt
+            log.debug("release geometry diagnostic failed: %r", e)
+        self.apply_draft_extras(draft)
 
     def settle_entities(self, draft: Draft):
         return [self.objects[n] for n in draft.object_poses]

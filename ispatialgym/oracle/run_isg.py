@@ -357,6 +357,8 @@ class InstanceLoader:
             self._apply_joint_friction(rec)
         for rec in getattr(self, "_counterbalance_records", []):
             self._apply_counterbalance(rec)
+        for rec in getattr(self, "_mass_records", []):
+            self._apply_mass(rec)
         for g in self.grasps:
             obj = self.physical[g["object"]]
             attached = self.robot._ag_obj_in_hand.get(g["arm"]) is obj
@@ -461,14 +463,33 @@ class InstanceLoader:
         applied = apply_counterbalance(ent, ent.joints[rec["joint"]], list(rec.get("links") or []), rec.get("damping"))
         return {"type": "counterbalance", "object": rec["object"], "joint": rec["joint"], **applied}
 
+    def _apply_mass(self, rec: dict) -> dict:
+        """``{"type": "mass", "object", "mass_kg"[, "link"]}`` (disembedding, owner 2026-09-25): the mass the sampler gave a
+        support object - the trays under 1 kg bottles, whose 0.39 kg category mass had PhysX chattering the stack
+        (:func:`ispatialgym.sampling.constraints.apply_mass`); the sampler's stillness gate ran with it. Idempotent; re-applied
+        after every reset."""
+        from ispatialgym.sampling.constraints import apply_mass
+
+        ent = self.physical.get(rec["object"])
+        if ent is None:
+            raise LoadError("error", f"mass constraint names an unbound instance {rec['object']!r}")
+        applied = apply_mass(ent, float(rec["mass_kg"]), rec.get("link"))
+        return {"type": "mass", "object": rec["object"], **applied}
+
     def _restore_constraints(self, records: List[dict]) -> List[dict]:
         out = []
         self.hinges = []
         self._hinge_records = []  # the hinge records in self.hinges order (restore_after_reset recreates a lost prim from its record)
         self._joint_friction_records = []
         self._counterbalance_records = []
+        self._mass_records = []
         for rec in records:
             kind = rec.get("type", "revolute")
+            if kind == "mass":
+                out.append(self._apply_mass(rec))
+                self._mass_records.append(rec)
+                log.info("mass applied: %s = %s", rec["object"], out[-1])
+                continue
             if kind == "counterbalance":
                 out.append(self._apply_counterbalance(rec))
                 self._counterbalance_records.append(rec)

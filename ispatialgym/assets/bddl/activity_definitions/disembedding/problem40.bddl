@@ -7,7 +7,7 @@
     ; the destination tray (centre, init orientation), no distractor does. Distractor categories come from the icl pools
     ; (roles/constraints_compatible.csv same-category / other-category), the member count (1-3) from the customs list
     ; (generation.groups.distractors); both are part of the alias (e.g. bottle_of_beer_3_bottle_of_sake_1). Trays are
-    ; fixed models for now (tray gsxbym source, tray hvlfig destination; roles/candidates.csv).
+    ; fixed models for now (tray uekqey source, tray hvlfig destination; roles/candidates.csv).
 
     (:objects
         computer_game.n.01_1 computer_game.n.01_2 computer_game.n.01_3 - computer_game.n.01

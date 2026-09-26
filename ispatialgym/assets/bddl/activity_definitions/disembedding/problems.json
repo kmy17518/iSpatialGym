@@ -1617,6 +1617,138 @@
    "pick": "disembedding#29~T1",
    "slot": "representative",
    "mode": "representative"
+  },
+  {
+   "alias": "disembedding-notebook-notebook_2-countertop",
+   "id": 148,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#08~T2",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-notebook-notebook_2-conference_table",
+   "id": 149,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#08~T3",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-notebook-notebook_2-breakfast_table",
+   "id": 150,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#08~T1",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-chili-asparagus_1_bacon_1-countertop",
+   "id": 151,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#14~T2",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-chili-asparagus_1_bacon_1-conference_table",
+   "id": 152,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#14~T3",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-chili-asparagus_1_bacon_1-breakfast_table",
+   "id": 153,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#14~T1",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-teaspoon-teaspoon_2-countertop",
+   "id": 154,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#16~T2",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-teaspoon-teaspoon_2-conference_table",
+   "id": 155,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#16~T3",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-teaspoon-teaspoon_2-breakfast_table",
+   "id": 156,
+   "grounded": "2026-09-24",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#16~T1",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_coconut_milk_1-countertop",
+   "id": 157,
+   "grounded": "2026-09-25",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#07~T2",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_coconut_milk_1-conference_table",
+   "id": 158,
+   "grounded": "2026-09-25",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#07~T3",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_coconut_milk_1-breakfast_table",
+   "id": 159,
+   "grounded": "2026-09-25",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#07~T1",
+   "slot": "representative",
+   "mode": "representative"
   }
  ],
  "unregistered": [

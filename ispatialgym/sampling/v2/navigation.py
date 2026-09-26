@@ -188,6 +188,55 @@ def face_travel_poses(waypoints: Sequence[Sequence[float]], stride: float = STRI
 FACE_TRAVEL_CARRIED_PROBE = {"checked": 0, "collides": 0}
 
 
+#: edge slide (owner 2026-09-24, disembedding carry): two stances at the same support edge are within this of each
+#: other's edge frame (midpoint, inward normal) and body yaw to be joined by a slide along the edge
+EDGE_SLIDE_MID_TOL_M = 0.02
+EDGE_SLIDE_YAW_TOL_RAD = math.radians(2.0)
+EDGE_SLIDE_MODE = "edge_slide"
+
+
+def same_edge(a: Stance, b: Stance, tol_m: float = EDGE_SLIDE_MID_TOL_M, tol_rad: float = EDGE_SLIDE_YAW_TOL_RAD) -> bool:
+    """Whether two tabletop stances stand at the **same support edge facing it**: the same edge frame (name, midpoint within
+    ``tol_m``, inward normal within ``tol_rad``) and the same body yaw (within ``tol_rad``; a stance faces its edge, so
+    the yaws agree whenever the frames do)."""
+    if a.edge is None or b.edge is None or a.edge.name != b.edge.name:
+        return False
+    if float(th.linalg.norm(a.edge.mid - b.edge.mid)) > tol_m:
+        return False
+    if float(th.dot(a.edge.inward, b.edge.inward)) < math.cos(tol_rad):
+        return False
+    dyaw = (float(a.yaw) - float(b.yaw) + math.pi) % (2 * math.pi) - math.pi
+    return abs(dyaw) <= tol_rad
+
+
+def edge_slide_waypoints(frm: Stance, to: Stance, back_m: float = 0.0) -> List[Tuple[float, float, float]]:
+    """§3.7 **edge slide** (owner 2026-09-24): the base path between two stances at the same support edge with the body
+    facing the edge the whole way (the R1Pro base is holonomic). Drive back along ``-inward`` to the slide stand-off (the
+    larger of the two stand-offs + ``back_m``), slide along the edge to the arriving stance's lateral position, drive in
+    to its stand-off. The first waypoint is the departing pose; every other waypoint carries the **arriving stance's
+    yaw**, so ``stride_poses`` / the oracle's tracker (style ``recorded``) blend no heading change and the slide is a pure
+    lateral velocity. Waypoints closer than 1 mm collapse (equal stand-offs: two waypoints, a straight slide). The
+    positions come from the stances' actual base poses and the edge normal alone, not from their ``lateral`` bookkeeping."""
+    inward = to.inward
+    s_from = float(frm.stand_off if frm.stand_off is not None else 0.0)
+    s_to = float(to.stand_off if to.stand_off is not None else 0.0)
+    s_slide = max(s_from, s_to) + max(0.0, float(back_m))
+    p0, p3 = frm.base_xy, to.base_xy
+    p1 = p0 - inward * (s_slide - s_from)
+    p2 = p3 - inward * (s_slide - s_to)
+    pts: List[th.Tensor] = []
+    for p in (p0, p1, p2, p3):
+        if pts and float(th.linalg.norm(p - pts[-1])) < 1e-3:
+            continue
+        pts.append(p)
+    yaw = float(to.yaw)
+    out = [tuple(float(v) for v in frm.base_pose2d)]
+    out += [(float(p[0]), float(p[1]), yaw) for p in pts[1:]]
+    if len(out) == 1:  # the stances coincide
+        out.append((float(p3[0]), float(p3[1]), yaw))
+    return out
+
+
 def grid_shortest_path(free: th.Tensor, start: Tuple[int, int], goal: Tuple[int, int]) -> Optional[List[Tuple[int, int]]]:
     """A* on a boolean grid (8-connected, no corner cutting through blocked cells); None when disconnected."""
     h, w = free.shape
@@ -463,19 +512,53 @@ class attached:
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def plan_edge_slide(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: str = "untucked", carried: Optional[str] = None,
+                    carried_obj: Any = None, carried_arm: str = "right", max_length_m: Optional[float] = None, stride: float = STRIDE_M,
+                    trunk: Optional[Tuple[float, float]] = None, eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None,
+                    arm_q: Optional[Dict[str, th.Tensor]] = None, margin: float = 0.01, back_m: float = 0.0) -> PathRecord:
+    """§3.7 edge slide (owner 2026-09-24): the :func:`edge_slide_waypoints` path between two stances at the same support
+    edge, validated exactly like :func:`plan_path` (whole-body checks every ``stride`` m at ``trunk`` / ``posture`` with
+    ``carried_obj`` attached), recorded with ``mode = "edge_slide"``. The grid planner is not consulted: the strip along
+    the edge at the stances' stand-off is checked against the real collision world (the trav map still carries the baked
+    footprints of removed chairs there). Raises ``NavigationError`` ``not_same_edge`` / ``path_too_long`` /
+    ``edge_slide_collision``."""
+    if not same_edge(stance_from, stance_to):
+        raise NavigationError("not_same_edge", f"{stance_from.name} -> {stance_to.name}: not at the same support edge facing it")
+    trunk = (stance_from.translate, stance_from.tilt) if trunk is None else trunk
+    if arm_q is None:
+        from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+        r, l, _ = stance_arm_vectors(kit, stance_from, posture if posture != "untucked" else None)
+        arm_q = {"right": r, "left": l}
+    waypoints = edge_slide_waypoints(stance_from, stance_to, back_m=back_m)
+    length = path_length(waypoints)
+    if max_length_m is not None and length > max_length_m:
+        raise NavigationError("path_too_long", f"edge slide {length:.2f} m > {max_length_m:.2f} m")
+    poses = stride_poses(waypoints, stride)
+    with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+        ok, bad = path_collision_free(kit, poses, trunk, posture, margin=float(margin), q_arms=arm_q)
+    if not ok:
+        raise NavigationError("edge_slide_collision", f"edge slide {stance_from.name} -> {stance_to.name} collides at stride {bad}/{len(poses)} ({poses[bad]}) at trunk {trunk}"
+                                                      + (f" (margin {float(margin):.3f})" if float(margin) > 0.011 else ""))
+    return PathRecord(stance_from.name, stance_to.name, EDGE_SLIDE_MODE, waypoints, length, posture, carried, trunk, stride, len(poses))
+
+
 def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: str = "untucked", carried: Optional[str] = None,
               carried_obj: Any = None, carried_arm: str = "right", rooms: Optional[Sequence[str]] = None, blocked: Sequence[Any] = (),
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
               eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None,
-              margin: float = 0.01, style: str = "recorded", probe_face_travel: bool = False) -> PathRecord:
+              margin: float = 0.01, edge_slide: bool = False, edge_slide_back_m: float = 0.0, style: str = "recorded",
+              probe_face_travel: bool = False) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
     ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
     attached to ``carried_arm`` (posed in the hand per ``eef_in_object``, the grasp record's T_obj→eef). ``trunk``
     defaults to the **departing** stance's trunk: the trunk changes at the transition stand-off after the drive (§3.8),
     so the path is driven at the trunk the robot leaves with. ``arm_q`` (per arm) fixes the arm posture of the drive
     (default: the departing stance's recorded arms when it has a configuration, else ``posture``). ``force_global``
-    plans on the eroded map end to end (camera relocalization). Raises ``NavigationError`` with reason ``no_path`` /
-    ``path_collision`` / ``path_too_long``.
+    plans on the eroded map end to end (camera relocalization). ``edge_slide`` (owner 2026-09-24): when the two stances
+    stand at the same support edge, try the :func:`plan_edge_slide` path first (body facing the edge throughout,
+    ``mode = "edge_slide"``) and fall back to the grid planner when it is not available or collides. Raises
+    ``NavigationError`` with reason ``no_path`` / ``path_collision`` / ``path_too_long``.
 
     ``style`` (owner 2026-09-26, ``generation.base_path_style``): ``"face_travel"`` checks the shared ``robot.base_path``
     schedule of the path (:func:`face_travel_poses`) with the same posture, carried object, margin and yaw-lag envelope
@@ -492,6 +575,13 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     a_xy, b_xy = stance_from.base_xy, stance_to.base_xy
     if float(th.linalg.norm(a_xy - b_xy)) < 1e-3 and abs(stance_from.yaw - stance_to.yaw) < 1e-3:
         return PathRecord(stance_from.name, stance_to.name, "local", [tuple(stance_to.base_pose2d)], 0.0, posture, carried, trunk, stride, 0)
+    if edge_slide and not force_global and same_edge(stance_from, stance_to):
+        try:
+            return plan_edge_slide(kit, stance_from, stance_to, posture=posture, carried=carried, carried_obj=carried_obj, carried_arm=carried_arm,
+                                   max_length_m=max_length_m, stride=stride, trunk=trunk, eef_in_object=eef_in_object, arm_q=arm_q, margin=margin,
+                                   back_m=edge_slide_back_m)
+        except NavigationError as e:
+            log.info("%s -> %s: edge slide not available (%s); falling back to the grid path", stance_from.name, stance_to.name, e)
     free_local = local_map(kit, rooms, blocked=blocked)
     a, b = _to_map(kit, a_xy), _to_map(kit, b_xy)
     a_free, b_free = nearest_free_cell(free_local, a, 3), nearest_free_cell(free_local, b, 3)

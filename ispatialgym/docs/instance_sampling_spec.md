@@ -411,6 +411,15 @@ end to end:
 The path (waypoints, posture, length) is recorded; the oracle drives exactly this path. Path length limits: Prompt 0
 step 6 (≤ 3 m), IORS large-scale B → C (≤ `max_partner_geodesic` + 1 m), camera relocalization buckets.
 
+**Edge slide** (owner decision 2026-09-24, `mode = "edge_slide"`; the disembedding carry manipulation → placement,
+`generation.carry_edge_slide`): when both stances stand at the same support edge facing it, the recorded path keeps the
+body facing the edge throughout — drive back along the edge normal to the larger of the two stand-offs (+
+`carry_edge_slide_back_m`), slide along the edge to the arriving stance's lateral position, drive in — with every waypoint
+at the arriving yaw, so the holonomic base slides without the turn-drive-turn of a grid path whose intermediate waypoints
+carry the travel heading. It is collision-checked like rule 1 (0.1 m strides, carried object attached, the real collision
+world rather than the trav map with its baked footprints of removed chairs); when the strip collides the grid path of
+rules 1–2 is recorded instead.
+
 Camera relocalization (owner decision 2026-09-22) records `style = "face_travel"`: its eroded-map path is the
 line-of-sight shortcut of the grid path (as `plan_path` records for every other family; the dense one-waypoint-per-cell
 records of the pilot made the oracle slow at every 45° stair and zig-zag), and "exactly this path" means the shared
@@ -570,7 +579,11 @@ The sampler only guarantees what the loader can reproduce. Beyond the BEHAVIOR o
   target, anchor = COM, axis as recorded) are re-created **with the recorded hinge resistance** (§7: `friction` /
   `damping` of the wall hinge as the joint's angular drive; absent = frictionless, the axial table hinge); the table
   hinge sits 1 mm below the top so the object cannot rock; a hinge that is missing at evaluation is a loader error,
-  not a free-spinning object.
+  not a free-spinning object. The same list carries the other physics the sampler probed with: `joint_friction` /
+  `counterbalance` (articulation) and `mass` (`{"type": "mass", "object", "mass_kg"}`, owner decision 2026‑09‑25,
+  disembedding: the trays get `generation.tray_mass_kg` = 2 kg — at their 0.4–0.6 kg category mass under 1 kg bottles
+  the table–tray–bottle stack is a 10:1 inverted mass ratio and PhysX resolves it with contact chatter, the bottles
+  hopping 1–7 mm seconds after the release; the loader re-applies the mass (inertia scaled along) after every reset).
 - `grasps` — the held object of object scaling / mental rotation: the object is placed at
   `grasps[0].object_pose_in_eef_frame`, the recorded finger joints are applied and the assisted grasp is attached
   before the first policy step; an attach failure fails the load (`grasp_restore_failed`), it never silently starts
@@ -1269,8 +1282,11 @@ eef pose, occlusion ratio, per-object image-space descriptors.
 Numbers and records kept from v1 §5.3:
 
 - Source-tray placement raster 1 cm over the tray's **inner floor** (floor polygon minus the wall thickness), 0.5 cm
-  footprint margin (3.2); the distractor set's footprints, each grown by its `pad_clearance_m`, may cover at most
-  **0.45** of the inner floor (`tray_budget`), so the target stays pickable from above.
+  footprint margin (3.2); the distractor set's footprints (each model's bbox rectangle grown by its `pad_clearance_m`
+  on both axes, yaw-invariant) may cover at most **0.60** of the inner floor (`tray_budget`), so the target stays
+  pickable from above. (Until 2026-09-24: 0.45 of a conservative square `(long + 2c)²` per distractor, which left a
+  22 cm bottle alone on the tray; the member count is fixed at grounding with the same rule, `ground_isg`
+  `generation.distractor_budget`.)
 - Occlusion: `external_occlusion_ratio = 1 − V / A` from two segmentation renders at the init stance — the complete
   scene, and the same view with the other candidate objects hidden (A = the target's own visible area, so
   self-occlusion is excluded); the target's projection must lie fully inside a 5 % image margin; ratio ≤ 0.30 and

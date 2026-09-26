@@ -40,6 +40,27 @@ log = logging.getLogger("ispatialgym.sampling")
 
 TABLE_CATEGORIES = ("breakfast_table", "desk", "coffee_table", "conference_table", "pedestal_table", "countertop", "bar", "nightstand", "console_table", "side_table")
 
+#: a path component is at most 255 bytes on ext4 (and most filesystems); the longest name derived from an instance id is
+#: ``<iid>-tro_state.json`` (2026-09-25: the 3-distractor milk alias' id ran to 241 characters and the TRO write failed
+#: with ENAMETOOLONG after an attempt had passed every check, 0925-044627)
+INSTANCE_FILE_NAME_MAX = 255
+INSTANCE_ID_MAX = INSTANCE_FILE_NAME_MAX - len("-tro_state.json")
+
+
+def make_instance_id(alias: str, template_id: str, index: int) -> str:
+    """``<alias>__<template_id>__<index:04d>``; when that exceeds :data:`INSTANCE_ID_MAX` bytes the template component is
+    cut and suffixed with ``~<sha1[:8] of the full template id>`` (deterministic, still unique per template). The alias
+    stays the first ``__`` component (``first_demo`` / the schedulers read it from the file name) and the consumers derive
+    the id from the file name and the template dir from the path, never from the id's structure."""
+    iid = f"{alias}__{template_id}__{index:04d}"
+    if len(iid.encode("utf-8")) <= INSTANCE_ID_MAX:
+        return iid
+    import hashlib
+
+    digest = hashlib.sha1(template_id.encode("utf-8")).hexdigest()[:8]
+    keep = max(INSTANCE_ID_MAX - len(f"{alias}____{index:04d}".encode("utf-8")) - len(digest) - 1, 0)
+    return f"{alias}__{template_id[:keep]}~{digest}__{index:04d}"
+
 
 @dataclass
 class Draft:
@@ -340,11 +361,45 @@ class TaskSampler:
         names = draft.settle_free if draft.settle_free is not None else self.spawned_instances
         return [self.objects[n] for n in names]
 
+    def settle_still_entities(self, draft: Draft) -> List[Any]:  # hook
+        """Entities held at rest during the settle / drift / trembling windows (2026-09-25: the scene support the task
+        objects rest on - a free-standing table chatters on the floor mesh once the dropped trays nudge it and shakes
+        everything on it; the demo loads it at rest and never kicks it). Default: none."""
+        return []
+
     def settle_and_validate(self, draft: Draft):
         free = self.settle_entities(draft)
-        err = self.world.settle(free, steps=int(self.gen("settle_steps", self.DEFAULT_SETTLE_STEPS)))
+        # the residual-velocity report of the settle is advisory since 2026-09-24: PhysX reports 0.1-0.9 rad/s of
+        # sign-alternating contact velocity on lying cylinders that do not move at all (32/32 bottle drops on tray uekqey
+        # stayed within 1.5 mm over 5 s while never reading below 0.05 rad/s), so the 0.5 rad/s gate rejected still
+        # scenes; anything that really moves fails the pose gate below (2 cm/s of rolling = 30 mm over its window)
+        still = self.settle_still_entities(draft)
+        vel_err = self.world.settle(free, steps=int(self.gen("settle_steps", self.DEFAULT_SETTLE_STEPS)), still=still)
+        draft.summary["residual_velocity"] = vel_err
+        # 2026-09-24: visible stillness over 1.5 s of frames (``SimWorld.tremble_after``) before the poses are recorded: the
+        # velocity report above and ``drift_after`` below let PhysX contact chatter through (the milk bottles lying across the
+        # seams of the gsxbym tray floor trembled from step 0 of every demo and never satisfied ``pose_settled``)
+        W = self.world
+        err = W.tremble_after(free, frames=int(self.gen("tremble_frames", W.TREMBLE_FRAMES)),
+                              pos_tol=float(self.gen("tremble_pos_tol_m", W.TREMBLE_POS_TOL)), ang_tol=float(self.gen("tremble_ang_tol_rad", W.TREMBLE_ANG_TOL)),
+                              drift_pos_tol=float(self.gen("tremble_drift_pos_tol_m", W.TREMBLE_DRIFT_POS_TOL)),
+                              drift_ang_tol=float(self.gen("tremble_drift_ang_tol_rad", W.TREMBLE_DRIFT_ANG_TOL)), still=still)
+        draft.summary["tremble"] = dict(getattr(W, "last_tremble", {}) or {})
         if err:
-            raise Reject("unstable_init", err)
+            # diagnostic (2026-09-25): what touches what at this moment - the robot's contacts and the free objects' contacts
+            contacts = ""
+            try:
+                from omnigibson.utils.usd_utils import RigidContactAPI
+
+                idx = W.scene.idx
+                pairs = set(RigidContactAPI.get_contact_pairs(idx, [W.robot] + list(free), None, current_only=True))
+                short = sorted({(a.split("/")[-2] + ":" + a.split("/")[-1], b.split("/")[-2] + ":" + b.split("/")[-1]) for a, b in pairs})
+                contacts = f" [contacts: {short[:24]}]"
+            except Exception as ce:  # noqa: BLE001
+                contacts = f" [contacts unavailable: {ce!r}]"
+            raise Reject("unstable_init" if vel_err else "trembling", f"{err}" + (f"; residual velocity: {vel_err}" if vel_err else "") + contacts)
+        if vel_err:
+            log.info("%s: residual velocity after the settle ignored, the objects are visually still: %s", getattr(getattr(self, "gp", None), "alias", self.__class__.__name__), vel_err)
         for name in draft.object_poses:
             p, q = self.objects[name].get_position_orientation()
             draft.object_poses[name] = (p.clone(), q.clone())
@@ -362,7 +417,7 @@ class TaskSampler:
         if holds:
             raise Reject("goal_satisfied_at_init", str(status))
         draft.summary["bddl_at_init"] = {"init_conditions_all_true": True, "goal": self.goal_report(status)}
-        err = self.world.drift_after(free, steps=10)
+        err = self.world.drift_after(free, steps=10, still=still)
         if err:
             raise Reject("drift", err)
         self.extra_checks(draft)
@@ -398,7 +453,7 @@ class TaskSampler:
             self.world.park_robot(self.world.robot_park_xy, floor_z=self.world.floor_z)
             self.apply_goal(draft)
             ents = self.goal_entities(draft)
-            err = self.world.settle(ents, steps=int(self.gen("goal_settle_steps", 2 * self.DEFAULT_SETTLE_STEPS)))
+            err = self.world.settle(ents, steps=int(self.gen("goal_settle_steps", 2 * self.DEFAULT_SETTLE_STEPS)), still=self.settle_still_entities(draft))
             if err:
                 raise Reject("goal_unstable", err)
             self.refine_targets_from_goal(draft)
@@ -492,7 +547,7 @@ class TaskSampler:
         return tro["ispatialgym"]
 
     def instance_id(self, index: int) -> str:
-        return f"{self.spec.name}__{self.ctx.template_id}__{index:04d}"
+        return make_instance_id(self.spec.name, self.ctx.template_id, index)
 
     def save_template(self):
         inst_to_name = {b.name: b.scene_object_name for b in self.bindings.all()}
@@ -533,6 +588,7 @@ class TaskSampler:
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         iid = self.instance_id(index)
+        self.world.keep_still(self.objects[inst] for inst in self.physical)  # a state at rest (see v2/core.write_instance)
         states = {inst: self.objects[inst].dump_state(serialized=False) for inst in self.physical}
         meta = self.tro_meta_block(draft, iid, seed)
         tro = dict(states)

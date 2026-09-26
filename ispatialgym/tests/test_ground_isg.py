@@ -284,8 +284,10 @@ def test_groups(grounded):
         # owner decision 2026-09-16 4a: the §6.4 tray budget decided the member count at grounding
         b = gp.entry.generation["distractor_budget"]
         assert {"tray_floor_m2", "used_m2", "n_distractors"} <= set(b) and b["n_distractors"] == g["size"]
-        assert b["tray"] == "tray/gsxbym" and b["tray_scale"] == 1.25 and abs(b["tray_floor_m2"] - 0.107 * 1.25 ** 2) < 1e-3
-        assert b["used_m2"] <= b["budget_fraction"] * b["tray_floor_m2"] + 1e-9
+        # 2026-09-24: source tray tray/uekqey at its canonical size (build_icl.TRAY_OVERRIDES); its 0.1673 m2 inner floor
+        # equals the retired gsxbym x 1.25 (0.107 x 1.25^2), so the member counts of the shipped picks are unchanged
+        assert b["tray"] == "tray/uekqey" and b["tray_scale"] == 1.0 and abs(b["tray_floor_m2"] - 0.1673) < 1e-3
+        assert b["used_m2"] <= b["budget_fraction"] * b["tray_floor_m2"] + 1e-4  # both recorded rounded to 4 decimals
         assert b["footprint_rule"] in ("square", "rectangle") and set(b["footprints_m2"]) == set(g["members"])
         assert abs(sum(b["footprints_m2"][c] * n for c, n in g["members"].items()) - b["used_m2"]) < 1e-3
         budgets.append(b)
@@ -299,10 +301,12 @@ def test_groups(grounded):
         target = gp.entry.roles["target"]
         assert target.representative not in sc.whitelist["distractors"].get(target.category, [])
         assert ["ontop", "distractors_group.n.01_1", gp.rendered.instances["source"]] in gp.problem.raw_init
-        # owner decision 2026-09-16 4b: the source tray spawns at 1.25 (uniform), the destination tray at 1.0
+        # owner decision 2026-09-16 4b (source tray at generation.source_tray_scale, destination at 1.0); since 2026-09-24 the
+        # source tray uekqey spawns at its canonical size, so neither role carries a scale
         src, dst = gp.entry.roles["source"], gp.entry.roles["destination"]
-        assert src.scale == {"tray/gsxbym": 1.25, "default": 1.25} and dst.scale == {}
-        assert gp.entry.generation["source_tray_scale"] == 1.25
+        assert src.representative == "uekqey" and dst.representative == "hvlfig"
+        assert src.scale == {} and dst.scale == {}
+        assert gp.entry.generation["source_tray_scale"] == 1.0
     assert {b["n_distractors"] for b in budgets} == {1, 2, 3}  # the shipped picks span the whole 3 -> 2 -> 1 range
     assert any(b["dropped"] for b in budgets) and any(b["footprint_rule"] == "rectangle" for b in budgets)
     attachment = _entries(grounded, "configuration_matching-attachment")[0]

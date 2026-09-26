@@ -32,6 +32,16 @@ from typing import Any, Dict, Optional, Sequence
 COMMON: Dict[str, Any] = {
     "templates_max": 20,  # §2.3
     "instances_per_template": 5,  # §2.3
+    # trembling gate after the §3.5 settle (2026-09-24, ``SimWorld.tremble_after``): every free task object must be visually
+    # still - per-frame pose change below 0.5 mm / 0.5 deg (a head-camera pixel; the settling hops of a just-released
+    # bottle read 0.1-0.5 mm with zero net motion) and net motion below 1 mm / 0.01 rad over 45 frames (1.5 s) - else
+    # ``Reject("trembling")``. Calibrated on the pilot demos: still boxes <= 0.04 mm / 0.004 rad per frame, the trembling
+    # milk bottles 0.6-2.2 mm per frame with 5-17 mm of net drift. Per subtask overridable (``generation.tremble_*``).
+    "tremble_frames": 45,
+    "tremble_pos_tol_m": 0.0005,
+    "tremble_ang_tol_rad": 0.0087,
+    "tremble_drift_pos_tol_m": 0.001,
+    "tremble_drift_ang_tol_rad": 0.01,
 }
 
 #: §8 "disembedding, IORS | measured only | 0.03 m / 0.20 rad; override threshold for goal := settled pose =
@@ -183,16 +193,33 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "tolerances": dict(TOLERANCES_MEASURED),  # §8 measured only
         "groups": {"distractors": {"size": [1, 3], "draw": "unique"}},  # §2.3 distractors {size: [1, 3], draw: unique}
         "path_buckets": None,
-        "tray_budget": 0.45,  # §6.4 distractor footprints (grown by pad_clearance_m) cover ≤ 0.45 of the inner floor
+        # §6.4 distractor footprints (the bbox rectangle grown by pad_clearance_m on both axes, yaw-invariant) cover ≤ this
+        # fraction of the inner floor. 2026-09-24: 0.45 -> 0.60 together with the square -> rectangle footprint rule in
+        # ground_isg._distractor_budget (the square charged a lying 22 cm bottle 4.6x its footprint: one distractor, 86 %
+        # of the milk tray empty); the same fraction gates place_distractors at sampling time
+        "tray_budget": 0.60,
         # owner decision 2026-09-16 4a/4b: the budget is applied at grounding (ground_isg picks the member count 3 -> 2 -> 1
-        # from the icl footprints, generation.distractor_budget records the maths); the source tray spawns at 1.25 (uniform,
-        # roles.source.scale), the destination tray stays 1.0. Inner floor area of the source tray at scale 1 as the pilot
-        # measured it (1 cm raster, house_single_floor); the area scales with the square of the tray scale.
-        "source_tray_scale": 1.25,  # owner decision 2026-09-16 4b
-        "source_tray_inner_floor_m2": {"tray/gsxbym": 0.107},  # pilot measurement at scale 1 (2026-09-16)
+        # from the icl footprints, generation.distractor_budget records the maths); the source tray spawns at
+        # ``source_tray_scale`` (uniform, roles.source.scale), the destination tray stays 1.0. Inner floor area of the source
+        # tray at scale 1 (1 cm raster, house_single_floor); the area scales with the square of the tray scale.
+        # 2026-09-24: source tray tray/gsxbym x 1.25 -> tray/uekqey x 1.0 (icl build_icl.TRAY_OVERRIDES): gsxbym's collision
+        # floor is four convex slabs with a 1.6 mm step, and objects lying across the seams (milk bottles) never settled -
+        # PhysX contact chatter, visible trembling in the pilot demos. uekqey's floor is one slab and its inner floor at
+        # scale 1 (0.1673 m2) equals gsxbym's at 1.25 (0.107 x 1.25^2 = 0.1672), so the distractor budget is unchanged.
+        "source_tray_scale": 1.0,
+        "source_tray_inner_floor_m2": {"tray/uekqey": 0.1673, "tray/gsxbym": 0.107},  # raycast measurements at scale 1
         "tray_raster_m": 0.01,  # §6.4 placement raster 1 cm over the tray's inner floor
-        "tray_footprint_margin_m": 0.005,  # §3.2 / §6.4 0.5 cm footprint margin on a tray floor
+        # §3.2 / §6.4 footprint margin on a tray floor: 0.5 cm -> 1.0 cm (2026-09-24): the tray walls' convex hulls lean a few
+        # mm over the raycast floor boundary at bottle height (uekqey corners / ends: 3-4 mm), so a footprint 0.5 cm inside
+        # the boundary can touch them (near-wall test on a fixed table: 4/8 still vs 6/8 centred); 1.5 cm starved the placement
+        # of four objects (47/64 attempts without a free position)
+        "tray_footprint_margin_m": 0.010,
         "distractor_spacing_extra_m": 0.01,  # §4.6 x = pad_clearance + 0.01 along the pinch axis
+        # random (cell, yaw) draws per distractor in place_distractors (same rules; 2026-09-25: 80 -> 400. A lying 22 cm
+        # bottle fits the 34 cm wide floor only within a few degrees of the tray's axes once the target's pinch strip and
+        # the 1 cm margins are out: 340 of 377 manipulation candidates of the 3-distractor milk alias (0925-034257) ended
+        # in "no free position", 176 of them for the first distractor)
+        "distractor_place_tries": 400,
         "max_occlusion_ratio": 0.30,  # §4.6 / §6.4 distractors may occlude the target up to 30 %
         "min_visible_pixels": 400,  # §6.4
         "occlusion_reload_tolerance": 0.05,  # §6.4 loader re-measures with tolerance 0.05 on the ratio
@@ -202,6 +229,19 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "destination_floor_visible_fraction": 0.30,  # §6.4 destination floor ≥ 30 % unoccluded in the confirmation render
         "lateral_margin_m": 0.437,  # §4.4 [pilot] the two fixed trays' half lengths along the edge + gap
         "carry_height_extra_m": 0.03,  # §4.7 lift ≥ tallest distractor + tray rim + 3 cm above the source floor
+        # owner 2026-09-24: the carry manipulation -> placement is the §3.7 edge slide (body facing the table, lateral slide
+        # along the edge, drive back / in when the stand-offs differ; the grid path's turn-drive-turn only as the fallback)
+        "carry_edge_slide": True,
+        "carry_edge_slide_back_m": 0.0,  # extra stand-off for the slide beyond the larger of the two stances' stand-offs
+        "release_gap_m": 0.003,  # 2026-09-24: release height of the objects above the tray floor; the §3.2 3 mm measured best (disembedding.RELEASE_GAP_M)
+        "tray_release_gap_m": 0.0002,  # 2026-09-25: the trays are released at contact with the table (their 3 mm drop set them chattering)
+        # 2026-09-25: mass of both trays (0 = the dataset's category mass, 0.39 kg for the uekqey base link). Under 1 kg
+        # bottles that is a 10:1 inverted mass ratio in the table-tray-bottle stack and PhysX resolves it with contact
+        # chatter: the bottles hopped 1-7 mm seconds after their release in 8 of 8 settled attempts of the 3-distractor milk
+        # alias (0925-034257); headless A/B on identical layouts: 0.39 kg 3 of 12 layouts moving, 2 kg 0 of 6 at <= 0.01 mm
+        # per frame (bottles at 0.3 kg - the mass-ratio probe - 0 of 6 too). Recorded per instance as a TRO ``constraints``
+        # record {"type": "mass"} the demo loader re-applies (constraints.apply_mass)
+        "tray_mass_kg": 2.0,
     },
     # ---- configuration matching (§6.5–6.8) ---------------------------------------------------------------------
     "configuration_matching-block_design": {

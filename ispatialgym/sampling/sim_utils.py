@@ -818,31 +818,51 @@ class SimWorld:
                 o.keep_still()
         return n_changed
 
-    def settle(self, task_entities: Iterable, steps: int = 60, robot_still: bool = True) -> Optional[str]:
-        """Let the task objects settle under physics (robot base held) and report residual motion."""
+    def settle(self, task_entities: Iterable, steps: int = 60, robot_still: bool = True, still: Iterable = ()) -> Optional[str]:
+        """Let the task objects settle under physics (robot base held) and report residual motion. ``still`` = entities
+        held at rest every step (2026-09-25: the scene support - a free-standing table is a rigid body on four convex-hull
+        legs; the trays' 3 mm drop sets it chattering on the floor mesh and the top then shakes every object on it for
+        seconds: headless test, identical placements - fixed table <= 0.2 mm per frame, dynamic table 1-150 mm. The demo
+        loads the table at rest from the TRO and never kicks it, so holding it here matches the demo)."""
         ents = list(task_entities)
+        held = [e for e in still if e is not None]
         self.wake(ents)
+        q0 = self.robot.get_joint_positions().clone()
         for _ in range(steps):
             og.sim.step_physics()
             if robot_still:
                 self.robot.keep_still()
+            for e in held:
+                e.keep_still()
         for _ in range(10):
             og.sim.step_physics()
             if robot_still:
                 self.robot.keep_still()
+            for e in held:
+                e.keep_still()
         # one full step refreshes the per-step caches (AABBs, contacts) that step_physics leaves stale
         self.full_step()
         if robot_still:
             self.robot.keep_still()
+        # diagnostic (2026-09-25): a robot whose drives target another configuration creeps during a physics-only settle
+        dq = (self.robot.get_joint_positions() - q0).abs()
+        self.last_robot_drift_rad = float(dq.max())
+        if self.last_robot_drift_rad > 0.01:
+            names = list(getattr(self.robot, "joints", {}).keys())
+            worst = names[int(dq.argmax())] if len(names) == len(dq) else int(dq.argmax())
+            log.warning("settle: the robot's joints drifted up to %.3f rad (%s) over %d + 10 physics steps - stale drive targets?", self.last_robot_drift_rad, worst, steps)
         return self.check_stability(ents)
 
-    def drift_after(self, entities: Iterable, steps: int = 10, pos_tol: float = 0.01, ang_tol: float = 0.05) -> Optional[str]:
+    def drift_after(self, entities: Iterable, steps: int = 10, pos_tol: float = 0.01, ang_tol: float = 0.05, still: Iterable = ()) -> Optional[str]:
         ents = list(entities)
+        held = [e for e in still if e is not None]
         before = {e.name: e.get_position_orientation() for e in ents}
         joints = {e.name: e.get_joint_positions().clone() for e in ents if e.n_joints > 0}
         for _ in range(steps):
             og.sim.step_physics()
             self.robot.keep_still()
+            for e in held:
+                e.keep_still()
         for e in ents:
             p, q = e.get_position_orientation()
             p0, q0 = before[e.name]
@@ -851,6 +871,91 @@ class SimWorld:
             if e.name in joints and float((e.get_joint_positions() - joints[e.name]).abs().max()) > 0.02:
                 return f"{e.name} joints drifted"
         return None
+
+    #: trembling gate (2026-09-24, disembedding milk bottles 0916-141051 / 0916-181259): after the settle every free task
+    #: object must be *visually* still for ``TREMBLE_FRAMES`` action frames. PhysX contact chatter - a body lying across the
+    #: seams of a convex-decomposition floor (the gsxbym tray: four slabs, 1.6 mm step), a cylinder on its side with no
+    #: restoring torque - keeps a body awake with 10-50 mm/s of alternating velocity that ``check_stability`` (50 mm/s,
+    #: 0.5 rad/s) and ``drift_after`` (10 mm / 0.05 rad over 10 physics steps) let through; the demos then showed 0.5-2 mm and
+    #: 1-8 deg jumps per frame from step 0, 17 mm of drift over the transition, and ``pose_settled`` never held. Calibration
+    #: (head_rgb demos, per 1/30 s frame): still boxes on a tray <= 0.04 mm / 0.22 deg (float32 pose noise); trembling bottles
+    #: 0.12-2.2 mm / 0.27-7.9 deg at their worst frame, 0.02-0.6 mm / 0.02-0.4 deg on average. Velocity is deliberately not
+    #: gated: PhysX reports 5-30 mm/s of sign-alternating velocity for bodies whose pose does not move at all.
+    TREMBLE_FRAMES = 45  # 1.5 s at 30 Hz
+    #: per-frame limits (0.5 mm / 0.5 deg): about a head-camera pixel (~0.5 mm at the tray); the settling jiggle of a bottle
+    #: seconds after its release reads 0.1-0.5 mm single-frame hops with zero net motion (roll / crowding tests 0924), the
+    #: net limits decide
+    TREMBLE_POS_TOL = 0.0005  # m per frame
+    TREMBLE_ANG_TOL = 0.0087  # rad per frame (0.5 deg)
+    TREMBLE_DRIFT_POS_TOL = 0.001  # m over the window (a slowly rolling cylinder: small steps, steady drift)
+    TREMBLE_DRIFT_ANG_TOL = 0.01  # rad over the window
+
+    def tremble_after(self, entities: Iterable, frames: int = TREMBLE_FRAMES, pos_tol: float = TREMBLE_POS_TOL, ang_tol: float = TREMBLE_ANG_TOL,
+                      drift_pos_tol: float = TREMBLE_DRIFT_POS_TOL, drift_ang_tol: float = TREMBLE_DRIFT_ANG_TOL, robot_still: bool = True,
+                      still: Iterable = ()) -> Optional[str]:
+        """Per-frame pose change of ``entities`` over ``frames`` action frames (``n_physics_timesteps_per_render`` physics
+        steps each, the robot held): the worst frame of every entity must stay within ``pos_tol`` / ``ang_tol`` and its net
+        motion over the window within ``drift_pos_tol`` / ``drift_ang_tol``. Objects held by the robot (assisted grasp) are
+        skipped. Returns a description of the worst offender or None; ``self.last_tremble`` keeps the per-entity maxima
+        (mm, deg) for the instance summary."""
+        held = set()
+        for obj in (getattr(self.robot, "_ag_obj_in_hand", {}) or {}).values():
+            if obj is not None:
+                held.add(obj.name)
+        ents = [e for e in entities if isinstance(e, DatasetObject) and e.name not in held]
+        held_still = [e for e in still if e is not None]
+        try:
+            n_sub = max(1, int(og.sim.n_physics_timesteps_per_render))
+        except Exception:
+            n_sub = 4
+        prev = {e.name: e.get_position_orientation() for e in ents}
+        first = dict(prev)
+        worst = {e.name: {"step_mm": 0.0, "step_deg": 0.0, "first_move_frame": None, "worst_frame": None} for e in ents}
+        for fi in range(int(frames)):
+            for _ in range(n_sub):
+                og.sim.step_physics()
+                if robot_still:
+                    self.robot.keep_still()
+                for e in held_still:
+                    e.keep_still()
+            for e in ents:
+                p, q = e.get_position_orientation()
+                p0, q0 = prev[e.name]
+                w = worst[e.name]
+                step_mm = float(th.linalg.norm(p - p0)) * 1000.0
+                if step_mm > w["step_mm"]:
+                    w["step_mm"], w["worst_frame"] = step_mm, fi
+                if w["first_move_frame"] is None and step_mm > 0.2:
+                    w["first_move_frame"] = fi
+                w["step_deg"] = max(w["step_deg"], math.degrees(G.quat_angle(q, q0)))
+                prev[e.name] = (p, q)
+        # as in ``settle``: one full step refreshes the per-step caches (AABBs, contacts) the physics-only steps leave stale
+        self.full_step()
+        if robot_still:
+            self.robot.keep_still()
+        self.last_tremble = {}
+        offender = None
+        for e in ents:
+            p, q = prev[e.name]
+            p0, q0 = first[e.name]
+            w = worst[e.name]
+            d = (p - p0) * 1000.0
+            w.update({"drift_mm": float(th.linalg.norm(p - p0)) * 1000.0, "drift_deg": math.degrees(G.quat_angle(q, q0)), "asleep": bool(getattr(e, "is_asleep", False)),
+                      "frames": int(frames), "drift_xyz_mm": [round(float(v), 2) for v in d.tolist()], "z0": round(float(p0[2]), 4)})
+            self.last_tremble[e.name] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in w.items()}
+            bad = w["step_mm"] > pos_tol * 1000.0 or w["step_deg"] > math.degrees(ang_tol) or w["drift_mm"] > drift_pos_tol * 1000.0 or w["drift_deg"] > math.degrees(drift_ang_tol)
+            if bad and (offender is None or w["step_mm"] + w["drift_mm"] > offender[1]):
+                offender = (e.name, w["step_mm"] + w["drift_mm"])
+        if offender is None:
+            return None
+        w = worst[offender[0]]
+        # who moved when: the initiator of a chain is the entity with the earliest first_move_frame
+        timeline = "; ".join(f"{n}: first>0.2mm@f{v['first_move_frame']} worst@f{v['worst_frame']} {v['step_mm']:.2f}mm net {v['drift_xyz_mm']}"
+                             for n, v in sorted(self.last_tremble.items(), key=lambda kv: (kv[1]["first_move_frame"] is None, kv[1]["first_move_frame"] or 0))
+                             if v["step_mm"] > 0.1 or v["drift_mm"] > 0.3)
+        return (f"{offender[0]} trembles: worst frame {w['step_mm']:.2f} mm / {w['step_deg']:.2f} deg (limits {pos_tol * 1000:.2f} mm / {math.degrees(ang_tol):.2f} deg), "
+                f"net {w['drift_mm']:.2f} mm / {w['drift_deg']:.2f} deg over {frames} frames (limits {drift_pos_tol * 1000:.1f} mm / {math.degrees(drift_ang_tol):.2f} deg)"
+                f" [timeline: {timeline}]")
 
     # ------------------------------------------------------------------ templates
 
@@ -884,6 +989,14 @@ class SimWorld:
         if q is not None:
             self.robot.set_joint_positions(G.t(q))
             self.robot.set_joint_velocities(th.zeros_like(G.t(q)))
+            # 2026-09-25: the joint *drive targets* too. ``set_joint_positions`` (drive=False) writes the joint state only;
+            # the position drives kept the targets of the last ``apply_action`` (a program-check grasp over the tray, the
+            # previous attempt's stance), and during the physics-only settle (``keep_still`` zeroes the velocities every
+            # step, the drive torque still integrates ½·a·dt² per step) the arm crept toward them - hundreds of steps
+            # later the hand had swept into the tray and shoved the bottles (the disembedding milk alias never settled
+            # once its distractors filled the tray; the objects nearest the hand moved first)
+            self.robot.set_joint_positions(G.t(q), drive=True)
+            self.robot.set_joint_velocities(th.zeros_like(G.t(q)), drive=True)
         self.robot.set_position_orientation(th.tensor([x, y, zb]), G.quat_from_yaw(yaw))
         self.robot.keep_still()
         og.sim.step_physics()

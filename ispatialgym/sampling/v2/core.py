@@ -459,6 +459,13 @@ class SamplerV2(TaskSampler):
         self.kit.sync_world()
         return xy
 
+    def settle_still_entities(self, draft: Draft) -> List[Any]:
+        """Entities held at rest during the settle / trembling / goal windows (hook of ``TaskSampler``). None by default:
+        holding the scene support was tried on 2026-09-25 against the disembedding bottles' motion and made no difference
+        (the excitation was the trays' own drop onto the table, see ``disembedding.TRAY_RELEASE_GAP_M``), and the demo
+        holds nothing."""
+        return []
+
     def check_goal_feasible(self, draft: Draft):
         """§3.5: teleport + settle (120 steps) with the robot parked per §3.3, every binary goal atom true, restore."""
         if not draft.goal_poses and not draft.goal_joints:
@@ -468,7 +475,7 @@ class SamplerV2(TaskSampler):
             self.park_robot()
             self.apply_goal(draft)
             ents = self.goal_entities(draft)
-            err = self.world.settle(ents, steps=int(self.gen("goal_settle_steps", self.GOAL_SETTLE_STEPS)))
+            err = self.world.settle(ents, steps=int(self.gen("goal_settle_steps", self.GOAL_SETTLE_STEPS)), still=self.settle_still_entities(draft))
             if err:
                 raise Reject("goal_unstable", err)
             self.check_goal_upright(draft)
@@ -785,13 +792,15 @@ class SamplerV2(TaskSampler):
 
     def record_path(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None, max_length_m: Optional[float] = None,
                     blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None,
-                    arm_q: Optional[Dict[str, th.Tensor]] = None, start_pose2d: Optional[Tuple[float, float, float]] = None) -> PathRecord:
+                    arm_q: Optional[Dict[str, th.Tensor]] = None, start_pose2d: Optional[Tuple[float, float, float]] = None,
+                    edge_slide: bool = False, edge_slide_back_m: float = 0.0) -> PathRecord:
         """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
         carried object attached (posed in the hand per its grasp record); ``arm_q`` (per arm) fixes the arm posture of the
         drive (a carry: the lift configuration the oracle drives with; default for a carried object: its recorded
         ``carry_arm_q``); ``start_pose2d`` = where the path starts when it is not ``frm``'s base pose (the drive-back pose
-        of a departure transition); ``force_global`` plans on the eroded map end to end;
-        ``Reject(no_path | path_collision | path_too_long)``."""
+        of a departure transition); ``force_global`` plans on the eroded map end to end; ``edge_slide`` (owner 2026-09-24)
+        tries the same-edge slide (``NAV.plan_edge_slide``: body facing the edge, no turns, ``edge_slide_back_m`` extra
+        stand-off for the slide) before the grid planner; ``Reject(no_path | path_collision | path_too_long)``."""
         carried = carried or to.carried or frm.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
         if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
@@ -817,7 +826,8 @@ class SamplerV2(TaskSampler):
             is_carried = bool(carried and obj is not None)
             style = "recorded" if is_carried else str(self.gp.gen("base_path_style", "recorded") or "recorded")
             p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
-                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q, margin=margin, style=style, probe_face_travel=is_carried)
+                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q, margin=margin,
+                              edge_slide=edge_slide, edge_slide_back_m=edge_slide_back_m, style=style, probe_face_travel=is_carried)
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)
@@ -864,6 +874,10 @@ class SamplerV2(TaskSampler):
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         iid = self.instance_id(index)
+        # the TRO records a state at rest: the physics steps of the checks after the settle (``attached`` teleports, program
+        # check) leave residual contact-chatter velocities on the objects the checks did not hold (2026-09-24: 8-50 mm/s on
+        # the disembedding distractor and source tray while the target read 0)
+        self.world.keep_still(self.objects[inst] for inst in self.physical)
         states = {inst: self.objects[inst].dump_state(serialized=False) for inst in self.physical}
         meta = self.tro_meta_block(draft, iid, seed)
         tro = dict(states)

@@ -367,8 +367,10 @@ class Transition:
 
 @dataclass
 class PathRecord:
-    """Spec §3.7 / §7 ``paths[]``: the base path the oracle drives, ``mode`` ``local`` (un-eroded shortest path) or
-    ``global`` (eroded global path + straight local connections), ``waypoints`` [[x, y, yaw], ...] world, ``length_m``,
+    """Spec §3.7 / §7 ``paths[]``: the base path the oracle drives, ``mode`` ``local`` (un-eroded shortest path),
+    ``global`` (eroded global path + straight local connections) or ``edge_slide`` (owner 2026-09-24: drive back / slide
+    along the support edge / drive in between two stances at the same edge, the body facing the edge throughout - every
+    waypoint carries the arriving yaw, so the holonomic base slides without turning), ``waypoints`` [[x, y, yaw], ...] world, ``length_m``,
     ``posture`` (``untucked``), ``carried`` bddl instance or None, ``trunk`` (translate, tilt) the checks were made at.
     ``style`` (optional, ``robot.base_path.STYLES``): how the oracle drives the waypoints — ``face_travel`` = the shared
     ``robot.base_path`` schedule the record was collision-checked as (camera relocalization, owner 2026-09-22); absent =
@@ -402,7 +404,7 @@ class PathRecord:
     def schema_ok(d: Dict[str, Any]) -> bool:
         """Whether a dict is a well-formed ``paths[]`` entry (used by tests and the program-check stub)."""
         try:
-            return (d["mode"] in ("local", "global") and isinstance(d["waypoints"], list) and len(d["waypoints"]) >= 1
+            return (d["mode"] in ("local", "global", "edge_slide") and isinstance(d["waypoints"], list) and len(d["waypoints"]) >= 1
                     and all(len(w) == 3 for w in d["waypoints"]) and float(d["length_m"]) >= 0.0 and isinstance(d["posture"], str)
                     and isinstance(d["from"], str) and isinstance(d["to"], str) and "carried" in d)
         except (KeyError, TypeError, ValueError):

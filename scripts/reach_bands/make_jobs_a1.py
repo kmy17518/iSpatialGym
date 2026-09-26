@@ -4,7 +4,7 @@
     python scripts/reach_bands/make_jobs_a1.py contact --supports house_single_floor/breakfast_table_rhjoby_0 --out <jobs.json>
     python scripts/reach_bands/make_jobs_a1.py generic --out <jobs.json>              # re-run of the generic pinch / push bands (pitched classes)
     python scripts/reach_bands/make_jobs_a1.py support-objects --supports <scene/support> ... --out <jobs.json>   # A3 supports: right-hand bands per object
-    python scripts/reach_bands/make_jobs_a1.py placed-tray --supports <scene/support> --tray-spec 'tray/gsxbym*1.25@focus_centred_edge_aligned' --out <jobs.json>
+    python scripts/reach_bands/make_jobs_a1.py placed-tray --supports <scene/support> --tray-spec 'tray/uekqey@focus_centred_edge_aligned' --out <jobs.json>
 
 ``contact``: one left-arm generic CONTACT band per (support, object height class) for the brace-task objects (axial
 alignment, block design, attachment targets, touching targets of the ``representative`` slot; ``--slots`` widens it);
@@ -115,7 +115,7 @@ def main():
     ap.add_argument("--supports", nargs="*", default=["house_single_floor/breakfast_table_rhjoby_0"], help="scene/support names")
     ap.add_argument("--slots", nargs="*", default=["representative"])
     ap.add_argument("--all-objects", action="store_true", help="support-objects: every tabletop pick object of the slots, not only the picks bound to the support")
-    ap.add_argument("--tray-spec", default="tray/gsxbym*1.25@focus_centred_edge_aligned", help="placed-tray: the --placed spec of the source tray")
+    ap.add_argument("--tray-spec", default="tray/uekqey@focus_centred_edge_aligned", help="placed-tray: the --placed spec of the source tray (2026-09-24: uekqey at its canonical size replaces gsxbym x 1.25)")
     ap.add_argument("--weight", type=float, default=None, help="queue weight of every job (default per mode)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()

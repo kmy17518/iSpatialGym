@@ -318,6 +318,40 @@ def remove_hinge(hinge: Optional[Hinge]):
         og.sim.update_handles()
 
 
+def apply_mass(target, mass_kg: float, link_name: Optional[str] = None) -> Dict[str, Any]:
+    """Give ``target``'s root link (or ``link_name``) the mass ``mass_kg`` with its inertia scaled along, both on the USD
+    prim (``physics:mass``, which a later ``og.sim.stop()`` / ``play()`` rebuilds PhysX from) and on the running actor.
+    Owner 2026-09-25 (disembedding): the dataset gives a tray its category mass (0.39 kg for the tray/uekqey base link) and
+    four bottles of milk 1 kg each, a 10:1 inverted mass ratio in the table-tray-bottle stack that PhysX (TGS, 32 position
+    iterations) resolves with contact chatter - the bottles hopped 1-7 mm seconds after their release in 8 of 8 attempts
+    of the 3-distractor alias (0925-034257). Headless A/B on identical layouts: tray 0.39 kg 3 of 12 layouts moving,
+    tray 2 kg 0 of 6 with every body within 0.01 mm per frame (bottles at 0.3 kg, the mass-ratio probe, 0 of 6 too).
+    Recorded per instance as the TRO ``constraints`` record ``{"type": "mass", "object", "mass_kg"}`` the loader
+    re-applies, so the sampler's stillness gate and the demo run the same physics. ``mass_kg <= 0`` leaves the mass
+    alone. Returns ``{"link", "before_kg", "after_kg"}``."""
+    link = target.root_link if link_name is None else target.links[link_name]
+    before = float(link.mass)
+    out = {"link": str(getattr(link, "body_name", link.prim_path.split("/")[-1])), "before_kg": before, "after_kg": before}
+    if mass_kg is None or float(mass_kg) <= 0.0 or abs(before - float(mass_kg)) < 1e-6:
+        return out
+    mass_kg = float(mass_kg)
+    from pxr import UsdPhysics
+
+    with og.sim.editing_usd():
+        prim = link.prim
+        api = UsdPhysics.MassAPI(prim) if prim.HasAPI(UsdPhysics.MassAPI) else UsdPhysics.MassAPI.Apply(prim)
+        api.GetMassAttr().Set(mass_kg)
+    view = getattr(link, "_rigid_prim_view", None)
+    if view is not None and view.is_physics_handle_valid():
+        # the live actor: PhysX applies the USD change lazily, and a mass write alone leaves the inertia of the old mass
+        inertia = view.get_inertias()
+        view.set_masses(th.tensor([mass_kg]))
+        if before > 0.0:
+            view.set_inertias(inertia * (mass_kg / before))
+    out["after_kg"] = float(link.mass)
+    return out
+
+
 def apply_counterbalance(target, joint, leaf_link_names: Sequence[str], damping: Optional[float]) -> Dict[str, Any]:
     """A spring-balanced appliance door (owner decision 2026-09-19, ``articulation_open_large_scale``): gravity is switched
     off on the leaf assembly (the moving link and every link fixed to it) and the joint gets a viscous damping, so the

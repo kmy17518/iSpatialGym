@@ -39,7 +39,7 @@ ARMS = ("left", "right")
 #: ``hybrid`` (sampler ``articulation_hybrid``, D-011 C 2026-09-17): ``base_follow`` as in base mode plus the dense
 #: ``base_follow_path.poses[]`` (``q``, ``base_pose2d``, ``arm_q``) the executor drives + tracks together
 FOLLOW_MODES = ("base", "arm", "hybrid")
-PATH_MODES = ("local", "global")
+PATH_MODES = ("local", "global", "edge_slide")  # edge_slide (sampler 2026-09-24): the same-edge slide, body facing the table, driven as recorded
 JOINT_TYPES = ("revolute", "prismatic")
 FACE_PAIRS = ("x", "y", "z")
 GOAL_ARMS = ("same", "untucked")
