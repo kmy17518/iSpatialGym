@@ -30,7 +30,7 @@ import logging
 import math
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -48,6 +48,7 @@ from ispatialgym.sampling.v2.tasks.iors_small import HAND_SPHERES_EEF  # the han
 
 import omnigibson as og  # noqa: E402
 from omnigibson.object_states import AttachedTo  # noqa: E402
+import omnigibson.utils.transform_utils as T  # noqa: E402
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -62,6 +63,9 @@ SECOND_BASE_LATERALS = (0.10, -0.10, 0.20, -0.20, 0.30, -0.30)
 SECOND_BASE_MAX_TRIES = 6
 FOCUS_DEPTH_PREFERRED = 0.62  # base-forward depth of the manipulation focus beyond which the lift / SLERP fail (att_diag2 21:04)
 GOOD_TRUNKS = ((0.5, -0.45), (0.5, 0.0), (0.25, -0.3))  # (translate, tilt) verified for pick + pre-poses by the block probes
+#: score penalty per earlier rejection of a manipulation candidate within the template (owner 2026-09-25, cap 0925-220515): one rejection
+#: outweighs any depth / trunk preference (depth excess <= ~0.3 m, trunk penalty <= ~0.5), so the next attempt's window of six moves on
+CANDIDATE_REJECT_PENALTY = 1.0
 CARRY_HEIGHTS = (0.12, 0.08, 0.05)  # the lift above the grasp: the first whose lift + SLERP pass the IK
 #: thin-part pick (owner 2026-09-20 20:41, cap/xxqyrt 1.1 cm): a male shorter than the pads' fingertip section (+ the band margin)
 #: is a fingertip pinch whatever the height; its rule is on the support, not on the male's top - the pads' fingertip-side end
@@ -76,6 +80,123 @@ FINGER_SUPPORT_CLEARANCE_M = 0.004
 #: after the insertion the pads' fingertip-side end (pad pinch) / the fingertip axis point (fingertip pinch) stay this far above
 #: the partner's top along the insertion axis (owner 2026-09-20 23:39 item 2b; cork/wine 0920-212757)
 PARTNER_CLEARANCE_M = 0.005
+#: how far below the female link a partner point under the fingertips can still matter to them (the pads' span + the fingertips
+#: beyond a male held at its top): deeper hits are the partner's body, not a top the tips could meet (owner 2026-09-25 cork rule)
+TIP_REACH_BELOW_LINK_M = 0.06
+#: an over_partner male's fingertips count as standing ON the partner's top only with at least this much partner surface under them
+#: (from the pad face outward); less is the rim's outer edge under the finger's body - no partner floor (cap/xxqyrt: 1.5 mm)
+TIP_EDGE_OVERLAP_M = 0.004
+#: the partner's top under the FINGERTIPS (owner 2026-09-24 item 4): partner hull points within this of a fingertip's radial distance
+#: from the insertion axis count - the fingertip section is 6.5 mm across the closing axis (r1pro_model.finger_hulls_eef), so the
+#: band is the tip's own radial footprint (+- 3.25 mm) plus 1 mm; the cap's tips (r ~26 mm) miss the lemonade bottle's neck lip, the
+#: cork's tips (r ~9 mm) still stand over the wine bottle's rim (inner radius ~9 mm)
+TIP_RADIAL_BAND_M = 0.00425
+#: rest orientation by stability (owner 2026-09-24 item 5): the male's library rest orientation is flipped 180 deg about a
+#: horizontal axis when the other end carries the mass centre with a tipping margin this many times larger; the lowest hull
+#: vertices within REST_SUPPORT_TOL_M of the bottom form the support facet
+REST_FLIP_MARGIN_RATIO = 1.3
+REST_SUPPORT_TOL_M = 0.002
+#: a library rest whose tipping margin (support inradius / mass-centre height, the tangent of the toppling tilt) reaches this is
+#: SOUND and is never flipped on geometry alone (owner 2026-09-25: the flat cap, margin 3.4, was turned open side up for a 1.6x
+#: "better" margin and lost every grasp - 0925-144739 'grasp_unreachable' 8/8); below it the flip is weighed as before
+REST_SOUND_MARGIN = 0.5
+
+
+def _support_margin(pts: th.Tensor, com: th.Tensor) -> Tuple[float, float, int]:
+    """``(tipping margin, support radius, n support vertices)`` of a body resting on its lowest hull vertices: the distance
+    from the mass centre's ground projection to the nearest edge of the support facet's convex outline (negative outside),
+    over the mass centre's height above the facet - the tangent of the angle the body may be tilted before it topples."""
+    z = pts[:, 2]
+    low = pts[z <= float(z.min()) + REST_SUPPORT_TOL_M][:, :2]
+    h = max(float(com[2]) - float(z.min()), 1e-6)
+    if low.shape[0] < 3:
+        if low.shape[0] == 2:  # a knife edge: the margin along the edge only
+            a, b = low[0], low[1]
+            d = b - a
+            t = float(th.dot(com[:2] - a, d) / max(float(th.dot(d, d)), 1e-12))
+            inside = 0.0 <= t <= 1.0
+            return (min(t, 1.0 - t) * float(d.norm()) if inside else -1.0) / h, 0.0, 2
+        return -1.0 / h, 0.0, int(low.shape[0])
+    try:
+        from scipy.spatial import ConvexHull
+
+        poly = low[ConvexHull(low.numpy()).vertices]
+    except Exception:  # noqa: BLE001 - degenerate (collinear) support
+        return -1.0 / h, 0.0, int(low.shape[0])
+    n = poly.shape[0]
+    centre = poly.mean(dim=0)
+    order = th.argsort(th.atan2(poly[:, 1] - centre[1], poly[:, 0] - centre[0]))
+    poly = poly[order]
+    margin = float("inf")
+    for i in range(n):
+        a, b = poly[i], poly[(i + 1) % n]
+        e = b - a
+        L = float(e.norm())
+        if L < 1e-9:
+            continue
+        margin = min(margin, float(e[0] * (com[1] - a[1]) - e[1] * (com[0] - a[0])) / L)  # signed: positive inside a CCW polygon
+    radius = float((poly - centre).norm(dim=1).max())
+    return (margin if margin != float("inf") else -1.0) / h, radius, n
+
+
+def stable_rest_quat(hull: th.Tensor, rest_quat, com=None, force: bool = False, insertion_axis_local=None, grasps: Sequence[Any] = ()) -> Tuple[th.Tensor, Dict[str, Any]]:
+    """The male's rest orientation: the library's ``rest_quat`` by default (the designer's: the grasps are annotated for it and
+    the attachment program does no in-hand 180 deg turn). Owner 2026-09-25: it is flipped 180 deg only when the nudge test
+    toppled the male on that end in a previous draw (``force``) AND the flip keeps the insertion direction - the turn is about
+    the insertion axis's horizontal projection, so a male inserted vertically (cork, cap) is never flipped - AND at least one
+    library grasp still approaches from above afterwards (``grasps``: rows with an eef pose in the object frame). Tipping margins
+    (:func:`_support_margin`; the mass centre = ``com`` when given, else the hull's vertex mean) are reported as facts.
+    Returns ``(quat, facts)``."""
+    q0 = TT._t(rest_quat)
+    hull_t = TT._t(hull)
+    c_loc = hull_t.mean(dim=0) if com is None else TT._t(com)
+    a_loc = TT._t(insertion_axis_local) if insertion_axis_local is not None else th.tensor([0.0, 0.0, 1.0])
+    a_w = C.quat_rotate(q0, a_loc / max(float(a_loc.norm()), 1e-9))
+    horiz = a_w.clone()
+    horiz[2] = 0.0
+    out: Dict[str, Any] = {"com_source": "vertex mean" if com is None else "link centre of mass", "flipped": False}
+    if float(horiz.norm()) >= 0.9:
+        flip_axis = horiz / float(horiz.norm())  # a turn about the insertion direction keeps it
+    else:
+        flip_axis = th.tensor([1.0, 0.0, 0.0])  # vertical insertion: any horizontal turn reverses it (reported, never applied)
+    q1 = C.qmul(C.quat_from_axis_angle(flip_axis, math.pi), q0)
+    margins = []
+    for tag, q in (("canonical", q0), ("flipped", q1)):
+        pts = C.transform_points((th.zeros(3), q), hull_t)
+        com_w = C.quat_rotate(q, c_loc)
+        m, r, n = _support_margin(pts, com_w)
+        margins.append(m)
+        out.update({f"margin_{tag}": round(m, 4), f"support_radius_{tag}_m": round(r, 4), f"support_vertices_{tag}": n})
+    m0, m1 = margins
+    keeps_direction = float(th.dot(C.quat_rotate(q1, a_loc), a_w)) > 0.95
+    out["flip_keeps_insertion_direction"] = bool(keeps_direction)
+    if not force:
+        out["reason"] = f"library rest kept (tipping margin {m0:.2f}; flipped {m1:.2f})"
+        return q0, out
+    if not keeps_direction:
+        out["reason"] = "the nudge test toppled the library end, but a flip would reverse the insertion direction (no in-hand turn): kept"
+        return q0, out
+    # grasps that still approach from above once the male is turned (the eef +z, wrist -> fingertips, pointing down in the world)
+    down = 0
+    for g in grasps or ():
+        try:
+            gq = TT._t(g.pose[1]) if hasattr(g, "pose") else TT._t(g[1])
+            a_eef = C.quat_rotate(C.qmul(q1, gq), th.tensor([0.0, 0.0, 1.0]))
+            down += int(float(a_eef[2]) < -0.2)
+        except Exception:  # noqa: BLE001
+            continue
+    out["grasps_from_above_after_flip"] = down
+    if grasps and down == 0:
+        out["reason"] = "the nudge test toppled the library end, but no library grasp approaches from above once turned: kept"
+        return q0, out
+    if m1 <= 0.0:
+        out["reason"] = "the nudge test toppled the library end, but the other end has no support: kept"
+        return q0, out
+    out["flipped"] = True
+    out["reason"] = f"the nudge test toppled the library end (previous draw); turned about the insertion direction (margin {m0:.2f} -> {m1:.2f})"
+    return q1, out
+
+
 #: rest-stability nudge test of the male / partner after the init settle (cork/ncxgpe 0920-200850 toppled off its tapered end)
 REST_NUDGE_DEG = 2.0
 REST_STABILITY_STEPS = 300
@@ -114,6 +235,8 @@ class Attachment(SamplerV2):
         self.top = None
         self.hull: Dict[str, th.Tensor] = {}
         self.rest: Dict[str, th.Tensor] = {}
+        #: the previous draw's nudge test toppled the male on its library rest end: the next draws stand it on the other end
+        self._rest_flip_forced = False
         self.height: Dict[str, float] = {}
         self.grasps: List[Any] = []
         self.grasp_key: Optional[str] = None
@@ -184,6 +307,33 @@ class Attachment(SamplerV2):
         self.rest[self.p_role] = C.IDENTITY_QUAT.clone()
         for role, o in ((self.t_role, male), (self.p_role, female)):
             self.hull[role] = self.world.local_hull(o)
+        # owner 2026-09-24 item 5: the male stands on its STABLE end - the library's rest orientation flipped 180 deg about a
+        # horizontal axis when that end carries the mass centre with a clearly larger tipping margin (cork/ncxgpe stood on its
+        # tapered end: 5-6.5 mm contact radius under a mass centre 1.7 cm up, the 2 deg rest nudge toppled 8/8 draws, 0925-093339;
+        # the carry turns the male in hand toward the attach orientation anyway, so the rest end is free). Facts on the template.
+        if bool(self.gen("male_rest_by_stability", True)):
+            com = None
+            try:
+                com = male.root_link.center_of_mass  # PhysX's, in the link frame (the cork's is at its origin: the vertex mean sat 5 mm lower)
+                if com is not None and (not th.isfinite(TT._t(com)).all() or float(TT._t(com).norm()) > 1.0):
+                    com = None
+            except Exception:  # noqa: BLE001
+                com = None
+            # owner 2026-09-25: the library rest by default; a flip only after the nudge test toppled that end (check_rest_stability,
+            # previous draw), about the insertion direction (never for a vertical insertion) and with library grasps left that still
+            # approach from above (the cap 0925-144739: flipped on geometry alone, open side up, 8/8 'grasp_unreachable')
+            a_loc = self._meta_link_axis_local(male)
+            self.rest[self.t_role], flip = stable_rest_quat(self.hull[self.t_role], self.rest[self.t_role], com=com, force=bool(self._rest_flip_forced),
+                                                            insertion_axis_local=a_loc, grasps=self.grasps)
+        else:
+            flip = {"flipped": False, "disabled": "generation.male_rest_by_stability false"}
+        self.template_facts["male_rest_orientation"] = flip
+        if flip.get("flipped"):
+            log.info("%s: %s turned onto its other end - %s", self.gp.alias, male.name, flip.get("reason"))
+        else:
+            log.info("%s: %s keeps the library rest orientation (tipping margin %.2f, other end %.2f; %s)", self.gp.alias, male.name,
+                     flip.get("margin_canonical", float("nan")), flip.get("margin_flipped", float("nan")), flip.get("reason", flip.get("disabled")))
+        for role in (self.t_role, self.p_role):
             self.height[role] = TT.height_of(self.hull[role], self.rest[role])
         self.grasps = self._recentre_grasps(self.grasps, male)
         # collision filter between the members (OmniGibson's AttachedTo no longer filters child / parent collisions)
@@ -353,6 +503,25 @@ class Attachment(SamplerV2):
 
     # ------------------------------------------------------------------ instance
 
+    def _candidate_order(self, rng: np.random.Generator, rejects: Dict[int, int]) -> List[int]:
+        """Manipulation candidates in the order an attempt tries them: the focus at an arm-friendly depth first (att_diag2 21:04:
+        the male at 0.81 m base-forward grasps but its 12 cm lift fails the IK at every candidate; the block probes pass picks +
+        pre-poses up to 0.65-0.70 m), a trunk close to a verified one next, ties by the draw. Owner 2026-09-25 (cap 0925-220515:
+        45 phase-2 survivors, the same 6 best-scored stances tried in all 8 attempts - candidates 6 / 21 / 36 rejected 20 times over
+        for the attach pose outside the manipulation image, no transition, the lift without IK - and 39 stances never looked at):
+        every rejection a candidate collected in an earlier attempt of this template adds ``CANDIDATE_REJECT_PENALTY``, so the next
+        attempt's window of six moves on to stances the score alone never admits."""
+        order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
+
+        def score(k: int) -> float:
+            c = self.manip_candidates[k]
+            depth = float(c.world_to_base(c.focus[:2])[0]) if c.focus is not None else FOCUS_DEPTH_PREFERRED
+            trunk_pen = min(abs(float(c.translate) - t0) + abs(float(c.tilt) - i0) for t0, i0 in GOOD_TRUNKS)
+            return max(0.0, depth - FOCUS_DEPTH_PREFERRED) + 0.3 * trunk_pen + CANDIDATE_REJECT_PENALTY * rejects.get(k, 0)
+
+        order.sort(key=score)
+        return order
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
@@ -360,15 +529,10 @@ class Attachment(SamplerV2):
         # candidates with the focus at an arm-friendly depth first (att_diag2 21:04: the male at 0.81 m base-forward grasps
         # but its 12 cm lift fails the IK at every candidate; the block probes pass picks + pre-poses up to 0.65-0.70 m),
         # ties by the draw
-        order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
-
-        def score(k: int) -> float:
-            c = self.manip_candidates[k]
-            depth = float(c.world_to_base(c.focus[:2])[0]) if c.focus is not None else FOCUS_DEPTH_PREFERRED
-            trunk_pen = min(abs(float(c.translate) - t0) + abs(float(c.tilt) - i0) for t0, i0 in GOOD_TRUNKS)
-            return max(0.0, depth - FOCUS_DEPTH_PREFERRED) + 0.3 * trunk_pen
-
-        order.sort(key=score)
+        rejects = getattr(self, "_candidate_rejects", None)
+        if rejects is None:
+            rejects = self._candidate_rejects = {}
+        order = self._candidate_order(rng, rejects)
         for k in order[:6]:
             if time.time() > self._deadline:
                 errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
@@ -384,6 +548,7 @@ class Attachment(SamplerV2):
             try:
                 return self._sample_with(rng, init, manip, int(k))
             except Reject as e:
+                rejects[int(k)] = rejects.get(int(k), 0) + 1
                 errors.append(f"candidate {int(k)}: {e}")
                 log.info("%s: %s", self.gp.alias, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
@@ -460,6 +625,9 @@ class Attachment(SamplerV2):
             work_st.extras.update({"second_base_pose": True, "lateral_shift": float(work_st.lateral - manip.lateral), "path_length_m": getattr(path, "length_m", None)})
         cam_manip = self.camera_pose_at(manip)
         cam_work = cam_manip if work_st is manip else self.camera_pose_at(work_st)
+        # the CONTACT poses keep the box check (slack for execution error); the in-between poses - the SLERP carry, the pre-attach 10 cm
+        # closer to the lens - are checked on QA's fingertip point by the program check (program_check.fingertips_in_frame, owner
+        # 2026-09-25: cap 0925-191101 gripper_out_of_fov at the pre-attach)
         for nm, p, cam in [("grasp", grasp.grasp, cam_manip), ("attach", attach, cam_work)] + ([("brace", brace, cam_work)] if brace is not None else []):
             if not self.ikc.eef_in_frame(p, cam):
                 raise Reject("gripper_not_in_frame", f"{nm} eef pose outside the {'manipulation' if cam is cam_manip else 'attach'} image (5 %)")
@@ -507,6 +675,20 @@ class Attachment(SamplerV2):
         return d
 
     # ------------------------------------------------------------------ asymmetric library grasps re-centred (cap/xxqyrt)
+
+    def _meta_link_axis_local(self, male) -> Optional[th.Tensor]:
+        """The male attachment meta link's +z in the object (root) frame - the insertion direction the pair's geometry uses
+        (``insertion axis {"source": "meta link +z"}``); ``None`` when the pair is not resolved yet (the caller assumes vertical)."""
+        try:
+            child_link = self.pair[0] if self.pair is not None else None
+            if child_link is None:
+                return None
+            cp, cq = child_link.get_position_orientation()
+            rp, rq = male.get_position_orientation()
+            _, q_rel = T.relative_pose_transform(cp, cq, rp, rq)
+            return C.quat_rotate(TT._t(q_rel), th.tensor([0.0, 0.0, 1.0]))
+        except Exception:  # noqa: BLE001
+            return None
 
     def _recentre_grasps(self, grasps: List[Any], male) -> List[Any]:
         """Library grasps whose pinch centre (pad centre) lies more than ``generation.pinch_offset_max_m`` (15 mm) off the male
@@ -721,14 +903,87 @@ class Attachment(SamplerV2):
         h = pts @ axis
         radial = (pts - h.unsqueeze(1) * axis).norm(dim=1)
         r_male = float((TT._t(self.hull[self.t_role])[:, :2]).norm(dim=1).max())
-        near = radial <= r_male + 0.005  # the rim under / around the male, not a handle or spout base further out
-        depth = float(h[near].max()) if bool(near.any()) else float(h.max())
-        depth = max(0.0, depth)
-        h_pad = float(((eef[0] + C.PAD_Z_RANGE[1] * a) - p_f) @ axis) - depth
-        h_tip = float(((eef[0] + C.FINGERTIP_LENGTH * a) - p_f) @ axis) - depth
+        # owner 2026-09-24 item 4: the partner's top is what lies UNDER THE FINGERTIPS - the partner hull points within a fingertip
+        # band of each tip's radial distance from the insertion axis (the tips pinch the male at +- half the pinch width along the
+        # closing axis) - not the highest point within the male's radius: a cap wider than its bottle's neck (xxqyrt 51 mm rim, the
+        # neck ~26 mm) put the rim height under fingertips that sit outside the neck, over the shoulder, and the 11 mm cap had no
+        # admissible band (0925-092708: 8/8 fingers_in_partner, 'even a fingertip pinch needs a 24.1 mm lift with 17.1 mm of part
+        # left'); the cork's tips stand over the rim and keep their floor
+        c_axis = C.quat_to_mat(eef[1])[:, 1]
+        w = self._pinch_width_at(grasp.eef_in_object)
+        tip_axis = eef[0] + C.FINGERTIP_LENGTH * a
+        tips = [tip_axis + s * 0.5 * w * c_axis for s in (1.0, -1.0)] if w is not None else [tip_axis]
+        r_tips = []
+        for t_ in tips:
+            d_ = t_ - p_f
+            r_tips.append(float((d_ - float(d_ @ axis) * axis).norm()))
+        near = th.zeros(len(pts), dtype=th.bool)
+        for r_t in r_tips:
+            near |= (radial - r_t).abs() <= TIP_RADIAL_BAND_M
+        under_tips = bool(near.any())
+        depth_tips = float(h[near].max()) if under_tips else None  # may lie below the female link (the shoulder under a wide cap's tips)
+        # the 09-20 rim rule: the highest partner point within the male's radius (+ 5 mm) of the axis, never below the female link
+        legacy_near = radial <= r_male + 0.005
+        depth_rim = max(0.0, float(h[legacy_near].max())) if bool(legacy_near.any()) else max(0.0, float(h.max()))
+        # owner 2026-09-25 (cork 0925-145307: the tips' 4.25 mm band met no hull vertex between the rim circle and the shoulder,
+        # so the "partner top under the tips" was a point 20 cm down the bottle; the rim floor vanished, the lift shrank from 31 to
+        # 14 mm, the fingers reached into the neck and the attach was refused twice at 15-16 mm): the pair is CLASSIFIED -
+        #   into_opening: the male enters the partner (its radius within the partner's rim radius at the female link: the cork) -
+        #                 the rim rule, fingertips >= PARTNER_CLEARANCE_M above the rim;
+        #   over_partner: the male goes over the partner (wider than the rim: the cap) - item 4's relief (the partner top under
+        #                 the fingertips), unless that top lies further below the female link than the male's own length (the
+        #                 band caught the shoulder / the body): then the rim rule again.
+        r_under_tips = float(radial[near & ((h - (depth_tips if depth_tips is not None else 0.0)).abs() <= 0.005)].max()) if under_tips else 0.0  # the partner's extent at the level found under the tips
+        near_link = h.abs() <= 0.005
+        r_rim = float(radial[near_link].max()) if bool(near_link.any()) else None  # the rim's outer radius at the female link
+        r_open = float(radial[near_link].min()) if bool(near_link.any()) else None  # the opening (a closed mesh: ~ the outer radius)
+        male_h = TT._t(self.hull[self.t_role]) @ C.unit(TT._t(self.insertion_axis_local))
+        male_len = float(male_h.max() - male_h.min())
+        if r_rim is None:
+            klass, rule, depth = "unknown_rim", "rim rule (no partner hull at the female link height)", depth_rim
+        elif r_male <= r_open + 0.002:
+            klass, rule, depth = "into_opening", "rim floor (the male enters the partner's opening)", depth_rim
+        elif r_male < r_rim - 0.002:
+            klass, rule, depth = "on_rim", "rim floor (the male sits on the rim: between the opening and the outer radius)", depth_rim
+        elif depth_tips is None:
+            klass, rule, depth = "over_partner", "no partner hull under the fingertips: no partner floor", None
+        elif depth_tips < -max(male_len, TIP_REACH_BELOW_LINK_M):
+            # the band caught the partner's body far below (the cork's 20 cm), not something the fingers can meet; a wide cap's tips
+            # DO hang over the shoulder 3-5 cm under the mouth, further than the 11 mm cap is long - that top stays theirs
+            klass, rule, depth = "over_partner", "under-tips point deeper than the male's length / the fingers' reach: rim floor", depth_rim
+        elif r_under_tips - max(r_tips) < TIP_EDGE_OVERLAP_M:
+            # the pads pinch the male's outside and the finger's body extends OUTWARD from the pad face: the partner surface found under
+            # the tips must reach at least TIP_EDGE_OVERLAP_M beyond the pad radius to be a top the tip stands on - less is the rim's
+            # outer edge (cap/xxqyrt on the lemonade bottle 0925-172312: the neck's collar reaches r 27.0 mm at the mouth, the tips at
+            # r 25.5 mm, 1.5 mm of collar under them, 'even a fingertip pinch needs a 22.3 mm lift with 17.2 mm of part left') or a
+            # surface inside the tips' radius; the 09-21 success grasped exactly this way (lift 14.4 mm, the fingertips 17 mm below the
+            # collar's top, attach aligned to 1.1 mm, 0 QA verdicts)
+            klass, rule, depth = "over_partner", f"the partner under the fingertips ends {(r_under_tips - max(r_tips)) * 1000:.1f} mm beyond the pad radius (edge / inside): no partner floor", None
+        else:
+            klass, rule, depth = "over_partner", "partner top under the fingertips", depth_tips
+        h_pad = None if depth is None else float(((eef[0] + C.PAD_Z_RANGE[1] * a) - p_f) @ axis) - depth
+        h_tip = None if depth is None else float(tip_axis @ axis - float(p_f @ axis)) - depth
         up_obj = C.quat_rotate(C.qinv(TT._t(self.rest[self.t_role])), th.tensor([0.0, 0.0, 1.0]))  # world up at rest, male frame
         lift_sign = float(C.quat_rotate(root[1], up_obj) @ axis)
-        return {"depth_m": depth, "h_pad_m": h_pad, "h_tip_m": h_tip, "lift_sign": lift_sign, "r_male_m": r_male}
+        facts = {"pair_class": klass, "floor_rule": rule, "r_male_m": round(r_male, 4), "r_rim_m": None if r_rim is None else round(r_rim, 4),
+                 "r_opening_m": None if r_open is None else round(r_open, 4),
+                 "male_length_m": round(male_len, 4), "r_tips_m": [round(r, 4) for r in r_tips], "depth_rim_m": round(depth_rim, 4),
+                 "depth_tips_m": None if depth_tips is None else round(depth_tips, 4), "depth_used_m": None if depth is None else round(depth, 4),
+                 "r_under_tips_m": round(r_under_tips, 4)}
+        self.template_facts["attach_pair_class"] = facts
+        return {"depth_m": depth, "h_pad_m": h_pad, "h_tip_m": h_tip, "lift_sign": lift_sign, "r_male_m": r_male, "r_tips_m": [round(r, 4) for r in r_tips],
+                "pinch_width_m": None if w is None else round(float(w), 4), "partner_points_under_tips": int(near.sum()), "depth_within_male_radius_m": depth_rim,
+                "depth_under_tips_m": depth_tips, "pair_class": klass, "floor_rule": rule, "r_rim_m": r_rim, "r_opening_m": r_open, "male_length_m": male_len}
+
+    def _pinch_width_at(self, eef_in_object) -> Optional[float]:
+        """The male's chord across the closing axis between the pads at ``eef_in_object`` (the band of :meth:`_record_pinch_width`,
+        in the male's frame); None without two hull points in the band."""
+        eef = (TT._t(eef_in_object[0]), TT._t(eef_in_object[1]))
+        loc = C.transform_points(C.invert(eef), TT._t(self.hull[self.t_role]))
+        band = (loc[:, 2] >= C.PAD_Z_RANGE[0]) & (loc[:, 2] <= C.FINGERTIP_LENGTH + 0.002) & (loc[:, 0].abs() <= 0.03)
+        if int(band.sum()) < 2:
+            return None
+        return float(loc[band, 1].max() - loc[band, 1].min())
 
     def _apply_grasp_height_extra(self, grasp, m_pose: TT.Pose, manip: Stance) -> None:
         """``generation.grasp_height_extra_m``: the knob pinch moves up the male by up to that much (0 = today's pose). Demo
@@ -773,13 +1028,34 @@ class Attachment(SamplerV2):
         # the cork 1.8 cm into the neck with the fingertips 1 cm below the rim and pushed the bottle 7 mm / 4.3 deg
         clr = self._attach_clearance(grasp)
         floors_pad, floors_tip = dict(floors), dict(floors)
-        if clr is not None and clr["lift_sign"] > 0.5:
+        if clr is not None and clr["lift_sign"] > 0.5 and clr.get("h_tip_m") is not None:
             # the fingertips reach 6.9 mm beyond the pads' end along the approach, so they - not the pad end - are the lowest part
             # of the finger over the rim in BOTH regimes (cork 0920-235939: the pad end 5 mm above the rim left the tips 1 mm below
             # it); the owner's pad-end condition (pinch point >= depth + PAD_Z_RANGE[1] + 5 mm) is implied by the tips' clearance
             floors_pad["partner top (fingertips)"] = PARTNER_CLEARANCE_M - clr["h_tip_m"]
             floors_tip["partner top (fingertips)"] = PARTNER_CLEARANCE_M - clr["h_tip_m"]
-            grasp.extras["attach_clearance"] = {k: round(v, 4) for k, v in clr.items()}
+            grasp.extras["attach_clearance"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in clr.items()}
+        elif clr is not None and clr["lift_sign"] > 0.5:
+            # no partner hull under the fingertips (a cap wider than the neck it screws on: the tips hang over the shoulder, the
+            # rim is inside them): the partner-top floor does not apply; the finger-envelope / pad floors and the attach-pose
+            # collision check (_fingers_in_partner) still guard the fingers
+            grasp.extras["attach_clearance"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in clr.items()}
+            grasp.extras["attach_clearance"]["partner_floor"] = "none: no partner hull under the fingertips"
+            log.info("%s: no partner hull within %.0f mm of the fingertips' radius %s mm (rim within the male's radius at depth %.1f mm): no partner-top floor",
+                     self.gp.alias, TIP_RADIAL_BAND_M * 1000, [round(r * 1000, 1) for r in clr["r_tips_m"]], clr["depth_within_male_radius_m"] * 1000)
+        elif clr is not None and clr["lift_sign"] < -0.5 and clr.get("h_tip_m") is not None:
+            # the male is inserted the other way up than it rests (its rest flipped onto its stable end, item 5: the cork stands on
+            # its wide end, the narrow end goes into the neck): a HIGHER grasp at rest brings the fingertips DOWN toward the rim at
+            # the attach, so the partner clearance caps the lift instead of flooring it - the same 5 mm above the partner's top
+            ceiling = clr["h_tip_m"] - PARTNER_CLEARANCE_M
+            grasp.extras["attach_clearance"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in clr.items()}
+            grasp.extras["attach_clearance"]["partner_rule"] = f"ceiling {ceiling * 1000:.1f} mm (inserted the other way up than it rests)"
+            if ceiling < 0.0:
+                self.counters["fingers_in_partner"] = self.counters.get("fingers_in_partner", 0) + 1
+                raise Reject("fingers_in_partner", f"the fingertips end {-clr['h_tip_m'] * 1000:.1f} mm below the partner's top at the attach for the unlifted grasp "
+                                                   f"(inserted the other way up than it rests; attach clearance {grasp.extras['attach_clearance']})")
+            room_pad, room_tip = min(room_pad, ceiling), min(room_tip, ceiling)
+            log.info("%s: the male is inserted the other way up than it rests (lift sign %.2f): the partner clearance caps the grasp lift at %.1f mm", self.gp.alias, clr["lift_sign"], ceiling * 1000)
         elif clr is not None:
             log.info("%s: the male is not inserted along its rest up axis (lift sign %.2f): no partner-clearance floor", self.gp.alias, clr["lift_sign"])
         need_pad = max(floors_pad.values()) if floors_pad else 0.0
@@ -840,7 +1116,18 @@ class Attachment(SamplerV2):
                     log.info("%s: pinch re-centred: the contact band moved %.1f mm along the fingers with the lift -> hand moved %.1f mm horizontally "
                              "so the band's centre stays on the male's axis", self.gp.alias, (s1 - s0) * 1000, float(th.linalg.norm(shift_w)) * 1000)
             else:
-                eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept"
+                if floors and needed > 0.0:
+                    # owner 2026-09-25 (cork 0925-195316 / 205211, replays 213602 / 215043: 'IK failed with the lift (ik_joint_limit:
+                    # right_arm_joint5 within 34 mrad of its limit); library height kept' left the fingertips 25.9 mm BELOW the rim
+                    # at the attach - the partner-top floor had asked for 30.9 mm - and the demo's insertion legs jammed on the
+                    # neck (right_arm_joint3 0.055 rad short of its target, the cork 18 mm above its seat, 4.4 deg tilted, refused
+                    # twice). A lift a floor demands is not optional: this candidate (grasp x stance) is rejected and the next one tried
+                    which = max(floors.items(), key=lambda kv: kv[1])[0]
+                    self.counters["lift_unreachable"] = self.counters.get("lift_unreachable", 0) + 1
+                    raise Reject("lift_unreachable", f"the {which} floor needs a {needed * 1000:.1f} mm grasp lift and the lifted grasp has no IK from this stance "
+                                                     f"({res.reason}); the library height would leave the fingers in the support / partner "
+                                                     f"(floors {grasp.extras['grasp_height_floors_m']}, attach clearance {grasp.extras.get('attach_clearance')})")
+                eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept (no floor asked for it)"
         log.info("%s: grasp height extra %.1f mm requested -> %.1f mm (%s; pad end %.3f, male top %.3f)", self.gp.alias, x * 1000, eff * 1000, why, pad_tip_end_z, top_z)
         grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": round(eff, 4), "grasp_height_extra_reason": why})
 
@@ -1134,6 +1421,12 @@ class Attachment(SamplerV2):
         bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
         if bad:
             self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
+            male = self.obj(self.t_role)
+            if male is not None and male.name in bad and not self._rest_flip_forced and not (self.template_facts.get("male_rest_orientation") or {}).get("flipped"):
+                # owner 2026-09-25: the male toppled on its library end - the next draws may turn it onto the other end when that keeps
+                # the insertion direction and library grasps (stable_rest_quat(force=True)); otherwise the rejection stands as it is
+                self._rest_flip_forced = True
+                log.info("%s: %s toppled on its library rest end (%.1f deg) - the next draw considers the other end", self.gp.alias, male.name, bad[male.name])
             raise Reject("rest_unstable", f"up axis {bad} deg off the settled pose {REST_STABILITY_STEPS} steps after a {REST_NUDGE_DEG:.0f} deg nudge "
                                           f"(> {REST_TIP_MAX_DEG:.0f}): the part does not stand on that end")
         log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.alias, REST_NUDGE_DEG, tilts)

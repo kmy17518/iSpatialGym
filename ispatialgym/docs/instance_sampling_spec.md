@@ -338,6 +338,31 @@ rejected (`program_check_failed`, reported per action name), never patched. `val
 expansion on written instances. Trajectories *between* key poses are not checked here: the oracle plans them at run
 time (oracle doc §3.9).
 
+**One chain, as the oracle runs it** (owner 2026-09-24). The targets of an action are checked in the order the arm
+moves through them, and every leg leaves from the configuration the arm is actually in: a chain whose first pose is
+where the previous motion left the arm (the retreat off the place configuration, the lift off the grasp, a `Retreat`
+off the previous action's end) is *tracked* from that configuration by differential IK — the first pose is never
+re-solved (a 32-seed re-solve of the same pose lands in another IK branch at random; block design 0921-050358: the
+retreat witness 3.2 rad from the arm, the oracle's finish refused it). A stall is finished by the IK of the end pose
+seeded at the stall and accepted only within the oracle's finish bound (0.6 rad); a `Retreat` action stalling within
+the oracle's partial acceptance (4 cm) is accepted as that partial retreat with no witness recorded; anything else is
+`program_check_failed`. A chain that leaves from a recorded free-space witness the oracle plans to (`pre_place` →
+descent, `pre_grasp` → approach) starts at that witness, and the witness follows the chain's start when the approach
+had to be re-tracked backward from the end's branch; a single pose that ends a chain (`place`, `grasp`, a brace
+`contact`) is the chain's tracked end. The recorded witnesses are therefore exactly the configurations the oracle's
+`arm_to` / `arm_along` chain passes through.
+
+**Travel with the arm as left** (owner 2026-09-24: "a teleoperator lifts the arm only as much as needed, then
+drives"). An empty-handed travel after an arm action — the consecutive navigate / transition actions between two arm
+actions — is swept again with the acting arm where the last motion left it (the tracked retreat end), then lifted
+5 / 10 cm straight up; the first candidate that keeps every leg whole-body collision-free (the path over its strides at
+its trunk, an arrival transition's trunk sweep and drive-in and a departure's drive-back and sweep at their recorded
+s_T, the released objects standing at their release poses) is recorded as `paths[].arms_q` / `transitions[].arms_q`
+(arm → 7 joints, both arms as swept) and the oracle re-poses only an arm that deviates from those joints. When no
+candidate is free the records stay as swept at the stance postures and the oracle re-poses to them as before (3.7,
+3.8). The block-design 7 cm stance hop keeps its straighten-first transitions (the tilted chest brushes the table edge
+otherwise, 0921-001836) but no longer spends 161 steps moving the arm to the untucked default and back.
+
 Details kept from v1 that the checks depend on:
 
 - **Predicate cache**: OmniGibson caches kinematic predicates (`ontop`, `inside`, `touching`, `nextto`) per object
@@ -376,7 +401,10 @@ end to end:
 1. If the goal stance lies in the same connected region of the **locally un-eroded** map (the room's erosion mask
    minus the strip in front of the support / face) as the start stance, compute the shortest path on the un-eroded
    map and validate the whole path with whole-body collision checks at the **navigation posture** (untucked arms,
-   carried object attached, trunk as recorded) at 0.1 m strides.
+   carried object attached, trunk as recorded) at 0.1 m strides. Since 2026‑09‑25 every stride is also swept at the
+   yaws of the tracker's lag envelope (`navigation.stride_poses(yaw_envelope=True)`: the hull of the reference yaws over
+   the last 0.25 m of path, every 10°) — the oracle's base tracker lags a yaw reference on a turn (shampoo 0925‑211757:
+   the idle finger brushed a wardrobe with the yaw 6° behind).
 2. Otherwise plan on the eroded map between the nearest eroded-free cells of the two stances and connect each stance
    to the global path with a straight local segment, collision-checked the same way.
 
@@ -412,7 +440,12 @@ Consequence for the recorded motion: the **carry leg** from the lift end to the 
 constant orientation (both ends are recorded in frame, so the projected path is in frame by construction); when that leg
 is infeasible the sampler records a `carry` waypoint (`grasps[k].carry`, core `dc6a1a5`) — never a free trajopt swing. Implemented oracle‑side in `166005ff` (per‑arm spans opened at the pre‑grasp / pre‑contact, closed after the release / contact leg, checkpointed; `Place.targets["carry"]` straight leg through the recorded waypoint): the nextto regression instance goes from 114 consecutive out‑of‑frame steps at the place transit (verdict `gripper_out_of_fov`) to 0. B1K's replay QA
 (`FieldOfViewMetric`, `gripper_changes_outside_fov_limit=0`) only requires the gripper in view at the grasp / release
-toggles; ours is deliberately stricter (oracle doc §6.4).
+toggles; ours is deliberately stricter (oracle doc §6.4). The program check tracks that same carry leg (owner 2026‑09‑25:
+`_SamplerState.eef_pose` = the FK of where the previous arm action left the hand, so `Place.targets()` builds the leg with
+`Place._carry_leg`; `_place_order` checks it first as a continuation with a `carry` witness, the start pose prepended,
+against the world QA sees) so the `pre_place` witness — and the descent, place and retreat chained from it — lie in the
+branch the oracle's tracked carry actually ends in (teacup 0925‑141122: the retreat witness 4.58 rad from the arm). A
+carried drive keeps the holding arm's configuration for that chain (IORS large‑scale, touching, disembedding).
 
 
 - Motions the oracle executes as paths are checked at intermediate waypoints, not only at the endpoints: SLERP of

@@ -208,6 +208,30 @@ def test_transition_standoff_enumeration():
                                                                      "order": ["drive-back", "trunk", "drive-in"]}
 
 
+def test_stride_poses_yaw_envelope_covers_the_trackers_lag_on_a_turn():
+    """Owner 2026-09-25 (shampoo 0925-211757: the finger brushed a wardrobe with the base yaw 6 deg behind the interpolated one on a
+    57 deg turn): with ``yaw_envelope`` every stride pose is repeated at the yaws the reference held over the last 0.25 m of path
+    (their hull with the interpolated yaw, every 10 deg); a straight path with a constant yaw adds nothing."""
+    import math
+
+    straight = NAV.stride_poses([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)], 0.1, yaw_envelope=True)
+    assert straight == NAV.stride_poses([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)], 0.1)
+    # a 36 cm segment turning 57 deg (146 -> 89), then 90 deg in place: the shampoo shuffle
+    wps = [(23.155, -0.68, math.radians(137.0)), (23.1, -0.7, math.radians(146.0)), (22.8, -0.5, math.radians(89.0)), (22.801, -0.447, math.radians(180.0))]
+    plain = NAV.stride_poses(wps, 0.05)
+    env = NAV.stride_poses(wps, 0.05, yaw_envelope=True)
+    assert len(env) > len(plain) and set(plain) <= set(env)
+    # the stride ~25 % into the second segment (interpolated yaw ~132 deg) is also swept at the yaws of the last 0.25 m: the whole 5.8 cm
+    # first segment (137 -> 146 deg) lies within - the demo's 141.9 deg is inside that envelope
+    seg2 = [p for p in env if abs(p[0] - (23.1 - 0.3 * 0.2)) < 0.02 and abs(p[1] - (-0.7 + 0.2 * 0.2)) < 0.02]
+    yaws = sorted(math.degrees(p[2]) for p in seg2)
+    assert yaws and min(yaws) <= 136.5 and max(yaws) >= 141.9, yaws
+    assert all(b - a <= 10.0 + 1e-6 for a, b in zip(yaws, yaws[1:])), yaws
+    # the lag is capped at YAW_LAG_MAX_RAD (12 deg) from the interpolated yaw, whatever the look-back hull holds
+    interp = [p for p in plain if abs(p[0] - seg2[0][0]) < 1e-9 and abs(p[1] - seg2[0][1]) < 1e-9][0][2]
+    assert max(yaws) <= math.degrees(interp) + 12.0 + 1e-6 and min(yaws) >= math.degrees(interp) - 12.0 - 1e-6, (yaws, math.degrees(interp))
+
+
 def test_stride_poses_and_grid_path():
     poses = NAV.stride_poses([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)], 0.1)
     assert len(poses) == 11 and poses[-1] == (1.0, 0.0, 0.0)
@@ -735,3 +759,465 @@ def test_contact_height_extra_knob():
     assert d["height_extra_m"] == 0.02 and d["height_extra_effective_m"] == 0.02 and d["height_extra_clip_reason"] == "full"
     off_rec = CORE.annotate_height_extra(ContactRecord("push", "right", ((0, 0, 0), (0, 0, 0, 1)), ((0, 0, 0), (0, 0, 0, 1)), None, ((0, 0, 0), (0, 0, 0, 1)), (1, 0, 0), 0.1), off)
     assert off_rec.extras["height_extra_clip_reason"] == "off" and off_rec.extras["height_extra_effective_m"] == 0.0
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# owner 2026-09-24: legs tracked from where the arm IS (IKChecker.continue_chain, program_check._chain_order) and the
+# travel driven with the arm where the previous motion left it (program_check.choose_departure_arms)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _pose(x, y=0.0, z=0.0):
+    return (th.tensor([x, y, z], dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0], dtype=th.float32))
+
+
+def test_chain_order_defers_a_single_that_ends_a_chain_and_keeps_a_chain_start_first():
+    pre, place, clear = _pose(0.0, 0.0, 0.10), _pose(0.0), _pose(0.0, 0.0, 0.15)
+    items = [("pre_place", [pre]), ("place", [place]), ("descent", [pre, _pose(0.0, 0.0, 0.05), place]), ("retreat", [place, _pose(0.0, 0.0, 0.05), clear])]
+    order = [k for k, _ in PC._chain_order(items)]
+    assert order == ["pre_place", "descent", "place", "retreat"]
+    # nothing to reorder without chains / singles
+    assert [k for k, _ in PC._chain_order([("pre", [pre])])] == ["pre"]
+    assert [k for k, _ in PC._chain_order([("lift", [place, clear])])] == ["lift"]
+    # a single that is a chain's START (and not the end of another) keeps its place
+    items2 = [("approach", [pre, place]), ("pre_grasp", [pre]), ("grasp", [place])]
+    assert [k for k, _ in PC._chain_order(items2)] == ["approach", "grasp", "pre_grasp"]
+
+
+def test_chain_starts_recover_the_start_line_waypoints_leave_out():
+    """``line_waypoints`` lists n poses AFTER the start: the leg [pre + 1/3, pre + 2/3, place] leaves from ``pre`` = 2 p0 - p1."""
+    pre, place = _pose(0.0, 0.0, 0.30), _pose(0.0, 0.0, 0.0)
+    leg = [_pose(0.0, 0.0, 0.20), _pose(0.0, 0.0, 0.10), place]
+    starts = PC._chain_starts(leg)
+    assert len(starts) == 2 and starts[0][1] is False and starts[1][1] is True
+    assert PC._same_pose(starts[1][0], pre)
+    # a one-pose chain has only itself; a chain turning between its first two poses has no straight-line start
+    assert len(PC._chain_starts([place])) == 1
+    turned = [(_pose(0.0, 0.0, 0.2)[0], th.tensor([0.0, 0.0, 0.3827, 0.9239])), _pose(0.0, 0.0, 0.1)]
+    assert len(PC._chain_starts(turned)) == 1
+    # the real Place layout: pre_place is where the DESCENT leaves from (unlisted) and where the RETREAT ends; it stays first
+    back = pre
+    items = [("pre_place", [pre]), ("place", [place]), ("descent", leg), ("retreat", [_pose(0.0, 0.0, 0.10), _pose(0.0, 0.0, 0.20), back])]
+    assert [k for k, _ in PC._chain_order(items)] == ["pre_place", "descent", "place", "retreat"]
+    # a Grasp: approach leaves from pre_grasp (unlisted) and ends at grasp
+    items = [("pre_grasp", [pre]), ("grasp", [place]), ("approach", leg)]
+    assert [k for k, _ in PC._chain_order(items)] == ["pre_grasp", "approach", "grasp"]
+
+
+class _ToyKit:
+    """A 7-joint 'arm' whose eef position is the first three joint values (identity orientation): differential-IK tracking
+    reaches any x up to ``reach``; the IK of a pose beyond the stall lands in the same branch or 3.2 rad away (``far_branch``)."""
+
+    def __init__(self, reach: float = 10.0, far_branch: bool = False):
+        self.robot = type("R", (), {})()
+        self.robot.arm_control_idx = {"right": th.arange(7, 14), "left": th.arange(14, 21)}
+        self.reach, self.far_branch = float(reach), bool(far_branch)
+        self.stats = {}
+        kit = self
+
+        class _Backend:
+            def solve_ik_path(self, name, targets, q_start, check_collisions=False, sync_world=False, max_joint_step=0.2, max_iters=60, **kw):
+                idx = kit.robot.arm_control_idx["right"]
+                traj = [q_start.clone()]
+                for k, t in enumerate(targets):
+                    p = list(t.values())[0][0]
+                    if float(p[0]) > kit.reach + 1e-9:
+                        rem = float(th.linalg.norm(p - traj[-1][idx][:3]))
+                        return type("Res", (), {"success": False, "q_traj": th.stack(traj), "status": f"stall at {k}", "diagnostics": {"stage": "diff_ik", "pos_err": rem, "fail_index": k}})()
+                    q = traj[-1].clone()
+                    q[idx[:3]] = p
+                    traj.append(q)
+                return type("Res", (), {"success": True, "q_traj": th.stack(traj), "status": "ok", "diagnostics": {}})()
+
+        self.backend = _Backend()
+
+    def _ensure_synced(self):
+        pass
+
+    def fk(self, links, q):
+        idx = self.robot.arm_control_idx["right"]
+        return {links[0]: (q[idx][:3].clone(), th.tensor([0.0, 0.0, 0.0, 1.0]))}
+
+    def collision_free(self, q, margin=0.0):
+        n = int(q.shape[0]) if q.dim() == 2 else 1
+        return th.ones(n, dtype=th.bool)
+
+    def ik(self, pose, q_seed, arm="right"):
+        idx = self.robot.arm_control_idx[arm]
+        q = q_seed.clone()
+        q[idx[:3]] = pose[0]
+        if self.far_branch:
+            q[idx[3]] = q_seed[idx[3]] + 3.2
+        return q
+
+
+def _q_at(x: float) -> th.Tensor:
+    q = th.zeros(28)
+    q[7] = x
+    return q
+
+
+def test_continue_chain_tracks_from_the_given_configuration():
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    ikc = IKChecker(_ToyKit())
+    chain = [_pose(0.0), _pose(0.5), _pose(1.0)]
+    res = ikc.continue_chain(_q_at(0.0), chain, "right", soft_stall_m=0.03)
+    assert res.ok and res.reason.startswith("tracked continuation") and abs(float(res.q[7]) - 1.0) < 1e-6
+    # the start must BE at the chain's first pose: no re-solve of the first pose
+    res = ikc.continue_chain(_q_at(0.3), chain, "right")
+    assert not res.ok and res.reason.startswith("continuation")
+    # a one-pose chain: the arm is already there
+    res = ikc.continue_chain(_q_at(0.0), [_pose(0.0)], "right")
+    assert res.ok and abs(float(res.q[7])) < 1e-9
+
+
+def test_continue_chain_finishes_a_small_stall_in_branch_and_refuses_another_branch():
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    chain = [_pose(0.0), _pose(1.5)]
+    # the tracking stalls 1 cm short (reach 1.49): finished by the IK of the end pose seeded at the stall, same branch -> ok
+    ikc = IKChecker(_ToyKit(reach=1.49))
+    res = ikc.continue_chain(_q_at(0.0), chain, "right", soft_stall_m=ikc.FREE_LEG_STALL_M)
+    assert res.ok and "stall finished" in res.reason and abs(float(res.q[7]) - 1.5) < 1e-6
+    assert ikc.last_track_stall is not None and 0.0 < ikc.last_track_stall["remaining_m"] < 0.03 and ikc.last_track_stall["free"]
+    # the same stall whose end-pose IK lies 3.2 rad away: the oracle's finish would be rejected (> 0.6 rad) -> the chain fails
+    ikc = IKChecker(_ToyKit(reach=1.49, far_branch=True))
+    res = ikc.continue_chain(_q_at(0.0), chain, "right", soft_stall_m=ikc.FREE_LEG_STALL_M)
+    assert not res.ok and "> 0.60" in res.reason and "another IK branch" in res.reason
+    assert ikc.last_track_stall is not None and 0.0 < ikc.last_track_stall["remaining_m"] < 0.03
+    # a stall far from the end with a small residual is finished too (the oracle's free-leg finish allows 0.6 m remaining); the
+    # remaining distance is recorded for the callers' partial rule
+    ikc = IKChecker(_ToyKit(reach=1.2))
+    res = ikc.continue_chain(_q_at(0.0), chain, "right", soft_stall_m=ikc.FREE_LEG_STALL_M)
+    assert res.ok and "stall finished" in res.reason and ikc.last_track_stall is not None and ikc.last_track_stall["remaining_m"] > 0.25
+    # without a soft stall (a reorient) any stall fails
+    ikc = IKChecker(_ToyKit(reach=1.49))
+    assert not ikc.continue_chain(_q_at(0.0), chain, "right", soft_stall_m=None).ok
+
+
+def test_away_from_limits_re_solves_from_random_configurations_only_when_the_seeded_retries_fail():
+    """Owner 2026-09-26 (bar soap 0926-011542: the place pose's solutions all within 2 mrad of right_arm_joint6's limit on one pod,
+    a valid solution for the same candidate on another): after the seeded re-solves stay within the margin, re-solves from random
+    arm configurations (reproducible: seeded by the pose) find the solution away from the limit; a solution already clear of the
+    limits is kept without any re-solve."""
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    kit = _ToyKit()
+    kit.robot.joint_lower_limits = th.full((28,), -3.0)
+    kit.robot.joint_upper_limits = th.full((28,), 3.0)
+    ikc = IKChecker(kit)
+    idx = kit.robot.arm_control_idx["right"]
+    calls = []
+
+    def ik(pose, q_seed, arm="right"):
+        # seeds near q0 (|arm joints| < 1) land on the limit branch; a seed far from it reaches the free branch
+        calls.append(q_seed.clone())
+        q = th.zeros(28)
+        q[idx] = 2.999 if float(q_seed[idx].abs().max()) < 1.0 else 1.0
+        return q
+
+    kit.ik = ik
+    ikc._retry_seeds = lambda q0, pose, arm, chain=(): []
+    q_lim = th.zeros(28)
+    q_lim[idx] = 2.999
+    pose = _pose(0.3)
+    q, why = ikc.away_from_limits(q_lim, pose, "right", th.zeros(28))
+    assert q is not None and why == "" and float(q[idx].max()) == 1.0
+    assert 3 < len(calls) <= 3 + IKChecker.LIMIT_RETRY_RANDOM  # 3 seeded re-solves (no remembered seeds: q0 x 3), then random ones
+    n_first = len(calls)
+    calls.clear()
+    q2, _ = ikc.away_from_limits(q_lim, pose, "right", th.zeros(28))
+    assert len(calls) == n_first and th.allclose(q, q2)  # the random seeds are reproducible (seeded by the pose)
+    # no random re-solve when the seeded ones succeed; none at all when the first solution is clear of the limits
+    calls.clear()
+    q_ok = th.zeros(28)
+    q_ok[idx] = 0.5
+    assert ikc.away_from_limits(q_ok, pose, "right", th.zeros(28))[1] == "" and calls == []
+    # with the random re-solves switched off the candidate is rejected as before
+    ikc.LIMIT_RETRY_RANDOM = 0
+    q3, why3 = ikc.away_from_limits(q_lim, pose, "right", th.zeros(28))
+    assert q3 is None and why3.startswith("ik_joint_limit")
+
+
+def test_exact_leaves_from_the_given_first_configuration():
+    """``q_first``: the chain's first pose is taken at the recorded witness (FK-verified) instead of a fresh solve."""
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    kit = _ToyKit()
+    ikc = IKChecker(kit)
+    calls = {"ik": 0}
+    real_ik = kit.ik
+
+    def counting_ik(pose, q_seed, arm="right"):
+        calls["ik"] += 1
+        return real_ik(pose, q_seed, arm)
+
+    kit.ik = counting_ik
+    ikc.q_locked = lambda stance, **kw: th.zeros(28)  # the stance configuration (no Stance needed for the toy)
+    ikc.away_from_limits = lambda q, pose, arm, q0, tries=4: (q, "")
+    ikc.joint_limit_margin = lambda q, arm: (1.0, "none")
+    def fake_track_approach(q_pre, pre, end, arm, ignore_end=(), ignore_mid=(), q_hint=None):
+        ikc._last_track_start = q_pre.clone()
+        return kit.ik(end, q_pre), "ok"
+
+    ikc.track_approach = fake_track_approach
+    q_first = _q_at(0.0)
+    q_first[10] = 0.7  # a branch marker the solver would not produce
+    res = ikc.exact([_pose(0.0), _pose(0.2)], stance=None, arm="right", q_seed=th.zeros(28), cache=False, q_first=q_first)
+    assert res.ok and calls["ik"] == 1 and abs(float(res.q[10]) - 0.7) < 1e-6, "the chain left from q_first (only the tracked end was solved)"
+    # a q_first that does not reach the first pose is ignored; the seed (zeros) holds the first pose itself and is pinned as the
+    # chain's start (2026-09-25, the held-object hold posture), so only the tracked end is solved
+    calls["ik"] = 0
+    res = ikc.exact([_pose(0.0), _pose(0.2)], stance=None, arm="right", q_seed=th.zeros(28), cache=False, q_first=_q_at(0.5))
+    assert res.ok and calls["ik"] == 1
+    # a seed away from the first pose is only a seed: both poses are solved as before
+    calls["ik"] = 0
+    res = ikc.exact([_pose(0.0), _pose(0.2)], stance=None, arm="right", q_seed=_q_at(0.9), cache=False, q_first=_q_at(0.5))
+    assert res.ok and calls["ik"] == 2
+
+
+def test_sampler_state_eef_pose_is_the_fk_of_the_arm_end_and_raises_when_unknown():
+    """Owner 2026-09-25 item 1: ``_SamplerState.eef_pose(arm)`` = FK of ``tracker.arm_end_q[arm]`` so ``Place.targets()`` builds the
+    carry leg the oracle tracks; unknown (after a travel / a push) -> raises, and ``targets()`` keeps its recorded-pose fallbacks."""
+    from ispatialgym.oracle.actions import Place, Pose, Lift, Grasp
+
+    kit = _ToyKit()
+    sampler = type("S", (), {})()
+    sampler.kit = kit
+    sidecar = type("SC", (), {"stances": {}, "blocks": None, "grasps": []})()
+    tr = PC._Tracker(sidecar)
+    st = PC._SamplerState(sampler, tr)
+    with pytest.raises(KeyError):
+        st.eef_pose("right")
+    tr.arm_end_q["right"] = _q_at(0.4)
+    p, q = st.eef_pose("right")
+    assert abs(float(p[0]) - 0.4) < 1e-6 and abs(float(q[3]) - 1.0) < 1e-6
+    # Place.targets() through the state: the carry leg from where the hand is to the pre-place, a pose every 5 cm (start left out)
+    pre = Pose([0.7, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])
+    act = Place(kind="support", arm="right", object="teacup.n.02_1", place=Pose([0.7, 0.0, -0.1], [0.0, 0.0, 0.0, 1.0]), pre_place=pre, on="saucer.n.02_1")
+    t = act.targets(sidecar, st)
+    assert len(t["carry"]) == 6 and abs(t["carry"][-1].position[0] - 0.7) < 1e-6 and abs(t["carry"][0].position[0] - 0.45) < 1e-6
+    # without a configuration the carry is empty (the place after a carried travel: as before)
+    tr.arm_end_q.clear()
+    assert act.targets(sidecar, st)["carry"] == []
+
+
+def test_exact_pins_a_seed_that_already_holds_the_first_pose_without_the_limit_margin():
+    """object_scaling-beaker 0925-172725: the held-object chain leaves from the HOLD posture (q_seed = q_init, FK(q_init) = the first
+    pose); it is the chain's start, not a solution to pick, so the joint-limit margin (about the branch an approach would stall in)
+    is not applied to it - every precomputed (grasp, goal) had been refused with 'right_arm_joint6 within 3 mrad of its limit'."""
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    kit = _ToyKit()
+    ikc = IKChecker(kit)
+    ikc.q_locked = lambda stance, **kw: th.zeros(28)
+    # the hold posture sits 3 mrad from a limit: away_from_limits would refuse every solution of the first pose
+    ikc.joint_limit_margin = lambda q, arm: (0.003, "right_arm_joint6")
+    ikc.away_from_limits = lambda q, pose, arm, q0, tries=4: (None, "ik_joint_limit: right_arm_joint6 within 3 mrad of its limit at the pose")
+    q_hold = _q_at(0.0)
+    q_hold[10] = 0.7  # a marker the solver would not produce
+    res = ikc.exact([_pose(0.0)], stance=None, arm="right", q_seed=q_hold, cache=False)
+    assert res.ok and abs(float(res.q[10]) - 0.7) < 1e-6, res.reason
+    # a seed that does NOT hold the first pose is only a seed: the margin rule applies to the solution
+    res = ikc.exact([_pose(0.3)], stance=None, arm="right", q_seed=q_hold, cache=False)
+    assert not res.ok and res.reason.startswith("ik_joint_limit")
+
+
+def test_tracker_keeps_the_holding_arm_through_a_carried_travel_and_drops_the_rest():
+    """Owner 2026-09-25: a carried navigate / transition keeps ``arm_end_q`` of the arm holding the object (the oracle freezes it
+    through carried legs) and drops the other arms; an empty-handed travel drops everything unless the record keeps the arms."""
+    sidecar = type("SC", (), {"stances": {}, "blocks": None, "grasps": []})()
+    tr = PC._Tracker(sidecar)
+    grasp = type("A", (), {"name": "grasp", "arms": ("right",), "object": "teacup.n.02_1", "kind": "library"})()
+    lift = type("A", (), {"name": "lift", "arms": ("right",), "object": "teacup.n.02_1"})()
+    brace = type("A", (), {"name": "brace", "arms": ("left",), "object": "x"})()
+    nav = type("A", (), {"name": "navigate", "arms": (), "path": None})()
+    place = type("A", (), {"name": "place", "arms": ("right",), "object": "teacup.n.02_1"})()
+    q_lift = _q_at(0.4)
+    tr.after(grasp); tr.note_arm_end(grasp, _q_at(0.1))
+    tr.after(lift); tr.note_arm_end(lift, q_lift)
+    tr.arm_end_q["left"] = _q_at(0.2)  # some other arm's configuration
+    assert tr.carried == "teacup.n.02_1" and tr.carrying_arm() == "right"
+    tr.after(nav); tr.note_arm_end(nav, None)
+    assert list(tr.arm_end_q) == ["right"] and th.equal(tr.arm_end_q["right"], q_lift), "the holding arm survives the carried travel, the other arm is dropped"
+    tr.after(place); tr.note_arm_end(place, _q_at(0.9))
+    assert tr.carried is None and tr.carrying_arm() is None
+    tr.after(nav); tr.note_arm_end(nav, None)
+    assert tr.arm_end_q == {}, "an empty-handed travel forgets the arms"
+    # the record keeps the arms (departure arms): everything stays
+    tr.note_arm_end(lift, q_lift)
+    nav_keep = type("A", (), {"name": "navigate", "arms": (), "path": None, "_keeps_arms": True})()
+    tr.after(nav_keep); tr.note_arm_end(nav_keep, None)
+    assert th.equal(tr.arm_end_q["right"], q_lift)
+    # a held-object init: the carrying arm comes from the sidecar's grasp record
+    sidecar2 = type("SC", (), {"stances": {"init": type("St", (), {"carried": "bottle.n.01_1"})()}, "blocks": None,
+                                "grasps": [type("G", (), {"object": "bottle.n.01_1", "arm": "left"})()]})()
+    tr2 = PC._Tracker(sidecar2)
+    assert tr2.carried == "bottle.n.01_1" and tr2.carrying_arm() == "left"
+
+
+def test_place_order_checks_the_carry_first_with_its_start_prepended():
+    """The place's keys in motion order: carry (start prepended) -> pre_place (its end) -> descent -> place -> retreat; ``carry_via``
+    is part of the carry; without a carry leg the generic ``_chain_order`` applies."""
+    kit = _ToyKit()
+    sampler = type("S", (), {})()
+    sampler.kit = kit
+    pre, place, clear = _pose(0.7), _pose(0.7, 0.0, -0.1), _pose(0.7, 0.0, 0.05)
+    carry = [_pose(0.45), _pose(0.5), _pose(0.55), _pose(0.6), _pose(0.65), pre]
+    items = [("pre_place", [pre]), ("place", [place]), ("descent", [_pose(0.7, 0.0, -0.033), _pose(0.7, 0.0, -0.066), place]),
+             ("retreat", [_pose(0.7, 0.0, -0.05), _pose(0.7, 0.0, 0.0), clear]), ("carry", carry), ("carry_via", [_pose(0.5)])]
+    out = PC._place_order(items, _q_at(0.4), sampler, "right")
+    assert [k for k, _ in out] == ["carry", "pre_place", "descent", "place", "retreat"]
+    assert len(out[0][1]) == 7 and PC._same_pose(out[0][1][0], _pose(0.4)) and PC._same_pose(out[0][1][-1], pre)
+    # no carry leg (no configuration): the generic order, carry_via dropped
+    out = PC._place_order([(k, p) for k, p in items if k != "carry"], None, sampler, "right")
+    assert [k for k, _ in out] == ["pre_place", "descent", "place", "retreat"]
+    out = PC._place_order([(k, p) if k != "carry" else (k, []) for k, p in items], _q_at(0.4), sampler, "right")
+    assert [k for k, _ in out] == ["pre_place", "descent", "place", "retreat"]
+
+
+def test_reorient_derived_poses_are_not_checked_as_a_second_chain_when_the_key_poses_are_recorded():
+    """``reorient.derived`` re-derives the tracked motion from the start pose and is never executed: with recorded ``waypoints``
+    only those are checked (shampoo 0925-210939 failed the re-derived floor-class carry from a fresh IK seed); without recorded
+    key poses ``derived`` IS the tracked list and stays. ``base_follow.handle_poses`` keep their skip."""
+    targets = {"waypoints": [_pose(0.5)], "derived": [_pose(0.5)], "pivot": [0, 0, 0], "end": _pose(0.5)}
+    recorded = type("R", (), {"waypoints": [_pose(0.5)]})()
+    assert PC._skipped_target_keys("reorient", recorded, targets) == {"derived"}
+    unrecorded = type("R", (), {"waypoints": None})()
+    assert PC._skipped_target_keys("reorient", unrecorded, targets) == set()
+    assert PC._skipped_target_keys("reorient", recorded, [_pose(0.5)]) == set()
+    assert PC._skipped_target_keys("base_follow", None, {"handle_poses": []}) == {"handle_poses"}
+    assert PC._skipped_target_keys("lift", None, targets) == set()
+
+
+def test_path_record_and_transition_carry_arms_q():
+    p = PathRecord("a", "b", "local", [(0.0, 0.0, 0.0), (0.1, 0.0, 0.0)], 0.1, arms_q={"right": [0.1] * 7})
+    d = p.to_sidecar()
+    assert d["arms_q"] == {"right": [0.1] * 7} and PathRecord.schema_ok(d)
+    assert "arms_q" not in PathRecord("a", "b", "local", [(0.0, 0.0, 0.0)], 0.0).to_sidecar()
+    t = Transition("a", "b", 0.45, extras={"arms_q": {"right": [0.2] * 7}, "arms_source": "where the arm is"})
+    assert t.to_sidecar()["arms_q"] == {"right": [0.2] * 7} and t.to_sidecar()["arms_source"] == "where the arm is"
+
+
+def test_choose_departure_arms_records_the_first_free_candidate_on_every_leg(monkeypatch):
+    """The empty-handed travel after a retreat: the arm as left is tried first, then lifted 5 / 10 cm; the first candidate that
+    sweeps every leg free is written as ``arms_q`` on the path and the transitions (sampler records + the oracle-side objects)
+    and the tracker keeps the arm's configuration through the travel."""
+    sd = SidecarDraft("alias", "configuration_matching")
+    sd.add_stance(Stance("manipulation_2", (0.0, 0.0, 0.0), 0.75, -0.3, 0.45))
+    sd.add_stance(Stance("manipulation_3", (0.0, -0.07, 0.0), 0.75, -0.3, 0.45))
+    dep = sd.add_transition(Transition("manipulation_2", "manipulation_3", 0.55, trunk_from=(0.75, -0.3), trunk_to=(0.75, 0.0), at="departure"))
+    path = sd.add_path(PathRecord("manipulation_2", "manipulation_3", "local", [(-0.1, 0.0, 0.0), (-0.1, -0.07, 0.0)], 0.07, trunk=(0.75, 0.0)))
+    arr = sd.add_transition(Transition("manipulation_2", "manipulation_3", 0.55, trunk_from=(0.75, 0.0), trunk_to=(0.75, -0.3)))
+
+    class Side:
+        def __init__(self, **kw):
+            self.__dict__.update(kw)
+
+    a_dep = Side(name="transition", transition=Side(frm="manipulation_2", to="manipulation_3", departure=True, extra={}), carried=None)
+    a_nav = Side(name="navigate", path=Side(frm="manipulation_2", to="manipulation_3", carried=None, extra={}))
+    a_arr = Side(name="transition", transition=Side(frm="manipulation_2", to="manipulation_3", departure=False, extra={}), carried=None)
+    actions = [Side(name="retreat", arms=("right",), object="toy_dice.n.01_3"), a_dep, a_nav, a_arr, Side(name="grasp", arms=("right",))]
+    assert PC._travel_group(actions, 1) == [1, 2, 3] and PC._travel_group(actions, 4) == []
+    assert PC._draft_record(sd, a_dep) is dep and PC._draft_record(sd, a_nav) is path and PC._draft_record(sd, a_arr) is arr
+
+    kit = _ToyKit()
+    kit.sync_world = lambda: None
+    q_end = _q_at(0.3)  # where the retreat left the right arm (7 arm joints: x = 0.3)
+
+    class IKC:
+        def track_segment(self, q, p_from, p_to, arm, **kw):
+            q2 = q.clone()
+            j = kit.robot.arm_control_idx[arm][2]
+            q2[j] = q2[j] + float(p_to[0][2] - p_from[0][2])  # the toy lifts along joint 3
+            return q2, "ok"
+
+    sampler = Side(kit=kit, ikc=IKC(), objects={})
+    tracker = PC._Tracker(sd)
+    tracker.arm_end_q["right"] = q_end.clone()
+    seen = []
+
+    def fake_sweep(sidecar, sampler_, action, override):
+        seen.append((action.name, {a: float(q[2]) for a, q in override.items()}))
+        lift = float(override["right"][2])
+        ok = lift >= 0.05 - 1e-9  # the arm as left collides on the path; lifted 5 cm it is free
+        return ok, "" if ok else f"{action.name} collides", dict(override)
+
+    monkeypatch.setattr(PC, "_sweep_travel_record", fake_sweep)
+    out = PC.choose_departure_arms(sd, sampler, actions, [1, 2, 3], tracker)
+    assert out["choice"] == "lifted 0.05 m" and out["legs"] == [1, 2, 3] and out["arms"] == ["right"]
+    assert seen[0][0] == "transition" and abs(seen[0][1]["right"]) < 1e-9 and seen[1][0] == "transition" and abs(seen[1][1]["right"] - 0.05) < 1e-6
+    assert [s[0] for s in seen] == ["transition", "transition", "navigate", "transition"]  # as left fails at the first leg; lifted 5 cm sweeps all three
+    lifted = path.arms_q["right"]
+    assert abs(lifted[2] - 0.05) < 1e-6 and abs(lifted[0] - 0.3) < 1e-6 and dep.extras["arms_q"]["right"] == lifted and arr.extras["arms_q"]["right"] == lifted
+    assert dep.extras["arms_source"] == "lifted 0.05 m"
+    assert a_nav.path.extra["arms_q"]["right"] == lifted and a_dep.transition.extra["arms_q"]["right"] == lifted and a_arr.transition.extra["arms_q"]["right"] == lifted
+    assert all(getattr(a, "_keeps_arms", False) for a in (a_dep, a_nav, a_arr))
+    assert path.to_sidecar()["arms_q"]["right"] == lifted and "arms_q" in dep.to_sidecar()
+    # the tracker keeps the arm through such a travel, and forgets it through one without arms_q
+    tracker.note_arm_end(a_nav, None)
+    assert "right" in tracker.arm_end_q
+    tracker.note_arm_end(Side(name="navigate", path=Side(frm="x", to="y", extra={})), None)
+    assert tracker.arm_end_q == {}
+    # no candidate free: the records stay as swept (no arms_q), the choice says so
+    sd2 = SidecarDraft("alias", "configuration_matching")
+    sd2.add_stance(Stance("manipulation_2", (0.0, 0.0, 0.0), 0.75, -0.3, 0.45))
+    sd2.add_stance(Stance("manipulation_3", (0.0, -0.07, 0.0), 0.75, -0.3, 0.45))
+    path2 = sd2.add_path(PathRecord("manipulation_2", "manipulation_3", "local", [(-0.1, 0.0, 0.0), (-0.1, -0.07, 0.0)], 0.07))
+    a_nav2 = Side(name="navigate", path=Side(frm="manipulation_2", to="manipulation_3", carried=None, extra={}))
+    tracker2 = PC._Tracker(sd2)
+    tracker2.arm_end_q["right"] = q_end.clone()
+    monkeypatch.setattr(PC, "_sweep_travel_record", lambda *a: (False, "collides", {}))
+    out = PC.choose_departure_arms(sd2, sampler, [a_nav2], [0], tracker2)
+    assert out["choice"].startswith("stance posture") and path2.arms_q is None and "arms_q" not in a_nav2.path.extra and not getattr(a_nav2, "_keeps_arms", False)
+    assert len(out["tried"]) == 3  # as left, lifted 0.05, lifted 0.10
+    # a braced arm / nothing left where it is: no selection at all
+    tracker3 = PC._Tracker(sd2)
+    assert PC.choose_departure_arms(sd2, sampler, [a_nav2], [0], tracker3) is None
+    tracker3.arm_end_q["right"] = q_end.clone()
+    tracker3.arm_q["left"] = th.zeros(7)
+    assert PC.choose_departure_arms(sd2, sampler, [a_nav2], [0], tracker3) is None
+
+
+def test_record_arms_q_reads_the_oracle_side_record():
+    class Side:
+        def __init__(self, **kw):
+            self.__dict__.update(kw)
+
+    nav = Side(name="navigate", path=Side(extra={"arms_q": {"right": [0.1] * 7, "left": [0.0, 1.0]}}))
+    got = PC._record_arms_q(nav)
+    assert list(got) == ["right"] and got["right"].shape == (7,)  # the malformed left entry is skipped
+    assert PC._record_arms_q(Side(name="transition", transition=Side(extra={}))) == {}
+    assert PC._record_arms_q(Side(name="grasp")) == {}
+
+
+def test_flipped_push_chain_check_rejects_only_a_witness_in_another_branch():
+    """Owner 2026-09-26 (axial 0926-043254 / 051919; wave 14 verification 0926-060408 / 060411): a free-object push whose recorded
+    pre-contact witness lies more than ``FLIPPED_PUSH_WITNESS_RAD`` from the raw IK of the pre-contact seeded at the stance posture
+    is rejected (``approach_untrackable``) - the oracle's closed-loop arc failed from either branch while the sampler's dense track
+    passed; a witness in the stance posture's branch (or no raw IK) is not judged at all."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2 import program_check as PC
+    from ispatialgym.sampling.v2.ik import IKResult
+
+    idx = th.arange(7)
+    q_wit = th.zeros(28)
+
+    def make(q_raw):
+        kit = SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": idx}), ik=lambda pose, q_seed, arm="right": q_raw)
+        ikc = SimpleNamespace(q_locked=lambda stance, fingers=None: th.zeros(28),
+                              waypoints_ok=lambda *a, **k: (_ for _ in ()).throw(AssertionError("no dense track any more")))
+        return SimpleNamespace(kit=kit, ikc=ikc)
+
+    chain = [((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))] * 3
+    near = th.zeros(28)
+    near[3] = 0.73  # world vertical's green instances (wave 15 0926-061803: rejected at the former 0.6)
+    assert PC._flipped_push_chain_check(make(near), chain, None, "right", q_wit, [], [], None, None) is None
+    assert PC._flipped_push_chain_check(make(None), chain, None, "right", q_wit, [], [], None, None) is None
+    far = th.zeros(28)
+    far[6] = 3.1  # the other branch (a wrist flip)
+    ok, why = PC._flipped_push_chain_check(make(far), chain, None, "right", q_wit, [], [], None, None)
+    assert not ok and why.startswith("approach_untrackable") and "3.10 rad" in why
+    assert IKResult(False, None, why, 3).code == "approach_untrackable"

@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import math
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union
 
@@ -93,6 +94,18 @@ class MotionsConfig:
     #: the witness is refined by the collision-aware IK of the recorded pose seeded at it when that solution stays
     #: within this joint distance (the same branch); the sampler's witnesses miss their poses by 3-15 mm
     witness_refine_max_jump: float = 0.6
+    #: owner 2026-09-25 (teacup pod demo 0925-172723): rounds of ``plan_attempts`` joint-space attempts to a recorded witness after the
+    #: first round fails (trajopt is stochastic), before the pose-goal fallback; 4 since the cap 0925-204950 grasp: all 3 rounds failed,
+    #: the pose-goal fallback landed 2.73 rad away (refused) and the executor's next attempt planned the same leg in one round
+    witness_plan_retries: int = 4
+    #: the pose-goal fallback is accepted only within this joint distance of the witness; further is another IK branch, and the
+    #: chained legs that follow (tracked from the witness's branch) would fail - the attempt fails instead and the executor retries
+    witness_branch_max_jump: float = 0.6
+    #: the protected-object transit remedy (owner 2026-09-26, ``Motions.protecting``): the hand first rises this much where it
+    #: is, the plan goes to the point this much above the transit's goal, then straight down; direct re-plans when that fails
+    protect_lift_m: float = 0.12
+    protect_above_m: float = 0.12
+    protect_replans: int = 3
     #: a leg that starts with the eef link this far from the FK of the reported joints (the arm wound up under a
     #: contact load) first re-targets the joints onto the link's pose (``arm_along`` unwind)
     unwind_min_deflection: float = 0.005
@@ -393,6 +406,13 @@ class Motions:
         self.last_witness_residual: Optional[Tuple[float, float]] = None  # a witness residual arm_to left unclosed (m, rad)
         self.last_jam: Optional[Dict[str, Any]] = None  # the last jammed free-space leg relaxed by _relax_if_jammed
         self.jams: List[Dict[str, Any]] = []
+        # the protected-object transit check (owner 2026-09-26, oracle.protection): the active context (set by the execute
+        # functions around a transit) and every firing of it this episode (task, action, object, clearance, remedy)
+        self._protect: Optional[Dict[str, Any]] = None
+        self.protect_events: List[Dict[str, Any]] = []
+        self.protect_checks = 0
+        # every witness whose other-branch pose-goal plan was kept (``arm_to(accept_other_branch=True)``, a push's pre-contact)
+        self.witness_branch_accepted_events: List[Dict[str, Any]] = []
         self._joint_limits = (
             self.robot.joint_lower_limits[self.robot.trunk_control_idx],
             self.robot.joint_upper_limits[self.robot.trunk_control_idx],
@@ -825,11 +845,84 @@ class Motions:
         dq = float((self.robot.get_joint_positions()[idx].float() - q0).abs().max())
         if v <= self.cfg.jam_vel_tol or dq > self.cfg.jam_pos_eps:
             return
+        worst = self._jam_worst_joint(arms)
+        contacts = self._jam_contacts(arms)
         log.warning("%s arm joints report %.2f rad/s but moved %.2f mrad over %d steps after converging: a drive is fighting a contact the leg did not see - "
-                    "relaxing the hold targets onto the measured joints", "/".join(arms), v, dq * 1000, int(self.cfg.jam_probe_steps))
+                    "relaxing the hold targets onto the measured joints%s%s", "/".join(arms), v, dq * 1000, int(self.cfg.jam_probe_steps),
+                    "" if not worst else f" (worst joint {worst['joint']}: {worst['error_rad']:+.4f} rad off its target, {worst['to_limit_rad']:.4f} rad from its {worst['limit']} limit{' - AT THE LIMIT' if worst['at_limit'] else ''})",
+                    f"; contacts of the arm's links right now: {contacts}" if contacts else "; no contact reported on the arm's links (the held object's contacts included)")
         relaxed = yield from self.relax_arms(arms)
-        self.last_jam = {"arms": list(arms), "reported_vel_rad_s": round(v, 4), "moved_rad": round(dq, 6), "relaxed_rad": {a: round(d, 5) for a, d in relaxed.items()}}
+        self.last_jam = {"arms": list(arms), "reported_vel_rad_s": round(v, 4), "moved_rad": round(dq, 6), "relaxed_rad": {a: round(d, 5) for a, d in relaxed.items()},
+                         "worst_joint": worst, "contacts": contacts}
         self.jams.append(self.last_jam)
+
+    def _jam_contacts(self, arms: Sequence[str], limit: int = 8) -> List[str]:
+        """``'<own link> ~ <other body>'`` for every current contact pair of the robot whose own body is one of ``arms``' links
+        (or an object held in that hand): robot-robot pairs included, so a self-contact (the elbow folded into the torso) is
+        named too - QA and ``hand_contacts`` leave those out."""
+        try:
+            from omnigibson.utils.usd_utils import RigidContactAPI
+        except Exception:  # noqa: BLE001
+            return []
+        scene = getattr(self.robot, "scene", None)
+        if scene is None or not hasattr(self.robot, "prim_path"):
+            return []
+        prefix = self.robot.prim_path + "/"
+        try:
+            pairs = RigidContactAPI.get_contact_pairs(scene.idx, [self.robot], None, current_only=True)
+        except Exception as e:  # noqa: BLE001
+            log.debug("jam contacts unavailable: %r", e)
+            return []
+        held = {a: getattr(self.robot, "_ag_obj_in_hand", {}).get(a) for a in arms}
+        held_prefixes = {o.prim_path + "/" for o in held.values() if o is not None and hasattr(o, "prim_path")}
+        out: List[str] = []
+        for own, other in pairs:
+            own_s, other_s = str(own), str(other)
+            own_link = own_s.rsplit("/", 1)[-1]
+            mine = own_s.startswith(prefix) and any(own_link.startswith(a + "_") or own_link == f"attached_object_{a}_eef_link" for a in arms)
+            if not mine and any(own_s.startswith(p) for p in held_prefixes):
+                mine, own_link = True, "held:" + own_link
+            if not mine:
+                continue
+            if other_s.startswith(prefix):
+                other_name = "robot:" + other_s.rsplit("/", 1)[-1]
+            else:
+                other_name = other_s.rsplit("/", 2)[-2] + "/" + other_s.rsplit("/", 1)[-1] if other_s.count("/") >= 2 else other_s
+            item = f"{own_link} ~ {other_name}"
+            if item not in out:
+                out.append(item)
+            if len(out) >= limit:
+                break
+        return out
+
+    def _jam_worst_joint(self, arms: Sequence[str]) -> Optional[Dict[str, Any]]:
+        """The arm joint furthest from its hold target and how far it stands from its joint limits (cork 0925-195316 / 205211:
+        the re-aim leg 'settled 0.056 rad off' then jammed - a joint pressed against its limit and a hand blocked by a contact
+        look alike in the velocities; this names the joint so the notes tell them apart)."""
+        try:
+            q_all = self.robot.get_joint_positions().float()
+            lo_all, hi_all = self.robot.joint_lower_limits.float(), self.robot.joint_upper_limits.float()
+            names = list(self.robot.joints.keys())
+            best: Optional[Dict[str, Any]] = None
+            for a in arms:
+                tgt = self.state.arm_target.get(a)
+                if tgt is None:
+                    continue
+                idx = self.robot.arm_control_idx[a]
+                for k, i in enumerate(idx.tolist()):
+                    err = float(tgt[k]) - float(q_all[i])
+                    d_lo, d_hi = float(q_all[i] - lo_all[i]), float(hi_all[i] - q_all[i])
+                    limit = "lower" if d_lo < d_hi else "upper"
+                    to_limit = min(d_lo, d_hi)
+                    toward = (err < 0 and limit == "lower") or (err > 0 and limit == "upper")  # the target lies beyond the near limit
+                    rec = {"arm": a, "joint": names[i] if i < len(names) else str(i), "error_rad": round(err, 5), "to_limit_rad": round(to_limit, 5),
+                           "limit": limit, "at_limit": bool(to_limit < 0.02 and toward)}
+                    if best is None or abs(err) > abs(best["error_rad"]):
+                        best = rec
+            return best
+        except Exception as e:  # noqa: BLE001
+            log.debug("jam diagnostics unavailable: %r", e)
+            return None
 
     def unwind(self, arm: str) -> float:
         """Re-target ``arm``'s hold target onto its measured joints so the drives stop pushing. A loaded arm (the hand
@@ -859,8 +952,177 @@ class Motions:
     def _emb_for(arms: Sequence[str]) -> str:
         return "both_arms" if len(arms) == 2 else f"{arms[0]}_arm"
 
+    # ------------------------------------------------------------------ protected-object transit check (oracle.protection)
+
+    @contextmanager
+    def protecting(self, objects: Sequence[Tuple[str, Any]], leg: str, task: str = "", action: str = "", index: Optional[int] = None,
+                   force_via_above: bool = False, along: Optional[str] = None, inflation: Optional[float] = None):
+        """Owner 2026-09-26 (teacup 0925-222212 / 235559: the transit to the pre-grasp shoved the saucer 20 cm): inside this
+        context every trajectory ``arm_to`` plans (and, with ``along="raise"`` / ``"log"``, the dense path ``arm_along``
+        tracks: the carry) is checked with the moving arm's spheres - a carried object's included - against the protected
+        ``objects`` (``[(bddl name, scene object)]``) inflated by ``inflation`` (``protection.INFLATION_M``), threshold
+        lowered to the endpoints' own clearance. A plan that clears runs unchanged; one that does not is re-planned via the
+        point above its goal (``arm_to``) or raises ``plan_failed`` stage ``protected`` for the caller's via-above
+        (``along="raise"``). ``force_via_above``: the retry after a run-time protected verdict takes the via-above at once.
+        No objects: a no-op (the motion is exactly as before). Every firing lands in ``protect_events`` and the log."""
+        from ispatialgym.oracle import protection as PROT
+
+        prev = self._protect
+        self._protect = None if not objects else {"objects": list(objects), "leg": leg, "task": task, "action": action, "index": index,
+                                                   "force": bool(force_via_above), "along": along,
+                                                   "inflation": PROT.INFLATION_M if inflation is None else float(inflation)}
+        try:
+            yield self._protect
+        finally:
+            self._protect = prev
+
+    def _protect_violations(self, arms: Sequence[str], q_traj: Any, emb: str, P: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """The protected objects a planned trajectory ``q_traj`` ((T, 28) full configurations) comes too close to (``[]`` when it
+        clears, when no context is active or when the backend cannot compute spheres)."""
+        from ispatialgym.oracle import protection as PROT
+
+        P = self._protect if P is None else P
+        fn = getattr(self.backend, "robot_spheres_world", None)
+        if P is None or fn is None or q_traj is None:
+            return []
+        try:
+            q = C.as_tensor(q_traj)
+            if q.ndim == 1 or len(q) < 3:
+                return []
+            spheres, links = fn(q, emb)
+            self.protect_checks += 1
+            return PROT.check_trajectory(spheres, links, arms, P["objects"], P["inflation"])
+        except Exception as e:  # noqa: BLE001 - the check is advisory; the run-time monitor stays
+            log.warning("protected-object plan check unavailable (%r)", e)
+            return []
+
+    def _protect_record(self, P: Dict[str, Any], arm: str, viol: Sequence[Dict[str, Any]], remedy: str, result: str) -> None:
+        ev = {"check": "plan", "task": P.get("task"), "action": P.get("action"), "index": P.get("index"), "leg": P.get("leg"), "arm": arm,
+              "objects": [dict(v) for v in viol], "remedy": remedy, "result": result}
+        self.protect_events.append(ev)
+        for v in viol or [{}]:
+            log.warning("PROTECT plan-check fired: task=%s action=%s[%s] leg=%s object=%s clearance=%s m (threshold %s m, link %s, waypoint %s/%s) -> %s: %s",
+                        P.get("task"), P.get("action"), P.get("index"), P.get("leg"), v.get("object", "-"), v.get("clearance_m", "-"), v.get("threshold_m", "-"),
+                        v.get("link", "-"), v.get("index", "-"), v.get("n", "-"), remedy, result)
+
+    def _via_above(self, arm: str, emb: str, goal_pose: Any, q_goal: Optional[th.Tensor], P: Dict[str, Any]) -> Generator[th.Tensor, None, Tuple[bool, str]]:
+        """The via-above transit: the hand rises ``protect_lift_m`` straight up where it is (collision-checked; skipped when
+        it cannot), a joint-space plan goes to the point ``protect_above_m`` above ``goal_pose`` (its IK seeded at ``q_goal``
+        - the goal's branch - when given), checked against the protected objects, then a straight descent reaches
+        ``goal_pose``. Returns ``(done, why)``; nothing after the lift has moved when it returns False."""
+        up = th.tensor([0.0, 0.0, float(self.cfg.protect_lift_m)])
+        here = self.eef_pose(arm)
+        ign_objs, ign_links = getattr(self, "_protect_ignores", ((), ()))
+        try:
+            yield from self.arm_along(arm, [(here[0] + up, here[1])], check_collisions=True, ignore_objects=list(ign_objs), soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
+            lifted = "lifted"
+        except SkillError as e:
+            # the tracked straight rise jumps near the singular hanging posture (teacup 0926-010042: 'joint jump 0.22 rad at waypoint 1'):
+            # a short joint-space plan to the raised hand pose instead (12 cm, else 6 cm), checked like any transit
+            lifted = f"no lift ({e.message[:60]})"
+            for dz in (float(self.cfg.protect_lift_m), 0.5 * float(self.cfg.protect_lift_m)):
+                here = self.eef_pose(arm)
+                try:
+                    r_up = self.backend.plan_pose(emb, {M.EEF_LINK[arm]: (here[0] + th.tensor([0.0, 0.0, dz]), here[1])}, q_start=self.backend.q_full(),
+                                                  max_attempts=self.cfg.plan_attempts, sync_world=False)
+                except SkillError:
+                    continue
+                if not getattr(r_up, "success", False) or r_up.q_traj is None:
+                    continue
+                idx_up = self.robot.arm_control_idx[arm]
+                q_up = C.as_tensor(r_up.q_traj)
+                if float(th.max(th.abs(q_up[-1][idx_up] - q_up[0][idx_up]))) > 1.2 or self._protect_violations([arm], r_up.q_traj, emb, P):
+                    continue  # a rise that swings the arm or passes a protected object is no remedy
+                yield from self.execute_joint_trajectory(r_up.q_traj, arms=[arm])
+                lifted = f"lifted {dz:.2f} m (planned)"
+                break
+        try:  # the enclosing arm_to's collision world (its ignores) for the plan to the point above
+            self.backend.update_world(ignore_objects=ign_objs, ignore_links=ign_links)
+        except TypeError:
+            self.backend.update_world(ignore_objects=ign_objs)
+        gp, gq = as_world_pose(goal_pose)
+        above = (gp.float() + th.tensor([0.0, 0.0, float(self.cfg.protect_above_m)]), gq.float())
+        q_start = self.backend.q_full()
+        idx = self.robot.arm_control_idx[arm]
+        q_above = None
+        solve_ik = getattr(self.backend, "solve_ik", None)
+        if q_goal is not None and solve_ik is not None:
+            try:
+                q_ik = solve_ik(emb, {M.EEF_LINK[arm]: above}, q_seed=q_goal, sync_world=False)
+            except Exception:  # noqa: BLE001
+                q_ik = None
+            if q_ik is not None:
+                q_ik = C.as_tensor(q_ik).reshape(-1)
+                if float(th.max(th.abs(q_ik[idx] - q_goal[idx]))) <= self.cfg.witness_refine_max_jump:
+                    q_above = q_start.clone()
+                    q_above[idx] = q_ik[idx]
+        if q_above is not None:
+            res = self.backend.plan_joint(emb, q_above, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+        else:
+            res = self.backend.plan_pose(emb, {M.EEF_LINK[arm]: above}, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+        if not res.success:
+            return False, f"{lifted}; no plan to the point above the goal ({res.status})"
+        viol = self._protect_violations([arm], res.q_traj, emb, P)
+        if viol:
+            return False, f"{lifted}; the plan to the point above still passes {viol[0]['object']} at {viol[0]['clearance_m']} m"
+        yield from self.execute_joint_trajectory(res.q_traj, arms=[arm])
+        yield from self.arm_along(arm, [(gp.float(), gq.float())], soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
+        return True, f"{lifted}; above the goal by {self.cfg.protect_above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'}), straight down"
+
+    def _protect_gate(self, arms: Sequence[str], emb: str, res: Any, goal_pose: Any, q_goal: Optional[th.Tensor],
+                      replan: Callable[[], Any]) -> Generator[th.Tensor, None, Tuple[bool, Any]]:
+        """Before ``arm_to`` streams ``res``: inside a protect context, check it; a plan that clears is kept (``(False, res)``).
+        One that does not (or every plan, after a run-time protected verdict) is re-planned via the point above the goal
+        (``(True, res)``: done, nothing left to execute), else re-planned directly up to ``protect_replans`` times (the first
+        plan that clears, else the one that keeps farthest from the protected objects - the run-time check is the backstop)."""
+        P = self._protect
+        if P is None or len(arms) != 1:
+            return False, res
+        arm = arms[0]
+        viol = [] if P["force"] else self._protect_violations(arms, res.q_traj, emb, P)
+        if not viol and not P["force"]:
+            return False, res
+        if goal_pose is None and q_goal is not None:
+            try:
+                goal_pose = self.backend.fk([M.EEF_LINK[arm]], q_goal)[M.EEF_LINK[arm]]
+            except Exception:  # noqa: BLE001
+                goal_pose = None
+        self._protect = None  # the remedy's own motions are checked explicitly, never recursively
+        try:
+            why = "no goal pose"
+            if goal_pose is not None:
+                done, why = yield from self._via_above(arm, emb, goal_pose, q_goal, P)
+                if done:
+                    self._protect_record(P, arm, viol, "via-above" + (" (forced after a run-time protected verdict)" if P["force"] else ""), why)
+                    return True, res
+            best, best_clear = res, (min(v["clearance_m"] for v in viol) if viol else -1.0)
+            idx_a = self.robot.arm_control_idx[arm]
+            if float(th.max(th.abs(self.backend.q_full()[idx_a] - C.as_tensor(res.q_traj[0]).reshape(-1)[idx_a]))) > 1e-3:
+                best, best_clear = None, float("-inf")  # the via-above lift moved the arm: the original plan no longer starts here
+            for k in range(int(self.cfg.protect_replans)):
+                try:
+                    r2 = replan()
+                except SkillError:
+                    r2 = None
+                if r2 is None or not getattr(r2, "success", False):
+                    continue
+                v2 = self._protect_violations(arms, r2.q_traj, emb, P)
+                if not v2:
+                    self._protect_record(P, arm, viol, f"re-plan {k + 1}", f"via-above failed ({why}); the direct re-plan clears")
+                    return False, r2
+                c2 = min(v["clearance_m"] for v in v2)
+                if c2 > best_clear:
+                    best, best_clear = r2, c2
+            if best is None:
+                self._protect_record(P, arm, viol, "failed", f"via-above failed ({why}) after the lift; no re-plan from there")
+                raise SkillError("plan_failed", f"arm_to({arm}): protected-object re-plan failed ({why}); no plan from the lifted hand", stage="protected", protected=list(viol))
+            self._protect_record(P, arm, viol, "kept", f"via-above failed ({why}); no re-plan clears - the plan keeping {best_clear:.4f} m is used, the run-time check stays")
+            return False, best
+        finally:
+            self._protect = P
+
     def arm_to(self, arms: Union[str, Sequence[str]], pose: Any = None, q: Any = None, ignore_objects=(), q_hint: Any = None,
-               max_excursion: Optional[float] = None, ignore_links=()) -> Iterator[th.Tensor]:
+               max_excursion: Optional[float] = None, ignore_links=(), accept_other_branch: bool = False) -> Iterator[th.Tensor]:
         """cuRobo trajopt of the arm(s) with the trunk locked, then streamed. Exactly one of ``pose`` (a world pose
         for one arm, or ``{arm: pose}``) or ``q`` (a 28-D vector, ``{joint_name: value}`` or ``{arm: q7}``) is the
         target. Raises ``plan_failed`` when no trajectory is found (the sampler proved the key poses, not the
@@ -871,9 +1133,14 @@ class Motions:
         and the residual to ``pose`` (the object settled a few mm away from its recorded pose) is closed with a short
         ``arm_along``. Without a hint cuRobo picks its own IK branch for the pose goal; ``max_excursion`` (rad) then
         bounds the largest joint change of the plan — a finishing motion of a few centimetres must not become an elbow
-        flip (the pilot's french-fries finish swung the hand out of the camera frame)."""
+        flip (the pilot's french-fries finish swung the hand out of the camera frame).
+
+        ``accept_other_branch`` (owner 2026-09-26, a push's pre-contact: its legs are Cartesian, tracked from wherever the hand is):
+        when every joint-space round to the witness fails and the pose-goal plan lands in another IK branch, that plan is kept
+        instead of failing the attempt - only in that situation, which raised ``plan_failed`` before."""
         arms = (arms,) if isinstance(arms, str) else tuple(arms)
         emb = self._emb_for(arms)
+        self._protect_ignores = (tuple(ignore_objects or ()), tuple(ignore_links or ()))  # the via-above re-plan keeps this world
         try:
             self.backend.update_world(ignore_objects=ignore_objects, ignore_links=ignore_links)
         except TypeError:  # a backend without link-level ignores (the test stubs)
@@ -914,6 +1181,19 @@ class Motions:
             else:
                 res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
             if not res.success:
+                # owner 2026-09-25 (teacup pod demo 0925-172723): the joint-space plan is stochastic (trajopt seeds) - the same witness
+                # planned fine on the local GPU; a second round of attempts comes before any change of branch
+                for k_retry in range(self.cfg.witness_plan_retries):
+                    if relax is not None:
+                        with relax(emb, q_start, arms) as relaxed:
+                            self.last_relaxed_links = list(relaxed)
+                            res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+                    else:
+                        res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+                    if res.success:
+                        log.info("arm_to(%s): joint-space plan to the witness succeeded on retry %d", arm, k_retry + 1)
+                        break
+            if not res.success:
                 # 2026-09-18 (blender eyedvd pod demo 0918-222128): the joint-space plan to the witness failed twice with a final pose
                 # error of 0.0 mm - the goal is fine, the path to that configuration is not (a witness on a joint limit under the
                 # margin-0 test setting, or a sweep through the target). Fall back to the pose goal in cuRobo's own branch before
@@ -930,8 +1210,26 @@ class Motions:
                     raise SkillError("plan_failed", f"arm_to({arm}, witness q): {diag_js.get('trajopt_verdict') or 'joint-space plan failed'}; pose-goal fallback: {res.status}",
                                      diagnostics={"joint_goal": diag_js, "pose_goal": dict(res.diagnostics)}, stage="trajopt")
                 q_goal = C.as_tensor(res.q_traj[-1]).reshape(-1) if res.q_traj is not None and len(res.q_traj) else q_goal
+                branch_gap = float(th.max(th.abs(q_goal[idx] - q28[idx])))
+                if branch_gap > self.cfg.witness_branch_max_jump and accept_other_branch:
+                    # owner 2026-09-26 (axial 0926-043254 wave 10, 0926-050248 wave 11, 0926-051919 wave 12: the push pre-contact witness
+                    # 3.10 rad from cuRobo's branch - from the seeded IK too - trajopt reaches it only through the board and the push
+                    # arc is untrackable from it even when it is reached): the caller's legs start from wherever the hand is (a push:
+                    # Cartesian, closed-loop), so cuRobo's own branch is kept - where this raised before
+                    ev = {"arm": arm, "branch_gap_rad": round(branch_gap, 3), "rounds": 1 + self.cfg.witness_plan_retries}
+                    self.witness_branch_accepted_events.append(ev)
+                    log.warning("arm_to(%s): OTHER BRANCH accepted - the joint-space plan to the witness failed %d rounds; the pose-goal plan ends %.2f rad "
+                                "from it and is kept (the caller's legs are tracked from wherever the hand is)", arm, ev["rounds"], branch_gap)
+                elif branch_gap > self.cfg.witness_branch_max_jump:
+                    # owner 2026-09-25: with the sidecar's legs chained from this witness (the approach tracked from the pre-grasp, the
+                    # finish aimed at the grasp witness), a pre pose reached in another branch fails the leg that follows anyway
+                    # (0925-172723: pre-grasp 3.13 rad off the witness, the approach stalled, its finish 3.46 rad away, 'the plan swings
+                    # a joint by 3.21 rad'); failing here lets the executor's attempt retry re-plan from the checkpoint instead
+                    raise SkillError("plan_failed", f"arm_to({arm}, witness q): {diag_js.get('trajopt_verdict') or 'joint-space plan failed'} after {1 + self.cfg.witness_plan_retries} rounds; "
+                                     f"the pose-goal plan ends {branch_gap:.2f} rad from the witness (> {self.cfg.witness_branch_max_jump:.2f}: another IK branch, the chained legs would fail)",
+                                     diagnostics={"joint_goal": diag_js, "pose_goal": dict(res.diagnostics)}, stage="trajopt", excursion=branch_gap)
                 log.warning("arm_to(%s): joint-space plan to the witness failed (%s); planned to the pose in cuRobo's own branch instead (joint distance to the witness %.2f rad)",
-                            arm, diag_js.get("trajopt_verdict"), float(th.max(th.abs(q_goal[idx] - q28[idx]))))
+                            arm, diag_js.get("trajopt_verdict"), branch_gap)
             if max_excursion is not None:
                 idx = self.robot.arm_control_idx[arm]
                 exc = float(th.max(th.abs(q_goal[idx] - q_start[idx])))
@@ -939,6 +1237,11 @@ class Motions:
                     raise SkillError("plan_failed", f"arm_to({arm}, witness q): the recorded IK witness lies {exc:.2f} rad away in joint space (> {max_excursion:.2f} allowed for a "
                                      f"finishing motion): the sidecar's pre-pose and end-pose witnesses are in different IK branches", stage="trajopt", excursion=exc)
             log.info("arm_to(%s): %d waypoints to the recorded IK witness (%.1fs), planned in %.2fs", arm, len(res.q_traj), res.duration, res.plan_time)
+            q_goal_w = q_goal
+            handled, res = yield from self._protect_gate(arms, emb, res, as_world_pose(pose), q_goal_w,
+                                                         lambda: self.backend.plan_joint(emb, q_goal_w, q_start=self.backend.q_full(), max_attempts=self.cfg.plan_attempts, sync_world=False))
+            if handled:
+                return
             yield from self.execute_joint_trajectory(res.q_traj, arms=arms)
             target = as_world_pose(pose)
             cur = self.eef_pose(arm)
@@ -998,6 +1301,17 @@ class Motions:
                 raise SkillError("plan_failed", f"arm_to({','.join(arms)}, {what}): the plan swings a joint by {exc:.2f} rad (> {max_excursion:.2f} allowed for a finishing motion; "
                                  f"cuRobo's IK branch differs from the current one, no IK witness in the sidecar)", stage="trajopt", excursion=exc)
         log.info("arm_to(%s): %d waypoints (%.1fs), planned in %.2fs", ",".join(arms), len(res.q_traj), res.duration, res.plan_time)
+        if self._protect is not None and len(arms) == 1:
+            if pose is not None:
+                goal_g = targets[M.EEF_LINK[arms[0]]]
+                q_goal_g = C.as_tensor(res.q_traj[-1]).reshape(-1)
+                replan = lambda: self.backend.plan_pose(emb, targets, q_start=self.backend.q_full(), max_attempts=self.cfg.plan_attempts, sync_world=False)  # noqa: E731
+            else:
+                goal_g, q_goal_g = None, q_goal
+                replan = lambda: self.backend.plan_joint(emb, q_goal_g, q_start=self.backend.q_full(), max_attempts=self.cfg.plan_attempts, sync_world=False)  # noqa: E731
+            handled, res = yield from self._protect_gate(arms, emb, res, goal_g, q_goal_g, replan)
+            if handled:
+                return
         yield from self.execute_joint_trajectory(res.q_traj, arms=arms)
 
     # ------------------------------------------------------------------ arm: differential IK along waypoints
@@ -1018,7 +1332,7 @@ class Motions:
 
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
                   soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False, converge: bool = True,
-                  check_collisions: bool = False, limit_margin: float = 0.0, ignore_objects: Sequence[Any] = ()) -> Iterator[th.Tensor]:
+                  check_collisions: bool = False, limit_margin: float = 0.0, ignore_objects: Sequence[Any] = (), soft_rot_tol: Optional[float] = None) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto by default (contact motions must touch —
@@ -1061,18 +1375,25 @@ class Motions:
             except Exception as e:  # noqa: BLE001 - a backend without a world model (the test stubs) checks nothing
                 log.debug("arm_along(%s): world update for the collision check failed (%r)", arm, e)
         extra_kw: Dict[str, Any] = {"limit_margin": float(limit_margin)} if limit_margin > 0.0 else {}
-        res = self.backend.solve_ik_path(
-            f"{arm}_arm",
-            [{frame: wp} for wp in dense],
-            pos_tol=self.cfg.diff_ik_pos_tol,
-            rot_tol=self.cfg.diff_ik_rot_tol,
-            max_iters=self.cfg.diff_ik_max_iters,
-            check_collisions=bool(check_collisions),
-            sync_world=False,
-            soft_pos_tol=self.cfg.diff_ik_soft_pos_tol if soft_pos_tol is None else float(soft_pos_tol),
-            soft_rot_tol=self.cfg.diff_ik_soft_rot_tol,
-            **extra_kw,
-        )
+        # a collision-checked leg fails on NEW collisions only (owner 2026-09-24 item 2): the self-collision pairs its start
+        # already violates against another arm's link / attached object leave the sphere model for this leg
+        relax_start = getattr(self.backend, "start_collisions_relaxed", None) if check_collisions else None
+        relax_ctx = relax_start(f"{arm}_arm", self.backend.q_full(), [arm]) if relax_start is not None else nullcontext([])
+        with relax_ctx as relaxed_start:
+            if relaxed_start:
+                self.last_relaxed_links = list(relaxed_start)
+            res = self.backend.solve_ik_path(
+                f"{arm}_arm",
+                [{frame: wp} for wp in dense],
+                pos_tol=self.cfg.diff_ik_pos_tol,
+                rot_tol=self.cfg.diff_ik_rot_tol,
+                max_iters=self.cfg.diff_ik_max_iters,
+                check_collisions=bool(check_collisions),
+                sync_world=False,
+                soft_pos_tol=self.cfg.diff_ik_soft_pos_tol if soft_pos_tol is None else float(soft_pos_tol),
+                soft_rot_tol=self.cfg.diff_ik_soft_rot_tol if soft_rot_tol is None else float(soft_rot_tol),
+                **extra_kw,
+            )
         if res.success and (res.diagnostics or {}).get("soft_waypoints"):
             log.info("arm_along(%s): %s", arm, res.status)
         speed = self.cfg.cartesian_speed if speed is None else float(speed)
@@ -1152,7 +1473,26 @@ class Motions:
                 log.warning("arm_along(%s): %s -> executing the %d converged waypoints only (best-effort leg)", arm, res.status, int(diag.get("converged", 0)))
                 yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm], loaded=loaded)
                 return
+            if finish is not None and diag.get("stage") == "diff_ik" and at_limit and finish.q_hint is None and res.q_traj is not None and len(res.q_traj) > 1:
+                # a finishing leg that stalls AT a joint limit with no recorded witness (owner 2026-09-24, block design 0925-062801
+                # retreat[15]: right_arm_joint2 at its lower limit 13 mm short, no in-branch configuration of the end pose exists
+                # - the sampler's own tracking of that leg stalled the same way and recorded no witness): the converged prefix is
+                # executed before the leg fails, exactly as after a rejected finish, so a free-space retreat's caller can accept
+                # it as the partial retreat it is (``execute_retreat``, ``retreat_partial_accept_m``) instead of failing the action
+                log.warning("arm_along(%s): %s -> a stall at a joint limit with no witness: executing the %d converged waypoints, then failing the leg (a retreat caller may accept the partial leg)",
+                            arm, res.status, int(diag.get("converged", 0)))
+                yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm], loaded=loaded)
             raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="diff_ik", n_waypoints=len(waypoints), **{k_: v for k_, v in diag.items() if k_ in ("fail_index", "pos_err", "rot_err")})
+        P = self._protect
+        if P is not None and P.get("along") in ("raise", "log") and res.q_traj is not None:
+            # the carry (owner 2026-09-26): the tracked path with the carried object checked against the protected objects
+            viol = self._protect_violations([arm], res.q_traj, f"{arm}_arm", P)
+            if viol:
+                if P["along"] == "raise":
+                    self._protect_record(P, arm, viol, "via-above (caller)", "the tracked leg is not executed")
+                    raise SkillError("plan_failed", f"arm_along({arm}): the {P.get('leg')} passes {viol[0]['object']} at {viol[0]['clearance_m']} m (threshold {viol[0]['threshold_m']} m)",
+                                     stage="protected", protected=viol)
+                self._protect_record(P, arm, viol, "kept", "the via-above leg still passes near; executed, the run-time check stays")
         yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm], loaded=loaded, converge=converge)
 
     def arm_arc_closed_loop(self, arm: str, centre: th.Tensor, axis: th.Tensor, target: Pose, joint_value: Callable[[], float], q_to: float,

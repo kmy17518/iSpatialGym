@@ -67,6 +67,24 @@ def sync_tree(ep) -> None:
             sys.exit(f"remote_run: could not sync {d} to {ip} after 3 attempts")
 
 
+#: the repo's own dataset (``ispatialgym/assets/datasets/ispatialgym-assets``: the Kohs block, the block-design board) is installed
+#: into OmniGibson's data path by setup.sh at bootstrap time from the ref the pod cloned - an asset added to the working tree since
+#: (the isgboard, 2026-09-25: block design 0925-171048 'No such file or directory .../ispatialgym-assets/objects/tray/isgboard/usd/isgboard.usd'
+#: on every fresh wave pod) reaches the pod only through this extra sync into the data path
+ASSET_SYNC = ("ispatialgym/assets/datasets/ispatialgym-assets", "/root/ispatialgym/Behavior-1K/datasets/ispatialgym-assets")
+
+
+def sync_assets(ep) -> None:
+    ip, port = ep
+    src = os.path.join(rp.REPO, ASSET_SYNC[0])
+    if not os.path.isdir(src):
+        return
+    ssh_cmd = " ".join(shlex.quote(x) for x in rp.ssh_base(ip, port)[:-1])
+    r = subprocess.run(["rsync", "-az", "-e", ssh_cmd, src + "/", f"root@{ip}:{ASSET_SYNC[1]}/"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=600)
+    if r.returncode != 0:
+        print(f"remote_run: dataset sync ({ASSET_SYNC[0]}) failed (rc {r.returncode}): {r.stderr.strip()[-200:]}", file=sys.stderr, flush=True)
+
+
 def acquire_pod(api, wait_s: int):
     os.makedirs(LOCKS, exist_ok=True)
     pods = [l.strip() for l in open(PODS_FILE) if l.strip()]
@@ -141,6 +159,7 @@ def main():
     try:
         if args.sync:
             sync_tree(ep)
+            sync_assets(ep)
         # ``ISG_*`` variables of the local environment reach the pod (2026-09-21: ISG_BASE_MASS_KG for a chassis-mass A/B run);
         # the pod-selection variable stays local
         passthrough = " ".join(f"{k}={shlex.quote(v)}" for k, v in sorted(os.environ.items())

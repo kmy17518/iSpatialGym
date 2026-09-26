@@ -4,6 +4,242 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
 
 ## 1.5.0 (unreleased) - one arm pose per task, scene variants without chairs, goal check without the robot
 
+- **Three 09-16..09-24 fixes narrowed to their geometry** (owner 2026-09-25; nothing reverted). (3) `iors_small.recentre_pinches`
+  (453b3065) re-centres a pinch only when the hull chord between the pads at the re-centred pose (`pinch_chord`, the
+  attachment module's band) matches the library pinch width - else the original chord - within
+  `pinch_recentre_width_tol_m` 5 mm / `pinch_recentre_width_tol_frac` 25 %: the nextto marker spans the same chord
+  anywhere along the closing axis and is still re-centred; the teacup's rim pinch moved onto the cup's centre put the
+  13.7 mm pre-shape over the interior (0925-075114 / 114310 `failed_grasp`) and keeps its 45 mm offset. Facts:
+  `template_facts.grasp_pinch_recentre`; `grasps_recentred` lists the grasps actually moved. (4) `attachment._attach_clearance`
+  (703a3837) takes the partner's top under the FINGERTIPS - the partner hull within `TIP_RADIAL_BAND_M` 4.25 mm of each
+  tip's radial distance from the insertion axis (the tips at ± pinch width / 2; the depth may lie below the female link) -
+  not the highest point within the male's radius: the 51 mm cap's tips hang over the lemonade bottle's shoulder, the
+  neck lip inside them no longer floors the lift (0925-092708: 8/8 `fingers_in_partner`); the cork's tips stand over the
+  rim and keep their floor; a male inserted the other way up than it rests gets the clearance as a lift ceiling; no
+  partner hull under the tips = no partner floor (`_fingers_in_partner` and the finger-envelope floor still guard).
+  (5) `attachment.stable_rest_quat` (superseded the same day: see "Male rest orientation" below - the library rest is kept
+  unless physics toppled it).
+  Also `IKChecker.track_chain(ignore_start, ground_at_start)`: the first 3.3 cm of a continuation off a contact are
+  checked with the start's supports / the released object removed and the ground slab off (the IORS floor-class lift,
+  0925-115205: the dispenser's spheres in the slab 1 cm off the floor).
+- **The carry leg is a tracked chain too** (owner 2026-09-25; teacup 0925-141122 retreat[4] `the recorded IK witness lies
+  4.58 rad away`, lift end -> pre-place 4.30 rad apart in the sidecar): the oracle reaches the pre-place by tracking the
+  carry from where the lift left the hand (`execute_place`, `carry_leg "straight"`) and stays in the lift's branch, while
+  the check solved `pre_place` as a fresh single from the stance posture (`_SamplerState` had no `eef_pose`, so
+  `Place.targets()` returned `carry: []`) and chained the descent, the place and both retreats from THAT branch.
+  `_SamplerState.eef_pose(arm)` is now the FK of `tracker.arm_end_q[arm]` on the current stance (raising when unknown, so
+  `targets()` keeps its recorded-pose fallbacks; `Lift.targets()` / `Retreat._segment` start from it too, within the
+  witness residual of the recorded pose; push / brace retreats are unchanged, their arm has no recorded end), and a `Place`
+  is checked in motion order (`_place_order`): `carry` first as a continuation from the arm's configuration (the start pose
+  prepended - `line_waypoints` leaves it out and the orientation SLERP defeats `_chain_starts`; `carry_via` is part of it),
+  `pre_place` = the carry's end, `descent` from it, `place` = the descent's end, then the retreat leg. The carry is checked
+  against the world QA sees (partner, neighbours and the destination support present); only the first `APPROACH_WAYPOINT_M`
+  off the lift end leave the grasp's support out (`_carry_start_ignores`). A carried navigate / transition keeps `arm_end_q`
+  of the arm holding the object (the oracle freezes it through carried legs) and drops the other arms, so the chain is
+  tracked after a carried drive as well (IORS large-scale, touching, disembedding; IORS large-scale's `carry_end_q` seed is
+  redundant now); `_keeps_arms` travels keep everything as before. A carry whose tracking stalls beyond `FREE_LEG_STALL_M`
+  rejects the draw, as the oracle's finish would.
+- **Fingertips in frame at every in-between pose** (owner 2026-09-25, between pilot waves 2 and 3; cap 0925-191101: the
+  demo's `gripper_out_of_fov` at `reorient.waypoints[3]` - the fingertip point at v = 65 px of the 480 px image, QA's
+  bound 54 px). `program_check.fingertips_in_frame` projects the fingertip point `C.fingertip(eef)` of every checked pose of
+  a watched action into the stance camera (`IKChecker.camera_pose`) and requires it inside the image with QA's 5 %
+  margin (`FINGERTIP_FRAME_MARGIN`) plus the execution slack of `FINGERTIP_FRAME_SLACK_M` 2 cm at the point's depth (the
+  tracked motion lands within that of the recorded pose); reject `gripper_not_in_frame` naming `action.key[i/n]`, u, v
+  and depth. Contact poses (grasp / place / contact, `CONTACT_POSE_KEYS`) keep the `eef_in_frame` box, which is not
+  extended to in-between poses (offline it rejects three QA-passing wave-2 demos: open blender push.waypoints[2], world
+  vertical brace.pre / approach / push.waypoints[2], close blender push.pre). Offline on the 22 wave-2 successes + the cap:
+  the cap rejected at its reorient, the 22 accepted. `ISG_FINGERTIP_FRAME_CHECK=off` disables it.
+- **Ground re-enable respects an active ignore context** (shampoo 0925-145936 / 174935 / 205946: the floor-class lift's
+  first dense pose 10 mm off the floor `1/11 collide` against `floors_glwobe_0`, the task's own floor, although the ignore
+  set held it). `R1ProCuRobo.check_collision(margin > 0)` toggled the ground obstacles back on for the padded query and
+  left them on, undoing the `ik._Ignoring` context that had removed the floor mesh for the leg; `_ground_obstacles_enabled`
+  now skips the meshes an active context holds off (`backend._held_off`, registered by `_Ignoring`). The IORS large-scale
+  module's own lift check (`iors_large.lift_arm_q`) tracks the lift as a continuation of the grasp witness with the same
+  ground handling (floor class: slab and ground meshes off) instead of a fresh end-pose IK. And `reorient.derived` is no
+  longer checked as a second chain when the recorded key poses exist (`_skipped_target_keys`): the oracle tracks the
+  recorded `waypoints`; the re-derived list from a fresh IK seed rejected the floor-class carry (0925-210939).
+- **IORS large: the A -> B drive is re-swept with the target placed** (owner 2026-09-26; shampoo 0926-015905, wave 8 phase 1:
+  navigate[0] failed twice, 'wheel_motor_link1 in contact with the shampoo dispenser' - the recorded A -> B line passed 5.6 cm
+  from the dispenser standing on the floor). `record_leg_a_b` runs before the target has a pose (it is parked), so the drive
+  was never swept against where the target ends up: harmless on a table, not for a target on the floor B drives up to.
+  `_leg_ab_clear_of_target`: once a (yaw bucket, grasp) gives the target's pose at B, the recorded A -> B path (its strides +
+  the yaw-lag envelope, the trunk and arms it was checked with, the floor relaxation of the original check) is swept once
+  with the target placed there; a collision drops that bucket (`B: the A -> B drive passes the placed target`) and the next
+  draw is tried. A target clear of the drive changes nothing.
+- **IORS large: a C whose place the placement camera cannot see is skipped in the C loop** (owner 2026-09-26; shampoo, waves
+  6-8: 8 of 22 attempts sampled a whole instance for 7-13 min and were then rejected in `goal_check` 'place eef pose outside
+  the placement image (5 %)'). The goal check's own test (`IKChecker.eef_in_frame(place_eef, camera_pose_at(C))`, ontop
+  relation, not the push-under drop) is applied to each C candidate once its place IK holds - at the release pose and at the
+  resting pose `goal_drop_m` (1 cm) below it, since the goal check tests the settled goal (wave 9 0926-023738 still failed it
+  with only the release pose tested); such a C is counted as `C: place eef outside the placement image` and the next C is
+  tried within the attempt. An instance whose C was in frame is unchanged.
+- **Joint-limit re-solves from random configurations** (owner 2026-09-26; bar soap 0926-011542, wave 7 phase 1: no instance in 8
+  attempts - every solution of the place pose within 2-12 mrad of `right_arm_joint6`'s limit - while copy 0926-011544 of the
+  same alias and seed sampled at attempt 0 and waves 3 / 6 passed; wave 5's 8/8 failure was the same flakiness). The four
+  re-solves of `IKChecker.away_from_limits` start from the remembered seeds and `q0` - near-identical starts; when they all stay
+  within `JOINT_LIMIT_MARGIN`, up to `LIMIT_RETRY_RANDOM` 12 more re-solves start from random arm configurations (a generator
+  seeded by the pose, so reproducible). Runs only where the candidate would otherwise be rejected `ik_joint_limit`.
+- **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
+  061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
+  push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and
+  the contact escape - the action failed there before - `execute_retreat` plans a transit (`arm_to`, pose goal, the leg's
+  ignore set) to the leg's end pose from where the hand is; its failure fails the action as before.
+  `ExecuteConfig.retreat_plan_fallback`; notes `retreat_planned_fallback`.
+- **Program check: a push whose pre-contact witness sits in another branch is rejected** (owner 2026-09-26; axial
+  0926-043254 wave 10 = 0926-051919 wave 12 = wave 13's copies, one instance: the push pre-contact witness 3.10 rad from the
+  branch the raw IK reaches from the stance posture; trajopt never reached it (5 of 5, only through the board) and the
+  oracle's closed-loop arc failed from EITHER branch - reached via the point above it, 0926-050248, or in cuRobo's branch,
+  0926-053900 - while every pose of the chain had an IK solution of its own). Only in that situation (a free-object push whose
+  pre-contact witness lies more than `FLIPPED_PUSH_WITNESS_RAD` 2.0 rad - a flip; world vertical's green instances keep 0.73 rad and
+  were rejected at 0.6 (wave 15 0926-061803) - from the raw IK - no joint-limit re-solves - of the
+  pre-contact seeded at the stance posture) the instance is rejected `approach_untrackable` and the sampler draws another
+  candidate (axial's other instance passed, 0926-051915 / 051917). A dense track of the chain was tried first and is no
+  proxy: it passed from the flipped witness (0926-060408 / 060411). A push whose witness is in the stance posture's branch
+  is checked as before.
+- **Oracle: a push pre-contact keeps cuRobo's branch where the witness's cannot be planned** (owner 2026-09-26; axial
+  0926-043254 wave 10 / 0926-051919 wave 12: the push pre-contact witness 3.10 rad from cuRobo's branch - from a random
+  joint-limit re-solve and from the seeded IK alike - trajopt reached it only through the board, 5 rounds, and the attempt's
+  pose-goal fallback was refused; reached via the point above it, the push arc was untrackable from it, 0926-050248).
+  `Motions.arm_to(accept_other_branch=True)` keeps the other-branch pose-goal plan at exactly that refusal; `execute_push`
+  passes it for the pre-contact (`reach_pre_pose`): a push's legs are Cartesian and closed-loop from wherever the hand is
+  (it already drops the witness whenever the pre-pose is lowered or moved). Logged `OTHER BRANCH accepted`; demo meta
+  `witness_branch_accepted`.
+- **Protected objects during transits** (owner 2026-09-26, overnight plan item 2; `oracle/protection.py`). Teacup
+  0925-222212 / 235559 (frames 220-340): on the way to the cup the hand passed low over the saucer and shoved it ~20 cm
+  against the cup before the grasp - the planner keeps the finger SPHERES >= 1 cm off, the real fingers stick out past
+  them, the saucer is 1.5 cm tall; the same instance had passed in wave 2 by a hair (an old near-miss). QA recorded no
+  collision because a grasp is a manipulation action from its first step: the acting arm's finger / gripper links are exempt
+  for the whole action, transit included. **Protected** = the objects the goal refers to in positive atoms that the task
+  placed (teacup -> saucer and cup, disembedding -> the destination tray, block design -> the blocks and the board) plus the
+  action's own target until its intended contact begins; distractors (negated atoms only), source containers and furniture
+  (scene names `<category>_<model>_<k>`: tables, doors, walls) keep today's handling; per-alias override
+  `isg_customs.json` `"protection": {"exclude"/"include": [bddl names]}` + `_protection_note`. **Plan-time**
+  (`Motions.protecting`, oracle only): every trajectory `arm_to` plans inside a transit (to the pre-grasp, the pre-place, the
+  pre-contact) and the carry's tracked path are checked with the moving arm's spheres - a carried object's included
+  (`R1ProCuRobo.robot_spheres_world`, forward kinematics only) - against the protected objects' boxes inflated by 2 cm
+  (`INFLATION_M`, the sphere-vs-finger gap), the threshold lowered to the transit endpoints' own clearance (a pre-contact
+  3 cm off a painting may be approached that close, no closer). A plan that clears runs unchanged; one that does not is
+  re-planned via the point above its goal (the hand rises 12 cm where it is, a plan to 12 cm above the goal in the goal's
+  IK branch, straight down; the carry: up, across, down), else re-planned directly up to 3 times. **Run-time** (QA transit
+  span): during a transit any NEW contact of a robot link (the acting fingers included) or held object with a protected
+  object is `protected_contact`, a protected object moving > 1 cm is `protected_moved`; the executor rolls back and the
+  retry takes the via-above at once. Nothing global changes (no margin, activation distance or planner config); no protected
+  object near the transit = neither check fires and the motion is exactly as before. Every firing is logged
+  (`PROTECT plan-check fired: task=... action=... object=... clearance=...` / `PROTECT run-check fired`) and lands in
+  `meta.protection.fired`; `meta.protected_objects` lists the set (`ISG_PROTECT=off` disables both checks).
+- **A place ignores its partner only** (owner 2026-09-26: "ignore only what the motion is meant to touch, only on the leg
+  where it touches"). An on / into / under / attach place ignored the partner plus `contact_supports(partner)` - its
+  contact-reported supports, i.e. the table and the floor whenever the partner was awake: the teacup's place ignored
+  breakfast_table + floors in wave 3 (the transit had shoved the saucer awake), only the saucer in wave 2 (saucer asleep).
+  Now the partner alone, whatever its sleep state; next-to / touching places keep ignoring the shared support.
+- **Braced-push ladder: brace hit vs free short** (owner 2026-09-26; world vertical 0925-193257 / 225052 / 235643: every rung
+  ended "short" with brace hits 0 - the pad stops at the goal, the painting sags back 0.015-0.035 rad once it leaves; moving
+  the brace outward cannot change that, the rungs never improved the residual (0.024-0.044 of the 0.08 tolerance) and wave 3's
+  fourth push failed to plan twice). `Executor.push_outcome`: a short with a brace hit keeps the ladder (brace outward); a
+  short with NO brace hit inside the tolerance is accepted without improvement rungs (the epilogue's settled check
+  decides); out of tolerance it is `short_free` - the mirror of `push_shorten_on_free_overshoot`: the arc is lengthened and
+  the pad aims past the goal by the measured sag (`execute.aim_push_past_goal`, `contact.extra["aim_past_goal_rad"]`,
+  `push_extend_on_free_short`), the brace unchanged. The fallback to the in-tolerance rung when an improvement rung fails
+  outright stays as the safety net (unit-tested with a forced plan failure).
+- **Path sweeps cover the tracker's yaw lag** (owner 2026-09-25; shampoo 0925-211757 / 222156: the idle left finger
+  brushed `wardrobe_pyuwgc_0` for 2 steps 38 steps into the carried 36 cm shuffle to the countertop stance - a 57 deg
+  turn then 90 deg in place - with the base 4 mm off the path line and its yaw 6 deg BEHIND the interpolated one; the
+  carried drive had been swept at the alias's 3 cm `carry_path_margin_m` along the interpolated yaws and passed).
+  `navigation.stride_poses(yaw_envelope=True)` repeats every stride pose at the yaws the reference held over the last
+  `YAW_LAG_LOOKBACK_M` 0.25 m of path (the angular hull of those yaws and the interpolated one, every
+  `YAW_ENVELOPE_STEP_RAD` 10 deg), and `plan_path` / the program check's travel re-sweep (`_sweep_travel_record`) sweep
+  that envelope - the oracle's `BaseTrajectoryTracker` (0.8 rad/s, 1.5 rad/s^2, kp_yaw 2: a ~0.5 s time constant at
+  0.3-0.5 m/s) lags what the reference did over the last ~0.2 m, a long straight run has caught up. A first cut swept back
+  to the whole segment's start yaw and rejected every init -> manipulation path of the shampoo's utility room (verification
+  0925-230222, wave 4 aborted before a result). Each offset is capped at `YAW_LAG_MAX_RAD` 12 deg (2026-09-26: the look-back
+  hull alone swept up to ~40 deg behind on the utility room's 36 cm / 57 deg shuffle and rejected most shampoo paths in wave 6
+  - 0926-001742, 3 attempts in 42 min, none written, where wave 3 had sampled at attempt 0 in 407 s; the measured lag of the
+  brush it guards against was 6 deg, the tracker's yaw feed-forward keeping the lag a fraction of the reference's change).
+  The recorded strides are unchanged (`n_strides`); a straight path with a constant yaw sweeps the same poses as before.
+- **Planner activation distance stays at 1 cm** (2026-09-25; teacup 0925-222212, wave 3: the pre-grasp transit planned at the
+  1 cm `collision_activation_distance` swept the TCP 2.7 cm over the table through the 1.5 cm saucer 30 cm beside the teacup
+  and pushed it 20 cm - `under(saucer, teacup)` was lost before the grasp). 2 cm was tried in wave 5 (f52992eb / 4ec17e77) and
+  reverted the same night: one `MotionPlannerCfg` configures the IK solvers and the trajopt alike, so the sampler's IK
+  solutions changed too (bar soap 0925-235551: 8/8 attempts `place_unreachable: ik_joint_limit`, an alias green in waves
+  2 and 3), and the transit still brushed the saucer (0925-235559: 12 cm). Open: the transit needs a via-above leg (or the
+  partner kept out of the arm's approach corridor), not a margin.
+- **Rejected manipulation candidates move down the order** (owner 2026-09-25; cap 0925-220515: 45 phase-2 survivors,
+  and all 8 attempts tried the same 6 best-scored stances - candidates 6 / 21 / 36 rejected 20 times over for the attach
+  pose outside the manipulation image, no transition or the lift without IK, 39 stances never looked at, no instance).
+  `attachment._candidate_order`: every rejection a candidate collected in an earlier attempt of the template adds
+  `CANDIDATE_REJECT_PENALTY` (1.0, more than any depth / trunk preference) to its score, so the next attempt's window of
+  six reaches the untried stances; the untried keep the depth / trunk order.
+- **A grasp lift a floor demands is not optional** (owner 2026-09-25; cork 0925-195316 / 205211 and their replays
+  0925-213602 / 215025: attach refused at 15-17 mm / 4.4-4.9°). The partner-top floor asked for a 30.9 mm lift of the
+  library pinch (fingertips 25.9 mm below the rim at the attach otherwise), the lifted grasp had no IK at the chosen stance
+  (`ik_joint_limit: right_arm_joint5 within 34 mrad of its limit`) and `_apply_grasp_height_extra` fell back to the
+  library height ("IK failed with the lift; library height kept") - the instance was written with the fingers ending inside
+  the neck; in the demo the re-aim leg at the pre-place already jammed (`right_arm_joint3` 0.055 rad short of its target,
+  1.5 rad from any limit: a contact), the hand ended 14 mm short, the base nudge and three correction passes oscillated
+  at 13-18 mm. The 09-21 success carried the full 31 mm lift (`grasp_height_extra_reason: full`). The cap's instances
+  (0925-191101 / 204950) had the same fallback for the finger-envelope floor (14.4 mm: the fingertips 14 mm into the table
+  at the library height; `right_arm_joint4` near its limit with the lift) - 204950 `failed_grasp`, the pads on the table.
+  Now an IK failure with a lift a floor demands rejects the candidate (`Reject("lift_unreachable")`, counter of the same name) and the next stance /
+  grasp is tried; the library height is kept only when no floor asked for the lift. Hardening on the oracle side from the
+  same runs: `ExecuteConfig.attach_leg_soft_rot_tol` 0.01 rad and `attach_leg_limit_margin_rad` 0.05 on the re-aim, the
+  attach descent and `_attach_at_place`'s correction passes (`Motions.arm_along(soft_rot_tol, limit_margin)`); a pass
+  stops only when neither the position nor the rotation improves (`attach_correct_stop_rot_rad` 0.005); the program check
+  tracks an attach place's carry and descent with the same `RETREAT_LIMIT_MARGIN_RAD` 0.05; the jam probe
+  (`Motions._relax_if_jammed`) names the worst joint, its distance to its limits and the arm's current contact pairs
+  (robot-robot included) in the log and the `jams` notes; `MotionsConfig.witness_plan_retries` 2 -> 4 (cap 0925-204950:
+  three joint-plan rounds failed, the pose fallback in another branch was refused, the next attempt planned it in one).
+- **Attachment partner floor: the pair is classified** (owner 2026-09-25 16:41; cork 0925-145307: item 4's band of 4.25 mm
+  around each fingertip's radius met no hull vertex between the wine bottle's rim circle and its shoulder, so the "partner top
+  under the tips" was a point 20 cm down the body - the rim floor vanished, the lift shrank from the 09-21 success's 31 mm
+  fingertip pinch to a 14 mm pad pinch and the attach was refused twice at 15-16 mm). `_attach_clearance` now classifies the
+  pair from the male's radius against the partner hull at the female link's height: `into_opening` (the male fits the
+  opening: the cork) and `on_rim` (between the opening and the outer radius: a lid on a thick rim) get the 09-20 rim floor
+  back (fingertips >= 5 mm above the highest partner point within the male's radius, never below the link); `over_partner`
+  (the male is wider than the rim: the cap) keeps item 4's relief, except when the point found under the tips lies further
+  below the link than the male's own length AND the fingers' reach (`TIP_REACH_BELOW_LINK_M` 6 cm - a wide cap's tips do hang
+  over a shoulder 3-5 cm under the mouth, further than the 11 mm cap is long): then the rim floor again. Class and numbers on
+  `template_facts.attach_pair_class` (r_male, r_rim, r_opening, male length, depth under the tips / rim, the rule used) for
+  every attachment alias. The cork's library end topples in ~half of PhysX's settles (probe: 3/6 baseline, 0/6 on its other
+  end; a self-excited rock 4 -> 6 -> 8 -> 10 -> 110 deg): the rest stays the library's and the cork runs with 20 attempts.
+- **Male rest orientation: the library's, unless physics toppled it** (owner 2026-09-25; cap 0925-144739: the geometry-only
+  flip of 2026-09-24 turned the flat cap open side up for a 1.6x "better" tipping margin and 8/8 draws had no reachable
+  library grasp). `attachment.stable_rest_quat` keeps the library rest by default; it turns the male 180° only when the
+  nudge test (`check_rest_stability`) toppled it on that end in a previous draw of the template (`_rest_flip_forced`), the
+  turn is about the insertion direction's horizontal projection (so a vertical insertion - cork, cap - is never turned: the
+  attachment program does no in-hand 180° turn) and at least one library grasp still approaches from above afterwards.
+  Tipping margins (link centre of mass when PhysX has it) are reported in `template_facts.male_rest_orientation`.
+- **Program check: legs tracked from where the arm is; travel with the arm as left** (owner 2026-09-24; block design
+  0921-050358 action 15 "the sidecar's pre-pose and end-pose witnesses are in different IK branches", finish rejected 3.2
+  rad away; the 371-step re-pose ceremony of a 7 cm stance hop). (1) `program_check.check_action_targets` checks an
+  action's eef targets as ONE chain the way the oracle runs them: a chain whose first pose is where the arm already is
+  (the retreat off the place configuration, the lift off the grasp, a `Retreat` off the previous action's end -
+  `_Tracker.arm_end_q`, every family) is tracked by differential IK from that configuration (`IKChecker.continue_chain`:
+  no re-solve of the first pose; a stall is finished by the IK of the end pose seeded at the stall and accepted only
+  within the oracle's 0.6 rad finish bound `FINISH_MAX_EXCURSION`, else `program_check_failed`; a `Retreat` action that
+  stalls within the oracle's `retreat_partial_accept_m` 4 cm is accepted as the partial retreat the oracle makes, with
+  no witness recorded); a chain that leaves from a recorded single witness (`pre_place` -> descent, `pre_grasp` ->
+  approach) starts at that witness (`exact(q_first=...)`), and when the approach re-tracks backward from the end's
+  branch the pre witness follows the chain's start; a single pose that ends a chain (`place`, `grasp`, a brace `contact`)
+  takes the chain's tracked end (`_chain_order`). Witness dicts carry `chain` / `branch` notes; the report entry
+  `partial_leg`. (2) An EMPTY-HANDED travel after an arm action (the consecutive navigate / transition actions) is swept
+  again with the acting arm where the last motion left it, then lifted 5 / 10 cm (`choose_departure_arms`,
+  `_sweep_travel_record`: the path over its strides at its trunk, an arrival transition's sweep / drive-in and a
+  departure's drive-back / sweep at their recorded s_T, the released objects at their release poses); the first
+  candidate that keeps every leg free is written as `paths[].arms_q` / `transitions[].arms_q` (+ `arms_source`), the
+  tracker keeps the arm through the travel, and the oracle re-poses only an arm that deviates from those joints
+  (`execute_navigate`, `move_idle_arms(arms_q=...)`; `Navigate` / `Transition` targets gain `arms_q`). No candidate
+  free: the records stay as swept and the oracle re-poses to the stance posture as before. `ISG_DEPARTURE_ARMS=off`
+  disables (2). Report: `departure_arms[]`. Details settled by the first re-sampling passes (2026-09-25): the straight
+  legs list `n` poses AFTER their start (`line_waypoints`), so a chain leaves from `2 p0 - p1` (`_chain_starts`; the
+  pre witness 3.3 cm away was outside the 3 cm remembered-solution radius - the very reason the first listed pose was
+  re-solved into a random branch); the continuation solver runs with the oracle's acceptance (soft waypoint tolerance
+  1 cm / 0.03 rad, 100 iterations: without it 8/8 block-design attempts stalled the lift at 4 mm where the oracle's
+  lift goes on); the grasped object's surface comes from the module's `grasp_ignore_objects` when it has one (IORS
+  floor class: the floor, which `support_objects` leaves out); the oracle executes the converged prefix of a finishing
+  leg that stalls AT a joint limit without a witness before failing it, so `execute_retreat` accepts the partial
+  retreat (block design 0925-062801 retreat[15] failed outright; 0925-110340 accepted 23 mm short). Block design
+  0925-110340: 521 travel steps (919 in the demo of record 0921-050358; the 7 cm stance hop 210 vs 371), no arm move at
+  the three later travels, 3898 steps in all (4264).
 - **Camera relocalization bucket = the geodesic** (2026-09-24). The four bucket decisions (goal sampling, the
   per-cell obstacle try, the final blocked-map path, the re-plan after the settle) read the eroded-map shortest-path
   length `kit.geodesic` returns (spec §2.3 / §6.1), not `paths[].length_m`: since the record became the line-of-sight

@@ -299,7 +299,8 @@ class FakeBackend:
         for i, wp in enumerate(waypoints):
             if stall is not None and i >= stall[0] and len(waypoints) > 1:
                 self.stall_ik_after = None
-                diag = {"stage": "diff_ik", "fail_index": i, "n_waypoints": len(waypoints), "pos_err": stall[1], "rot_err": 0.001, "at_lower": [], "at_upper": [], "converged": i}
+                diag = {"stage": "diff_ik", "fail_index": i, "n_waypoints": len(waypoints), "pos_err": stall[1], "rot_err": 0.001,
+                        "at_lower": list(stall[2]) if len(stall) > 2 else [], "at_upper": [], "converged": i}  # (n, pos_err[, joints at their lower limit])
                 return _Res(False, th.stack(path) if len(path) > 1 else None, status=f"differential IK did not converge at waypoint {i}/{len(waypoints)}: pos_err={stall[1]*1000:.1f}mm (fake)", diagnostics=diag)
             for frame, pose in wp.items():
                 arm = M.arm_of_eef_link(frame)
@@ -894,26 +895,41 @@ def axial_world(gain=1.0, stop=None, tol=0.10):
 
 
 def test_brace_retry_ladder_short_and_overshoot(tmp_path):
-    """Owner decisions 2026-09-16 05:26 / 05:39: a braced push ending out of tolerance is re-run from the checkpoint
-    before the brace with the brace +5 / +10 mm outward when the target touched the brace finger before the goal
-    (short), −5 / −10 mm inward when the residual flipped sign (overshoot); two retries, then ``tolerance``."""
-    # (a) short: the stop blocks the board at 80 % of the arc with the recorded brace, at 100 % once it stands 5 mm further out
+    """Owner decisions 2026-09-16 05:26 / 05:39, split 2026-09-26: a braced push ending out of tolerance is re-run from the
+    checkpoint before the brace with the brace +5 / +10 ... mm outward when the target touched the brace finger before the goal
+    (short, brace hit). A short with NO brace catch is not the brace's fault: out of tolerance the pad aims past the goal by the
+    measured sag (``aim_push_past_goal``, the brace unchanged), inside the tolerance it is accepted without improvement rungs
+    (world vertical 0925-193257 / 225052 / 235643: every rung 'short' with brace hits 0, the painting sagged back after the pad
+    left, the rungs only added plan failures)."""
+
+    def touch_while_blocked(ex, env, board, pushes=1):
+        # the brace finger touches the board only while the brace blocks it (the first ``pushes`` pushes: brace at the recorded
+        # contact); moved outward, the board no longer reaches it
+        n = {"push": 0}
+        orig = ex.monitors.begin_action
+
+        def begin_action(action, index, attempt, **kw):
+            if getattr(action, "name", "") == "push":
+                n["push"] += 1  # every rung starts its push afresh
+            return orig(action, index, attempt, **kw)
+
+        ex.monitors.begin_action = begin_action
+        return FakeContacts(lambda step, query: [(f"{env.robot.prim_path}/left_gripper_finger_link1", f"{board.prim_path}/base_link")]
+                            if ex.monitors.action is not None and ex.monitors.action.name == "push" and n["push"] <= pushes else [])
+
+    # (a) short with a brace hit: the stop blocks the board at 80 % of the arc with the recorded brace; 5 mm further out the board
+    # reaches the goal without touching it -> one rung, then accepted in tolerance
     sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, stop=lambda off: 0.8 + 40.0 * off)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
-
-    def brace_touch(step, query):
-        if ex.monitors.action is not None and ex.monitors.action.name == "push":
-            return [(f"{env.robot.prim_path}/left_gripper_finger_link1", f"{board.prim_path}/base_link")]
-        return []
-
-    ex.monitors._contact_api = FakeContacts(brace_touch)
+    ex.monitors._contact_api = touch_while_blocked(ex, env, board)
     result = ex.run_program(actions)
     assert result["success"], result["verdict"]
     assert len(result["brace_retry"]) == 1
     br = result["brace_retry"][0]
     assert [r["reason"] for r in br["retries"]] == ["short"] and br["retries"][0]["next_offset_m"] == 0.005 and br["final_offset_m"] == 0.005
     assert br["retries"][0]["brace_hits"] > 0 and br["retries"][0]["residual"] > 0.10
-    assert br["final"]["in_tolerance"] and [a["name"] for a in result["actions"]] == ["transition", "brace", "push", "retreat", "retreat"]
+    assert br["final"]["in_tolerance"] and br["final"]["reason"] is None and "accepted" in br["final"]
+    assert [a["name"] for a in result["actions"]] == ["transition", "brace", "push", "retreat", "retreat"]
     # the re-run brace stood 5 mm outward along -direction of the recorded contact (offset_brace geometry)
     moved = EX.offset_brace(brace, 0.005)
     assert abs(float(th.dot(brace.contact.contact.tensors()[0] - moved.contact.contact.tensors()[0], th.tensor(brace.contact.direction[:3]).float())) - 0.005) < 1e-6
@@ -921,26 +937,56 @@ def test_brace_retry_ladder_short_and_overshoot(tmp_path):
     # the record is consistent: committed rows = committed steps, the rolled-back group kept aside
     assert len(rec.rows["step"]) == result["n_steps"] and np.all(np.diff(np.asarray(rec.rows["step"])) == 1)
     assert any(r["attempt"] == 0 and r["action_index"] == 1 for r in rec.rollbacks)
-    # (b) overshoot: the board over-rotates 15 % and the recorded stop stands too far to catch it; 5 mm inward it does
+    # (b) overshoot caught by the stop within the aim band (the arc aim is biased to the overshoot side): no rung
     sc, env, actions, board, brace, push, geom = axial_world(gain=1.15, stop=lambda off: 1.15 + 30.0 * off)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path / "b")
     result = ex.run_program(actions)
     assert result["success"], result["verdict"]
-    br = result["brace_retry"][0]
-    assert [r["reason"] for r in br["retries"]] == ["overshoot"] and br["retries"][0]["next_offset_m"] == -0.005 and br["retries"][0]["residual"] < -0.10
-    # (c) hopeless: the stop blocks at 60 % whatever the brace does -> two short retries (+5, +10 mm), then tolerance
+    assert result["brace_retry"] == []
+    # (c) hopeless: the stop blocks at 60 % whatever the brace does and is touched every time -> every brace rung, then tolerance
     sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, stop=lambda off: 0.6)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path / "c")
-    ex.monitors._contact_api = FakeContacts(lambda step, query: [(f"{env.robot.prim_path}/left_gripper_finger_link2", f"{board.prim_path}/base_link")] if ex.monitors.action is not None and ex.monitors.action.name == "push" else [])
+    ex.monitors._contact_api = touch_while_blocked(ex, env, board, pushes=99)
     result = ex.run_program(actions)
     assert result["reason"] == "tolerance"
     br = result["brace_retry"][0]
-    assert [r["next_offset_m"] for r in br["retries"]] == [0.005, 0.010] and br["final_offset_m"] == 0.010 and br["final"]["reason"] == "short"
-    # (d) short without a brace contact (the board just slips) is not the brace's fault: no ladder, straight to tolerance
+    assert [r["next_offset_m"] for r in br["retries"]] == [0.005, 0.010, 0.015, 0.020] and br["final_offset_m"] == 0.020 and br["final"]["reason"] == "short"
+    # (d) short without a brace contact, out of tolerance (the board just slips back): the brace stays, the pad aims past the goal
+    # by the measured sag and the re-push ends in tolerance
     sc, env, actions, board, brace, push, geom = axial_world(gain=0.6)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path / "d")
     result = ex.run_program(actions)
-    assert result["reason"] == "tolerance" and result["brace_retry"] == []
+    assert result["success"], result["verdict"]
+    br = result["brace_retry"][0]
+    assert [r["reason"] for r in br["retries"]] == ["short_free"] and br["retries"][0]["next_offset_m"] == 0.0 and br["final_offset_m"] == 0.0
+    assert br["final"]["in_tolerance"] and br["final"]["reason"] is None
+
+
+def test_brace_ladder_falls_back_to_the_in_tolerance_rung_when_an_improvement_rung_fails_to_plan(tmp_path):
+    """Owner 2026-09-26: an improvement rung that fails outright (wave 3's fourth push: 'trajectory optimization to the joint goal
+    failed' twice) goes back to the rung that was already in tolerance - rolled back, re-run once - instead of failing the demo."""
+    sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, stop=lambda off: 0.8 + 40.0 * off)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    # the brace is touched on every push: rung 2 (5 mm out) ends IN tolerance but above the aim, so a third rung is tried
+    ex.monitors._contact_api = FakeContacts(lambda step, query: [(f"{env.robot.prim_path}/left_gripper_finger_link1", f"{board.prim_path}/base_link")]
+                                            if ex.monitors.action is not None and ex.monitors.action.name == "push" else [])
+    n = {"brace": 0}
+    orig = ex.run_action
+
+    def run_action(index, action, watch=()):
+        if action.name == "brace":
+            n["brace"] += 1
+            backend.fail_plans = 1000 if n["brace"] == 3 else 0  # every plan of the third rung fails
+        return orig(index, action, watch=watch)
+
+    ex.run_action = run_action
+    result = ex.run_program(actions)
+    assert result["success"], result["verdict"]
+    br = result["brace_retry"][0]
+    reasons = [r["reason"] for r in br["retries"]]
+    assert reasons[:2] == ["short", "short"] and reasons[-1].startswith("rung failed: plan_failed"), reasons
+    assert br["final_offset_m"] == 0.005 and br["final"]["in_tolerance"] and br["verdict"] is None
+    assert n["brace"] == 4  # rung 1, rung 2, the failed rung 3, the re-run of rung 2
 
 
 def test_arm_along_unwinds_a_loaded_arm_before_the_leg():
@@ -3115,3 +3161,436 @@ def test_arc_push_of_a_hinged_target_is_tracked_closed_loop_and_stops_at_the_goa
         end = state.eef_pose(push.contact.arm)
         assert float(th.linalg.norm(end[0] - ctx["push_end_pose"][0])) < 1e-3
         assert EX.check_postcondition(push, state, targets, ctx) is None
+
+
+# ==========================================================================================
+# owner 2026-09-24: a travel swept with the arm where the previous motion left it (``paths[].arms_q`` /
+# ``transitions[].arms_q``) - the executor re-poses only a deviating arm
+# ==========================================================================================
+
+
+def _nav_from(robot, arms_q=None, posture="untucked", dx=0.3):
+    """A ``Navigate`` over a short recorded path from the robot's base pose, optionally carrying ``arms_q``."""
+    from ispatialgym.oracle import sidecar as SC
+
+    x, y = float(robot.pos[0]), float(robot.pos[1])
+    yaw = float(C.yaw_from_quat(robot.quat)) if hasattr(C, "yaw_from_quat") else 0.0
+    d = {"from": "manipulation_2", "to": "manipulation_3", "mode": "local", "waypoints": [[x, y, yaw], [x + dx, y, yaw]], "length_m": dx,
+         "posture": posture, "carried": None}
+    if arms_q is not None:
+        d["arms_q"] = arms_q
+    return Navigate(path=SC.Path.from_dict(d, "paths[0]"))
+
+
+def _first_move_step(rows, idx):
+    q = np.asarray(rows["joint_positions"])
+    moved = np.abs(q[:, idx] - q[0, idx]).max(axis=1) > 1e-4
+    return int(np.argmax(moved)) if moved.any() else None
+
+
+def _first_base_move_step(rows):
+    p = np.asarray(rows["base_pose2d"]) if "base_pose2d" in rows else None
+    if p is None:
+        return None
+    moved = np.abs(p[:, :2] - p[0, :2]).max(axis=1) > 1e-3
+    return int(np.argmax(moved)) if moved.any() else None
+
+
+def test_navigate_keeps_an_arm_at_the_records_arms_q(tmp_path):
+    """The record was swept with the right arm where the retreat left it (``arms_q``): the arm does not move before the
+    drive (no re-pose to the untucked default), the note says so."""
+    sc, env = iors_world()
+    robot = env.robot
+    ridx, lidx = robot.arm_control_idx["right"], robot.arm_control_idx["left"]
+    retreat_q = th.tensor([0.5, -0.4, 0.7, 0.3, 0.2, -0.1, 0.9])
+    robot.q[ridx] = retreat_q.clone()
+    assert float(th.max(th.abs(robot.q[ridx] - robot.untucked_default_joint_pos[ridx]))) > EX.IDLE_ARM_TOL
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    nav = _nav_from(robot, arms_q={"right": retreat_q.tolist(), "left": robot.q[lidx].tolist()})
+    targets = nav.targets(sc, ex.state)
+    assert targets["arms_q"] == {"right": retreat_q.tolist(), "left": robot.q[lidx].tolist()}
+    assert ex.run_action(0, nav) is None
+    assert th.allclose(robot.q[ridx], retreat_q, atol=1e-5), "the arm swept in the record must stay where it is"
+    notes = ex.action_records[0].notes
+    assert notes["navigate_arms_reposed"] == [] and notes["navigate_arms_source"] == "record arms_q"
+
+
+def test_navigate_reposes_only_the_arm_that_deviates_from_the_records_arms_q(tmp_path):
+    """A retreat that ended short in another branch: the arm deviates from the swept joints and is brought there first
+    (before the base moves); the other arm, already at its swept joints, is left alone."""
+    sc, env = iors_world()
+    robot = env.robot
+    ridx, lidx = robot.arm_control_idx["right"], robot.arm_control_idx["left"]
+    swept_right = th.tensor([0.5, -0.4, 0.7, 0.3, 0.2, -0.1, 0.9])
+    robot.q[ridx] = swept_right + th.tensor([0.3, 0.0, -0.2, 0.0, 0.0, 0.0, 0.0])
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    nav = _nav_from(robot, arms_q={"right": swept_right.tolist(), "left": robot.q[lidx].tolist()})
+    assert ex.run_action(0, nav) is None
+    assert th.allclose(robot.q[ridx], swept_right, atol=1e-4)
+    notes = ex.action_records[0].notes
+    assert notes["navigate_arms_reposed"] == ["right"]
+    rows = rec.rows
+    arm_step, base_step = _first_move_step(rows, ridx.numpy()), _first_base_move_step(rows)
+    assert arm_step is not None and (base_step is None or arm_step < base_step), (arm_step, base_step)
+    assert _first_move_step(rows, lidx.numpy()) is None  # the left arm was already at its swept joints
+
+
+def test_navigate_without_arms_q_keeps_the_untucked_rule(tmp_path):
+    """No ``arms_q`` on the record: the 2026-09-19 rule - an untucked, uncarried path re-poses every empty arm to the
+    untucked default before the drive."""
+    sc, env = iors_world()
+    robot = env.robot
+    ridx, lidx = robot.arm_control_idx["right"], robot.arm_control_idx["left"]
+    robot.q[ridx] = th.tensor([0.5, -0.4, 0.7, 0.3, 0.2, -0.1, 0.9])
+    robot.q[lidx] = robot.untucked_default_joint_pos[lidx].clone()  # the fake spawns off the untucked default: only the right arm deviates
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    nav = _nav_from(robot)
+    assert nav.targets(sc, ex.state)["arms_q"] is None
+    assert ex.run_action(0, nav) is None
+    assert th.allclose(robot.q[ridx], robot.untucked_default_joint_pos[ridx], atol=1e-4)
+    assert ex.action_records[0].notes["navigate_arms_reposed"] == ["right"]
+
+
+def test_transition_arms_q_replaces_the_stance_posture_for_move_idle_arms(tmp_path):
+    """``transitions[].arms_q`` (the arm as the previous motion left it): ``move_idle_arms`` targets those joints instead of
+    the arriving stance's ``arms_q`` / posture - an arm already there does not move; the stance's fingers still apply."""
+    sc, env = iors_world()
+    robot = env.robot
+    manip = sc.stance("manipulation")
+    ridx, lidx = robot.arm_control_idx["right"], robot.arm_control_idx["left"]
+    manip.extra["arms_q"] = {"left": [0.9, 0.3, -0.7, -1.2, 0.5, 0.2, 0.8], "right": [0.0] * 7}
+    manip.extra["idle_posture"] = "ready"
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    here = {"left": robot.q[lidx].tolist(), "right": robot.q[ridx].tolist()}
+    ctx = {}
+    list(EX.move_idle_arms(motions, ex.state, manip, ctx, arms_q=here))
+    assert ctx["arms_posture"]["moved"] == [] and ctx["arms_posture"]["source"].startswith("record arms_q")
+    assert th.allclose(robot.q[lidx], th.tensor(here["left"]), atol=1e-6) and th.allclose(robot.q[ridx], th.tensor(here["right"]), atol=1e-6)
+    # a deviating arm is brought to the record's joints (not to the stance's)
+    want_right = th.tensor(here["right"]) + th.tensor([0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    ctx = {}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx, arms_q={"left": here["left"], "right": want_right.tolist()}):
+        env.step(a)
+    assert ctx["arms_posture"]["moved"] == ["right"] and th.allclose(robot.q[ridx], want_right, atol=1e-4)
+    # the transition action carries the record's arms_q in its targets
+    transition = expand(sc.alias, sc)[0]
+    assert transition.name == "transition" and transition.targets(sc, ex.state)["arms_q"] is None
+    transition.transition.extra["arms_q"] = {"right": want_right.tolist()}
+    assert transition.targets(sc, ex.state)["arms_q"] == {"right": want_right.tolist()}
+    transition.transition.extra["arms_q"] = {"right": [0.0, 1.0]}  # malformed: ignored
+    assert transition.targets(sc, ex.state)["arms_q"] is None
+
+
+def test_retreat_stalling_at_a_joint_limit_without_a_witness_is_accepted_as_partial(monkeypatch):
+    """Owner 2026-09-24 (block design 0925-062801 retreat[15]): a free-space retreat whose differential IK stalls AT a joint
+    limit with no recorded witness used to fail the action outright (nothing executed, ``plan_failed``); now the converged
+    prefix is executed and ``execute_retreat`` accepts the leg as the partial retreat it is when it ends within
+    ``retreat_partial_accept_m`` of its end pose."""
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc)
+    motions.cfg = replace(motions.cfg, cartesian_step=0.02)  # the 5 cm retreat densifies to 3 waypoints
+    actions = expand(sc.alias, sc)
+    names = [a.name for a in actions]
+    assert names[:5] == ["transition", "grasp", "lift", "place", "retreat"]
+    for i in range(4):
+        assert ex.run_action(i, actions[i]) is None
+    backend.stall_ik_after = (2, 0.013, ["right_arm_joint2"])  # stalls 13 mm short at the third waypoint, joint 2 on its limit
+    assert ex.run_action(4, actions[4]) is None
+    rec = ex.action_records[4]
+    assert rec.attempts == [None], rec.attempts
+    assert 0.0 < rec.notes["retreat_partial_m"] <= EX.ExecuteConfig().retreat_partial_accept_m
+    # a limit stall before the first waypoint (nothing converged, the whole 5 cm leg missing): owner 2026-09-26 (axial 0926-061151
+    # retreat[2]) - a planned transit to the leg's end pose from where the hand is, recorded; without it the attempt fails as before
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc)
+    motions.cfg = replace(motions.cfg, cartesian_step=0.02)
+    actions = expand(sc.alias, sc)
+    for i in range(4):
+        assert ex.run_action(i, actions[i]) is None
+    backend.stall_ik_after = (0, 0.05, ["right_arm_joint2"])
+    backend.calls.clear()
+    assert ex.run_action(4, actions[4]) is None
+    rec = ex.action_records[4]
+    assert rec.attempts == [None] and rec.notes["retreat_planned_fallback"]["short_m"] > EX.ExecuteConfig().retreat_partial_accept_m
+    assert "plan_pose" in backend.calls
+    monkeypatch.setattr(EX, "CONFIG", replace(EX.CONFIG, retreat_plan_fallback=False))
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc)
+    motions.cfg = replace(motions.cfg, cartesian_step=0.02)
+    actions = expand(sc.alias, sc)
+    for i in range(4):
+        assert ex.run_action(i, actions[i]) is None
+    backend.stall_ik_after = (0, 0.05, ["right_arm_joint2"])
+    ex.run_action(4, actions[4])
+    rec = ex.action_records[4]
+    assert rec.attempts[0] is not None and rec.attempts[0]["category"] == "plan_failed"
+
+
+# ==========================================================================================
+# owner 2026-09-24 regressions: (1) the brace hand on the braced object is allowed while the brace holds; (2) a
+# collision-checked leg fails on NEW collisions only
+# ==========================================================================================
+
+
+def test_collision_monitor_allows_the_brace_fingers_on_the_braced_object():
+    """Item 1: ``allowed`` pairs (the brace arm's finger / gripper links vs the braced object) are neither flagged nor counted
+    during the push; every other link / object pair keeps its rule."""
+    robot = FakeRobot()
+    partner = FakeObject("partner_box_of_tissues_0", [0.6, 0.1, 0.9], category="box_of_tissues")
+    target = FakeObject("target_box_of_napkins_0", [0.6, -0.1, 0.9], category="box")
+    env = FakeEnv(robot, {"partner": partner, "target": target})
+    mon = QA.Monitors(env, robot, cfg=QA.QAConfig(collision_min_steps=2, fov_min_steps=100000, pause_steps=100000))
+    left_pad = f"{robot.prim_path}/{M.FINGER_LINKS['left'][0]}"
+    right_pad = f"{robot.prim_path}/{M.FINGER_LINKS['right'][0]}"
+    torso = f"{robot.prim_path}/torso_link4"
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
+    push = next(a for a in expand(sc.alias, sc) if a.name == "push")
+    allowed = [(list(M.FINGER_LINKS["left"]) + [M.GRIPPER_LINK["left"]], partner.name)]
+    # the brace (left) pad presses the partner throughout the (right-arm) push: allowed
+    mon._contact_api = FakeContacts(lambda s, q: [(left_pad, f"{partner.prim_path}/base_link")])
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False, allowed=allowed)
+    assert [mon.check(i) for i in range(1, 6)] == [None] * 5
+    assert mon.stats.events.get("contact", 0) == 0 and mon.collision_events == []
+    mon.end_action()
+    # the same contact without the allowance is the old verdict
+    mon._contact_api = FakeContacts(lambda s, q: [(left_pad, f"{partner.prim_path}/base_link")])
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False)
+    verdicts = [mon.check(i) for i in range(1, 4)]
+    assert verdicts[0] is None and verdicts[1] is not None and verdicts[1].category == "collision" and "left_gripper_finger_link1" in verdicts[1].message
+    mon.end_action()
+    # an allowed pair covers ONLY those links against THAT object: the torso on the partner, or the left pad on a third object, still fail
+    mon._contact_api = FakeContacts(lambda s, q: [(torso, f"{partner.prim_path}/base_link")])
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False, allowed=allowed)
+    verdicts = [mon.check(i) for i in range(1, 4)]
+    assert verdicts[1] is not None and verdicts[1].details["link"] == "torso_link4"
+    mon.end_action()
+    # the acting arm's own fingers stay exempt as before
+    mon._contact_api = FakeContacts(lambda s, q: [(right_pad, f"{partner.prim_path}/base_link")])
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False, allowed=allowed)
+    assert [mon.check(i) for i in range(1, 4)] == [None] * 3
+    mon.end_action()
+
+
+def test_brace_allowed_pairs_span_the_brace_to_its_release():
+    """Item 1: the executor derives the allowed pairs from the program - the brace arm's fingers vs the braced object for every
+    action from the ``Brace`` through the brace arm's releasing ``Retreat`` (the push and the push arm's retreat included)."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
+    actions = expand(sc.alias, sc)
+    names = [a.name for a in actions]
+    b = names.index("brace")
+    rel = next(i for i, a in enumerate(actions) if a.name == "retreat" and getattr(a, "release", False) and i > b)
+    brace = actions[b]
+
+    class _Ex:
+        program_actions = actions
+
+        def _scene_names(self, insts):
+            return {f"scene:{i}" for i in insts}
+
+    ex = _Ex()
+    for i, a in enumerate(actions):
+        pairs = Executor.brace_allowed_pairs(ex, i)
+        if b <= i <= rel:
+            assert pairs and pairs[0][1] == f"scene:{brace.contact.object}" and set(pairs[0][0]) == set(M.FINGER_LINKS[brace.contact.arm]) | {M.GRIPPER_LINK[brace.contact.arm]}, (i, a.name, pairs)
+        else:
+            assert pairs == [], (i, a.name, pairs)
+
+
+def test_start_collisions_relaxed_exempts_only_pairs_present_at_the_start():
+    """Item 2 (b): the pairs the leg's start already violates against another arm's link / attached object leave the sphere
+    model for the block; pairs within the moving arm (the 0918-000750 elbow fold) and against the trunk / base stay."""
+    from ispatialgym.oracle.curobo_planner import R1ProCuRobo
+
+    disabled, enabled = [], []
+
+    class _KC:
+        link_name_to_idx_map = {"attached_object_right_eef_link": 0, "left_gripper_finger_link1": 1, "right_arm_link3": 2, "right_arm_link5": 3, "torso_link4": 4, "left_arm_link4": 5}
+
+        def disable_link_spheres(self, link):
+            disabled.append(link)
+
+        def enable_link_spheres(self, link):
+            enabled.append(link)
+
+    class _FK:
+        kinematics_config = _KC()
+
+    class _Entry:
+        fk = _FK()
+
+    class _Planner:
+        _arm_of_link = staticmethod(R1ProCuRobo._arm_of_link)
+
+        def __init__(self, pairs):
+            self._pairs = pairs
+
+        def self_collision_pairs(self, q, emb_name):
+            return self._pairs
+
+        def kin_entry(self, emb):
+            return _Entry()
+
+    # the bracing left hand leaving the carton the right hand holds (0925-103154): the attached carton is exempted for the left arm's leg
+    p = _Planner([{"links": ("attached_object_right_eef_link", "left_gripper_finger_link1"), "penetration": 0.05}])
+    with R1ProCuRobo.start_collisions_relaxed(p, "left_arm", th.zeros(28), ["left"]) as done:
+        assert done == ["attached_object_right_eef_link"]
+    assert disabled == ["attached_object_right_eef_link"] and enabled == ["attached_object_right_eef_link"]
+    disabled.clear(); enabled.clear()
+    # the moving arm against itself (the elbow fold) and against the trunk: genuine, nothing relaxed
+    p = _Planner([{"links": ("right_arm_link3", "right_arm_link5"), "penetration": 0.001}, {"links": ("right_arm_link5", "torso_link4"), "penetration": 0.002}])
+    with R1ProCuRobo.start_collisions_relaxed(p, "right_arm", th.zeros(28), ["right"]) as done:
+        assert done == []
+    assert disabled == []
+    # two static arms' links (the old static_links_relaxed case) and a static arm against the trunk: the static links go
+    p = _Planner([{"links": ("left_arm_link4", "torso_link4"), "penetration": 0.003}])
+    with R1ProCuRobo.start_collisions_relaxed(p, "right_arm", th.zeros(28), ["right"]) as done:
+        assert done == ["left_arm_link4"]
+    assert R1ProCuRobo._arm_of_link("attached_object_left_eef_link") == "left" and R1ProCuRobo._arm_of_link("torso_link4") is None
+
+
+def test_retreat_ignores_the_objects_the_hand_touches_where_it_starts(tmp_path):
+    """Item 2 (a): ``execute_retreat`` leaves every object the retreating hand is in contact with at the start out of the leg's
+    collision world (the partner the push pad ended against), recorded in the notes; objects it meets later still count."""
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    actions = expand(sc.alias, sc)
+    for i in range(4):
+        assert ex.run_action(i, actions[i]) is None
+    plate = env.objects["plate.n.04_1"]
+    ex.state.hand_contacts = lambda arm: [plate]  # the pad still presses the plate where the retreat starts
+    seen = {}
+    real_update = backend.update_world
+
+    def spy_update(*a, **kw):
+        seen["ignore"] = list(kw.get("ignore_objects", ()) or ())
+        return real_update(*a, **kw) if callable(real_update) else None
+
+    backend.update_world = spy_update
+    assert ex.run_action(4, actions[4]) is None
+    rec = ex.action_records[4]
+    assert rec.notes.get("retreat_start_contacts") == [plate.name]
+    assert any(o is plate for o in seen.get("ignore", [])), seen
+
+
+def test_retreat_ignores_the_planner_start_offenders_too(tmp_path):
+    """Item 2 follow-up (owner 2026-09-25, touching 0925-134446): the start-in-collision set also comes from the planner - the
+    objects owning the world meshes the start configuration penetrates in cuRobo's padded sphere model (no physical contact
+    reported) join the leg's and the finish's ignore_objects and are noted as ``retreat_start_offenders``; the search runs with
+    the leg's own ignore set applied and only when the start reads as a world collision."""
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    actions = expand(sc.alias, sc)
+    for i in range(4):
+        assert ex.run_action(i, actions[i]) is None
+    plate = env.objects["plate.n.04_1"]
+    ex.state.hand_contacts = lambda arm: []  # physics: no contact
+    mesh = "/World/scene_0/plate/base_link/collisions/plate__base_link__collision__0"
+    plate.links = {"base_link": type("L", (), {"collision_meshes": {"c0": type("CM", (), {"prim_path": mesh})()}})()}
+    calls = {}
+
+    def start_world_offenders(q, emb_name="whole_body", limit=6):
+        calls["emb"] = emb_name
+        calls["ignore_at_query"] = list(seen.get("ignore", []))
+        return [mesh]
+
+    def objects_of_world_meshes(names):
+        return [o for o in env.objects.values()
+                if any(str(cm.prim_path) in set(names) for l in getattr(o, "links", {}).values() for cm in getattr(l, "collision_meshes", {}).values())]
+
+    backend.start_world_offenders = start_world_offenders
+    backend.objects_of_world_meshes = objects_of_world_meshes
+    seen, legs, finishes = {}, [], []
+    real_update, real_along = backend.update_world, motions.arm_along
+
+    def spy_update(*a, **kw):
+        seen["ignore"] = list(kw.get("ignore_objects", ()) or ())
+        return real_update(*a, **kw)
+
+    def spy_along(arm, waypoints, *a, **kw):
+        legs.append(list(kw.get("ignore_objects", ()) or ()))
+        finishes.append(kw.get("finish"))
+        return real_along(arm, waypoints, *a, **kw)
+
+    backend.update_world = spy_update
+    motions.arm_along = spy_along
+    assert ex.run_action(4, actions[4]) is None
+    rec = ex.action_records[4]
+    assert rec.notes.get("retreat_start_offenders") == [plate.name] and "retreat_start_contacts" not in rec.notes
+    assert calls["emb"] == "right_arm" and not any(o is plate for o in calls["ignore_at_query"])  # queried with the leg's own ignore set
+    assert legs and any(o is plate for o in legs[-1]), legs
+    assert finishes[-1] is not None and any(o is plate for o in finishes[-1].ignore_objects)
+
+
+def test_arm_to_replans_a_transit_near_a_protected_object_via_the_point_above(tmp_path):
+    """Owner 2026-09-26 (oracle.protection; teacup 0925-222212 / 235559): inside a protect context a planned transit that passes
+    too close to a protected object is re-planned via the point above its goal (rise, plan to above, straight down) and the
+    firing is recorded; a plan that clears runs unchanged; outside a context nothing is checked."""
+    from types import SimpleNamespace
+
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    arm = "right"
+    p0, q0 = motions.eef_pose(arm)
+    target = (p0 + th.tensor([0.08, 0.0, -0.04]), q0)
+    backend.solve_ik = None
+    n = {"calls": 0}
+
+    def viol(arms, q_traj, emb, P=None):
+        n["calls"] += 1
+        return [{"object": "partner_saucer_mgbeah_0", "clearance_m": 0.004, "threshold_m": 0.02, "index": 5, "n": 10, "link": "right_gripper_finger_link1"}] if n["calls"] == 1 else []
+
+    motions._protect_violations = viol
+    saucer = [("saucer.n.02_1", SimpleNamespace(name="partner_saucer_mgbeah_0"))]
+    backend.calls.clear()
+    with motions.protecting(saucer, leg="pre_grasp", task="teacup", action="grasp", index=1):
+        drive(env, motions.arm_to(arm, pose=target))
+    ev = motions.protect_events[-1]
+    assert ev["remedy"] == "via-above" and ev["leg"] == "pre_grasp" and ev["objects"][0]["clearance_m"] == 0.004
+    assert backend.calls.count("plan_pose") == 2 and backend.calls.count("solve_ik_path") >= 2  # the plan to above; the lift and the descent
+    p1, _ = motions.eef_pose(arm)
+    assert float(th.linalg.norm(p1 - target[0])) < 5e-3
+    # a plan that clears is executed unchanged: no event, one plan
+    motions.protect_events.clear()
+    backend.calls.clear()
+    motions._protect_violations = lambda arms, q_traj, emb, P=None: []
+    with motions.protecting(saucer, leg="pre_grasp", task="teacup", action="grasp", index=1):
+        drive(env, motions.arm_to(arm, pose=(p1 + th.tensor([0.0, 0.03, 0.0]), q0)))
+    assert motions.protect_events == [] and backend.calls.count("plan_pose") == 1
+    # no context: the check is never consulted
+    motions._protect_violations = lambda *a, **k: (_ for _ in ()).throw(AssertionError("checked outside a protect context"))
+    drive(env, motions.arm_to(arm, pose=(p1, q0)))
+
+
+def test_arm_to_witness_retries_the_joint_plan_and_refuses_another_branch(tmp_path):
+    """Owner 2026-09-25 (teacup pod demo 0925-172723): a failed joint-space plan to a recorded witness is retried
+    (``witness_plan_retries`` rounds) before any pose-goal fallback, and a fallback that lands in another IK branch (further than
+    ``witness_branch_max_jump`` from the witness) fails the attempt instead of continuing there - the chained legs would fail anyway."""
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    idx = env.robot.arm_control_idx["right"]
+    pose = as_world_pose(env.robot.eef_pose("right"))
+    q_hint = env.robot.get_joint_positions().clone()
+    q_hint[idx[3]] += 2.0  # the witness sits in another branch than where a pose plan would end
+    motions.backend.solve_ik = None  # no refinement: the witness is used as recorded
+    rounds = 1 + motions.cfg.witness_plan_retries
+    # the first round and the first retry fail, the second retry succeeds: no pose-goal fallback
+    backend.fail_plans = 2
+    backend.calls.clear()
+    drive(env, motions.arm_to("right", pose=pose, q_hint=q_hint))
+    assert backend.calls.count("plan_joint") == 3 and "plan_pose" not in backend.calls
+    # every joint-space round fails and the pose-goal plan ends 2 rad from the witness: plan_failed with the excursion recorded
+    backend.fail_plans = rounds
+    backend.calls.clear()
+    with pytest.raises(SkillError) as ei:
+        drive(env, motions.arm_to("right", pose=pose, q_hint=q_hint))
+    assert ei.value.reason == "plan_failed" and ei.value.details.get("excursion") is not None and ei.value.details["excursion"] > 0.6
+    assert backend.calls.count("plan_joint") == rounds and backend.calls.count("plan_pose") == 1
+    # owner 2026-09-26 (axial 0926-043254 / 051919): a caller whose legs start from wherever the hand is (a push's pre-contact) keeps
+    # the other-branch pose-goal plan instead - recorded; the arm ends where the pose plan ends, not at the witness
+    backend.fail_plans = rounds
+    backend.calls.clear()
+    drive(env, motions.arm_to("right", pose=pose, q_hint=q_hint, accept_other_branch=True))
+    ev = motions.witness_branch_accepted_events[-1]
+    assert ev["branch_gap_rad"] > 0.6 and ev["rounds"] == rounds
+    assert backend.calls.count("plan_joint") == rounds and backend.calls.count("plan_pose") == 1
+    assert abs(float(env.robot.get_joint_positions()[idx[3]]) - float(q_hint[idx[3]])) > 0.6

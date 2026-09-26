@@ -55,7 +55,7 @@ import torch as th
 from ispatialgym import ASSETS_ROOT
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action, Brace, Place, Push
-from ispatialgym.oracle.execute import check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
+from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
 from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
@@ -133,6 +133,9 @@ class ExecutorConfig:
     brace_retry_aim_bias_rad: float = 0.05
     #: (rush) an arc overshoot with no brace catch shortens the recorded arc (shorten_push) instead of moving the brace
     push_shorten_on_free_overshoot: bool = True
+    #: (owner 2026-09-26) the mirror for a short with no brace catch: out of tolerance -> the arc is lengthened and the pad aims
+    #: past the goal by the measured sag (aim_push_past_goal); in tolerance -> accepted as it is (the epilogue's settled check decides)
+    push_extend_on_free_short: bool = True
     #: demo-collection gates applied after the epilogue (``run_isg --demo-gating``; oracle mode: ``placed_orientation``):
     #: ``placed_orientation`` = every placed object (place / drop / attach, not pushes) must end within its recorded
     #: orientation target's tolerance (``orientation_tolerance``, 0.2 rad default; nearest equivalence, the evaluator's
@@ -337,7 +340,8 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
 NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "carry_leg", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
-             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m", "follow", "attach", "reorient_finish", "approach_standoff", "partner_shift", "pre_grasp_transit")
+             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m", "follow", "attach", "reorient_finish", "approach_standoff", "partner_shift", "pre_grasp_transit",
+             "navigate_arms_reposed", "navigate_arms_source", "retreat_partial_m", "retreat_start_contacts", "retreat_start_offenders", "brace_allowed")
 
 
 def _jsonable(x):
@@ -356,6 +360,8 @@ def _jsonable(x):
 NOTE_KEYS = NOTE_KEYS + ("inhand_reaim",)
 #: room door push-close: the per-chunk record of execute.execute_push_close
 NOTE_KEYS = NOTE_KEYS + ("push_close",)
+NOTE_KEYS = NOTE_KEYS + ("protection",)  # oracle.protection (owner 2026-09-26): the transits of the action and their protected objects
+NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial 0926-061151): a failed retreat leg replaced by a planned transit
 
 
 @dataclass
@@ -506,6 +512,40 @@ class SimState:
                     out.append(ent)
             except Exception:  # noqa: BLE001
                 continue
+        return out
+
+    def hand_contacts(self, arm: str) -> List[Any]:
+        """Scene objects the ``arm``'s finger / gripper links are in contact with right now (``RigidContactAPI``, current
+        step; the floor and other ground categories left out) — what a leg that starts from a contact is allowed to touch
+        along its way (owner 2026-09-24 item 2: the push pad against the partner it just pushed the target onto, the brace
+        hand on the braced object). ``[]`` without the simulator / a contact view."""
+        try:
+            from omnigibson.utils.usd_utils import RigidContactAPI
+        except Exception:  # noqa: BLE001
+            return []
+        scene = getattr(self.env, "scene", None)
+        if scene is None or not hasattr(self.robot, "prim_path"):
+            return []
+        links = set(M.FINGER_LINKS.get(arm, ())) | {M.GRIPPER_LINK.get(arm)}
+        prefix = self.robot.prim_path + "/"
+        try:
+            pairs = RigidContactAPI.get_contact_pairs(scene.idx, [self.robot], None, current_only=True)
+        except Exception:  # noqa: BLE001
+            return []
+        out: List[Any] = []
+        for own, other in pairs:
+            if not str(own).startswith(prefix) or str(other).startswith(prefix):
+                continue
+            if str(own).rsplit("/", 1)[-1] not in links:
+                continue
+            try:
+                obj = scene.object_registry("prim_path", str(other).rsplit("/", 1)[0], None)
+            except Exception:  # noqa: BLE001
+                obj = None
+            if obj is None or obj is self.robot or str(getattr(obj, "category", "")) in ("floors", "ceilings", "lawn", "roof"):
+                continue
+            if not any(obj is o for o in out):
+                out.append(obj)
         return out
 
     def held_object(self, arm: str):
@@ -666,6 +706,10 @@ class Executor:
         self.last_ctx: Dict[str, Any] = {}
         self._defer_commit = False
         self.brace_retries: List[Dict[str, Any]] = []
+        # oracle.protection (owner 2026-09-26): the goal objects protected during transits ([(bddl name, scene object)], set by
+        # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
+        self.protected_goal: List[Tuple[str, Any]] = []
+        self._protect_force: set = set()
         self.program_actions: List[Action] = []
         self.checkpoint_reports: List[Dict[str, Any]] = []
         self.timings: Dict[str, float] = {}
@@ -1005,6 +1049,38 @@ class Executor:
                 out.add(inst)
         return out
 
+    def brace_allowed_pairs(self, index: int) -> List[Tuple[List[str], str]]:
+        """Contacts the collision monitor must not flag while a brace is active (owner 2026-09-24 item 1): the brace hand's
+        finger / gripper links against the braced object, from the ``Brace`` action through the brace arm's releasing
+        ``Retreat`` (``programs._brace_push_retreat``: brace -> push -> push-arm retreat -> brace-arm retreat). Read off the
+        program, so a checkpoint restore / retry needs no state: ``[(link names, scene object name), ...]`` for the braces
+        whose span contains action ``index``. The braced object was never in the push's ``intended`` set and the monitor
+        exempts the acting arm's fingers only; with the closed-loop push arc and the 250 kg chassis the brace pad presses on
+        its object on every attempt (touching 0925-113253: ``left_gripper_finger_link1 in contact with partner_box_of_tissues``)."""
+        out: List[Tuple[List[str], str]] = []
+        actions = list(getattr(self, "program_actions", None) or [])
+        active: Dict[str, Tuple[int, str]] = {}
+        for j, a in enumerate(actions):
+            name = getattr(a, "name", "")
+            if name == "brace":
+                contact = getattr(a, "contact", None)
+                arm, obj = getattr(contact, "arm", None), getattr(contact, "object", None)
+                if arm and obj:
+                    active[arm] = (j, obj)
+            elif name == "retreat" and getattr(a, "release", False) and getattr(a, "arm", None) in active:
+                start, obj = active.pop(a.arm)
+                if start <= index <= j:
+                    out.append((list(M.FINGER_LINKS[a.arm]) + [M.GRIPPER_LINK[a.arm]], obj))
+        for arm, (start, obj) in active.items():  # a brace with no releasing retreat recorded: active to the program's end
+            if start <= index:
+                out.append((list(M.FINGER_LINKS[arm]) + [M.GRIPPER_LINK[arm]], obj))
+        resolved: List[Tuple[List[str], str]] = []
+        for links, obj in out:
+            names = self._scene_names([obj])
+            for n in names:
+                resolved.append((links, n))
+        return resolved
+
     def attempt(self, index: int, action: Action, attempt: int, watch: Sequence[Tuple[Sequence[str], str]] = ()) -> Tuple[Optional[Verdict], Dict[str, Any]]:
         """Execute ``action`` once under the monitors and check its postcondition. ``watch``: contact pairs the
         monitors log for the caller (``ctx["watch_hits"]``, episode steps)."""
@@ -1025,12 +1101,17 @@ class Executor:
             if stage is not None:
                 self.motions.release_opening[action.arm] = stage
             ctx["release_stage_m"] = stage
+        ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "alias", None) if self.sidecar is not None else None,
+                          "index": index}
         if self.monitors is not None:
-            ctx["hooks"] = {"fov": self.monitors.set_fov_enabled}
+            ctx["hooks"] = {"fov": self.monitors.set_fov_enabled,
+                            "transit": (lambda on, objects=(), label=None: self.monitors.begin_transit(objects, label) if on else self.monitors.end_transit())}
             ctx["monitors"] = self.monitors  # experiments read collision_events for their notes (owner 2026-09-20 23:58)
+            allowed = self.brace_allowed_pairs(index)
+            ctx["brace_allowed"] = [(sorted(links), obj) for links, obj in allowed]
             self.monitors.begin_action(action, index, attempt, intended=self._scene_names(intended_contacts(action)), held=self.state.held_objects(),
                                        manipulation=is_manipulation(action), fov=fov_monitored(action), forbidden=self._scene_names(forbidden_contacts(action)),
-                                       watch=[(links, next(iter(self._scene_names([obj])))) for links, obj in watch])
+                                       watch=[(links, next(iter(self._scene_names([obj])))) for links, obj in watch], allowed=allowed)
         try:
             gen = run_action(action, self.motions, self.state, targets, ctx)
             v = self.run_generator(gen, PHASE_ORACLE, index, attempt)
@@ -1099,6 +1180,8 @@ class Executor:
                 log.info("action %d %s ok in %d steps (%.1fs)", index, action.summary() if hasattr(action, "summary") else action.name, self.n - rec.step_start, time.time() - t0)
                 break
             log.warning("action %d %s attempt %d failed: %s", index, action.name, k, verdict)
+            if verdict.category in ("protected_contact", "protected_moved"):
+                self._protect_force.add(index)  # the retry re-plans the transit via the point above its goal (oracle.protection)
             if k < self.cfg.retries:
                 # roll back: the failed attempt leaves no trace in the demo (kept under rollbacks), retry from the checkpoint
                 if self.recorder is not None:
@@ -1201,8 +1284,15 @@ class Executor:
             return out
         if signed < centre:
             out["reason"] = "overshoot"
-        elif hits or out["in_tolerance"]:
-            out["reason"] = "short"
+        elif hits:
+            out["reason"] = "short"  # the target touched the brace before the goal: the stop stands too close - move it outward
+        elif out["in_tolerance"]:
+            # owner 2026-09-26 (world vertical 0925-193257 / 225052 / 235643: every rung 'short' with brace hits 0 - the pad stops at
+            # the goal and the painting sags back 0.015-0.035 rad when it leaves; moving the brace outward cannot change that, the
+            # extra pushes were only more chances for a plan failure): a free short inside the tolerance is accepted as it is
+            out["accepted"] = "in tolerance, no brace catch: accepted without improvement rungs (the epilogue's settled check decides)"
+        else:
+            out["reason"] = "short_free"  # out of tolerance, the brace untouched: push further (aim_push_past_goal by the measured sag)
         return out
 
     def run_braced_push(self, index: int, brace: Brace, push: Push) -> Optional[Verdict]:
@@ -1220,29 +1310,62 @@ class Executor:
         history: List[Tuple[float, str]] = []  # (brace offset, reason) of every out-of-tolerance push so far
         offset = 0.0
         shorten = 0.0  # rad the recorded arc is shortened by (overshoot with no brace catch: push less, brace unchanged)
+        extend = 0.0  # rad the pad aims past the goal (short with no brace catch, out of tolerance: push further, brace unchanged)
         verdict: Optional[Verdict] = None
+        best_in_tol: Optional[Tuple[float, float, float]] = None  # (offset, shorten, extend) of the last rung whose push ended IN tolerance
+        fell_back = False
         self._defer_commit = True
         try:
-            for k in range(self.cfg.brace_retries + 1):
+            k = 0
+            while k <= self.cfg.brace_retries:
                 brace_k = brace if offset == 0.0 else offset_brace(brace, offset)
-                push_k = shorten_push(push, shorten) if shorten > 0 else push
+                push_k = shorten_push(push, shorten) if shorten > 0 else (aim_push_past_goal(push, extend) if extend > 0 else push)
                 verdict = self.run_action(index, brace_k)
+                if verdict is None:
+                    watch = [(list(M.FINGER_LINKS[brace.contact.arm]) + [M.GRIPPER_LINK[brace.contact.arm]], push.contact.object)]
+                    verdict = self.run_action(index + 1, push_k, watch=watch)
                 if verdict is not None:
-                    break
-                watch = [(list(M.FINGER_LINKS[brace.contact.arm]) + [M.GRIPPER_LINK[brace.contact.arm]], push.contact.object)]
-                verdict = self.run_action(index + 1, push_k, watch=watch)
-                if verdict is not None:
+                    if best_in_tol is not None and not fell_back and (offset, shorten, extend) != best_in_tol:
+                        # owner 2026-09-25 (world vertical 0925-225052, wave 3): three rungs ended IN tolerance (0.025-0.035 rad of the
+                        # 0.08) but above the aim, the fourth re-brace at -15 mm left the push arm no plan ('trajectory optimization to the
+                        # joint goal failed' twice) and the demo failed although the painting had stood aligned three times. An improvement
+                        # rung that fails outright goes back to the rung that was in tolerance: rolled back and re-run once, whatever it yields
+                        log.warning("braced push: the improvement rung at %+.0f mm failed (%s) - back to the rung that was in tolerance (%+.0f mm, arc shortened %.3f rad)",
+                                    -offset * 1000, verdict.category, -best_in_tol[0] * 1000, best_in_tol[1])
+                        retries.append({"attempt": k, "offset_m": offset, "reason": f"rung failed: {verdict.category}", "residual": None, "tolerance": None,
+                                        "brace_hits": None, "actions": [r.to_dict() for r in self.action_records[first_record:]], "next_offset_m": best_in_tol[0]})
+                        del self.action_records[first_record:]
+                        if self.recorder is not None:
+                            self.recorder.rollback(index, k, {"category": verdict.category, "message": f"braced push rung failed: {verdict.message}"}, state_before=cp.sim_state, mark=mark)
+                            self.recorder.note_rollback({"category": verdict.category, "brace_retry": "rung failed"})
+                        self.restore(cp, index, k + 1)
+                        offset, shorten, extend = best_in_tol
+                        fell_back, verdict = True, None
+                        k += 1
+                        continue
                     break
                 outcome = self.push_outcome(push, self.last_ctx)
                 outcome["shortened_rad"] = shorten
                 self.action_records[-1].notes["push_outcome"] = outcome
-                if outcome["reason"] is None or k == self.cfg.brace_retries:
+                if outcome.get("in_tolerance"):
+                    best_in_tol = (offset, shorten, extend)
+                if outcome["reason"] is None or k >= self.cfg.brace_retries or fell_back:
                     if outcome["reason"] is not None:
                         log.warning("braced push: %s residual %.4f > tolerance %.4f after %d brace retries; the epilogue decides", outcome["reason"], outcome["residual"], outcome["tolerance"], k)
                     break
-                history.append((offset, outcome["reason"]))
+                if outcome["reason"] != "short_free":
+                    history.append((offset, outcome["reason"]))
                 centre = float((outcome.get("aim") or {}).get("centre", 0.0))
-                if outcome["reason"] == "overshoot" and outcome["brace_hits"] == 0 and self.cfg.push_shorten_on_free_overshoot and push.contact.mid is not None:
+                if outcome["reason"] == "short_free":
+                    if not (self.cfg.push_extend_on_free_short and push.contact.mid is not None):
+                        log.warning("braced push: short with no brace catch (residual %.4f > tolerance %.4f) and no arc to lengthen; the epilogue decides", outcome["residual"], outcome["tolerance"])
+                        break
+                    # the painting sags back by about the final residual once the pad leaves: aim the pad that far past the goal
+                    extend += max(float(outcome["residual"]) - centre, 0.0)
+                    new_offset = offset
+                    log.warning("braced push: short with no brace catch (residual %.4f, tolerance %.4f) -> the pad aims %.3f rad past the goal and re-pushes (brace unchanged)",
+                                outcome["residual"], outcome["tolerance"], extend)
+                elif outcome["reason"] == "overshoot" and outcome["brace_hits"] == 0 and self.cfg.push_shorten_on_free_overshoot and push.contact.mid is not None:
                     # the target swept past the goal without touching the brace: the pad's arc rotates it too far - push
                     # less (aim at the ladder centre), keep the brace where it is
                     shorten += abs(float(outcome["residual"])) - abs(centre)
@@ -1269,6 +1392,7 @@ class Executor:
                     self.recorder.note_rollback({"category": "tolerance", "brace_retry": outcome["reason"]})
                 self.restore(cp, index, k + 1)
                 offset = new_offset
+                k += 1
         finally:
             self._defer_commit = False
         if retries:
@@ -1683,6 +1807,9 @@ class Executor:
             "settle_windows": windows,
             "epilogue_relax": relax_info,
             "jams": _jsonable(list(getattr(self.motions, "jams", []) or [])),
+            "witness_branch_accepted": _jsonable(list(getattr(self.motions, "witness_branch_accepted_events", []) or [])),
+            "protection": _jsonable({"protected": [getattr(o, "name", n) for n, o in self.protected_goal], "plan_checks": int(getattr(self.motions, "protect_checks", 0) or 0),
+                                     "fired": list(getattr(self.motions, "protect_events", []) or []) + list(getattr(self.monitors, "protect_events", []) or [])}),
             "demo_gating": demo_gating,
             "motion_delta": motion,
             "actions": [r.to_dict() for r in self.action_records],

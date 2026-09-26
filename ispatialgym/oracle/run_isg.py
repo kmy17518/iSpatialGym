@@ -904,6 +904,19 @@ def main(argv=None) -> int:
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
                             tracked_objects=tracked, cam_key=cam_key)
         executor.last_obs, executor.last_info = obs, info
+        # oracle.protection (owner 2026-09-26): the goal objects the task placed are protected during transits - plan-time
+        # clearance check with a via-above re-plan, run-time contact / movement verdicts (ISG_PROTECT=off disables both)
+        if os.environ.get("ISG_PROTECT", "on").lower() not in ("off", "0", "false"):
+            from ispatialgym.oracle import protection as _PROT
+
+            try:
+                _goal = list(getattr(getattr(task, "problem", None), "goal", None) or [])
+                executor.protected_goal = _PROT.goal_protected(_goal, loader.physical, _PROT.alias_override(meta.get("alias")))
+            except Exception as e:  # noqa: BLE001
+                log.warning("protected objects unavailable (%r): transits unchecked", e)
+                executor.protected_goal = []
+        meta["protected_objects"] = {b: getattr(o, "name", b) for b, o in executor.protected_goal}
+        log.info("protected during transits (goal objects placed by the task): %s", meta["protected_objects"] or "none")
         if rec_cfg.hdf5:
             executor.enable_recording_filter(True)
         recorder.start(obs, info, state0=executor._dump_state(full=True))

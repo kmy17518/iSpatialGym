@@ -64,7 +64,7 @@ RTX_GPUS = {
     "NVIDIA RTX PRO 6000 Blackwell Server Edition": 8,
     "NVIDIA RTX PRO 6000 Blackwell Workstation Edition": 8,
 }
-DEFAULT_CAP_USD = 1000.0  # owner raised the budget to $1000 on 2026-09-16 17:10 ($500 on 09-15); the cap is never enforced by the watchdog (owner 09-15 21:27)
+DEFAULT_CAP_USD = 2500.0  # owner raised the budget to $2500 on 2026-09-25 17:05 (pilot waves: speed over cost; $1000 on 09-16 17:10, $500 on 09-15); the cap is never enforced by the watchdog (owner 09-15 21:27)
 RECHARGE_MIN_JUMP_USD = 20.0
 
 

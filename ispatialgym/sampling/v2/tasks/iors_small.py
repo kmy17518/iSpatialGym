@@ -232,7 +232,9 @@ class IORSSmall(SamplerV2):
         # so the shift along c changes nothing else); the original offset is recorded per grasp
         self.grasps, offsets = self.recentre_pinches(self.grasps, tgt)
         self.template_facts["grasp_pinch_offset_m"] = {k: round(v, 4) for k, v in offsets.items()}
-        self.template_facts["grasps_recentred"] = [k for k, v in offsets.items() if abs(v) > float(self.gen("pinch_offset_max_m", PINCH_OFFSET_MAX))]
+        # the grasps whose pinch WAS moved (owner 2026-09-24 item 3: an off-centre pinch whose re-centring would change the width
+        # between the pads - a rim pinch of a thin-walled cup - keeps its offset and is listed with its reason)
+        self.template_facts["grasps_recentred"] = [k for k, f in (self.template_facts.get("grasp_pinch_recentre") or {}).items() if f.get("applied")]
         # flush pinch (teacup demo 2026-09-16 14:44: grasp_3's closing axis was inclined 28 deg to the horizontal; the flat
         # pads squeezed the vertical cup wall at two heights, the cup rotated in the hand until the pinch was flush - 16-32
         # deg in the hand, 21 deg at the release, at rest 10 deg on the well slope). The target is placed at its rest
@@ -356,15 +358,43 @@ class IORSSmall(SamplerV2):
         mid = 0.5 * float(proj.min() + proj.max())
         return float(th.dot(pc, c)) - mid
 
+    def pinch_chord(self, eef_in_object: G.Pose) -> Optional[float]:
+        """The target's width across the closing axis between the pads at a grasp pose: the hull points inside the pads' band
+        along the approach axis (``PAD_Z_RANGE[0]`` .. the fingertips) and within the pads' lateral reach, measured along the
+        closing axis in the eef frame (the attachment module's ``pinch_width_m``). None when fewer than two hull points lie
+        in the band (the pads close on nothing there)."""
+        eef = (G.t(eef_in_object[0]), G.t(eef_in_object[1]))
+        loc = C.transform_points(C.invert(eef), G.t(self.hull["target"]))
+        in_z = (loc[:, 2] >= C.PAD_Z_RANGE[0]) & (loc[:, 2] <= C.FINGERTIP_LENGTH + 0.002)
+        band = in_z & (loc[:, 0].abs() <= 0.03)
+        if int(band.sum()) < 2:
+            # a sparse collision hull (a prism marker: vertices at its two end rings only) has no boundary point within the pads'
+            # lateral reach - its cross-section is the same all along, so every point in the pads' height band counts
+            band = in_z
+        if int(band.sum()) < 2:
+            return None
+        return float(loc[band, 1].max() - loc[band, 1].min())
+
     def recentre_pinches(self, grasps: Sequence[Any], tgt) -> Tuple[List[Any], Dict[str, float]]:
         """Library grasps with the pinch centre moved onto the hull centre along the closing axis when the offset exceeds
         ``pinch_offset_max_m`` (a copy of the library record with the shifted position; the attachability screen is re-run on
-        it, a grasp that stops being attachable keeps its original pose). Returns ``(grasps, {name: original offset})``."""
+        it, a grasp that stops being attachable keeps its original pose). Returns ``(grasps, {name: original offset})``.
+
+        Owner 2026-09-24 item 3: the shift is applied only when the pinch geometry survives it — the hull chord across the
+        closing axis between the pads at the re-centred pose (:meth:`pinch_chord`) must match the library pinch width (else the
+        chord at the original pose) within ``pinch_recentre_width_tol_m`` / ``pinch_recentre_width_tol_frac``. A solid body
+        (the nextto marker, 453b3065) spans the same chord anywhere along c and is re-centred; a thin-walled cup's rim pinch
+        moved onto the cup's centre puts the pads over the interior, the 13.7 mm pre-shape lands on the rim and the assisted
+        grasp never attaches (teacup 0925-075114 / 114310, ``grasp_4`` 45.4 mm -> 0): such a grasp keeps its offset. The
+        decision per grasp is recorded in ``template_facts["grasp_pinch_recentre"]``."""
         import copy
 
         limit = float(self.gen("pinch_offset_max_m", PINCH_OFFSET_MAX))
+        tol_abs = float(self.gen("pinch_recentre_width_tol_m", 0.005))
+        tol_frac = float(self.gen("pinch_recentre_width_tol_frac", 0.25))
         out: List[Any] = []
         offsets: Dict[str, float] = {}
+        facts: Dict[str, Dict[str, Any]] = {}
         for g in grasps:
             off = self.pinch_offset(g.pose)
             offsets[g.name] = off
@@ -374,12 +404,40 @@ class IORSSmall(SamplerV2):
             c = C.quat_to_mat(G.t(g.pose[1]))[:, 1]
             shifted = copy.copy(g)
             shifted.position = G.t(g.pose[0]) - off * c
+            w0, w1 = self.pinch_chord(g.pose), self.pinch_chord(shifted.pose)
+            lib = None
+            try:
+                lib = (getattr(g, "meta", None) or {}).get("width")
+                lib = None if lib is None else float(lib)
+            except (TypeError, ValueError):
+                lib = None
+            ref = lib if lib is not None and lib > 0 else w0
+            fact: Dict[str, Any] = {"offset_m": round(off, 4), "chord_original_m": None if w0 is None else round(w0, 4), "chord_recentred_m": None if w1 is None else round(w1, 4),
+                                    "library_width_m": None if lib is None else round(lib, 4)}
+            if w0 is None and w1 is None:
+                comparable = False  # no boundary point between the pads at either pose: nothing says the geometry changes (453b3065 as before)
+                fact["note"] = "no hull points in the pads' band at either pose: re-centred as before"
+            else:
+                comparable = True
+            if comparable and (ref is None or w1 is None or abs(w1 - ref) > max(tol_abs, tol_frac * ref)):
+                fact.update({"applied": False, "reason": "the re-centred pads would close on a different width" if w1 is not None and ref is not None else "no hull between the re-centred pads"})
+                facts[g.name] = fact
+                log.info("%s: grasp %s pinch %+.1f mm off centre; re-centring would change the pinch width from %s to %s mm (library %s) - kept as is",
+                         self.grasp_key, g.name, off * 1000, None if ref is None else round(ref * 1000, 1), None if w1 is None else round(w1 * 1000, 1), None if lib is None else round(lib * 1000, 1))
+                out.append(g)
+                offsets[g.name] = off
+                continue
             if self.ikc.attachable(tgt, shifted.pose, "right"):
-                log.info("%s: grasp %s pinch centre %+.1f mm off the object's centre along the closing axis - re-centred", self.grasp_key, g.name, off * 1000)
+                log.info("%s: grasp %s pinch centre %+.1f mm off the object's centre along the closing axis - re-centred (pinch width %.1f -> %.1f mm)", self.grasp_key, g.name, off * 1000,
+                         (w0 or 0.0) * 1000, w1 * 1000)
+                fact.update({"applied": True})
                 out.append(shifted)
             else:
                 log.info("%s: grasp %s pinch %+.1f mm off centre; the re-centred pose is not attachable - kept as is", self.grasp_key, g.name, off * 1000)
+                fact.update({"applied": False, "reason": "the re-centred pose is not attachable"})
                 out.append(g)
+            facts[g.name] = fact
+        self.template_facts["grasp_pinch_recentre"] = facts
         return out, offsets
 
     def pinch_vs_long_axis_deg(self, eef_in_object: G.Pose) -> float:

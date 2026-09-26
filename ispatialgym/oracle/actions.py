@@ -444,6 +444,23 @@ class Action:
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def _arms_q_of(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, List[float]]]:
+    """``arms_q`` of a path / transition record (arm -> 7 joint values as floats), None when absent or malformed."""
+    aq = (extra or {}).get("arms_q")
+    if not isinstance(aq, dict):
+        return None
+    out: Dict[str, List[float]] = {}
+    for a, v in aq.items():
+        try:
+            vals = [float(x) for x in v]
+        except (TypeError, ValueError):
+            return None
+        if len(vals) != 7:
+            return None
+        out[str(a)] = vals
+    return out or None
+
+
 @dataclass(kw_only=True)
 class Navigate(Action):
     """Follow a recorded base path (``paths[i]``; motion ``track_path``).
@@ -456,14 +473,16 @@ class Navigate(Action):
     what the camera-relocalization sampler collision-checked, owner 2026-09-22). The program sets ``style``; when it
     does not, the record's own ``style`` (sidecar ``paths[].style``) decides, else ``"recorded"``. ``obstacles`` (camera
     relocalization — obstructed) name the objects the path avoids for the annotation; they are deliberately **not** in
-    ``objects`` (never touched).
+    ``objects`` (never touched). ``arms_q`` (sidecar ``paths[].arms_q``, owner 2026-09-24; None when absent): the arm
+    joints (arm -> 7) the sampler swept the drive with when it left an arm where the previous motion ended it instead of
+    the stance posture - the executor re-poses only an arm that deviates from them.
     """
 
     name: str = "navigate"
     path: PathRecord
     obstacles: Tuple[str, ...] = ()
     style: Optional[str] = None
-    TARGET_KEYS = ("waypoints", "goal", "posture", "carried", "style")
+    TARGET_KEYS = ("waypoints", "goal", "posture", "carried", "style", "arms_q")
 
     def __post_init__(self):
         super().__post_init__()
@@ -477,6 +496,7 @@ class Navigate(Action):
             "posture": self.path.posture,
             "carried": self.path.carried,
             "style": self.style or (self.path.extra or {}).get("style") or BP.RECORDED,
+            "arms_q": _arms_q_of(self.path.extra),
         }
 
     def annotate(self, sidecar):
@@ -498,9 +518,12 @@ class Transition(Action):
     """Stance transition (``transitions[i]`` + the two stances, spec §3.8): drive back to the transition stand-off
     s_T, move the trunk, drive in (motions ``track_path`` → ``trunk_to`` → ``track_path``).
 
-    targets: ``{"drive_back": [x, y, yaw], "trunk": (translate, tilt), "drive_in": [x, y, yaw]}`` — the fields
-    ``drive_back`` / ``trunk`` / ``drive_in`` of the ``TransitionPoses`` dataclass
-    ``conventions.transition_poses(stance_from, stance_to, s_T)`` returns (stances passed as their sidecar dicts).
+    targets: ``{"drive_back": [x, y, yaw], "trunk": (translate, tilt), "drive_in": [x, y, yaw], "arms_q": {arm: [7]} | None}``
+    — the fields ``drive_back`` / ``trunk`` / ``drive_in`` of the ``TransitionPoses`` dataclass
+    ``conventions.transition_poses(stance_from, stance_to, s_T)`` returns (stances passed as their sidecar dicts);
+    ``arms_q`` (sidecar ``transitions[].arms_q``, owner 2026-09-24): the arm joints the sampler swept the transition with when
+    it left an arm where the previous motion ended it - the executor's ``move_idle_arms`` then targets these instead of
+    the arriving stance's posture.
     """
 
     name: str = "transition"
@@ -508,7 +531,7 @@ class Transition(Action):
     stance_from: Stance
     stance_to: Stance
     carried: Optional[str] = None
-    TARGET_KEYS = ("drive_back", "trunk", "drive_in")
+    TARGET_KEYS = ("drive_back", "trunk", "drive_in", "arms_q")
 
     def targets(self, sidecar, state):
         C = _conventions()
@@ -519,7 +542,8 @@ class Transition(Action):
         else:
             tp = C.transition_poses(self.stance_from.to_dict(), self.stance_to.to_dict(), self.transition.stand_off)
         translate, tilt = (float(v) for v in tp.trunk)
-        return {"drive_back": _as_pose2d(tp.drive_back), "trunk": (translate, tilt), "drive_in": _as_pose2d(tp.drive_in)}
+        return {"drive_back": _as_pose2d(tp.drive_back), "trunk": (translate, tilt), "drive_in": _as_pose2d(tp.drive_in),
+                "arms_q": _arms_q_of(getattr(self.transition, "extra", None))}
 
     def annotate(self, sidecar):
         purpose = "placing" if self.transition.to == "placement" else "manipulation"

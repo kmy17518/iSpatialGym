@@ -385,12 +385,17 @@ class PathRecord:
     stride_m: float = 0.1
     n_checked: int = 0
     style: Optional[str] = None
+    #: owner 2026-09-24: the arm joints (arm -> 7 values) the drive was swept with when they are not the stance posture - the arm
+    #: left where the previous motion ended it (``program_check.choose_departure_arms``); the oracle re-poses only a deviating arm
+    arms_q: Optional[Dict[str, List[float]]] = None
 
     def to_sidecar(self) -> Dict[str, Any]:
         out = {"from": self.frm, "to": self.to, "mode": self.mode, "waypoints": [[float(a) for a in w] for w in self.waypoints],
                "length_m": float(self.length_m), "posture": self.posture, "carried": self.carried}
         if self.style is not None:
             out["style"] = self.style
+        if self.arms_q:
+            out["arms_q"] = {str(a): [float(v) for v in q] for a, q in self.arms_q.items()}
         return out
 
     @staticmethod

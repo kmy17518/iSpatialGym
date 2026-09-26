@@ -1544,6 +1544,42 @@ class IORSLarge(SamplerV2):
             errors.append(f"torso-then-navigate: {e.reason}: {e}")
         raise Reject("no_transition", "init -> manipulation: " + "; ".join(errors))
 
+    def _leg_ab_clear_of_target(self, init: Stance, manip: Stance, t_pose) -> Optional[str]:
+        """Owner 2026-09-26 (shampoo 0926-015905, wave 8: navigate[0] 'wheel_motor_link1 in contact with the dispenser' twice - the
+        recorded A -> B line passed 5.6 cm from the dispenser standing on the floor): the A -> B leg is recorded before the target
+        has a pose (``record_leg_a_b`` runs with the target parked), so its sweep never saw where the target ends up - harmless for
+        a target on a table, not for one on the floor B drives up to. Re-sweep the recorded A -> B path (its strides + the
+        yaw-lag envelope, the trunk and arms it was checked with, the floor relaxation of the original check) with the target
+        placed at ``t_pose``; returns the reason when it collides, None when it clears (or when there is no path)."""
+        path_ab = next((p for p in self.sidecar.paths if p.to == manip.name), None)
+        if path_ab is None or len(path_ab.waypoints) < 2:
+            return None
+        from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+        trunk = tuple(float(v) for v in path_ab.trunk) if path_ab.trunk is not None else (float(init.translate), float(init.tilt))
+        at_init = abs(trunk[0] - float(init.translate)) < 1e-6 and abs(trunk[1] - float(init.tilt)) < 1e-6
+        r, l, _ = stance_arm_vectors(self.kit, init if at_init else manip)
+        q_arms = {"right": r, "left": l}
+        if path_ab.arms_q:
+            q_arms.update({a: th.as_tensor(q, dtype=th.float32) for a, q in path_ab.arms_q.items()})
+        tgt = self.target
+        p0, q0 = (x.clone() for x in tgt.get_position_orientation())
+        try:
+            tgt.set_position_orientation(*t_pose)
+            tgt.keep_still()
+            self.kit.sync_world()
+            poses = NAV.stride_poses(path_ab.waypoints, float(path_ab.stride_m or NAV.STRIDE_M), yaw_envelope=True)
+            with self._floor_relaxed():
+                ok, bad = NAV.path_collision_free(self.kit, poses, trunk, path_ab.posture, margin=0.01, q_arms=q_arms)
+        finally:
+            tgt.set_position_orientation(p0, q0)
+            tgt.keep_still()
+            self.kit.sync_world()
+        if ok:
+            return None
+        return (f"B: the A -> B drive passes the target drawn at ({float(t_pose[0][0]):.3f}, {float(t_pose[0][1]):.3f}): swept pose {bad}/{len(poses)} "
+                f"({tuple(round(float(v), 3) for v in poses[bad])}) collides with it placed")
+
     def travel_trunks(self, init: Stance, manip: Stance) -> List[Tuple[float, float]]:
         """(iii') carry trunks in order: the grasp stance's translate with the torso straightened (tilt 0 — the object
         stays low), then the init translate straightened; ``generation.travel_trunks`` overrides."""
@@ -1672,8 +1708,22 @@ class IORSLarge(SamplerV2):
         from stance B with the object attached — the configuration the oracle carries with (``program_check`` solves the
         same ``lift_end``); None when the lift has no solution (the leg then uses the stance posture, as before)."""
         lift = (eef[0] + th.tensor([0.0, 0.0, float(carry_height)]), eef[1])
+        # owner 2026-09-25 (shampoo 0925-171050 / 194056: 8/8 draws lost at the program check's lift - 'lift: 1/11 tracked chain
+        # configurations collide' - after this end-pose check had passed): the lift is TRACKED from the grasp configuration exactly
+        # as the program check tracks it (IKChecker.continue_chain: the oracle's differential IK, the grasp's supports and the
+        # ground off for a floor-class lift), so an untrackable lift drops the grasp / stance here instead of the whole draw later
+        q_grasp = self.ikc.solutions.get(("right", self.ikc._pose_key(eef)))
+        floor_class = (getattr(self, "surface", None) or {}).get("kind") == "floor"
+        ignore = list(self.grasp_ignore_objects())
         with attached(self.kit, "right", target, eef_in_object=eef_in_object):
-            r = self.ikc.exact([lift], manip, "right", ignore_for_last=self.grasp_ignore_objects(), cache=False)
+            if q_grasp is not None and self.ikc.reaches(q_grasp, eef, "right"):
+                r = self.ikc.continue_chain(q_grasp, [eef, lift], "right", ignore=ignore, ignore_end=[], soft_stall_m=self.ikc.FREE_LEG_STALL_M,
+                                            ignore_start=ignore + list(self.support_objects()), ground_along=not floor_class, ground_meshes_along=not floor_class)
+                if not r.ok:
+                    log.info("%s: lift %.2f m untrackable from the grasp configuration (%s): grasp skipped", self.gp.alias, carry_height, r.reason[:200])
+                    return None
+            else:
+                r = self.ikc.exact([lift], manip, "right", ignore_for_last=ignore, cache=False)
         if not r.ok or r.q is None:
             return None
         return r.q[self.kit.robot.arm_control_idx["right"]].clone()
@@ -2065,6 +2115,13 @@ class IORSLarge(SamplerV2):
                         log.info("%s: B exact IK fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.alias, yaw0, getattr(g, "name", g), manip.translate, manip.tilt,
                                  " | ".join(why_b)[:600])
                         continue
+                    why_ab = self._leg_ab_clear_of_target(init, manip, t_pose)
+                    if why_ab:
+                        # the A -> B drive was swept before the target had a pose (parked): a draw on the drive's corridor is dropped
+                        b_ik_cache[bk] = None
+                        fails["B: the A -> B drive passes the placed target"] = fails.get("B: the A -> B drive passes the placed target", 0) + 1
+                        log.info("%s: %s", self.gp.alias, why_ab)
+                        continue
                     b_ik_cache[bk] = (yaw, t_pose, eef, pre)
                 goal_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
                 goal = release_pose(release_xy, goal_quat)
@@ -2090,6 +2147,17 @@ class IORSLarge(SamplerV2):
                     swing = float(th.max(th.abs(r2.q[self.kit.robot.arm_control_idx["right"]] - q_lift_seed)))
                     if swing > float(self.num("place_branch_max_rad", 2.6)):
                         fails["C: place branch differs from the carry (joint swing)"] = fails.get("C: place branch differs from the carry (joint swing)", 0) + 1
+                        continue
+                if self.relation == "ontop" and not push:
+                    # owner 2026-09-26 (shampoo, waves 6-8: 8 of 22 attempts rejected in goal_check 'place eef pose outside the placement image
+                    # (5 %)' after 7-13 min of sampling each): the goal check's own frame test, applied to this C candidate's place now, so a C
+                    # whose place the placement camera cannot see is skipped within the attempt instead of failing it at the end. The goal
+                    # check tests the SETTLED goal, generation.goal_drop_m (1 cm) below the release pose (wave 9 0926-023738 still failed it
+                    # with only the release pose tested here), so both poses are tested
+                    cam_c = self.camera_pose_at(place)
+                    rest = (goal[0] - th.tensor([0.0, 0.0, float(self.num("goal_drop_m", 0.01))]), goal[1])
+                    if not (self.ikc.eef_in_frame(place_eef, cam_c) and self.ikc.eef_in_frame(IK.grasp_pose(rest, g.pose), cam_c)):
+                        fails["C: place eef outside the placement image"] = fails.get("C: place eef outside the placement image", 0) + 1
                         continue
                 chain = None
                 if push:  # the straight floor push drop → goal from the same stance (closed gripper, floor + target ignored)

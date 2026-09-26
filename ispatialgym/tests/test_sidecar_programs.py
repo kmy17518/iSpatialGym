@@ -559,7 +559,11 @@ def test_direction_words():
 
 def _check_value(key, value, where):
     if value is None:
-        assert key in ("base_poses", "carried", "follow_path", "follow_segments"), where  # follow_path / follow_segments: hybrid base-follow only
+        assert key in ("base_poses", "carried", "follow_path", "follow_segments", "arms_q"), where  # follow_path / follow_segments: hybrid base-follow only; arms_q: only when the record carries it
+        return
+    if key == "arms_q":
+        # navigate / transition: the arm joints the record was swept with (owner 2026-09-24), arm -> 7 values
+        assert isinstance(value, dict) and value and all(a in ("left", "right") and len(v) == 7 for a, v in value.items()), where
         return
     if key == "follow_path":
         assert isinstance(value, list) and len(value) >= 2 and all(len(p["base_pose2d"]) == 3 and len(p["arm_q"]) == 7 for p in value), where

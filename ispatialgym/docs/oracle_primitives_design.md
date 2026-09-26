@@ -210,8 +210,8 @@ The vocabulary (the rows of 6.2 are compositions of these and nothing else):
 
 | Action | Sidecar block | Motions | Postcondition |
 | --- | --- | --- | --- |
-| `Navigate(path, style)` | `paths[i]` (waypoints, posture, carried; `style` = the program's or the record's, `recorded` / `face_travel`) | `track_path` | base within tracker tolerance of the last waypoint; whole-body collision-free along the way (monitor) |
-| `Transition(t)` | `transitions[i]` + the two stances | `track_path` (drive-back) → `trunk_to` → `track_path` (drive-in) | trunk at the target pair, base at the arriving stance |
+| `Navigate(path, style)` | `paths[i]` (waypoints, posture, carried; `style` = the program's or the record's, `recorded` / `face_travel`; `arms_q` = the arm joints the sampler swept the drive with when it left an arm where the previous motion ended it, owner 2026-09-24) | (`arm_to` of an empty arm that deviates from `arms_q`, else of every empty arm off the untucked default on an `untucked` uncarried path) → `track_path` | base within tracker tolerance of the last waypoint; whole-body collision-free along the way (monitor) |
+| `Transition(t)` | `transitions[i]` + the two stances (`arms_q` on the record: the arms the sampler swept it with, owner 2026-09-24) | `track_path` (drive-back) → `move_idle_arms` (to the record's `arms_q` when present, else the arriving stance's posture) → `trunk_to` → `track_path` (drive-in) | trunk at the target pair, base at the arriving stance |
 | `SetTorso(goal)` | `goal.{translate, tilt, arms}` | (`arm_to` untucked when `goal.arms` says so) → `trunk_to` | trunk converged; camera relocalization: head-camera pose within tolerance, one corrective `track_path` on the residual allowed (correction, not fallback) |
 | `Grasp(g)` | `grasps[i]` | `gripper(open)` → `arm_to(pre_grasp)` → `arm_along(approach)` → `gripper(close)` | assisted grasp attached to the object (`failed_grasp` otherwise); backend `attach_object` |
 | `Lift(g)` | `grasps[i].carry_height` | `arm_along(vertical)` | eef at the carry height, object orientation kept |
@@ -220,7 +220,7 @@ The vocabulary (the rows of 6.2 are compositions of these and nothing else):
 | `Push(c)` | `contacts.push` | `gripper(close)` → `arm_to(pre)` → `arm_along(init → mid → goal)` | eef reached the goal contact; the pushed object moved (`no_motion` otherwise) |
 | `Brace(c)` | `contacts.brace` | `gripper(close)` → `arm_to(pre)` → `arm_along(pre → contact)` | eef at the contact; held (no further command) until the working arm's `Retreat` |
 | `BaseFollow(a)` | `articulation.{base_follow, waypoints, follow_mode, passive_from}` | `base_follow(b_k)` with the arm locked, or `arm_along(h(q_k))` in arm mode | joint at `q_goal`, or `passive_from` reached and the joint continued passively |
-| `Retreat(arm)` | the preceding action's retreat vector (−a, 0.10 m) or "away a little" after a place | `gripper(open)` if it was closed for a brace → `arm_along(retreat)` | eef clear of the object by the retreat distance |
+| `Retreat(arm)` | the preceding action's retreat vector (−a, 0.10 m) or "away a little" after a place | `gripper(open)` if it was closed for a brace → `arm_along(retreat)` (a free-space leg that stalls — at a joint limit without a witness included, owner 2026-09-24 — executes its converged prefix; `execute_retreat` accepts the leg as a partial retreat within `retreat_partial_accept_m` of its end) | eef clear of the object by the retreat distance |
 
 Actions read privileged state between yields (object poses, `_ag_obj_in_hand`, joint positions) to evaluate their
 postcondition and to close the loop on tracking error; they never choose between alternatives.
@@ -496,6 +496,10 @@ Owner decisions 2026‑09‑16: **`gripper_out_of_fov` is armed unconditionally*
 action (grasp, lift, place, push, brace) to the end of the action — a leg whose fingertips never enter the frame is
 itself a verdict (`fov_first_entry_step: null`); the transit to the pre‑pose and the retreat legs stay unmonitored, and
 a recorded pre‑pose on the 5 % margin is a sampler defect (the sampler's frame check includes the pre‑poses).
+Since 2026‑09‑25 the sampler's program check applies QA's own criterion to every in‑between pose of a watched action
+(`program_check.fingertips_in_frame`: the fingertip point `C.fingertip(eef)` projected into the stance camera, the 5 %
+margin plus 2 cm of execution slack at the point's depth; reject `gripper_not_in_frame`), while the contact poses keep
+the `eef_in_frame` box; cap 0925‑191101 (`reorient.waypoints[3]`, v = 65 px against QA's 54 px) is the reference.
 **Placed‑object orientation gates demo collection only**: `run_isg --mode oracle` (`--demo-gating placed_orientation`,
 default on for oracle runs, off for replay / policy) fails a demo whose placed object ends outside its recorded
 orientation tolerance (`placed_orientation`); the TRO targets keep `gating: false`, so policy evaluation is unchanged;
@@ -504,10 +508,38 @@ applied to every free arm, an idle hand (no acting arm, nothing held) still touc
 during `transition` / `set_torso` briefly (< 3 × the monitor's consecutive‑step threshold) with no penetration and no
 displacement of the support, that contact is a *brush warning* in `meta.json` / `annotations.json`, not a failure;
 every other contact (held object, non‑support objects, acting‑arm contacts outside the finger exemption) stays a
-`collision` verdict. **Brace retry ladder**: a braced push that ends outside tolerance restores the checkpoint before
+`collision` verdict. **Brace contact allowed while the brace holds** (owner 2026‑09‑25 item 1): the brace hand's finger /
+gripper links against the braced object are allowed pairs (`Monitors.begin_action(allowed=...)`, neither flagged nor
+counted) for every action from the `Brace` through the brace arm's releasing `Retreat` — read off the program
+(`Executor.brace_allowed_pairs`); the braced object was never in the push's intended set and the closed‑loop push arc
+with the 250 kg chassis presses the brace pad on it on every attempt (touching 0925‑113253). **Collision‑checked legs
+fail on new collisions only** (item 2): a retreat's `arm_along(check_collisions=True)` takes the static member of every
+self‑collision pair its start already violates against another arm's link / attached object out of the sphere model for
+the leg (`R1ProCuRobo.start_collisions_relaxed`; pairs within the moving arm — the 0918‑000750 elbow fold — and against
+the trunk / base stay), and `execute_retreat` leaves every object the retreating hand touches where the leg starts out of
+the leg's collision world (`SimState.hand_contacts`, notes `retreat_start_contacts`; touching 0924‑200220 retreat[8]
+started against the partner) — and, since the planner's padded spheres read a start collision the physics contact report
+does not (touching 0925‑134446: `start configuration is in collision: world; offenders: ntbrtz__base_link__collision__0`,
+no contact pair), every object owning a world mesh the start configuration already penetrates in the planner's world with
+the leg's ignore set applied (`R1ProCuRobo.start_world_offenders` → `objects_of_world_meshes`, notes
+`retreat_start_offenders`) joins the leg's and the finish's `ignore_objects`; whatever the leg meets later is still a
+collision. **Brace retry ladder**: a braced push that ends outside tolerance restores the checkpoint before
 the brace and re‑braces at +5 / +10 mm outward (target touched the brace before the goal: `short`) or −5 / −10 mm
 inward (residual sign flipped: `overshoot`), re‑pushes the residual, records `meta.brace_retry`; two retries, then
-`tolerance`.
+`tolerance`. Since 2026‑09‑26 a short with **no** brace hit is not the brace's fault: inside the tolerance it is
+accepted as it is (the epilogue's settled check decides), outside it the pad aims past the goal by the measured sag
+(`short_free` → `aim_push_past_goal`, brace unchanged); an improvement rung that fails outright falls back to the
+rung that was in tolerance.
+
+**Protected objects during transits** (2026‑09‑26, `oracle/protection.py`): the goal objects the task placed (the
+saucer of the teacup, the destination tray of disembedding, the blocks and board of block design) plus the action's
+own target until its intended contact begins are protected while the arm moves freely to a pre‑grasp, pre‑place or
+pre‑contact and during the carry. Plan‑time: the planned trajectory's moving spheres (carried object included) are
+checked against the objects' boxes inflated by 2 cm (threshold capped by the endpoints' own clearance); a plan that
+passes too close is re‑planned via the point above its goal. Run‑time: a new robot / held‑object contact with a
+protected object, or a protected object moving more than 1 cm, is a `protected_contact` / `protected_moved` verdict and
+the retry takes the via‑above. Planner ignores follow one rule: only what the motion is meant to touch, only on the leg
+where it touches (a grasp's support, a place's partner — never the partner's own supports).
 
 ### 6.5 `run_isg` modes and recording
 

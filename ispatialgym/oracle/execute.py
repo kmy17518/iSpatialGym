@@ -46,6 +46,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field, replace
+from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 import torch as th
@@ -247,6 +248,15 @@ class ExecuteConfig:
     #: the hand is corrected by the male -> female transform (a short Cartesian leg, at most ``attach_correct_max_m``) before
     #: the assisted grasp is dropped and ``AttachedTo.set_value(True)`` snaps the residual and creates the fixed joint
     attach_correct_min_m: float = 0.003
+    #: owner 2026-09-25 (cork 0925-195316 'attach refused 16.6 mm / 4.9 deg'): the attach's insertion legs - the re-aim move to the
+    #: pre-place, the descent, the correction passes - track the rotation to this soft tolerance (the default 0.03 rad let the
+    #: male arrive 4.4 deg tilted and every correction pass stop 1.7 deg short); the correction loop stops on rotation only when a
+    #: pass improves it by less than ``attach_correct_stop_rot_rad``
+    attach_leg_soft_rot_tol: float = 0.01
+    attach_correct_stop_rot_rad: float = 0.005
+    #: the attach's insertion legs keep the differential IK this far from the joint limits (the cork's correction passes swung the
+    #: residual by +-10 mm / +-3 deg between passes: commanded millimetre moves at a joint limit produce uncommanded rotations)
+    attach_leg_limit_margin_rad: float = 0.05
     attach_correct_min_rad: float = 0.03
     attach_correct_max_m: float = 0.06
     attach_settle_steps: int = 20
@@ -282,6 +292,9 @@ class ExecuteConfig:
     free_leg_finish_max_remaining: float = 0.6
     #: a free-space retreat whose finish is rejected is accepted when it ends within this of its end pose (m)
     retreat_partial_accept_m: float = 0.04
+    #: a retreat leg that fails (plan_failed) short of both the partial acceptance and the contact escape is replaced by a planned
+    #: transit to its end pose from where the hand is, before the action fails (owner 2026-09-26, axial 0926-061151 retreat[2])
+    retreat_plan_fallback: bool = True
     #: a pad leaving a brace / push contact first moves this far straight away from the supports (escape_direction) (m; 0 = off)
     contact_retreat_escape_m: float = 0.05
     #: owner 2026-09-22 11:27: a pinching hand that comes from its own brace beside the object reaches the pre-grasp by a tracked
@@ -389,20 +402,21 @@ def support_clearance(state, pose, objects: Sequence[Any]) -> Optional[float]:
 
 
 def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any], cfg: "ExecuteConfig",
-                   ignore_links: Sequence[Any] = ()) -> Iterator[th.Tensor]:
+                   ignore_links: Sequence[Any] = (), accept_other_branch: bool = False) -> Iterator[th.Tensor]:
     """Reach a contact pre-pose that the sampler checked with its supports ignored (a wall / table 2 cm from the
     pads). The supports leave the collision world only for the **last straight leg**: the trajopt goes to a standoff
     ``pre + standoff · n`` (``n`` away from the supports) with the supports present — a trajopt with the wall ignored
     planned the hand *through* the wall region and the arm jammed against it (1.39 rad joint error on the painting
-    push) — then a straight ``arm_along`` closes the standoff. ``through`` (the pushed target) is ignored for both."""
+    push) — then a straight ``arm_along`` closes the standoff. ``through`` (the pushed target) is ignored for both.
+    ``accept_other_branch``: passed to ``Motions.arm_to`` for the planned legs to the pre-pose (a push, owner 2026-09-26)."""
     if not supports:
-        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links))
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links), accept_other_branch=accept_other_branch)
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
     n = escape_direction(state, pre, supports)
     if n is None:
-        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through), ignore_links=list(ignore_links))
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through), ignore_links=list(ignore_links), accept_other_branch=accept_other_branch)
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
@@ -412,7 +426,7 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
         # above the table) is planned directly with the supports present - the standoff excursion (up 8 cm, then down
         # again) was a redundant raise before the descent; the wall contacts (pre-pose 2-5 cm off the wall) keep it
         ctx["pre_pose_standoff"] = {"skipped": True, "clearance_m": round(clearance, 3)}
-        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links))
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links), accept_other_branch=accept_other_branch)
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
@@ -622,13 +636,17 @@ def stance_fingers(record) -> Optional[float]:
     return None if f is None else float(f)
 
 
-def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any]) -> Iterator[th.Tensor]:
+def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q: Optional[Dict[str, Sequence[float]]] = None) -> Iterator[th.Tensor]:
     """Put the arms into the stance's recorded drive-in posture before the trunk motion / drive-in (A6 + owner
     decision 2026-09-16 10:47): the recorded finger opening (``fingers``: closed pads for the wall two-arm stance) and
     the recorded joints (``arms_q`` / ``arm_posture``) on **every arm that holds nothing** — working arms included —
     so the swept trunk motion and the drive-in happen in the posture the sampler checked (the wall stance at
     d = 0.55 m was rejected untucked and recorded tucked). A carried object keeps its grasp and its arm. Arms already
-    there are left alone. Notes: ``arms_posture`` = {moved, kept (holding), source}, ``fingers_set``."""
+    there are left alone. Notes: ``arms_posture`` = {moved, kept (holding), source}, ``fingers_set``.
+
+    ``arms_q`` (owner 2026-09-24): the arm joints the *transition record* itself was swept with (``transitions[].arms_q``
+    — the arm left where the previous motion ended it, ``program_check.choose_departure_arms``); they replace the stance's
+    arm targets, so an arm already there does not move (the fingers still follow the stance record)."""
     holding = [arm for arm in M.ARMS if state.held_object(arm) is not None]
     fingers = stance_fingers(record)
     set_fingers = []
@@ -655,11 +673,15 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any]) -> Iter
         ctx["fingers_set"] = {"arms": set_fingers, "closed": want_close}
     else:
         ctx["fingers_set"] = None
-    targets = stance_arm_targets(record, state, include_working=True)
+    if arms_q:
+        targets = {arm: C.as_tensor(list(arms_q[arm])).reshape(-1).float() for arm in M.ARMS if arms_q.get(arm) is not None}
+        source = "record arms_q (the arm as the previous motion left it)"
+    else:
+        targets = stance_arm_targets(record, state, include_working=True)
+        extra = getattr(record, "extra", None) or {}
+        source = "arms_q" if extra.get("arms_q") else (extra.get("arm_posture") or extra.get("idle_posture") or None)
     q = state.robot.get_joint_positions()
     move = {arm: qa for arm, qa in targets.items() if arm not in holding and float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
-    extra = getattr(record, "extra", None) or {}
-    source = "arms_q" if extra.get("arms_q") else (extra.get("arm_posture") or extra.get("idle_posture") or None)
     ctx["arms_posture"] = {"moved": sorted(move), "kept_holding": [a for a in holding if a in targets], "source": source}
     ctx["idle_arms_moved"] = sorted(a for a in move if a not in set(getattr(record, "working_arms", []) or []))
     if move:
@@ -684,7 +706,24 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
     # brought back to that posture before the base moves (block design's per-block stances, owner 2026-09-19). A carried
     # object keeps its grasp and arm (the carried paths were swept with the lift configuration).
     posture = targets.get("posture")
-    if posture == "untucked" and not targets.get("carried") and all(state.held_object(arm) is None for arm in M.ARMS):
+    arms_q = targets.get("arms_q")
+    if arms_q and not targets.get("carried"):
+        # owner 2026-09-24: the record was swept with the arm where the previous motion left it (``paths[].arms_q``): an arm
+        # that is there stays; one that deviates (a retreat that ended short in another branch) is brought to the swept joints
+        q_now = state.robot.get_joint_positions()
+        move = {}
+        for arm in M.ARMS:
+            if arms_q.get(arm) is None or state.held_object(arm) is not None:
+                continue
+            idx = state.robot.arm_control_idx[arm]
+            qa = C.as_tensor(list(arms_q[arm])).reshape(-1).float()
+            if float(th.max(th.abs(q_now[idx].float() - qa))) > IDLE_ARM_TOL:
+                move[arm] = qa
+        ctx["navigate_arms_reposed"] = sorted(move)
+        ctx["navigate_arms_source"] = "record arms_q"
+        if move:
+            yield from motions.arm_to(tuple(sorted(move)), q=move)
+    elif posture == "untucked" and not targets.get("carried") and all(state.held_object(arm) is None for arm in M.ARMS):
         q_now = state.robot.get_joint_positions()
         want = state.robot.untucked_default_joint_pos
         move = {}
@@ -708,8 +747,9 @@ def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:
 
 def execute_transition(action: Transition, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     yield from motions.track_path([targets["drive_back"]])
-    # A6: the arriving stance's idle arm(s) to their recorded posture before the trunk moves (at the stand-off)
-    yield from move_idle_arms(motions, state, action.stance_to, ctx)
+    # A6: the arriving stance's idle arm(s) to their recorded posture before the trunk moves (at the stand-off) - or, when the
+    # record was swept with the arm where the previous motion left it (``arms_q``, owner 2026-09-24), to exactly that
+    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"))
     t, k = targets["trunk"]
     yield from motions.trunk_to(float(t), float(k))
     yield from motions.track_path([targets["drive_in"]])
@@ -813,32 +853,9 @@ def grasp_pinch_width(action: Grasp) -> Optional[float]:
     return width if math.isfinite(width) and width > 0 else None
 
 
-def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
-    arm = action.arm
-    _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
-    yield from motions.gripper(arm, close=False)
-    # the container / support the object rests in (the source tray of disembedding, the table; ``grasps[].grasp_from``
-    # when recorded) leaves the collision world for the grasp poses, like the sampler's check (spec §3.6)
-    grasp_from = (getattr(action.grasp, "extra", None) or {}).get("grasp_from") if action.grasp is not None else None
-    supports = contact_ignores(state, action.object, extra=(grasp_from,) if grasp_from else ())
-    hold = getattr(motions, "press_hold", None)  # ctx is per action (executor.attempt): the held press lives on the Motions
-    ignore_links = []
-    if hold and hold.get("object") == action.object and hold.get("arm") != arm:
-        # the other hand is pressing this very object (a two-flap carton's prep press, 2026-09-19): its fist in contact makes
-        # the start configuration "in collision" for cuRobo (0919-061328: offender left_lid). Only the PRESSED LINK leaves the
-        # world for the transit (0920-021937: with the whole box gone the plan ran through its body, the arm did not converge)
-        obj_h = state.object(action.object)
-        if hold.get("link"):
-            # the pressed link and every other MOVING link of the object (the sheets a fist may touch: the other flap's edge at
-            # the seam); the base link (the box body) stays an obstacle
-            moving = [ln for ln in getattr(obj_h, "links", {}) if ln != getattr(getattr(obj_h, "root_link", None), "body_name", None) and ln != "base_link"]
-            ignore_links = [(obj_h, ln) for ln in ({hold["link"]} | set(moving))]
-            log.info("grasp(%s): links %s of %s leave the collision world for the transit (the %s fist presses %s)", arm, sorted(ln for _, ln in ignore_links), action.object,
-                     hold.get("arm"), hold["link"])
-        else:
-            supports = list(supports) + [obj_h]
-            log.info("grasp(%s): %s leaves the collision world for the transit (the %s hand holds its press)", arm, action.object, hold.get("arm"))
-    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports] + [f"{getattr(o, 'name', o)}:{ln}" for o, ln in ignore_links]
+def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: str, supports: Sequence[Any], ignore_links: Sequence[Any]) -> Iterator[th.Tensor]:
+    """The free move to the pre-grasp (``execute_grasp``): through a recorded standoff, a lever grasp's Cartesian detour, or
+    the supports-present plan of ``reach_pre_pose`` (the supports-ignored plan as its fallback)."""
     standoff_m = _grasp_extra_float(action, "approach_standoff_m")
     if standoff_m:
         yield from reach_via_standoff(motions, arm, targets["pre_grasp"], standoff_m, _witness(ctx, "pre_grasp"), supports, ctx)
@@ -883,9 +900,91 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
             yield from reach_pre_pose(motions, state, arm, targets["pre_grasp"], supports, [], _witness(ctx, "pre_grasp"), ctx, _cfg(ctx))
             ctx["pre_grasp_transit"] = "supports present"
         except SkillError as e:
+            if e.details.get("stage") == "protected":
+                raise
             log.warning("grasp(%s): no transit to the pre-grasp with the supports present (%s); planning with them ignored", arm, e.message)
             ctx["pre_grasp_transit"] = f"supports ignored (fallback: {e.message[:80]})"
             yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports)
+
+
+def _protected_for(ctx, state, target: Optional[str] = None) -> List[Tuple[str, Any]]:
+    """The objects protected during this action's transit (oracle.protection): the task's goal objects (``ctx["protect"]
+    ["goal"]``, set by run_isg) plus the action's own ``target`` when the task placed it - protected until its intended
+    contact begins - minus whatever is in hand (a carried object is part of the robot)."""
+    P = ctx.get("protect") or {}
+    objs: List[Tuple[str, Any]] = list(P.get("goal") or [])
+    if target:
+        from ispatialgym.oracle import protection as PROT
+
+        try:
+            o = state.object(target)
+        except Exception:  # noqa: BLE001
+            o = None
+        if o is not None and PROT.is_task_object(o) and not any(o is x for _, x in objs):
+            objs.append((target, o))
+    try:
+        held = list(state.held_objects())
+    except Exception:  # noqa: BLE001
+        held = []
+    return [(n, o) for n, o in objs if not any(o is h for h in held)]
+
+
+@contextmanager
+def _transit(ctx, motions: Motions, state, action, leg: str, target: Optional[str] = None, along: Optional[str] = None):
+    """A transit of ``action`` (``leg``: pre_grasp / carry / pre_contact): the plan-time protect context of ``motions`` and the
+    QA transit span over the protected objects (``_protected_for``); no protected object - a no-op, the motion unchanged."""
+    objs = _protected_for(ctx, state, target)
+    P = ctx.get("protect") or {}
+    label = {"task": P.get("task"), "action": getattr(action, "name", ""), "index": P.get("index"), "leg": leg}
+    if not objs or not hasattr(motions, "protecting"):
+        yield
+        return
+    ctx.setdefault("protection", []).append({"leg": leg, "protected": [getattr(o, "name", n) for n, o in objs], "forced_via_above": bool(P.get("force"))})
+    hook = _hook(ctx, "transit")
+    try:
+        hook(True, objs, label)
+    except TypeError:
+        pass
+    try:
+        with motions.protecting(objs, leg=leg, task=label["task"] or "", action=label["action"], index=label["index"], force_via_above=bool(P.get("force")), along=along):
+            yield
+    finally:
+        try:
+            hook(False)
+        except TypeError:
+            pass
+
+
+def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    arm = action.arm
+    _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
+    yield from motions.gripper(arm, close=False)
+    # the container / support the object rests in (the source tray of disembedding, the table; ``grasps[].grasp_from``
+    # when recorded) leaves the collision world for the grasp poses, like the sampler's check (spec §3.6)
+    grasp_from = (getattr(action.grasp, "extra", None) or {}).get("grasp_from") if action.grasp is not None else None
+    supports = contact_ignores(state, action.object, extra=(grasp_from,) if grasp_from else ())
+    hold = getattr(motions, "press_hold", None)  # ctx is per action (executor.attempt): the held press lives on the Motions
+    ignore_links = []
+    if hold and hold.get("object") == action.object and hold.get("arm") != arm:
+        # the other hand is pressing this very object (a two-flap carton's prep press, 2026-09-19): its fist in contact makes
+        # the start configuration "in collision" for cuRobo (0919-061328: offender left_lid). Only the PRESSED LINK leaves the
+        # world for the transit (0920-021937: with the whole box gone the plan ran through its body, the arm did not converge)
+        obj_h = state.object(action.object)
+        if hold.get("link"):
+            # the pressed link and every other MOVING link of the object (the sheets a fist may touch: the other flap's edge at
+            # the seam); the base link (the box body) stays an obstacle
+            moving = [ln for ln in getattr(obj_h, "links", {}) if ln != getattr(getattr(obj_h, "root_link", None), "body_name", None) and ln != "base_link"]
+            ignore_links = [(obj_h, ln) for ln in ({hold["link"]} | set(moving))]
+            log.info("grasp(%s): links %s of %s leave the collision world for the transit (the %s fist presses %s)", arm, sorted(ln for _, ln in ignore_links), action.object,
+                     hold.get("arm"), hold["link"])
+        else:
+            supports = list(supports) + [obj_h]
+            log.info("grasp(%s): %s leaves the collision world for the transit (the %s hand holds its press)", arm, action.object, hold.get("arm"))
+    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports] + [f"{getattr(o, 'name', o)}:{ln}" for o, ln in ignore_links]
+    # the transit to the pre-grasp: the goal objects and the grasp's own target are protected until the approach begins
+    # (owner 2026-09-26, oracle.protection: teacup 0925-222212 / 235559 - the hand passed low over the saucer and shoved it 20 cm)
+    with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
+        yield from _grasp_transit(action, motions, state, targets, ctx, arm, supports, ignore_links)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
@@ -1024,6 +1123,29 @@ def shorten_push(push: Push, shorten_rad: float) -> Push:
     return Push(contact=contact, base_yaw=push.base_yaw)
 
 
+def aim_push_past_goal(push: Push, extend_rad: float) -> Push:
+    """(owner 2026-09-26, the braced-push ladder) The arc push aimed ``extend_rad`` PAST its goal: mid / goal are the recorded
+    init rotated about the recorded arc's pivot by half / all of the lengthened angle and the pad's goal stop moves past the
+    goal by the same angle (``contact.extra["aim_past_goal_rad"]``, read by the push legs). The mirror of ``shorten_push``:
+    a painting that sags back ~0.015-0.035 rad once the pad leaves (brace untouched) ends short by that sag - pushing past the
+    goal by the measured sag is the remedy; moving the brace outward is not (it was never touched)."""
+    c = push.contact
+    if c.mid is None or extend_rad <= 0:
+        return push
+    geom = push_geometry(c.waypoints, c.direction)
+    if geom.kind != "arc":
+        return push
+    angle = float(geom.angle)
+    new_angle = math.copysign(abs(angle) + float(extend_rad), angle)
+
+    def rotated(frac: float) -> Pose:
+        p, q = _rotate_pose_about(c.init, geom.pivot, new_angle * frac, geom.axis)
+        return Pose(position=[float(v) for v in p.tolist()], orientation=[float(v) for v in q.tolist()])
+
+    contact = replace(c, mid=rotated(0.5), goal=rotated(1.0), extra={**c.extra, "aim_past_goal_rad": float(extend_rad), "swept_rad": new_angle})
+    return Push(contact=contact, base_yaw=push.base_yaw)
+
+
 def intended_contacts(action: Action) -> Tuple[str, ...]:
     """The bddl instances an action may touch (the QA collision whitelist): its ``objects`` plus ``touches`` (the floor
     of a push-under), except that a ``Place(kind="drop")`` must not touch its container (owner decision 2026-09-16:
@@ -1052,7 +1174,14 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     on = []
     if getattr(action, "on", None) and not drop:  # a drop keeps its container in the collision world: it must not be touched
         if action.relation in ("on", "into", "under") or action.kind == "attach":
-            on = contact_ignores(state, action.on, extra=(action.on,))  # the destination support / container and what it rests on
+            # owner 2026-09-26: a place ignores the partner it is set on / into / attached to - only that. The partner's own supports
+            # (the table, the floor) came in through ``contact_supports`` whenever the partner was awake and reporting contacts: the
+            # teacup's place ignored breakfast_table + floors in wave 3 (the transit had shoved the saucer awake), only the saucer in
+            # wave 2 (the saucer asleep) - the ignore list must not depend on that
+            try:
+                on = [state.object(action.on)]
+            except Exception:  # noqa: BLE001
+                on = contact_ignores(state, action.on, extra=(action.on,))
         else:
             on = contact_ignores(state, action.on)  # next to / touching: the partner stays an obstacle, only the shared support leaves
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
@@ -1065,16 +1194,38 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         # (the free trajopt transit swung the nextto marker 40 cm back toward the robot and out of the frame). A stall
         # is finished by ``arm_to`` to the pre-place, as for the lift / retreat legs.
         finish = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
-        yield from motions.arm_along(arm, carry, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-        ctx["carry_leg"] = {"kind": "straight", "waypoints": len(carry), "via_recorded": len(targets.get("carry_via") or ()), "finish": finish.info if finish.used else None}
+        # the carry is a transit (owner 2026-09-26, oracle.protection): its tracked path, the carried object included, is checked
+        # against the protected goal objects before it runs; when it passes too close it is re-run via the point above the pre-place
+        with _transit(ctx, motions, state, action, "carry", along="raise"):
+            try:
+                yield from motions.arm_along(arm, carry, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+                ctx["carry_leg"] = {"kind": "straight", "waypoints": len(carry), "via_recorded": len(targets.get("carry_via") or ()), "finish": finish.info if finish.used else None}
+            except SkillError as e:
+                if e.details.get("stage") != "protected":
+                    raise
+                here = as_world_pose(state.eef_pose(arm))
+                pre_p, pre_q = as_world_pose(targets["pre_place"])
+                z_top = max(float(here[0][2]), float(pre_p[2])) + float(motions.cfg.protect_above_m)
+                legs = [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(pre_p[0]), float(pre_p[1]), z_top]), pre_q), (pre_p, pre_q)]
+                P = getattr(motions, "_protect", None)
+                if P is not None:
+                    P["along"] = "log"  # the via-above leg is executed; a remaining near pass is logged, the run-time check stays
+                finish2 = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
+                yield from motions.arm_along(arm, legs, finish=finish2, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+                ctx["carry_leg"] = {"kind": "straight via above", "lift_m": round(z_top - max(float(here[0][2]), float(pre_p[2])), 3), "finish": finish2.info if finish2.used else None,
+                                    "protected": e.details.get("protected")}
     else:
-        yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
+        with _transit(ctx, motions, state, action, "carry"):
+            yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
         ctx["carry_leg"] = {"kind": "trajopt"}
     if action.kind == "attach" and action.on:
         # the part is in the air above the partner: re-aim the descent for its live in-hand pose (and the carry's residual)
         targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
-    yield from motions.arm_along(arm, targets["descent"], finish=finish)
+    # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
+    # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
+    yield from motions.arm_along(arm, targets["descent"], finish=finish, soft_rot_tol=cfg.attach_leg_soft_rot_tol if action.kind == "attach" else None,
+                                 limit_margin=cfg.attach_leg_limit_margin_rad if action.kind == "attach" else 0.0)
     if finish.used:
         ctx["descent_finish"] = finish.info
     # rush 2026-09-17: the hand ends the descent short of the recorded place pose by a systematic ~1-1.5 cm (the witness
@@ -1224,7 +1375,7 @@ def _reaim_for_inhand_pose(action: Place, motions: Motions, state, targets: Dict
     log.info("place(%s): re-aimed for the in-hand pose: the aligned hand pose is %.1f mm / %.1f deg from the recorded place (meta links %.1f mm / %.1f deg off in the hand)",
              action.object, dist * 1000, math.degrees(drot), off["pos_m"] * 1000, math.degrees(off["rot_rad"]))
     try:
-        yield from motions.arm_along(arm, [pre_live], soft_pos_tol=cfg.attach_correct_min_m)
+        yield from motions.arm_along(arm, [pre_live], soft_pos_tol=cfg.attach_correct_min_m, soft_rot_tol=cfg.attach_leg_soft_rot_tol, limit_margin=cfg.attach_leg_limit_margin_rad)
     except SkillError as e:
         rec["pre_place_move_error"] = e.message
         log.warning("place(%s): the move to the re-aimed pre-place did not complete (%s); descending from where the hand is", action.object, e.message)
@@ -1340,7 +1491,11 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
         via1 = (th.tensor([float(p[0]), float(p[1]), top]), q.float())
         via2 = (th.tensor([float(target[0][0]), float(target[0][1]), top]), target[1])
         try:
-            yield from motions.arm_along(arm, [via1, via2, target], soft_pos_tol=reg.soft_pos_tol_m)
+            # owner 2026-09-25 (cork 0925-195316: 'attach refused 16.6 mm / 4.9 deg', four passes corrected 9 mm but 0.017 of 0.077 rad):
+            # the legs of a correction pass track the ROTATION to the regime's target too - the default soft tolerance (0.03 rad)
+            # let every pass stop 1.7 deg short of the male -> female fix, so the tilt never closed
+            yield from motions.arm_along(arm, [via1, via2, target], soft_pos_tol=reg.soft_pos_tol_m, soft_rot_tol=min(0.5 * reg.target_rot_rad, cfg.attach_leg_soft_rot_tol),
+                                         limit_margin=cfg.attach_leg_limit_margin_rad)
             yield from motions.settle(max_steps=reg.settle_steps)
         except SkillError as e:
             log.warning("place(%s): attach correction pass %d did not complete (%s)", action.object, k + 1, e.message)
@@ -1349,12 +1504,16 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
         if off2 is None:
             break
         improvement = float(off["pos_m"]) - float(off2["pos_m"])
-        passes.append({**{k2: v for k2, v in off2.items() if k2 != "fix"}, "improvement_m": round(improvement, 5)})
-        log.info("place(%s): after correction pass %d: %.1f mm / %.1f deg (improvement %.1f mm)", action.object, k + 1, off2["pos_m"] * 1000,
-                 math.degrees(off2["rot_rad"]), improvement * 1000)
+        improvement_rot = float(off["rot_rad"]) - float(off2["rot_rad"])
+        passes.append({**{k2: v for k2, v in off2.items() if k2 != "fix"}, "improvement_m": round(improvement, 5), "improvement_rad": round(improvement_rot, 5)})
+        log.info("place(%s): after correction pass %d: %.1f mm / %.1f deg (improvement %.1f mm / %.2f deg)", action.object, k + 1, off2["pos_m"] * 1000,
+                 math.degrees(off2["rot_rad"]), improvement * 1000, math.degrees(improvement_rot))
         off = off2
-        if improvement < reg.stop_when_improvement_below_m and (off["pos_m"] > reg.target_pos_m or off["rot_rad"] > reg.target_rot_rad):
-            rec["stopped"] = f"pass {k + 1} improved the residual by {improvement * 1000:.2f} mm < {reg.stop_when_improvement_below_m * 1000:.2f} mm"
+        # the loop stops when NEITHER the position nor the rotation residual improves any more (the rotation used to be ignored here)
+        if (improvement < reg.stop_when_improvement_below_m and improvement_rot < cfg.attach_correct_stop_rot_rad
+                and (off["pos_m"] > reg.target_pos_m or off["rot_rad"] > reg.target_rot_rad)):
+            rec["stopped"] = (f"pass {k + 1} improved the residual by {improvement * 1000:.2f} mm < {reg.stop_when_improvement_below_m * 1000:.2f} mm and "
+                              f"{math.degrees(improvement_rot):.2f} deg < {math.degrees(cfg.attach_correct_stop_rot_rad):.2f} deg")
             log.info("place(%s): correction stopped: %s", action.object, rec["stopped"])
             break
     rec["offset_after_correction"] = passes[-1] if passes else None
@@ -1440,6 +1599,29 @@ def _retreat_reach(motions: Motions, arm: str, here, d1: th.Tensor, normal_out: 
     return float(tried[-1]["far_m"]), {"tried": tried, "reachable": False}
 
 
+def _start_world_offenders(motions: Motions, state, arm: str, ignore: Sequence[Any], limit: int = 4) -> List[Any]:
+    """The scene objects whose collision meshes the arm's CURRENT configuration already penetrates in the planner's
+    world with ``ignore`` applied (``R1ProCuRobo.start_world_offenders`` → ``objects_of_world_meshes``); ``[]`` when the
+    start is clear or the backend has no world model (the test stubs). Never raises: a failure here leaves the leg's
+    ignore set as it was."""
+    backend = getattr(motions, "backend", None)
+    if backend is None or not hasattr(backend, "start_world_offenders") or not hasattr(backend, "objects_of_world_meshes"):
+        return []
+    try:
+        backend.update_world(ignore_objects=list(ignore))
+        q_now = backend.q_full() if hasattr(backend, "q_full") else state.robot.get_joint_positions()
+        names = backend.start_world_offenders(q_now, emb_name=f"{arm}_arm", limit=limit)
+        if not names:
+            return []
+        objs = [o for o in backend.objects_of_world_meshes(names) if not any(o is x for x in ignore)]
+        log.info("retreat(%s): the start configuration already penetrates %s in the planner's world -> %s exempted for this leg (new collisions still count)",
+                 arm, [str(n).rsplit("/", 1)[-1] for n in names], [getattr(o, "name", str(o)) for o in objs] or "no scene object (ground slab / unresolved)")
+        return objs
+    except Exception as e:  # noqa: BLE001
+        log.info("retreat(%s): start-collision offenders not resolved (%r)", arm, e)
+        return []
+
+
 def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
@@ -1469,6 +1651,22 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             ignore = [state.object(action.object)] + contact_ignores(state, action.object)  # the released object and its support
         except Exception:  # noqa: BLE001
             ignore = []
+    # owner 2026-09-24 item 2 (a): a retreat leaves a contact - every object the retreating hand touches where the leg STARTS is
+    # out of the collision world for this leg (the partner the push pad ended against, touching 0924-200220 retreat[8]: 'start
+    # configuration is in collision: world; offenders: partner_box_of_tissues'); everything else the leg meets is still a collision
+    start_touch = [o for o in (getattr(state, "hand_contacts", lambda a: [])(arm) or []) if not any(o is x for x in ignore)]
+    if start_touch:
+        ctx["retreat_start_contacts"] = sorted(getattr(o, "name", str(o)) for o in start_touch)
+        ignore = ignore + start_touch
+    # owner 2026-09-25 (touching 0925-134446 / 140113 retreat[8]): the start-in-collision set comes from the PLANNER as well -
+    # the physics contact report saw no pad-partner contact while cuRobo's padded spheres put the start configuration inside
+    # the partner's mesh ('IK failed [start configuration is in collision: world; offenders: ntbrtz__base_link__collision__0]'),
+    # so neither the collision-checked leg nor the arm_to finish had a collision-free start. The objects owning the world
+    # meshes the start already penetrates (the leg's ignore set applied) join the leg's and the finish's ignore_objects
+    start_off = _start_world_offenders(motions, state, arm, ignore)
+    if start_off:
+        ctx["retreat_start_offenders"] = sorted(getattr(o, "name", str(o)) for o in start_off)
+        ignore = ignore + start_off
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
     leg = list(targets["retreat"])
     after_x = (getattr(getattr(getattr(action, "after", None), "contact", None), "extra", None) or {}) if isinstance(getattr(action, "after", None), (Push, Brace)) else {}
@@ -1546,7 +1744,21 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         escape = ctx.get("retreat_escape") or {}
         clear = bool(escape) and "skipped" not in escape and moved >= cfg.contact_retreat_escape_m - 0.005
         if dp > cfg.retreat_partial_accept_m and not clear:
-            raise
+            if not cfg.retreat_plan_fallback:
+                raise
+            # owner 2026-09-26 (axial 0926-061151 retreat[2]: from the push's end configuration the escape leg reached right_arm_joint4's
+            # lower limit at waypoint 3/11, both attempts): only here, where the action fails otherwise - a planned transit to the leg's
+            # end pose from where the hand is (the same ignore set: the released object, its support, what the start touches)
+            try:
+                yield from motions.arm_to(arm, pose=targets["retreat"][-1], ignore_objects=list(ignore))
+            except SkillError as e2:
+                raise SkillError(e.reason, f"{e.message}; planned transit to the retreat's end pose: {e2.message[:160]}", **dict(getattr(e, "details", {}) or {})) from e
+            ctx["retreat_planned_fallback"] = {"leg_failure": e.message[:200], "moved_m": round(moved, 4), "short_m": round(dp, 4)}
+            log.warning("retreat: the leg failed %.1f mm short of its end pose (the pad %.1f mm from where it left the object: %s) - PLANNED transit to the end pose instead",
+                        dp * 1000, moved * 1000, e.message[:160])
+            if finish.used:
+                ctx["retreat_finish"] = finish.info
+            return
         log.warning("retreat: the leg ends %.1f mm short of its end pose, the pad %.1f mm from where it left the object (finish rejected: %s) - accepted as a partial free-space retreat",
                     dp * 1000, moved * 1000, e.message)
         ctx["retreat_partial_m"] = dp
@@ -1829,8 +2041,9 @@ def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[A
         res, src = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
         if res is None or src not in ("goal_position", "goal_orientation"):
             continue
-        if float(res) * sign <= margin:
-            log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d steps -> the pad stops here", label, obj, src, float(res) * sign, margin, k)
+        if float(res) * sign <= margin - float(ctx.get("push_aim_past_goal", 0.0) or 0.0):
+            log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d steps -> the pad stops here", label, obj, src, float(res) * sign,
+                     margin - float(ctx.get("push_aim_past_goal", 0.0) or 0.0), k)
             ctx.setdefault("push_stopped", []).append({"leg": label, "steps": k, "residual": float(res) * sign})
             gen.close()
             return
@@ -1888,8 +2101,9 @@ def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints
             log.info("%s(%s): first contact after %d approach steps (the object turned %.3f rad)", label, obj, k, abs(swept()))
         if cfg.push_stop_at_goal and margin is not None:
             res, src = push_residual(geom, state, obj, pose0, None)
-            if res is not None and src in ("goal_position", "goal_orientation") and float(res) * sign <= margin:
-                log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d approach steps -> the pad stops here", label, obj, src, float(res) * sign, margin, k)
+            if res is not None and src in ("goal_position", "goal_orientation") and float(res) * sign <= margin - float(ctx.get("push_aim_past_goal", 0.0) or 0.0):
+                log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d approach steps -> the pad stops here", label, obj, src, float(res) * sign,
+                         margin - float(ctx.get("push_aim_past_goal", 0.0) or 0.0), k)
                 ctx.setdefault("push_stopped", []).append({"leg": f"{label}-approach", "steps": k, "residual": float(res) * sign})
                 gen.close()
                 return
@@ -1914,8 +2128,9 @@ def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints
             res, src = push_residual(geom, state, obj, pose0, None)
             if res is None or src not in ("goal_position", "goal_orientation"):
                 continue
-            if float(res) * sign <= margin:
-                log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d closed-loop steps -> the pad stops here", label, obj, src, float(res) * sign, margin, k)
+            if float(res) * sign <= margin - float(ctx.get("push_aim_past_goal", 0.0) or 0.0):
+                log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d closed-loop steps -> the pad stops here", label, obj, src, float(res) * sign,
+                         margin - float(ctx.get("push_aim_past_goal", 0.0) or 0.0), k)
                 ctx.setdefault("push_stopped", []).append({"leg": label, "steps": k, "residual": float(res) * sign, "closed_loop": True})
                 motions.stop_requested = True
     finally:
@@ -1946,6 +2161,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     yield from motions.gripper(arm, close=True)
     supports = contact_ignores(state, obj)  # the wall / table the target rests against (sampler rule: ignored along the chain)
     extra0 = getattr(action.contact, "extra", None) or {}
+    # a re-push after a free short (owner 2026-09-26, braced-push ladder): the pad stops that far PAST the goal (``aim_push_past_goal``)
+    ctx["push_aim_past_goal"] = float(extra0.get("aim_past_goal_rad", 0.0) or 0.0)
     try:
         # the pushed object leaves the collision world for the push plan (program_check._ignore_for) - except an articulated
         # lid (stage 2): the hand travels from the released handle on one side of the standing lid to the underside pre-pose on
@@ -2083,7 +2300,11 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
                     ctx["plan_ignored_links"] = sorted(str(e[1]) + ("/" + str(e[2]) if len(e) > 2 else "") for e in link_ign)
             except Exception:  # noqa: BLE001
                 link_ign = []
-        yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign)
+        # the transit to the pre-contact (owner 2026-09-26, oracle.protection): the goal objects and the pushed target are protected
+        with _transit(ctx, motions, state, action, "pre_contact", target=obj):
+            # owner 2026-09-26 (axial 0926-043254 / 051919): a push's legs are Cartesian and closed-loop from wherever the hand is -
+            # a pre-contact witness trajopt cannot reach (another branch) is replaced by cuRobo's own branch instead of failing
+            yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign, accept_other_branch=True)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
@@ -2342,16 +2563,18 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
     else:
         yield from motions.gripper(arm, close=True)
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
-    try:
-        yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], q_hint_pre, ctx, cfg)
-    except SkillError as e:
-        if at_goal is None or e.reason != "plan_failed":
-            raise
-        # the goal-edge pre pose is out of this stance's reach: the recorded brace (validated by the sampler) stands instead
-        log.warning("brace(%s): the goal-edge pre pose is not reachable (%s) - bracing at the recorded contact", action.contact.object, e.message)
-        targets.update(recorded)
-        ctx["brace_at_goal"] = {**ctx.get("brace_at_goal", {}), "fallback": "recorded contact", "reason": e.message[:160]}
-        yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
+    # the transit to the brace's pre-contact (owner 2026-09-26, oracle.protection): the goal objects and the braced object are protected
+    with _transit(ctx, motions, state, action, "pre_contact", target=action.contact.object):
+        try:
+            yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], q_hint_pre, ctx, cfg)
+        except SkillError as e:
+            if at_goal is None or e.reason != "plan_failed":
+                raise
+            # the goal-edge pre pose is out of this stance's reach: the recorded brace (validated by the sampler) stands instead
+            log.warning("brace(%s): the goal-edge pre pose is not reachable (%s) - bracing at the recorded contact", action.contact.object, e.message)
+            targets.update(recorded)
+            ctx["brace_at_goal"] = {**ctx.get("brace_at_goal", {}), "fallback": "recorded contact", "reason": e.message[:160]}
+            yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
     obj = action.contact.object
     if cfg.brace_touch_stop_m > 0:

@@ -21,7 +21,7 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -195,6 +195,10 @@ class R1ProCuRobo:
         robot,
         device: str = "cuda:0",
         control_dt: Optional[float] = None,
+        # 1 cm for the IK solvers AND the motion planner's trajopt (one MotionPlannerCfg configures both). 2026-09-25 (teacup
+        # 0925-222212, wave 3: the pre-grasp transit skimmed the saucer 30 cm beside the teacup and pushed it 20 cm) 2 cm was tried:
+        # it changed the sampler's IK solutions as well (wave 5, bar soap 0925-235551: 8/8 attempts ik_joint_limit at the place) and
+        # the transit still brushed the saucer (0925-235559, 12 cm) - reverted; the transit needs a via-above leg, not a margin
         collision_activation_distance: float = 0.01,
         position_tolerance: float = 0.005,
         orientation_tolerance: float = 0.05,
@@ -628,7 +632,8 @@ class R1ProCuRobo:
             if n in self._world_mesh_names:
                 self._mesh_enable(n, False)
                 self._disabled_obstacles.add(n)
-        self._attached[arm] = {"obj": obj, "mesh_names": mesh_names, "planners": targets, "link": link_name}
+        self._attached[arm] = {"obj": obj, "mesh_names": mesh_names, "planners": targets, "link": link_name,
+                               "spheres": None if sphere_tensor is None else sphere_tensor.detach().cpu().clone()}  # (n, 4): x y z r in the link frame (diagnostics)
         log.info("Attached %s to %s (%d spheres)", obj.name, link_name, 0 if sphere_tensor is None else sphere_tensor.shape[0])
 
     def detach_object(self, arm: str):
@@ -733,6 +738,26 @@ class R1ProCuRobo:
             near = ((dm > 0.0) & mask).any(dim=1)
         return near.cpu()
 
+    def robot_spheres_world(self, q_batch: th.Tensor, emb_name: str = "whole_body") -> Tuple[th.Tensor, List[str]]:
+        """``(N, S, 4)`` world-frame collision spheres (x y z r; r <= 0 = a disabled sphere) of the full configurations
+        ``q_batch`` (N, 28) in the embodiment ``emb_name`` - an attached object's spheres included - and the link of every
+        sphere. Forward kinematics only: no world query, no planner or world state is touched (the oracle's protected-object
+        transit check, ``protection.check_trajectory``)."""
+        entry = self.kin_entry(emb_name)
+        q_batch = as_tensor(q_batch)
+        if q_batch.ndim == 1:
+            q_batch = q_batch.unsqueeze(0)
+        n = q_batch.shape[0]
+        self.refresh_locked_joints(emb_name, q_batch[0])
+        js = self._active_js(entry, q_batch)
+        with th.no_grad():
+            sp = entry.fk.compute_kinematics(js).robot_spheres.reshape(n, -1, 4).float().cpu()
+        rp, rq = self.root_pose()
+        R = T.quat2mat(rq.float().cpu()).float()
+        world = sp.clone()
+        world[..., :3] = sp[..., :3] @ R.T + rp.float().cpu().reshape(1, 1, 3)
+        return world, list(self._collision_costs(entry)["link_of_sphere"])
+
     def _ground_obstacles_enabled(self, enabled: bool):
         """Enable / disable every ground-like obstacle (slab + floor/carpet/... meshes).
 
@@ -741,10 +766,15 @@ class R1ProCuRobo:
         cub = getattr(self.checker.data, "cuboids", None)
         if cub is not None and self.GROUND_SLAB_NAME in cub.names[0]:
             cub.set_enabled(self.GROUND_SLAB_NAME, enabled)
+        held_off = getattr(self, "_held_off", set())  # meshes an active sampler ignore context (ik._Ignoring) switched off
         for name in self._ground_mesh_names:
             if name not in self._world_mesh_names:
                 continue
-            if enabled and name in self._disabled_obstacles:
+            if enabled and (name in self._disabled_obstacles or name in held_off):
+                # owner 2026-09-25 (shampoo 0925-171050 .. 205946, 'lift: 1/11 tracked chain configurations collide', body = the utility
+                # room floor): every margin > 0 check (step 3 of check_collision) switched the ground meshes off and back ON, re-enabling
+                # the floor mesh a sampler ignore context had removed for a floor-class lift - the carried dispenser's spheres then met
+                # the floor 10 mm into the leg
                 continue
             self._mesh_enable(name, enabled)
 
@@ -866,6 +896,57 @@ class R1ProCuRobo:
                     kc.disable_link_spheres(link)
                     done.append(link)
             log.warning("planning %s with the held arm's %s out of the sphere model: the start violates the self-collision margin by %.1f mm (%s)",
+                        "/".join(sorted(moving)), done, 1000 * pairs[0]["penetration"], " ".join(f"{a}-{b}" for a, b in (pr["links"] for pr in pairs)))
+            yield done
+        finally:
+            for link in done:
+                kc.enable_link_spheres(link)
+
+    @staticmethod
+    def _arm_of_link(link: str) -> Optional[str]:
+        """``left`` / ``right`` for an arm link or an attached object (``attached_object_<arm>_eef_link``), None for the trunk / base."""
+        for arm in M.ARMS:
+            if link.startswith(arm + "_") or link == f"attached_object_{arm}_eef_link":
+                return arm
+        return None
+
+    @contextmanager
+    def start_collisions_relaxed(self, emb_name: str, q_start: th.Tensor, moving_arms: Sequence[str]):
+        """A collision-checked leg (``solve_ik_path(check_collisions=True)``) must fail on NEW collisions only (owner 2026-09-24
+        item 2): every self-collision pair the start configuration already violates between the moving arm and **another
+        arm's** link or attached object (the bracing hand's fingers inside the sphere model of the carton the other hand
+        holds, 23-50 mm; 0925-103154 retreat[6] 'start configuration is in collision') is exempted for the block by taking
+        the static member's spheres out of the model; pairs within the moving arm itself or against the trunk / base stay
+        (the 0918-000750 elbow fold, 3 mrad short of the joint limit, is such a pair and is still caught), and pairs between
+        two static arms are relaxed as ``static_links_relaxed`` does. Yields the disabled link names."""
+        moving = set(moving_arms)
+        disable: List[str] = []
+        try:
+            pairs = self.self_collision_pairs(q_start, emb_name)
+        except Exception as e:  # noqa: BLE001
+            log.warning("start_collisions_relaxed: self-collision pairs unavailable (%r)", e)
+            pairs = []
+        for pr in pairs:
+            arms = [self._arm_of_link(link) for link in pr["links"]]
+            if all(a is not None and a in moving for a in arms):
+                continue  # within the moving arm: a genuine constraint
+            if any(a is None for a in arms) and any(a is not None and a in moving for a in arms):
+                continue  # the moving arm against the trunk / base: genuine
+            for link, arm in zip(pr["links"], arms):
+                if arm is not None and arm not in moving and link not in disable:
+                    disable.append(link)  # the static arm's member (its link or its attached object) leaves the model for this leg
+        if not disable:
+            yield []
+            return
+        entry = self.kin_entry(emb_name)
+        kc = entry.fk.kinematics_config
+        done: List[str] = []
+        try:
+            for link in disable:
+                if link in kc.link_name_to_idx_map:
+                    kc.disable_link_spheres(link)
+                    done.append(link)
+            log.warning("checking %s's leg with %s out of the sphere model: the start already violates the self-collision margin by %.1f mm (%s) - only new collisions fail the leg",
                         "/".join(sorted(moving)), done, 1000 * pairs[0]["penetration"], " ".join(f"{a}-{b}" for a, b in (pr["links"] for pr in pairs)))
             yield done
         finally:
@@ -1014,6 +1095,36 @@ class R1ProCuRobo:
             except Exception as e:  # noqa: BLE001
                 d["start_collision_detail"] = f"unknown ({e})"
         return d
+
+    def start_world_offenders(self, q_full: th.Tensor, emb_name: str = "whole_body", limit: int = 6) -> List[str]:
+        """The world meshes the configuration ``q_full`` already penetrates in the planner's sphere model (padding /
+        activation distance included), ``[]`` when the world check passes - the per-mesh search of
+        :meth:`world_collision_offenders` runs only then (owner 2026-09-25: a leg that leaves a contact is judged on
+        NEW collisions; the pad that ended a push against the partner reads as a start collision here while the
+        physics contact report is empty, touching 0925-134446 retreat[8])."""
+        if not bool(self.check_collision(q_full, emb_name=emb_name, self_collision=False)[0]):
+            return []
+        return self.world_collision_offenders(q_full, emb_name=emb_name, limit=limit)
+
+    def objects_of_world_meshes(self, names: Sequence[str]) -> List[Any]:
+        """The scene objects owning the collision meshes ``names`` (prim paths as :meth:`world_collision_offenders` lists
+        them; a ``together: a, b`` entry is split). The ground slab and unknown names map to nothing."""
+        wanted = set()
+        for n in names or ():
+            s = str(n)
+            if s.startswith("together: "):
+                wanted.update(x.strip() for x in s[len("together: "):].split(","))
+            else:
+                wanted.add(s)
+        out: List[Any] = []
+        for obj in self.robot.scene.objects:
+            if obj is self.robot:
+                continue
+            for link in getattr(obj, "links", {}).values():
+                if any(str(cm.prim_path) in wanted for cm in getattr(link, "collision_meshes", {}).values()):
+                    out.append(obj)
+                    break
+        return out
 
     def world_collision_offenders(self, q_full: th.Tensor, emb_name: str = "whole_body", limit: int = 6) -> List[str]:
         """The enabled world meshes (and the ground slab) whose removal clears the penetration at ``q_full``: each enabled

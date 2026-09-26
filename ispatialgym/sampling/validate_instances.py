@@ -510,10 +510,13 @@ def draft_from_sidecar(d: Mapping[str, Any]) -> LoadedSidecar:
     for name, st in (d.get("stances") or {}).items():
         sd.add_stance(Stance.from_sidecar(name, st))
     for t in d.get("transitions") or []:
-        sd.add_transition(Transition(t["from"], t["to"], float(t["stand_off"]), tuple(t.get("order") or TRANSITION_ORDER)))
+        tr = Transition(t["from"], t["to"], float(t["stand_off"]), tuple(t.get("order") or TRANSITION_ORDER))
+        if t.get("arms_q"):
+            tr.extras["arms_q"] = t["arms_q"]  # the arms the transition was swept with (owner 2026-09-24)
+        sd.add_transition(tr)
     for p in d.get("paths") or []:
         sd.add_path(PathRecord(p["from"], p["to"], p.get("mode", "local"), [tuple(float(v) for v in w) for w in p["waypoints"]],
-                               float(p.get("length_m", 0.0)), p.get("posture", "untucked"), p.get("carried"), style=p.get("style")))
+                               float(p.get("length_m", 0.0)), p.get("posture", "untucked"), p.get("carried"), style=p.get("style"), arms_q=p.get("arms_q")))
     for g in d.get("grasps") or []:
         ch = g.get("carry_height", 0.12)
         sd.add_grasp(GraspRecord(g["object"], g["arm"], g.get("grasp_key"), g.get("grasp_name"), float(g.get("yaw", 0.0) or 0.0),

@@ -147,10 +147,11 @@ class _Ignoring:
     reason (attached objects, removed objects) are left alone. Falls back to ``RobotKit.ignoring`` (two world syncs)
     when the backend has no per-mesh switch."""
 
-    def __init__(self, kit, objs: List[Any], ground: bool = True):
+    def __init__(self, kit, objs: List[Any], ground: bool = True, ground_meshes: bool = True):
         self.kit = kit
         self.objs = objs
         self.ground = ground  # False: the cuRobo ground slab (``R1ProCuRobo.GROUND_SLAB_NAME``) is switched off too (floor-level pushes)
+        self.ground_meshes = ground_meshes  # False (opt-in, owner 2026-09-25): the ground-like scene meshes (floors, lawn, carpets) off as well
         self.names: List[str] = []
         self._fallback = None
         self._slab_off = False
@@ -170,6 +171,8 @@ class _Ignoring:
     def __enter__(self):
         if not self.ground:
             self._slab_off = self._slab(False)
+        if not self.ground_meshes:
+            self._ground_meshes(False)
         if not self.objs:
             return self
         backend = self.kit.backend
@@ -186,25 +189,64 @@ class _Ignoring:
                     name = cm.prim_path
                     if name in backend._world_mesh_names and name not in disabled:
                         # nested contexts may ignore the same mesh: it is switched off once and back on when the last
-                        # context that asked for it exits (refcount)
+                        # context that asked for it exits (refcount); the backend's ``_held_off`` set keeps its own ground
+                        # re-enable (check_collision at margin > 0) from switching it back on meanwhile (owner 2026-09-25)
                         if active.get(name, 0) == 0:
                             backend._mesh_enable(name, False)
                         active[name] = active.get(name, 0) + 1
+                        held = getattr(backend, "_held_off", None)
+                        if held is None:
+                            held = backend._held_off = set()
+                        held.add(name)
                         self.names.append(name)
         return self
+
+    def _ground_meshes(self, enabled: bool) -> None:
+        """``ground=False`` also switches the GROUND-LIKE scene meshes off (the planner's ``_ground_mesh_names``: floors, carpets,
+        the lawn, ...; owner 2026-09-25, shampoo 0925-194056: with the floor ignored and the slab off, the floor-class lift still
+        collided 'with the scene' - the lawn mesh spans the house at floor level) and back on at exit; meshes another active
+        ignore context holds off, or the backend disabled for its own reasons, are left to them."""
+        backend = self.kit.backend
+        names = getattr(backend, "_ground_mesh_names", None)
+        if not names or not hasattr(backend, "_mesh_enable"):
+            return
+        active = _ACTIVE_IGNORES.setdefault(id(backend), {})
+        disabled = getattr(backend, "_disabled_obstacles", set())
+        if not enabled:
+            self._ground_off = []
+            held = getattr(backend, "_held_off", None)
+            if held is None:
+                held = backend._held_off = set()
+            for name in list(names):
+                if name in getattr(backend, "_world_mesh_names", set()) and name not in disabled and active.get(name, 0) == 0 and name not in held:
+                    backend._mesh_enable(name, False)
+                    held.add(name)
+                    self._ground_off.append(name)
+        else:
+            held = getattr(backend, "_held_off", set())
+            for name in getattr(self, "_ground_off", []):
+                held.discard(name)
+                if active.get(name, 0) == 0 and name not in disabled:
+                    backend._mesh_enable(name, True)
+            self._ground_off = []
 
     def __exit__(self, *exc):
         if self._slab_off:
             self._slab(True)
             self._slab_off = False
+        if not self.ground_meshes:
+            self._ground_meshes(True)
         if self._fallback is not None:
             self._fallback.__exit__(*exc)
             return False
         active = _ACTIVE_IGNORES.setdefault(id(self.kit.backend), {})
+        held = getattr(self.kit.backend, "_held_off", None)
         for name in self.names:
             active[name] = active.get(name, 1) - 1
             if active[name] <= 0:
                 active.pop(name, None)
+                if held is not None:
+                    held.discard(name)
                 self.kit.backend._mesh_enable(name, True)
         self.names = []
         return False
@@ -261,15 +303,16 @@ class IKChecker:
         #: sampler's own solution is used as the seed configuration then. Cleared per attempt (``core``).
         self.solutions: Dict[Tuple[str, Tuple[float, ...]], th.Tensor] = {}
         self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
+        self.last_track_stall: Optional[Dict[str, Any]] = None  # where the last ``track_chain`` stalled (``continue_chain`` callers' partial rule)
 
-    def ignoring(self, objs: Sequence[Any], ground: bool = True):
+    def ignoring(self, objs: Sequence[Any], ground: bool = True, ground_meshes: bool = True):
         """Context manager: ``objs`` leave the cuRobo collision world for the queries inside (§3.6 "support ignored for the
         grasp pose only"). Their collision meshes are switched off by name (``R1ProCuRobo._mesh_enable``, what
         ``attach_object`` does) instead of the two full world re-syncs of ``RobotKit.ignoring`` (0.5–13 s each).
         ``ground=False`` also switches the cuRobo ground slab off (a floor-level push whose fingertips run < 4 cm above the
         floor: the padded fingertip spheres penetrate the slab while the real fingers do not; the oracle tracks the push
         legs without a collision veto)."""
-        return _Ignoring(self.kit, list(objs), ground=ground)
+        return _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes)
 
     @staticmethod
     def _pose_key(pose: Pose) -> Tuple[float, ...]:
@@ -495,7 +538,7 @@ class IKChecker:
 
     def exact(self, poses: Sequence[Pose], stance: Stance, arm: str = "right", ignore_for_last: Sequence[Any] = (),
               q_seed: Optional[th.Tensor] = None, scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None,
-              approached: Optional[Sequence[Any]] = None) -> IKResult:
+              approached: Optional[Sequence[Any]] = None, q_first: Optional[th.Tensor] = None) -> IKResult:
         """32-seed IK of every pose in order from the stance (locked joints = the stance's recorded configuration /
         posture, ``fingers`` overrides the gripper opening); the last pose with ``ignore_for_last`` removed (the support
         under a grasp). Returns the configuration at the last pose. ``scale_key`` (the spawn scale vector of the object
@@ -505,10 +548,18 @@ class IKChecker:
         grasped target, the placed-on partner, the touched object — is removed from the world along the **whole** segment
         (side / top grasps straddle it over the last 10 cm by construction); the supports of ``ignore_for_last`` stay
         removed for the last waypoint only, the pre pose itself keeps the full world. ``None`` infers it from the end
-        pose (``approached_objects``: the spawned objects whose expanded AABB holds the pad centre / fingertip)."""
+        pose (``approached_objects``: the spawned objects whose expanded AABB holds the pad centre / fingertip).
+
+        ``q_first`` (owner 2026-09-24): the configuration the chain's first pose is reached in - a witness recorded earlier in the
+        same action (the ``pre_place`` the oracle's ``arm_to`` plans to before it tracks the descent). It is used as the first
+        pose's solution when it reaches it (:meth:`reaches`) instead of a fresh 32-seed solve, so the tracked chain leaves from
+        the very configuration the oracle will leave from; the backward re-tracking of ``track_approach`` may still replace it
+        (``_last_track_start``) and the caller then updates the recorded witness."""
         if len(poses) == 0:
             return IKResult(True, None, "no poses", 0)
         q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
+        if q_first is not None and cache:
+            cache = False  # a chain pinned to a given start is never a cached verdict of the poses alone
         key = None
         if cache:
             key = cache_key("exact_ik_v3", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
@@ -580,7 +631,16 @@ class IKChecker:
                     # a remembered solution of this very pose is verified as a witness (FK + collision) before the solver
                     # is asked again (cuRobo's IK is randomised, a witness check is not); otherwise it seeds the solver
                     q_near = self._seeded(q0, p, arm) if q_seed is None else q0
-                    if q_seed is None and not th.equal(q_near, q0) and self._witness_ok(q_near, p, arm):
+                    pinned = False
+                    if i == 0 and q_first is not None and self.reaches(q_first, p, arm):
+                        q = G.t(q_first).clone()  # the chain leaves from the recorded start configuration (owner 2026-09-24)
+                    elif i == 0 and q_seed is not None and self._witness_ok(G.t(q_seed), p, arm):
+                        # the caller's configuration IS the first pose (a held-object init: the hold posture the in-hand chain leaves
+                        # from) - it is the chain's start, not a solution to pick; the joint-limit margin below is about the branch
+                        # an approach would stall in and does not apply to it (object_scaling-beaker 0925-172725: 'right_arm_joint6
+                        # within 3 mrad of its limit at the pose' on every precomputed (grasp, goal), the hold posture itself)
+                        q, pinned = G.t(q_seed).clone(), True
+                    elif q_seed is None and not th.equal(q_near, q0) and self._witness_ok(q_near, p, arm):
                         q = q_near
                     else:
                         q = self.kit.ik(p, q_near, arm=arm)
@@ -595,11 +655,12 @@ class IKChecker:
                 if q is None:
                     why = f"exact IK failed at pose {i + 1} of {n}"
                     break
-                with self.ignoring(ign):
-                    q, why_lim = self.away_from_limits(q, p, arm, q0)
-                if q is None:
-                    why = why_lim
-                    break
+                if not pinned:
+                    with self.ignoring(ign):
+                        q, why_lim = self.away_from_limits(q, p, arm, q0)
+                    if q is None:
+                        why = why_lim
+                        break
             qs.append(q)
             self.solutions[(arm, self._pose_key(p))] = q.clone()
         if q is not None and self.WITNESS_RESIDUAL_AT_DRAW is not None:
@@ -625,6 +686,9 @@ class IKChecker:
     #: a chain witness must keep this much room (rad) to every arm joint limit: the oracle's straight approach / descent from
     #: it stalls at the limit otherwise (touching 0916-223613: right_arm_joint2 at -3.139, limit -3.142, plan_failed at grasp)
     JOINT_LIMIT_MARGIN = 0.05
+    #: re-solves from random arm configurations after the seeded re-solves of ``away_from_limits`` stayed within the margin
+    #: (owner 2026-09-26: bar soap's place pose - valid solutions exist on some pods and were missed on others)
+    LIMIT_RETRY_RANDOM = 12
     #: FK(q) of a recorded witness must reach its pose within this (m) after polishing
     WITNESS_RESIDUAL_MAX = 0.002
 
@@ -659,6 +723,28 @@ class IKChecker:
                 best, best_m = q_alt, m_alt
             if best_m >= self.JOINT_LIMIT_MARGIN:
                 return best, ""
+        if self.LIMIT_RETRY_RANDOM > 0:
+            # owner 2026-09-26 (bar soap 0926-011542 / 0925-235551: every solution of the place pose within 2-12 mrad of
+            # right_arm_joint6's limit on some pods, a valid one for the same candidate on others): the re-solves above start
+            # from the remembered seeds and q0 - near-identical starts; these start from random arm configurations (a generator
+            # seeded by the pose, reproducible) and run only in this situation, when the candidate would be rejected otherwise
+            idx = self.kit.robot.arm_control_idx[arm]
+            lo = self.kit.robot.joint_lower_limits[idx].float()
+            hi = self.kit.robot.joint_upper_limits[idx].float()
+            gen = th.Generator().manual_seed(hash(tuple(round(float(v), 4) for v in list(G.t(pose[0]).tolist()) + list(G.t(pose[1]).tolist()))) % (2 ** 31))
+            for k in range(self.LIMIT_RETRY_RANDOM):
+                q_s = G.t(q0).clone().float()
+                q_s[idx] = lo + (hi - lo) * th.rand(len(idx), generator=gen)
+                q_alt = self.kit.ik(pose, q_s, arm=arm)
+                if q_alt is None:
+                    continue
+                m_alt, _ = self.joint_limit_margin(q_alt, arm)
+                if m_alt > best_m:
+                    best, best_m = q_alt, m_alt
+                if best_m >= self.JOINT_LIMIT_MARGIN:
+                    log.info("ik: a solution %.0f mrad from every joint limit after %d random re-solves (the first solutions stood within %.0f mrad of %s's limit)",
+                             best_m * 1000, k + 1, m * 1000, jn)
+                    return best, ""
         m_b, jn_b = self.joint_limit_margin(best, arm)
         return None, f"ik_joint_limit: {jn_b} within {m_b * 1000:.0f} mrad of its limit at the pose (every solution found; the approach from it would stall)"
 
@@ -792,8 +878,68 @@ class IKChecker:
     TRACK_STEP_M = 0.01
     TRACK_STEP_RAD = 0.05
 
+    #: the oracle's ``ApproachFinish.max_excursion``: a finishing ``arm_to`` (the end of a stalled leg) may not swing any arm joint
+    #: by more than this (rad) - a witness farther from the stalled configuration is in another IK branch and is refused there
+    FINISH_MAX_EXCURSION = 0.6
+    #: the oracle's ``ExecuteConfig.free_leg_finish_max_stall``: a free-space leg (lift / retreat / carry) whose differential IK
+    #: stalls with a residual below this (m) is finished by ``arm_to``; a larger stall fails the leg
+    FREE_LEG_STALL_M = 0.03
+    #: the oracle's ``MotionsConfig`` differential-IK acceptance (``arm_along``): a waypoint left within the SOFT tolerances is
+    #: accepted with its residual and the tracking goes on (``diff_ik_soft_pos_tol`` 1 cm / ``diff_ik_soft_rot_tol`` 0.03 rad,
+    #: ``diff_ik_max_iters`` 100) - a continuation checked without them stalled where the oracle's lift goes on (block design
+    #: 0925-050230: 4.1 mm at waypoint 5/9 of the lift, 8/8 attempts rejected)
+    ORACLE_SOFT_POS_TOL = 0.01
+    ORACLE_SOFT_ROT_TOL = 0.03
+    ORACLE_DIFF_IK_MAX_ITERS = 100
+
+    def reaches(self, q: th.Tensor, pose: Pose, arm: str) -> bool:
+        """FK of ``q`` puts ``arm``'s eef at ``pose`` within the IK acceptance (5 mm / 0.05 rad); no collision check - the
+        configuration is a verified end of an earlier motion, asked here only whether it *is* at the chain's first pose."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        try:
+            eef = self.kit.fk([M.EEF_LINK[arm]], G.t(q))[M.EEF_LINK[arm]]
+        except Exception:  # noqa: BLE001
+            return False
+        return float(th.linalg.norm(G.t(eef[0]) - G.t(pose[0]))) <= self.WITNESS_POS_TOL and G.quat_angle(eef[1], G.t(pose[1])) <= self.WITNESS_ANG_TOL
+
+    def continue_chain(self, q_start: th.Tensor, waypoints: Sequence[Pose], arm: str, ignore: Sequence[Any] = (), ignore_end: Sequence[Any] = (),
+                       soft_stall_m: Optional[float] = None, limit_margin: float = 0.0, ignore_start: Sequence[Any] = (), ground_along: bool = True,
+                       ground_meshes_along: bool = True) -> IKResult:
+        """A chain that starts where the arm already **is** (owner 2026-09-24): ``q_start`` is the configuration the previous
+        motion ended in (the place configuration for the retreat off it, the grasp configuration for the lift, the previous
+        action's end for a ``Retreat``), and the chain is tracked from it by differential IK exactly as the oracle's
+        ``arm_along`` will run it - the first pose is **not** re-solved (a 32-seed IK re-solve of the same pose lands in another
+        branch at random, and the witnesses the oracle then aims its finish at lie 2-3 rad away: block design 0921-050358
+        action 15, 'the sidecar's pre-pose and end-pose witnesses are in different IK branches'). A stall within
+        ``soft_stall_m`` is finished by the IK of the end pose seeded at the stalled configuration and accepted only within
+        :attr:`FINISH_MAX_EXCURSION` of it - the bound the oracle's finish applies. The solver runs with the oracle's own
+        acceptance (soft waypoint tolerances, iteration budget; ``limit_margin`` as ``execute_retreat`` keeps the retreat off the
+        joint limits); the first ``APPROACH_WAYPOINT_M`` off the start leave a contact and are checked with ``ignore_start`` (the
+        start's support / the released object) removed and the ground slab off. Returns the tracked end configuration
+        (``IKResult.q``); on failure ``last_track_stall`` (set by :meth:`track_chain`) tells the caller where the tracking stalled."""
+        wps = list(waypoints)
+        n = len(wps)
+        self.last_track_stall = None
+        if n == 0:
+            return IKResult(True, G.t(q_start).clone(), "no poses", 0)
+        if not self.reaches(q_start, wps[0], arm):
+            return IKResult(False, None, "continuation: the start configuration does not reach the chain's first pose", n)
+        if n == 1:
+            return IKResult(True, G.t(q_start).clone(), "tracked continuation", 1)
+        q_end, why = self.track_chain(q_start, wps, arm, ignore=ignore, ignore_end=ignore_end, soft_stall_m=soft_stall_m,
+                                      finish_max_excursion=self.FINISH_MAX_EXCURSION, soft_pos_tol=self.ORACLE_SOFT_POS_TOL, soft_rot_tol=self.ORACLE_SOFT_ROT_TOL,
+                                      max_iters=self.ORACLE_DIFF_IK_MAX_ITERS, limit_margin=float(limit_margin), ignore_start=list(ignore_start), ground_at_start=False,
+                                      ground_along=ground_along, ground_meshes_along=ground_meshes_along)
+        if q_end is None:
+            return IKResult(False, None, why, n)
+        return IKResult(True, q_end, "tracked continuation" + (" (stall finished)" if "finished" in why else ""), n)
+
     def track_chain(self, q_from: th.Tensor, waypoints: Sequence[Pose], arm: str, ignore: Sequence[Any] = (), ignore_end: Sequence[Any] = (),
-                    soft_stall_m: Optional[float] = None, clear_links: Sequence[str] = (), clear_margin: float = 0.0) -> Tuple[Optional[th.Tensor], str]:
+                    soft_stall_m: Optional[float] = None, clear_links: Sequence[str] = (), clear_margin: float = 0.0,
+                    finish_max_excursion: Optional[float] = None, soft_pos_tol: Optional[float] = None, soft_rot_tol: Optional[float] = None,
+                    max_iters: int = 60, limit_margin: float = 0.0, ignore_start: Sequence[Any] = (), ground_at_start: bool = True,
+                    ground_along: bool = True, ground_meshes_along: bool = True) -> Tuple[Optional[th.Tensor], str]:
         """Differential-IK tracking of a whole eef chain (a reorient: yaw-align orbit, in-hand flip) from ``q_from`` (which
         reaches ``waypoints[0]``) exactly as the oracle's ``arm_along`` tracks it - every segment densified by position
         (``TRACK_STEP_M``) AND rotation (``TRACK_STEP_RAD``), no joint step above ``APPROACH_MAX_STEP`` - the configurations
@@ -819,14 +965,30 @@ class IKChecker:
             n = max(1, int(math.ceil(max(dist / self.TRACK_STEP_M, ang / self.TRACK_STEP_RAD))))
             dense.extend(tuple(w) for w in C.line_waypoints(a, b, n))
         self.kit._ensure_synced()
+        extra_kw: Dict[str, Any] = {}
+        if soft_pos_tol is not None:
+            extra_kw["soft_pos_tol"] = float(soft_pos_tol)
+        if soft_rot_tol is not None:
+            extra_kw["soft_rot_tol"] = float(soft_rot_tol)
+        if limit_margin > 0.0:
+            extra_kw["limit_margin"] = float(limit_margin)
         with self.ignoring(list(ignore)):
             res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in dense], q_start=G.t(q_from),
-                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=60)
+                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=int(max_iters), **extra_kw)
         self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1
         finished = ""
+        self.last_track_stall = None
         if not res.success:
             diag = dict(getattr(res, "diagnostics", None) or {})
             stall = diag.get("pos_err")
+            if diag.get("stage") == "diff_ik" and stall is not None and res.q_traj is not None and len(res.q_traj) > 0:
+                # where the tracking stalled (the caller's partial-retreat rule mirrors the oracle's acceptance of a short retreat)
+                q_stall = res.q_traj[-1].clone()
+                with self.ignoring(list(ignore)):
+                    stall_free = bool(self.kit.collision_free(q_stall, margin=0.0)[0])
+                self.last_track_stall = {"pos_err_m": float(stall), "fail_index": diag.get("fail_index"), "n_dense": len(dense), "q": q_stall,
+                                         "remaining_m": float(th.linalg.norm(wps[-1][0] - G.t(self.kit.fk([M.EEF_LINK[arm]], q_stall)[M.EEF_LINK[arm]][0]))), "free": stall_free,
+                                         "at_limit": bool(diag.get("at_lower") or diag.get("at_upper"))}
             if soft_stall_m is not None and diag.get("stage") == "diff_ik" and stall is not None and float(stall) <= float(soft_stall_m) and res.q_traj is not None and len(res.q_traj) > 0:
                 # the oracle's finish: plan to the end pose from where the tracking stalled (here: its exact IK seeded there)
                 q_last = res.q_traj[-1].clone()
@@ -834,17 +996,48 @@ class IKChecker:
                     q_fin = self.kit.ik(wps[-1], q_last, arm=arm)
                 if q_fin is None:
                     return None, f"approach_untrackable: chain tracking ({len(dense)} dense poses): {res.status}; the end pose has no IK from the stall either"
+                if finish_max_excursion is not None:
+                    idx = self.kit.robot.arm_control_idx[arm]
+                    exc = float(th.max(th.abs(G.t(q_fin)[idx] - G.t(q_last)[idx])))
+                    if exc > float(finish_max_excursion):
+                        # the oracle refuses such a finish ("the plan swings a joint by X rad (> 0.60 allowed for a finishing motion)")
+                        return None, (f"approach_untrackable: chain tracking ({len(dense)} dense poses): {res.status}; the end pose's IK from the stall lies "
+                                      f"{exc:.2f} rad away in joint space (> {float(finish_max_excursion):.2f}: another IK branch, the oracle's finish would be rejected)")
                 traj = th.cat([res.q_traj, q_fin.unsqueeze(0)], dim=0)
                 finished = f" (stall {float(stall) * 1000:.1f} mm at dense pose {diag.get('fail_index')} finished by IK)"
             else:
                 return None, f"approach_untrackable: chain tracking ({len(dense)} dense poses): {res.status}"
         else:
             traj = res.q_traj
-        with self.ignoring(list(ignore)):
-            free = self.kit.collision_free(traj[1:-1], margin=0.0) if len(traj) > 2 else th.ones(0, dtype=th.bool)
-        if len(free) and not bool(free.all()):
-            bad = [i + 1 for i, f in enumerate(free.tolist()) if not f]
-            return None, f"approach_untrackable: {len(bad)}/{len(free)} tracked chain configurations collide ({self._collision_blame(traj[bad[0]], list(ignore))})"
+        # the configurations within APPROACH_WAYPOINT_M of the START leave a contact (the grasped object still on its support, the
+        # pads around the object just released): checked with ``ignore_start`` removed and the ground slab off, as ``track_segment``
+        # checks the first centimetres of a leg (the chains that began 3.3 cm past their start never saw them: IORS floor class
+        # 0925-115205, 'lift: 1/11 tracked chain configurations collide' - the dispenser's spheres in the slab 1 cm off the floor)
+        mid = list(range(1, len(traj) - 1))
+        near = [j for j in mid if j - 1 < len(dense) and float(th.linalg.norm(G.t(dense[j - 1][0]) - wps[0][0])) <= self.APPROACH_WAYPOINT_M] if (ignore_start or not ground_at_start) else []
+        far = [j for j in mid if j not in set(near)]
+        bad: List[int] = []
+        if far:
+            # ``ground_along=False``: the ground slab (top at z = 0) is off for the whole chain - a FLOOR-class lift carries an object
+            # whose sphere fit reaches below its mesh bottom (shampoo dispenser 0925-171050: 'lift: 1/11 tracked chain configurations
+            # collide', the one configuration just past the start band, the dispenser's spheres still in the slab 3-4 cm up); the
+            # floor mesh itself is in ``ignore`` and the oracle's lift is a contact motion without a collision veto
+            with self.ignoring(list(ignore), ground=ground_along, ground_meshes=ground_meshes_along):
+                free = self.kit.collision_free(traj[far], margin=0.0)
+            bad += [j for j, f in zip(far, free.tolist()) if not f]
+        if near:
+            with self.ignoring(list(ignore) + list(ignore_start), ground=ground_at_start):
+                free_n = self.kit.collision_free(traj[near], margin=0.0)
+            bad += [j for j, f in zip(near, free_n.tolist()) if not f]
+        if bad:
+            bad.sort()
+            j0 = bad[0]
+            try:
+                d0 = float(th.linalg.norm(G.t(dense[j0 - 1][0]) - wps[0][0])) if j0 - 1 < len(dense) else float("nan")
+            except Exception:  # noqa: BLE001
+                d0 = float("nan")
+            return None, (f"approach_untrackable: {len(bad)}/{len(mid)} tracked chain configurations collide (first: dense pose {j0} of {len(traj) - 1}, "
+                          f"{d0 * 1000:.0f} mm from the start{', in the start band' if j0 in near else ''}; {self._collision_blame(traj[j0], list(ignore) + (list(ignore_start) if j0 in near else []))})")
         with self.ignoring(list(ignore) + list(ignore_end)):
             if not bool(self.kit.collision_free(traj[-1], margin=0.0)[0]):
                 return None, "approach_untrackable: the tracked chain's end configuration collides"
@@ -883,6 +1076,12 @@ class IKChecker:
                 pairs = self.self_collision_pairs(q)
                 named = ", ".join(f"{a} x {b} ({pen * 1000:.0f} mm)" for (a, b), pen in pairs[:3]) or "arm / attached object against the robot's own links"
                 return f"self-collision ({named})"
+            # the cuRobo ground slab (a cuboid whose top is the floor plane, not a scene object): re-check with it off (owner 2026-09-25,
+            # shampoo 0925-171050 'lift: 1/11 tracked chain configurations collide (collides with the scene ...)': the carried dispenser's
+            # sphere fit reaches below its mesh into the slab)
+            with self.ignoring(list(ignored), ground=False):
+                if bool(self.kit.collision_free(q, margin=float(margin))[0]):
+                    return "collides with the cuRobo ground slab only (top at the floor plane; the floor mesh is ignored or clear)"
             # a non-spawned scene mesh within the margin: name the scene objects whose AABB lies nearest the base pose
             # (a heuristic - the padded proximity is not attributed per mesh by the checker)
             if world is not None and hasattr(world, "scene"):
@@ -897,11 +1096,48 @@ class IKChecker:
                     dx = max(float(lo[0]) - float(base[0]), 0.0, float(base[0]) - float(hi[0]))
                     dy = max(float(lo[1]) - float(base[1]), 0.0, float(base[1]) - float(hi[1]))
                     d = math.hypot(dx, dy)
-                    if d < 1.0 and "floor" not in o.name and "ceiling" not in o.name:
+                    if d < 2.5 and "floor" not in o.name and "ceiling" not in o.name:
                         rows.append((d, o.name))
                 rows.sort()
+                # name the scene object (owner 2026-09-25, shampoo 0925-200239: floor, lawn and slab all off, still 'collides with the
+                # scene'): the nearest scene objects are removed in turn - the first whose removal frees the configuration is the body
+                by_name = {o.name: o for o in getattr(world.scene, "objects", [])}
+                for d, n in rows[:20]:
+                    o = by_name.get(n)
+                    if o is None or o is getattr(self.kit, "robot", None) or "robot" in n:
+                        continue
+                    with self.ignoring(list(ignored) + [o]):
+                        if bool(self.kit.collision_free(q, margin=float(margin))[0]):
+                            return f"collides with the scene object {n} ({d:.2f} m from the base)"
+                # which of the robot's (or the attached object's) links touch the world: the sphere owners at this configuration
+                link_hits = []
+                try:
+                    costs = self.kit.backend._collision_costs(self.kit.backend.kin_entry("whole_body"))
+                    for link in sorted(set(costs.get("link_of_sphere", []))):
+                        with self.ignoring(list(ignored)):
+                            if not bool(self.kit.links_clear(q, [link], float(margin))[0]):
+                                link_hits.append(link)
+                except Exception:  # noqa: BLE001
+                    pass
+                hits = f"; links in the world: {', '.join(link_hits)}" if link_hits else ""
+                # per world body (owner 2026-09-25): the planner disables each enabled mesh in turn and re-checks - the meshes whose
+                # removal clears the penetration name the body, whatever scene object (or none) owns them
+                try:
+                    with self.ignoring(list(ignored)):
+                        offs = self.kit.backend.world_collision_offenders(G.t(q), emb_name="whole_body", limit=4)
+                    if offs:
+                        hits += f"; world meshes in contact: {[str(o).rsplit('/', 2)[-2:] for o in offs]}"
+                except Exception as e:  # noqa: BLE001
+                    hits += f"; per-mesh search failed ({e!r})"
+                try:  # the attached object's sphere fit (a coarse fit bulges far beyond the mesh)
+                    for arm_, att in (getattr(self.kit.backend, "_attached", None) or {}).items():
+                        sp = att.get("spheres")
+                        if sp is not None:
+                            hits += f"; attached({arm_}) spheres r={[round(float(r), 3) for r in G.t(sp)[:, 3].tolist()]}"
+                except Exception:  # noqa: BLE001
+                    pass
                 if rows:
-                    return "collides with the scene within %.2f m; nearest scene objects to the base: %s" % (float(margin), ", ".join(f"{n} ({d:.2f} m)" for d, n in rows[:4]))
+                    return "collides with the scene within %.2f m; nearest scene objects to the base: %s%s" % (float(margin), ", ".join(f"{n} ({d:.2f} m)" for d, n in rows[:4]), hits)
         except Exception:  # noqa: BLE001
             pass
         return "collides with the scene (a non-spawned object)" + (f" within {float(margin):.2f} m" if margin > 0 else "")
@@ -985,7 +1221,7 @@ class IKChecker:
     def waypoints_ok(self, waypoints: Sequence[Pose], stance: Stance, arm: str = "right", policy: str = "screen_mid_exact_ends",
                      ignore_for_last: Sequence[Any] = (), ignore_all: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None,
                      scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None, approached: Optional[Sequence[Any]] = None,
-                     track_dense: bool = False) -> IKResult:
+                     track_dense: bool = False, q_first: Optional[th.Tensor] = None) -> IKResult:
         """§3.9: screening IK at the intermediate waypoints, exact IK at the two endpoints (``policy`` names what was
         checked and is recorded as ``waypoint_policy``). ``ignore_all`` objects are removed for every waypoint (the
         carried object's own support along a lift), ``ignore_for_last`` for the final pose only. ``cache=False`` for
@@ -993,20 +1229,22 @@ class IKChecker:
 
         ``track_dense`` (block design, owner 2026-09-19): a chain that is not a straight approach (a reorient) is additionally
         tracked from the first pose's solution by :meth:`track_chain` at the oracle's densification, so the recorded chain
-        is one the oracle's ``arm_along`` follows without a joint jump; the returned configuration is the tracked end."""
+        is one the oracle's ``arm_along`` follows without a joint jump; the returned configuration is the tracked end.
+
+        ``q_first``: the recorded configuration of the first pose (:meth:`exact`) - the chain leaves from it."""
         wps = list(waypoints)
         if len(wps) < 2:
-            return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers, approached=approached)
+            return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers, approached=approached, q_first=q_first)
         if all(is_approach(a, b) for a, b in zip(wps[:-1], wps[1:])):
             # a straight same-orientation chain (approach, lift, descent, retreat, the wall brace chain): solved by
             # ``exact`` as one tracked motion from the first pose's solution (branch-consistent witnesses at every
             # waypoint; ``approach_untrackable`` otherwise) with ``ignore_all`` removed throughout
             with self.ignoring(list(ignore_all)):
-                res = self.exact(wps, stance, arm, list(ignore_for_last), q_seed=q_seed, scale_key=scale_key, cache=False, fingers=fingers, approached=approached)
+                res = self.exact(wps, stance, arm, list(ignore_for_last), q_seed=q_seed, scale_key=scale_key, cache=False, fingers=fingers, approached=approached, q_first=q_first)
             return IKResult(res.ok, res.q, policy if res.ok else res.reason, len(wps))
         # endpoints first (exact): their solutions seed the screening of the intermediate waypoints, which otherwise
         # misses poses near the ends that the 32-seed solver finds (the wall brace chain)
-        r0 = self.exact([wps[0]], stance, arm, list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
+        r0 = self.exact([wps[0]], stance, arm, list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers, q_first=q_first)
         if not r0.ok:
             return IKResult(False, None, "first waypoint fails the exact IK", len(wps))
         r1 = self.exact([wps[-1]], stance, arm, list(ignore_for_last) + list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)

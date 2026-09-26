@@ -741,3 +741,268 @@ def test_table_flip_yaw_first_decomposition_exists_for_every_goal_face():
                                 v = C.quat_rotate(q_end, th.tensor(TT.FACE_AXES[face]))
                                 assert max(abs(float(c)) for c in v) > 0.999  # table-aligned
             assert len(found) == 3, (gf, jitter_deg, found)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# owner 2026-09-24 regressions 3-5: pinch re-centring only when the pinch geometry survives it; the partner top under
+# the fingertips; the male's rest orientation by stability
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _ring(r, z, n=36):
+    return [[r * math.cos(2 * math.pi * k / n), r * math.sin(2 * math.pi * k / n), z] for k in range(n)]
+
+
+def _eef(pos, a, c):
+    """An eef pose (object frame) from its origin, approach axis ``a`` (+z of the eef) and closing axis ``c`` (+y)."""
+    a, c = th.tensor(a, dtype=th.float32), th.tensor(c, dtype=th.float32)
+    a, c = a / a.norm(), c / c.norm()
+    x = th.cross(c, a, dim=0)
+    R = th.stack([x, c, a], dim=1)
+    return th.tensor(pos, dtype=th.float32), C.mat_to_quat(R)
+
+
+def _iors_stub(hull, lib_width=None, attachable=True):
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    class Stub:
+        pass
+
+    s = Stub()
+    s.hull = {"target": th.tensor(hull, dtype=th.float32)}
+    s.gen = lambda key, default=None: default
+    s.grasp_key = "test"
+    s.ikc = SimpleNamespace(attachable=lambda tgt, pose, arm: attachable)
+    s.template_facts = {}
+    s.pinch_offset = lambda pose: IS.IORSSmall.pinch_offset(s, pose)
+    s.pinch_chord = lambda pose: IS.IORSSmall.pinch_chord(s, pose)
+    return s, IS
+
+
+class _G:
+    """A grasp-library row stand-in: ``pose`` = (position, quat) in the object frame, ``meta`` the library facts."""
+
+    def __init__(self, name, pos, quat, width=None):
+        self.name, self.position, self.quat = name, pos, quat
+        self.meta = {} if width is None else {"width": width}
+
+    @property
+    def pose(self):
+        return self.position, self.quat
+
+
+def test_recentre_keeps_a_rim_pinch_of_a_thin_walled_cup_and_recentres_a_solid_marker():
+    # a cup: inner and outer walls (collision decomposition boundary points), rim at z = 0.08
+    cup = _ring(0.035, 0.0) + _ring(0.035, 0.08) + _ring(0.030, 0.01) + _ring(0.030, 0.08)
+    s, IS = _iors_stub(cup, lib_width=0.007)
+    # a rim pinch: the eef 3 cm above the rim at the +x wall, approach down, closing along x (across the wall)
+    pos, quat = _eef([0.0325, 0.0, 0.08 + 0.01], a=[0, 0, -1], c=[1, 0, 0])  # the eef 1 cm above the rim: the tips reach 9 mm down the wall
+    g = _G("grasp_4", pos, quat, width=0.007)
+    off = IS.IORSSmall.pinch_offset(s, g.pose)
+    assert abs(off - 0.0325) < 0.003, off  # the pinch sits at the wall, 32.5 mm off the cup's centre along c
+    out, offsets = IS.IORSSmall.recentre_pinches(s, [g], object())
+    assert out[0] is g, "the rim pinch keeps its offset"
+    fact = s.template_facts["grasp_pinch_recentre"]["grasp_4"]
+    assert fact["applied"] is False and fact["chord_recentred_m"] > 0.06 and "different width" in fact["reason"]
+    assert abs(offsets["grasp_4"] - off) < 1e-6
+    # a solid marker lying along x (a sparse prism hull: vertices at the end rings only), r = 8 mm, pinched from above across y
+    marker = [[x, 0.008 * math.cos(t), 0.008 * math.sin(t) + 0.008] for x in (-0.06, 0.06) for t in [2 * math.pi * k / 16 for k in range(16)]]
+    s2, _ = _iors_stub(marker, lib_width=0.016)
+    pos, quat = _eef([0.0, 0.015, 0.016 + 0.01], a=[0, 0, -1], c=[0, 1, 0])  # the eef 1 cm above the marker, the pinch centre 15 mm off the axis along c
+    g2 = _G("grasp_1", pos, quat, width=0.016)
+    assert abs(IS.IORSSmall.pinch_offset(s2, g2.pose) - 0.015) < 1e-3
+    out, _ = IS.IORSSmall.recentre_pinches(s2, [g2], object())
+    assert out[0] is not g2 and abs(float(out[0].position[1])) < 1e-4, "the solid body is re-centred onto its axis"
+    assert s2.template_facts["grasp_pinch_recentre"]["grasp_1"]["applied"] is True
+    # a pinch already within the limit is untouched and unlisted
+    pos, quat = _eef([0.0, 0.002, 0.026], a=[0, 0, -1], c=[0, 1, 0])
+    g3 = _G("grasp_2", pos, quat, width=0.016)
+    out, _ = IS.IORSSmall.recentre_pinches(s2, [g3], object())
+    assert out[0] is g3 and "grasp_2" not in s2.template_facts["grasp_pinch_recentre"]
+
+
+def test_rejected_manipulation_candidates_move_down_the_order_in_later_attempts():
+    """Owner 2026-09-25 (cap 0925-220515): 45 survivors, the same 6 best-scored stances in every attempt. A rejection collected in an
+    earlier attempt adds CANDIDATE_REJECT_PENALTY to the candidate's score, so the next attempt's window of six reaches new stances;
+    the untried ones keep the depth / trunk order."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import attachment as A
+
+    def cand(depth, translate=0.5, tilt=-0.45):
+        return SimpleNamespace(focus=th.tensor([depth, 0.0, 0.8]), translate=translate, tilt=tilt, world_to_base=lambda xy: th.tensor([float(xy[0]), 0.0]))
+
+    s = SimpleNamespace(manip_candidates=[cand(0.60), cand(0.61), cand(0.62), cand(0.70), cand(0.75), cand(0.80), cand(0.85), cand(0.90), cand(0.95)])
+    rng = np.random.default_rng(0)
+    first = A.Attachment._candidate_order(s, rng, {})
+    assert set(first[:3]) == {0, 1, 2} and first[3:6] == [3, 4, 5]  # the arm-friendly depths first (ties by the draw), then by depth
+    rejects = {k: 1 for k in first[:6]}  # every stance of the first window was rejected
+    second = A.Attachment._candidate_order(s, np.random.default_rng(1), rejects)
+    assert second[:3] == [6, 7, 8], second  # the untried stances come first now
+    assert set(second[3:6]) == {0, 1, 2}  # the rejected ones follow in their own preference order
+    twice = dict(rejects)
+    twice[6] = 2
+    third = A.Attachment._candidate_order(s, np.random.default_rng(2), twice)
+    assert third[:2] == [7, 8] and third[-1] == 6, third  # two rejections rank below one
+
+
+def test_a_grasp_lift_a_floor_demands_is_not_optional():
+    """Owner 2026-09-25 (cork 0925-195316 / 205211): the partner-top floor asked for a 31 mm lift, the lifted grasp had no IK
+    (right_arm_joint5 near its limit) and the sampler kept the library height - the fingertips ended 26 mm below the rim and the
+    demo's insertion jammed on the neck. Now: an IK failure with a lift a FLOOR demands rejects the candidate (``lift_unreachable``);
+    without a floor (the lift is only ``generation.grasp_height_extra_m``) the library height is still kept."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2.tasks import attachment as A
+
+    cork = th.tensor(_ring(0.009, 0.0) + _ring(0.009, 0.04), dtype=th.float32)  # 40 mm tall, resting on the support at z = 0
+    m_pose = (th.zeros(3), C.IDENTITY_QUAT.clone())
+
+    def stub(extra_m, clearance):
+        s = SimpleNamespace()
+        s.gp = SimpleNamespace(alias="cork-test")
+        s.gen = lambda key, default=None: extra_m if key == "grasp_height_extra_m" else default
+        s.hull, s.t_role = {"male": cork}, "male"
+        s.world = SimpleNamespace(hull_at=lambda hull, pose: hull.clone())
+        s.counters = {}
+        s.choice = SimpleNamespace(models={"male": SimpleNamespace(scale=1.0)})
+        s.obj = lambda role: "support-object"
+        s._finger_lowest_z = lambda eef: None  # no robot meshes needed here: the partner floor is the one under test
+        s._attach_clearance = lambda grasp: clearance
+        s._contact_band_centre = lambda eef, pose: None
+        s.ikc = SimpleNamespace(exact=lambda *a, **k: SimpleNamespace(ok=False, reason="ik_joint_limit: right_arm_joint5 within 34 mrad of its limit"))
+        return s
+
+    def grasp_at(tip_above_bottom):
+        # a top-down pinch: the fingertip axis point ``tip_above_bottom`` above the cork's bottom
+        pos, quat = _eef([0.0, 0.0, tip_above_bottom + C.FINGERTIP_LENGTH], a=[0, 0, -1], c=[1, 0, 0])
+        return SimpleNamespace(eef_in_object=(pos.clone(), quat.clone()), grasp=(pos.clone(), quat.clone()), pre_grasp=None, extras={}, arm="right")
+
+    # the tips 2 mm above the bottom; at the attach they would end 25.9 mm below the rim: the floor asks for 30.9 mm, the IK fails
+    floor_case = {"lift_sign": 1.0, "h_tip_m": -0.0259, "h_pad_m": -0.0198, "depth_m": 0.0184, "r_male_m": 0.009, "r_tips_m": [0.009, 0.009],
+                  "pinch_width_m": 0.017, "partner_points_under_tips": 7, "depth_within_male_radius_m": 0.0184, "depth_under_tips_m": None,
+                  "pair_class": "into_opening", "floor_rule": "rim floor", "r_rim_m": 0.013, "r_opening_m": 0.0095, "male_length_m": 0.04}
+    s = stub(0.0, floor_case)
+    with pytest.raises(Reject) as ei:
+        A.Attachment._apply_grasp_height_extra(s, grasp_at(0.002), m_pose, None)
+    assert ei.value.reason == "lift_unreachable" and "partner top (fingertips)" in str(ei.value) and s.counters["lift_unreachable"] == 1
+    # no floor (the tips clear the rim by 2 cm at the attach), the lift is only the generation knob: the library height is kept
+    clear_case = dict(floor_case, h_tip_m=0.02, h_pad_m=0.013)
+    s = stub(0.01, clear_case)
+    g = grasp_at(0.02)
+    A.Attachment._apply_grasp_height_extra(s, g, m_pose, None)
+    assert g.extras["grasp_height_extra_effective_m"] == 0.0 and "library height kept (no floor asked for it)" in g.extras["grasp_height_extra_reason"]
+    assert "lift_unreachable" not in s.counters
+
+
+def test_partner_top_is_taken_under_the_fingertips():
+    """Item 4: the cap's fingertips (r ~ 21 mm) hang over the bottle's shoulder, not over the 13 mm neck rim: no partner floor;
+    the cork's tips (r ~ 9 mm) stand over the rim and keep it."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import attachment as A
+
+    def stub(male_hull, partner_hull):
+        s = SimpleNamespace()
+        s.template_facts = {}
+        s.hull = {"male": th.tensor(male_hull, dtype=th.float32), "partner": th.tensor(partner_hull, dtype=th.float32)}
+        s.t_role, s.p_role = "male", "partner"
+        s.parent_link_in_female = (th.tensor([0.0, 0.0, 0.20]), C.IDENTITY_QUAT.clone())  # the female link at the neck top, 20 cm up
+        s.root_in_child_link = (th.zeros(3), C.IDENTITY_QUAT.clone())
+        s.insertion_axis_local = th.tensor([0.0, 0.0, 1.0])
+        s.rest = {"male": C.IDENTITY_QUAT.clone()}
+        s._pinch_width_at = lambda eef_in_object: A.Attachment._pinch_width_at(s, eef_in_object)
+        return s
+
+    # a bottle: body r = 30 mm to z = 0.15, a shoulder ring at r = 22 mm z = 0.17, the neck r = 13 mm from z = 0.17 to 0.20 (rim at 0.20)
+    bottle = _ring(0.030, 0.0) + _ring(0.030, 0.15) + _ring(0.022, 0.17) + _ring(0.013, 0.17) + _ring(0.013, 0.20)
+    # the cap: r = 25.5 mm, 11 mm tall, pinched across its rim from above: eef 1.2 cm above the cap's top at its centre
+    cap = _ring(0.0255, 0.0) + _ring(0.0255, 0.011)
+    s = stub(cap, bottle)
+    pos, quat = _eef([0.0, 0.0, 0.011 + 0.012], a=[0, 0, -1], c=[1, 0, 0])
+    g = SimpleNamespace(eef_in_object=(pos, quat))
+    clr = A.Attachment._attach_clearance(s, g)
+    assert clr is not None and clr["pinch_width_m"] is not None and abs(clr["pinch_width_m"] - 0.051) < 0.002
+    assert all(r > 0.02 for r in clr["r_tips_m"]), clr
+    # under the cap's tips (r ~25.5 mm) the band meets the shoulder ring (r 22 mm, z 0.17 = 3 cm below the link) - a surface INSIDE
+    # the tips' radius, not a top the finger (whose body extends outward from the pad face) stands on: no partner floor; the old
+    # rule took the rim (z 0.20) within the cap's radius
+    assert clr["pair_class"] == "over_partner" and clr["depth_m"] is None and "edge / inside" in clr["floor_rule"], clr
+    assert abs(clr["depth_within_male_radius_m"] - 0.0) < 1e-3  # the rim at the link height (clamped legacy depth)
+    # a bottle without a shoulder under the tips: no partner floor at all
+    s = stub(cap, _ring(0.013, 0.17) + _ring(0.013, 0.20) + _ring(0.030, 0.0))
+    clr = A.Attachment._attach_clearance(s, SimpleNamespace(eef_in_object=(pos, quat)))
+    assert clr["depth_m"] is None and clr["h_tip_m"] is None
+    assert s.template_facts["attach_pair_class"]["pair_class"] == "over_partner"
+    # the real cap / lemonade bottle (0925-172312): the collar reaches r 27 mm at the mouth (4.6 mm above the link), the cap's tips
+    # at r 25.5 mm stand over 1.5 mm of collar edge - no partner floor (the 09-21 success's grasp), class over_partner
+    collar = _ring(0.030, 0.0) + _ring(0.030, 0.10) + _ring(0.0197, 0.20) + _ring(0.027, 0.20) + _ring(0.027, 0.2046) + _ring(0.0197, 0.2046)
+    s = stub(cap, collar)
+    clr = A.Attachment._attach_clearance(s, SimpleNamespace(eef_in_object=(pos, quat)))
+    assert clr["pair_class"] == "over_partner" and "edge / inside" in clr["floor_rule"] and clr["depth_m"] is None and clr["h_tip_m"] is None, clr
+    # a collar wider than the cap (r 32 mm): the cap sits ON that rim (on_rim) and the rim floor applies at the link height
+    wide = _ring(0.030, 0.0) + _ring(0.030, 0.10) + _ring(0.0197, 0.20) + _ring(0.032, 0.20) + _ring(0.032, 0.2046)
+    clr = A.Attachment._attach_clearance(stub(cap, wide), SimpleNamespace(eef_in_object=(pos, quat)))
+    assert clr["pair_class"] == "on_rim" and "rim floor" in clr["floor_rule"] and clr["depth_m"] is not None and abs(clr["depth_m"]) < 1e-3, clr
+    # the cork: r = 9 mm, 40 mm tall, pinched across from above 1 cm above its top: the tips stand over the rim
+    cork = _ring(0.009, 0.0) + _ring(0.009, 0.04)
+    s = stub(cork, bottle)
+    pos, quat = _eef([0.0, 0.0, 0.04 + 0.01], a=[0, 0, -1], c=[1, 0, 0])
+    clr = A.Attachment._attach_clearance(s, SimpleNamespace(eef_in_object=(pos, quat)))
+    assert clr["pair_class"] == "into_opening" and "rim floor" in clr["floor_rule"], clr
+    assert clr["depth_m"] is not None and abs(clr["depth_m"]) < 1e-3 and all(abs(r - 0.009) < 0.002 for r in clr["r_tips_m"]), clr  # the rim at the link height
+    # h_tip = the fingertip axis point above the rim: the eef 5 cm up the cork (its bottom at the link), tips 18.8 mm below the eef
+    assert clr["h_tip_m"] is not None and abs(clr["h_tip_m"] - ((0.05 - C.FINGERTIP_LENGTH) - 0.0)) < 1e-3, clr
+    # owner 2026-09-25 (cork 0925-145307): a TILTED pad pinch whose tips stand 17 mm off the axis - the 4.25 mm band meets no hull
+    # vertex between the rim and the shoulder / body; the pair is into_opening (9 mm cork, 13 mm rim), so the rim floor holds and
+    # the fingertips must clear the rim by 5 mm whatever lies under them
+    pos, quat = _eef([0.015, 0.0, 0.04 + 0.01], a=[0, 0, -1], c=[0, 1, 0])
+    clr = A.Attachment._attach_clearance(s, SimpleNamespace(eef_in_object=(pos, quat)))
+    assert all(r > 0.014 for r in clr["r_tips_m"]) and (clr["depth_under_tips_m"] is None or clr["depth_under_tips_m"] < -0.02), clr
+    assert clr["pair_class"] == "into_opening" and abs(clr["depth_m"] - 0.0) < 1e-3 and abs(clr["h_tip_m"] - (0.05 - C.FINGERTIP_LENGTH)) < 1e-3, clr
+    assert s.template_facts["attach_pair_class"]["depth_rim_m"] == 0.0 and s.template_facts["attach_pair_class"]["r_rim_m"] is not None
+    # over_partner whose under-tips point lies deeper than the male is long (a lid whose knob pinch hangs over the pot's interior):
+    # the rim rule again
+    lid = _ring(0.03, 0.0) + _ring(0.03, 0.01) + _ring(0.006, 0.03)
+    pot = _ring(0.022, 0.0) + _ring(0.022, 0.20) + _ring(0.020, 0.20) + _ring(0.020, 0.0) + _ring(0.006, 0.0)  # a thin-walled 20 cm pot, its interior bottom under the knob
+    s = stub(lid, pot)
+    pos, quat = _eef([0.0, 0.0, 0.03 + 0.01], a=[0, 0, -1], c=[1, 0, 0])
+    clr = A.Attachment._attach_clearance(s, SimpleNamespace(eef_in_object=(pos, quat)))
+    assert clr["pair_class"] == "over_partner" and "deeper than the male" in clr["floor_rule"] and abs(clr["depth_m"] - 0.0) < 1e-3, clr
+    # a lid between the opening and the outer radius (it sits on a thick rim): the rim rule
+    pot2 = _ring(0.05, 0.0) + _ring(0.05, 0.20) + _ring(0.02, 0.20) + _ring(0.02, 0.0)
+    clr = A.Attachment._attach_clearance(stub(lid, pot2), SimpleNamespace(eef_in_object=(pos, quat)))
+    assert clr["pair_class"] == "on_rim" and abs(clr["depth_m"] - 0.0) < 1e-3, clr
+
+
+def test_male_rest_orientation_keeps_the_library_rest_unless_physics_toppled_it():
+    """Owner 2026-09-25 (cap 0925-144739: flipped on geometry alone, open side up, no grasp reachable): the library rest is kept by
+    default whatever the tipping margins; only a previous draw's toppling (``force``) may turn the male, and only about the
+    insertion direction (never for a vertical insertion: the program does no in-hand 180 deg turn) with a grasp that still
+    approaches from above."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import attachment as A
+
+    cork = _ring(0.006, 0.0, 24) + _ring(0.010, 0.04, 24)  # a frustum on its narrow end: the flip would be the more stable end
+    q, f = A.stable_rest_quat(th.tensor(cork), C.IDENTITY_QUAT)
+    assert not f["flipped"] and th.allclose(q, C.IDENTITY_QUAT) and f["margin_flipped"] > 1.3 * f["margin_canonical"]
+    # physics toppled it, but the insertion axis is vertical: a horizontal turn would reverse it -> kept
+    q, f = A.stable_rest_quat(th.tensor(cork), C.IDENTITY_QUAT, force=True, insertion_axis_local=[0.0, 0.0, 1.0])
+    assert not f["flipped"] and not f["flip_keeps_insertion_direction"] and "reverse the insertion" in f["reason"]
+    # a male inserted sideways (insertion axis along x): the turn about x keeps the direction; a top-down grasp survives the turn
+    # only if some library grasp still points down afterwards
+    down_grasp = SimpleNamespace(pose=(th.zeros(3), C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), math.pi)))  # eef +z down
+    q, f = A.stable_rest_quat(th.tensor(cork), C.IDENTITY_QUAT, force=True, insertion_axis_local=[1.0, 0.0, 0.0], grasps=[down_grasp])
+    assert f["flip_keeps_insertion_direction"] and not f["flipped"] and f["grasps_from_above_after_flip"] == 0
+    up_grasp = SimpleNamespace(pose=(th.zeros(3), C.IDENTITY_QUAT))  # eef +z up at the library rest: points down once turned
+    q, f = A.stable_rest_quat(th.tensor(cork), C.IDENTITY_QUAT, force=True, insertion_axis_local=[1.0, 0.0, 0.0], grasps=[down_grasp, up_grasp])
+    assert f["flipped"] and f["grasps_from_above_after_flip"] == 1
+    assert float(C.quat_rotate(q, th.tensor([1.0, 0.0, 0.0]))[0]) > 0.99  # the insertion direction is kept
+    assert float(C.quat_rotate(q, th.tensor([0.0, 0.0, 1.0]))[2]) < -0.99  # the wide end is the support now
+    cap = _ring(0.0255, 0.0, 24) + _ring(0.0255, 0.011, 24)
+    q, f = A.stable_rest_quat(th.tensor(cap), C.IDENTITY_QUAT)
+    assert not f["flipped"] and th.allclose(q, C.IDENTITY_QUAT)

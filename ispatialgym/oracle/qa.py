@@ -12,6 +12,8 @@ Verdict categories (the executor's verdict / ``SkillError.reason``; this module 
 ``ghost_hand``              assisted-grasp artefact: the held object drifted off the hand while still "in hand"
 ``paused``                  the robot stood still for longer than the pause budget inside an action
 ``gripper_out_of_fov``      an acting gripper left the head camera's frame (5 % margin) during a manipulation action
+``protected_contact``       during a transit, a robot link or held object touched a protected (goal) object (oracle.protection)
+``protected_moved``         during a transit, a protected (goal) object moved more than protection.MOVE_TOL_M
 ``failed_grasp``            the assisted grasp did not attach (grasp actions; push / brace exempt)
 ``no_motion``               a push / articulation moved nothing
 ``plan_failed``             trajopt (or the differential IK along recorded waypoints) found no trajectory
@@ -91,9 +93,11 @@ CATEGORIES: Tuple[str, ...] = (
     "error",
     "placed_orientation",
     "placed_tilt",
+    "protected_contact",
+    "protected_moved",
 )
-#: categories the per-step monitors can raise
-STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "gripper_out_of_fov", "timeout")
+#: categories the per-step monitors can raise (``protected_*``: the transit span of oracle.protection, owner 2026-09-26)
+STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "gripper_out_of_fov", "timeout", "protected_contact", "protected_moved")
 #: categories of the epilogue (``placed_orientation`` = the demo-collection gate on a placed object's orientation
 #: against its recorded, non-gating TRO target — owner decision 2026-09-16 10:15; policy evaluation is unchanged)
 EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation", "placed_tilt")
@@ -298,17 +302,48 @@ class Monitors:
         self.forbidden: set = set()
         self.watch: List[Tuple[set, str]] = []
         self.watch_hits: List[int] = []
+        self.allowed: List[Tuple[set, str]] = []
         self._contact_streak: Counter = Counter()
         self._pause_streak = 0
         self._fov_streak: Counter = Counter()
         self._fov_first_entry: Dict[str, Optional[int]] = {}
         self._fov_out_steps: Counter = Counter()
         self._ag_ref: Dict[str, Tuple[Any, Tuple[th.Tensor, th.Tensor]]] = {}
+        # the protected-object transit span (owner 2026-09-26, oracle.protection): open from the start of a transit (the free
+        # move to a pre-grasp / pre-place / pre-contact, the carry) to its end; any NEW contact of a robot link - the acting
+        # fingers included, the manipulation exemption does not apply - or of a held object with a protected object, or a
+        # protected object moving more than protection.MOVE_TOL_M, is a verdict
+        self.transit: Optional[Dict[str, Any]] = None
+        self.protect_events: List[Dict[str, Any]] = []
+        self._pairs_step: Optional[int] = None
+        self._pairs: set = set()
 
     # ------------------------------------------------------------------ lifecycle
 
+    def begin_transit(self, objects: Sequence[Tuple[str, Any]], label: Optional[Dict[str, Any]] = None) -> None:
+        """Open the protected-object transit span over ``objects`` (``[(bddl name, scene object)]``): their positions now
+        and the contacts robot / held objects already have with them (a brace on the partner, a start contact) are the
+        reference - only new contacts and movement count. No objects: nothing is watched."""
+        objs = [(n, o) for n, o in (objects or ()) if o is not None]
+        if not objs:
+            self.transit = None
+            return
+        start: Dict[str, th.Tensor] = {}
+        for _, o in objs:
+            try:
+                start[o.name] = th.as_tensor(o.get_position_orientation()[0], dtype=th.float32).clone()
+            except Exception:  # noqa: BLE001
+                continue
+        names = {o.name for _, o in objs}
+        self.transit = {"objects": objs, "names": names, "start": start, "label": dict(label or {}), "exempt": set()}
+        self.transit["exempt"] = {pair for pair in self._protected_pairs()}
+
+    def end_transit(self) -> None:
+        self.transit = None
+
     def begin_action(self, action, index: int, attempt: int, intended: Iterable[str] = (), held: Sequence[Any] = (), manipulation: Optional[bool] = None,
-                     fov: Optional[bool] = None, forbidden: Iterable[str] = (), watch: Iterable[Tuple[Iterable[str], str]] = ()) -> None:
+                     fov: Optional[bool] = None, forbidden: Iterable[str] = (), watch: Iterable[Tuple[Iterable[str], str]] = (),
+                     allowed: Iterable[Tuple[Iterable[str], str]] = ()) -> None:
         """``intended``: scene object names the action may touch (its ``objects`` resolved to scene names);
         ``held``: scene objects currently in hand (their contacts are the robot's own); ``fov``: whether the
         gripper-in-FOV monitor runs during this action at all (default: every action of a program — which arms it
@@ -317,11 +352,15 @@ class Monitors:
         the manipulation exemptions (the container of a ``Place(kind="drop")``: a bowl lifted by the opening fingers
         or nudged by the held object is a ``collision``, never a silent success); ``watch``: ``(link names, scene
         object)`` pairs whose contacts are only *logged* (``watch_hits`` = episode steps with a contact) — the brace
-        fingers against the pushed target, read by the executor's brace retry ladder."""
+        fingers against the pushed target, read by the executor's brace retry ladder; ``allowed``: ``(link names, scene
+        object)`` pairs whose contacts are neither flagged nor counted (owner 2026-09-24 item 1: the brace hand's fingers
+        on the braced object while the brace holds, ``Executor.brace_allowed_pairs`` - every other link / object pair keeps
+        its rule)."""
         self.action = action
         self.action_index = index
         self.attempt = attempt
         self.epilogue = False
+        self.transit = None
         self.arms = tuple(getattr(action, "arms", ()) or ())
         if manipulation is None or fov is None:
             from ispatialgym.oracle.execute import fov_monitored, is_manipulation  # lazy: execute imports actions (pure) only
@@ -337,6 +376,7 @@ class Monitors:
         self.intended -= self.forbidden
         self.watch = [(set(links), str(obj)) for links, obj in (watch or ())]
         self.watch_hits: List[int] = []
+        self.allowed = [(set(links), str(obj)) for links, obj in (allowed or ())]
         self.held = list(held)
         self.exempt_links = set()
         if self.manipulation:
@@ -351,6 +391,7 @@ class Monitors:
         self._fov_out_steps = Counter()
 
     def end_action(self) -> None:
+        self.transit = None
         self.action = None
         self.action_index = None
         self.manipulation = False
@@ -358,6 +399,7 @@ class Monitors:
         self.intended = set()
         self.forbidden = set()
         self.watch = []
+        self.allowed = []
         self.exempt_links = set()
         self.held = []
         self.arms = ()
@@ -403,6 +445,7 @@ class Monitors:
         """The final no-op window: pause / FOV monitors off; objects still in hand (held-object tasks) stay the
         robot's own for the collision monitor."""
         self.epilogue = True
+        self.transit = None
         self.manipulation = False
         self.fov_active = False
         self.action = None
@@ -431,7 +474,7 @@ class Monitors:
         """Run every monitor on the current simulator state; the first failure wins."""
         self.episode_steps = self.episode_steps + 1 if step is None else int(step)
         self.action_steps += 1
-        for fn in (self._check_collision, self._check_ghost_hand, self._check_pause, self._check_fov, self._check_timeout):
+        for fn in (self._check_protected, self._check_collision, self._check_ghost_hand, self._check_pause, self._check_fov, self._check_timeout):
             v = fn()
             if v is not None:
                 return v
@@ -447,8 +490,12 @@ class Monitors:
                 from omnigibson.utils.usd_utils import RigidContactAPI
 
                 self._contact_api = RigidContactAPI
-            query = [self.robot] + ([] if self.manipulation else list(self.held))
-            return self._contact_api.get_contact_pairs(self.scene.idx, query, None, current_only=False)
+            if self._pairs_step == self.episode_steps and self._pairs_step is not None:
+                return self._pairs
+            query = [self.robot] + ([] if (self.manipulation and self.transit is None) else list(self.held))
+            self._pairs = self._contact_api.get_contact_pairs(self.scene.idx, query, None, current_only=False)
+            self._pairs_step = self.episode_steps
+            return self._pairs
         except Exception as e:  # noqa: BLE001  (no contact view: monitor off, reported once)
             log.warning("collision monitor disabled: %r", e)
             self._contact_failed = True
@@ -467,6 +514,56 @@ class Monitors:
             name = obj.name
         self._prim_cache[body_path] = name
         return name
+
+    def _protected_pairs(self) -> set:
+        """``{(own link or "held:<link>", protected object name)}`` in contact now (robot links and held objects)."""
+        if self.transit is None:
+            return set()
+        robot_prefix = self.robot.prim_path + "/"
+        held_prefixes = [o.prim_path + "/" for o in self.held]
+        out = set()
+        for own, other in self._contact_pairs():
+            name = self._object_of(other)
+            if name is None or name not in self.transit["names"]:
+                continue
+            if own.startswith(robot_prefix):
+                out.add((own.rsplit("/", 1)[1], name))
+            elif any(own.startswith(p) for p in held_prefixes):
+                out.add(("held:" + own.rsplit("/", 1)[1], name))
+        return out
+
+    def _check_protected(self) -> Optional[Verdict]:
+        """The transit span (``begin_transit``): a new contact with a protected object, or a protected object moved by more
+        than ``protection.MOVE_TOL_M`` since the span opened, is a verdict (the executor rolls back and re-plans the
+        transit via the point above its goal)."""
+        if self.transit is None:
+            return None
+        from ispatialgym.oracle import protection as PROT
+
+        tr = self.transit
+        lab = tr.get("label") or {}
+        for own_link, name in sorted(self._protected_pairs() - tr["exempt"]):
+            ev = {"check": "run", "kind": "contact", "task": lab.get("task"), "action": lab.get("action"), "index": lab.get("index"), "leg": lab.get("leg"),
+                  "object": name, "link": own_link, "step": self.episode_steps}
+            self.protect_events.append(ev)
+            log.warning("PROTECT run-check fired: task=%s action=%s[%s] leg=%s object=%s: contact of %s during the transit (step %d)", ev["task"], ev["action"], ev["index"], ev["leg"], name, own_link, self.episode_steps)
+            return self._verdict("protected_contact", f"{own_link} touched the protected {name} during the {lab.get('leg') or 'transit'}", link=own_link, object=name, leg=lab.get("leg"))
+        for _, o in tr["objects"]:
+            p0 = tr["start"].get(o.name)
+            if p0 is None:
+                continue
+            try:
+                p = th.as_tensor(o.get_position_orientation()[0], dtype=th.float32)
+            except Exception:  # noqa: BLE001
+                continue
+            d = float(th.linalg.norm(p - p0))
+            if d > PROT.MOVE_TOL_M:
+                ev = {"check": "run", "kind": "moved", "task": lab.get("task"), "action": lab.get("action"), "index": lab.get("index"), "leg": lab.get("leg"),
+                      "object": o.name, "moved_m": round(d, 4), "step": self.episode_steps}
+                self.protect_events.append(ev)
+                log.warning("PROTECT run-check fired: task=%s action=%s[%s] leg=%s object=%s moved %.1f mm during the transit (step %d)", ev["task"], ev["action"], ev["index"], ev["leg"], o.name, d * 1000, self.episode_steps)
+                return self._verdict("protected_moved", f"the protected {o.name} moved {d * 1000:.1f} mm during the {lab.get('leg') or 'transit'}", object=o.name, moved_m=d, leg=lab.get("leg"))
+        return None
 
     def _check_collision(self) -> Optional[Verdict]:
         robot_prefix = self.robot.prim_path + "/"
@@ -494,6 +591,8 @@ class Monitors:
                     continue
                 if own_link in self.exempt_links:
                     continue
+                if self.allowed and any(own_link in links and name == obj for links, obj in self.allowed):
+                    continue  # the brace hand on the object it braces (allowed for the span of the brace)
             seen[(own_link, name)] += 1
         for key in list(self._contact_streak):
             if key not in seen:
