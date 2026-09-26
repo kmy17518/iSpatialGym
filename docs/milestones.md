@@ -48,6 +48,9 @@ Tagged states of this repository and what passed on them.
 | `mental_rotation-banana` | 0926-072342 | no drive leg | 0926-065122 |
 | `object_scaling-beaker` | 0926-075332 | no drive leg | 0926-072149 |
 
+**Collected demos:** copies of the 28 run directories above, one video link per alias and a `manifest.json` are in
+`runlogs/first-demo-v1.0/`.
+
 **Artefacts** (local to the pilot machine; `runlogs/` is not tracked): each run lives in
 `runlogs/pilot_20260915/first_demo/<subtask>/<run>/` (`remote.log` / `local.log`, `inst/` with the TRO and its sidecar, `demo/` with
 `meta.json` and `head_rgb.mp4`); every run is a row of `runlogs/pilot_20260915/first_demo/ledger.jsonl`; the job markers are in
