@@ -24,7 +24,7 @@ python scripts/runpod/rp.py run <pod id> "nvidia-smi; python -c 'import torch; p
   before adding a pod to any pod file.
 - Verify the thread cap too (§9): after `conda activate ispatialgym` on the pod, `taskset -cp $$` must list `0-<floor(quota)-1>` and
   `$ISG_THREAD_CAP` must be set: `rp.py run <pod> "bash -c 'source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && echo \$ISG_THREAD_CAP && taskset -cp \$\$'"`.
-  `bootstrap.sh` does not install the hook yet (pending as of 2026-09-25): install it by hand. If the first Isaac launch segfaults, run it
+  `bootstrap.sh` installs it (e0516d15, after the verify step; the 13 pilot-wave pods of 2026-09-25 got it by hand at 18:55 PDT, `runlogs/runpod/thread_caps.log`). If the first Isaac launch segfaults, run it
   once under gdb (§9) before judging the host.
 - Pods do **not** have the local `~/.cache/ispatialgym` caches or anything under `/tmp`; inputs a run needs go under
   `runlogs/smoke_inputs/` (git-ignored, synced by `remote_run.py`) and are referenced repo-relative.
