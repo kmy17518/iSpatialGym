@@ -1152,6 +1152,45 @@ def test_small_articulation_braced_stance_lists_both_working_arms():
     assert any("cannot tell the handle arm" in p for p in Sidecar.from_dict(d3).problems())
 
 
+def test_room_door_close_pushes_the_outer_face():
+    """Owner decision B (2026-09-20 20:19): a room door (``articulation.door_class`` ``room_door``) is closed by pushing its
+    outer face — navigate, transition, push_close with the working arm, no grasp; the hinge is the centre of the circle
+    through the recorded handle contacts and the closed leaf's frame is the waypoint at the lower limit (k = 1 for a
+    close). Any other class keeps the inverse of the open (grasp, follow, retreat), as does a room door's open."""
+    from ispatialgym.oracle.programs import program_articulation_large
+
+    st = "configuration_matching-articulation_close_large_scale"
+    with open(os.path.join(VARIANTS, f"{st}__room_door.json")) as f:
+        d = json.load(f)
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == []
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == _WALL_IN + ["push_close"]
+    push = actions[-1]
+    assert isinstance(push, A.PushClose) and type(push) in A.VOCABULARY
+    assert (push.arm, push.arms, push.objects) == ("right", ("left", "right"), ("door.n.01_1",))
+    assert push.qa_exempt == frozenset({A.QA_FAILED_GRASP}) and set(push.targets(sc, None)) == set(push.TARGET_KEYS) == {"leaf"}
+    art = d["articulation"]
+    for w in art["waypoints"].values():  # a vertical hinge: every recorded handle contact on one circle about it
+        assert math.hypot(w["contact"][0] - push.hinge_xy[0], w["contact"][1] - push.hinge_xy[1]) == pytest.approx(push.handle_radius_m, abs=2e-3)
+    closed = art["waypoints"]["1.0"]
+    assert push.handle_xy_closed == pytest.approx(tuple(closed["contact"][:2])) and push.handle_z == pytest.approx(closed["contact"][2])
+    assert push.approach_closed == pytest.approx(tuple(closed["approach"]))
+    assert (push.q_from, push.q_lower) == (pytest.approx(art["q_init"]), pytest.approx(art["q_goal"]))
+    fine, numbers = push.annotate(sc)
+    assert fine == "close the door by pushing its outer face with the closed hand" and numbers.startswith(fine)
+    for cls in (None, "cabinet"):
+        d2 = copy.deepcopy(d)
+        d2["articulation"]["door_class"] = cls
+        assert [a.name for a in expand(sc.alias, Sidecar.from_dict(d2))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+    assert [a.name for a in program_articulation_large(sc, direction="open")] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+    d3 = copy.deepcopy(d)
+    d3["articulation"]["waypoints"] = {k: d3["articulation"]["waypoints"][k] for k in ("0.0", "1.0")}
+    d3["articulation"]["handle_reach"] = {"1.0": True}
+    with pytest.raises(SidecarError, match=">= 3 recorded handle waypoints"):
+        expand(sc.alias, Sidecar.from_dict(d3))
+
+
 def test_attachment_second_base_pose_is_travelled_while_holding():
     """Owner decision 2026-09-16 17:10 item 2 (spec §6.8; tabletop ``58afae2``, core ``bd10c72``): when the attach pose
     and the brace are not both reachable from the grasp stance the sidecar records an ``attach`` stance reached with the

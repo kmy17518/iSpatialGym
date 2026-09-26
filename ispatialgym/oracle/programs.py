@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import replace
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from ispatialgym.oracle.actions import (
     RETREAT_DIST,
@@ -42,6 +42,7 @@ from ispatialgym.oracle.actions import (
     Navigate,
     Place,
     Push,
+    PushClose,
     Reorient,
     Retreat,
     SetTorso,
@@ -400,14 +401,52 @@ def program_block_design(sc: Sidecar) -> List[Action]:
     return actions
 
 
+#: ``articulation.door_class`` of a room door's revolute leaf (sampler ``articulation_large.door_class``, owner decision A4)
+ROOM_DOOR_CLASS = "room_door"
+
+
+def _circle_xy(p0: Sequence[float], p1: Sequence[float], p2: Sequence[float]) -> Tuple[float, float, float]:
+    """Centre (x, y) and radius of the circle through three planar points."""
+    (x0, y0), (x1, y1), (x2, y2) = p0[:2], p1[:2], p2[:2]
+    a11, a12, b1 = 2.0 * (x1 - x0), 2.0 * (y1 - y0), x1 * x1 + y1 * y1 - x0 * x0 - y0 * y0
+    a21, a22, b2 = 2.0 * (x2 - x0), 2.0 * (y2 - y0), x2 * x2 + y2 * y2 - x0 * x0 - y0 * y0
+    det = a11 * a22 - a12 * a21
+    if abs(det) < 1e-12:
+        raise SidecarError("articulation.waypoints: the handle contacts are collinear, no hinge circle")
+    cx, cy = (b1 * a22 - a12 * b2) / det, (a11 * b2 - b1 * a21) / det
+    return cx, cy, math.hypot(x0 - cx, y0 - cy)
+
+
+def door_leaf_geometry(art) -> Dict[str, object]:
+    """The leaf of a vertical-axis door from the recorded handle waypoints h(q_k): the hinge = the centre of the circle
+    through the handle contacts at the first, middle and last recorded fraction, the handle radius about it, and the
+    closed leaf's handle contact / approach / height = the waypoint at the lower joint limit (open: k = 0; close: k = 1)."""
+    keys = [key for _, key in art.fractions()]
+    if len(keys) < 3:
+        raise SidecarError(f"articulation.waypoints: the door leaf needs >= 3 recorded handle waypoints, got {len(keys)}")
+    hx, hy, r = _circle_xy(*(art.waypoints[k].contact for k in (keys[0], keys[len(keys) // 2], keys[-1])))
+    closed = art.waypoints[keys[0] if art.q_init <= art.q_goal else keys[-1]]
+    return {"hinge_xy": (hx, hy), "handle_radius_m": r, "handle_xy_closed": (float(closed.contact[0]), float(closed.contact[1])),
+            "approach_closed": tuple(float(v) for v in closed.approach), "handle_z": float(closed.contact[2])}
+
+
 def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Action]:
     """init → manipulation stance (transition) → grasp the handle at h(q_init) → move the joint: base_follow along the
     recorded b_k (``follow_mode`` base) or the arm along h(q_k) (``follow_mode`` arm), up to ``passive_from`` or q_goal
-    → release → retreat."""
+    → release → retreat.
+
+    A **room door is closed by pushing its outer face** (owner decision B, 2026-09-20 20:19; ``articulation.door_class``
+    ``room_door``): init → manipulation stance (path + transition) → ``push_close`` with the working arm — no grasp; the
+    leaf geometry from the recorded handle waypoints (:func:`door_leaf_geometry`)."""
     art = sc.articulation
     if art is None:
         raise SidecarError("articulation: required for articulation tasks")
     arm = _working_arm(sc)
+    if direction == "close" and (art.extra or {}).get("door_class") == ROOM_DOOR_CLASS:
+        if art.joint_type != "revolute":
+            raise SidecarError(f"articulation.joint_type: a room door leaf is revolute, got {art.joint_type!r}")
+        push = PushClose(arm=arm, object=art.object, joint=art.joint, q_from=art.q_init, q_lower=min(art.q_init, art.q_goal), **door_leaf_geometry(art))
+        return _travel(sc, "init", "manipulation") + [push]
     grasp = Grasp(kind="handle", arm=arm, object=art.object, articulation=art)
     follow = BaseFollow(arm=arm, articulation=art, stance=sc.stance("manipulation"), grasp_action=grasp, direction=direction)
     return _travel(sc, "init", "manipulation") + [grasp, follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]

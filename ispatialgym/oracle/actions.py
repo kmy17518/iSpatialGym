@@ -2,7 +2,7 @@
 
 An action is the unit of checkpoint, annotation and QA in the executor loop (§3.8). This module (TODO F6) declares
 the contract and the vocabulary — ``Navigate``, ``Transition``, ``SetTorso``, ``Grasp``, ``Lift``, ``Reorient``,
-``Place``, ``Push``, ``Brace``, ``BaseFollow``, ``Retreat`` — and implements ``targets()`` and ``annotate()``;
+``Place``, ``Push``, ``Brace``, ``BaseFollow``, ``PushClose``, ``Retreat`` — and implements ``targets()`` and ``annotate()``;
 ``execute()`` / ``postcondition()`` are declared and implemented by F2 (Layer-1 motions).
 
 ``targets(sidecar, state) -> dict`` resolves every pose / waypoint list / base path the action will track from the
@@ -1160,6 +1160,59 @@ class BaseFollow(Action):
 
 
 @dataclass(kw_only=True)
+class PushClose(Action):
+    """Close an open room door by pushing its **outer** face (the side the robot stands on) with the closed hand, no
+    grasp (owner decision B, 2026-09-20 20:19): per chunk of ``chunk_deg`` a base pose in front of (or beside) the
+    contact is chosen by the backend IK of the pre-contact, the contact and the arc waypoints, the base drives there
+    with the arms at "ready", the hand approaches the face guarded along −m, pushes along the arc about the hinge to the
+    arm's limit and backs off; repeated until the joint is within ``closed_tol_rad`` of ``q_lower`` or a chunk gains
+    nothing. The leaf geometry is derived from the recorded handle waypoints (``programs.door_leaf_geometry``).
+
+    targets: ``{"leaf": {"hinge_xy", "handle_radius_m", "q_from", "q_to"}}`` — geometry only: the push stances and
+    contacts depend on where the leaf is at the start of each chunk, so none of them is an eef pose of the record.
+    """
+
+    name: str = "push_close"
+    arm: str
+    object: str
+    joint: str
+    hinge_xy: Tuple[float, float]
+    handle_xy_closed: Tuple[float, float]
+    approach_closed: Tuple[float, float, float]
+    handle_radius_m: float
+    handle_z: float
+    q_from: float
+    q_lower: float = 0.0
+    leaf_link: str = "leaf"
+    push_inset_m: float = 0.15
+    push_height_drop_m: float = 0.05
+    hook_gap_m: float = 0.035
+    push_pre_m: float = 0.10
+    chunk_deg: float = 20.0
+    push_n: int = 5
+    closed_tol_rad: float = 0.05
+    max_chunks: int = 10
+    drag_m: float = 0.20  # base drive along −m with the fist on the face when the arm's arc gains < 2°
+    push_arms: Tuple[str, ...] = ("right", "left")
+    qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
+    TARGET_KEYS = ("leaf",)
+
+    def __post_init__(self):
+        self.arms = ("left", "right")
+        self.objects = (self.object,)
+        super().__post_init__()
+
+    def targets(self, sidecar, state):
+        return {"leaf": {"hinge_xy": [float(v) for v in self.hinge_xy], "handle_radius_m": float(self.handle_radius_m), "q_from": float(self.q_from),
+                         "q_to": float(self.q_lower)}}
+
+    def annotate(self, sidecar):
+        obj = sidecar.language.phrase(self.object)
+        fine = f"close {obj} by pushing its outer face with the closed hand"
+        return fine, f"{fine}: joint {self.joint} from {self.q_from:.2f} rad to {self.q_lower:.2f} rad ({_deg(abs(self.q_from - self.q_lower))}), pushed in arcs of {self.chunk_deg:.0f}° about the hinge"
+
+
+@dataclass(kw_only=True)
 class Retreat(Action):
     """Move the gripper clear of the object along −a from where the preceding action left it (``after.end_pose``):
     ``gripper(open)`` first when ``release`` (a brace or a held handle), then ``arm_along(retreat)``; postcondition:
@@ -1279,11 +1332,11 @@ class Retreat(Action):
         return fine, numbers
 
 
-VOCABULARY: Tuple[type, ...] = (Navigate, Transition, SetTorso, Grasp, Lift, Reorient, Place, Push, Brace, BaseFollow, Retreat)
+VOCABULARY: Tuple[type, ...] = (Navigate, Transition, SetTorso, Grasp, Lift, Reorient, Place, Push, Brace, BaseFollow, PushClose, Retreat)
 ACTION_NAMES: Tuple[str, ...] = tuple(cls.__dataclass_fields__["name"].default for cls in VOCABULARY)
 
 __all__ = [
     "PRE_DIST", "RETREAT_DIST", "RETREAT_LITTLE", "N_WAYPOINTS", "N_INHAND", "N_YAW_ALIGN", "N_FLIP", "QA_FAILED_GRASP",
     "State", "Action", "Navigate", "Transition", "SetTorso", "Grasp", "Lift", "Reorient", "Place", "Push", "Brace",
-    "BaseFollow", "Retreat", "VOCABULARY", "ACTION_NAMES", "direction_word", "yaw_align_deg", "block_reorients", "block_centre_pose",
+    "BaseFollow", "PushClose", "Retreat", "VOCABULARY", "ACTION_NAMES", "direction_word", "yaw_align_deg", "block_reorients", "block_centre_pose",
 ]
