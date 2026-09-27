@@ -1023,7 +1023,8 @@ def main(argv=None) -> int:
                 qa = (executor.result.get("qa") or {}).get("stats") if executor is not None and executor.result else None
                 paths = recorder.close(meta, qa=qa, success=bool(result.get("success")))
                 meta.update({"hdf5": paths.get("hdf5"), "video": paths.get("video"), "lerobot": paths.get("lerobot"), "annotations": paths.get("annotations"),
-                             "video_error": paths.get("video_error"), "lerobot_error": paths.get("lerobot_error")})
+                             "video_error": paths.get("video_error"), "lerobot_error": paths.get("lerobot_error"),
+                             **{k: paths[k] for k in ("external_video", "external_video_error") if k in paths}})  # --dev: the overhead view
             except Exception as e:  # noqa: BLE001
                 meta["recorder_error"] = repr(e)
                 traceback.print_exc()
