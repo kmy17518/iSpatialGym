@@ -90,6 +90,13 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   re-solves of `IKChecker.away_from_limits` start from the remembered seeds and `q0` - near-identical starts; when they all stay
   within `JOINT_LIMIT_MARGIN`, up to `LIMIT_RETRY_RANDOM` 12 more re-solves start from random arm configurations (a generator
   seeded by the pose, so reproducible). Runs only where the candidate would otherwise be rejected `ik_joint_limit`.
+  **From attempt 1 on only** (`LIMIT_RETRY_RANDOM_FROM_ATTEMPT`, first-demo v2 B1, re-applied from pilot-wave-12): a solution
+  rescued from a random start lies in another IK branch and is remembered as a seed (`IKChecker.solutions`, cleared per
+  attempt), so the attempt's later candidates were solved in that branch too - sandal's attempt 0 (0926-023744) ended
+  without an instance, and axial's flipped push pre-contact witnesses came from it; the dishwasher close's dragging hybrid
+  follow passed the program check only through such a rescue. The core sets `ikc.attempt` per attempt: attempt 0 solves as
+  before the re-solves existed, every later attempt with them (verified before: sandal 0926-030813 and bar soap 0926-031126
+  found their instance at attempt 0, job `ik_attempt_gate_20260926`).
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

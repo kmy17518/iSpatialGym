@@ -697,6 +697,13 @@ class IKChecker:
     #: re-solves from random arm configurations after the seeded re-solves of ``away_from_limits`` stayed within the margin
     #: (owner 2026-09-26: bar soap's place pose - valid solutions exist on some pods and were missed on others)
     LIMIT_RETRY_RANDOM = 12
+    #: the random re-solves run from this attempt of an instance on (the core sets ``attempt`` per attempt; ``None`` = outside
+    #: the attempt loop, re-solves on). Owner 2026-09-26 (sandal 0926-023744 / 023746, wave 9 phase 1): a rescued solution lies
+    #: in another IK branch and is remembered as a seed (``solutions``), so the later candidates of the same attempt are solved
+    #: in that branch too - sandal's attempt 0, an instance on waves 6 / 7, ended without one. Attempt 0 therefore solves as
+    #: before the re-solves existed; an attempt after a rejected one gets them (bar soap: its flaky pod rejects attempt 0).
+    LIMIT_RETRY_RANDOM_FROM_ATTEMPT = 1
+    attempt: Optional[int] = None
     #: FK(q) of a recorded witness must reach its pose within this (m) after polishing
     WITNESS_RESIDUAL_MAX = 0.002
 
@@ -731,7 +738,7 @@ class IKChecker:
                 best, best_m = q_alt, m_alt
             if best_m >= self.JOINT_LIMIT_MARGIN:
                 return best, ""
-        if self.LIMIT_RETRY_RANDOM > 0:
+        if self.LIMIT_RETRY_RANDOM > 0 and (self.attempt is None or self.attempt >= self.LIMIT_RETRY_RANDOM_FROM_ATTEMPT):
             # owner 2026-09-26 (bar soap 0926-011542 / 0925-235551: every solution of the place pose within 2-12 mrad of
             # right_arm_joint6's limit on some pods, a valid one for the same candidate on others): the re-solves above start
             # from the remembered seeds and q0 - near-identical starts; these start from random arm configurations (a generator

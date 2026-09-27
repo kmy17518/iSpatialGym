@@ -983,6 +983,7 @@ class SamplerV2(TaskSampler):
                         self.counters["scene_reset"] = self.counters.get("scene_reset", 0) + n_reset
                     self.park_robot()
                     self.ikc.solutions.clear()
+                    self.ikc.attempt = attempt  # ``IKChecker.LIMIT_RETRY_RANDOM_FROM_ATTEMPT``: attempt 0 solves without the random re-solves
                     phase = "sample"
                     draft = self.sample(rng)
                     t_sample = time.time() - t0

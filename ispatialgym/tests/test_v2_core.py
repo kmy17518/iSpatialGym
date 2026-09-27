@@ -1096,10 +1096,32 @@ def test_away_from_limits_re_solves_from_random_configurations_only_when_the_see
     q_ok = th.zeros(28)
     q_ok[idx] = 0.5
     assert ikc.away_from_limits(q_ok, pose, "right", th.zeros(28))[1] == "" and calls == []
+    # attempt 0 of an instance solves as before the random re-solves existed (sandal 0926-023744: a rescued solution is remembered
+    # as a seed and pulls the attempt's later candidates into its branch); the attempts after it get them
+    ikc.attempt = 0
+    calls.clear()
+    q0_, why0 = ikc.away_from_limits(q_lim, pose, "right", th.zeros(28))
+    assert q0_ is None and why0.startswith("ik_joint_limit") and len(calls) == 3  # the seeded re-solves only
+    ikc.attempt = IKChecker.LIMIT_RETRY_RANDOM_FROM_ATTEMPT
+    q1_, why1 = ikc.away_from_limits(q_lim, pose, "right", th.zeros(28))
+    assert q1_ is not None and why1 == "" and th.allclose(q1_, q)
+    ikc.attempt = None
     # with the random re-solves switched off the candidate is rejected as before
     ikc.LIMIT_RETRY_RANDOM = 0
     q3, why3 = ikc.away_from_limits(q_lim, pose, "right", th.zeros(28))
     assert q3 is None and why3.startswith("ik_joint_limit")
+
+
+def test_run_instances_tells_the_ik_checker_the_attempt():
+    """``SamplerV2.run_instances`` sets ``ikc.attempt`` before each attempt's sampling (the random joint-limit re-solves start at
+    ``IKChecker.LIMIT_RETRY_RANDOM_FROM_ATTEMPT``)."""
+    import inspect
+
+    from ispatialgym.sampling.v2.core import SamplerV2
+
+    src = inspect.getsource(SamplerV2.run_instances)
+    i_attempt, i_clear, i_sample = src.index("self.ikc.attempt = attempt"), src.index("self.ikc.solutions.clear()"), src.index("self.sample(rng)")
+    assert i_clear < i_attempt < i_sample
 
 
 def test_exact_leaves_from_the_given_first_configuration():
