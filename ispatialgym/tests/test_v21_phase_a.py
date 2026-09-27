@@ -360,3 +360,74 @@ def test_wide_stop_keeps_the_push_line_between_its_fingertips():
     assert wide_stop_positions(0.07, 0.0, 0.04, ends) == pytest.approx([0.0, 0.01, 0.02, 0.03])
     # a face too short for a stop around the line: nothing to try (the next brace kind)
     assert wide_stop_positions(0.04, -0.02, 0.04, (-0.045, 0.045)) == []
+
+
+# ------------------------------------------------------------------------------------------------ via-above in the goal witness's branch (A3 follow-up)
+
+
+def _via_self(stall_down=True, climb_to=0.07, plan_ok=True, violations=()):
+    """A toy arm (joints 0-2: the hand position, joint 3: the IK branch sign) and the backend calls of ``Motions._witness_branch_above``."""
+    from ispatialgym.oracle.motions import Motions, MotionsConfig
+
+    calls = []
+
+    def fk(frames, q):
+        q = C.as_tensor(q).reshape(-1)
+        return {frames[0]: (q[:3].clone(), th.tensor([0.0, 0.0, 0.0, 1.0]))}
+
+    def solve_ik_path(emb, waypoints, q_start=None, **kw):
+        q = C.as_tensor(q_start).reshape(-1).clone()
+        goal_z = float(waypoints[-1][M.EEF_LINK["right"]][0][2])
+        calls.append(("path", float(q[3]), goal_z))
+        if q[3] < 0:  # the pose-goal branch: the descent stalls
+            return SimpleNamespace(success=not stall_down, q_traj=th.stack([q, q]), status="differential IK did not converge at waypoint 3/5: pos_err=13.2mm")
+        top = q.clone()
+        top[2] = q[2] + climb_to
+        return SimpleNamespace(success=False, q_traj=th.stack([q, top]), status="stalled")
+
+    def plan_joint(emb, q_goal, q_start=None, **kw):
+        calls.append(("plan", C.as_tensor(q_goal).reshape(-1).clone()))
+        return SimpleNamespace(success=plan_ok, q_traj=th.stack([C.as_tensor(q_start).reshape(-1), C.as_tensor(q_goal).reshape(-1)]))
+
+    cfg = MotionsConfig(cartesian_step=0.05, cartesian_rot_step=0.3)
+    s = SimpleNamespace(cfg=cfg, robot=SimpleNamespace(arm_control_idx={"right": th.arange(7)}),
+                        backend=SimpleNamespace(fk=fk, solve_ik_path=solve_ik_path, plan_joint=plan_joint),
+                        _protect_violations=lambda arms, q_traj, emb, P=None: list(violations))
+    s._densify = lambda start, wps: Motions._densify(s, start, wps)
+    s._tracks_from = lambda arm, q, wps: Motions._tracks_from(s, arm, q, wps)
+    return s, calls, (lambda *a: Motions._witness_branch_above(s, *a))
+
+
+def test_via_above_takes_the_point_above_in_the_goal_witness_branch_when_the_planned_one_stalls():
+    """Sandal 0927-030120 on 8b572a12: the pose-goal point above the lifted pre-grasp lay 3.06 rad from its witness and the descent
+    from it stalled 13 mm short; the hand tracked straight up from the witness gives the point above, the descent retraces it."""
+    s, calls, wba = _via_self()
+    goal = (th.tensor([0.5, 0.0, 0.85]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    q_goal = th.tensor([0.5, 0.0, 0.85, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    q_start = th.tensor([0.3, 0.1, 1.10, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    q_top = th.tensor([0.5, 0.0, 0.97, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # 2 rad from the witness on joint 3
+    out = wba("right", "right_arm", goal, q_goal, q_start, q_top, {})
+    assert out is not None
+    res, why = out
+    planned = [c[1] for c in calls if c[0] == "plan"]
+    assert len(planned) == 1 and float(planned[0][3]) == 1.0 and float(planned[0][2]) == pytest.approx(0.92)  # the witness's branch, 7 cm up
+    assert "goal witness's branch" in why and "0.07 m" in why and "stalls" in why
+
+
+def test_via_above_keeps_the_planned_point_outside_that_situation():
+    goal = (th.tensor([0.5, 0.0, 0.85]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    q_goal = th.tensor([0.5, 0.0, 0.85, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    q_start = th.tensor([0.3, 0.1, 1.10, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    far = th.tensor([0.5, 0.0, 0.97, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    near = th.tensor([0.5, 0.0, 0.97, 0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    s, calls, wba = _via_self()
+    assert wba("right", "right_arm", goal, None, q_start, far, {}) is None  # no witness of the goal
+    assert wba("right", "right_arm", goal, q_goal, q_start, near, {}) is None and calls == []  # the goal's branch: its descent is the planned one
+    s, calls, wba = _via_self(stall_down=False)
+    assert wba("right", "right_arm", goal, q_goal, q_start, far, {}) is None  # another branch, but its descent reaches the goal
+    s, calls, wba = _via_self(climb_to=0.02)
+    assert wba("right", "right_arm", goal, q_goal, q_start, far, {}) is None  # the witness's branch rises < 3 cm
+    s, calls, wba = _via_self(plan_ok=False)
+    assert wba("right", "right_arm", goal, q_goal, q_start, far, {}) is None
+    s, calls, wba = _via_self(violations=[{"object": "saucer", "clearance_m": -0.01}])
+    assert wba("right", "right_arm", goal, q_goal, q_start, far, {}) is None  # the plan there passes a protected object

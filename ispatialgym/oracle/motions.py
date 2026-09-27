@@ -105,6 +105,9 @@ class MotionsConfig:
     #: is, the plan goes to the point this much above the transit's goal, then straight down; direct re-plans when that fails
     protect_lift_m: float = 0.12
     protect_above_m: float = 0.12
+    #: when the descent from the planned point above would stall in another IK branch than the goal's witness, the point above is
+    #: taken where the hand, tracked straight up from the witness, gets to - at least this high above the goal
+    protect_above_witness_min_m: float = 0.03
     protect_replans: int = 3
     #: a pre-grasp transit plan that clears the protected objects only the long way round - its hand path longer than this
     #: times the via-above's nominal one (``protect_lift_m`` + the straight distance + ``protect_above_m``) and its hand higher
@@ -1091,9 +1094,72 @@ class Motions:
         viol = self._protect_violations([arm], res.q_traj, emb, P)
         if viol:
             return False, f"{lifted}; the plan to the point above still passes {viol[0]['object']} at {viol[0]['clearance_m']} m"
+        where = f"above the goal by {self.cfg.protect_above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'})"
+        alt = self._witness_branch_above(arm, emb, (gp.float(), gq.float()), q_goal, q_start, C.as_tensor(res.q_traj)[-1].reshape(-1), P)
+        if alt is not None:
+            res, where = alt
         yield from self.execute_joint_trajectory(res.q_traj, arms=[arm])
         yield from self.arm_along(arm, [(gp.float(), gq.float())], soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
-        return True, f"{lifted}; above the goal by {self.cfg.protect_above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'}), straight down"
+        return True, f"{lifted}; {where}, straight down"
+
+    def _tracks_from(self, arm: str, q_start: th.Tensor, waypoints: Sequence[Any]) -> Optional[Any]:
+        """``solve_ik_path`` of :meth:`arm_along`'s densified leg through ``waypoints`` started from the configuration ``q_start``
+        (nothing executed, no collision check); None when the backend cannot tell."""
+        solve = getattr(self.backend, "solve_ik_path", None)
+        if solve is None:
+            return None
+        try:
+            start = self.backend.fk([M.EEF_LINK[arm]], q_start)[M.EEF_LINK[arm]]
+            dense = self._densify(as_world_pose(start), list(waypoints))
+            return solve(f"{arm}_arm", [{M.EEF_LINK[arm]: wp} for wp in dense], q_start=q_start, pos_tol=self.cfg.diff_ik_pos_tol,
+                         rot_tol=self.cfg.diff_ik_rot_tol, max_iters=self.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False,
+                         soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
+        except Exception as e:  # noqa: BLE001
+            log.debug("_tracks_from(%s) failed (%r)", arm, e)
+            return None
+
+    def _witness_branch_above(self, arm: str, emb: str, goal: Pose, q_goal: Optional[th.Tensor], q_start: th.Tensor, q_top: th.Tensor,
+                              P: Dict[str, Any]) -> Optional[Tuple[Any, str]]:
+        """The via-above's point above the goal when the planned one leaves the goal out of reach: its configuration ``q_top`` lies
+        in another IK branch than the goal's witness ``q_goal`` (farther than ``witness_refine_max_jump``) and the straight descent
+        from it stalls - its finish toward the witness would be refused and cuRobo's IK in that branch swings the arm (sandal
+        0927-030120 on 8b572a12: the grasp lifted 14 mm off the table, the witness's branch has no IK 12 cm above the pre-grasp, the
+        pose-goal branch stalled 13 mm short 4.7 cm above it, both attempts failed plan_failed). The hand is tracked straight up
+        from the witness instead; the highest point it gets to (at least ``protect_above_witness_min_m`` above the goal) is planned
+        to in joint space, checked against the protected objects, and the descent retraces that climb. Returns ``(plan, why)`` or
+        None (the planned point above stays)."""
+        if q_goal is None:
+            return None
+        idx = self.robot.arm_control_idx[arm]
+        q_goal = C.as_tensor(q_goal).reshape(-1)
+        if float(th.max(th.abs(q_top[idx] - q_goal[idx]))) <= self.cfg.witness_refine_max_jump:
+            return None
+        down = self._tracks_from(arm, q_top, [goal])
+        if down is None or down.success:
+            return None
+        q0 = C.as_tensor(q_start).reshape(-1).clone()
+        q0[idx] = q_goal[idx]
+        gp, gq = goal
+        up = self._tracks_from(arm, q0, [(gp + th.tensor([0.0, 0.0, float(self.cfg.protect_above_m)]), gq)])
+        if up is None or up.q_traj is None or len(up.q_traj) < 2:
+            return None
+        q_hi = C.as_tensor(up.q_traj)[-1].reshape(-1)
+        try:
+            h = float(self.backend.fk([M.EEF_LINK[arm]], q_hi)[M.EEF_LINK[arm]][0][2]) - float(gp[2])
+        except Exception:  # noqa: BLE001
+            return None
+        if h < float(self.cfg.protect_above_witness_min_m):
+            return None
+        try:
+            res = self.backend.plan_joint(emb, q_hi, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+        except SkillError:
+            return None
+        if not getattr(res, "success", False) or res.q_traj is None or self._protect_violations([arm], res.q_traj, emb, P):
+            return None
+        why = (f"above the goal by {h:.2f} m in the goal witness's branch (tracked up from the witness; the planned point above lies "
+               f"{float(th.max(th.abs(q_top[idx] - q_goal[idx]))):.2f} rad from it and its descent stalls: {str(down.status)[:70]})")
+        log.info("via-above(%s): %s", arm, why)
+        return res, why
 
     def _plan_detour(self, arm: str, q_traj: Any) -> Optional[Dict[str, Any]]:
         """The hand path of a planned transit that detours past the via-above's - longer than ``protect_detour_ratio`` x
