@@ -1167,14 +1167,40 @@ def _raised(pose, dz: float) -> Pose:
     return Pose(position=[float(p[0]), float(p[1]), float(p[2]) + float(dz)], orientation=[float(v) for v in q.tolist()])
 
 
-def lift_grasp_off_support(action: Grasp, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Dict[str, Any]:
+def _reachable_near(motions: Optional[Motions], arm: str, pose, q_hint, ignore: Sequence[Any] = ()) -> Optional[bool]:
+    """Whether the backend's collision-aware IK (world minus ``ignore``) reaches ``pose`` within ``witness_refine_max_jump`` of
+    ``q_hint``'s arm joints - the IK branch the recorded approach runs in (the current configuration without a hint); None without
+    a backend IK (the test stubs)."""
+    backend = getattr(motions, "backend", None)
+    solve_ik = getattr(backend, "solve_ik", None)
+    robot = getattr(motions, "robot", None)
+    if solve_ik is None or robot is None:
+        return None
+    try:
+        q0 = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+        idx = robot.arm_control_idx[arm]
+        if q_hint is not None:
+            q0[idx] = C.as_tensor(q_hint).reshape(-1).float()[idx]
+        backend.update_world(ignore_objects=list(ignore))
+        sol = solve_ik(f"{arm}_arm", {M.EEF_LINK[arm]: as_world_pose(pose)}, q_seed=q0, sync_world=False)
+    except Exception as e:  # noqa: BLE001
+        log.debug("reach probe of %s failed (%r)", arm, e)
+        return None
+    if sol is None:
+        return False
+    return float(th.max(th.abs(C.as_tensor(sol).reshape(-1).float()[idx] - q0[idx]))) <= float(motions.cfg.witness_refine_max_jump)
+
+
+def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Dict[str, Any]:
     """Owner 2026-09-27 (first-demo v2.1 A3, bar soap 0927-034001: "the wrist camera contacts the table during grasp & release and
     pushes against it, causing robot to wobble" - a replay's contact dump showed only the two finger links, pressing 91-154 N into the
     tray floor while the hand stood still, and torso_joint1 bent 7.6 mrad; the camera never touched): a library pinch of an object
     resting on a support must not put a finger below the object's lowest point - nothing of the hand fits there. When the finger
     envelope at the grasp pose reaches below the object's bottom + ``grasp_support_clearance_m``, the grasp, its pre-grasp and approach
     are lifted by the deficit along world z, provided the pads' fingertip-side end stays ``grasp_support_pad_margin_m`` below the
-    object's top (else the recorded grasp runs). ``ctx["grasp_support_lift"]`` records the facts."""
+    object's top and the lifted grasp is reached in the grasp witness's IK branch (``_reachable_near``; sandal 0927-030120 replayed:
+    the 13.7 mm lifted grasp lay 3.2 rad away in another branch and the approach's finish was refused) - else the recorded grasp
+    runs. ``ctx["grasp_support_lift"]`` records the facts."""
     if action.kind != "library" or targets.get("grasp") is None:
         return targets
     try:
@@ -1196,8 +1222,16 @@ def lift_grasp_off_support(action: Grasp, state, targets: Dict[str, Any], ctx: D
     if pad_end + need > top - cfg.grasp_support_pad_margin_m:
         rec["reason"] = f"a {need * 1000:.1f} mm lift leaves the pads {(top - pad_end - need) * 1000:.1f} mm below the object's top"
         return targets
+    lifted = _raised(targets["grasp"], need)
+    try:
+        ignore = [state.object(action.object)] + list(contact_ignores(state, action.object))
+    except Exception:  # noqa: BLE001
+        ignore = []
+    if _reachable_near(motions, action.arm, lifted, _witness(ctx, "grasp"), ignore) is False:
+        rec["reason"] = f"the {need * 1000:.1f} mm lifted grasp is not reached in the grasp witness's IK branch"
+        return targets
     out = dict(targets)
-    out["grasp"] = _raised(targets["grasp"], need)
+    out["grasp"] = lifted
     out["pre_grasp"] = _raised(targets["pre_grasp"], need)
     out["approach"] = [_raised(p, need) for p in targets["approach"]]
     rec.update({"applied": True, "lift_m": round(need, 4)})
@@ -1249,7 +1283,7 @@ def raise_place_for_inhand_pose(action: Place, state, sidecar, targets: Dict[str
 
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
-    targets = lift_grasp_off_support(action, state, targets, ctx, _cfg(ctx))
+    targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
     _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
     yield from motions.gripper(arm, close=False)
     # the container / support the object rests in (the source tray of disembedding, the table; ``grasps[].grasp_from``

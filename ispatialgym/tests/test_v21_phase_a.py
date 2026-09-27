@@ -42,7 +42,7 @@ def test_a3_grasp_lifted_by_the_finger_deficit_below_the_object(monkeypatch):
     action, state, targets = _grasp_setup()
     monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.794)  # 6 mm under the object's bottom
     ctx = {}
-    out = EX.lift_grasp_off_support(action, state, targets, ctx, EX.ExecuteConfig())
+    out = EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig())
     need = 0.80 + EX.ExecuteConfig().grasp_support_clearance_m - 0.794
     assert ctx["grasp_support_lift"]["applied"] and ctx["grasp_support_lift"]["lift_m"] == pytest.approx(need, abs=1e-4)
     for k in ("grasp", "pre_grasp"):
@@ -55,15 +55,34 @@ def test_a3_grasp_kept_when_clear_or_when_the_pads_would_leave_the_object(monkey
     action, state, targets = _grasp_setup()
     monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.81)  # already 10 mm above the bottom
     ctx = {}
-    assert EX.lift_grasp_off_support(action, state, targets, ctx, EX.ExecuteConfig()) is targets and not ctx["grasp_support_lift"]["applied"]
+    assert EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig()) is targets and not ctx["grasp_support_lift"]["applied"]
     action, state, targets = _grasp_setup(top=0.835)  # a 5 mm-tall part: a lift would take the pads off it
     monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.79)
     ctx = {}
-    assert EX.lift_grasp_off_support(action, state, targets, ctx, EX.ExecuteConfig()) is targets
+    assert EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig()) is targets
     assert not ctx["grasp_support_lift"]["applied"] and "pads" in ctx["grasp_support_lift"]["reason"]
     ctx = {}
-    assert EX.lift_grasp_off_support(SimpleNamespace(kind="cube", object="b", arm="right"), state, targets, ctx, EX.ExecuteConfig()) is targets
+    assert EX.lift_grasp_off_support(SimpleNamespace(kind="cube", object="b", arm="right"), None, state, targets, ctx, EX.ExecuteConfig()) is targets
     assert ctx == {}
+
+
+def test_a3_grasp_kept_when_the_lifted_grasp_leaves_the_witness_branch(monkeypatch):
+    """Sandal 0927-030120 replayed: the lifted grasp lay 3.2 rad away in another IK branch and the approach's finish was refused."""
+    action, state, targets = _grasp_setup()
+    state.object = lambda name: SimpleNamespace(aabb=(th.tensor([0.5, -0.05, 0.80]), th.tensor([0.6, 0.05, 0.86])))
+    monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.794)
+    monkeypatch.setattr(EX, "contact_ignores", lambda state, name, extra=(): [])
+    seen = {}
+
+    def reach(motions, arm, pose, q_hint, ignore=()):
+        seen["z"] = float(pose.position[2])
+        return False
+
+    monkeypatch.setattr(EX, "_reachable_near", reach)
+    ctx = {}
+    assert EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig()) is targets
+    assert not ctx["grasp_support_lift"]["applied"] and "IK branch" in ctx["grasp_support_lift"]["reason"]
+    assert seen["z"] == pytest.approx(targets["grasp"].position[2] + 0.010, abs=1e-6)
 
 
 def _place_setup(hang_extra):
