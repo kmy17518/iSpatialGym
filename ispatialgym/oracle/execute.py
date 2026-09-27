@@ -865,6 +865,7 @@ def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: st
         # first a tracked Cartesian detour - straight up, across at that height, down onto the pre-grasp - the planner only when
         # the tracking has no solution
         done = False
+        branch_short = False
         if _cfg(ctx).grasp_transit_cartesian:
             try:
                 here = as_world_pose(state.eef_pose(arm))
@@ -874,12 +875,22 @@ def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: st
                 up = (th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1])
                 over = (th.tensor([float(pre_p[0]), float(pre_p[1]), z_top]), pre_q)
                 legs = [here, up, over, (pre_p, pre_q)]
+                # the detour keeps the brace's IK branch; the sampler checked the approach in the pre-grasp witness's. The detour is
+                # taken only when that branch also reaches the grasp (0927-023811: the brace branch stood at right_arm_joint2's limit
+                # and stalled 11 mm short of a pinch 2 cm further along the flap edge; the witness branch was never used)
+                if hasattr(motions, "along_reaches") and targets.get("grasp") is not None and not motions.along_reaches(arm, legs[1:] + [as_world_pose(targets["grasp"])]):
+                    branch_short = True
+                    raise SkillError("plan_failed", "the detour's IK branch does not reach the grasp", stage="diff_ik")
                 yield from motions.arm_along(arm, legs)
                 ctx["pre_grasp_transit"] = f"cartesian detour {lift * 100:.0f} cm above"
                 done = True
             except SkillError as e:
                 log.info("grasp(%s): the Cartesian detour to the pre-grasp has no solution (%s) - planning it", arm, e.message[:80])
-        if not done:
+        if not done and branch_short:
+            # cuRobo's own branch is the one nearest the hand - the branch that does not reach the grasp: the witness branch directly
+            yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports, ignore_links=ignore_links)
+            ctx["pre_grasp_transit"] = "witness branch (the detour's branch does not reach the grasp)"
+        elif not done:
             # the pose goal in cuRobo's OWN branch first (trajopt picks the goal configuration with the path: the branch nearest the blade
             # pose; 0922-150937: the joint-space plan to the sampler's witness - another branch - swung the hand 70 cm out to the right),
             # the witness branch when that fails

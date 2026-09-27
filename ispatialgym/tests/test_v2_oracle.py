@@ -4002,3 +4002,39 @@ def test_a7_plain_plan_and_other_legs_are_unchanged(tmp_path):
     with motions.protecting(saucer, leg="carry", task="t", action="place", index=3):
         drive(env, motions.arm_to(arm, pose=(p1 + th.tensor([-0.10, 0.0, 0.0]), q0)))
     assert motions.protect_events == [] and n2["calls"] == 1
+
+
+def test_lever_grasp_transit_takes_the_witness_branch_when_the_detour_branch_stops_short_of_the_grasp():
+    """The lever's pinch comes from the brace beside the box by a Cartesian detour, which keeps the brace's IK branch. When that
+    branch cannot reach the grasp (0927-023811: right_arm_joint2 at its limit, 11 mm short), the transit plans to the pre-grasp
+    witness's branch - where the sampler checked the approach - instead of executing the detour; when it can, the detour runs."""
+    here = (th.tensor([6.126, 3.572, 1.026]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    pre = (th.tensor([6.084, 3.687, 1.077]), th.tensor([0.641633, 0.498948, 0.499852, 0.299175]))
+    grasp = (th.tensor([6.178, 3.699, 1.045]), th.tensor([0.641633, 0.498948, 0.499852, 0.299175]))
+    w_pre = th.zeros(28)
+
+    class _M:
+        def __init__(self, reaches):
+            self.reaches, self.calls = reaches, []
+
+        def along_reaches(self, arm, waypoints):
+            self.calls.append(("probe", len(waypoints)))
+            return self.reaches
+
+        def arm_along(self, arm, legs, **kw):
+            self.calls.append(("along", len(legs)))
+            yield th.zeros(23)
+
+        def arm_to(self, arm, pose=None, q_hint=None, **kw):
+            self.calls.append(("arm_to", q_hint is not None))
+            yield th.zeros(23)
+
+    action = SimpleNamespace(arm="right", grasp=SimpleNamespace(extra={}))
+    state = SimpleNamespace(eef_pose=lambda arm: (here[0].clone(), here[1].clone()))
+    for reaches in (False, True):
+        m, ctx = _M(reaches), {"cfg": EX.ExecuteConfig(), "witnesses": {"pre_grasp": w_pre}}
+        list(EX._grasp_transit(action, m, state, {"pre_grasp": pre, "grasp": grasp}, ctx, "right", [], [("box", "right_lid")]))
+        if reaches:
+            assert m.calls == [("probe", 4), ("along", 4)] and ctx["pre_grasp_transit"].startswith("cartesian detour")
+        else:
+            assert m.calls == [("probe", 4), ("arm_to", True)] and ctx["pre_grasp_transit"].startswith("witness branch")

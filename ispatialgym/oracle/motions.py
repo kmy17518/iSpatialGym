@@ -1387,6 +1387,18 @@ class Motions:
             prev = (p1, q1)
         return dense
 
+    def along_reaches(self, arm: str, waypoints: Sequence[Any]) -> bool:
+        """Whether :meth:`arm_along` would track ``waypoints`` from the current configuration to the last one (the same
+        densification and differential-IK settings, nothing executed): the Cartesian leg keeps the IK branch it starts in."""
+        waypoints = list(waypoints)
+        if not waypoints:
+            return True
+        dense = self._densify(self.eef_pose(arm), waypoints)
+        res = self.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: wp} for wp in dense], pos_tol=self.cfg.diff_ik_pos_tol, rot_tol=self.cfg.diff_ik_rot_tol,
+                                         max_iters=self.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False,
+                                         soft_pos_tol=self.cfg.diff_ik_soft_pos_tol, soft_rot_tol=self.cfg.diff_ik_soft_rot_tol)
+        return bool(res.success)
+
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
                   soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False, converge: bool = True,
                   check_collisions: bool = False, limit_margin: float = 0.0, ignore_objects: Sequence[Any] = (), soft_rot_tol: Optional[float] = None) -> Iterator[th.Tensor]:
