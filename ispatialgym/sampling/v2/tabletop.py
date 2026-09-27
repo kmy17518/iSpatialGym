@@ -1702,6 +1702,203 @@ def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pr
     return TwinPick(False, g, eef_in_object, eef, pre, chosen.result, True, other, facts)
 
 
+class TurnNotOffered(Exception):
+    """Raised by a task module's ``turn_recheck`` when it cannot re-check the other finger assignment of a recorded pinch; the
+    message is recorded as the reason (:func:`held_turns`: not offered)."""
+
+
+#: the fields of a ``GraspRecord`` its finger assignment decides (:func:`flip_grasp`)
+_TURN_FIELDS = ("grasp_name", "finger_q", "eef_in_object", "pre_grasp", "grasp", "pre_place", "place", "carry", "waypoints", "extras")
+#: a row the draw itself barred (``pick_twin(row_allowed=False)`` / the caller's name rule): never offered back by :func:`held_turns`
+_BARRED = ("excluded by name", "the row is barred by the caller")
+
+
+def flip_grasp(g) -> Dict[str, Any]:
+    """Record ``g`` as the other finger assignment of its pinch: every eef pose it holds turned pi about its approach axis
+    (``conventions.twin_pose`` - the carry and in-hand waypoints too: the SLERP of two twins is the twin of the SLERP),
+    ``conventions.twin_name``, ``finger_q`` reversed, ``wrist_flip`` toggled. Returns the fields as they were
+    (:func:`unflip_grasp`; flipping twice negates the quaternions, which the IK memory's pose keys tell apart)."""
+    was = {k: getattr(g, k) for k in _TURN_FIELDS}
+
+    def tw(p):
+        return None if p is None else C.twin_pose((_t(p[0]), _t(p[1])))
+
+    g.grasp_name = C.twin_name(str(g.grasp_name))
+    g.finger_q = None if g.finger_q is None else list(reversed(list(g.finger_q)))
+    for k in ("eef_in_object", "pre_grasp", "grasp", "pre_place", "place"):
+        setattr(g, k, tw(getattr(g, k)))
+    for k in ("carry", "waypoints"):
+        setattr(g, k, None if getattr(g, k) is None else [tw(p) for p in getattr(g, k)])
+    g.extras = dict(g.extras, wrist_flip=not bool(g.extras.get("wrist_flip")))
+    return was
+
+
+def unflip_grasp(g, was: Dict[str, Any]) -> None:
+    """Put back the fields :func:`flip_grasp` returned (the very objects)."""
+    for k, v in was.items():
+        setattr(g, k, v)
+
+
+def _held_snapshot(s, draft) -> Dict[str, Any]:
+    """Everything :func:`held_turns`' re-check of the other assignment may write besides the grasp record: the program check's
+    witnesses and the travel records' ``arms_q`` (``program_check.choose_departure_arms``), the waypoint policy and the carry facts
+    (``verify_carry_legs``), the summary, the carry configurations and the IK memory."""
+    sc = s.sidecar
+    recs = list(getattr(sc, "paths", []) or []) + list(getattr(sc, "transitions", []) or [])
+    return {"ik_witnesses": list(sc.ik_witnesses or []), "waypoint_policy": sc.waypoint_policy, "paths": list(getattr(sc, "paths", []) or []),
+            "transitions": list(getattr(sc, "transitions", []) or []), "records": [(r, {k: (dict(v) if isinstance(v, dict) else v) for k, v in vars(r).items()}) for r in recs],
+            "summary": dict(draft.summary), "solutions": dict(s.ikc.solutions),
+            "carry": {k: dict(getattr(s, k)) for k in ("carry_arm_q", "carry_end_q") if isinstance(getattr(s, k, None), dict)}}
+
+
+def _held_restore(s, draft, snap: Dict[str, Any]) -> None:
+    sc = s.sidecar
+    sc.ik_witnesses, sc.waypoint_policy = snap["ik_witnesses"], snap["waypoint_policy"]
+    if hasattr(sc, "paths"):
+        sc.paths[:] = snap["paths"]
+    if hasattr(sc, "transitions"):
+        sc.transitions[:] = snap["transitions"]
+    for r, d in snap["records"]:
+        vars(r).update(d)
+    draft.summary.clear()
+    draft.summary.update(snap["summary"])
+    s.ikc.solutions.clear()
+    s.ikc.solutions.update(snap["solutions"])
+    for k, d in snap["carry"].items():
+        getattr(s, k).clear()
+        getattr(s, k).update(d)
+
+
+def _turn_scored(O, ikc, label: str, chain: Optional[Dict[str, Any]], q_start: Optional[th.Tensor], arm: str, source: str, why: str = ""):
+    """``orient.Scored`` of one finger assignment from its ``program_check.turn_chain``: margin = the smallest over its pick and
+    held chain, reach = the largest arm-joint change of its recorded pre-grasp witness from the stance configuration."""
+    ok = chain is not None and chain.get("margin") is not None
+    q_pre = chain.get("q_pre") if chain else None
+    reach = O.reach(ikc, th.as_tensor(q_pre, dtype=th.float32), q_start, arm) if (q_pre is not None and q_start is not None) else None
+    return O.Scored(O.Proposal(label, 1 if C.split_twin(label)[1] else 0, None, [], source=source, arm=arm), ok, margin=chain.get("margin") if ok else None,
+                    nearest=chain.get("joint") if ok else None, reach=reach, why=why)
+
+
+def held_turns(s, draft, report: Dict[str, Any], rerun: Callable[[], Dict[str, Any]]) -> Dict[str, Any]:
+    """The orientation rule of :mod:`ispatialgym.sampling.v2.orient` over the whole chain a library pinch decides (owner 2026-09-27:
+    count the carry / pre-place / place configurations in the joint-limit ranking; ranking only). :func:`pick_twin` scored the pick
+    alone, but the grasp also decides the configurations the program check tracks from its witness: the lift, an in-hand reorient,
+    the carry, the pre-place, the descent and the place (``program_check.turn_chain``; the place's release retreat keeps the oracle's
+    own 0.05 rad joint-limit box, never past its start, and is left out). ``report`` = the program check of the recorded assignment.
+    A record whose chain there is joint-limit safe (every configuration >= ``IKChecker.JOINT_LIMIT_MARGIN``) is left alone - the
+    rule ranks it first anyway. Otherwise the record is flipped to its other finger assignment (:func:`flip_grasp`), which must pass
+    the task module's turn checks (``s.turn_recheck(draft, grasp, q_first)``, started from the recorded pre-grasp witness
+    wrist-flipped), the carry legs (``s.verify_carry_legs``) and the program check again (``rerun``); the two are ordered by
+    ``orient.prefer`` on the whole chain - safe first, neither safe: more clearance (``orient.CLEARANCE_EQ``), then the smaller reach
+    of the recorded pre-grasp witness from the stance configuration, the generator's order (the library row first) within
+    ``orient.REACH_TOL``. When the other assignment fails a check or is not preferred, the grasp record, the witnesses, the travel
+    records, the waypoint policy, the summary, the carry configurations and the IK memory are put back exactly: a draw is never
+    rejected here. Not offered (recorded with the reason): a row the draw barred, a task module without ``turn_recheck``, one that
+    raises :class:`TurnNotOffered`. The decision is ``twin_choice.held`` on the grasp record plus an ``orient [held chain, <arm> arm]``
+    log line in the format of ``orient.choose``; kit counters ``held_turn_checks`` / ``held_turn_switched`` / ``held_turn_kept`` /
+    ``held_turn_not_offered`` (``held_turn_errors``: a fault of this step, which then keeps the recorded assignment too). Returns the
+    program-check report the sidecar keeps."""
+    for g in list(s.sidecar.grasps):
+        flipped: Dict[str, Any] = {}
+        try:
+            report = _held_turn(s, draft, g, report, rerun, flipped)
+        except Exception as e:  # noqa: BLE001 - the rule only ranks: a fault here keeps the recorded assignment and the instance
+            if flipped:
+                unflip_grasp(g, flipped["was"])
+                _held_restore(s, draft, flipped["snap"])
+            _count(s, "held_turn_errors")
+            log.warning("held chain [%s]: %r - the recorded assignment %s stays", g.object, e, g.grasp_name)
+    return report
+
+
+def _held_turn(s, draft, g, report: Dict[str, Any], rerun: Callable[[], Dict[str, Any]], flipped: Dict[str, Any]) -> Dict[str, Any]:
+    """:func:`held_turns` for one grasp record; ``flipped`` holds ``was`` / ``snap`` while the record stands flipped and uncommitted."""
+    import functools
+
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import orient as O
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    tc = g.extras.get("twin_choice")
+    if not isinstance(tc, dict) or not g.grasp_name:
+        return report
+    safe = float(s.ikc.JOINT_LIMIT_MARGIN)
+    mine = PC.turn_chain(report, g.object)
+    if mine["margin"] is None or mine["margin"] >= safe:
+        return report
+    _count(s, "held_turn_checks")
+    stance = s.sidecar.stances.get(g.stance)
+    q_start = _t(s.ikc.q_locked(stance)) if stance is not None else None
+    label0, label1 = str(g.grasp_name), C.twin_name(str(g.grasp_name))
+    a = _turn_scored(O, s.ikc, label0, mine, q_start, g.arm, "recorded")
+    base = {"stage": "held chain", "arm": g.arm, "recorded": label0, "safe_margin_rad": round(safe, 4), "actions": list(mine["actions"])}
+    barred = str((tc.get("row") or {}).get("why") or "") if C.split_twin(label0)[1] else ""  # only a row is ever barred
+    recheck = getattr(s, "turn_recheck", None)
+    why_not = f"the draw barred it ({barred})" if barred in _BARRED else (None if recheck is not None else "no turn re-check in this task module")
+    b, rep2, why, theirs = None, None, "", None
+    if why_not is None:
+        q_first = None
+        if mine["q_pre"] is not None and q_start is not None:
+            q_rec = q_start.clone()
+            idx = s.kit.robot.arm_control_idx[g.arm]
+            q_rec[idx] = th.as_tensor(mine["q_pre"], dtype=th.float32)[idx]
+            q_first = s.ikc.twin_q(q_rec, g.arm)
+        flipped["snap"] = _held_snapshot(s, draft)
+        flipped["was"] = flip_grasp(g)
+        try:
+            why = recheck(draft, g, q_first=q_first) or ""
+            if not why:
+                g.carry = None  # this assignment's carry leg is screened afresh
+                s.verify_carry_legs(draft)
+                rep2 = rerun()
+        except TurnNotOffered as e:
+            why_not = str(e) or "the task module cannot re-check it"
+        except Reject as e:
+            why = str(e)[:200]  # "[<reason>] <message>"
+        except Exception as e:  # noqa: BLE001 - the recorded assignment stays; a failed re-check never costs the instance
+            why = f"re-check raised {e!r}"[:200]
+        theirs = PC.turn_chain(rep2, g.object) if rep2 is not None else None
+        if rep2 is not None and theirs["margin"] is None:
+            why = "the program check left no witnesses of its chain"
+        source = "ik"
+        if q_first is not None and theirs is not None and theirs["q_pre"] is not None:
+            idx = s.kit.robot.arm_control_idx[g.arm]
+            if float((th.as_tensor(theirs["q_pre"], dtype=th.float32)[idx] - q_first[idx]).abs().max()) < 1e-2:
+                source = "map"  # the chain left from the recorded pre-grasp witness wrist-flipped
+        b = _turn_scored(O, s.ikc, label1, theirs if not why else None, q_start, g.arm, source, why=why)
+    if why_not is not None:
+        if flipped:
+            unflip_grasp(g, flipped.pop("was"))
+            _held_restore(s, draft, flipped.pop("snap"))
+        opts = [dict(a.facts(), where=mine["where"]), {"label": label1, "arm": g.arm, "ok": False, "why": f"not offered: {why_not}"[:200]}]
+        tc["held"] = dict(base, status="not offered", chosen=label0, reason=None, why=why_not, against_default=a.proposal.rank > 0, options=opts)
+        _count(s, "held_turn_not_offered")
+        log.info("orient [held chain, %s arm] %s (not offered) | %s | %s not offered: %s", g.arm, label0, O._side(opts[0]), label1, why_not[:120])
+        return report
+    pool = sorted([x for x in (a, b) if x.ok], key=functools.cmp_to_key(O.prefer))
+    chosen = pool[0]
+    reason = O.reason(chosen, pool[1:])
+    switched = chosen is b
+    opts = [dict(a.facts(), where=mine["where"]), dict(b.facts(), **({"where": theirs["where"]} if b.ok else {}))]
+    held = dict(base, status="switched" if switched else "kept", chosen=chosen.proposal.label, reason=reason, against_default=chosen.proposal.rank > 0,
+                options=opts, **({"why": why} if why else {}))
+    log.info("orient [held chain, %s arm] %s (%s%s)%s | %s", g.arm, chosen.proposal.label, reason, ", wrist-flipped branch" if chosen.proposal.source == "map" else "",
+             " AGAINST the generator's order" if chosen.proposal.rank > 0 else "", " | ".join(O._side(o) for o in opts))
+    if not switched:
+        unflip_grasp(g, flipped.pop("was"))
+        _held_restore(s, draft, flipped.pop("snap"))
+        tc["held"] = held
+        _count(s, "held_turn_kept")
+        return report
+    flipped.clear()  # committed: the other assignment is the record now
+    tc["held"] = held
+    tc["chosen"] = "twin" if C.split_twin(label1)[1] else "row"
+    if isinstance(draft.summary.get("grasp"), dict):
+        draft.summary["grasp"] = dict(draft.summary["grasp"], name=label1)
+    _count(s, "held_turn_switched")
+    return rep2
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # Phase 3 step 1 — target init pose (§4.6)
 # ----------------------------------------------------------------------------------------------------------------

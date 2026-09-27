@@ -132,6 +132,26 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   `orient_choices`, `orient_reason.*`, `orient_source.map`, `orient_against_default`. Every proposal and record carries the
   `arm` making the contact (default: the arm of the call; scoring, the camera check and the wrist-twin pairing / mapping use
   each proposal's own arm; no arm choice yet). Tests: `test_orient.py`, `test_grasp_twins.py`.
+- **A library pinch's wrist turn is ranked on its whole held chain** (owner 2026-09-27 ~14:46, first-demo v2.1: "count the carry /
+  pre-place / place configurations in the joint-limit safety ranking"; sprouts 0927-130119: carry / pre-place 17.7 mrad from
+  `right_arm_joint7`'s limit with the row `pick_twin` scored on [pre-grasp, grasp] alone). The configurations the grasp decides
+  besides its pick exist only in the program check, tracked from the grasp witness: `program_check.turn_chain` takes the smallest
+  `joint_limit_margin_rad` over the pick and the held chain (lift, in-hand reorient, carry, pre-place, descent, place; the place's
+  release retreat keeps the oracle's own 0.05 rad box and is left out). `tabletop.held_turns` runs in `SamplerV2.program_check`
+  after the check of the recorded assignment: a record with `twin_choice` whose chain is below `JOINT_LIMIT_MARGIN` is flipped to
+  its other finger assignment (`flip_grasp`: every eef pose, `~r180` name, `finger_q`), which must pass the task module's
+  `turn_recheck` (the pick at the settled pose from the recorded pre-grasp witness wrist-flipped, camera, pads, descent, lift, and
+  the module's turn-dependent sweeps), `verify_carry_legs` and the program check again; `orient.prefer` orders the two on the
+  whole chain (safe, more clearance, reach of the recorded pre-grasp witness, the row first within `REACH_TOL`). Ranking only:
+  otherwise the grasp record, witnesses, travel records (`arms_q`), waypoint policy, summary, carry configurations and IK memory
+  are put back exactly, never a rejection (a fault of the step keeps the record too). Hooks: IORS small (all relations; touching
+  re-sweeps its carried drive at the other turn's lift configuration, `SamplerV2.recheck_carried_travel`), disembedding (carried
+  path, place at the placement stance), attachment (standoff, lift + SLERP, attach, brace re-solved on the new attach, fingers
+  in the partner, a second base pose's sweeps); IORS large-scale records `not offered` (its carry pose, B -> C carried travel and
+  `carry_end_q` belong to the recorded turn). Records `grasps[].twin_choice.held` (status switched / kept / not offered + why,
+  reason, both chains' margins, nearest joint, where, reach, `against_default`), log `orient [held chain, <arm> arm] ...`, kit
+  `held_turn_checks` / `held_turn_switched` / `held_turn_kept` / `held_turn_not_offered` / `held_turn_errors`. Tests:
+  `test_grasp_twins.py`.
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

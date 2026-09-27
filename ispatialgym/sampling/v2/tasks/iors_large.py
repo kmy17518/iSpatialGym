@@ -2457,6 +2457,14 @@ class IORSLarge(SamplerV2):
         if self.relation == "ontop" and not self.ikc.eef_in_frame(place_eef, self.camera_pose_at(place)):
             raise Reject("gripper_not_in_frame", "place eef pose outside the placement image (5 %)")
 
+    def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
+        """``tabletop.held_turns``: not offered here. The held chain runs through state recorded for the recorded turn alone - the carry
+        pose (``grasps[].waypoints``, ``carry_arm_q``), the B -> C departure transition / path / arrival swept with the arm there, and
+        the carry leg at C tracked from it to the pre-place (``carry_end_q``, which seeds the program check's place) - so the other turn
+        means re-planning the carry from the carry-pose search on."""
+        raise TT.TurnNotOffered("the held chain runs through the carry pose, the B -> C carried travel swept at the recorded carry configuration "
+                                "(carry_arm_q) and the carry leg at C tracked from it (carry_end_q): the other turn needs that carry re-planned")
+
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         g = self.sidecar.grasp_of(self.tname)
         place = self.sidecar.stances.get("placement")

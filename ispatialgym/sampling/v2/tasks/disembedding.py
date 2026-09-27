@@ -886,6 +886,34 @@ class Disembedding(SamplerV2):
             raise Reject("place_unreachable", f"settled goal: pre-place / place fail the exact IK from the placement stance: {res.reason}")
         grasp.pre_place, grasp.place = pre_place, place
 
+    def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
+        """``tabletop.held_turns``: this module's checks that depend on the wrist turn, for ``grasp`` just recorded as its other finger
+        assignment - the pick from the manipulation stance as the draw solved it (support and source tray ignored at the grasp; from
+        ``q_first``, the recorded pre-grasp witness wrist-flipped, else afresh) with the wrist camera clear of the source tray's floor
+        and of the world, the carried path to the placement stance swept again with this turn in the hand, and the pre-place -> place
+        from the placement stance as ``after_goal_check`` solves it. None when every check passes, else the first failure."""
+        from ispatialgym.sampling.v2 import orient as O
+
+        tgt, support, src, dst = self.obj("target"), self.obj("support"), self.obj(self.src_role), self.obj(self.dst_role)
+        manip, place_st = self.sidecar.stance("manipulation"), self.sidecar.stance("placement")
+        scale = self.choice.models["target"].scale
+        kw = {"ignore_for_last": [support, src], "scale_key": scale, "cache": False}
+        res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", q_first=q_first, **kw)
+        if not res.ok and q_first is not None:
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", **kw)
+        if not res.ok:
+            return f"pick: {res.reason}"
+        floor_z = float(self.src_floor.at(draft.object_poses[self.bindings.one(self.src_role).name]).z)
+        if TT.wrist_camera_clearance(grasp.grasp, floor_z) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, "right"):
+            return "pick: the wrist camera on the tray floor / within 5 mm of the world"
+        why = self.recheck_carried_travel(self.tname)
+        if why:
+            return f"carried path: {why}"
+        with TT.posed_in_hand(self, "right", tgt, grasp.eef_in_object):
+            with attached(self.kit, "right", tgt):
+                r = self.ikc.exact([grasp.pre_place, grasp.place], place_st, "right", ignore_for_last=[support, dst], scale_key=scale, cache=False)
+        return None if r.ok else f"place: {r.reason}"
+
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         g = self.sidecar.grasp_of(self.tname)
         manip = self.sidecar.stance("manipulation")

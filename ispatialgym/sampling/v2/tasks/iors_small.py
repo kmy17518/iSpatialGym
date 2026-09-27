@@ -1213,6 +1213,57 @@ class IORSSmall(SamplerV2):
             return str(grasp.grasp_name)
         return None
 
+    def turn_recheck(self, draft: Draft, grasp: GraspRecord, q_first: Optional[th.Tensor] = None) -> Optional[str]:
+        """``tabletop.held_turns``: this module's checks that depend on the wrist turn, for ``grasp`` just recorded as its other finger
+        assignment - the pick at the settled target pose as ``after_settle`` solves it (from ``q_first``, the recorded pre-grasp
+        witness wrist-flipped, else afresh) with the wrist camera clear of the support top and of the world and the open pads as clear
+        as the recorded turn's; the pre-place -> place descent and the lift of ``after_goal_check`` with the object attached; touching:
+        the place from the push stance with its retreat clear pose (``place_infeasible_why``) and the carried drive there swept again
+        at this turn's lift configuration. None when every check passes, else the first failure."""
+        tgt, manip = self.obj("target"), self.sidecar.stance("manipulation")
+        scale = self.choice.models["target"].scale
+        kw = {"ignore_for_last": self.support_objects(), "scale_key": scale, "cache": False, "approached": [tgt]}
+        res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
+        if not res.ok and q_first is not None:
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)
+        if not res.ok:
+            return f"pick: {res.reason}"
+        if TT.wrist_camera_clearance(grasp.grasp, float(self.top.z)) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, grasp.arm):
+            return "pick: the wrist camera on the support top / within 5 mm of the world"
+        clear = self.open_pads_clear_of_support(res.q)
+        if grasp.extras.get("open_pads_clear_of_support") and not clear:
+            return "pick: the open pads on the support (the recorded turn's clear it)"
+        grasp.extras["open_pads_clear_of_support"] = clear
+        push = self.sidecar.stances.get("push") if self.relation == "touching" else None
+        st_place = push or manip
+        ign = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
+        lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
+        arm_q = None
+        with attached(self.kit, grasp.arm, tgt, eef_in_object=grasp.eef_in_object):
+            r = self.ikc.exact([grasp.pre_place, grasp.place], st_place, grasp.arm, ignore_for_last=ign, scale_key=scale, cache=False, approached=ign)
+            if not r.ok:
+                return f"descent: {r.reason}"
+            r = self.ikc.waypoints_ok([grasp.grasp, lift_end], manip, grasp.arm, ignore_all=self.support_objects(), cache=False, approached=[])
+            if not r.ok:
+                return f"lift: {r.reason}"
+            if push is not None:
+                # the carried drive to the push stance is swept with the arm at the lift configuration (``push_stance``)
+                r = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
+                if not r.ok or r.q is None:
+                    return f"lift configuration: {r.reason}"
+                idx = self.kit.robot.arm_control_idx
+                arm_q = {"right": r.q[idx["right"]].clone(), "left": r.q[idx["left"]].clone()}
+        if self.relation == "touching":
+            r = self.ikc.exact([IK.pre_pose(grasp.place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st_place, grasp.arm, ignore_for_last=self.support_objects() + [tgt], cache=False)
+            if not r.ok:
+                return f"place retreat clear pose: {r.reason}"
+        if push is not None:
+            # the push stance got its carried object after ``check_stances_with_objects``: the drive's sweep covers its pose
+            why = self.recheck_carried_travel(self.bindings.one("target").name, arm_q=arm_q, stances=False)
+            if why:
+                return f"carried drive: {why}"
+        return None
+
     def refine_targets_from_goal(self, draft: Draft):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         if self.relation == "touching":

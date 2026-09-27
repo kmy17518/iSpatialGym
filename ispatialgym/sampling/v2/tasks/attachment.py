@@ -1503,3 +1503,52 @@ class Attachment(SamplerV2):
         grasp.pre_place, grasp.place = pre, attach
         if grasp.waypoints:
             grasp.waypoints[-1] = pre
+
+    def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
+        """``tabletop.held_turns``: this module's checks that depend on the wrist turn, for ``grasp`` just recorded as its other finger
+        assignment - the pick as the draw solved it (support ignored at the grasp; from ``q_first``, the recorded pre-grasp witness
+        wrist-flipped, else afresh) with the wrist camera clear of the support top and of the world, and the over-the-top standoff
+        when one is recorded; a second base pose's carried path / transition / stance swept again with this turn in the hand; from the
+        attach stance the lift + SLERP carry tracked as ``_attach_and_brace`` tracks it, the pre-attach -> attach, the left brace
+        solved again with the right arm locked at this attach (``tabletop.brace_second_arm``) when one is recorded, and the fingers
+        clear of the partner at the attach (``_fingers_in_partner``). None when every check passes, else the first failure."""
+        male, female, support = self.obj(self.t_role), self.obj(self.p_role), self.obj("support")
+        manip = self.sidecar.stance("manipulation")
+        st = self.sidecar.stances.get(str(grasp.extras.get("attach_stance") or "manipulation")) or manip
+        scale = self.choice.models[self.t_role].scale
+        kw = {"ignore_for_last": [support], "scale_key": scale, "cache": False}
+        res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", q_first=q_first, **kw)
+        if not res.ok and q_first is not None:
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", **kw)
+        if not res.ok:
+            return f"pick: {res.reason}"
+        if TT.wrist_camera_clearance(grasp.grasp, float(self.top.z)) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, "right"):
+            return "pick: the wrist camera on the support top / within 5 mm of the world"
+        if grasp.extras.get("approach_standoff_m"):
+            standoff = C.pre_pose((TT._t(grasp.pre_grasp[0]), TT._t(grasp.pre_grasp[1])), float(grasp.extras["approach_standoff_m"]))
+            r = self.ikc.exact([standoff], manip, "right", ignore_for_last=[support], scale_key=scale, cache=False)
+            if not r.ok:
+                return f"approach standoff: {r.reason}"
+        if st is not manip:
+            why = self.recheck_carried_travel(self.tname)
+            if why:
+                return f"second base pose: {why}"
+        brace = self.sidecar.contacts.get("brace")
+        lift = grasp.extras.get("lift")
+        with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
+            with attached(self.kit, "right", male):
+                if lift is not None and grasp.waypoints:
+                    r = self.ikc.waypoints_ok([(th.as_tensor(lift, dtype=th.float32), TT._t(grasp.grasp[1]))] + list(grasp.waypoints), st, "right",
+                                              ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)))
+                    if not r.ok:
+                        return f"lift + SLERP: {r.reason}"
+                r = self.ikc.exact([grasp.pre_place, grasp.place], st, "right", ignore_for_last=[support, female], scale_key=scale, cache=False)
+                if not r.ok:
+                    return f"attach: {r.reason}"
+                if brace is not None:
+                    r_b = TT.brace_second_arm(self, st, "right", [grasp.pre_place, grasp.place], "left", [brace.pre, brace.contact],
+                                              ignore_work_last=[support, female], ignore_brace_last=[support, female])
+                    if not r_b.ok:
+                        return f"brace with the right arm at this attach: {r_b.reason}"
+            why = self._fingers_in_partner(r.q, grasp.place, support, male, female)
+        return f"attach: {why}" if why else None
