@@ -123,6 +123,11 @@ def test_a3_place_never_lowered_and_only_for_support_places():
     action = SimpleNamespace(kind="attach", object="soap", arm="right")
     ctx = {}
     assert EX.raise_place_for_inhand_pose(action, state, sidecar, targets, ctx, EX.ExecuteConfig()) is targets and ctx == {}
+    # a drop releases where the recorded drop did (sandal 0927-030120: lifted 14 mm at its grasp, dropped 14 mm lower)
+    action, state, sidecar, targets = _place_setup(0.012)
+    ctx = {}
+    out = EX.raise_place_for_inhand_pose(SimpleNamespace(kind="drop", object="soap", arm="right"), state, sidecar, targets, ctx, EX.ExecuteConfig())
+    assert ctx["place_inhand_raise"]["applied"] and out["place"].position[2] == pytest.approx(targets["place"].position[2] + 0.012, abs=1e-5)
 
 
 # ------------------------------------------------------------------------------------------------ A1
@@ -273,7 +278,10 @@ def test_a2_keep_arm_branch_refuses_outside_its_situation():
     far = q_rec.clone()
     far[0] = 0.56  # 6 cm from the hand: another hand pose
     assert EX.keep_arm_branch(motions, state, "right", far, [], nxt, {})["why"] == "the hand is not at the recorded pose"
-    assert "no contact" in EX.keep_arm_branch(motions, state, "right", q_rec, [], None, {})["why"]
+    assert "no grasp" in EX.keep_arm_branch(motions, state, "right", q_rec, [], None, {})["why"]
+    # the arm's next contact is a push (sandal 0927-030120: the push under the table from the kept branch turned the sandal 49 deg)
+    push = {"index": 5, "name": "push", "object": None, "chain": [], "why": "the arm's next contact is a push, not a grasp"}
+    assert EX.keep_arm_branch(motions, state, "right", q_rec, [], push, {})["why"] == push["why"]
     backend.collide = True
     assert "collides" in EX.keep_arm_branch(motions, state, "right", q_rec, [backend.q_full()], nxt, {})["why"]
     backend.collide, backend.fail_path = False, True

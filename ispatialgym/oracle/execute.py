@@ -699,7 +699,7 @@ def keep_arm_branch(motions: Motions, state, arm: str, q_rec, sweep: Sequence[th
     if dp > max(cfg.witness_residual_accept_pos, _cfg(ctx).retreat_partial_accept_m) or da > cfg.witness_residual_accept_rot:
         return {**f, "why": "the hand is not at the recorded pose"}
     if not nxt or not nxt.get("chain"):
-        return {**f, "why": "no contact of the arm follows the travel legs"}
+        return {**f, "why": (nxt or {}).get("why") or "no grasp of the arm follows the travel legs"}
     f["next"] = nxt["index"]
     qs = th.stack([C.as_tensor(q).reshape(-1).float() for q in sweep]) if sweep else q_now.unsqueeze(0)
     if bool(C.as_tensor(backend.check_collision(qs, sync_world=True)).any()):
@@ -1247,8 +1247,9 @@ def raise_place_for_inhand_pose(action: Place, state, sidecar, targets: Dict[str
     (``grasps[].eef_in_object``); an object that hangs LOWER in the hand (a grasp that ended higher on it - stopped short on the
     support, 1 cm on the bar soap's tray floor, or lifted by ``lift_grasp_off_support``) was driven into its support by that much, the
     fingertips pressing ~100 N into the destination tray through the release. The pre-place, place, descent and retreat are raised by
-    the difference (z only, never lowered) and the carry ramps up to the raised pre-place. ``ctx["place_inhand_raise"]`` records it."""
-    if action.kind != "support" or targets.get("place") is None:
+    the difference (z only, never lowered) and the carry ramps up to the raised pre-place; a drop releases where the recorded drop
+    did (the sandal lifted 14 mm at its grasp was dropped 14 mm lower). ``ctx["place_inhand_raise"]`` records it."""
+    if action.kind not in ("support", "drop") or targets.get("place") is None:
         return targets
     try:
         obj = state.object(action.object)
@@ -1516,7 +1517,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
     if action.kind == "attach" and action.on:
         targets = _reaim_attach_targets(action, state, targets, ctx, cfg)
-    elif action.kind == "support":
+    elif action.kind in ("support", "drop"):
         targets = raise_place_for_inhand_pose(action, state, ctx.get("sidecar"), targets, ctx, cfg)
     carry = list(targets.get("carry") or ())
     if cfg.carry_leg == "straight" and carry:

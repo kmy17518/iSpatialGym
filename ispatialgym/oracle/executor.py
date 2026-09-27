@@ -54,7 +54,7 @@ import torch as th
 
 from ispatialgym import ASSETS_ROOT
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.actions import Action, Brace, Navigate, Place, Push, Transition
+from ispatialgym.oracle.actions import Action, Brace, Grasp, Navigate, Place, Push, Transition
 from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
@@ -1117,6 +1117,10 @@ class Executor:
             j += 1
         if j >= len(acts) or arm not in tuple(getattr(acts[j], "arms", ()) or ()):
             return None
+        if not isinstance(acts[j], Grasp):
+            # a push / brace acts through the arm's posture around its obstacles (sandal 0927-030120 replayed with the arm kept: the push
+            # under the table from the other branch turned the sandal 49 deg): its recorded arm posture stays
+            return {"index": j, "name": acts[j].name, "object": None, "chain": [], "why": f"the arm's next contact is a {acts[j].name}, not a grasp"}
         chain: List[Dict[str, Any]] = []
         k = j
         while k < len(acts) and not isinstance(acts[k], (Transition, Navigate)):
