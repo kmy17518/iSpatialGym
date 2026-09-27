@@ -446,6 +446,7 @@ NOTE_KEYS = NOTE_KEYS + ("inhand_reaim",)
 NOTE_KEYS = NOTE_KEYS + ("push_close",)
 NOTE_KEYS = NOTE_KEYS + ("protection",)  # oracle.protection (owner 2026-09-26): the transits of the action and their protected objects
 NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial 0926-061151): a failed retreat leg replaced by a planned transit
+NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first", "brace_seek")  # root_moved (2026-09-27, carton lever): the lever fist's slide-out, the edge-on blade's seek
 
 
 @dataclass

@@ -3821,6 +3821,186 @@ def test_base_follow_stage2_handover_does_not_ride_past_follow_to():
     assert legs == 2 and "handover" not in note and note["extended"]["q"] >= 1.4 - band
 
 
+def test_base_follow_free_standing_object_tracks_live_hinge_closed_loop():
+    """An arm-mode follow of a free-standing object (blender_eyedvd 0927-014528: the open-loop stream through the recorded handle
+    poses wound the arm up 0.056 rad and the unwind tipped the body 2.6 deg) tracks the arc closed-loop about the hinge where
+    it is now, up to the hand's part (q(follow_to)); a fixed-base object keeps the recorded path."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "configuration_matching-articulation_open_small_scale.json"))
+    extra0 = dict(sc.articulation.extra)
+
+    class _Motions:
+        follow_phase = "arm"
+        cfg = MotionsConfig()
+
+        def __init__(self, q):
+            self.q, self.calls = q, []
+
+        def arm_along(self, arm, waypoints, converge=True, **kw):
+            self.calls.append(("along", None))
+            for _ in range(40):
+                self.q[0] += 1.05 / 40
+                yield th.zeros(23)
+
+        def arm_arc_closed_loop(self, arm, centre, axis, target, joint_value, q_to, **kw):
+            self.calls.append(("arc", (centre.tolist(), axis.tolist(), q_to, joint_value())))
+            for _ in range(40):
+                self.q[0] += 1.05 / 40
+                yield th.zeros(23)
+            return {"stop": "joint_at_target"}
+
+        def unwind(self, arm):
+            return 0.0
+
+        def hold(self, steps=1):
+            for _ in range(int(steps)):
+                yield th.zeros(23)
+
+    def run(fixed_base):
+        follow = [a for a in expand(sc.alias, sc) if isinstance(a, BaseFollow)][0]
+        art = follow.articulation
+        art.passive_from = None
+        art.extra = {**extra0, "hinge_world": [6.0, 3.35, 1.15], "axis_world": [1.0, 0.0, 0.0], "follow_to": 0.75,
+                     "object_pose": {"position": [6.0, 3.4, 0.9], "orientation": [0.0, 0.0, 0.0, 1.0]}}
+        q = [0.0]
+        motions = _Motions(q)
+        state = SimpleNamespace(joint_position=lambda o, j: float(q[0]), object=lambda o: SimpleNamespace(fixed_base=fixed_base),
+                                object_pose=lambda o: (th.tensor([6.01, 3.4, 0.9]), th.tensor([0.0, 0.0, 0.0, 1.0])),
+                                eef_pose=lambda a: (th.tensor([6.0, 3.32, 1.17]), th.tensor([0.0, 0.0, 0.0, 1.0])))
+        ctx = {}
+        for _ in EX.execute_base_follow(follow, motions, state, follow.targets(sc, None), ctx):
+            pass
+        return motions.calls, ctx["follow"], art
+
+    calls, note, art = run(False)
+    assert [c[0] for c in calls] == ["arc"]
+    centre, axis, q_to, _ = calls[0][1]
+    assert centre == pytest.approx([6.01, 3.35, 1.15], abs=1e-5) and axis == pytest.approx([1.0, 0.0, 0.0], abs=1e-6)
+    assert q_to == pytest.approx(art.q_at(0.75)) and note["closed_loop"]["q_to"] == pytest.approx(art.q_at(0.75))
+    calls, note, _ = run(True)
+    assert [c[0] for c in calls] == ["along"] and "closed_loop" not in note
+
+
+def _lever_lift_push(arm="left", obj="carton.n.02_1"):
+    from ispatialgym.oracle.sidecar import Pose as SPose, PushContact
+
+    q = [0.851, -0.311, 0.397, 0.145]
+    lift = PushContact(arm=arm, object=obj, pre=SPose([6.2804, 3.8030, 0.9745], q), init=SPose([6.2802, 3.7328, 0.9623], q), mid=SPose([6.2802, 3.7328, 0.9952], q),
+                       goal=SPose([6.2802, 3.7328, 1.0280], q), direction=[0.0, 0.0, 1.0], distance_m=0.0658,
+                       extra={"hold": True, "approach_is_slide": True, "articulation": {"joint": "j_right_lid", "link": "right_lid", "q_from": 0.0, "q_to": 0.35}})
+    return Push(contact=lift, base_yaw=0.0)
+
+
+def test_lever_retreat_slides_out_before_lifting_when_the_other_hand_holds_the_flap():
+    """Two-flap lever (0926-073750 retreat[6]): the fist sits under the flap it lifted and the other hand pinches that flap - the
+    recorded lift-first leg drove the fingers into the held flap and tipped the box 1.5 deg / 16 mm. With the object in the other
+    hand the fist slides out along ``slide_dir`` first and lifts after (same end pose); with nothing held the recorded order stands."""
+    from ispatialgym.oracle.actions import Retreat
+
+    retreat = Retreat(arm="left", object="carton.n.02_1", after=_lever_lift_push(), distance=0.08, lift_first_m=0.03, slide_dir=[0.0, 1.0, 0.0])
+    here, quat = th.tensor([6.2802, 3.7328, 1.0280]), th.tensor([0.851, -0.311, 0.397, 0.145])
+    box = FakeObject("target_carton_0", [6.2883, 3.7464, 0.8684], category="carton", extent=(0.23, 0.31, 0.19))
+    for holder in ("right", None):
+        state = SimpleNamespace(eef_pose=lambda arm: (here.clone(), quat.clone()), object_pose=lambda n: (box.pos.clone(), box.quat.clone()),
+                                object=lambda n: box, held_object=lambda arm, h=holder: box if arm == h else None, robot=None)
+        motions = _RetreatStubMotions(with_ik=False)
+        motions.press_hold = {"arm": "left", "object": "carton.n.02_1", "link": "right_lid"}
+        ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(), "witnesses": {}, "hooks": {}}
+        list(EX.execute_retreat(retreat, motions, state, retreat.targets(None, state), ctx))
+        leg = motions.legs[-1]
+        assert motions.press_hold is None and th.allclose(leg[-1], here + th.tensor([0.0, 0.08, 0.03]), atol=1e-5)
+        if holder is not None:
+            assert th.allclose(leg[0], here + th.tensor([0.0, 0.08, 0.0]), atol=1e-5)
+            assert ctx["retreat_slide_first"] == {"held_by": "right", "link": "right_lid", "slide_m": 0.08, "lift_m": 0.03}
+        else:
+            assert float(leg[0][1]) == pytest.approx(float(here[1]), abs=1e-5) and float(leg[0][2]) > float(here[2]) + 1e-3
+            assert "retreat_slide_first" not in ctx
+
+
+def test_base_follow_unwind_stops_re_reading_when_the_free_body_turns():
+    """The unwind re-reads the measured joints every step; a loaded arm then creeps and a free-standing body turns with it
+    (carton lever 0926-073750: 0.08 deg per step). It stops re-reading on the first step the object's root is not still; a root
+    that stays put (a fixed-base door) unwinds over all ``follow_unwind_steps``."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "configuration_matching-articulation_open_small_scale.json"))
+    follow = [a for a in expand(sc.alias, sc) if isinstance(a, BaseFollow)][0]
+    art = follow.articulation
+    art.passive_from = None
+    art.extra = {k: v for k, v in (art.extra or {}).items() if k not in ("hinge_world", "follow_to")}
+    cfg = EX.ExecuteConfig()
+
+    def run(yaw_step):
+        q, yaw = [art.q_init], [0.0]
+
+        class _Motions:
+            follow_phase = "arm"
+            unwinds = 0
+
+            def arm_along(self, arm, waypoints, converge=True, **kw):
+                for _ in range(40):
+                    q[0] += (art.q_goal - art.q_init) / 30
+                    yield th.zeros(23)
+
+            def unwind(self, arm):
+                self.unwinds += 1
+                return 0.001
+
+            def hold(self, steps=1):
+                for _ in range(int(steps)):
+                    yaw[0] += yaw_step if self.unwinds else 0.0
+                    yield th.zeros(23)
+
+        motions = _Motions()
+        state = SimpleNamespace(joint_position=lambda o, j: float(q[0]),
+                                object_pose=lambda o: (th.tensor([6.0, 3.4, 0.9]), C.quat_from_axis_angle(th.tensor([0.0, 0.0, 1.0]), yaw[0])))
+        ctx: Dict[str, Any] = {"cfg": cfg}
+        list(EX.execute_base_follow(follow, motions, state, follow.targets(sc, None), ctx))
+        return motions.unwinds, ctx["follow"]
+
+    unwinds, note = run(math.radians(0.08))
+    assert unwinds == 1 and note["unwind_stopped"]["after_steps"] == 1 and note["unwind_stopped"]["root_step_rad"] > cfg.push_still_rot
+    unwinds, note = run(0.0)
+    assert unwinds == cfg.follow_unwind_steps and "unwind_stopped" not in note
+
+
+def test_edge_on_brace_seeks_the_face_it_stands_off_and_rests_the_clearance_off_it():
+    """The lever's edge-on blade was placed with the plate's long side (18 mm) and stood ~10 mm off the box wall (0926-073750: the
+    box slid 10 mm under the lever before it met the blade). The blade goes on along the brace direction until the hand touches the
+    object and backs off the recorded 2 mm clearance; without a touch it stops where the thinnest finger section would meet the face."""
+    from ispatialgym.oracle.sidecar import BraceContact, Pose as SPose
+
+    q = [0.6132, 0.6116, 0.3531, 0.3540]
+    start = th.tensor([6.1953, 3.5715, 0.986])
+    extra = {"blade_half_thickness_m": 0.018, "stop_clearance_m": 0.002, "blade_closing": "edge_on", "pose_class": "blade_down"}
+    brace = QA_Brace(contact=BraceContact(arm="right", object="carton.n.02_1", kind="side_blade", pre=SPose([6.152, 3.5716, 1.011], q), contact=SPose(start.tolist(), q),
+                                          direction=[0.0, 1.0, 0.0], extra=extra), base_yaw=0.0)
+    box = FakeObject("target_carton_0", [6.2883, 3.7464, 0.8684], category="carton", extent=(0.23, 0.31, 0.19))
+    eef = [start.clone()]
+
+    class _M:
+        def __init__(self):
+            self.legs: List[Any] = []
+
+        def arm_along(self, arm, waypoints, loaded=False, speed=None, **kw):
+            self.legs.append([as_world_pose(w)[0].clone() for w in waypoints])
+            goal = as_world_pose(waypoints[-1])[0]
+            while float(th.linalg.norm(goal - eef[0])) > 1e-7:
+                d = goal - eef[0]
+                eef[0] = eef[0] + d * min(1.0, 0.0012 / float(th.linalg.norm(d)))
+                yield th.zeros(23)
+
+    for touch_at in (0.0094, None):
+        eef[0] = start.clone()
+        state = SimpleNamespace(eef_pose=lambda arm: (eef[0].clone(), th.tensor(q)), object_pose=lambda n: (box.pos.clone(), box.quat.clone()), object=lambda n: box,
+                                hand_contacts=lambda arm, t=touch_at: [box] if t is not None and float(eef[0][1] - start[1]) >= t - 1e-9 else [])
+        m, ctx = _M(), {}
+        list(EX._seek_brace_face(brace, m, state, "carton.n.02_1", extra, EX.ExecuteConfig(), ctx))
+        seek = ctx["brace_seek"]
+        assert seek["seek_m"] == pytest.approx(0.018 + 0.002 - EX.BLADE_TIP_HALF_M) and seek["moved_m"] == 0.0
+        if touch_at is not None:
+            assert seek["touched"] == "contact" and touch_at - 1e-6 <= seek["travel_m"] < touch_at + 0.0013 and len(m.legs) == 2
+            assert float(eef[0][1] - start[1]) == pytest.approx(seek["travel_m"] - 0.002, abs=1e-6)
+        else:
+            assert seek["touched"] is None and seek["travel_m"] == pytest.approx(seek["seek_m"], abs=1e-6) and len(m.legs) == 1
+
 
 def _held_marker(joints=None):
     robot = FakeRobot()
