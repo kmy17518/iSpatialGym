@@ -140,6 +140,7 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     max_steps = int(max(abs(q_to), abs(arc_dir)) / max(step_ang, 1e-6) * 3) + 60
     swept, commanded, consecutive, steps, misses = 0.0, 0.0, 0, 0, 0
     stop = None
+    worst = sampler.ikc.joint_limit_margin(q, arm)  # (margin, joint): the arc's closest approach to a joint limit
     while True:
         if sgn_joint * (swept - q_to) >= -band_rad:
             stop = "joint_at_target"
@@ -167,6 +168,9 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
             commanded += abs(d_ang)
             swept += d_ang
             consecutive = 0
+            m_ = sampler.ikc.joint_limit_margin(q, arm)
+            if m_[0] < worst[0]:
+                worst = m_
         else:
             consecutive += 1
             misses += 1
@@ -175,9 +179,16 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
                 return False, (f"approach_untrackable: push replay - the closed-loop arc misses 10 differential-IK steps in a row at swept {swept:+.3f} of {q_to:+.3f} rad "
                                f"(nearest joint limit {margin:.3f} rad at {jn}; {getattr(r_, 'status', '')[:100]})"), rep
         steps += 1
-    rep["arc"] = {"steps": steps, "swept_rad": round(swept, 4), "q_to_rad": round(q_to, 4), "stop": stop, "ik_misses": misses}
+    rep["arc"] = {"steps": steps, "swept_rad": round(swept, 4), "q_to_rad": round(q_to, 4), "stop": stop, "ik_misses": misses,
+                  "min_limit_margin_rad": round(float(worst[0]), 4), "nearest_joint": worst[1]}
     if stop != "joint_at_target":
         return False, f"approach_untrackable: push replay - the closed-loop arc stops at {stop} (swept {swept:+.3f} of {q_to:+.3f} rad)", rep
+    if worst[0] < sampler.ikc.JOINT_LIMIT_MARGIN:
+        # the arc followed continuously from the pre-contact reaches its goal only at a joint limit, where the arm has no authority:
+        # the object lags the pad, the loop keeps waiting for it and its steps miss (axial 0926-050248 / 053900: right_arm_joint6 at its
+        # upper limit, the board at -0.42 of -0.69 rad) - the pose-by-pose check found each pose a configuration of its own
+        return False, (f"approach_untrackable: push replay - the closed-loop arc reaches within {worst[0]:.3f} rad of {worst[1]}'s limit "
+                       f"(< the joint-limit margin {sampler.ikc.JOINT_LIMIT_MARGIN:.3f}; swept {swept:+.3f} of {q_to:+.3f} rad)"), rep
     # 3. the contact retreat's escape leg from the arc's end (execute_retreat)
     here = fk(q)
     n = E.escape_direction(None, here, supports)
