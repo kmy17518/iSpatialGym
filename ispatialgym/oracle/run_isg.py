@@ -368,7 +368,7 @@ class InstanceLoader:
             obj = self.physical[g["object"]]
             attached = self.robot._ag_obj_in_hand.get(g["arm"]) is obj
             if not attached:
-                self._establish(g["arm"], obj)
+                self._establish(g["arm"], obj, g.get("ag_anchor_in_eef"))
                 attached = self.robot._ag_obj_in_hand.get(g["arm"]) is obj
             g["attached_after_reset"] = attached
             out["grasps"].append({"arm": g["arm"], "object": g["object"], "attached": attached})
@@ -538,7 +538,9 @@ class InstanceLoader:
 
     # -- grasps -----------------------------------------------------------------------------------------------------
 
-    def _establish(self, arm: str, obj) -> None:
+    def _establish(self, arm: str, obj, anchor_in_eef=None) -> None:
+        """The assisted-grasp joint of ``obj`` in ``arm``'s hand, anchored at ``anchor_in_eef`` (the recorded joint anchor in
+        the eef frame; the grasp record's ``ag_anchor_in_eef``) or at the eef origin without one."""
         robot = self.robot
         link = obj.root_link_name
         joint_type = robot._get_assisted_grasp_joint_type(obj, link)
@@ -548,7 +550,8 @@ class InstanceLoader:
         if held is not None and held is not obj:
             robot.release_grasp_immediately(arm)
         if robot._ag_obj_in_hand.get(arm) is not obj:
-            contact = robot.eef_links[arm].get_position_orientation()[0]
+            eef = tuple(x.float() for x in robot.eef_links[arm].get_position_orientation())
+            contact = eef[0] if anchor_in_eef is None else C.compose(eef, (th.tensor(anchor_in_eef, dtype=th.float32), C.IDENTITY_QUAT))[0]
             robot._establish_grasp(obj, link, arm, contact, joint_type)
 
     def _restore_grasps(self, records: List[dict]) -> List[dict]:
@@ -567,7 +570,8 @@ class InstanceLoader:
                 raise LoadError("failed_grasp", f"grasp record names {inst!r}, which is not a bound physical instance")
             eef = tuple(x.float() for x in robot.eef_links[arm].get_position_orientation())
             ref = g.get("object_pose_in_eef_frame")
-            rec = {"arm": arm, "object": inst, "scene_object": obj.name, "grasp_key": g.get("grasp_key"), "grasp_name": g.get("grasp_name"), "finger_q": g.get("finger_q")}
+            rec = {"arm": arm, "object": inst, "scene_object": obj.name, "grasp_key": g.get("grasp_key"), "grasp_name": g.get("grasp_name"), "finger_q": g.get("finger_q"),
+                   "ag_anchor_in_eef": g.get("ag_anchor_in_eef")}
             if ref:
                 want = C.compose(eef, (th.tensor(ref["position"], dtype=th.float32), th.tensor(ref["orientation"], dtype=th.float32)))
                 have = tuple(x.float() for x in obj.get_position_orientation())
@@ -581,7 +585,7 @@ class InstanceLoader:
                 q = robot.get_joint_positions()
                 q[robot.gripper_control_idx[arm]] = th.tensor(g["finger_q"], dtype=th.float32)
                 robot.set_joint_positions(q)
-            self._establish(arm, obj)
+            self._establish(arm, obj, g.get("ag_anchor_in_eef"))
             rel = C.relative(tuple(x.float() for x in obj.get_position_orientation()), tuple(x.float() for x in robot.eef_links[arm].get_position_orientation()))
             if ref:
                 rec["object_in_eef_dev_mm"] = 1000.0 * float(th.linalg.norm(rel[0] - th.tensor(ref["position"])))

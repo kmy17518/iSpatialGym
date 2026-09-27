@@ -1119,10 +1119,22 @@ class ObjectScalingV2(HeldObjectV2):
         hold = draft.summary["hold"]  # the same dict as the sidecar's init stance and goal blocks
         hold["start_depth_m"] = d0
         hold["depth_m"] = round(float(th.dot(G.t(C.pad_center(eef)) - G.t(cam[0]), axis)), 6)
+        # the grasp as the loader restores it: fingers, in-hand pose and the assisted-grasp joint's anchor (the finger
+        # contact point OmniGibson chose, in the eef frame) from the settled state
+        rel = C.relative(tuple(x.float() for x in self.obj("target").get_position_orientation()), eef)
+        finger_q = self.robot.get_joint_positions()[gidx].tolist()
+        gr = draft.extras["grasps"][0]
+        gr["object_pose_in_eef_frame"] = {"position": rel[0].tolist(), "orientation": rel[1].tolist()}
+        gr["finger_q"] = finger_q
+        params = (getattr(self.robot, "_ag_obj_constraint_params", None) or {}).get(ARM) or {}
+        if params.get("parent_frame_pos") is not None:
+            gr["ag_anchor_in_eef"] = (th.as_tensor(params["parent_frame_pos"], dtype=th.float32) * th.as_tensor(self.robot.scale, dtype=th.float32)).tolist()
         rec = self.sidecar.grasp_of(self.target_name)
         if rec is not None:
             rec.grasp = eef
             rec.pre_grasp = IK.pre_pose(eef)
+            rec.finger_q = finger_q
+            rec.eef_in_object = C.invert(rel)
         self.sidecar.language["goal_numbers"].update(self.goal_numbers(info))
 
     def tro_meta_block(self, draft: Draft, instance_id: str, seed: int) -> Dict[str, Any]:
