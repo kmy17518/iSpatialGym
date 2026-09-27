@@ -2029,7 +2029,9 @@ def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[A
     base sprang forward when the pad left) and squeezes the target against the brace (+0.1 rad relaxation)."""
     sign = 1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)
     margin = _push_stop_margin(state, obj, geom, cfg, ctx)
-    if speed is None:
+    if speed is None and ctx.get("push_articulation") is None:
+        # ``push_speed_arc`` answers a viscous hinge (the painting's); a link on its joint is held by the loader's joint brake, a
+        # Coulomb torque (constraints.joint_brake_spec) that does not grow with the pad's speed - its legs keep the arm's Cartesian speed
         speed = cfg.push_speed_arc if geom.kind == "arc" else cfg.push_speed_line
     gen = motions.arm_along(arm, waypoints, loaded=True, partial=partial, speed=speed)
     k = 0

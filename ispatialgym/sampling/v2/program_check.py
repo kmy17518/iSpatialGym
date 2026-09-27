@@ -600,6 +600,33 @@ def _sweep_travel_record(sidecar: SidecarDraft, sampler, action, override: Dict[
     return True, "", q_arms
 
 
+def _arrival_holds_next_contact(sidecar: SidecarDraft, sampler, actions: Sequence[Any], group: Sequence[int]) -> Optional[Tuple[str, str]]:
+    """``(arm, action name)`` when the travel ``group`` arrives at a stance whose recorded configuration already puts ``arm`` at the
+    pre-contact of the push / brace right after the travel (FK of the stance's arms at the action's ``pre``), else None - the stance
+    records the arm at its next contact and the transition was swept that way (the push-close re-stance, ``articulation_small``)."""
+    follow: List[Any] = []
+    for act in actions[group[-1] + 1:] if group else []:
+        if getattr(act, "name", "") not in ("push", "brace"):
+            break
+        follow.append(act)
+    if not follow:
+        return None
+    rec = _draft_record(sidecar, actions[group[-1]])
+    to_st = sidecar.stances.get(str(rec.to)) if rec is not None else None
+    if to_st is None:
+        return None
+    q_to = sampler.ikc.q_locked(to_st)
+    for act in follow:
+        c = getattr(act, "contact", None)
+        pre = getattr(c, "pre", None)
+        if pre is None or getattr(c, "arm", None) is None:
+            continue
+        pose = (th.tensor([float(v) for v in pre.position], dtype=th.float32), th.tensor([float(v) for v in pre.orientation], dtype=th.float32))
+        if sampler.ikc.reaches(q_to, pose, str(c.arm)):
+            return str(c.arm), str(act.name)
+    return None
+
+
 def choose_departure_arms(sidecar: SidecarDraft, sampler, actions: Sequence[Any], group: Sequence[int], tracker: "_Tracker") -> Optional[Dict[str, Any]]:
     """Owner 2026-09-24 ("a teleoperator lifts the arm only as much as needed, then drives"): the arms an empty-handed travel
     (the consecutive ``navigate`` / ``transition`` actions ``group``) is driven with. Candidates, in order: the acting arm(s)
@@ -614,6 +641,12 @@ def choose_departure_arms(sidecar: SidecarDraft, sampler, actions: Sequence[Any]
     ends = {a: q for a, q in tracker.arm_end_q.items() if a in ("left", "right")}
     if not ends or tracker.arm_q:  # nothing left where it is / a braced arm: the canonical postures
         return None
+    held = _arrival_holds_next_contact(sidecar, sampler, actions, group)
+    if held is not None:
+        # the arriving stance's recorded arms are the next contact's pre-pose, not a posture: the arm goes straight there
+        log.info("program check: travel at indices %s keeps the arriving stance's recorded arms (the %s arm there is at the pre-contact of the %s that follows)",
+                 list(group), held[0], held[1])
+        return {"arms": sorted(ends), "choice": f"arriving stance's arms ({held[0]} at the {held[1]} pre-contact)", "legs": [int(j) for j in group], "tried": []}
     candidates: List[Tuple[str, Dict[str, th.Tensor]]] = []
     base = {a: q[kit.robot.arm_control_idx[a]].clone().float() for a, q in ends.items()}
     candidates.append(("where the arm is", base))

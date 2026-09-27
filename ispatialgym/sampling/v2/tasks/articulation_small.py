@@ -1387,9 +1387,11 @@ class ArticulationSmall(SamplerV2):
         is recorded as a push (``contacts.push``, ``push2``, ...), the brake holds the link there, the robot re-stances
         (a second stance around the current one, the transition recorded with the link at that value) and the next segment
         continues from there - up to ``close_push_max_segments`` - until q_goal = the closed limit."""
+        from ispatialgym.sampling.v2 import program_check as PC
         from ispatialgym.sampling.v2.stances import ContactRecord
 
         tname, arm = self.tname, self.handle_arm
+        idx_arm = self.kit.robot.arm_control_idx[arm]
         q0, qg = float(self.q_init), float(self.q_goal)
         fractions = [float(x) for x in self.g("waypoint_fractions")]
         # every other joint at its closed value for the checks (the instance starts that way, ``_finish_draft``): the other flap of a
@@ -1416,6 +1418,7 @@ class ArticulationSmall(SamplerV2):
                 self.q, self.ok = q, True
 
         over_ok: Dict[int, float] = {}  # id(stance) -> the overshoot beyond q_goal its arm reaches (the final segment's arc end)
+        ret_q: Dict[int, th.Tensor] = {}  # id(stance) -> the retreat configuration at its coverage end (where that segment's Retreat leaves the arm)
 
         def coverage(st: Stance, q_from: float, seed):
             """(q_to, q_seed_at_q_to) of the farthest reachable arc pose from ``st`` (None when none). The arc is TRACKED from the
@@ -1441,6 +1444,7 @@ class ArticulationSmall(SamplerV2):
                 if m_ret < float(getattr(self.ikc, "JOINT_LIMIT_MARGIN", 0.0)) + 0.01:
                     break
                 best, last_q = q, rr.q
+                ret_q[id(st)] = r_ret.q
             if best is not None and abs(best - qg) < 1e-6:
                 sense = 1.0 if qg >= q_from else -1.0
                 over_ok[id(st)] = 0.0
@@ -1452,14 +1456,36 @@ class ArticulationSmall(SamplerV2):
                         break
             return best, last_q
 
-        def first_contact(st: Stance, q_from: float):
-            """The [pre, contact] pair at q_from from ``st`` (exact IK), plus the pre pose's own configuration (the stance's recorded arms)."""
+        def first_contact(st: Stance, q_from: float, q_arm=None):
+            """The [pre, contact] pair at q_from from ``st`` (exact IK), plus the pre pose's own configuration (the stance's recorded arms).
+            ``q_arm`` (28-D, where the previous segment's retreat leaves the arm - the travel carries it): the pair's seed; the IK keeps
+            the solution nearest its seed, so the next pre-contact lies in the branch the arm is already in."""
             wp = wp_at(q_from)
-            r = self.ikc.exact([wp.pre_grasp, wp.eef], st, arm, [support, target], cache=False, fingers=C.FINGER_CLOSED)
+            seed = None
+            if q_arm is not None:
+                seed = self.ikc.q_locked(st, fingers=C.FINGER_CLOSED).clone()
+                seed[idx_arm] = th.as_tensor(q_arm, dtype=th.float32)[idx_arm]
+            r = self.ikc.exact([wp.pre_grasp, wp.eef], st, arm, [support, target], q_seed=seed, cache=False, fingers=C.FINGER_CLOSED)
             if not r.ok:
                 return None
             r_pre = self.ikc.exact([wp.pre_grasp], st, arm, [support, target], q_seed=r.q, cache=False, fingers=C.FINGER_CLOSED)
             return r, (r_pre.q if r_pre.ok else None)
+
+        def segment_targets(st: Stance, q_from: float, q_to: float):
+            """The segment's key poses as ``Push.targets`` gives them to the program check: the pre-contact, then the arc (the contact at
+            q_from, mid, end - past the goal by the overshoot ``st`` reaches when the segment ends there), as the segment loop records them."""
+            wpf = C.handle_waypoints(self.handle, self.jinfo, [q_from], pose)[0]
+            sense = 1.0 if qg >= q_from else -1.0
+            q_arc = q_to + sense * over_ok.get(id(st), 0.0) if abs(q_to - qg) < 1e-6 else q_to
+            mid_pose, goal_pose = C.orbit_waypoints(wpf.eef, hinge_w, C.quat_from_axis_angle(axis_w, q_arc - q_from), n=2, frame="world")
+            return [("pre", [wpf.pre_grasp]), ("waypoints", [wpf.eef, mid_pose, goal_pose])]
+
+        def fingertip_out(st: Stance, q_from: float, q_to: float):
+            """The program check's fingertip test (``program_check.fingertips_in_frame``: QA's 5 % margin + the execution slack) on the
+            segment's key poses from ``st``: None when every pose passes, else the first one outside - the check rejects the attempt for it."""
+            if os.environ.get("ISG_FINGERTIP_FRAME_CHECK", "on").lower() in ("off", "0", "false"):
+                return None
+            return PC.fingertips_in_frame(self, st, "push", segment_targets(st, q_from, q_to))
 
         brace_on = bool(self.gen("close_push_brace", False))
         brace_arm = "left" if arm == "right" else "right"
@@ -1568,6 +1594,11 @@ class ArticulationSmall(SamplerV2):
             q_to, _ = coverage(st, q0, fc[0].q)
             if q_to is None:
                 continue
+            out = fingertip_out(st, q0, q_to)
+            if out is not None:
+                log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but the fingertip leaves the frame at "
+                         "push.%s[%d] (u %.0f, v %.0f): skipped", self.gp.alias, dlat, dso, trunk[0], trunk[1], q0, q_to, out["key"], out["index"], out["u"], out["v"])
+                continue
             n_eval += 1
             if fc[1] is not None:
                 st.q = fc[1].clone()  # the stance's recorded arms = the fist at its pre-contact: the transition brings the arm straight there
@@ -1602,8 +1633,9 @@ class ArticulationSmall(SamplerV2):
         braces: List[Any] = []
         segments: List[Dict[str, Any]] = []
         reach: Dict[str, bool] = {"0.0": True}
-        q_from, seed = q0, r.q
+        q_from, seed, seed_pre = q0, r.q, q_pre
         max_seg = int(self.gen("close_push_max_segments", 3))
+        branch_jump = float(self.gen("close_push_branch_jump_rad", 1.5))
         q_to_next = q_to1
         for seg_i in range(max_seg):
             self._check_deadline()
@@ -1635,6 +1667,11 @@ class ArticulationSmall(SamplerV2):
                     braces.append(b)
                     seg["brace"] = b.kind
             segments.append(seg)
+            # the program check seeds an unbraced push's witnesses from the solutions remembered per world pose; the stance searches solved
+            # this tip's pre-contact / contact from every candidate stance, so the chosen stance's own configurations are put back
+            for p_, q_ in ((pre, seed_pre), (contact, seed)):
+                if q_ is not None:
+                    self.ikc.solutions[(arm, self.ikc._pose_key(p_))] = q_.clone()
             log.info("%s: push-close segment %d from %s: q %.3f -> %.3f (of %.3f) at r %.3f m%s", self.gp.alias, seg_i + 1, stance.name, q_from, q_to, qg, r_w,
                      f", braced by the {brace_arm} hand" if seg.get("brace") else "")
             q_from = q_to
@@ -1645,6 +1682,7 @@ class ArticulationSmall(SamplerV2):
             # ---- the next stance: around the current one, with the link held at q_from (brake): the one covering the most of the rest
             # (``close_push_stance_eval`` candidates WITH coverage are compared; the search runs on until it has them or the combos end)
             best_n, n_eval, n_fc = None, 0, 0
+            q_carry = ret_q.get(id(stance))  # where this segment's Retreat leaves the arm: the travel to the next stance carries it
             for _, dlat, dso, trunk, st in self._v2_stance_combos(stance, pose):
                 if n_eval >= int(self.gen("close_push_stance_eval", 10)):
                     break
@@ -1655,7 +1693,7 @@ class ArticulationSmall(SamplerV2):
                 wpn = wp_at(q_from)
                 if not TT.in_frame(self, cam, pts, float(self.g("view_margin_m"))) or not self.ikc.eef_in_frame(wpn.eef, cam):
                     continue
-                fc = first_contact(st, q_from)
+                fc = first_contact(st, q_from, q_arm=q_carry)
                 if fc is None:
                     n_fc += 1
                     continue
@@ -1663,6 +1701,11 @@ class ArticulationSmall(SamplerV2):
                 if q_to_c is None:
                     log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f): the tip at q %.2f is reachable but no arc pose beyond it (with its retreat)",
                              self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from)
+                    continue
+                out = fingertip_out(st, q_from, q_to_c)
+                if out is not None:
+                    log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but the fingertip leaves the frame at "
+                             "push.%s[%d] (u %.0f, v %.0f): skipped", self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, out["key"], out["index"], out["u"], out["v"])
                     continue
                 n_eval += 1
                 if fc[1] is not None:
@@ -1673,16 +1716,22 @@ class ArticulationSmall(SamplerV2):
                         log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but no transition from %s",
                                  self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, stance.name)
                         continue
-                log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f", self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from, q_to_c)
+                # the pre-contact's joint distance from the carried arm: an elbow flip in between is an out-and-back swing of the hand
+                jump = float(th.max(th.abs(fc[1][idx_arm] - q_carry[idx_arm]))) if (fc[1] is not None and q_carry is not None) else 0.0
+                direct = 1.0 if jump <= branch_jump else 0.0
+                log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f, pre-contact %.2f rad from the carried arm",
+                         self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, jump)
                 cov = abs(q_to_c - q_from)
-                score = (1.0, cov)  # the re-stances: coverage first, unbraced (owner 23:20)
+                # at equal coverage the stance keeping the departing trunk: the transition then moves the base only
+                same_trunk = 1.0 if (abs(float(st.translate) - float(stance.translate)) < 1e-6 and abs(float(st.tilt) - float(stance.tilt)) < 1e-6) else 0.0
+                score = (direct, cov, same_trunk)  # the re-stances: the next pre-contact in the carried arm's branch, then coverage; unbraced (owner 23:20)
                 if best_n is None or score > best_n[0]:
                     best_n = (score, st, fc, q_to_c, (dlat, dso, trunk))
-                if abs(q_to_c - qg) < 1e-3:
+                if abs(q_to_c - qg) < 1e-3 and direct and same_trunk:
                     break
             if best_n is None:
                 raise Reject("push_unreachable", f"push-close: no stance continues the push from q {q_from:.2f} (segment {seg_i + 2}; {n_fc} candidates without the tip contact, {n_eval} with coverage but no transition)")
-            _, new_st, (rr, _q_pre), q_to_next, shifts = best_n
+            _, new_st, (rr, q_pre_n), q_to_next, shifts = best_n
             new_st.name = f"manipulation{len(stances) + 1}"
             new_st.extras.update({"second_stance": True, "lateral_shift": float(shifts[0]), "stand_off_shift": float(shifts[1]), "trunk_from": [float(stance.translate), float(stance.tilt)],
                                   "close_push_segment": seg_i + 2,
@@ -1691,7 +1740,7 @@ class ArticulationSmall(SamplerV2):
             wp_at(q_from)
             self.record_transition(stance, new_st)  # the link at q_from, held by the brake, hands free; the arm travels to the next pre-contact (new_st.q)
             stances.append(new_st)
-            stance, seed = new_st, rr.q
+            stance, seed, seed_pre = new_st, rr.q, q_pre_n
         # ---- gates + records (each stance's recorded arms hold the fist at ITS segment's pre-contact: checked with the link where that
         # segment starts, not at q_init - the flap at q_init would sweep through a later pre-contact)
         self._set_joint(target, q0)

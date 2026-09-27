@@ -1342,6 +1342,47 @@ def test_choose_departure_arms_records_the_first_free_candidate_on_every_leg(mon
     assert PC.choose_departure_arms(sd2, sampler, [a_nav2], [0], tracker3) is None
 
 
+def test_choose_departure_arms_keeps_an_arriving_stance_that_holds_the_next_pre_contact(monkeypatch):
+    """A push-close re-stance records the fist at its next pre-contact (``stance.q``): the travel arriving there keeps the stance's
+    recorded arms (no departure candidate, the records untouched), so the arm goes straight to the next contact; arriving arms that
+    do not reach the next push's pre-contact (a posture) leave the departure choice as it was."""
+    sd = SidecarDraft("alias", "configuration_matching")
+    sd.add_stance(Stance("manipulation", (0.0, 0.0, 0.0), 0.25, -0.3, 0.45))
+    st2 = sd.add_stance(Stance("manipulation2", (0.0, 0.1, 0.0), 0.25, -0.3, 0.45))
+    tr = sd.add_transition(Transition("manipulation", "manipulation2", 0.45))
+    kit = _ToyKit()
+    st2.q = _q_at(0.62)
+    st2.q[8], st2.q[9] = -0.17, 1.34  # the toy FK: the fist at (0.62, -0.17, 1.34), the next push's pre-contact
+
+    class Side:
+        def __init__(self, **kw):
+            self.__dict__.update(kw)
+
+    class IKC:
+        def q_locked(self, st, **kw):
+            return st.q.clone()
+
+        def reaches(self, q, pose, arm):
+            return float(th.linalg.norm(q[kit.robot.arm_control_idx[arm]][:3] - pose[0])) <= 0.005
+
+        def track_segment(self, q, p_from, p_to, arm, **kw):
+            return q.clone(), "ok"
+
+    pre = Side(position=[0.62, -0.17, 1.34], orientation=[0.0, 0.0, 0.0, 1.0])
+    a_tr = Side(name="transition", transition=Side(frm="manipulation", to="manipulation2", departure=False, extra={}), carried=None)
+    actions = [Side(name="retreat", arms=("right",), object="blender.n.01_1"), a_tr, Side(name="push", arms=("right",), contact=Side(arm="right", pre=pre))]
+    sampler = Side(kit=kit, ikc=IKC(), objects={})
+    tracker = PC._Tracker(sd)
+    tracker.arm_end_q["right"] = _q_at(0.3)
+    monkeypatch.setattr(PC, "_sweep_travel_record", lambda sidecar, sampler_, action, override: (True, "", dict(override)))
+    out = PC.choose_departure_arms(sd, sampler, actions, [1], tracker)
+    assert out["choice"].startswith("arriving stance's arms") and out["legs"] == [1]
+    assert "arms_q" not in tr.extras and "arms_q" not in a_tr.transition.extra and not getattr(a_tr, "_keeps_arms", False)
+    st2.q = _q_at(0.0)
+    out = PC.choose_departure_arms(sd, sampler, actions, [1], tracker)
+    assert out["choice"] == "where the arm is" and tr.extras["arms_q"]["right"] is not None and a_tr._keeps_arms
+
+
 def test_record_arms_q_reads_the_oracle_side_record():
     class Side:
         def __init__(self, **kw):

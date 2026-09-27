@@ -3175,6 +3175,23 @@ def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):
     assert result2["success"] and result2["epilogue_relax"] == {} and result2["n_settle_steps"] == result2["settle_window"]
 
 
+def test_a_push_on_a_braked_link_streams_at_the_cartesian_speed():
+    """``push_speed_arc`` paces an arc push of a free hinged object; a link on its joint (``contacts.push.articulation``, held by the
+    loader's Coulomb joint brake) streams at the arm's Cartesian speed (``speed=None``)."""
+    seen = []
+
+    class _Motions:
+        def arm_along(self, arm, waypoints, loaded=False, partial=False, speed=None, **kw):
+            seen.append(speed)
+            return iter(())
+
+    cfg = EX.ExecuteConfig()
+    geom = SimpleNamespace(kind="arc", angle=0.5)
+    for art in (None, {"joint": "j_lid", "q_from": 0.8, "q_to": 0.2, "tolerance": 0.15}):
+        list(EX._push_leg(_Motions(), SimpleNamespace(), "right", "blender.n.01_1", [], geom, None, cfg, {"push_articulation": art}, "push"))
+    assert seen == [cfg.push_speed_arc, None]
+
+
 class _FkBackend(FakeBackend):
     """The fake backend with the FK ``arm_arc_closed_loop`` needs (the toy kinematics of the fake robot)."""
 
