@@ -365,7 +365,12 @@ def test_close_push_runs_the_preferred_fist_turn_and_falls_back_to_the_other(mon
                            kit=SimpleNamespace(sync_world=lambda: None), sidecar=SidecarDraft("a", "f"), _set_joint=lambda t, q: None, _set_named_joint=lambda t, n, q: None)
     stub._pinch_variants = lambda h: AS.ArticulationSmall._pinch_variants(stub, h)
 
+    ikc.solutions[("right", "earlier pose")] = q_own.clone()  # the IK memory before the close push
+    memory0 = dict(ikc.solutions)
+
     def flow(rng, d, init_, manip_, k, target, support, pose, cam_init):
+        assert set(ikc.solutions) == set(memory0), "every flow starts from the IK memory before the ranking"
+        ikc.solutions[("right", f"flow {len(runs)}")] = q_own.clone()
         runs.append((stub.handle["pinch_axis"], manip_.name, dict(manip_.extras), len(stub.sidecar.contacts)))
         manip_.name, manip_.extras["second_stance"] = "manipulation2", True
         stub.sidecar.add_contact(ContactRecord("push", "right", None, None, None, None, None, 0.1, object="t"))

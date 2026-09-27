@@ -1427,9 +1427,12 @@ class ArticulationSmall(SamplerV2):
         contact at q_init from the Phase-2 stance (joint-limit safe, then easier to reach, the handle's own turn within the
         tolerance; a turn that does not solve there stays in unscored - the flow searches other stances; a turn whose wrist camera
         comes within 5 mm of the world at the contact is out), the flow runs with the preferred turn, with the other one when it
-        rejects."""
+        rejects. Every flow starts from the IK memory as it was before the ranking (``IKChecker.solutions`` seeds the flow's own
+        solves: carton close 0927-130109 - the remembered twin solutions changed the arc coverage from the same stance, the
+        handle's own turn gave another instance than v2.0)."""
         base = getattr(self, "_close_push_handle0", None) or self.handle
         arm, q0 = self.handle_arm, float(self.q_init)
+        memory0 = dict(self.ikc.solutions)
         for n in target.joints:  # as the flow checks: every other joint closed, the target's at q_init
             if n != self.joint_name:
                 self._set_named_joint(target, n, float(self.all_jinfo.get(n, {}).get("closed_q", 0.0)) if n in getattr(self, "all_jinfo", {}) else float(target.joints[n].lower_limit))
@@ -1457,6 +1460,8 @@ class ArticulationSmall(SamplerV2):
                 manip.extras.update(state0[2])
             runs["n"] += 1
             self.handle = sc.proposal.payload
+            self.ikc.solutions.clear()
+            self.ikc.solutions.update(memory0)
             try:
                 runs["draft"] = self._close_push_flow(rng, d if runs["n"] == 1 else Draft(), init, manip, k, target, support, pose, cam_init)
             except Reject as e:
