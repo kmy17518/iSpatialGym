@@ -350,7 +350,10 @@ the oracle's partial acceptance (4 cm) is accepted as that partial retreat with 
 descent, `pre_grasp` → approach) starts at that witness, and the witness follows the chain's start when the approach
 had to be re-tracked backward from the end's branch; a single pose that ends a chain (`place`, `grasp`, a brace
 `contact`) is the chain's tracked end. The recorded witnesses are therefore exactly the configurations the oracle's
-`arm_to` / `arm_along` chain passes through.
+`arm_to` / `arm_along` chain passes through. The first in-hand chain of a held-object task (§6.3) leaves from the
+recorded start configuration as well — the object has been in the hand since init and the arm has not moved — instead
+of a re-solve of the hold held to a chosen witness's joint-limit margin (2026-09-26: the mental-rotation hold's wrist
+joint 6 sits 3 mrad from its limit; the re-solve found another branch or failed, at random, in `validate_instances`).
 
 **Travel with the arm as left** (owner 2026-09-24: "a teleoperator lifts the arm only as much as needed, then
 drives"). An empty-handed travel after an arm action — the consecutive navigate / transition actions between two arm

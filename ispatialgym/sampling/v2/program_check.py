@@ -604,7 +604,7 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
             # owner 2026-09-24: where the previous arm action left THIS arm (every family) - the leg that starts there is tracked from it
             q_end_prev = tracker.arm_end_q.get((getattr(action, "arms", None) or ["right"])[0])
             n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj, q_seed_prev=q_prev,
-                                                q_end_prev=q_end_prev)
+                                                q_end_prev=q_end_prev, held_since_init=tracker.carried is not None and tracker.carried_arm is None)
             end_q = witnesses.pop("__arm_end_q__", None)
             partial_leg = witnesses.pop("__partial__", None)
             tracker.after(action, witnesses, sampler)
@@ -1291,9 +1291,26 @@ def _skipped_target_keys(name: str, action, targets: Any) -> set:
     return skip
 
 
+def _held_start_q(sampler, stance, grasp, carried: Optional[str], arm: str, fingers: Optional[float], held_since_init: bool, stance_obj,
+                  q_seed_prev, q_end_prev) -> Optional[th.Tensor]:
+    """The configuration the acting arm starts the program in when it already holds ``carried`` (a held-object init,
+    §6.3): the object has been in the hand since the init stance (no grasp action before this one), the recorded stance
+    names it as carried, the grasp record puts it in this arm and the arm has not moved yet. The in-hand chain leaves
+    from it, as the sampler's draw check (``waypoints_ok(q_seed=<hold>)``) and the oracle do; a fresh solve of that first
+    pose must meet the joint-limit margin of a chosen witness, which the hold need not (mental_rotation-banana: the hold's
+    wrist joint 6 sits 3 mrad from its limit, so a validator process without the sampler's remembered solutions found a
+    branch with the margin or failed, at random). None otherwise."""
+    if not held_since_init or carried is None or grasp is None or getattr(grasp, "arm", None) != arm or stance_obj is not None:
+        return None
+    if q_seed_prev is not None or q_end_prev is not None or getattr(stance, "carried", None) != carried:
+        return None
+    return sampler.ikc.q_locked(stance, fingers=fingers).clone()
+
+
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
                          locked_arms: Optional[Dict[str, th.Tensor]] = None, stance_obj: Optional[Stance] = None,
-                         q_seed_prev: Optional[th.Tensor] = None, q_end_prev: Optional[th.Tensor] = None) -> Tuple[int, Dict[str, Any]]:
+                         q_seed_prev: Optional[th.Tensor] = None, q_end_prev: Optional[th.Tensor] = None,
+                         held_since_init: bool = False) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
     (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
     object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
@@ -1311,7 +1328,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
 
     ``q_seed_prev``: the configuration the acting arm's IK is *seeded* from (block design / IORS carry chaining).
     ``q_end_prev`` (owner 2026-09-24, every family): where the previous arm action left the acting arm — a chain whose first
-    pose is there (the retreat off a place, the lift off a grasp) is tracked from it instead of being re-solved."""
+    pose is there (the retreat off a place, the lift off a grasp) is tracked from it instead of being re-solved.
+    ``held_since_init``: ``carried`` has been in the hand since the init stance (no grasp action before this one) - with the
+    arm not moved yet, its chain leaves from the stance's recorded configuration (:func:`_held_start_q`)."""
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2 import navigation as NAV
     from ispatialgym.sampling.v2.navigation import attached
@@ -1373,6 +1392,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
         idx = sampler.kit.robot.arm_control_idx[arm]
         q_seed[idx] = th.as_tensor(q_seed_prev, dtype=th.float32)[idx]
+    else:
+        q_seed = _held_start_q(sampler, stance, g, carried, arm, fingers, held_since_init, stance_obj, q_seed_prev, q_end_prev)
     if name == "grasp" and getattr(action, "kind", None) == "cube" and getattr(sidecar, "blocks", None):
         # a block's grasp IK is seeded with the sampler's pick configuration (``blocks[].pick_q``): the branch its tracked legs passed in
         pq = _block_pick_q(sidecar, sampler, getattr(action, "object", None))

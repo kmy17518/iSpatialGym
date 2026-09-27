@@ -403,6 +403,34 @@ def test_program_check_target_extraction():
     assert set(found) == {"pre_grasp", "approach", "nested.place"} and len(found["approach"]) == 3
 
 
+def test_program_check_held_start_leaves_from_the_recorded_configuration():
+    """A held-object init (the object in the hand since the init stance, the arm holding it not moved yet): the in-hand
+    chain is seeded with the stance's recorded configuration, as the sampler's draw check does; every other case keeps
+    the fresh solve - among them an object carried to a place stance that records it (iors / attachment), whose arm-end
+    record a base motion cleared."""
+    from types import SimpleNamespace
+
+    q_hold = th.arange(28, dtype=th.float32)
+    sampler = SimpleNamespace(ikc=SimpleNamespace(q_locked=lambda stance, fingers=None: q_hold))
+    init, grasp, held = Stance("init", (0.0, 0.0, 0.0), 0.5, arms=["right"], carried="banana.n.02_1"), SimpleNamespace(arm="right"), "banana.n.02_1"
+    q = PC._held_start_q(sampler, init, grasp, held, "right", None, True, None, None, None)
+    assert q is not None and th.equal(q, q_hold) and q is not q_hold
+    moved = th.zeros(28)
+    place = Stance("place", (1.0, 0.0, 0.0), 0.5, arms=["right"], carried=held)
+    not_held = [
+        (place, grasp, held, "right", False, None, None, None),  # grasped during the program, carried to its place stance
+        (init, grasp, None, "right", True, None, None, None),  # nothing carried
+        (init, grasp, held, "left", True, None, None, None),  # the other arm acts
+        (init, None, held, "right", True, None, None, None),  # no grasp record
+        (Stance("manip", (0.0, 0.0, 0.0), 0.5), grasp, held, "right", True, None, None, None),  # the stance does not record it
+        (init, grasp, held, "right", True, SimpleNamespace(), None, None),  # the base moved (a follow's stance)
+        (init, grasp, held, "right", True, None, moved, None),  # seeded from a previous action's end
+        (init, grasp, held, "right", True, None, None, moved),  # the arm already moved
+    ]
+    for stance, g, carried, arm, since_init, stance_obj, prev, end in not_held:
+        assert PC._held_start_q(sampler, stance, g, carried, arm, None, since_init, stance_obj, prev, end) is None
+
+
 def test_program_check_tracker_handle_grasp_carries_nothing():
     """Large articulation (Rs_int drawer bamfsz_1): a kind="handle" grasp must not set ``carried`` - the cabinet stays in the
     world, only its handle link follows the hand; library / cube grasps carry their object until the place."""
