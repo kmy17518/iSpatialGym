@@ -449,6 +449,8 @@ NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial
 NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, carton lever): the lever fist slides out before it lifts
 #: first-demo v2.1 A3 (bar soap 0927-034001): a library pinch lifted off the support under it, a support place raised for the in-hand pose
 NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
+#: first-demo v2.1 A1 (cap 0927-040231): an attach place opened the fingers that would meet the partner before the part seats
+NOTE_KEYS = NOTE_KEYS + ("finger_clearance",)
 
 
 @dataclass

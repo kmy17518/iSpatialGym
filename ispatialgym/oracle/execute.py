@@ -279,6 +279,19 @@ class ExecuteConfig:
     #: partner's displacement since the program start when it exceeds this (0920-164504: the bottle knocked 4.7 cm during the grasp
     #: phase, the descent came down 4 cm beside the neck)
     partner_shift_min_m: float = 0.005
+    #: (owner 2026-09-27, first-demo v2.1 A1) an attach place whose fingers would meet the partner before the part seats (the cap's
+    #: 51 mm rim pinched on its axis, the lemonade bottle's collar 54 mm across: the fingertips landed on the collar 5 mm before the
+    #: cap seated, tipped the bottle 1.2 deg and the attach locked the offset, 0927-040231) opens the fingers by up to this per finger
+    #: before the descent - the assisted grasp keeps holding the part (it releases on the full open command only) ...
+    attach_finger_clear_max_m: float = 0.004
+    #: ... in steps of this: the least opening whose fingers stay ``attach_finger_clear_margin_m`` from the partner down to the seat,
+    #: else the one that meets it latest
+    attach_finger_clear_step_m: float = 0.0005
+    attach_finger_clear_margin_m: float = 0.001
+    #: the finger surface is swept along the descent from its lowest this-many metres (the part of the finger that can reach the
+    #: partner first), sampled every ``attach_finger_clear_spacing_m``
+    attach_finger_clear_band_m: float = 0.010
+    attach_finger_clear_spacing_m: float = 0.003
     #: (owner 2026-09-27, first-demo v2.1 A3, bar soap 0927-034001: "the robot wobbles at the grasp and the release") a library pinch
     #: whose finger envelope (both finger meshes, closed..open) at the grasp pose reaches below the grasped object's lowest point + this
     #: is lifted by the deficit along world z, the pads' fingertip-side end kept ``grasp_support_pad_margin_m`` below the object's top
@@ -1353,6 +1366,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     if action.kind == "attach" and action.on:
         # the part is in the air above the partner: re-aim the descent for its live in-hand pose (and the carry's residual)
         targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
+        yield from clear_fingers_over_partner(action, motions, state, targets, ctx, cfg)
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
     # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
@@ -1513,6 +1527,131 @@ def _reaim_for_inhand_pose(action: Place, motions: Motions, state, targets: Dict
         log.warning("place(%s): the move to the re-aimed pre-place did not complete (%s); descending from where the hand is", action.object, e.message)
     rec["applied"] = True
     return out
+
+
+_FINGER_SURFACE: Dict[Tuple[str, float], Optional[List[Tuple[Any, Any]]]] = {}
+
+
+def finger_surface_points(arm: str, spacing: float) -> Optional[List[Tuple[Any, Any]]]:
+    """Points on the two finger meshes' convex hulls, at most ``spacing`` apart, in the eef frame at finger joint 0, with each finger's
+    slide axis (``r1pro_model.finger_hulls_eef`` gives the hull vertices only: a rim edge under a finger's flat underside passes
+    between rays cast from its corners). ``[(points (N, 3) ndarray, axis (3,) ndarray), ...]``; None without the assets."""
+    key = (arm, round(float(spacing), 5))
+    if key in _FINGER_SURFACE:
+        return _FINGER_SURFACE[key]
+    hulls = M.finger_hulls_eef(arm)
+    out = None
+    if hulls:
+        import numpy as np
+        from scipy.spatial import ConvexHull
+
+        out = []
+        for pts, axis in hulls:
+            samples = [pts]
+            for tri in ConvexHull(pts).simplices:
+                a, b, c = pts[tri]
+                n = max(1, int(math.ceil(max(np.linalg.norm(b - a), np.linalg.norm(c - a), np.linalg.norm(c - b)) / spacing)))
+                ij = np.array([(i, j) for i in range(n + 1) for j in range(n + 1 - i)], dtype=float) / n
+                samples.append(a + ij[:, :1] * (b - a) + ij[:, 1:] * (c - a))
+            out.append((np.unique(np.vstack(samples).round(5), axis=0), axis))
+    _FINGER_SURFACE[key] = out
+    return out
+
+
+def _raycast_all(starts, ends):
+    """Every hit along each ray (OmniGibson ``raytest_batch``, PhysX scene queries): a list per ray of hit dicts."""
+    from omnigibson.utils.sampling_utils import raytest_batch
+
+    return raytest_batch(starts, ends, only_closest=False)
+
+
+def _finger_meets_partner(arm: str, finger_q: Sequence[float], pre, place, partner, cfg: ExecuteConfig) -> Tuple[Optional[float], int, List[str]]:
+    """Where the fingers (joint values ``finger_q``) meet ``partner`` when the hand descends straight from ``pre`` to ``place`` (same
+    orientation): rays from the finger surface's lowest ``attach_finger_clear_band_m`` along the descent, down to
+    ``attach_finger_clear_margin_m`` past the seat, against the partner's collision geometry. ``(metres before the seat at the first
+    contact - negative within the margin past it, None when clear -, rays cast, partner bodies hit)``."""
+    import numpy as np
+
+    surf = finger_surface_points(arm, cfg.attach_finger_clear_spacing_m)
+    if not surf:
+        return None, 0, []
+    pts = np.vstack([p + float(q) * ax for (p, ax), q in zip(surf, finger_q)])
+    (p0, q0), (p1, _) = as_world_pose(pre), as_world_pose(place)
+    R = C.quat_to_mat(C.as_tensor(q0).float()).numpy()
+    rise = (C.as_tensor(p0) - C.as_tensor(p1)).float().numpy()
+    length = float(np.linalg.norm(rise))
+    if length < 1e-4:
+        return None, 0, []
+    down = -rise / length
+    seat = pts @ R.T + C.as_tensor(p1).float().numpy()
+    low = seat @ down
+    seat = seat[low >= float(low.max()) - cfg.attach_finger_clear_band_m]
+    starts, ends = seat + rise, seat + cfg.attach_finger_clear_margin_m * down
+    root = str(getattr(partner, "prim_path", "") or "")
+    worst, bodies = None, set()
+    for ray in _raycast_all(starts.tolist(), ends.tolist()):
+        for h in (ray if isinstance(ray, list) else [ray]):
+            body = str(h.get("rigidBody") or "")
+            if not h.get("hit") or not root or not body.startswith(root):
+                continue
+            before = length - float(h.get("distance", length))
+            worst = before if worst is None else max(worst, before)
+            bodies.add(body[len(root):] or body)
+    return worst, len(starts), sorted(bodies)
+
+
+def clear_fingers_over_partner(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
+    """Owner 2026-09-27 (first-demo v2.1 A1, cap 0927-040231 "the cap seems slightly off when attached"; the owner's stable attach
+    0920-235831): a part pinched by its rim can hold the fingers inside the outline of the partner's top it goes onto - the cap's 51 mm
+    rim pinched on its axis (the sampler's re-centred fingertip pinch), the lemonade bottle's collar 54 mm across - and the fingertips
+    land on the collar before the part seats: 5 mm short, the bottle tipped 1.2 deg, the attach locked that offset and the correction
+    pass (measured on the tipped bottle) did not help. At the pre-place, after the re-aim, the finger surface is swept along the descent
+    against the partner (``_finger_meets_partner``); when the fingers would meet it before the seat they open by the least
+    ``attach_finger_clear_step_m`` multiple (<= ``attach_finger_clear_max_m`` per finger) that keeps ``attach_finger_clear_margin_m``
+    down to the seat - else the one that meets it latest - and the assisted grasp keeps holding the part (OmniGibson releases it on the
+    full open command only), so the part seats before a finger touches the partner. ``ctx["finger_clearance"]`` records the facts."""
+    arm = action.arm
+    rec: Dict[str, Any] = {"applied": False}
+    ctx["finger_clearance"] = rec
+    if targets.get("place") is None or targets.get("pre_place") is None or not action.on:
+        rec["reason"] = "no place targets"
+        return
+    try:
+        partner = state.object(action.on)
+        q_now = [float(v) for v in motions.robot.get_joint_positions()[motions.robot.gripper_control_idx[arm]].tolist()]
+        before, n_rays, bodies = _finger_meets_partner(arm, q_now, targets["pre_place"], targets["place"], partner, cfg)
+    except Exception as e:  # noqa: BLE001 - no raycasts / finger meshes: the place runs as before
+        rec["reason"] = f"no finger sweep ({e!r})"[:160]
+        return
+    rec.update({"before_seat_m": None if before is None else round(before, 4), "rays": n_rays, "partner_bodies": bodies, "finger_q_m": [round(v, 4) for v in q_now]})
+    if before is None:
+        return
+    best = None  # (metres before the seat or None, opening) of the opening that meets the partner latest
+    k = 1
+    while k * cfg.attach_finger_clear_step_m <= cfg.attach_finger_clear_max_m + 1e-9:
+        dq = k * cfg.attach_finger_clear_step_m
+        after, _, _ = _finger_meets_partner(arm, [v + dq for v in q_now], targets["pre_place"], targets["place"], partner, cfg)
+        if after is None:
+            best = (None, dq)
+            break
+        if after < before and (best is None or after < best[0]):
+            best = (after, dq)
+        k += 1
+    if best is None:
+        rec["reason"] = f"no opening up to {cfg.attach_finger_clear_max_m * 1000:.1f} mm per finger meets the partner later"
+        log.warning("place(%s): the fingers meet %s %.1f mm before the seat and no bounded opening helps", action.object, action.on, before * 1000)
+        return
+    after, dq = best
+    lo, hi = motions._gripper_limits(arm)
+    opening = min(hi - 1e-4, sum(q_now) / len(q_now) + dq)  # below the full open command: the assisted grasp holds
+    motions.state.gripper_cmd[arm] = motions.gripper_command(arm, opening)
+    motions.state.stop_base()
+    for _ in range(int(motions.cfg.gripper_preshape_steps)):
+        yield motions._emit()
+    rec.update({"applied": True, "opened_m": round(dq, 4), "before_seat_after_m": None if after is None else round(after, 4), "opening_cmd_m": round(opening, 4),
+                "held": state.held_object(arm) is state.object(action.object)})
+    log.info("place(%s): the fingers would meet %s %.1f mm before the seat; opened %.1f mm per finger (%s)", action.object, action.on, before * 1000, dq * 1000,
+             "clear of it down to the seat" if after is None else f"{after * 1000:.1f} mm before the seat after")
 
 
 @dataclass
