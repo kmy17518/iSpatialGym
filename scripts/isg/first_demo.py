@@ -2,7 +2,7 @@
 """First-valid-demo loop (owner decisions 2026-09-16 06:50): fix -> sample one alias (1 template x 1 instance) ->
 ``run_isg --mode oracle --video`` -> read meta.json -> board + ledgers.
 
-    python scripts/isg/first_demo.py run --alias <alias> [--max-attempts 8] [--timeout 5400] [--note "..."]
+    python scripts/isg/first_demo.py run --alias <alias> [--max-attempts 8] [--timeout 5400] [--run-isg-args=--dev] [--note "..."]
     python scripts/isg/first_demo.py demo-only --tro <local tro path> [--note "..."]      # existing instance, re-run only
     python scripts/isg/first_demo.py board                                                # regenerate the board files
     python scripts/isg/first_demo.py fix --commit <sha> --subtasks A B ... --what "..."    # append to the fix log
@@ -182,11 +182,12 @@ def cmd_run(args):
     # --customs: an experiment's copy of the customs (repo-relative, under runlogs/smoke_inputs/ so remote_run syncs it); the
     # template keeps its own copy, so run_isg reads the same list
     customs_opt = f" --customs {os.path.relpath(os.path.abspath(args.customs), REPO)}" if getattr(args, "customs", None) else ""
+    extra = (" " + args.run_isg_args.strip()) if getattr(args, "run_isg_args", "") else ""
     cmd = (f"python -m ispatialgym.sampling.sample_isg --alias {args.alias}{scene}{customs_opt} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
            f"--seed {args.seed} --no-write-back --out $SMOKE_OUT/inst --log-level INFO; echo SAMPLE_EXIT $?; "
            f"tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json 2>/dev/null | head -1); "
            + ("if [ -n \"$tro\" ]; then echo TRO=$tro; fi" if getattr(args, "sample_only", False) else
-              f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540; echo DEMO_EXIT $?; fi"))
+              f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540{extra}; echo DEMO_EXIT $?; fi"))
     rc = run_local(cmd, out_dir, args.timeout) if args.local else run_remote(cmd, out_dir, args.timeout)
     samp = parse_sampling(os.path.join(out_dir, "inst"))
     demo = parse_meta(os.path.join(out_dir, "demo"))
@@ -396,6 +397,9 @@ def main():
     s.add_argument("--note", default="")
     s.add_argument("--customs", default=None, help="experiment copy of the customs for sample_isg (repo-relative, under runlogs/smoke_inputs/)")
     s.add_argument("--sample-only", action="store_true", help="sample the instance, no demo (owner 2026-09-26: compare a re-sampled sidecar with its record)")
+    s.add_argument("--run-isg-args", default="", help="extra run_isg arguments appended verbatim to the demo, as for demo-only (owner 2026-09-27: "
+                                                      "--run-isg-args=--dev also records the over-the-shoulder view, external_rgb.mp4; the '=' form is "
+                                                      "needed for a value that starts with '--')")
     s.set_defaults(fn=cmd_run)
     s = sub.add_parser("demo-only")
     s.add_argument("--tro", required=True)
