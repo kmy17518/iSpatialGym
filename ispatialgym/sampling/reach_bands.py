@@ -41,6 +41,28 @@ Modes::
 verifies the shoulder FK against the simulated robot and prints a band sanity summary; ``--trunks 0.5,0 0.95,-0.9``
 restricts the grid explicitly.
 
+Worker mode - many bands in one process (the scene load + cuRobo setup was 41 % of a one-band process)::
+
+    python -m ispatialgym.sampling.reach_bands --jobs runlogs/reach_bands_20260915/jobs.json --ids ID1 ID2 ... --out ROOT
+
+runs the manifest jobs (``scripts/reach_bands/make_jobs.py`` format; ``--ids`` default = all) grouped by world key (scene,
+loaded rooms, removed chairs) on one loaded world per key, writing ``ROOT/<id>/<band>.npz|.json`` + ``run.log`` and a
+``ROOT/done.txt`` line per job like the pod runner (``collect_bands.py`` reads the tree unchanged). Bands are isolated (the
+previous band's objects removed, the collision world re-synced, the cuRobo seed streams reset), so every band is
+byte-identical to its one-process run; a failing job prints ``REACH_BANDS_FAILED <id>`` and the others continue.
+
+Setup defaults since 2026-09-16 (single-band and worker mode alike; each verified byte-identical on three two-trunk
+bands): the world is camera-less (``SimWorld(cameras=False)``), the arms' motion planners are not built (bands use the
+kinematics entries and the batched IK solvers only) and the neighbouring rooms' objects that can never pass
+``SimWorld.obstacle_filter`` are not loaded (``_slim_drop_list``: same obstacle set and cuRobo meshes, 421 -> 108
+objects, scene load 117 s -> 54 s on house_single_floor); per trunk, the near meshes no robot sphere can reach are
+disabled during that trunk's IK passes (:class:`TrunkBound`). ``--cameras`` / ``--prebuild-planner`` / ``--full-load`` /
+``--no-trunk-bound`` restore the old setup; none changes a band. Same-algorithm opt-ins (marginal cells may differ,
+default off): ``--mesh-cache auto`` (2.5x faster IK), ``--ik-tail-sizes``. Approximate opt-in (default off):
+``--collision sdf-grid [--sdf-res 0.01]`` - the static obstacles become float16 signed-distance voxel layers (cuRobo
+``VoxelGrid``, trilinear lookup, sampled from the exact mesh SDF; :mod:`ispatialgym.oracle.sdf_grid`), ~25x cheaper per
+batched IK call; recorded as ``schedule.collision`` and in the file-name key, so such bands never shadow exact ones by name.
+
 Reading a band (the sampler)::
 
     from ispatialgym.sampling.reach_bands import ReachBands
@@ -607,15 +629,25 @@ class ObstacleScope:
         for o in world.scene.objects:
             if o is world.robot or o.name not in self.names_of:
                 continue
-            lo, hi = o.aabb
-            dx = max(float(lo[0]) - bx, 0.0, bx - float(hi[0]))
-            dy = max(float(lo[1]) - by, 0.0, by - float(hi[1]))
             mine = self.names_of[o.name]
-            if math.hypot(dx, dy) > radius or float(lo[2]) > world.floor_z + self.Z_ABOVE or (drop_ground and all(n in ground for n in mine)):
+            if self.is_far(o, (bx, by), world.floor_z, radius) or (drop_ground and all(n in ground for n in mine)):
                 self.far.extend(mine)
             else:
                 self.kept.append(o.name)
         self.n_near = sum(len(v) for v in self.names_of.values()) - len(self.far)
+        #: sdf-grid mode (``--collision sdf-grid``): the ground-like objects are a voxel layer, toggled like their meshes
+        self.grid_layers = dict(getattr(be, "_grid_layers", {}) or {})
+        self.drop_ground = drop_ground
+
+    @staticmethod
+    def is_far(obj, base_xy, floor_z: float, radius: float = RADIUS) -> bool:
+        """Whether ``obj`` (with ``.aabb``) is out of the robot's reach from ``base_xy``: its horizontal AABB distance exceeds
+        ``radius`` or its bottom is above ``floor_z + Z_ABOVE`` (ceilings, room lights)."""
+        bx, by = float(base_xy[0]), float(base_xy[1])
+        lo, hi = obj.aabb
+        dx = max(float(lo[0]) - bx, 0.0, bx - float(hi[0]))
+        dy = max(float(lo[1]) - by, 0.0, by - float(hi[1]))
+        return math.hypot(dx, dy) > radius or float(lo[2]) > floor_z + ObstacleScope.Z_ABOVE
 
     def _enable(self, names: Sequence[str], enabled: bool):
         be = self.kit.backend
@@ -623,14 +655,45 @@ class ObstacleScope:
             if n in be._world_mesh_names:
                 be._mesh_enable(n, enabled)
 
+    def _ground_layers_enable(self, enabled: bool):
+        """sdf-grid mode with ``drop_ground``: the ground-like layers follow the ground-like meshes (disabled with the scope)."""
+        if not (self.drop_ground and self.grid_layers):
+            return
+        for lname, info in self.grid_layers.items():
+            if info.get("ground_like"):
+                self.kit.backend.grid_layer_enable(lname, enabled)
+
     def __enter__(self):
         self._enable(self.far, False)
-        log.info("collision world for the band: %d meshes of %d objects kept within %.1f m of the base (%s), %d far meshes disabled", self.n_near, len(self.kept),
-                 self.radius, ", ".join(sorted(self.kept)), len(self.far))
+        self._ground_layers_enable(False)
+        log.info("collision world for the band: %d meshes of %d objects kept within %.1f m of the base (%s), %d far meshes disabled%s", self.n_near, len(self.kept),
+                 self.radius, ", ".join(sorted(self.kept)), len(self.far),
+                 "; sdf-grid layers: " + ", ".join(f"{k} ({len(v['objects'])} objects)" for k, v in self.grid_layers.items()) if self.grid_layers else "")
         return self
 
     def __exit__(self, *exc):
         self._enable(self.far, True)
+        self._ground_layers_enable(True)
+
+    def trunk_prune(self, q: th.Tensor, shoulder_world, arm: str, protect=()) -> List[str]:
+        """Disable, for one trunk configuration ``q``, the meshes of the kept scene objects that :class:`TrunkBound` proves
+        no robot sphere can touch (exact, see there); ``protect`` (the support ignored at the grasp pose) and every spawned
+        object are never pruned. Returns the disabled mesh names - the caller re-enables them with ``_enable(names, True)``
+        after the trunk."""
+        bounds = getattr(self, "_bounds", None)
+        if bounds is None:
+            bounds = self._bounds = {}
+        if arm not in bounds:
+            bounds[arm] = TrunkBound(self.kit, arm)
+        bound = bounds[arm]
+        protect_names = {getattr(o, "name", o) for o in protect} | set(self.world.spawned)
+        objs = [o for o in self.world.scene.objects if o.name in self.kept and o.name not in protect_names]
+        names = bound.prunable(q, shoulder_world, objs)
+        meshes = [m for n in names for m in self.names_of.get(n, [])]
+        self._enable(meshes, False)
+        bound.n_pruned.append(len(meshes))
+        log.info("trunk bound: %d of %d near meshes out of reach at this trunk and disabled (%s)", len(meshes), self.n_near, ", ".join(sorted(names)) or "-")
+        return meshes
 
     def ignoring(self, objs):
         scope = self
@@ -639,11 +702,133 @@ class ObstacleScope:
             def __enter__(self_inner):
                 self_inner.names = [n for o in objs for n in scope.names_of.get(getattr(o, "name", o), [])]
                 scope._enable(self_inner.names, False)
+                if scope.grid_layers:  # sdf-grid mode: an ignored object that is a voxel layer (the support) is switched off too
+                    for o in objs:
+                        scope.kit.backend.grid_object_enable(getattr(o, "name", o), False)
 
             def __exit__(self_inner, *exc):
                 scope._enable(self_inner.names, True)
+                if scope.grid_layers:
+                    for o in objs:
+                        scope.kit.backend.grid_object_enable(getattr(o, "name", o), True)
 
         return _Ctx()
+
+
+class TrunkBound:
+    """Per-trunk conservative pruning of the near obstacles - **exact**: a mesh that can never come within the collision
+    activation distance of any robot sphere during a trunk's IK solves never contributes to cuRobo's collision cost or
+    gradient (its kernel threads find no penetration and add nothing), so disabling it for that trunk leaves every sum
+    bit-identical - unlike a smaller mesh store, which changes the thread layout of the sums that do happen.
+
+    Bound, per trunk configuration ``q`` (base pose, torso, idle arm and fingers locked; only the band arm moves):
+
+    * fixed spheres (every robot sphere not on a link below ``<arm>_arm_link1``) are where the whole-body FK puts them
+      at ``q``; a mesh is out of their reach when its AABB is farther than ``radius + eta + MARGIN`` from each centre;
+    * moving spheres (links below the shoulder joint) stay inside a ball around the shoulder: for a serial chain of
+      revolute joints ``|T(x)| <= |t| + |x|`` link by link, so every point of a link below the shoulder is within
+      ``sum(|joint origin translations| along the chain) + |sphere centre in its link| + radius`` of the shoulder
+      (prismatic finger joints add their travel); ``r_arm`` = the maximum over the moving spheres (URDF origins,
+      cuRobo's link-local spheres). A mesh is out of the arm's reach when its AABB is farther than
+      ``r_arm + eta + MARGIN`` from the shoulder (``BandComputer.shoulder_and_reach``: cuRobo FK of ``torso_link4`` +
+      the measured shoulder offset; its error vs the simulated robot is millimetres, covered by MARGIN).
+
+    ``eta`` = the optimizers' ``collision_activation_distance`` (0.01 m; the metrics rollout uses 0). Object AABBs come
+    from the simulator (``obj.aabb`` = the collision points, a superset of every one of its cuRobo meshes). The support,
+    the placed objects and every spawned object are never pruned. Fail-safe: when the moving spheres of the seed
+    configuration itself are not inside the ball (a wrong frame assumption), pruning is switched off with a warning."""
+
+    #: safety margin (m) on top of the activation distance: shoulder FK vs simulated robot (~3 mm), AABB / mesh reads
+    MARGIN = 0.05
+
+    def __init__(self, kit, arm: str):
+        import xml.etree.ElementTree as ET
+
+        from ispatialgym.oracle import r1pro_model as M
+
+        be = kit.backend
+        self.kit, self.arm, self.be = kit, arm, be
+        self.eta = float(be.collision_activation_distance)
+        root = ET.parse(be.urdf_path).getroot()
+        joint_of_child: Dict[str, Tuple[str, str, float, float]] = {}  # child link -> (parent link, type, |origin xyz|, prismatic travel)
+        for j in root.findall("joint"):
+            o = j.find("origin")
+            xyz = [float(v) for v in (o.get("xyz", "0 0 0") if o is not None else "0 0 0").split()]
+            lim = j.find("limit")
+            travel = (float(lim.get("upper", 0.0)) - float(lim.get("lower", 0.0))) if (j.get("type") == "prismatic" and lim is not None) else 0.0
+            joint_of_child[j.find("child").get("link")] = (j.find("parent").get("link"), j.get("type"), math.sqrt(sum(v * v for v in xyz)), abs(travel))
+        shoulder_link = f"{arm}_arm_link1"
+
+        def chain_length(link: str) -> Optional[float]:
+            """Sum of the joint-origin translations (+ prismatic travel) from the shoulder link down to ``link``; None when ``link`` is not below it."""
+            total, cur = 0.0, link
+            while cur != shoulder_link:
+                if cur not in joint_of_child:
+                    return None
+                parent, _, t, travel = joint_of_child[cur]
+                total += t + travel
+                cur = parent
+            return total
+
+        self.entry = be.kin_entry("whole_body")
+        kc = self.entry.fk.kinematics_config
+        inv = {v: k for k, v in kc.link_name_to_idx_map.items()}
+        link_of_sphere = [inv.get(int(i), "") for i in kc.link_sphere_idx_map.cpu().tolist()]
+        local = kc.link_spheres.reshape(-1, len(link_of_sphere), 4)[0].detach().cpu().float()  # link-local (x, y, z, radius)
+        chain = [chain_length(l) for l in link_of_sphere]
+        self.moving = th.tensor([c is not None for c in chain])
+        self.valid = local[:, 3] > 0  # negative radius = unused (attached-object placeholders)
+        r_arm = 0.0
+        for k, c in enumerate(chain):
+            if c is not None and bool(self.valid[k]):
+                r_arm = max(r_arm, c + float(th.linalg.norm(local[k, :3])) + float(local[k, 3]))
+        self.r_arm = r_arm
+        self.enabled = True
+        self.n_pruned: List[int] = []
+        log.info("trunk bound (%s arm): %d moving / %d fixed spheres, ball radius %.3f m around the shoulder, activation %.3f m + margin %.2f m", arm,
+                 int((self.moving & self.valid).sum()), int((~self.moving & self.valid).sum()), r_arm, self.eta, self.MARGIN)
+
+    def spheres_world(self, q: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+        """``(centres (n, 3) world, radii (n,), moving mask (n,))`` of the valid robot spheres at the full configuration ``q``."""
+        import omnigibson.utils.transform_utils as T
+
+        be = self.be
+        be.refresh_locked_joints("whole_body", q)
+        st = be._kin_state(self.entry, th.as_tensor(q).float().unsqueeze(0))
+        sph = st.robot_spheres.reshape(-1, 4).detach().cpu().float()
+        rp, rq = be.root_pose()
+        centres = rp.unsqueeze(0) + sph[:, :3] @ T.quat2mat(rq).T
+        return centres[self.valid], sph[self.valid, 3], self.moving[self.valid]
+
+    @staticmethod
+    def _aabb_distance(lo: th.Tensor, hi: th.Tensor, pts: th.Tensor) -> th.Tensor:
+        return th.linalg.norm(th.clamp(lo - pts, min=0.0) + th.clamp(pts - hi, min=0.0), dim=1)
+
+    def prunable(self, q: th.Tensor, shoulder_world, objects: Sequence[Any]) -> List[str]:
+        """Names of ``objects`` (scene objects with ``.aabb``) no robot sphere can touch during the solves of trunk ``q``."""
+        if not self.enabled:
+            return []
+        centres, radii, moving = self.spheres_world(q)
+        sh = th.as_tensor(shoulder_world).float()
+        slack = self.eta + self.MARGIN
+        # fail-safe: the arm's spheres at q must lie inside the ball the bound claims for them
+        d_move = th.linalg.norm(centres[moving] - sh, dim=1) + radii[moving]
+        if bool((d_move > self.r_arm + self.MARGIN).any()):
+            log.warning("trunk bound: a moving sphere lies %.3f m from the shoulder, outside the %.3f m ball - the bound is not trusted, no pruning", float(d_move.max()),
+                        self.r_arm)
+            self.enabled = False
+            return []
+        fixed_c, fixed_r = centres[~moving], radii[~moving]
+        out = []
+        for o in objects:
+            lo, hi = o.aabb
+            lo, hi = lo.float(), hi.float()
+            if float(self._aabb_distance(lo, hi, sh.unsqueeze(0))[0]) <= self.r_arm + slack:
+                continue
+            if bool((self._aabb_distance(lo, hi, fixed_c) <= fixed_r + slack).any()):
+                continue
+            out.append(o.name)
+        return out
 
 
 class MovingPlaced:
@@ -755,6 +940,9 @@ class BandComputer:
     #: coarse cell and its 8 neighbours). Measured 2026-09-15 on the smoke job: 54 s vs 45 s exhaustive per trunk and one
     #: isolated cell lost - the IK cost is per pose, not per cell, so the coarse pass does not pay for itself; off (0).
     COARSE = 0.0
+    #: per-trunk pruning of the near obstacles no robot sphere can reach at that trunk (:class:`TrunkBound`, exact:
+    #: an unreachable mesh contributes nothing to cuRobo's collision sums). ``--no-trunk-bound`` switches it off.
+    TRUNK_BOUND = True
 
     def __init__(self, world, kit, arms: Sequence[str] = ("right",), lattice: float = LATTICE, seeds: int = 12):
         from ispatialgym.oracle import r1pro_model as M
@@ -766,6 +954,8 @@ class BandComputer:
         self.lattice = lattice
         self.seeds = seeds
         self.scope: Optional[ObstacleScope] = None
+        #: sdf-grid mode context (:meth:`sdf_prepare`); ``None`` = the exact mesh world
+        self._sdf: Optional[Dict[str, Any]] = None
         #: gripper opening of the locked finger joints (open for grasp bands, closed for the contact bands)
         self.fingers: float = 0.05
         #: contact-band mode: object height class (m) -> the generic CONTACT set replaces the generic pinch in
@@ -780,12 +970,117 @@ class BandComputer:
     def ignoring(self, objs):
         return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
 
+    # -- sdf-grid collision world (opt-in, --collision sdf-grid) ---------------------------------------------------
+    #: base displacement (m) from the current grid centre beyond which :meth:`trunk_config` rebuilds the layers around the
+    #: queried base pose (the stance search probes several base poses before the band's stance is known; the grid's half
+    #: width 1.8 m minus this keeps the whole body inside the grid for the trunk (0.5, 0) check)
+    SDF_RECENTRE_TOL = 0.5
+
+    def sdf_prepare(self, scene: str, ignore_for_grasp: Sequence[Any], cache_dir: Optional[str]):
+        """Arm the sdf-grid mode for this band (before the stance search): the layers are built around every base pose the
+        whole-body checks of :meth:`trunk_config` ask about (re-centred when it moves by more than ``SDF_RECENTRE_TOL``), and
+        finally at the band's stance by :meth:`setup_sdf_world`. ``ignore_for_grasp``: the non-spawned objects ignored at the
+        grasp pose (the support / the floor) - they get their own layer."""
+        self._sdf = {"scene": scene, "ignore": list(ignore_for_grasp), "cache_dir": cache_dir, "centre": None, "meta": None}
+
+    def _sdf_ensure_centre(self, x0: float, y0: float, tol: Optional[float] = None):
+        ctx = getattr(self, "_sdf", None)
+        if not ctx:
+            return
+        c = ctx["centre"]
+        if c is None or math.hypot(c[0] - float(x0), c[1] - float(y0)) > (self.SDF_RECENTRE_TOL if tol is None else tol):
+            ctx["meta"] = self._sdf_load((float(x0), float(y0)))
+            ctx["centre"] = (float(x0), float(y0))
+
+    def _sdf_load(self, base_xy: Tuple[float, float]) -> Dict[str, Any]:
+        """Move the static obstacles into signed-distance voxel layers around ``base_xy`` (:mod:`ispatialgym.oracle.sdf_grid`):
+        ``__sdf_static__`` = every scene object the exact mode's :class:`ObstacleScope` would keep (within ``RADIUS`` of the
+        base, below ``Z_ABOVE``) except the ground-like ones (``__sdf_ground__``, toggled like the ground meshes) and the
+        objects ignored at the grasp pose that are not spawned (the support; ``__sdf_support__``, switched off by
+        :meth:`ignoring`). Spawned objects (placed trays, the target) stay meshes in the small mesh store, so
+        :class:`MovingPlaced` and the per-cell checks work unchanged."""
+        from ispatialgym.oracle import sdf_grid as SG
+
+        ctx = self._sdf
+        kit, world = self.kit, self.world
+        be = kit.backend
+        assert be.sdf_grid, "the sdf-grid mode needs a kit built with sdf_grid=... (reach_bands --collision sdf-grid)"
+        x0, y0 = base_xy
+        support_objs = [o for o in ctx["ignore"] if getattr(o, "name", None) is not None and o.name not in world.spawned]
+        support_names = {o.name for o in support_objs}
+        static, ground = [], []
+        for o in world.scene.objects:
+            if o is world.robot or getattr(o, "visual_only", False) or o.name in world.spawned or o.name in support_names:
+                continue
+            if hasattr(world, "obstacle_filter") and not world.obstacle_filter(o):
+                continue
+            if ObstacleScope.is_far(o, (x0, y0), world.floor_z):
+                continue
+            (ground if be._is_ground_like(o) else static).append(o)
+        centre = np.array([float(x0), float(y0), world.floor_z + 0.5 * (SG.Z_ABOVE - SG.Z_BELOW)])
+        meta = be.load_sdf_layers({SG.LAYER_STATIC: static, SG.LAYER_SUPPORT: support_objs, SG.LAYER_GROUND: ground}, centre, ctx["cache_dir"], ctx["scene"])
+        meta["mesh_store"] = sorted(be._world_mesh_names)
+        meta["n_loads"] = (ctx["meta"] or {}).get("n_loads", 0) + 1
+        return meta
+
+    def setup_sdf_world(self, stance: Dict[str, Any], trunks: Sequence[Tuple[float, float]], arms: Sequence[str]) -> Dict[str, Any]:
+        """The band's final sdf-grid world: the layers centred exactly on the stance (:meth:`_sdf_load`; a cache hit when the
+        stance search already built them there), the check that the grid covers every robot sphere at the band's trunks, and
+        :class:`TrunkBound` switched off (the layers cost the same at every trunk). Returns the ``schedule.collision`` meta."""
+        x0, y0, _ = stance["base_pose2d"]
+        self._sdf_ensure_centre(x0, y0, tol=1e-6)
+        meta = dict(self._sdf["meta"])
+        meta["extent_check"] = self.sdf_extent_check(stance, trunks, arms, meta["bounds_world"])
+        meta["trunk_bound"] = "off (the static obstacles are voxel layers, whose lookup costs the same at every trunk)"
+        meta["recentre_tol"] = self.SDF_RECENTRE_TOL
+        self.TRUNK_BOUND = False
+        return meta
+
+    def sdf_extent_check(self, stance: Dict[str, Any], trunks: Sequence[Tuple[float, float]], arms: Sequence[str], bounds_world) -> Dict[str, Any]:
+        """Whether the grid box ``bounds_world`` contains every position a robot sphere can take during the band: per trunk
+        (untucked arms), the fixed spheres' AABB and the :class:`TrunkBound` ball of every band arm around its shoulder, grown
+        by the activation distance + its margin. Points outside the grid are free space for cuRobo, so a too small grid would
+        silently miss collisions; the check is recorded in the meta and logged as a warning when it fails."""
+        kit = self.kit
+        x0, y0, yaw0 = stance["base_pose2d"]
+        bounds = {arm: TrunkBound(kit, arm) for arm in arms}
+        lo_all = hi_all = None
+        n_ok = 0
+        for tr, ti in trunks:
+            try:
+                q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti, fingers=self.fingers), x0, y0, yaw0)
+            except (ValueError, KeyError):
+                continue
+            for arm, bound in bounds.items():
+                centres, radii, moving = bound.spheres_world(q)
+                shoulder, _ = self.shoulder_and_reach(q, arm)
+                lo = th.minimum((centres - radii.unsqueeze(1)).min(dim=0).values, shoulder - bound.r_arm)
+                hi = th.maximum((centres + radii.unsqueeze(1)).max(dim=0).values, shoulder + bound.r_arm)
+                lo_all = lo if lo_all is None else th.minimum(lo_all, lo)
+                hi_all = hi if hi_all is None else th.maximum(hi_all, hi)
+            n_ok += 1
+        if lo_all is None:
+            return {"ok": None, "n_trunks": 0}
+        slack = max(b.eta + b.MARGIN for b in bounds.values())
+        need_lo, need_hi = (lo_all - slack).tolist(), (hi_all + slack).tolist()
+        # the arm ball reaches below the floor at low, tilted trunks; a sphere centre there already penetrates the floor's top
+        # layer (inside the grid), so the region below the floor is irrelevant
+        need_lo[2] = max(need_lo[2], float(self.world.floor_z) - 0.02)
+        g_lo, g_hi = bounds_world
+        ok = all(a >= b for a, b in zip(need_lo, g_lo)) and all(a <= b for a, b in zip(need_hi, g_hi))
+        rec = {"ok": bool(ok), "n_trunks": n_ok, "needed_world": [[round(v, 3) for v in need_lo], [round(v, 3) for v in need_hi]], "grid_world": [[round(float(v), 3) for v in g_lo], [round(float(v), 3) for v in g_hi]],
+               "r_arm": {arm: round(b.r_arm, 3) for arm, b in bounds.items()}}
+        (log.info if ok else log.warning)("sdf-grid extent check over %d trunks: robot spheres need %s .. %s, grid %s .. %s -> %s", n_ok, rec["needed_world"][0], rec["needed_world"][1],
+                                          rec["grid_world"][0], rec["grid_world"][1], "ok" if ok else "TOO SMALL (outside the grid is free space)")
+        return rec
+
     # -- postures (owner decision A6) -----------------------------------------------------------------------------
     def trunk_config(self, translate: float, tilt: float, x0: float, y0: float, yaw0: float, postures: Optional[Sequence[str]] = None):
         """Whole-body collision-free configuration at the trunk with the first posture of ``postures`` (default
         :attr:`postures`) that is free (``untucked`` first; ``ready`` / ``tucked`` when the untucked arms self-collide,
         e.g. translate 0.95 / tilt -1.2): ``(q, posture)`` or ``(None, None)`` when every posture collides."""
         kit = self.kit
+        self._sdf_ensure_centre(x0, y0)  # sdf-grid mode only: the layers must surround the queried base pose
         for posture in (postures if postures is not None else self.postures):
             try:
                 q = kit.q_at_base_pose(kit.q_config(arms=posture, translate=translate, tilt=tilt, fingers=self.fingers), x0, y0, yaw0)
@@ -1027,6 +1322,7 @@ class BandComputer:
                 results.append(self._trunk(tr, ti, base_cells, world_cells, *common))
         finally:
             self.scope.__exit__(None, None, None)
+            self._last_bounds = getattr(self.scope, "_bounds", None)  # TrunkBound diagnostics for the meta
             self.scope = None
             if self.cell_obstacle is not None:
                 self.cell_obstacle.show()
@@ -1082,6 +1378,8 @@ class BandComputer:
             entry["shoulder_world"] = [round(float(v), 4) for v in shoulder.tolist()]
             entry["arm_len"] = round(arm_len, 4)
             entry["reach"] = round(reach, 4)
+            # near meshes no sphere can reach at this trunk (exact, TrunkBound); re-enabled after the trunk's IK passes
+            pruned = self.scope.trunk_prune(q, shoulder, arm, protect=ignore_for_grasp) if (self.scope is not None and self.TRUNK_BOUND) else []
             pts = th.cat([world_cells, th.full((len(world_cells), 1), z_support)], dim=1)
             near = th.linalg.norm(pts - shoulder, dim=1) <= reach
             todo = [i for i in range(len(base_cells)) if bool(near[i])]
@@ -1097,51 +1395,55 @@ class BandComputer:
                 pair_specs = [(g.name, g, y) for g in grasp_sets for y in yaw_order]
             chunk = self.CHUNK if grasp_sets is not None else 1
             pose_reach = arm_len + 0.03  # the eef origin can never be farther from the shoulder than the stretched arm
-            for r0 in range(0, len(pair_specs), chunk):
-                if not todo:
-                    break
-                specs = pair_specs[r0:r0 + chunk]
-                pairs, index, spec_of = [], [], []
-                for i in todo:
-                    if grasp_sets is None and self.contact_height is not None:
-                        # generic CONTACT set: the cell is the contact point; z_support = the top the object stands on
-                        cands = [((-1, ci), pair) for ci, pair in self.contact_candidates_at(world_cells[i], z_support, self.contact_height, fwd, left)]
-                    elif grasp_sets is None:
-                        centre = th.tensor([float(world_cells[i][0]), float(world_cells[i][1]), z_support])
-                        cands = [((-1, ci), pair) for ci, pair in enumerate(kit.grasp_candidates_at(centre, [yaw0, yaw0 + math.pi / 2][:N_YAWS_GENERIC], TILTS_GENERIC, fwd))]
-                    else:
-                        cands = [((yaw_index[y], grasp_index[name]), self.grasp_eef_pair(pose_fn(world_cells[i], y + yaw0), g)) for name, g, y in specs]
-                    for spec, pair in cands:
-                        if float(th.linalg.norm(pair[1][0] - shoulder)) > pose_reach or float(th.linalg.norm(pair[0][0] - shoulder)) > pose_reach:
-                            n_pose_pruned += 1
-                            continue
-                        pairs.append(pair)
-                        index.append(i)
-                        spec_of.append(spec)
-                if pairs:
-                    pres = [p[0] for p in pairs]
-                    ok_pre = self.ik_screen(pres, q, arm)
-                    sel = [k for k, s in enumerate(ok_pre.tolist()) if s]
-                    for k in sel:
-                        pre_seen[index[k]] = True
-                    hits: List[int] = []  # indices into ``pairs`` feasible at pre-grasp and grasp this round
-                    if sel:
-                        with self.ignoring(ignore_for_grasp):
-                            ok_g = self.ik_screen([pairs[k][1] for k in sel], q, arm)
-                        hits = [k for k, s in zip(sel, ok_g.tolist()) if s]
-                    if hits and self.cell_obstacle is not None:
-                        # stance-relative placed object: the batched passes ran without it; verify the pre-grasps of every
-                        # passing cell with the object placed at that cell (the grasp pose ignores it, spec 3.6)
-                        hits = self._verify_with_placed(hits, pairs, index, q, arm, world_cells, entry)
-                    for k in hits:
-                        ok[index[k]] = True
-                        found.append((index[k], spec_of[k][0], spec_of[k][1]))
-                entry["rounds"] += 1
-                todo = [i for i in todo if not bool(ok[i])]
-                if self.MAX_ROUNDS_WITHOUT_PRE and entry["rounds"] >= self.MAX_ROUNDS_WITHOUT_PRE:
-                    n_before = len(todo)
-                    todo = [i for i in todo if bool(pre_seen[i])]
-                    entry["n_dropped_no_pre"] = entry.get("n_dropped_no_pre", 0) + (n_before - len(todo))
+            try:
+                for r0 in range(0, len(pair_specs), chunk):
+                    if not todo:
+                        break
+                    specs = pair_specs[r0:r0 + chunk]
+                    pairs, index, spec_of = [], [], []
+                    for i in todo:
+                        if grasp_sets is None and self.contact_height is not None:
+                            # generic CONTACT set: the cell is the contact point; z_support = the top the object stands on
+                            cands = [((-1, ci), pair) for ci, pair in self.contact_candidates_at(world_cells[i], z_support, self.contact_height, fwd, left)]
+                        elif grasp_sets is None:
+                            centre = th.tensor([float(world_cells[i][0]), float(world_cells[i][1]), z_support])
+                            cands = [((-1, ci), pair) for ci, pair in enumerate(kit.grasp_candidates_at(centre, [yaw0, yaw0 + math.pi / 2][:N_YAWS_GENERIC], TILTS_GENERIC, fwd))]
+                        else:
+                            cands = [((yaw_index[y], grasp_index[name]), self.grasp_eef_pair(pose_fn(world_cells[i], y + yaw0), g)) for name, g, y in specs]
+                        for spec, pair in cands:
+                            if float(th.linalg.norm(pair[1][0] - shoulder)) > pose_reach or float(th.linalg.norm(pair[0][0] - shoulder)) > pose_reach:
+                                n_pose_pruned += 1
+                                continue
+                            pairs.append(pair)
+                            index.append(i)
+                            spec_of.append(spec)
+                    if pairs:
+                        pres = [p[0] for p in pairs]
+                        ok_pre = self.ik_screen(pres, q, arm)
+                        sel = [k for k, s in enumerate(ok_pre.tolist()) if s]
+                        for k in sel:
+                            pre_seen[index[k]] = True
+                        hits: List[int] = []  # indices into ``pairs`` feasible at pre-grasp and grasp this round
+                        if sel:
+                            with self.ignoring(ignore_for_grasp):
+                                ok_g = self.ik_screen([pairs[k][1] for k in sel], q, arm)
+                            hits = [k for k, s in zip(sel, ok_g.tolist()) if s]
+                        if hits and self.cell_obstacle is not None:
+                            # stance-relative placed object: the batched passes ran without it; verify the pre-grasps of every
+                            # passing cell with the object placed at that cell (the grasp pose ignores it, spec 3.6)
+                            hits = self._verify_with_placed(hits, pairs, index, q, arm, world_cells, entry)
+                        for k in hits:
+                            ok[index[k]] = True
+                            found.append((index[k], spec_of[k][0], spec_of[k][1]))
+                    entry["rounds"] += 1
+                    todo = [i for i in todo if not bool(ok[i])]
+                    if self.MAX_ROUNDS_WITHOUT_PRE and entry["rounds"] >= self.MAX_ROUNDS_WITHOUT_PRE:
+                        n_before = len(todo)
+                        todo = [i for i in todo if bool(pre_seen[i])]
+                        entry["n_dropped_no_pre"] = entry.get("n_dropped_no_pre", 0) + (n_before - len(todo))
+            finally:
+                if pruned:  # the trunk's unreachable meshes are obstacles again for the next trunk / the scope's exit
+                    self.scope._enable(pruned, True)
             entry["n_pose_pruned"] = n_pose_pruned
             sel_cells = [i for i in range(len(base_cells)) if bool(ok[i])]
             remap = {i: n for n, i in enumerate(sel_cells)}
@@ -1368,17 +1670,159 @@ def band_sanity(stance: Dict[str, Any], result: Dict[str, Any], z_support: float
 # ----------------------------------------------------------------------------------------------- driver
 
 
-def _chairs_variant(scene: str, support_name: str, rooms: List[str], out_dir: str):
-    from ispatialgym.sampling import scene_variants as SV
-    from ispatialgym.sampling.sim_utils import stable_scene_path
+def _stable_scene(scene: str) -> Dict[str, Any]:
+    """The stable scene json (``omnigibson`` package import only; no simulator launch)."""
+    from omnigibson.utils.asset_utils import get_dataset_path
 
-    with open(stable_scene_path(scene)) as f:
-        stable = json.load(f)
-    removed = SV.chairs_near_tables(stable, rooms, [support_name], distance=1.0, categories=SV.CHAIR_CATEGORIES)
-    if not removed:
+    with open(os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene, "json", f"{scene}_stable.json")) as f:
+        return json.load(f)
+
+
+def _chairs_to_remove(scene: str, support_name: str, rooms: List[str], stable: Optional[Dict[str, Any]] = None) -> List[str]:
+    """Chairs within 1 m of the support (removed for the band like the sampler does); sorted names, no file written."""
+    from ispatialgym.sampling import scene_variants as SV
+
+    stable = _stable_scene(scene) if stable is None else stable
+    return SV.chairs_near_tables(stable, rooms, [support_name], distance=1.0, categories=SV.CHAIR_CATEGORIES)
+
+
+#: cuRobo mesh store: capacity = loaded collision meshes + this headroom for the objects bands spawn (a target object is
+#: 1-6 meshes, a placed tray a few more; the worker reloads the world when fewer than MESH_CACHE_RESERVE slots are left),
+#: at least MESH_CACHE_MIN. The capacity, not the fill, sizes every collision kernel launch (R1ProCuRobo.__init__).
+MESH_CACHE_HEADROOM = 256
+MESH_CACHE_MIN = 512
+MESH_CACHE_RESERVE = 64
+#: --collision sdf-grid defaults (APPROXIMATE OPT-IN, see build_parser): voxel size (m) and the mesh-store capacity for the
+#: spawned objects (the only meshes of that mode; ~0.6 ms per slot per batched IK call)
+SDF_RES = 0.01
+SDF_MESH_CACHE = 64
+
+#: slim load (``_slim_drop_list``): safety margin (m) added to every bounding box derived from the stable scene json before
+#: the ``SimWorld.obstacle_filter`` test - the json knows the canonical (visual) bounding box, the filter measures the
+#: collision meshes; articulated objects get their largest extent on top (an open door leaf / drawer reaches that far).
+#: Calibrated 2026-09-16 on the 420 loaded objects of house_single_floor (dining room + neighbours): json box vs loaded
+#: collision AABB mismatch median 0.0 m, 3 objects > 0.1 m, max 0.33 m (a rail fence); with 1.0 m every dropped object's
+#: true AABB stayed >= 2.16 m outside the true filter bounds while 313 of 421 objects were dropped (0.5 m: 328, gap 1.2 m).
+SLIM_MARGIN_M = 1.0
+
+
+def _json_aabb(init_args: Dict[str, Any], state: Dict[str, Any], margin: float, articulated: bool) -> Optional[Tuple[th.Tensor, th.Tensor]]:
+    """World AABB ``(lo, hi)`` of an object from the stable scene json alone: the scaled canonical bounding box
+    (``knowledge.canonical_bbox`` + ``base_link_offset``, as ``scene_variants._bbox_footprint``) rotated by the full
+    orientation, grown by ``margin`` (+ the largest extent for ``articulated`` objects); ``None`` when unknown."""
+    from ispatialgym.robot.conventions import quat_to_mat
+    from ispatialgym.sampling import knowledge as K
+    from ispatialgym.sampling import scene_variants as SV
+
+    model = init_args.get("model")
+    bb = K.canonical_bbox(model) if model else None
+    if bb is None:
+        return None
+    meta = SV._metadata(init_args.get("category"), model)
+    scale = th.tensor(init_args.get("scale") or [1.0, 1.0, 1.0], dtype=th.float32)
+    offset = th.tensor(meta.get("base_link_offset", [0.0, 0.0, 0.0]), dtype=th.float32)
+    pos = th.tensor(state["root_link"]["pos"], dtype=th.float32)
+    rot = quat_to_mat(state["root_link"]["ori"]).float()
+    # bbox centre = base link origin + scale * base_link_offset (OmniGibson's ``scaled_bbox_center_in_base_frame`` is
+    # the base link *in the bbox frame*, i.e. the negative; checked 2026-09-16 against the loaded collision AABBs of 420
+    # objects: with this sign the median mismatch is 3 cm, with the other one whole windows / floors were displaced)
+    centre = pos + rot @ (scale * offset)
+    half = th.tensor(bb, dtype=th.float32) * scale / 2
+    corners = th.tensor([[sx, sy, sz] for sx in (-1.0, 1.0) for sy in (-1.0, 1.0) for sz in (-1.0, 1.0)]) * half
+    world = centre + corners @ rot.T
+    grow = margin + (float(half.max()) * 2 if articulated else 0.0)
+    return world.min(dim=0).values - grow, world.max(dim=0).values + grow
+
+
+def _slim_drop_list(stable: Dict[str, Any], rooms: Sequence[str], loaded_rooms: Sequence[str], obstacle_margin: Optional[float] = None,
+                    margin: float = SLIM_MARGIN_M) -> List[str]:
+    """Objects of the loaded neighbouring rooms that cannot pass ``SimWorld.obstacle_filter`` and are therefore never
+    collision obstacles of a band: their json AABB (:func:`_json_aabb`, grown by ``margin``) misses the task rooms' floor
+    extent grown by the filter's ``ISG_OBSTACLE_MARGIN_M`` (and by ``margin`` again, the floor extent being a json
+    estimate too).     Everything in the task rooms, everything with an unknown box and everything a kept non-structure
+    object might rest on (xy overlap, top within 0.3 m of the kept object's bottom; closed under iteration) stays.
+    Candidates are what OmniGibson's partial-room loading brings in: objects of the loaded rooms **plus every building
+    structure and door of the whole scene** (``InteractiveTraversableScene._should_load_object`` loads walls, ceilings,
+    roofs, fences and doors regardless of ``load_room_instances`` - 147 wall segments in house_single_floor), which is
+    where most of the saving is. Conservative in the only direction that matters: an object kept needlessly is filtered
+    out of the collision world at load time exactly as before; an object dropped wrongly would change the world.
+    Sorted names."""
+    from omnigibson.utils.constants import GROUND_CATEGORIES as OG_GROUND
+    from omnigibson.utils.constants import STRUCTURE_CATEGORIES as OG_STRUCTURE
+
+    from ispatialgym.sampling.knowledge import STRUCTURE_CATEGORIES
+
+    always_loaded = (set(OG_STRUCTURE) - set(OG_GROUND)) | {"door", "sliding_door"}  # the loader's is_building_structure rule
+    init = stable["objects_info"]["init_info"]
+    reg = stable["state"]["registry"]["object_registry"]
+    rooms_set, loaded_set = set(rooms), set(loaded_rooms)
+    m_obst = float(os.environ.get("ISG_OBSTACLE_MARGIN_M", "1.0")) if obstacle_margin is None else float(obstacle_margin)
+    los, his = [], []
+    for name, info in init.items():
+        a = info["args"]
+        if a.get("category") == "floors" and set(a.get("in_rooms") or []) & rooms_set and name in reg:
+            box = _json_aabb(a, reg[name], margin, False)
+            if box is not None:
+                los.append(box[0])
+                his.append(box[1])
+    if not los:
+        return []
+    blo = th.stack(los).min(dim=0).values - m_obst
+    bhi = th.stack(his).max(dim=0).values + m_obst
+    bhi[2] = 10.0  # everything above the floor (SimWorld.task_bounds)
+    boxes: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+    keep, cand = set(), []
+    for name, info in init.items():
+        a = info["args"]
+        in_rooms = set(a.get("in_rooms") or [])
+        if name not in reg or not (in_rooms & loaded_set or a.get("category") in always_loaded):
+            continue  # not loaded at all (partial-room loading) - nothing to drop
+        box = _json_aabb(a, reg[name], margin, bool(reg[name].get("joint_pos")))
+        if box is not None:
+            boxes[name] = box
+        if in_rooms & rooms_set or box is None or bool(((box[1] >= blo) & (box[0] <= bhi)).all()):
+            keep.add(name)
+        else:
+            cand.append(name)
+    # closure: keep what a kept non-structure object may rest on
+    changed = True
+    while changed and cand:
+        changed = False
+        supports = [(boxes[k][0], boxes[k][1]) for k in keep if k in boxes and init[k]["args"].get("category") not in STRUCTURE_CATEGORIES]
+        for name in list(cand):
+            lo, hi = boxes[name]
+            for klo, khi in supports:  # the candidate's top at the kept object's bottom (both boxes carry ``margin``), footprints overlapping
+                if bool((hi[:2] >= klo[:2]).all() and (lo[:2] <= khi[:2]).all()) and abs(float(hi[2]) - float(klo[2])) <= 0.3 + 2 * margin:
+                    keep.add(name)
+                    cand.remove(name)
+                    changed = True
+                    break
+    return sorted(cand)
+
+
+def _chairs_variant(scene: str, support_name: str, rooms: List[str], out_dir: str, removed: Optional[List[str]] = None, slim: bool = False):
+    """Scene variant (``scene_variants.write_variant``) without the chairs around the support and, with ``slim``, without
+    the neighbouring rooms' objects that can never be collision obstacles (:func:`_slim_drop_list`): ``(variant dict |
+    None, removed chairs)``. Only the chairs' footprints are freed in the traversability map and recorded as removed."""
+    from ispatialgym.sampling import scene_variants as SV
+    from ispatialgym.sampling.sim_utils import adjacent_rooms, stable_scene_path
+
+    stable = _stable_scene(scene)
+    if removed is None:
+        removed = _chairs_to_remove(scene, support_name, rooms, stable)
+    dropped: List[str] = []
+    if slim and os.environ.get("ISG_LOAD_ADJACENT", "1") == "1":
+        loaded = list(rooms) + [r for r in adjacent_rooms(scene, rooms) if r not in rooms]
+        dropped = [n for n in _slim_drop_list(stable, rooms, loaded) if n not in removed]
+        log.info("slim load: %d objects of the neighbouring rooms %s can never pass the obstacle filter and are not loaded", len(dropped),
+                 sorted(set(loaded) - set(rooms)))
+    if not removed and not dropped:
         return None, []
-    vpath, _ = SV.write_variant(stable_scene_path(scene), removed, out_dir)
-    return {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed)}, removed
+    vpath, _ = SV.write_variant(stable_scene_path(scene), list(removed) + dropped, out_dir)
+    variant = {"path": vpath, "removed_objects": list(removed), "freed_footprints": SV.freed_footprints(stable, removed) if removed else None}
+    if dropped:
+        variant["slim_dropped"] = dropped
+    return variant, list(removed)
 
 
 def _dataset_of(category: str, model: str, preferred: Optional[str] = None) -> str:
@@ -1397,11 +1841,8 @@ def _dataset_of(category: str, model: str, preferred: Optional[str] = None) -> s
     return "behavior-1k-assets"
 
 
-def _rooms_of(scene: str, name: str) -> List[str]:
-    from ispatialgym.sampling.sim_utils import stable_scene_path
-
-    with open(stable_scene_path(scene)) as f:
-        stable = json.load(f)
+def _rooms_of(scene: str, name: str, stable: Optional[Dict[str, Any]] = None) -> List[str]:
+    stable = _stable_scene(scene) if stable is None else stable
     info = stable["objects_info"]["init_info"].get(name)
     if info is None:
         raise SystemExit(f"{name} not in scene {scene}")
@@ -1409,10 +1850,62 @@ def _rooms_of(scene: str, name: str) -> List[str]:
     return list(rooms)
 
 
-def main(argv=None):
+def band_rooms(args, stable: Optional[Dict[str, Any]] = None) -> Tuple[bool, List[str]]:
+    """``(floor_mode, rooms)`` of one band's parsed arguments: the loaded rooms are ``--rooms``, else the floor mode's
+    ``--room``, else the rooms of the support (``--under`` partner in the floor-under mode). Sets ``args.room`` for the
+    floor-under mode (its lattice's floor object). No simulator."""
+    floor_mode = args.support == "floor"
+    if floor_mode and not (args.room or args.under or args.rooms):
+        raise SystemExit("--support floor needs --room R (or --under PARTNER)")
+    anchor_name = args.under if floor_mode and args.under else (None if floor_mode else args.support)
+    rooms = args.rooms or ([args.room] if floor_mode and args.room else _rooms_of(args.scene, anchor_name, stable))
+    if floor_mode and args.under and not args.room:
+        args.room = rooms[0]
+    return floor_mode, list(rooms)
+
+
+def band_arms(args) -> Tuple[str, ...]:
+    """Arms whose embodiments the band uses (both for ``--brace``)."""
+    if args.generic_contact and args.brace:
+        raise SystemExit("--generic-contact and --brace are exclusive")
+    return ("right", "left") if args.brace else (args.arm,)
+
+
+def band_world_key(args, stable: Optional[Dict[str, Any]] = None) -> Tuple[str, Tuple[str, ...], Tuple[str, ...]]:
+    """The **world key** of a band job - ``(scene, loaded rooms, removed chairs)`` - what decides whether two jobs can
+    share one loaded world in the ``--jobs`` worker (the sampler's ``sample_isg.world_key`` for aliases). Needs only the
+    stable scene json (``stable``; loaded from the dataset when omitted)."""
+    stable = _stable_scene(args.scene) if stable is None else stable
+    floor_mode, rooms = band_rooms(args, stable)
+    removed = [] if floor_mode else _chairs_to_remove(args.scene, args.support, rooms, stable)
+    return args.scene, tuple(rooms), tuple(removed)
+
+
+def select_jobs(manifest: Sequence[Dict[str, Any]], ids: Optional[Sequence[str]]) -> List[Dict[str, Any]]:
+    """Jobs of a ``make_jobs.py`` manifest by id (``ids=None`` = every job, manifest order). Unknown ids raise ``KeyError``."""
+    if ids is None:
+        return list(manifest)
+    by_id = {j["id"]: j for j in manifest}
+    missing = [i for i in ids if i not in by_id]
+    if missing:
+        raise KeyError(f"job ids not in the manifest: {missing}")
+    return [by_id[i] for i in dict.fromkeys(ids)]  # given order, duplicates dropped
+
+
+def group_by_key(items: Sequence[Any], key_of) -> List[Any]:
+    """``items`` reordered so that equal keys are contiguous: groups in the order of their first item, items in their
+    original order within a group (what makes world reloads rare in the ``--jobs`` worker while keeping the given order
+    where it does not matter)."""
+    groups: Dict[Any, List[Any]] = {}
+    for it in items:
+        groups.setdefault(key_of(it), []).append(it)
+    return [it for g in groups.values() for it in g]
+
+
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--scene", required=True)
-    ap.add_argument("--support", required=True, help="scene object name, or 'floor' (with --room)")
+    ap.add_argument("--scene", default=None, help="scene model (required unless --jobs)")
+    ap.add_argument("--support", default=None, help="scene object name, or 'floor' (with --room); required unless --jobs")
     ap.add_argument("--room", default=None, help="floor mode: room instance")
     ap.add_argument("--rooms", nargs="*", default=None, help="rooms to load (default: the support's rooms)")
     ap.add_argument("--object", default=None, help="CATEGORY/MODEL of the grasped object")
@@ -1444,40 +1937,170 @@ def main(argv=None):
     ap.add_argument("--out", default=None, help="directory for the .npz/.json (default: the cache dir)")
     ap.add_argument("--smoke", action="store_true", help="16 cm lattice, two trunks, shoulder-FK verification + band sanity summary")
     ap.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
-    args = ap.parse_args(argv)
-    logging.basicConfig(level=args.log_level, format="[%(levelname)s %(name)s] %(message)s", force=True)
+    # -- multi-job worker (one process, many bands; see run_jobs)
+    ap.add_argument("--jobs", default=None, help="worker mode: a make_jobs.py manifest; every selected job's `args` is one band, written to <--out>/<id>/ "
+                    "(+ <--out>/done.txt), the world (scene, rooms, removed chairs) is reused across jobs with the same key")
+    ap.add_argument("--ids", nargs="*", default=None, help="worker mode: job ids of the manifest to run (default: every job), grouped by world key")
+    ap.add_argument("--prebuild-planner", action="store_true", help="build the arms' cuRobo motion planners at start (the pre-2026-09-16 behaviour; bands "
+                    "only use the kinematics and the batched IK solvers, which are independent of the planners, so this costs ~25 s per process for nothing)")
+    ap.add_argument("--cameras", action="store_true", help="give the robot the sampler's 1080^2 rgb + seg_instance head camera (the pre-2026-09-16 behaviour); "
+                    "bands never read pixels, so the default world is camera-less (SimWorld(cameras=False): faster launch, less GPU memory, same bands)")
+    ap.add_argument("--full-load", action="store_true", help="load every object of the task + neighbouring rooms (the pre-2026-09-16 behaviour). Default: "
+                    "the neighbouring rooms' (and the always-loaded structures') objects that can never pass SimWorld.obstacle_filter are left out - their "
+                    "stable-scene bounding box, grown by SLIM_MARGIN_M (+ extent when articulated), misses the task rooms' floor extent + ISG_OBSTACLE_MARGIN_M; "
+                    "the collision world (obstacle set, cuRobo mesh names, bands) is identical, the scene load 117 s -> 54 s, 421 -> 108 objects (house_single_floor)")
+    ap.add_argument("--no-trunk-bound", action="store_true", help="keep every near mesh enabled at every trunk (the pre-2026-09-16 behaviour). Default: the meshes "
+                    "no robot sphere can reach at a trunk (TrunkBound: fixed spheres + a ball around the shoulder for the arm) are disabled for that trunk - exact, "
+                    "they never contribute to cuRobo's collision sums")
+    ap.add_argument("--mesh-cache", default=None, help="SAME-ALGORITHM OPT-IN (default: cuRobo's 8192, unchanged): capacity of the cuRobo mesh store, a number "
+                    "or 'auto' (= the loaded collision meshes + %d, at least %d). cuRobo launches spheres x capacity collision threads per evaluation, so "
+                    "'auto' made every batched IK call ~2.5x faster (trunk 65 s -> 25 s), but the thread layout changes the order of its atomic float "
+                    "accumulation and a marginal cell can differ from the 8192 result (1 pair of 88 on the contact test band); recorded as schedule.mesh_cache" % (MESH_CACHE_HEADROOM, MESH_CACHE_MIN))
+    ap.add_argument("--ik-tail-sizes", default=None, help="SAME-ALGORITHM OPT-IN (default: the committed 16,32,64,128): batched IK solver sizes for the last "
+                    "chunk of a screening call, e.g. 8,16,24,32,48,64,96,128 - fewer padded slots (73 real poses per 128-slot call in the pilot), but every "
+                    "solver size draws its own cuRobo seed stream, so marginal cells can differ from the default schedule; recorded as schedule.ik_sizes")
+    ap.add_argument("--collision", default=None, choices=["mesh", "sdf-grid"],
+                    help="APPROXIMATE OPT-IN (default 'mesh': the exact per-mesh cuRobo world, unchanged): 'sdf-grid' represents the static scene obstacles "
+                    "by float16 signed-distance voxel layers (cuRobo VoxelGrid, trilinear lookup; ispatialgym.oracle.sdf_grid) sampled from the exact "
+                    "mesh SDF at the voxel centres - the static objects near the stance, the support (its own layer, switched off for the grasp pose) "
+                    "and the ground-like objects; spawned objects (placed trays, the target) stay meshes in a %d-slot store. ~25x cheaper per batched IK "
+                    "call on an RTX 4090; marginal cells can differ (interpolation between voxel centres). Recorded as schedule.collision" % SDF_MESH_CACHE)
+    ap.add_argument("--sdf-res", type=float, default=SDF_RES, help=f"--collision sdf-grid: voxel size (m), default {SDF_RES} (3.6 x 3.6 x 3.0 m grid: 39 M voxels = "
+                    "78 MB float16 per layer, three layers; 0.02 gave the same bands at 1/8 of that, 0.005 = 1.9 GB and ~10 GB of GPU while sampling)")
+    ap.add_argument("--sdf-mesh-cache", type=int, default=SDF_MESH_CACHE, help=f"--collision sdf-grid: capacity of the mesh store for the spawned objects (default {SDF_MESH_CACHE}; "
+                    "~0.6 ms per slot per batched IK call)")
+    ap.add_argument("--sdf-cache-dir", default=None, help="--collision sdf-grid: directory of the sampled layers (<key>.npz float16 + <key>.json), shared by every band of a "
+                    "support / stance (default: <--out or the cache root>/sdf_grids; worker mode: <ROOT>/sdf_grids)")
+    return ap
 
-    from ispatialgym.sampling import geometry as G
-    from ispatialgym.sampling import grasp_library as GL
+
+def sdf_grid_config(args) -> Optional[Dict[str, Any]]:
+    """The ``R1ProCuRobo(sdf_grid=...)`` config of ``--collision sdf-grid`` (``None`` in the default mesh mode): the voxel size, the
+    grid's voxel counts / extents (fixed: ``2 * HALF_XY`` around the stance, ``Z_BELOW`` below the floor to ``Z_ABOVE`` above it) and
+    the mesh-store capacity."""
+    if getattr(args, "collision", None) != "sdf-grid":
+        return None
+    from ispatialgym.oracle import sdf_grid as SG
+
+    res = float(args.sdf_res)
+    n, dims, _ = SG.grid_spec((0.0, 0.0), -SG.Z_BELOW, SG.Z_ABOVE, res)
+    return {"res": res, "n": n.tolist(), "dims": dims.tolist(), "mesh_cache": int(args.sdf_mesh_cache)}
+
+
+def sdf_cache_dir(args, out_dir: str) -> str:
+    return args.sdf_cache_dir or os.path.join(out_dir, "sdf_grids")
+
+
+def _reset_kit_seeds(kit):
+    """Put every cuRobo solver's random stream back where a fresh process starts it: the 11 extra IK seeds per pose come
+    from a Halton buffer indexed by a ``torch.Generator`` seeded once per solver instance and advanced by every call, so a
+    band computed after another one in the same process would draw different seeds (and marginal cells could flip)
+    without this. ``IKSolver.reset_seed`` restores the generator state of the LM seed solver and the optimizer's."""
+    be = kit.backend
+    for e in (getattr(be, "_batch_ik", None) or {}).values():
+        e.rsc.reset_seed()
+    for e in be._entries.values():  # the planners' IK solvers (not used by bands; reset for completeness)
+        if e.planner is not None and getattr(e.planner, "ik_solver", None) is not None:
+            e.planner.ik_solver.reset_seed()
+
+
+def load_world(args, rooms: List[str], variant: Optional[dict], removed: List[str], arms: Sequence[str]):
+    """``(world, kit)`` of a band job: ``SimWorld`` + ``RobotKit`` + the first cuRobo world sync. The arms' motion planners
+    are not built unless ``--prebuild-planner``: bands use FK / collision kinematics entries and the batched IK solvers
+    only (measured 24.5-24.9 s per process for the right-arm planner build + warmup)."""
     from ispatialgym.sampling.robot_utils import RobotKit
     from ispatialgym.sampling.sim_utils import SimWorld
 
     import omnigibson as og
 
+    t_load = time.time()
+    world = SimWorld(args.scene, rooms, scene_variant=variant, cameras=bool(args.cameras))
+    # cuRobo's mesh store capacity sizes every collision kernel launch (see R1ProCuRobo.__init__). SAME-ALGORITHM OPT-IN: a
+    # snug capacity (``--mesh-cache auto`` = loaded meshes + MESH_CACHE_HEADROOM, or a number) made the batched IK 2.5x
+    # faster, but the kernel's thread layout changes with the capacity and with it the order of cuRobo's atomic float
+    # accumulation over the obstacles that touch one sphere: measured 2026-09-16, two of three two-trunk bands
+    # byte-identical, the contact band gained one marginal (cell, class) pair. Default: the backend's 8192 (unchanged).
+    n_meshes = RobotKit.count_collision_meshes(world)
+    cache = None
+    if args.mesh_cache:
+        cache = max(MESH_CACHE_MIN, 64 * math.ceil((n_meshes + MESH_CACHE_HEADROOM) / 64)) if str(args.mesh_cache).lower() == "auto" else int(args.mesh_cache)
+    sdf = sdf_grid_config(args)
+    kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms) if args.prebuild_planner else (), mesh_cache_size=cache, sdf_grid=sdf)
+    if sdf:
+        # APPROXIMATE OPT-IN (--collision sdf-grid): only spawned objects are meshes; the scene's static obstacles become voxel
+        # layers per band (BandComputer.setup_sdf_world), so the first sync loads nothing but the ground slab
+        kit.backend.mesh_object_filter = lambda o, _w=world: o.name in _w.spawned
+    kit.sync_world()
+    log.info("cuRobo mesh cache %d for %d loaded collision meshes (%d after the sync)%s", kit.backend.mesh_cache_size, n_meshes, len(kit.backend._world_mesh_names),
+             "" if cache is None else " [--mesh-cache: same-algorithm opt-in, marginal cells can differ from the 8192 default]")
+    if sdf:
+        log.info("collision world: sdf-grid (APPROXIMATE OPT-IN) - voxel %.3f m, %s voxels per layer, %d layers, mesh store %d for the spawned objects", sdf["res"],
+                 "x".join(str(v) for v in sdf["n"]), 3, sdf["mesh_cache"])
+    #: physics state a band starts from in a fresh process (robot parked, five physics steps, nothing spawned); restored
+    #: before every further band of a worker (:func:`reset_world_between_bands`)
+    world.parked_state = og.sim.dump_state()
+    log.info("scene %s rooms %s loaded in %.0fs (chairs removed: %s)", args.scene, rooms, time.time() - t_load, removed)
+    dump = os.environ.get("ISPATIALGYM_RB_DUMP_WORLD")
+    if dump:  # diagnostic: the loaded objects, the obstacle-filter verdicts and the cuRobo mesh names (to diff a --slim-load world against a full one)
+        rec = {"n_objects": len(world.scene.objects), "loaded_rooms": world.loaded_rooms, "n_curobo_meshes": len(kit.backend._world_mesh_names),
+               "curobo_meshes": sorted(kit.backend._world_mesh_names), "obstacles": sorted(o.name for o in world.scene.objects if o is not world.robot and world.obstacle_filter(o)),
+               "objects": {o.name: {"category": o.category, "in_rooms": list(o.in_rooms or []), "aabb": [[float(v) for v in b] for b in o.aabb],
+                                    "obstacle": bool(world.obstacle_filter(o))} for o in world.scene.objects if o is not world.robot}}
+        with open(dump, "w") as f:
+            json.dump(rec, f, indent=1)
+        log.info("world dump written to %s (%d objects, %d obstacles, %d cuRobo meshes)", dump, rec["n_objects"], len(rec["obstacles"]), rec["n_curobo_meshes"])
+    return world, kit
+
+
+def reset_world_between_bands(world, kit):
+    """Isolation of consecutive bands in one process (``--jobs``), so that band k sees exactly what a fresh process shows
+    a band: the previous band's spawned objects are removed; the render-side transforms are put back to the state after
+    the environment's load (``SimWorld.initial_state`` + one PhysX -> Fabric sync: a fresh process's ``aabb`` / raster /
+    first cuRobo sync read those, since only physics steps follow the load) and the physics side to the parked state
+    (``parked_state``, loaded without a step: the fresh process's five park steps, nothing more - the objects a band
+    spawns re-create PhysX from that state exactly as in a fresh process); the cuRobo world is re-synced (re-enables what
+    an ``ObstacleScope`` / ``MovingPlaced`` of a failed band may have left disabled, disables the removed objects'
+    meshes, re-poses every mesh from the restored transforms) and every solver's seed stream reset
+    (:func:`_reset_kit_seeds`). Measured 2026-09-16 on three two-trunk bands: byte-identical to their one-band runs."""
+    import omnigibson as og
+
+    for o in list(world.spawned.values()):
+        world.remove(o)
+    og.sim.load_state(world.initial_state, serialized=False)
+    world.sync_render_transforms()  # render side = the state after the load, as in a fresh process
+    # the physics side alone goes to the parked state: RigidDynamicPrim.set_position_orientation (what load_state calls
+    # per body while playing) writes the PhysX view and then syncs *every* body's PhysX pose to Fabric, which would move the
+    # render side to the parked poses too (a fresh process never renders between the load and its band; measured
+    # 2026-09-16: the support's AABB then differed by 2.4e-6 m and one pose of 1968 was pruned differently)
+    og.sim.sync_physx_to_fabric = lambda: None  # shadows the bound method on the simulator instance
+    try:
+        og.sim.load_state(world.parked_state, serialized=False)
+    finally:
+        del og.sim.sync_physx_to_fabric
+    if kit.backend.sdf_grid:  # --collision sdf-grid: the small mesh store is emptied of the previous band's objects; the layers are rebuilt per band
+        kit.backend.reload_mesh_store()
+        kit._synced_root = kit.backend.root_pose()[0].clone()
+    else:
+        kit.sync_world()
+    _reset_kit_seeds(kit)
+
+
+def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: List[str], floor_mode: bool, arms: Sequence[str], t_load: float,
+                 setup_s: float, job_id: Optional[str] = None, spawn_suffix: str = "") -> Dict[str, Any]:
+    """One band on an existing ``(world, kit)``: support geometry and stance, placed objects, target spawn, the band
+    computation, the ``.npz`` / ``.json`` files in ``out_dir`` and the ``REACH_BANDS {...}`` stdout line. Returns the
+    summary dict; raises on failure (the callers print ``REACH_BANDS_FAILED``). ``t_load`` = when the band's setup began
+    (``time_s`` counts from there), ``setup_s`` = world load / reuse time (meta ``setup_s``), ``spawn_suffix`` = suffix of
+    the spawned objects' names (the worker gives every band its own so that cuRobo, which caches mesh geometry by prim
+    path, never reuses a previous band's geometry for a re-spawned model at another scale)."""
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling import grasp_library as GL
+
     lattice = args.lattice if args.lattice is not None else (0.16 if args.smoke else LATTICE)
     scale = parse_scale(args.scale)
     trunk_sel = [tuple(float(v) for v in t.split(",")) for t in args.trunks] if args.trunks else None
-    floor_mode = args.support == "floor"
-    if floor_mode and not (args.room or args.under or args.rooms):
-        raise SystemExit("--support floor needs --room R (or --under PARTNER)")
-    anchor_name = args.under if floor_mode and args.under else (None if floor_mode else args.support)
-    rooms = args.rooms or ([args.room] if floor_mode and args.room else _rooms_of(args.scene, anchor_name))
-    if floor_mode and args.under and not args.room:
-        args.room = rooms[0]
-    out_dir = args.out or cache_root()
-    os.makedirs(out_dir, exist_ok=True)
-    variant, removed = (None, [])
-    if not floor_mode:
-        variant, removed = _chairs_variant(args.scene, args.support, rooms, os.path.join(out_dir, "scene_variants"))
-    t_load = time.time()
-    world = SimWorld(args.scene, rooms, scene_variant=variant)
     band_arm = args.arm
-    if args.generic_contact and args.brace:
-        raise SystemExit("--generic-contact and --brace are exclusive")
-    arms = ("right", "left") if args.brace else (band_arm,)
-    kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms))
-    kit.sync_world()
-    log.info("scene %s rooms %s loaded in %.0fs (chairs removed: %s)", args.scene, rooms, time.time() - t_load, removed)
+    stats0 = kit.stats_snapshot()
     bc = BandComputer(world, kit, arms=arms, lattice=lattice)
     if args.generic_contact:
         bc.fingers = 0.0  # closed gripper
@@ -1500,407 +2123,472 @@ def main(argv=None):
                                          "obstacle_z_above_m": ObstacleScope.Z_ABOVE}}
     if trunk_sel:
         meta["trunk_selection"] = trunk_sel
-    try:
-        if args.smoke:
-            t_fk = time.time()
-            meta["shoulder_fk_check"] = verify_shoulder_fk(world, kit, bc, SMOKE_FK_TRUNKS, arm="right")
-            log.info("shoulder FK check done in %.1fs", time.time() - t_fk)
-            kit.sync_world()
-        # ---- support geometry and stance
-        placed_objs = []
-        placed_specs = [PlacedSpec.parse(s) for s in args.placed]
-        under_edge_parts = None  # --under-edge: (outside cells, under cells near the edge, their clearances), finalized with the object height
+    if job_id is not None:
+        meta["job_id"] = job_id
+    if args.ik_tail_sizes:
+        sizes = tuple(sorted({int(v) for v in str(args.ik_tail_sizes).split(",") if v.strip()}))
+        if not sizes or sizes[-1] != BandComputer.IK_BATCH or sizes[0] < 1:
+            raise SystemExit(f"--ik-tail-sizes must be positive sizes ending with the batch size {BandComputer.IK_BATCH}, got {args.ik_tail_sizes!r}")
+        if sizes != tuple(BandComputer.IK_SIZES):
+            bc.IK_SIZES = sizes  # instance override; the class default stays the exact schedule
+            meta["schedule"]["ik_sizes"] = list(sizes)
+    if args.mesh_cache:  # same-algorithm opt-in (see load_world): record the capacity the bands were computed with
+        meta["schedule"]["mesh_cache"] = int(kit.backend.mesh_cache_size)
+    if args.no_trunk_bound:
+        bc.TRUNK_BOUND = False
+    grid_mode = bool(kit.backend.sdf_grid)  # --collision sdf-grid (approximate opt-in): the layers are built once the stance is known
+    if grid_mode != (getattr(args, "collision", None) == "sdf-grid"):
+        raise SystemExit(f"--collision {args.collision!r} does not match the loaded world (sdf-grid={grid_mode}); the worker groups jobs by collision mode")
+    #: file-name key extras: a grid band never overwrites / shadows an exact band of the same factors by name (the exact key is unchanged)
+    key_extra = {"collision": ["sdf_grid", float(kit.backend.sdf_grid["res"])]} if grid_mode else {}
+    if args.smoke:
+        t_fk = time.time()
+        meta["shoulder_fk_check"] = verify_shoulder_fk(world, kit, bc, SMOKE_FK_TRUNKS, arm="right")
+        log.info("shoulder FK check done in %.1fs", time.time() - t_fk)
+        kit.sync_world()
+    # ---- support geometry and stance
+    placed_objs = []
+    placed_specs = [PlacedSpec.parse(s) for s in args.placed]
+    under_edge_parts = None  # --under-edge: (outside cells, under cells near the edge, their clearances), finalized with the object height
+    if grid_mode:
+        # the stance search below runs whole-body checks at candidate base poses: the layers are built around each of them
+        # (BandComputer.trunk_config), the object ignored at the grasp pose (support / floor) in its own layer from the start
         if floor_mode:
-            z_support = world.floor_z
-            if args.under:
-                partner = world.obj(args.under)
-                # under-edge push band: rank the partner's edges by the deep floor trunks the band will use (a crouch next to a
-                # bed collides on the cramped side); the plain under band keeps the (0.5, 0) probe
-                deep = trunk_sel or [(tr, ti) for tr in (0.75, 0.95) for ti in (-0.9, -1.2)]
-                stance = bc.stance_under(partner, args.stand_off, probe_trunks=deep if args.under_edge else None)
-                lo, hi = partner.aabb
-                res = 0.02
-                xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
-                ys = th.arange(float(lo[1]) + res / 2, float(hi[1]), res)
-                gx, gy = th.meshgrid(xs, ys, indexing="ij")
-                pts = th.stack([gx.flatten(), gy.flatten()], dim=1)
-                starts = th.cat([pts, th.full((len(pts), 1), world.floor_z + 0.005)], dim=1)
-                ends = starts.clone()
-                ends[:, 2] = float(hi[2]) + 0.5
-                hits = world.raycast(starts, ends)
-                prims = {l.prim_path for l in partner.links.values()}
-                clear = th.tensor([bool(h["hit"] and h["rigidBody"] in prims) for h in hits])
-                clearance = th.tensor([float(h["position"][2]) - world.floor_z if h["hit"] else 0.0 for h in hits])
-                lattice_world = pts[clear]
-                meta["under_clearance_m"] = {"min": float(clearance[clear].min()) if int(clear.sum()) else None, "max": float(clearance[clear].max()) if int(clear.sum()) else None}
-                meta["under_partner"] = args.under
-                ignore_grasp = [world.obj(world.floor_of_room(rooms[0]).name)] if rooms else []
-                if args.under_edge:
-                    # under-edge strip (push-under): the free floor in front of the near edge (drop cells, up to UNDER_EDGE_OUT_M
-                    # outside) + the clear cells under the partner within UNDER_EDGE_IN_M of that edge (goal cells; the object
-                    # height filter is applied once the object is spawned). Everything in base coordinates at the edge stance.
-                    origin, fwd, left = bc.base_frame(stance)
-                    inward = th.tensor(stance["inward"])
-                    mid = th.tensor(stance["edge_mid"])
-                    edge_depth = float(stance["edge_depth"])  # distance base -> edge along the inward direction
-                    xs = th.arange(max(0.2, edge_depth - UNDER_EDGE_OUT_M), edge_depth + 1e-6, res)
-                    ls = th.arange(-STRIP_HALF_WIDTH, STRIP_HALF_WIDTH + 1e-6, res)
-                    gx, gl = th.meshgrid(xs, ls, indexing="ij")
-                    outside = origin + gx.flatten().unsqueeze(1) * fwd + gl.flatten().unsqueeze(1) * left
-                    outside = th.stack([c for c in outside if kit.trav_free(c)]) if len(outside) else outside
-                    under_pts = pts[clear]
-                    depth = (under_pts - mid) @ inward
-                    near = (depth >= -res) & (depth <= UNDER_EDGE_IN_M)
-                    under_edge_parts = (outside, under_pts[near], clearance[clear][near])
-                    meta["under_edge"] = {"out_m": UNDER_EDGE_OUT_M, "in_m": UNDER_EDGE_IN_M, "clearance_extra_m": UNDER_EDGE_CLEARANCE_EXTRA_M, "n_outside": int(len(outside)),
-                                          "n_under_near": int(near.sum()), "edge_depth_m": edge_depth,
-                                          "lattice": "free floor strip in front of the partner's near edge (drop cells) + clear floor under it within in_m of the edge (goal cells)"}
-                    log.info("under-edge band at %s: %d free floor cells in front of the edge (%.2f m ahead of the base), %d clear cells under it within %.2f m",
-                             args.under, len(outside), edge_depth, int(near.sum()), UNDER_EDGE_IN_M)
-            else:
-                stance = bc.stance_free_floor(args.room)
-                origin, fwd, left = bc.base_frame(stance)
-                xs = th.arange(0.2, STRIP_MAX_DEPTH + 0.5, 0.02)
-                ls = th.arange(-STRIP_HALF_WIDTH, STRIP_HALF_WIDTH + 1e-6, 0.02)
-                gx, gl = th.meshgrid(xs, ls, indexing="ij")
-                lattice_world = origin + gx.flatten().unsqueeze(1) * fwd + gl.flatten().unsqueeze(1) * left
-                lattice_world = th.stack([c for c in lattice_world if kit.trav_free(c)]) if len(lattice_world) else lattice_world
-                ignore_grasp = [world.floor_of_room(args.room)] if args.room else []
-            top_json = {"z": z_support, "kind": "floor"}
+            room = rooms[0] if args.under else args.room
+            sdf_ignore = [world.floor_of_room(room)] if room else []
         else:
-            support = world.obj(args.support)
-            top = world.support_top(support)
-            z_support = top.z
-            stance = bc.stance_at_edge(top, support, args.stand_off, args.edge)
-            lattice_world = top.cells(free_only=True)
-            ignore_grasp = [support]
-            top_json = top.to_json()
-            # objects placed before the target (disembedding source tray), long axis along the edge. ``edge`` mode (legacy):
-            # centred on the stance line, near edge PLACED_EDGE_SETBACK behind the front edge, the lattice = its inner
-            # floor. ``focus_centred_edge_aligned`` (owner item 9, stance-relative): the tray is measured at that pose,
-            # then follows the cell - inner-floor centroid on the cell -, the lattice = the top cells where it fits and
-            # its collision meshes are checked per cell (MovingPlaced); the grasped object stands on its floor at the cell.
-            moving_placed = []
-            for ps in placed_specs:
-                cat, model = ps.category, ps.model
-                obj = world.spawn(f"placed_{cat}_{model}", cat, model, dataset=_dataset_of(cat, model, None), scale=ps.scale_list())
-                hull = world.local_hull(obj)
-                ext = hull.max(dim=0).values - hull.min(dim=0).values
-                tangent = th.tensor(stance["tangent"])
+            sdf_ignore = [world.obj(args.support)]
+        bc.sdf_prepare(args.scene, sdf_ignore, sdf_cache_dir(args, out_dir))
+    if floor_mode:
+        z_support = world.floor_z
+        if args.under:
+            partner = world.obj(args.under)
+            # under-edge push band: rank the partner's edges by the deep floor trunks the band will use (a crouch next to a
+            # bed collides on the cramped side); the plain under band keeps the (0.5, 0) probe
+            deep = trunk_sel or [(tr, ti) for tr in (0.75, 0.95) for ti in (-0.9, -1.2)]
+            stance = bc.stance_under(partner, args.stand_off, probe_trunks=deep if args.under_edge else None)
+            lo, hi = partner.aabb
+            res = 0.02
+            xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
+            ys = th.arange(float(lo[1]) + res / 2, float(hi[1]), res)
+            gx, gy = th.meshgrid(xs, ys, indexing="ij")
+            pts = th.stack([gx.flatten(), gy.flatten()], dim=1)
+            starts = th.cat([pts, th.full((len(pts), 1), world.floor_z + 0.005)], dim=1)
+            ends = starts.clone()
+            ends[:, 2] = float(hi[2]) + 0.5
+            hits = world.raycast(starts, ends)
+            prims = {l.prim_path for l in partner.links.values()}
+            clear = th.tensor([bool(h["hit"] and h["rigidBody"] in prims) for h in hits])
+            clearance = th.tensor([float(h["position"][2]) - world.floor_z if h["hit"] else 0.0 for h in hits])
+            lattice_world = pts[clear]
+            meta["under_clearance_m"] = {"min": float(clearance[clear].min()) if int(clear.sum()) else None, "max": float(clearance[clear].max()) if int(clear.sum()) else None}
+            meta["under_partner"] = args.under
+            ignore_grasp = [world.obj(world.floor_of_room(rooms[0]).name)] if rooms else []
+            if args.under_edge:
+                # under-edge strip (push-under): the free floor in front of the near edge (drop cells, up to UNDER_EDGE_OUT_M
+                # outside) + the clear cells under the partner within UNDER_EDGE_IN_M of that edge (goal cells; the object
+                # height filter is applied once the object is spawned). Everything in base coordinates at the edge stance.
+                origin, fwd, left = bc.base_frame(stance)
                 inward = th.tensor(stance["inward"])
-                tangent_yaw = math.atan2(float(tangent[1]), float(tangent[0]))
-                yaw = tangent_yaw if float(ext[0]) >= float(ext[1]) else tangent_yaw - math.pi / 2
-                quat = G.quat_from_yaw(yaw)
-                fp0 = world.footprint(hull, (th.zeros(3), quat))
-                half_depth = float((fp0 @ inward).abs().max())
                 mid = th.tensor(stance["edge_mid"])
-                xy = mid + inward * (PLACED_EDGE_SETBACK + half_depth)
-                pos = th.tensor([float(xy[0]), float(xy[1]), top.z + world.bottom_offset(hull, quat) + 0.003])
-                obj.set_position_orientation(pos, quat)
-                world.activate(obj)
-                world.step_physics(30, still=[world.robot])
-                p0, q0 = obj.get_position_orientation()
-                pose0 = (p0.float(), q0.float())
-                placed_objs.append((obj, pose0))
-                # inner floor raster of the placed object (lowest inner level hit by downward rays)
-                lo, hi = obj.aabb
-                res = 0.01
-                xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
-                ys = th.arange(float(lo[1]) + res / 2, float(hi[1]), res)
-                gx, gy = th.meshgrid(xs, ys, indexing="ij")
-                starts = th.stack([gx.flatten(), gy.flatten(), th.full_like(gx.flatten(), float(hi[2]) + 0.10)], dim=1)
-                ends = starts.clone()
-                ends[:, 2] = float(lo[2]) - 0.02
-                hits = world.raycast(starts, ends)
-                prims = {l.prim_path for l in obj.links.values()}
-                zs = th.tensor([float(h["position"][2]) if (h["hit"] and h["rigidBody"] in prims) else float("nan") for h in hits])
-                valid = zs[~th.isnan(zs)]
-                floor_z = float(th.quantile(valid, 0.10))
-                keep = (~th.isnan(zs)) & ((zs - floor_z).abs() < 0.004)
-                floor_cells = starts[keep][:, :2]
-                z_support = floor_z
-                c_w = floor_cells.mean(dim=0)
-                c_local = G.relative((th.tensor([float(c_w[0]), float(c_w[1]), floor_z]), G.IDENTITY_QUAT), pose0)[0]
-                rec = dict(ps.to_json(), pose=[pos.tolist(), quat.tolist()], pose_settled=[pose0[0].tolist(), pose0[1].tolist()], floor_z=floor_z,
-                           n_floor_cells=int(keep.sum()), floor_centre_local=[round(float(v), 4) for v in c_local.tolist()], yaw=yaw,
-                           hull_extent=[round(float(v), 4) for v in ext.tolist()],
-                           yaw_rule="long footprint axis along the edge tangent: yaw = tangent_yaw if extent_x >= extent_y else tangent_yaw - pi/2")
-                if ps.mode == PLACED_MODE_FOCUS:
-                    off = (c_w - pose0[0][:2]).clone()  # root -> inner-floor centroid, world xy at this yaw
-                    z0 = float(pose0[0][2])
+                edge_depth = float(stance["edge_depth"])  # distance base -> edge along the inward direction
+                xs = th.arange(max(0.2, edge_depth - UNDER_EDGE_OUT_M), edge_depth + 1e-6, res)
+                ls = th.arange(-STRIP_HALF_WIDTH, STRIP_HALF_WIDTH + 1e-6, res)
+                gx, gl = th.meshgrid(xs, ls, indexing="ij")
+                outside = origin + gx.flatten().unsqueeze(1) * fwd + gl.flatten().unsqueeze(1) * left
+                outside = th.stack([c for c in outside if kit.trav_free(c)]) if len(outside) else outside
+                under_pts = pts[clear]
+                depth = (under_pts - mid) @ inward
+                near = (depth >= -res) & (depth <= UNDER_EDGE_IN_M)
+                under_edge_parts = (outside, under_pts[near], clearance[clear][near])
+                meta["under_edge"] = {"out_m": UNDER_EDGE_OUT_M, "in_m": UNDER_EDGE_IN_M, "clearance_extra_m": UNDER_EDGE_CLEARANCE_EXTRA_M, "n_outside": int(len(outside)),
+                                      "n_under_near": int(near.sum()), "edge_depth_m": edge_depth,
+                                      "lattice": "free floor strip in front of the partner's near edge (drop cells) + clear floor under it within in_m of the edge (goal cells)"}
+                log.info("under-edge band at %s: %d free floor cells in front of the edge (%.2f m ahead of the base), %d clear cells under it within %.2f m",
+                         args.under, len(outside), edge_depth, int(near.sum()), UNDER_EDGE_IN_M)
+        else:
+            stance = bc.stance_free_floor(args.room)
+            origin, fwd, left = bc.base_frame(stance)
+            xs = th.arange(0.2, STRIP_MAX_DEPTH + 0.5, 0.02)
+            ls = th.arange(-STRIP_HALF_WIDTH, STRIP_HALF_WIDTH + 1e-6, 0.02)
+            gx, gl = th.meshgrid(xs, ls, indexing="ij")
+            lattice_world = origin + gx.flatten().unsqueeze(1) * fwd + gl.flatten().unsqueeze(1) * left
+            lattice_world = th.stack([c for c in lattice_world if kit.trav_free(c)]) if len(lattice_world) else lattice_world
+            ignore_grasp = [world.floor_of_room(args.room)] if args.room else []
+        top_json = {"z": z_support, "kind": "floor"}
+    else:
+        support = world.obj(args.support)
+        top = world.support_top(support)
+        z_support = top.z
+        stance = bc.stance_at_edge(top, support, args.stand_off, args.edge)
+        lattice_world = top.cells(free_only=True)
+        ignore_grasp = [support]
+        top_json = top.to_json()
+        # objects placed before the target (disembedding source tray), long axis along the edge. ``edge`` mode (legacy):
+        # centred on the stance line, near edge PLACED_EDGE_SETBACK behind the front edge, the lattice = its inner
+        # floor. ``focus_centred_edge_aligned`` (owner item 9, stance-relative): the tray is measured at that pose,
+        # then follows the cell - inner-floor centroid on the cell -, the lattice = the top cells where it fits and
+        # its collision meshes are checked per cell (MovingPlaced); the grasped object stands on its floor at the cell.
+        moving_placed = []
+        for ps in placed_specs:
+            cat, model = ps.category, ps.model
+            obj = world.spawn(f"placed_{cat}_{model}{spawn_suffix}", cat, model, dataset=_dataset_of(cat, model, None), scale=ps.scale_list())
+            hull = world.local_hull(obj)
+            ext = hull.max(dim=0).values - hull.min(dim=0).values
+            tangent = th.tensor(stance["tangent"])
+            inward = th.tensor(stance["inward"])
+            tangent_yaw = math.atan2(float(tangent[1]), float(tangent[0]))
+            yaw = tangent_yaw if float(ext[0]) >= float(ext[1]) else tangent_yaw - math.pi / 2
+            quat = G.quat_from_yaw(yaw)
+            fp0 = world.footprint(hull, (th.zeros(3), quat))
+            half_depth = float((fp0 @ inward).abs().max())
+            mid = th.tensor(stance["edge_mid"])
+            xy = mid + inward * (PLACED_EDGE_SETBACK + half_depth)
+            pos = th.tensor([float(xy[0]), float(xy[1]), top.z + world.bottom_offset(hull, quat) + 0.003])
+            obj.set_position_orientation(pos, quat)
+            world.activate(obj)
+            world.step_physics(30, still=[world.robot])
+            p0, q0 = obj.get_position_orientation()
+            pose0 = (p0.float(), q0.float())
+            placed_objs.append((obj, pose0))
+            # inner floor raster of the placed object (lowest inner level hit by downward rays)
+            lo, hi = obj.aabb
+            res = 0.01
+            xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
+            ys = th.arange(float(lo[1]) + res / 2, float(hi[1]), res)
+            gx, gy = th.meshgrid(xs, ys, indexing="ij")
+            starts = th.stack([gx.flatten(), gy.flatten(), th.full_like(gx.flatten(), float(hi[2]) + 0.10)], dim=1)
+            ends = starts.clone()
+            ends[:, 2] = float(lo[2]) - 0.02
+            hits = world.raycast(starts, ends)
+            prims = {l.prim_path for l in obj.links.values()}
+            zs = th.tensor([float(h["position"][2]) if (h["hit"] and h["rigidBody"] in prims) else float("nan") for h in hits])
+            valid = zs[~th.isnan(zs)]
+            floor_z = float(th.quantile(valid, 0.10))
+            keep = (~th.isnan(zs)) & ((zs - floor_z).abs() < 0.004)
+            floor_cells = starts[keep][:, :2]
+            z_support = floor_z
+            c_w = floor_cells.mean(dim=0)
+            c_local = G.relative((th.tensor([float(c_w[0]), float(c_w[1]), floor_z]), G.IDENTITY_QUAT), pose0)[0]
+            rec = dict(ps.to_json(), pose=[pos.tolist(), quat.tolist()], pose_settled=[pose0[0].tolist(), pose0[1].tolist()], floor_z=floor_z,
+                       n_floor_cells=int(keep.sum()), floor_centre_local=[round(float(v), 4) for v in c_local.tolist()], yaw=yaw,
+                       hull_extent=[round(float(v), 4) for v in ext.tolist()],
+                       yaw_rule="long footprint axis along the edge tangent: yaw = tangent_yaw if extent_x >= extent_y else tangent_yaw - pi/2")
+            if ps.mode == PLACED_MODE_FOCUS:
+                off = (c_w - pose0[0][:2]).clone()  # root -> inner-floor centroid, world xy at this yaw
+                z0 = float(pose0[0][2])
 
-                    def pose_at(world_xy, _off=off, _z=z0, _q=pose0[1]):
-                        return th.tensor([float(world_xy[0]) - float(_off[0]), float(world_xy[1]) - float(_off[1]), _z]), _q
+                def pose_at(world_xy, _off=off, _z=z0, _q=pose0[1]):
+                    return th.tensor([float(world_xy[0]) - float(_off[0]), float(world_xy[1]) - float(_off[1]), _z]), _q
 
-                    # the lattice is the whole near strip of the top (as for the plain bands): the band is relative to the base, the
-                    # sampler shifts it with its own stand-off and checks the tray's fit on the top / in the frame itself (a cell
-                    # near the front edge is the stance-relative geometry of a closer stance, so it is not filtered here)
-                    _, world_c = bc.lattice_on_cells(stance, top.cells(free_only=True))
-                    lattice_world = world_c
-                    fit = th.tensor([top.polygon_supported(fp0 + pose_at(c)[0][:2], margin=PLACED_FIT_MARGIN) for c in world_c], dtype=th.bool) if len(world_c) else th.zeros(0, dtype=th.bool)
-                    moving_placed.append((obj, pose0, pose_at))
-                    rec.update({"lattice": "near strip of the top (the tray follows every cell; its fit on the top is the sampler's check at its stance)",
-                                "n_lattice_top": int(len(world_c)), "n_lattice_fit_at_band_stance": int(fit.sum()), "fit_margin": PLACED_FIT_MARGIN,
-                                "pose_rule": "root xy = cell - (floor centroid - root) at the edge-aligned yaw, z = top + bottom_offset(hull, quat) + 0.003; "
-                                             "the grasped object stands on the floor (z_support) at the cell; collision meshes checked per cell for the pre-grasp, "
-                                             "ignored for the grasp pose"})
-                    log.info("placed %s (%s): floor z %.3f, %d floor cells, centroid offset from the root %s; %d top lattice cells (%d admit the tray at the band stance)",
-                             ps.canonical(), ps.mode, floor_z, int(keep.sum()), [round(float(v), 3) for v in off.tolist()], len(world_c), int(fit.sum()))
-                else:
-                    lattice_world = floor_cells
-                    ignore_grasp.append(obj)
-                meta.setdefault("placed", []).append(rec)
-            kit.sync_world()
-            if len(moving_placed) > 1:
-                raise SystemExit("at most one --placed object in the focus_centred_edge_aligned mode")
-            for obj, pose0, pose_at in moving_placed:
-                bc.cell_obstacle = MovingPlaced(kit, world, obj, pose0, pose_at)
-                if not bc.cell_obstacle.names:
-                    raise RuntimeError(f"placed object {obj.name}: no collision meshes in the cuRobo world")
-                if args.smoke:  # moved-mesh geometry against the simulator at a cell of the reachable strip (0.56 m ahead, 8 cm right)
-                    origin, fwd, left = bc.base_frame(stance)
-                    meta["placed"][-1]["self_check"] = bc.cell_obstacle.self_check(origin + 0.56 * fwd - 0.08 * left)
-        meta.update({"stance": stance, "top": top_json, "z_support": z_support})
+                # the lattice is the whole near strip of the top (as for the plain bands): the band is relative to the base, the
+                # sampler shifts it with its own stand-off and checks the tray's fit on the top / in the frame itself (a cell
+                # near the front edge is the stance-relative geometry of a closer stance, so it is not filtered here)
+                _, world_c = bc.lattice_on_cells(stance, top.cells(free_only=True))
+                lattice_world = world_c
+                fit = th.tensor([top.polygon_supported(fp0 + pose_at(c)[0][:2], margin=PLACED_FIT_MARGIN) for c in world_c], dtype=th.bool) if len(world_c) else th.zeros(0, dtype=th.bool)
+                moving_placed.append((obj, pose0, pose_at))
+                rec.update({"lattice": "near strip of the top (the tray follows every cell; its fit on the top is the sampler's check at its stance)",
+                            "n_lattice_top": int(len(world_c)), "n_lattice_fit_at_band_stance": int(fit.sum()), "fit_margin": PLACED_FIT_MARGIN,
+                            "pose_rule": "root xy = cell - (floor centroid - root) at the edge-aligned yaw, z = top + bottom_offset(hull, quat) + 0.003; "
+                                         "the grasped object stands on the floor (z_support) at the cell; collision meshes checked per cell for the pre-grasp, "
+                                         "ignored for the grasp pose"})
+                log.info("placed %s (%s): floor z %.3f, %d floor cells, centroid offset from the root %s; %d top lattice cells (%d admit the tray at the band stance)",
+                         ps.canonical(), ps.mode, floor_z, int(keep.sum()), [round(float(v), 3) for v in off.tolist()], len(world_c), int(fit.sum()))
+            else:
+                lattice_world = floor_cells
+                ignore_grasp.append(obj)
+            meta.setdefault("placed", []).append(rec)
+        kit.sync_world()
+        if len(moving_placed) > 1:
+            raise SystemExit("at most one --placed object in the focus_centred_edge_aligned mode")
+        for obj, pose0, pose_at in moving_placed:
+            bc.cell_obstacle = MovingPlaced(kit, world, obj, pose0, pose_at)
+            if not bc.cell_obstacle.names:
+                raise RuntimeError(f"placed object {obj.name}: no collision meshes in the cuRobo world")
+            if args.smoke:  # moved-mesh geometry against the simulator at a cell of the reachable strip (0.56 m ahead, 8 cm right)
+                origin, fwd, left = bc.base_frame(stance)
+                meta["placed"][-1]["self_check"] = bc.cell_obstacle.self_check(origin + 0.56 * fwd - 0.08 * left)
+    meta.update({"stance": stance, "top": top_json, "z_support": z_support})
 
-        def restore_placed():
-            """``world.spawn`` (of the grasped object) re-parks every object spawned before it: put the placed objects back
-            at their measured poses so that they are obstacles again (the ``edge`` mode's fixed tray; the focus mode moves
-            its collision meshes itself but keeps the body where the meshes were measured)."""
-            for po, p0 in placed_objs:
-                po.set_position_orientation(p0[0], p0[1])
-                world.activate(po)
-            if placed_objs:
-                world.step_physics(5, still=[world.robot])
+    def restore_placed():
+        """``world.spawn`` (of the grasped object) re-parks every object spawned before it: put the placed objects back
+        at their measured poses so that they are obstacles again (the ``edge`` mode's fixed tray; the focus mode moves
+        its collision meshes itself but keeps the body where the meshes were measured)."""
+        for po, p0 in placed_objs:
+            po.set_position_orientation(p0[0], p0[1])
+            world.activate(po)
+        if placed_objs:
+            world.step_physics(5, still=[world.robot])
 
-        # ---- object / grasp set
-        if args.brace:
-            assert args.target and args.handle_key and args.joint and args.joint_values, "--brace needs --target --handle-key --joint --joint-values"
-            cat, model = args.target.split("/", 1)
-            from ispatialgym.sampling.grasp_library import library_root
+    # ---- object / grasp set
+    if args.brace:
+        assert args.target and args.handle_key and args.joint and args.joint_values, "--brace needs --target --handle-key --joint --joint-values"
+        cat, model = args.target.split("/", 1)
+        from ispatialgym.sampling.grasp_library import library_root
 
-            with open(os.path.join(library_root(), "artic", "handles", f"{args.handle_key}.json")) as f:
-                hdata = json.load(f)
-            jinfo = next(j for j in hdata["joints"] if j["joint"] == args.joint)
-            handles = [h for h in jinfo.get("handles", []) if h.get("kind") in ("bar", "knob")] or ([jinfo["fallback"]] if jinfo.get("fallback") else [])
-            if not handles:
-                raise SystemExit(f"no graspable handle for {args.handle_key}/{args.joint}")
-            hdata["handle"] = handles[0]
-            q_values = [float(v) for v in args.joint_values.split(",")]
-            obj = world.spawn(f"target_{cat}_{model}", cat, model, dataset=_dataset_of(cat, model, args.dataset), scale=scale)
+        with open(os.path.join(library_root(), "artic", "handles", f"{args.handle_key}.json")) as f:
+            hdata = json.load(f)
+        jinfo = next(j for j in hdata["joints"] if j["joint"] == args.joint)
+        handles = [h for h in jinfo.get("handles", []) if h.get("kind") in ("bar", "knob")] or ([jinfo["fallback"]] if jinfo.get("fallback") else [])
+        if not handles:
+            raise SystemExit(f"no graspable handle for {args.handle_key}/{args.joint}")
+        hdata["handle"] = handles[0]
+        q_values = [float(v) for v in args.joint_values.split(",")]
+        obj = world.spawn(f"target_{cat}_{model}{spawn_suffix}", cat, model, dataset=_dataset_of(cat, model, args.dataset), scale=scale)
+        hull = world.local_hull(obj)
+        world.park(obj, len(world.spawned) - 1)
+        restore_placed()
+        kit.sync_world()
+        # facing direction: moving face outward normal (lids: from the hinge line to the centre) points at the robot
+        outward = th.tensor(jinfo.get("outward_normal", [1.0, 0.0, 0.0]), dtype=th.float32)
+        if abs(float(outward[2])) > 0.9:
+            axis = th.tensor(jinfo.get("axis_dir_obj", [0.0, 1.0, 0.0]), dtype=th.float32)
+            hinge = th.tensor(jinfo.get("hinge_point_obj", [0.0, 0.0, 0.0]), dtype=th.float32)
+            perp = th.cross(axis, th.tensor([0.0, 0.0, 1.0]), dim=0)
+            centre = hull.mean(dim=0)
+            if float(th.dot(perp[:2], (centre - hinge)[:2])) < 0:
+                perp = -perp
+            outward = perp
+        outward[2] = 0.0
+        outward = outward / th.linalg.norm(outward)
+        inward = th.tensor(stance["inward"])
+        face_yaw = math.atan2(float(-inward[1]), float(-inward[0])) - math.atan2(float(outward[1]), float(outward[0]))
+        # handle arm = the arm on the handle's side of the target centre (> 5 cm), else right; brace = the other
+        hc = th.tensor(hdata["handle"]["contact"], dtype=th.float32)
+        side_axis = th.tensor([-float(outward[1]), float(outward[0]), 0.0])  # robot's left when the face points at the robot
+        lat = float(th.dot(hc - hull.mean(dim=0), side_axis))
+        handle_arm = "left" if lat > 0.05 else "right"
+        brace_arm = "right" if handle_arm == "left" else "left"
+        brace_side = 1.0 if brace_arm == "left" else -1.0
+        x0, y0, yaw0 = stance["base_pose2d"]
+        face_off = G.wrap_angle(face_yaw - yaw0)  # object yaw offset (relative to the base yaw) with the moving face toward the robot
+        meta.update({"target": args.target, "handle_key": args.handle_key, "joint": args.joint, "joint_values": q_values, "face_yaw_offset": face_off,
+                     "handle_arm": handle_arm, "brace_arm": brace_arm, "handle": hdata["handle"]})
+        base_cells, world_cells = bc.lattice_on_cells(stance, lattice_world)
+        trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
+        meta["grid"] = grid_meta((z_support - world.floor_z) < LOW_TOP_Z)  # the ground trunks are part of a LOW top's key (W1)
+        per_trunk = []
+        cells_out: Dict[Tuple[float, float], np.ndarray] = {}
+        if grid_mode:
+            meta["schedule"]["collision"] = bc.setup_sdf_world(stance, trunks, (handle_arm, brace_arm))
+        bc.scope = ObstacleScope(kit, world, (x0, y0), drop_ground=(z_support - world.floor_z) >= 0.55).__enter__()
+        for tr, ti in trunks:
+            t0 = time.time()
+            entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_reachable": 0, "time_s": 0.0, "feasible": [], "posture": None}
+            q, posture = bc.trunk_config(tr, ti, x0, y0, yaw0)
+            if q is None:
+                entry["collides"] = True
+                per_trunk.append(entry)
+                cells_out[(tr, ti)] = np.zeros((0, 2))
+                log.info("brace trunk (%.2f, %+.1f): collides with every idle-arm posture, skipped", tr, ti)
+                continue
+            entry["posture"] = posture
+            entry["idle_arm_q"] = bc.idle_arm_q(q)
+            # 3 yaws about the facing yaw (offsets relative to the base yaw). Per (cell, yaw) the handle [pre-grasp, grasp]
+            # is screened at every listed joint value (spec 5.4: the output is the SET of joint values whose handle poses
+            # are feasible; the sampler requires its direction's waypoints to be a subset), then the brace [pre, contact]
+            # candidates with the brace arm for the (cell, yaw) pairs with >= 1 feasible joint value. A cell is in the band
+            # when some yaw has >= 1 feasible joint value and >= 1 feasible brace kind; the yaw with the most feasible
+            # joint values (ties: the facing yaw first) is recorded. Batched per trunk: every handle pre-grasp of every
+            # (cell, yaw, q) in one IK call, the grasps of the pre-feasible ones in a second (support ignored), the brace
+            # pairs in a third.
+            shoulder, arm_len = bc.shoulder_and_reach(q, handle_arm)
+            pts = th.cat([world_cells, th.full((len(world_cells), 1), z_support)], dim=1)
+            near = th.linalg.norm(pts - shoulder, dim=1) <= arm_len + float(th.linalg.norm(th.tensor(hdata["handle"]["contact"]))) + PRE_GRASP + 0.05
+            yaw_offsets = (face_off, face_off - 0.1, face_off + 0.1)
+            combos = [(i, dy) for i in range(len(base_cells)) if bool(near[i]) for dy in yaw_offsets]
+            obj_poses = {c: bc.object_pose_at(world_cells[c[0]], yaw0 + c[1], z_support, hull, G.IDENTITY_QUAT) for c in combos}
+            handle_pairs = {c: [handle_pose_at_q(jinfo, hdata["handle"], qv, obj_poses[c], G) for qv in q_values] for c in combos}
+            flat = [(c, k) for c in combos for k in range(len(q_values))]
+            ok_pre = bc.ik_screen([handle_pairs[c][k][0] for c, k in flat], q, handle_arm)
+            pre_ok = [(c, k) for n, (c, k) in enumerate(flat) if bool(ok_pre[n])]
+            with bc.ignoring(ignore_grasp):
+                ok_g = bc.ik_screen([handle_pairs[c][k][1] for c, k in pre_ok], q, handle_arm)
+            handle_ok: Dict[Tuple[int, float], List[int]] = {}
+            for n, (c, k) in enumerate(pre_ok):
+                if bool(ok_g[n]):
+                    handle_ok.setdefault(c, []).append(k)
+            surv = [c for c in combos if c in handle_ok]
+            braces = {c: brace_candidates(jinfo, hdata, obj_poses[c], q_values, brace_side, G) for c in surv}
+            bflat = [(c, kind) for c in surv for kind, _ in braces[c]]
+            bposes = [pose for c in surv for _, pair in braces[c] for pose in pair]
+            brace_prefix = {c: (braces[c][0].q_prefix if braces[c] else 0) for c in surv}
+            ok_b = bc.ik_screen(bposes, q, brace_arm)
+            brace_ok: Dict[Tuple[int, float], List[str]] = {}
+            for n, (c, kind) in enumerate(bflat):
+                if bool(ok_b[2 * n]) and bool(ok_b[2 * n + 1]):
+                    brace_ok.setdefault(c, []).append(kind)
+            feasible_cells = []
+            n_handle_only = 0
+            for i in range(len(base_cells)):
+                best = None
+                for dy in yaw_offsets:
+                    c = (i, dy)
+                    if c not in handle_ok:
+                        continue
+                    if c not in brace_ok:
+                        n_handle_only += 1
+                        continue
+                    if best is None or len(handle_ok[c]) > len(handle_ok[best]):
+                        best = c
+                if best is not None:
+                    feasible_cells.append((i, best[1], sorted(handle_ok[best]), brace_ok[best], brace_prefix[best]))
+            entry["n_after_prune"] = int(near.sum())
+            entry["n_reachable"] = len(feasible_cells)
+            entry["n_handle_only_pairs"] = n_handle_only
+            entry["n_all_q"] = sum(1 for _, _, ks, _, _ in feasible_cells if len(ks) == len(q_values))
+            entry["feasible"] = [{"cell": base_cells[i].tolist(), "yaw_offset": yaw, "q_indices": ks, "q_feasible": [q_values[k] for k in ks], "brace_kinds": kinds,
+                                  "brace_q_prefix": kp}
+                                 for i, yaw, ks, kinds, kp in feasible_cells]
+            entry["time_s"] = round(time.time() - t0, 2)
+            per_trunk.append(entry)
+            cells_out[(tr, ti)] = base_cells[[i for i, _, _, _, _ in feasible_cells]].numpy() if feasible_cells else np.zeros((0, 2))
+            log.info("brace trunk (%.2f, %+.1f): %d/%d cells feasible (%d with every joint value; %d (cell, yaw) handle-only), %.1fs", tr, ti,
+                     len(feasible_cells), len(base_cells), entry["n_all_q"], n_handle_only, entry["time_s"])
+        bc.scope.__exit__(None, None, None)
+        bc.scope = None
+        result = {"trunks": per_trunk, "cells": cells_out, "pairs": {}}
+        key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "target": args.target,
+                    "scale": scale, "handle_key": args.handle_key, "joint": args.joint, "q": q_values, "brace": True, "grid": meta["grid"], "lattice": lattice, "arms": "untucked",
+                    **key_extra})
+        name = f"brace__{args.scene}__{args.support}__{cat}-{model}__{key}"
+    else:
+        grasps, rest_quat, max_off = None, G.IDENTITY_QUAT.clone(), 0.0
+        hull = None
+        if args.object:
+            cat, model = args.object.split("/", 1)
+            obj = world.spawn(f"target_{cat}_{model}{spawn_suffix}", cat, model, dataset=_dataset_of(cat, model, args.dataset), scale=scale)
             hull = world.local_hull(obj)
             world.park(obj, len(world.spawned) - 1)
-            restore_placed()
-            kit.sync_world()
-            # facing direction: moving face outward normal (lids: from the hinge line to the centre) points at the robot
-            outward = th.tensor(jinfo.get("outward_normal", [1.0, 0.0, 0.0]), dtype=th.float32)
-            if abs(float(outward[2])) > 0.9:
-                axis = th.tensor(jinfo.get("axis_dir_obj", [0.0, 1.0, 0.0]), dtype=th.float32)
-                hinge = th.tensor(jinfo.get("hinge_point_obj", [0.0, 0.0, 0.0]), dtype=th.float32)
-                perp = th.cross(axis, th.tensor([0.0, 0.0, 1.0]), dim=0)
-                centre = hull.mean(dim=0)
-                if float(th.dot(perp[:2], (centre - hinge)[:2])) < 0:
-                    perp = -perp
-                outward = perp
-            outward[2] = 0.0
-            outward = outward / th.linalg.norm(outward)
-            inward = th.tensor(stance["inward"])
-            face_yaw = math.atan2(float(-inward[1]), float(-inward[0])) - math.atan2(float(outward[1]), float(outward[0]))
-            # handle arm = the arm on the handle's side of the target centre (> 5 cm), else right; brace = the other
-            hc = th.tensor(hdata["handle"]["contact"], dtype=th.float32)
-            side_axis = th.tensor([-float(outward[1]), float(outward[0]), 0.0])  # robot's left when the face points at the robot
-            lat = float(th.dot(hc - hull.mean(dim=0), side_axis))
-            handle_arm = "left" if lat > 0.05 else "right"
-            brace_arm = "right" if handle_arm == "left" else "left"
-            brace_side = 1.0 if brace_arm == "left" else -1.0
-            x0, y0, yaw0 = stance["base_pose2d"]
-            face_off = G.wrap_angle(face_yaw - yaw0)  # object yaw offset (relative to the base yaw) with the moving face toward the robot
-            meta.update({"target": args.target, "handle_key": args.handle_key, "joint": args.joint, "joint_values": q_values, "face_yaw_offset": face_off,
-                         "handle_arm": handle_arm, "brace_arm": brace_arm, "handle": hdata["handle"]})
-            base_cells, world_cells = bc.lattice_on_cells(stance, lattice_world)
-            trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
-            meta["grid"] = grid_meta((z_support - world.floor_z) < LOW_TOP_Z)  # the ground trunks are part of a LOW top's key (W1)
-            per_trunk = []
-            cells_out: Dict[Tuple[float, float], np.ndarray] = {}
-            bc.scope = ObstacleScope(kit, world, (x0, y0), drop_ground=(z_support - world.floor_z) >= 0.55).__enter__()
-            for tr, ti in trunks:
-                t0 = time.time()
-                entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_reachable": 0, "time_s": 0.0, "feasible": [], "posture": None}
-                q, posture = bc.trunk_config(tr, ti, x0, y0, yaw0)
-                if q is None:
-                    entry["collides"] = True
-                    per_trunk.append(entry)
-                    cells_out[(tr, ti)] = np.zeros((0, 2))
-                    log.info("brace trunk (%.2f, %+.1f): collides with every idle-arm posture, skipped", tr, ti)
-                    continue
-                entry["posture"] = posture
-                entry["idle_arm_q"] = bc.idle_arm_q(q)
-                # 3 yaws about the facing yaw (offsets relative to the base yaw). Per (cell, yaw) the handle [pre-grasp, grasp]
-                # is screened at every listed joint value (spec 5.4: the output is the SET of joint values whose handle poses
-                # are feasible; the sampler requires its direction's waypoints to be a subset), then the brace [pre, contact]
-                # candidates with the brace arm for the (cell, yaw) pairs with >= 1 feasible joint value. A cell is in the band
-                # when some yaw has >= 1 feasible joint value and >= 1 feasible brace kind; the yaw with the most feasible
-                # joint values (ties: the facing yaw first) is recorded. Batched per trunk: every handle pre-grasp of every
-                # (cell, yaw, q) in one IK call, the grasps of the pre-feasible ones in a second (support ignored), the brace
-                # pairs in a third.
-                shoulder, arm_len = bc.shoulder_and_reach(q, handle_arm)
-                pts = th.cat([world_cells, th.full((len(world_cells), 1), z_support)], dim=1)
-                near = th.linalg.norm(pts - shoulder, dim=1) <= arm_len + float(th.linalg.norm(th.tensor(hdata["handle"]["contact"]))) + PRE_GRASP + 0.05
-                yaw_offsets = (face_off, face_off - 0.1, face_off + 0.1)
-                combos = [(i, dy) for i in range(len(base_cells)) if bool(near[i]) for dy in yaw_offsets]
-                obj_poses = {c: bc.object_pose_at(world_cells[c[0]], yaw0 + c[1], z_support, hull, G.IDENTITY_QUAT) for c in combos}
-                handle_pairs = {c: [handle_pose_at_q(jinfo, hdata["handle"], qv, obj_poses[c], G) for qv in q_values] for c in combos}
-                flat = [(c, k) for c in combos for k in range(len(q_values))]
-                ok_pre = bc.ik_screen([handle_pairs[c][k][0] for c, k in flat], q, handle_arm)
-                pre_ok = [(c, k) for n, (c, k) in enumerate(flat) if bool(ok_pre[n])]
-                with bc.ignoring(ignore_grasp):
-                    ok_g = bc.ik_screen([handle_pairs[c][k][1] for c, k in pre_ok], q, handle_arm)
-                handle_ok: Dict[Tuple[int, float], List[int]] = {}
-                for n, (c, k) in enumerate(pre_ok):
-                    if bool(ok_g[n]):
-                        handle_ok.setdefault(c, []).append(k)
-                surv = [c for c in combos if c in handle_ok]
-                braces = {c: brace_candidates(jinfo, hdata, obj_poses[c], q_values, brace_side, G) for c in surv}
-                bflat = [(c, kind) for c in surv for kind, _ in braces[c]]
-                bposes = [pose for c in surv for _, pair in braces[c] for pose in pair]
-                brace_prefix = {c: (braces[c][0].q_prefix if braces[c] else 0) for c in surv}
-                ok_b = bc.ik_screen(bposes, q, brace_arm)
-                brace_ok: Dict[Tuple[int, float], List[str]] = {}
-                for n, (c, kind) in enumerate(bflat):
-                    if bool(ok_b[2 * n]) and bool(ok_b[2 * n + 1]):
-                        brace_ok.setdefault(c, []).append(kind)
-                feasible_cells = []
-                n_handle_only = 0
-                for i in range(len(base_cells)):
-                    best = None
-                    for dy in yaw_offsets:
-                        c = (i, dy)
-                        if c not in handle_ok:
-                            continue
-                        if c not in brace_ok:
-                            n_handle_only += 1
-                            continue
-                        if best is None or len(handle_ok[c]) > len(handle_ok[best]):
-                            best = c
-                    if best is not None:
-                        feasible_cells.append((i, best[1], sorted(handle_ok[best]), brace_ok[best], brace_prefix[best]))
-                entry["n_after_prune"] = int(near.sum())
-                entry["n_reachable"] = len(feasible_cells)
-                entry["n_handle_only_pairs"] = n_handle_only
-                entry["n_all_q"] = sum(1 for _, _, ks, _, _ in feasible_cells if len(ks) == len(q_values))
-                entry["feasible"] = [{"cell": base_cells[i].tolist(), "yaw_offset": yaw, "q_indices": ks, "q_feasible": [q_values[k] for k in ks], "brace_kinds": kinds,
-                                      "brace_q_prefix": kp}
-                                     for i, yaw, ks, kinds, kp in feasible_cells]
-                entry["time_s"] = round(time.time() - t0, 2)
-                per_trunk.append(entry)
-                cells_out[(tr, ti)] = base_cells[[i for i, _, _, _, _ in feasible_cells]].numpy() if feasible_cells else np.zeros((0, 2))
-                log.info("brace trunk (%.2f, %+.1f): %d/%d cells feasible (%d with every joint value; %d (cell, yaw) handle-only), %.1fs", tr, ti,
-                         len(feasible_cells), len(base_cells), entry["n_all_q"], n_handle_only, entry["time_s"])
-            bc.scope.__exit__(None, None, None)
-            bc.scope = None
-            result = {"trunks": per_trunk, "cells": cells_out, "pairs": {}}
-            key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "target": args.target,
-                        "scale": scale, "handle_key": args.handle_key, "joint": args.joint, "q": q_values, "brace": True, "grid": meta["grid"], "lattice": lattice, "arms": "untucked"})
-            name = f"brace__{args.scene}__{args.support}__{cat}-{model}__{key}"
+            ext = (hull.max(dim=0).values - hull.min(dim=0).values).tolist() if hull is not None and len(hull) else None
+            meta["object_extent"] = [round(float(v), 4) for v in ext] if ext else None
+            if not args.generic_pinch:
+                key = GL.resolve_key(cat, model, args.grasp_key, ["tabletop", "insert", "floating"])
+                grasps = GL.load_grasps(key)
+                rq = GL.rest_quat_xyzw(key)
+                rest_quat = rq if rq is not None else rest_quat
+                max_off = max(float(th.linalg.norm(g.position)) for g in grasps) if grasps else 0.0
+                meta.update({"object": args.object, "grasp_key": key, "n_grasps": len(grasps), "grasp_names": [g.name for g in grasps],
+                             "rest_quat_xyzw": rest_quat.tolist(), "generic_pinch": False})
+            else:
+                meta.update({"object": args.object, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
+            h = float(hull[:, 2].max() - hull[:, 2].min()) if hull is not None and len(hull) else 0.05
         else:
-            grasps, rest_quat, max_off = None, G.IDENTITY_QUAT.clone(), 0.0
-            hull = None
-            if args.object:
-                cat, model = args.object.split("/", 1)
-                obj = world.spawn(f"target_{cat}_{model}", cat, model, dataset=_dataset_of(cat, model, args.dataset), scale=scale)
-                hull = world.local_hull(obj)
-                world.park(obj, len(world.spawned) - 1)
-                ext = (hull.max(dim=0).values - hull.min(dim=0).values).tolist() if hull is not None and len(hull) else None
-                meta["object_extent"] = [round(float(v), 4) for v in ext] if ext else None
-                if not args.generic_pinch:
-                    key = GL.resolve_key(cat, model, args.grasp_key, ["tabletop", "insert", "floating"])
-                    grasps = GL.load_grasps(key)
-                    rq = GL.rest_quat_xyzw(key)
-                    rest_quat = rq if rq is not None else rest_quat
-                    max_off = max(float(th.linalg.norm(g.position)) for g in grasps) if grasps else 0.0
-                    meta.update({"object": args.object, "grasp_key": key, "n_grasps": len(grasps), "grasp_names": [g.name for g in grasps],
-                                 "rest_quat_xyzw": rest_quat.tolist(), "generic_pinch": False})
-                else:
-                    meta.update({"object": args.object, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
-                h = float(hull[:, 2].max() - hull[:, 2].min()) if hull is not None and len(hull) else 0.05
-            else:
-                meta.update({"object": None, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
-                h = 0.05
-            if under_edge_parts is not None:
-                # under-edge lattice: the goal cells under the partner need clearance >= object height + extra
-                outside, under_near, under_clear = under_edge_parts
-                need = h + UNDER_EDGE_CLEARANCE_EXTRA_M
-                keep = under_clear >= need
-                lattice_world = th.cat([outside, under_near[keep]]) if len(outside) or int(keep.sum()) else th.zeros(0, 2)
-                meta["under_edge"].update({"object_height_m": round(h, 4), "clearance_needed_m": round(need, 4), "n_under_clear": int(keep.sum()),
-                                           "n_lattice": int(len(lattice_world))})
-                log.info("under-edge band: %d of %d cells under the edge have clearance >= %.3f m (object %.3f m); %d lattice points", int(keep.sum()), len(under_near), need, h,
-                         len(lattice_world))
-            if args.generic_contact:
-                # left-arm (brace) contact band: one per object height class; the cell is the contact point on the object's
-                # side face at 3/4 of the class height (top press at the class height); z_support = the top the object stands on
-                h_obj = float(args.height) if args.height is not None else h
-                hcls = height_class(h_obj)
-                bc.contact_height = hcls
-                pose_fn, grasps, max_off = None, None, 0.0
-                meta.update({"object": None if args.height is not None else args.object, "grasp_key": None, "generic_pinch": False, "grasp_names": [],
-                             "contact_set": CONTACT_SET, "height_class": hcls, "height_measured": round(h_obj, 4), "classes": CONTACT_CLASSES_NAMES,
-                             "contact_spec": {"classes": CONTACT_CLASSES, "height_fraction": CONTACT_HEIGHT_FRACTION, "height_bin": HEIGHT_BIN,
-                                              "eef_origin": "point - CONTACT_CENTER_Z * a", "pre_contact": PRE_GRASP, "fingers": bc.fingers,
-                                              "support_ignored_for": "contact pose only"}})
-                z_eval = z_support
-            elif args.generic_pinch or grasps is None:
-                pose_fn = None
-                meta["generic_pinch_spec"] = {"n_yaws": N_YAWS_GENERIC, "tilts_deg": list(TILTS_GENERIC), "z_above_support": round(max(0.6 * h, 0.03), 4),
-                                             "order": "tilt-major, yaw-minor (RobotKit.grasp_candidates_at)", "classes": GENERIC_CLASSES}
-                meta["classes"] = GENERIC_CLASSES
-                z_eval = z_support + max(0.6 * h, 0.03)
-            else:
-                def pose_fn(world_xy, yaw, _hull=hull, _rq=rest_quat):
-                    return bc.object_pose_at(world_xy, yaw, z_support, _hull, _rq)
-                z_eval = z_support
-            restore_placed()
-            kit.sync_world()
-            trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
-            meta["grid"] = grid_meta((z_support - world.floor_z) < LOW_TOP_Z)  # the ground trunks are part of a LOW top's key (W1)
-            result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
-                                arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
-            gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
-            key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": meta.get("object"),
-                        "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": meta["placed_specs"], "under": args.under, "grid": meta["grid"], "lattice": lattice,
-                        "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(bc.postures),
-                        # only non-default extras enter the key (the file names of the existing modes stay stable)
-                        **({"fingers": bc.fingers} if abs(bc.fingers - (0.0 if args.generic_contact else 0.05)) > 1e-9 else {}),
-                        **({"under_edge": meta["under_edge"]} if meta.get("under_edge") else {})})
-            oname = f"h{meta['height_class']:.2f}" if args.generic_contact else (args.object.replace("/", "-") if args.object else "generic")
-            for ps in placed_specs:
-                oname += f"__placed-{ps.category}-{ps.model}" + (f"-s{ps.scale[0]:g}" if ps.scale else "") + ("-focus" if ps.mode == PLACED_MODE_FOCUS else "")
-            mode_name = "contact" if args.generic_contact else meta["mode"]
-            under_tag = ("-under-edge-" if args.under_edge else "-under-") + args.under if args.under else ""
-            name = f"{mode_name}__{args.scene}__{args.support}{under_tag}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
-            if args.smoke:
-                meta["sanity"] = band_sanity(stance, result, z_eval)
-
-        # ---- write
-        lat_all = np.concatenate([c[:, 1] for c in result["cells"].values() if len(c)]) if any(len(c) for c in result["cells"].values()) else np.zeros(0)
-        meta.update({"trunks": result["trunks"], "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
-                     "n_reachable_total": int(sum(len(c) for c in result["cells"].values())), "key": key, "time_s": round(time.time() - t_load, 1),
-                     "kit_stats": kit.stats_snapshot()})
-        arrays = {trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in result["cells"].items()}
-        for (tr, ti), p in result.get("pairs", {}).items():
-            arrays[trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)
-        for (tr, ti), m in result.get("classes", {}).items():
-            if meta.get("classes"):
-                arrays[trunk_key(tr, ti) + "__classes"] = np.asarray(m, dtype=np.int32).reshape(-1)
-        np.savez_compressed(os.path.join(out_dir, name + ".npz"), **arrays)
-        with open(os.path.join(out_dir, name + ".json"), "w") as f:
-            json.dump(meta, f, indent=1, default=str)
-        summary = {"file": os.path.join(out_dir, name + ".npz"), "union_extent": meta["union_extent"], "n_reachable_total": meta["n_reachable_total"],
-                   "trunks": [(t["translate"], t["tilt"], t["n_reachable"], t["collides"], t.get("time_s"), t.get("posture")) for t in result["trunks"]],
-                   "time_s": meta["time_s"]}
+            meta.update({"object": None, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
+            h = 0.05
+        if under_edge_parts is not None:
+            # under-edge lattice: the goal cells under the partner need clearance >= object height + extra
+            outside, under_near, under_clear = under_edge_parts
+            need = h + UNDER_EDGE_CLEARANCE_EXTRA_M
+            keep = under_clear >= need
+            lattice_world = th.cat([outside, under_near[keep]]) if len(outside) or int(keep.sum()) else th.zeros(0, 2)
+            meta["under_edge"].update({"object_height_m": round(h, 4), "clearance_needed_m": round(need, 4), "n_under_clear": int(keep.sum()),
+                                       "n_lattice": int(len(lattice_world))})
+            log.info("under-edge band: %d of %d cells under the edge have clearance >= %.3f m (object %.3f m); %d lattice points", int(keep.sum()), len(under_near), need, h,
+                     len(lattice_world))
+        if args.generic_contact:
+            # left-arm (brace) contact band: one per object height class; the cell is the contact point on the object's
+            # side face at 3/4 of the class height (top press at the class height); z_support = the top the object stands on
+            h_obj = float(args.height) if args.height is not None else h
+            hcls = height_class(h_obj)
+            bc.contact_height = hcls
+            pose_fn, grasps, max_off = None, None, 0.0
+            meta.update({"object": None if args.height is not None else args.object, "grasp_key": None, "generic_pinch": False, "grasp_names": [],
+                         "contact_set": CONTACT_SET, "height_class": hcls, "height_measured": round(h_obj, 4), "classes": CONTACT_CLASSES_NAMES,
+                         "contact_spec": {"classes": CONTACT_CLASSES, "height_fraction": CONTACT_HEIGHT_FRACTION, "height_bin": HEIGHT_BIN,
+                                          "eef_origin": "point - CONTACT_CENTER_Z * a", "pre_contact": PRE_GRASP, "fingers": bc.fingers,
+                                          "support_ignored_for": "contact pose only"}})
+            z_eval = z_support
+        elif args.generic_pinch or grasps is None:
+            pose_fn = None
+            meta["generic_pinch_spec"] = {"n_yaws": N_YAWS_GENERIC, "tilts_deg": list(TILTS_GENERIC), "z_above_support": round(max(0.6 * h, 0.03), 4),
+                                         "order": "tilt-major, yaw-minor (RobotKit.grasp_candidates_at)", "classes": GENERIC_CLASSES}
+            meta["classes"] = GENERIC_CLASSES
+            z_eval = z_support + max(0.6 * h, 0.03)
+        else:
+            def pose_fn(world_xy, yaw, _hull=hull, _rq=rest_quat):
+                return bc.object_pose_at(world_xy, yaw, z_support, _hull, _rq)
+            z_eval = z_support
+        restore_placed()
+        kit.sync_world()
+        trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
+        meta["grid"] = grid_meta((z_support - world.floor_z) < LOW_TOP_Z)  # the ground trunks are part of a LOW top's key (W1)
+        if grid_mode:
+            meta["schedule"]["collision"] = bc.setup_sdf_world(stance, trunks, (band_arm,))
+        result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
+                            arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
+        gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
+        key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": meta.get("object"),
+                    "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": meta["placed_specs"], "under": args.under, "grid": meta["grid"], "lattice": lattice,
+                    "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(bc.postures),
+                    # only non-default extras enter the key (the file names of the existing modes stay stable)
+                    **({"fingers": bc.fingers} if abs(bc.fingers - (0.0 if args.generic_contact else 0.05)) > 1e-9 else {}),
+                    **({"under_edge": meta["under_edge"]} if meta.get("under_edge") else {}), **key_extra})
+        oname = f"h{meta['height_class']:.2f}" if args.generic_contact else (args.object.replace("/", "-") if args.object else "generic")
+        for ps in placed_specs:
+            oname += f"__placed-{ps.category}-{ps.model}" + (f"-s{ps.scale[0]:g}" if ps.scale else "") + ("-focus" if ps.mode == PLACED_MODE_FOCUS else "")
+        mode_name = "contact" if args.generic_contact else meta["mode"]
+        under_tag = ("-under-edge-" if args.under_edge else "-under-") + args.under if args.under else ""
+        name = f"{mode_name}__{args.scene}__{args.support}{under_tag}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
         if args.smoke:
-            summary["shoulder_fk_check"] = [(r["translate"], r["tilt"], r["shoulder_err_mm"]) for r in meta.get("shoulder_fk_check", [])]
-            summary["sanity"] = meta.get("sanity")
-        print(f"REACH_BANDS {json.dumps(summary, default=str)}", flush=True)
+            meta["sanity"] = band_sanity(stance, result, z_eval)
+
+    # ---- write
+    lat_all = np.concatenate([c[:, 1] for c in result["cells"].values() if len(c)]) if any(len(c) for c in result["cells"].values()) else np.zeros(0)
+    # kit_stats = this band's share of the kit counters (the worker's kit serves several bands; a fresh process's
+    # counters start at zero, so the single-band value is unchanged)
+    stats1 = kit.stats_snapshot()
+    meta.update({"trunks": result["trunks"], "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
+                 "n_reachable_total": int(sum(len(c) for c in result["cells"].values())), "key": key, "time_s": round(time.time() - t_load, 1),
+                 "setup_s": round(setup_s, 1), "kit_stats": {k: stats1[k] - stats0.get(k, 0) for k in stats1}})
+    bounds = getattr(bc.scope, "_bounds", None) if bc.scope is not None else None  # (compute() clears the scope; the brace loop keeps none)
+    if bounds is None:
+        bounds = getattr(bc, "_last_bounds", None)
+    if bounds:  # diagnostic (volatile): how many near meshes the per-trunk bound disabled
+        meta["trunk_bound"] = {arm: {"r_arm": round(b.r_arm, 4), "margin": b.MARGIN, "enabled": b.enabled, "n_pruned_per_trunk": list(b.n_pruned)} for arm, b in bounds.items()}
+    arrays = {trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in result["cells"].items()}
+    for (tr, ti), p in result.get("pairs", {}).items():
+        arrays[trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)
+    for (tr, ti), m in result.get("classes", {}).items():
+        if meta.get("classes"):
+            arrays[trunk_key(tr, ti) + "__classes"] = np.asarray(m, dtype=np.int32).reshape(-1)
+    np.savez_compressed(os.path.join(out_dir, name + ".npz"), **arrays)
+    with open(os.path.join(out_dir, name + ".json"), "w") as f:
+        json.dump(meta, f, indent=1, default=str)
+    summary = {"file": os.path.join(out_dir, name + ".npz"), "union_extent": meta["union_extent"], "n_reachable_total": meta["n_reachable_total"],
+               "trunks": [(t["translate"], t["tilt"], t["n_reachable"], t["collides"], t.get("time_s"), t.get("posture")) for t in result["trunks"]],
+               "time_s": meta["time_s"]}
+    if args.smoke:
+        summary["shoulder_fk_check"] = [(r["translate"], r["tilt"], r["shoulder_err_mm"]) for r in meta.get("shoulder_fk_check", [])]
+        summary["sanity"] = meta.get("sanity")
+    if job_id is not None:
+        summary["job_id"] = job_id
+    line = f"REACH_BANDS {json.dumps(summary, default=str)}"
+    print(line, flush=True)
+    if job_id is not None:  # the worker's per-job run.log (what collect_bands.py reads the summary from)
+        with open(os.path.join(out_dir, "run.log"), "a") as f:
+            f.write(line + "\n")
+    return summary
+
+
+def run_single(args):
+    """One band per process (the original CLI): world load, band, ``og.shutdown()``."""
+    import omnigibson as og
+
+    out_dir = args.out or cache_root()
+    os.makedirs(out_dir, exist_ok=True)
+    floor_mode, rooms = band_rooms(args)
+    arms = band_arms(args)
+    variant, removed = (None, [])
+    if not floor_mode or not args.full_load:
+        variant, removed = _chairs_variant(args.scene, args.support, rooms, os.path.join(out_dir, "scene_variants"), removed=[] if floor_mode else None,
+                                           slim=not args.full_load)
+    t_load = time.time()
+    world, kit = load_world(args, rooms, variant, removed, arms)
+    setup_s = time.time() - t_load
+    try:
+        compute_band(args, world, kit, out_dir, rooms=rooms, removed=removed, floor_mode=floor_mode, arms=arms, t_load=t_load, setup_s=setup_s)
     except BaseException:
         import traceback
 
@@ -1909,6 +2597,139 @@ def main(argv=None):
         raise
     finally:
         og.shutdown()
+
+
+def run_jobs(args):
+    """Worker mode (``--jobs MANIFEST [--ids ID ...] --out ROOT``): many bands in one process.
+
+    Every selected job's ``args`` (the ``make_jobs.py`` manifest format) is parsed like a single-band command line and
+    computed on a shared ``(world, kit)``; jobs are grouped by :func:`band_world_key` (scene, loaded rooms, removed
+    chairs) and the world is reloaded in place (``og.clear()`` + a new ``SimWorld`` / ``RobotKit``, as
+    ``sample_isg.WorldPool`` does) only when the key changes. Between bands of one world
+    :func:`reset_world_between_bands` removes the previous band's objects, re-syncs the collision world and resets the
+    cuRobo seed streams, so band k of a process is computed exactly like band k alone (verified 2026-09-16 on three
+    two-trunk jobs: byte-identical arrays, metas equal up to the timing fields). Per job: the band files in
+    ``ROOT/<id>/`` (same names as a single run), ``ROOT/<id>/run.log`` (this job's log records + the ``REACH_BANDS``
+    line), a ``REACH_BANDS_JOB <id>`` stdout line before the usual ``REACH_BANDS {...}`` (which also carries
+    ``job_id``) and a ``<id> rc=<rc> wall=<s> n_written=-1`` line appended to ``ROOT/done.txt`` - the layout of the pod
+    runner / ``run_local.sh``, so ``collect_bands.py`` reads the tree unchanged. A failing job logs its traceback, prints
+    ``REACH_BANDS_FAILED <id>`` and does not stop the others."""
+    import omnigibson as og
+
+    with open(args.jobs) as f:
+        manifest = json.load(f)
+    jobs = select_jobs(manifest, args.ids)
+    root = args.out or cache_root()
+    os.makedirs(root, exist_ok=True)
+    parser = build_parser()
+    prepared = []  # (job, job args, floor_mode, rooms, removed, world key) or (job, error)
+    for job in jobs:
+        try:
+            jargs = parser.parse_args(list(job["args"]))
+            if jargs.jobs:
+                raise ValueError("a job's args cannot contain --jobs")
+            jargs.out = os.path.join(root, job["id"])
+            jargs.log_level, jargs.prebuild_planner = args.log_level, args.prebuild_planner
+            jargs.cameras, jargs.full_load = args.cameras or jargs.cameras, args.full_load or jargs.full_load
+            jargs.ik_tail_sizes, jargs.mesh_cache = args.ik_tail_sizes or jargs.ik_tail_sizes, args.mesh_cache or jargs.mesh_cache
+            jargs.collision = args.collision or jargs.collision
+            if args.collision == "sdf-grid":
+                jargs.sdf_res, jargs.sdf_mesh_cache = args.sdf_res, args.sdf_mesh_cache
+            jargs.sdf_cache_dir = args.sdf_cache_dir or jargs.sdf_cache_dir or os.path.join(root, "sdf_grids")
+            key = band_world_key(jargs)
+            if jargs.collision == "sdf-grid":  # the voxel store is part of the world: grid jobs get their own world key
+                key = key + (("sdf-grid", float(jargs.sdf_res), int(jargs.sdf_mesh_cache)),)
+            floor_mode, rooms = band_rooms(jargs)
+            prepared.append((job, jargs, floor_mode, rooms, list(key[2]), key))
+        except (SystemExit, Exception) as e:  # noqa: BLE001 - a malformed job must not stop the others
+            prepared.append((job, e))
+    ordered = group_by_key(prepared, lambda p: p[5] if len(p) > 2 else ("__invalid__", p[0]["id"]))
+    n_keys = len({p[5] for p in prepared if len(p) > 2})
+    log.info("worker: %d jobs, %d world keys (%d reloads), order: %s", len(ordered), n_keys, max(n_keys - 1, 0), [p[0]["id"] for p in ordered])
+    world = kit = None
+    cur_key = None
+    n_bands = 0
+    for p in ordered:
+        job = p[0]
+        jid = job["id"]
+        t_job = time.time()
+        job_dir = os.path.join(root, jid)
+        os.makedirs(job_dir, exist_ok=True)
+        # this job's log records (the ``ispatialgym`` logger has its own stdout handler and does not propagate to the root)
+        handler = logging.FileHandler(os.path.join(job_dir, "run.log"))
+        handler.setFormatter(logging.Formatter("[%(levelname)s %(name)s] %(message)s"))
+        handler.setLevel(logging.INFO)
+        logging.getLogger("ispatialgym").addHandler(handler)
+        print(f"REACH_BANDS_JOB {jid}", flush=True)
+        rc = 0
+        try:
+            if len(p) == 2:
+                raise p[1]
+            _, jargs, floor_mode, rooms, removed, key = p
+            arms = band_arms(jargs)
+            if world is not None and key == cur_key and not kit.backend.sdf_grid and len(kit.backend._world_mesh_names) + MESH_CACHE_RESERVE > kit.backend.mesh_cache_size:
+                log.info("worker: cuRobo mesh store nearly full (%d of %d after %d bands); reloading the scene", len(kit.backend._world_mesh_names),
+                         kit.backend.mesh_cache_size, n_bands)
+                cur_key = None  # forces the reload below
+            if world is None or key != cur_key:
+                if world is not None:
+                    log.info("worker: world key changed (%s -> %s); reloading the scene", cur_key, key)
+                    og.clear()
+                    world = kit = None
+                    cur_key = None
+                variant = None
+                if removed or not jargs.full_load:
+                    variant, _ = _chairs_variant(jargs.scene, jargs.support, rooms, os.path.join(root, "scene_variants"), removed, slim=not jargs.full_load)
+                world, kit = load_world(jargs, rooms, variant, removed, arms)
+                cur_key = key
+                n_bands = 0
+            else:
+                reset_world_between_bands(world, kit)
+                log.info("worker: world reused for %s (%s)", jid, key)
+            setup_s = time.time() - t_job
+            compute_band(jargs, world, kit, job_dir, rooms=rooms, removed=removed, floor_mode=floor_mode, arms=arms, t_load=t_job, setup_s=setup_s, job_id=jid,
+                         spawn_suffix=f"_b{n_bands}" if n_bands else "")
+            n_bands += 1
+        except KeyboardInterrupt:
+            raise
+        except BaseException:  # noqa: BLE001 - SystemExit from argument checks included; one job must not abort the others
+            rc = 1
+            log.error("worker: job %s failed", jid, exc_info=True)
+            print(f"REACH_BANDS_FAILED {jid}", flush=True)
+            with open(os.path.join(job_dir, "run.log"), "a") as f:  # the marker collect_bands.py looks for (after the logged traceback)
+                f.write(f"REACH_BANDS_FAILED {jid}\n")
+            if world is not None:
+                n_bands += 1  # the failed band may have spawned objects: keep the name suffixes unique
+                try:
+                    reset_world_between_bands(world, kit)
+                except Exception:  # noqa: BLE001 - the world is unusable: reload it for the next job
+                    log.error("worker: could not recover the world after job %s; it is reloaded for the next job", jid, exc_info=True)
+                    try:
+                        og.clear()
+                    except Exception:  # noqa: BLE001
+                        log.error("worker: og.clear() failed", exc_info=True)
+                    world = kit = None
+                    cur_key = None
+        finally:
+            with open(os.path.join(root, "done.txt"), "a") as f:
+                f.write(f"{jid} rc={rc} wall={int(time.time() - t_job)} n_written=-1\n")
+            logging.getLogger("ispatialgym").removeHandler(handler)
+            handler.close()
+    og.shutdown()
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    logging.basicConfig(level=args.log_level, format="[%(levelname)s %(name)s] %(message)s", force=True)
+    # import order matters: the cuRobo backend (through robot_utils) pins pip-warp before omnigibson starts Isaac Sim
+    from ispatialgym.sampling import robot_utils  # noqa: F401
+    from ispatialgym.sampling import sim_utils  # noqa: F401
+
+    if args.jobs:
+        return run_jobs(args)
+    if args.scene is None or args.support is None:
+        raise SystemExit("--scene and --support are required (or --jobs MANIFEST)")
+    return run_single(args)
 
 
 if __name__ == "__main__":

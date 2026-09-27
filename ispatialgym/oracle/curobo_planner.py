@@ -209,7 +209,13 @@ class R1ProCuRobo:
         prebuild: Sequence[str] = ("right_arm", "base"),
         use_cuda_graph: bool = True,
         warmup_iterations: int = 3,
+        sdf_grid: Optional[Dict[str, object]] = None,
     ):
+        """``sdf_grid`` (opt-in, ``reach_bands --collision sdf-grid``): ``{"res": voxel size (m), "dims": [x, y, z] grid extents (m),
+        "mesh_cache": capacity of the mesh store}`` - the checker gets a ``len(sdf_grid.LAYERS)``-layer cuRobo voxel store of
+        that size (see :mod:`ispatialgym.oracle.sdf_grid`) and callers move static obstacles into it with
+        :meth:`load_sdf_layers`; only the objects passing :attr:`mesh_object_filter` are loaded as meshes. ``None`` (default):
+        the exact mesh-only world, unchanged."""
         assert robot.model == "r1pro", f"R1ProCuRobo only supports r1pro, got {robot.model}"
         self.robot = robot
         self.device_cfg = DeviceCfg(device=th.device(device), dtype=th.float32)
@@ -247,12 +253,25 @@ class R1ProCuRobo:
         self._joint_child = self._parse_joint_children(self.urdf_path)
         self._default_q = {n: float(v) for n, v in zip(self.joint_names, robot.reset_joint_pos)}
 
-        # Shared world
+        # Shared world. NOTE: cuRobo 0.8 launches its sphere-vs-mesh kernel over spheres x ``mesh_cache_size`` threads (the
+        # cache capacity, not the number of loaded meshes; ``wp_autograd.py``: ``dim = b * h * n * max_n``), so an oversized
+        # cache is paid on every collision evaluation: measured 2026-09-16, a 128-pose x 12-seed batched IK call with 28
+        # enabled meshes took 8.0 s with the 8192 cache and 5.2 s with *no* enabled mesh at all. Callers that know their
+        # world (reach_bands.load_world) pass a cache sized to the loaded meshes.
+        self.mesh_cache_size = int(mesh_cache_size)
+        cache = {"mesh": self.mesh_cache_size, "cuboid": cuboid_cache_size}
+        self.sdf_grid = dict(sdf_grid) if sdf_grid else None
+        if self.sdf_grid:
+            from ispatialgym.oracle import sdf_grid as SG
+
+            self.mesh_cache_size = int(self.sdf_grid.get("mesh_cache", self.mesh_cache_size))
+            cache = {"mesh": self.mesh_cache_size, "cuboid": cuboid_cache_size,
+                     "voxel": {"layers": len(SG.LAYERS), "dims": [float(v) for v in self.sdf_grid["dims"]], "voxel_size": float(self.sdf_grid["res"])}}
         self.checker = create_collision_checker(
             SceneCollisionCfg(
                 device_cfg=self.device_cfg,
                 scene_model=None,
-                cache={"mesh": mesh_cache_size, "cuboid": cuboid_cache_size},
+                cache=cache,
             )
         )
         self._world_loaded = False
@@ -262,6 +281,12 @@ class R1ProCuRobo:
         #: optional ``callable(obj) -> bool``: scene objects for which it returns False are never loaded as obstacles
         #: (e.g. furniture of neighbouring rooms that only exists for rendering; the mesh cache holds ``mesh_cache_size``)
         self.obstacle_filter = None
+        #: optional ``callable(obj) -> bool`` (sdf-grid mode): objects for which it returns False are not loaded into the *mesh*
+        #: store - they are expected to be represented by the voxel layers (:meth:`load_sdf_layers`) or to be irrelevant
+        self.mesh_object_filter = None
+        #: voxel layer name -> {"objects": [scene object names], "ground_like": bool} (sdf-grid mode, :meth:`load_sdf_layers`)
+        self._grid_layers: Dict[str, Dict[str, object]] = {}
+        self._grid_centre_world: Optional[np.ndarray] = None
 
         self._entries: Dict[str, _PlannerEntry] = {}
         self._kin_entries: Dict[str, _PlannerEntry] = {}
@@ -375,9 +400,12 @@ class R1ProCuRobo:
         return T.pose_transform(rp, rq, as_tensor(pose[0]), as_tensor(pose[1]))
 
     def _cu_pose_from_world(self, poses: Sequence[Pose]) -> CuPose:
+        # one simulator read of the root pose for the whole batch (it was read per pose: 128 PhysX view reads = 40 ms of a
+        # 128-pose batched IK call, measured 2026-09-16); the per-pose arithmetic is unchanged, so results are identical
+        root_p, root_q = self.root_pose()
         pos, quat = [], []
         for p in poses:
-            rp, rq = self.world_to_root(p)
+            rp, rq = T.relative_pose_transform(as_tensor(p[0]), as_tensor(p[1]), root_p, root_q)
             pos.append(rp)
             quat.append(quat_xyzw_to_wxyz(rq))
         return CuPose(
@@ -446,6 +474,8 @@ class R1ProCuRobo:
             if obj is self.robot or getattr(obj, "visual_only", False) or obj.name in ignore:
                 continue
             if self.obstacle_filter is not None and not self.obstacle_filter(obj):
+                continue
+            if self.mesh_object_filter is not None and not self.mesh_object_filter(obj):
                 continue
             for link_name, link in obj.links.items():
                 if (obj.name, link_name) in ign_links:
@@ -518,6 +548,7 @@ class R1ProCuRobo:
                     e.planner.graph_planner.reset_buffer()
             self._world_mesh_names = names
             self._world_loaded = True
+            self._grid_update_poses()
             log.info("cuRobo world loaded: %d meshes in %.2fs", len(meshes), time.time() - t0)
             return
 
@@ -545,9 +576,128 @@ class R1ProCuRobo:
                 self._mesh_enable(name, False)
                 self._disabled_obstacles.add(name)
         self._patch_mesh_query_dims()
+        self._grid_update_poses()
         for e in self._entries.values():
             if e.planner.graph_planner is not None:
                 e.planner.graph_planner.reset_buffer()
+
+    # ------------------------------------------------------------------ sdf-grid mode (opt-in; see ispatialgym.oracle.sdf_grid)
+
+    def reload_mesh_store(self, ignore_objects=()):
+        """Empty the mesh store (in place: the solvers' CUDA graphs keep their buffers) and load it again from the simulator
+        through :attr:`mesh_object_filter`; the voxel layers are dropped too (``load_collision_model`` clears every store) and
+        must be loaded again with :meth:`load_sdf_layers`. sdf-grid mode only: the store is small and holds one band's
+        movable objects; the worker calls this between bands."""
+        assert self.sdf_grid, "reload_mesh_store is for the sdf-grid mode"
+        self.checker.data.meshes.clear(clear_warp_cache=True)
+        self._world_loaded = False
+        self._world_mesh_names = set()
+        self._disabled_obstacles = set()
+        self._ground_mesh_names = set()
+        self._grid_layers = {}
+        self.update_world(ignore_objects=ignore_objects)
+
+    def _grid_pose_root(self, centre_world) -> List[float]:
+        """``[x, y, z, qw, qx, qy, qz]`` of the world-axis-aligned grid centred at ``centre_world`` in the cuRobo (root) frame."""
+        rp, rq = self.root_pose()
+        c = th.as_tensor(np.asarray(centre_world, dtype=np.float64), dtype=th.float32)
+        p, q = T.relative_pose_transform(c, th.tensor([0.0, 0.0, 0.0, 1.0]), rp, rq)
+        return th.cat([p, quat_xyzw_to_wxyz(q)]).tolist()
+
+    def _grid_update_poses(self):
+        """Re-pose the voxel layers relative to the robot root (they are defined in the world frame)."""
+        if not self._grid_layers or self._grid_centre_world is None:
+            return
+        pose = self._grid_pose_root(self._grid_centre_world)
+        dev = self.device_cfg.device
+        cu = CuPose(position=th.tensor(pose[:3], device=dev).reshape(1, 3), quaternion=th.tensor(pose[3:], device=dev).reshape(1, 4))
+        for name in self._grid_layers:
+            self.checker.data.voxels.update_pose(name, w_obj_pose=cu)
+
+    def load_sdf_layers(self, layers: Dict[str, Sequence[object]], centre_world, cache_dir: Optional[str], scene_name: str) -> Dict[str, object]:
+        """Represent the collision meshes of ``layers[layer name] = [scene objects]`` by one signed-distance voxel layer each
+        (:data:`sdf_grid.LAYERS`; a layer with no objects is left disabled), sampled with cuRobo's own mesh SDF at the voxel
+        centres of the grid of :attr:`sdf_grid` centred (x, y) at ``centre_world`` (world frame; z from the config), cached
+        on disk under ``cache_dir`` by scene, grid, and the meshes' prim paths / poses / geometry. The objects must not be in
+        the mesh store (see :attr:`mesh_object_filter`). Returns the meta record (per layer: objects, meshes, cache hit, build
+        time, file) for the band's ``schedule.collision``."""
+        from ispatialgym.oracle import sdf_grid as SG
+        from curobo._src.geom.types import VoxelGrid
+
+        assert self.sdf_grid, "load_sdf_layers needs a backend built with sdf_grid=..."
+        t0 = time.time()
+        res = float(self.sdf_grid["res"])
+        n = np.asarray(self.sdf_grid["n"], dtype=int)
+        centre = np.asarray(centre_world, dtype=np.float64)
+        pose_root = self._grid_pose_root(centre)
+        grids, meta_layers = [], {}
+        mesh_store = set(self._world_mesh_names)
+        for lname in SG.LAYERS:
+            objs = list(layers.get(lname, []) or [])
+            meshes, records, obj_names = [], [], []
+            for obj in objs:
+                obj_names.append(obj.name)
+                for link in obj.links.values():
+                    for cm in link.collision_meshes.values():
+                        if cm.prim_path in mesh_store:
+                            raise ValueError(f"{cm.prim_path} is in the mesh store and cannot be gridded too (mesh_object_filter)")
+                        verts, faces, scale = self._mesh_geometry(cm)
+                        pos, quat = cm.get_position_orientation()
+                        pose7 = th.cat([pos.float(), quat_xyzw_to_wxyz(quat.float())]).tolist()
+                        meshes.append({"name": cm.prim_path, "pose": pose7, "scale": [float(v) for v in scale], "vertices": verts, "faces": faces})
+                        records.append(SG.mesh_record(cm.prim_path, pose7, scale, verts, faces))
+            rec = {"objects": obj_names, "n_meshes": len(meshes), "ground_like": bool(objs) and all(self._is_ground_like(o) for o in objs)}
+            if not meshes:
+                rec["enabled"] = False
+                meta_layers[lname] = rec
+                continue
+            key = SG.cache_key(scene_name, res, n, centre, records, self.MESH_QUERY_MIN_DIMS)
+            feat = SG.load_cached(cache_dir, key, n, self.device_cfg.device) if cache_dir else None
+            rec.update({"key": key, "cache_hit": feat is not None})
+            if feat is None:
+                t1 = time.time()
+                feat, st = SG.sample_layer(meshes, n, res, centre, self.device_cfg, self.MESH_QUERY_MIN_DIMS)
+                rec.update({"sample": st, "build_s": round(time.time() - t1, 3)})
+                if cache_dir:
+                    path, size = SG.save_cached(cache_dir, key, feat, {"scene": scene_name, "layer": lname, "res": res, "n": n.tolist(), "centre": centre.tolist(),
+                                                                      "min_dims": self.MESH_QUERY_MIN_DIMS, "far": SG.FAR, "objects": obj_names, "meshes": records, "sample": st})
+                    rec.update({"file": path, "file_bytes": size})
+            else:
+                rec["file"] = SG.cache_paths(cache_dir, key)[0]
+            rec.update(SG.layer_stats(feat, res))
+            rec["enabled"] = True
+            grids.append(VoxelGrid(name=lname, pose=list(pose_root), dims=[float(v) for v in self.sdf_grid["dims"]], voxel_size=res, feature_tensor=feat))
+            meta_layers[lname] = rec
+        vox = self.checker.data.voxels
+        vox.load_batch(grids, 0)
+        params = vox.params[0, :len(grids)].detach().cpu().numpy()
+        assert all(int(params[l, k]) == int(n[k]) for l in range(len(grids)) for k in range(3)), (params, n)
+        self._grid_layers = {g.name: {"objects": list(meta_layers[g.name]["objects"]), "ground_like": bool(meta_layers[g.name]["ground_like"])} for g in grids}
+        self._grid_centre_world = centre
+        lo, hi = SG.grid_bounds(n, res, centre)
+        meta = {"type": "sdf_grid", "res": res, "n": n.tolist(), "n_voxels": int(np.prod(n)), "bounds_world": [lo.tolist(), hi.tolist()], "centre_world": centre.tolist(),
+                "features": "float16", "far": SG.FAR, "layers": meta_layers, "mesh_cache": self.mesh_cache_size, "load_s": round(time.time() - t0, 3)}
+        log.info("sdf-grid world: res %.3f m, %s voxels/layer, %d layers (%s), mesh store %d/%d in %.1fs", res, "x".join(str(int(v)) for v in n), len(grids),
+                 ", ".join(f"{g.name}: {meta_layers[g.name]['n_meshes']} meshes of {len(meta_layers[g.name]['objects'])} objects" + (" [cached]" if meta_layers[g.name]["cache_hit"] else "") for g in grids),
+                 len(self._world_mesh_names), self.mesh_cache_size, time.time() - t0)
+        return meta
+
+    def grid_layer_enable(self, name: str, enabled: bool):
+        if name in self._grid_layers:
+            self.checker.data.voxels.set_enabled(name, enabled)
+
+    def grid_layer_of_object(self, obj_name: str) -> Optional[str]:
+        for lname, info in self._grid_layers.items():
+            if obj_name in info["objects"]:
+                return lname
+        return None
+
+    def grid_object_enable(self, obj_name: str, enabled: bool):
+        """Enable / disable the voxel layer holding ``obj_name`` (no-op when the object is not gridded). Note a layer holds
+        every object listed for it, so callers keep objects toggled separately in their own layer (the band's support)."""
+        lname = self.grid_layer_of_object(obj_name)
+        if lname is not None:
+            self.checker.data.voxels.set_enabled(lname, enabled)
 
     # cuRobo 0.8.0's SceneData routers (update_obstacle_pose / enable_obstacle) only catch
     # RuntimeError while the cuboid store raises ValueError for unknown names, so mesh obstacles
@@ -766,6 +916,9 @@ class R1ProCuRobo:
         cub = getattr(self.checker.data, "cuboids", None)
         if cub is not None and self.GROUND_SLAB_NAME in cub.names[0]:
             cub.set_enabled(self.GROUND_SLAB_NAME, enabled)
+        for lname, info in self._grid_layers.items():  # sdf-grid mode: layers of ground-like objects, like the meshes below
+            if info["ground_like"]:
+                self.checker.data.voxels.set_enabled(lname, enabled)
         held_off = getattr(self, "_held_off", set())  # meshes an active sampler ignore context (ik._Ignoring) switched off
         for name in self._ground_mesh_names:
             if name not in self._world_mesh_names:
