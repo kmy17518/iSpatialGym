@@ -64,6 +64,188 @@ def _flipped_push_chain_check(sampler, chain, stance, arm: str, q_first, ignore_
     return False, (f"approach_untrackable: push pre-contact witness {gap:.2f} rad from the raw IK from the stance posture (another branch): "
                    f"trajopt reaches such a witness only through the pushed object and the closed-loop arc fails from either branch")
 
+def _push_stop_frac_arc() -> float:
+    """The oracle's ``ExecuteConfig.push_stop_frac_arc``: an arc push stops at this fraction of the orientation tolerance."""
+    from ispatialgym.oracle import execute as E
+
+    return float(E.ExecuteConfig().push_stop_frac_arc)
+
+
+def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, direction, obj, supports: Sequence[Any], ignore: Sequence[Any],
+                    band_rad: float, retreat_distance: float) -> Tuple[bool, str, Dict[str, Any]]:
+    """A free-object arc push replayed kinematically as the oracle executes it (owner 2026-09-27, first-demo v2 A8; the object
+    follows the pad): from the pre-contact witness ``q_pre`` the straight leg to the first contact pose (``execute_push`` ->
+    ``_push_arc_closed_loop``: ``Motions.arm_along`` at the arm_along solver settings), then the TRUE arc of ``push_geometry``
+    (``Motions.arm_arc_closed_loop``: every control step the FK pose rotated by ``push_speed_arc / radius · dt`` about the arc's
+    axis, one differential-IK step at the loop's tolerances with its joint-speed bound, 10 consecutive misses fail) until the
+    object reaches its goal band, then the contact retreat's escape leg from the arc's end (``execute_retreat``: radial off the
+    object, then off its supports, the end probed for reach and shortened like ``_retreat_reach``; tracked with the retreat's
+    joint-limit margin; a stall away from a joint limit is finished by IK, a partial retreat accepted as the oracle accepts it).
+    Every setting is read from the oracle's ``ExecuteConfig`` / ``MotionsConfig``. Returns ``(ok, why, report)``; a replay that
+    cannot follow the push (``ok`` False) is an ``approach_untrackable`` instance. Collisions are not judged (the oracle's contact
+    legs run without a veto)."""
+    import math
+
+    from ispatialgym.oracle import execute as E
+    from ispatialgym.oracle import motions as MO
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.robot import conventions as C
+
+    ecfg, mcfg = E.ExecuteConfig(), MO.MotionsConfig()
+    backend, kit = sampler.kit.backend, sampler.kit
+    frame = M.EEF_LINK[arm]
+    idx = kit.robot.arm_control_idx[arm]
+    dt = float(getattr(backend, "control_dt", 1.0 / 30.0))
+    rep: Dict[str, Any] = {}
+    geom = E.push_geometry(list(waypoints), direction)
+    if geom.kind != "arc":
+        return True, "not an arc", rep
+
+    def fk(q):
+        p, qq = kit.fk([frame], q)[frame]
+        return th.as_tensor(p).float(), th.as_tensor(qq).float()
+
+    kit._ensure_synced()
+    q = th.as_tensor(q_pre).reshape(-1).float().clone()
+    # 1. the straight leg pre -> the first contact pose, densified as Motions._densify does
+    start = fk(q)
+    end = (th.as_tensor(waypoints[0][0]).float(), th.as_tensor(waypoints[0][1]).float())
+    n_d = max(1, int(math.ceil(max(float(th.linalg.norm(end[0] - start[0])) / mcfg.cartesian_step, float(C.quat_angle(start[1], end[1])) / mcfg.cartesian_rot_step))))
+    dense = [tuple(w) for w in C.line_waypoints(start, end, n_d)]
+    res = backend.solve_ik_path(f"{arm}_arm", [{frame: w} for w in dense], q_start=q, pos_tol=mcfg.diff_ik_pos_tol, rot_tol=mcfg.diff_ik_rot_tol,
+                                max_iters=mcfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=mcfg.diff_ik_soft_pos_tol,
+                                soft_rot_tol=mcfg.diff_ik_soft_rot_tol)
+    if not res.success or res.q_traj is None:
+        return False, f"approach_untrackable: push replay - the straight leg to the first contact pose: {res.status}", rep
+    q = res.q_traj[-1].reshape(-1).float().clone()
+    # 2. the closed-loop arc (the object follows the pad: its swept angle is the commanded one)
+    ax = C.unit(geom.axis.float())
+    cen = geom.pivot.float()
+
+    def radial(p):
+        r = p - cen
+        return r - ax * float(r @ ax)
+
+    def signed_angle(ra, rb) -> float:
+        return math.atan2(float(th.cross(ra, rb, dim=0) @ ax), float(ra @ rb))
+
+    p_t = th.as_tensor(waypoints[-1][0]).float()
+    q_to = float(geom.angle)
+    sgn_joint = 1.0 if q_to >= 0 else -1.0
+    r_now = radial(fk(q)[0])
+    radius = max(float(th.linalg.norm(r_now)), 0.05)
+    step_ang = ecfg.push_speed_arc / radius * dt
+    arc_dir = signed_angle(r_now, radial(p_t))
+    sgn = 1.0 if arc_dir >= 0 else -1.0
+    max_steps = int(max(abs(q_to), abs(arc_dir)) / max(step_ang, 1e-6) * 3) + 60
+    swept, commanded, consecutive, steps, misses = 0.0, 0.0, 0, 0, 0
+    stop = None
+    while True:
+        if sgn_joint * (swept - q_to) >= -band_rad:
+            stop = "joint_at_target"
+            break
+        if commanded >= ecfg.push_arc_lag_factor * max(abs(q_to), 1e-3) + 2 * step_ang:
+            stop = "door_lags"
+            break
+        if steps >= max_steps:
+            stop = "max_steps"
+            break
+        pose = fk(q)
+        remaining = signed_angle(radial(pose[0]), radial(p_t))
+        d_ang = sgn * min(step_ang, max(abs(remaining), 0.25 * step_ang))
+        wp = C.orbit_waypoints(pose, cen, C.quat_from_axis_angle(ax, d_ang), n=1, frame="world")[-1]
+        step_m = abs(d_ang) * radius
+        r_ = backend.solve_ik_path(f"{arm}_arm", [{frame: (th.as_tensor(wp[0]).float(), th.as_tensor(wp[1]).float())}], q_start=q, pos_tol=min(1e-4, 0.05 * step_m),
+                                   rot_tol=5e-4, max_iters=20, check_collisions=False, sync_world=False, soft_pos_tol=0.25 * step_m, soft_rot_tol=2e-3)
+        if r_.success and r_.q_traj is not None and len(r_.q_traj) > 0:
+            q_cmd = r_.q_traj[-1].reshape(-1).float()
+            dq = float(th.max(th.abs(q_cmd[idx] - q[idx])))
+            if dq > mcfg.diff_ik_joint_speed * dt:
+                q_cmd = q.clone()
+                q_cmd[idx] = q[idx] + (r_.q_traj[-1].reshape(-1).float()[idx] - q[idx]) * (mcfg.diff_ik_joint_speed * dt / dq)
+            q = q_cmd.clone()
+            commanded += abs(d_ang)
+            swept += d_ang
+            consecutive = 0
+        else:
+            consecutive += 1
+            misses += 1
+            if consecutive >= 10:
+                margin, jn = sampler.ikc.joint_limit_margin(q, arm)
+                return False, (f"approach_untrackable: push replay - the closed-loop arc misses 10 differential-IK steps in a row at swept {swept:+.3f} of {q_to:+.3f} rad "
+                               f"(nearest joint limit {margin:.3f} rad at {jn}; {getattr(r_, 'status', '')[:100]})"), rep
+        steps += 1
+    rep["arc"] = {"steps": steps, "swept_rad": round(swept, 4), "q_to_rad": round(q_to, 4), "stop": stop, "ik_misses": misses}
+    if stop != "joint_at_target":
+        return False, f"approach_untrackable: push replay - the closed-loop arc stops at {stop} (swept {swept:+.3f} of {q_to:+.3f} rad)", rep
+    # 3. the contact retreat's escape leg from the arc's end (execute_retreat)
+    here = fk(q)
+    n = E.escape_direction(None, here, supports)
+    radial_d = None
+    try:
+        centre = th.as_tensor(obj.get_position_orientation()[0]).reshape(-1)[:3].float()
+        radial_d = here[0] - centre
+        if n is not None:
+            radial_d = radial_d - n * float(th.dot(radial_d, n))
+        radial_d = radial_d / float(th.linalg.norm(radial_d)) if float(th.linalg.norm(radial_d)) > 1e-3 else None
+    except Exception:  # noqa: BLE001
+        radial_d = None
+    if radial_d is None and n is None:
+        return True, "arc replayed (no escape direction)", rep
+    d1 = radial_d if radial_d is not None else n
+    out = ecfg.contact_retreat_escape_m
+    far = max(float(retreat_distance), 2 * out)
+    normal_out = n * out if (n is not None and radial_d is not None) else th.zeros(3)
+    far_used, tried = far, []
+    with sampler.ikc.ignoring(list(ignore)):
+        for f in tuple(ecfg.retreat_reach_factors) or (1.0,):
+            d = max(far * float(f), out)
+            if tried and abs(d - tried[-1][0]) < 1e-6:
+                break
+            ok = kit.ik((here[0] + d1 * d + normal_out, here[1]), q, arm=arm) is not None
+            tried.append((round(d, 4), ok))
+            if ok:
+                far_used = d
+                break
+        else:
+            far_used = tried[-1][0]
+    leg = [(here[0] + d1 * out, here[1]), (here[0] + d1 * far_used + normal_out, here[1])]
+    rep["retreat"] = {"distance_m": far_used, "probe": tried}
+    dense_r: List[Any] = []
+    prev = here
+    for w in leg:
+        n_r = max(1, int(math.ceil(float(th.linalg.norm(w[0] - prev[0])) / mcfg.cartesian_step)))
+        dense_r.extend(tuple(x) for x in C.line_waypoints(prev, w, n_r))
+        prev = w
+    # the retreat leg as arm_along runs it (free-space soft tolerance, the retreat's joint-limit margin); its collision veto is
+    # left out - a colliding leg is finished around by the oracle's planned finish, only the kinematics can strand it
+    r_leg = backend.solve_ik_path(f"{arm}_arm", [{frame: w} for w in dense_r], q_start=q, pos_tol=mcfg.diff_ik_pos_tol, rot_tol=mcfg.diff_ik_rot_tol,
+                                  max_iters=mcfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=mcfg.diff_ik_soft_pos_tol_free,
+                                  soft_rot_tol=mcfg.diff_ik_soft_rot_tol, limit_margin=ecfg.retreat_limit_margin_rad)
+    if r_leg.success:
+        return True, "arc + retreat replayed", rep
+    diag = dict(getattr(r_leg, "diagnostics", None) or {})
+    k, stall = diag.get("fail_index"), diag.get("pos_err")
+    at_limit = bool(diag.get("at_lower") or diag.get("at_upper"))
+    q_stall = r_leg.q_traj[-1].reshape(-1).float() if r_leg.q_traj is not None and len(r_leg.q_traj) > 0 else q
+    remaining = float(stall or 0.0) + sum(float(th.linalg.norm(th.as_tensor(dense_r[i][0]) - th.as_tensor(dense_r[i - 1][0]))) for i in range(max(int(k or 1), 1), len(dense_r)))
+    rep["retreat"].update({"stall_m": None if stall is None else round(float(stall), 4), "at_limit": at_limit, "fail_index": k, "n_dense": len(dense_r)})
+    if diag.get("stage") == "diff_ik" and stall is not None and not at_limit and float(stall) <= ecfg.free_leg_finish_max_stall and remaining <= ecfg.free_leg_finish_max_remaining:
+        # ApproachFinish without a witness: cuRobo's IK of the end pose from the stall, within the finish's joint excursion
+        with sampler.ikc.ignoring(list(ignore)):
+            q_fin = kit.ik(leg[-1], q_stall, arm=arm)
+        if q_fin is not None and float(th.max(th.abs(th.as_tensor(q_fin).reshape(-1).float()[idx] - q_stall[idx]))) <= MO.ApproachFinish(None).max_excursion:
+            rep["retreat"]["finished"] = True
+            return True, "arc + retreat replayed (stall finished)", rep
+    moved = float(th.linalg.norm(fk(q_stall)[0] - here[0]))
+    end_gap = float(th.linalg.norm(fk(q_stall)[0] - leg[-1][0]))
+    if end_gap <= ecfg.retreat_partial_accept_m or moved >= out - 0.005:
+        rep["retreat"]["partial"] = {"short_m": round(end_gap, 4), "moved_m": round(moved, 4)}
+        return True, "arc replayed, retreat partial", rep
+    return False, (f"approach_untrackable: push replay - the contact retreat's escape leg from the arc's end stalls after {moved * 1000:.0f} mm "
+                   f"({end_gap * 1000:.0f} mm short; {r_leg.status[:160]})"), rep
+
+
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 #: which sidecar blocks each subtask's program consumes (oracle doc §6.2; used by the stub and as a sanity list)
@@ -1606,7 +1788,23 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             if pre_poses:
                                 q_ref, chain_ref = single_q["pre"], list(pre_poses) + list(chain)
                         chk = None
-                        if q_ref is not None:
+                        if (q_ref is not None and len(chain_ref) >= 4 and not _is_pack_push(sidecar, action)
+                                and os.environ.get("ISG_PUSH_REPLAY", "on").lower() not in ("off", "0", "false")):
+                            # owner 2026-09-27 (A8): a free-object arc push is replayed as the oracle runs it - the straight leg, the true
+                            # arc of the closed loop, the contact retreat's escape leg - and rejected when the replay cannot follow it
+                            from ispatialgym.oracle.actions import RETREAT_DIST
+
+                            tol_o = (sampler.gp.gen("tolerances") or {}).get("orientation") if hasattr(sampler, "gp") else None
+                            band = float(tol_o) * _push_stop_frac_arc() if tol_o else 0.005
+                            obj_ = sampler.objects.get(getattr(getattr(action, "contact", None), "object", None))
+                            ok_r, why_r, rep_r = replay_arc_push(sampler, arm, q_ref, chain_ref[0], chain_ref[1:], targets.get("direction") if isinstance(targets, dict) else None,
+                                                                 obj_, list(sampler.support_objects()), list(ignore_all) + list(ignore_last), band, RETREAT_DIST)
+                            if rep_r:
+                                log.info("program check: push replay of %s: %s %s", getattr(getattr(action, "contact", None), "object", None), why_r[:200], rep_r)
+                            chain_notes[key] = why_r[:160]
+                            if not ok_r:
+                                chk = (False, why_r)
+                        if chk is None and q_ref is not None and os.environ.get("ISG_FLIPPED_PUSH_CHECK", "on").lower() not in ("off", "0", "false"):
                             chk = _flipped_push_chain_check(sampler, chain_ref, stance, arm, q_ref, ignore_last, ignore_all, fingers, approached)
                         if chk is not None:
                             chain_notes[key] = chk[1][:160]
