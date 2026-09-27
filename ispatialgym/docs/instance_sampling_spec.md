@@ -335,7 +335,9 @@ every pose and waypoint that every action's `targets()` returns — in the recor
 carried object attached where the action carries one (screening IK at waypoints, exact IK at end poses, 3.6). This is
 the check principle 4 refers to. A pose that fails here is a bug in the rule that recorded it; the attempt is
 rejected (`program_check_failed`, reported per action name), never patched. `validate_instances.py` (D5) runs the same
-expansion on written instances. Trajectories *between* key poses are not checked here: the oracle plans them at run
+expansion on written instances, each stance rebuilt with the arm joint values the sampler recorded for it (`arms_q`;
+2026-09-26: rebuilt in the default postures, a held-object init had both arms untucked and failed where the sampler's
+hold did not). Trajectories *between* key poses are not checked here: the oracle plans them at run
 time (oracle doc §3.9).
 
 **One chain, as the oracle runs it** (owner 2026-09-24). The targets of an action are checked in the order the arm
