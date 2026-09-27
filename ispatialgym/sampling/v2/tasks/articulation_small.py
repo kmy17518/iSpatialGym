@@ -62,6 +62,24 @@ SUBTASKS = ("configuration_matching-articulation_open_small_scale", "configurati
 ATTEMPT_BUDGET_S = 300.0  # per instance attempt (brace search over the manipulation + second stances)
 
 
+def wide_stop_positions(a_pos: float, s_line: float, opening: float, ends: Sequence[float], step: float = 0.01) -> List[float]:
+    """Pad positions along the face (m) to try for a push-close brace's open stop on the far face. An open stop reacts the push only
+    between its fingertips (``opening`` each side of the pad): a stop whose fingertips the push line passes 1 cm inside keeps the
+    rule's position ``a_pos`` (the face's robot-side end + inset); one beside the line moves onto it - the positions from the line
+    toward ``a_pos`` in ``step`` that keep the line 1 cm inside the fingertips and the stop 1 cm inside the face ``ends``, possibly none
+    (owner 2026-09-27, first-demo v2.1: carton close 0927-133502, the stop 65 mm beside the push line, turned 1.23 deg)."""
+    reach = opening - 0.01
+    if abs(a_pos - s_line) <= reach:
+        return [a_pos]
+    d = math.copysign(step, a_pos - s_line)
+    out = []
+    for k in range(int(round(reach / step)) + 1):
+        s = s_line + k * d
+        if ends[0] + 0.01 + opening <= s <= ends[1] - 0.01 - opening:
+            out.append(round(s, 6))
+    return out
+
+
 class _LinkSubset:
     """A few links of a spawned object as an ignorable 'object' for the collision checks (``ik._Ignoring`` walks ``.links``):
     the flap a fist presses / the flap a hand holds leaves the cuRobo world while the box body stays in it."""
@@ -1598,7 +1616,8 @@ class ArticulationSmall(SamplerV2):
         def find_brace(st: Stance, pair, q_from: float):
             """Owner 2026-09-20 16:24: the pushes shove the box along the push direction - the other hand braces the face the box would
             slide toward with an OPEN gripper (the touching demo's wide stop, ``fingers_opening_m``): the pad on the face centre at
-            ``close_push_brace_height_frac`` of the height, approach into the face, tips side by side along the face."""
+            ``close_push_brace_height_frac`` of the height, approach into the face, tips side by side along the face. A stop on the far
+            face keeps the push line between its fingertips (``wide_stop_positions``; its record carries ``push_line_offset_m``)."""
             wpf = wp_at(q_from)
             t_h = th.tensor([float(wpf.approach[0]), float(wpf.approach[1]), 0.0])
             if float(th.linalg.norm(t_h)) < 1e-6:
@@ -1621,11 +1640,15 @@ class ArticulationSmall(SamplerV2):
             corner_inset = float(self.gen("close_push_brace_corner_inset_m", 0.04))
             a_pos = ends[near_i] + (corner_inset if near_i == 0 else -corner_inset)
             a_pos = min(max(a_pos, ends[0] + 0.01), ends[1] - 0.01)
-            on_face = centre + along * (a_pos - c_along)
             opening = float(self.gen("close_push_brace_opening_m", 0.04))
             kinds = [str(k) for k in (self.gen("close_push_brace_kinds", ["top_press", "opposite_face"]) or [])]
+            # the push line's place along the face (the arc turns the contact about the hinge, which runs along the face)
+            s_line = float(th.dot(wpf.contact.float(), along))
             whys = []
-            for kind in kinds:
+
+            def stop_at(kind: str, a_k: float):
+                """The ``kind`` brace with its pad at ``a_k`` along the face: ``(BraceRecord, None)`` or ``(None, why)``."""
+                on_face = centre + along * (a_k - c_along)
                 # owner 2026-09-21 23:23 (0921-030848: the stop drove the pads 5 mm into the face, the box rose 5 mm and the base rocked):
                 # the pads stop ``close_push_brace_clearance_m`` short of the face; the push shoves the box that far into them
                 b_clear = float(self.gen("close_push_brace_clearance_m", 0.006))
@@ -1655,8 +1678,7 @@ class ArticulationSmall(SamplerV2):
                     r_ret = self.ikc.exact([ret], st, brace_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED)
                     m_ret = self.ikc.joint_limit_margin(r_ret.q, brace_arm)[0] if r_ret.ok else -1.0
                     if not r_ret.ok or m_ret < float(getattr(self.ikc, "JOINT_LIMIT_MARGIN", 0.0)) + 0.01:
-                        whys.append(f"{kind}: brace ok but its lift-off pose {'has no solution' if not r_ret.ok else f'sits {1000 * m_ret:.0f} mrad from a joint limit'}")
-                        continue
+                        return None, f"{kind}: brace ok but its lift-off pose {'has no solution' if not r_ret.ok else f'sits {1000 * m_ret:.0f} mrad from a joint limit'}"
                 if not res.ok:
                     b = st.world_to_base(pre[0][:2])
                     r_free = self.ikc.exact([pre], st, brace_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED)
@@ -1670,12 +1692,26 @@ class ArticulationSmall(SamplerV2):
                                 why_d = f"the pre-pose meets the box: {self.ikc._collision_blame(q_c, [support])}"
                         else:
                             why_d = "reachable with the box; fails with the fist arm locked at its contact (the arms are in each other's way)"
-                    whys.append(f"{kind}: {str(res.reason)[:60]} (pre at base depth {float(b[0]):.2f} lateral {float(b[1]):+.2f} z {float(pre[0][2]):.2f}: {why_d})")
-                    continue
-                return TT.BraceRecord("brace", brace_arm, pre, contact, direction=direction, brace_kind=kind, object=tname, stance=st.name,
-                                      extras={"stop_clearance_m": b_clear, "pose_class": "wide_stop", "fingers_opening_m": opening, "stop_width_m": 2 * opening + 0.02,
-                                              "retreat_m": float(self.gen("close_push_brace_retreat_m", 0.06)),
-                                              "note": "the box slides along the push; the other hand, open, holds it (owner 2026-09-20 16:24): a top press on the far rim or a stop on the far face"})
+                    return None, f"{kind}: {str(res.reason)[:60]} (pre at base depth {float(b[0]):.2f} lateral {float(b[1]):+.2f} z {float(pre[0][2]):.2f}: {why_d})"
+                extras = {"stop_clearance_m": b_clear, "pose_class": "wide_stop", "fingers_opening_m": opening, "stop_width_m": 2 * opening + 0.02,
+                          "retreat_m": float(self.gen("close_push_brace_retreat_m", 0.06)),
+                          "note": "the box slides along the push; the other hand, open, holds it (owner 2026-09-20 16:24): a top press on the far rim or a stop on the far face"}
+                if kind == "opposite_face":
+                    extras["push_line_offset_m"] = round(s_line - a_k, 4)
+                return TT.BraceRecord("brace", brace_arm, pre, contact, direction=direction, brace_kind=kind, object=tname, stance=st.name, extras=extras), None
+
+            for kind in kinds:
+                positions = wide_stop_positions(a_pos, s_line, opening, ends) if kind == "opposite_face" else [a_pos]
+                rec, why = None, (f"{kind}: the push line passes {1000 * abs(a_pos - s_line):.0f} mm from the stop's centre and the face has no room "
+                                  f"for a stop straddling it")
+                for a_k in positions:
+                    rec, why_k = stop_at(kind, a_k)
+                    if rec is not None:
+                        break
+                    why = why_k if len(positions) == 1 else f"{kind} on the push line: {why_k}"
+                if rec is not None:
+                    return rec
+                whys.append(why)
             log.info("%s: push-close brace (%s hand, open) with the fist at q %.2f fails: %s", self.gp.alias, brace_arm, q_from, " | ".join(whys)[:700])
             return None
 

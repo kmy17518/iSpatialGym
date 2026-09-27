@@ -307,3 +307,22 @@ def test_a2_executor_looks_ahead_past_travel_legs_and_applies_the_kept_witnesses
     assert ex._witness_overrides[1]["leg"] == 0 and th.equal(ex._witness_overrides[1]["witnesses"]["pre_grasp"], q_kept)
     ex._absorb_branch_decisions(3, {"arms_posture": {"moved": ["right"]}})
     assert ex._witness_overrides == {}
+
+
+# ------------------------------------------------------------------------------------------------ carton close brace (chooser follow-up)
+
+
+def test_wide_stop_keeps_the_push_line_between_its_fingertips():
+    """Carton close 0927-133502: the far-face stop at the robot-side end + 5 cm inset stood 65 mm beside the push line (the fingertips
+    +-4 cm around the pad) and the push turned the box 1.23 deg; a stop the line passes 1 cm inside keeps its place."""
+    from ispatialgym.sampling.v2.tasks.articulation_small import wide_stop_positions
+
+    ends = (-0.115, 0.115)
+    assert wide_stop_positions(-0.066, -0.041, 0.04, ends) == [-0.066]  # the line 25 mm from the pad: >= 1 cm inside the 4 cm tips
+    assert wide_stop_positions(-0.066, -0.035, 0.04, ends)[0] == pytest.approx(-0.035)  # 31 mm: beside the tips' 3 cm reach - moved
+    pos = wide_stop_positions(-0.066, -0.0035, 0.04, ends)
+    assert pos == pytest.approx([-0.0035, -0.0135, -0.0235, -0.0335])  # from the line toward the corner, the line >= 1 cm inside the tips
+    assert all(abs(p - (-0.0035)) <= 0.03 + 1e-9 for p in pos)
+    assert wide_stop_positions(0.07, 0.0, 0.04, ends) == pytest.approx([0.0, 0.01, 0.02, 0.03])
+    # a face too short for a stop around the line: nothing to try (the next brace kind)
+    assert wide_stop_positions(0.04, -0.02, 0.04, (-0.045, 0.045)) == []
