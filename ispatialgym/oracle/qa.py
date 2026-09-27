@@ -341,6 +341,9 @@ class Monitors:
         names = {o.name for _, o in objs}
         self.transit = {"objects": objs, "names": names, "start": start, "label": dict(label or {}), "exempt": set()}
         self.transit["exempt"] = {pair for pair in self._protected_pairs()}
+        hx = (label or {}).get("hold_exempt") or {}
+        # a hand holding a press on a protected object touches it by design, whenever the contact comes and goes (execute._transit)
+        self.transit["hold_exempt"] = (set(hx.get("links") or ()), str(hx.get("object"))) if hx.get("object") else None
 
     def end_transit(self) -> None:
         self.transit = None
@@ -546,7 +549,10 @@ class Monitors:
 
         tr = self.transit
         lab = tr.get("label") or {}
+        hx = tr.get("hold_exempt")
         for own_link, name in sorted(self._protected_pairs() - tr["exempt"]):
+            if hx is not None and own_link in hx[0] and name == hx[1]:
+                continue
             ev = {"check": "run", "kind": "contact", "task": lab.get("task"), "action": lab.get("action"), "index": lab.get("index"), "leg": lab.get("leg"),
                   "object": name, "link": own_link, "step": self.episode_steps}
             self.protect_events.append(ev)

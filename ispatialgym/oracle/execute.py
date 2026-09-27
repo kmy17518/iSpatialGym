@@ -939,7 +939,17 @@ def _transit(ctx, motions: Motions, state, action, leg: str, target: Optional[st
     if not objs or not hasattr(motions, "protecting"):
         yield
         return
-    ctx.setdefault("protection", []).append({"leg": leg, "protected": [getattr(o, "name", n) for n, o in objs], "forced_via_above": bool(P.get("force"))})
+    hold = getattr(motions, "press_hold", None) or {}
+    if hold.get("arm") and hold.get("object") and hold.get("arm") != getattr(action, "arm", None):
+        # the other hand holds a press on a protected object (the two-flap lever's fist under the flap the transit's hand goes to
+        # pinch): its finger / gripper links touch that object by design, a contact that comes and goes as the flap settles is not
+        # the transit's (0927-022029: left_gripper_finger_link2 on the propped flap two steps into the pinch's pre-grasp transit)
+        try:
+            label["hold_exempt"] = {"links": list(M.FINGER_LINKS[hold["arm"]]) + [M.GRIPPER_LINK[hold["arm"]]], "object": state.object(hold["object"]).name}
+        except Exception:  # noqa: BLE001
+            pass
+    ctx.setdefault("protection", []).append({"leg": leg, "protected": [getattr(o, "name", n) for n, o in objs], "forced_via_above": bool(P.get("force")),
+                                             **({"hold_exempt": label["hold_exempt"]} if label.get("hold_exempt") else {})})
     hook = _hook(ctx, "transit")
     try:
         hook(True, objs, label)

@@ -123,3 +123,53 @@ def test_qa_transit_span_flags_new_contacts_and_movement_only():
     assert v is not None and v.category == "protected_moved" and abs(v.details["moved_m"] - 0.012) < 1e-6
     mon.end_transit()
     assert mon._check_protected() is None
+    # a hand that holds a press on the protected object (``hold_exempt``, the lever fist under the flap the other hand pinches):
+    # its contacts with that object come and go by design; the transit's own hand touching it is still a verdict
+    saucer.get_position_orientation = lambda: (th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    pairs["now"] = set()
+    mon.begin_transit([("saucer.n.02_1", saucer)], {"leg": "pre_grasp", "hold_exempt": {"links": ["left_gripper_finger_link1", "left_gripper_finger_link2", "left_gripper_link"],
+                                                                                       "object": "partner_saucer_mgbeah_0"}})
+    pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link2", f"{saucer.prim_path}/base_link")}
+    mon.episode_steps = 4
+    assert mon._check_protected() is None
+    pairs["now"] = pairs["now"] | {(f"{robot.prim_path}/right_gripper_finger_link2", f"{saucer.prim_path}/base_link")}
+    mon.episode_steps = 5
+    v = mon._check_protected()
+    assert v is not None and v.category == "protected_contact" and v.details["link"] == "right_gripper_finger_link2"
+
+
+def test_transit_label_exempts_the_hand_holding_a_press_on_the_object():
+    """``execute._transit``: while the other hand holds a press on the object (``Motions.press_hold``), the span's label carries
+    that hand's finger / gripper links and the object's scene name; the pressing hand's own transit gets no exemption."""
+    from contextlib import contextmanager
+
+    from ispatialgym.oracle import execute as EX
+
+    box = SimpleNamespace(name="target_carton_cdmmwy_0")
+    labels = []
+
+    class _M:
+        press_hold = {"arm": "left", "object": "carton.n.02_1", "link": "right_lid"}
+
+        @contextmanager
+        def protecting(self, objs, **kw):
+            yield
+
+    state = SimpleNamespace(object=lambda n: box)
+    for arm, exempt in (("right", True), ("left", False)):
+        labels.clear()
+        ctx = {"protect": {"goal": ["carton.n.02_1"], "task": "lever", "index": 5},
+               "hooks": {"transit": lambda on, objects=(), label=None: labels.append(label) if on else None}}
+        action = SimpleNamespace(name="grasp", arm=arm)
+        orig = EX._protected_for
+        EX._protected_for = lambda ctx, state, target: [("carton.n.02_1", box)]
+        try:
+            with EX._transit(ctx, _M(), state, action, "pre_grasp", target="carton.n.02_1"):
+                pass
+        finally:
+            EX._protected_for = orig
+        if exempt:
+            assert labels[0]["hold_exempt"] == {"links": ["left_gripper_finger_link1", "left_gripper_finger_link2", "left_gripper_link"], "object": "target_carton_cdmmwy_0"}
+            assert ctx["protection"][0]["hold_exempt"]["object"] == "target_carton_cdmmwy_0"
+        else:
+            assert "hold_exempt" not in labels[0] and "hold_exempt" not in ctx["protection"][0]
