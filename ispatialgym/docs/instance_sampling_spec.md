@@ -1264,6 +1264,10 @@ must stay connected). The obstacle is not a look-alike of any object the init vi
   object scaling** (fingers horizontal, closing toward the robot, so an object pinched across its side faces the
   camera with that side, e.g. a can's label rather than its lid; owner 2026-09-26) and 15° for mental rotation
   `[pilot]` (no depth or trunk fallbacks: the hold is a constant written into the customs list as a `hold` constraint).
+  How comfortable the mental-rotation start would be elsewhere — the hold at 90° over 23–53 cm against the current
+  15° / 0.50 m: joint-limit clearance, hand rotation dexterity, the share of the rotation goal set the sampler's
+  screening reaches, grasp visibility — is recorded in `runlogs/held_comfort_20260926/README.md`
+  (`scripts/held_comfort/sweep.py`, 2026-09-26).
   The B7 visibility survey is a prior only at the hold it was rendered at (15°); at any other hold every library row
   is realised and measured. **Object scaling starts at a depth drawn per instance** (owner 2026-09-26): the fixed hold
   is its *reference* hold, the init right arm holds the object with its root at the drawn start depth d0 — the
