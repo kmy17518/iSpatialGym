@@ -209,6 +209,18 @@ def wall_fist_axes(normal, closing, tilt: float = 0.0) -> Tuple[th.Tensor, th.Te
     return a, c
 
 
+def wall_brace_turns(tilts: Sequence[float]) -> List[Tuple[float, str, float]]:
+    """The brace's wrist turns ``(tilt, label, turn)`` in wrist-twin pairs (``orient``): turn + at tilt t and turn - at -t are the
+    same fist turned pi about its approach. Each pair keeps the generator's own order (tilts 0, +t, -t, turn + before -: (+t, +)
+    before (-t, -), (+t, -) before (-t, +)), so its first member is the tie-breaker default; the set is the tilts x turns."""
+    out: List[Tuple[float, str, float]] = []
+    for tilt in sorted({abs(float(t)) for t in tilts}):
+        for t_sign in ((1.0,) if tilt == 0.0 else (1.0, -1.0)):
+            for label, sgn in ((("+", 1.0), ("-", -1.0)) if t_sign > 0 else (("-", -1.0), ("+", 1.0))):
+                out.append((tilt * t_sign * sgn + 0.0, label, sgn))  # + 0.0: no -0.0 (the wrist label stays "s+0/-")
+    return out
+
+
 def _orient_extra(decision: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """``{"orient": decision}`` when the contact had two wrist turns (``orient.choose``), else nothing."""
     if decision is None or len([o for o in decision.get("options", []) if o.get("source") == "ik"]) < 2:
@@ -481,15 +493,11 @@ class AlignmentWall(SamplerV2):
             B = on_plane(B, mid_plane, n)
             # the stop: a finger's outer side ``brace_offset_m`` before B along a (toward the target), reached along a in the
             # wall plane from PRE_DIST out (spec §5.5: "the approach slides along the wall from outside the hull")
-            # the wrist turns in twin pairs (``orient``): turn + at tilt t and turn - at -t are the same fist turned pi about its approach
-            for tilt in sorted({abs(t) for t in tilts}):
-                for t_sign in ((1.0,) if tilt == 0.0 else (1.0, -1.0)):
-                    for label, sgn in (("+", 1.0), ("-", -1.0)):
-                        tilt_b = tilt * t_sign * sgn
-                        eef_w = wall_contact_pose(B, n, a, face, gap=gap_b, tilt=tilt_b, turn=sgn)
-                        pre = (eef_w[0] - C.PRE_DIST * a, eef_w[1])
-                        braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": f"s{math.degrees(tilt_b):+.0f}/{label}",
-                                       "tilt_deg": math.degrees(tilt_b), "face_m": face})
+            for tilt_b, label, sgn in wall_brace_turns(tilts):
+                eef_w = wall_contact_pose(B, n, a, face, gap=gap_b, tilt=tilt_b, turn=sgn)
+                pre = (eef_w[0] - C.PRE_DIST * a, eef_w[1])
+                braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": f"s{math.degrees(tilt_b):+.0f}/{label}",
+                               "tilt_deg": math.degrees(tilt_b), "face_m": face})
         push_arm = push_arm_of(E_push, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))  # the arm on the pushed end's side
         return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "normal": n, "E_low": E_low, "E_high": E_high, "E_push": E_push,
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,

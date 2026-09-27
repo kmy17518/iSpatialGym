@@ -389,3 +389,20 @@ def test_close_push_runs_the_preferred_fist_turn_and_falls_back_to_the_other(mon
     with pytest.raises(Reject) as e:
         AS.ArticulationSmall._sample_with_close_push(stub, None, Draft(), init, manip, 0, target, "support", None, None)
     assert e.value.reason == "push_unreachable" and "the other fist turn" in str(e.value) and stub.handle is handle0
+
+
+def test_wall_brace_turns_pair_the_wrist_twins_in_the_generators_order():
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    tilts = [math.radians(v) for v in (0.0, 25.0, -25.0)]
+    turns = AW.wall_brace_turns(tilts)
+    original = [(t, lab) for t in tilts for lab in ("+", "-")]  # the generator's order before the pairing
+    got = [(t, lab) for t, lab, _ in turns]
+    assert sorted(got) == sorted(original) and all(math.copysign(1.0, t) > 0 for t, lab, _ in turns if t == 0.0), "the same six, no -0.0"
+    n, d, point = th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 1.0, 0.0]), th.tensor([0.9, 0.1, 1.2])
+    for i in range(0, len(turns), 2):
+        (t0, l0, s0), (t1, l1, s1) = turns[i], turns[i + 1]
+        assert original.index((t0, l0)) < original.index((t1, l1)), "each pair keeps the generator's order"
+        p0 = AW.wall_contact_pose(point, n, d, 0.02, tilt=t0, turn=s0)
+        p1 = AW.wall_contact_pose(point, n, d, 0.02, tilt=t1, turn=s1)
+        assert O.is_twin(p0, p1), f"{(t0, l0)} / {(t1, l1)} are not the same fist turned pi about its approach"
