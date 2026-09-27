@@ -601,3 +601,22 @@ def test_registry_has_the_three_subtasks():
     assert REGISTRY["mental_rotation"] is HO.MentalRotationV2
     assert REGISTRY[CR.SUBTASK_STANDARD] is CR.CameraRelocalizationV2
     assert REGISTRY[CR.SUBTASK_OBSTRUCTED] is CR.CameraRelocalizationV2
+
+
+def test_both_held_object_subtasks_write_the_start_drive_targets(monkeypatch):
+    """Mental rotation records ``robot_state.controller_targets`` like object scaling (owner 2026-09-26): the settle of
+    the start and the recorded targets live in the shared held-object sampler, object scaling adds its start depths.
+    Without recorded targets the TRO has no ``controller_targets`` and the loader holds the loaded joints as before."""
+    from ispatialgym.sampling.v2.core import SamplerV2
+
+    monkeypatch.setattr(SamplerV2, "tro_meta_block", lambda self, draft, instance_id, seed: {"robot_state": {"joint_positions": {}}})
+    targets = {"torso_joint1": 1.025, "left_arm_joint1": 0.0, "right_arm_joint6": 0.4263}
+    for cls in (HO.MentalRotationV2, HO.ObjectScalingV2):
+        sampler = object.__new__(cls)
+        sampler._controller_targets = {}
+        assert "controller_targets" not in sampler.tro_meta_block(None, "iid", 0)["robot_state"]
+        sampler._controller_targets = dict(targets)
+        assert sampler.tro_meta_block(None, "iid", 0)["robot_state"]["controller_targets"] == targets
+        assert cls.write_instance is HO.HeldObjectV2.write_instance and cls.settle_start is HO.HeldObjectV2.settle_start
+    assert HO.MentalRotationV2.record_settled_start is HO.HeldObjectV2.record_settled_start
+    assert HO.ObjectScalingV2.record_settled_start is not HO.HeldObjectV2.record_settled_start

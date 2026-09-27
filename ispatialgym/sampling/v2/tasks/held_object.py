@@ -37,7 +37,9 @@ and without the robot) and the whole object in frame. The B7 prior (``runlogs/he
 before they are realised; it applies only at the hold it was rendered at (its ``hold`` record, roll 15°), so at any
 other hold every row is realised and measured by the renders.
 
-TRO: ``grasps[0]`` (agent, arm, object, key, name, ``object_pose_in_eef_frame``, ``finger_q``); ``pose_targets[target]``
+TRO: ``grasps[0]`` (agent, arm, object, key, name, ``object_pose_in_eef_frame``, ``finger_q``, ``ag_anchor_in_eef``) and
+``robot_state.controller_targets`` (the drive targets the start settled under, which the instance loader holds), both
+from the settled start (``HeldObjectV2.settle_start``); ``pose_targets[target]``
 = depth metric in the camera frame (scaling; tolerance max(0.02, 0.20·|Δd|), §8) or the world orientation with the
 model's ``orientation_equivalences`` (rotation; 0.15 rad; symmetric models rejected per §3.13 rule 1). Sidecar:
 ``stances.init`` (arms ``["right"]``, ``carried`` = target), ``grasps[0]`` (hold eef, waypoints = 3 intermediate + the
@@ -93,7 +95,7 @@ ROTATION_ANGLE_STEP_DEG = 15.0
 GRASP_ATTACH_STEPS = 90
 #: settle steps under gravity after the attach (the object must stay in hand)
 GRASP_GRAVITY_STEPS = 30
-#: object scaling: the recorded start settles under its drive targets before the TRO is written, in chunks of
+#: the recorded start (object in hand) settles under its drive targets before the TRO is written, in chunks of
 #: ``START_SETTLE_CHUNK`` control steps until no joint moves more than ``START_SETTLE_TOL_RAD`` over a chunk (at most
 #: ``START_SETTLE_MAX_STEPS``)
 START_SETTLE_CHUNK = 10
@@ -341,6 +343,8 @@ class HeldObjectV2(SamplerV2):
         self.grasp_debug: Dict[str, Any] = {}
         self.prior: Dict[Tuple[str, str], Dict[str, Any]] = {}  # loaded with the hold (sample_template)
         self.equivalences: Optional[List[List[float]]] = None
+        self._start_q: Optional[th.Tensor] = None  # the instance's commanded start configuration (settle_start)
+        self._controller_targets: Dict[str, float] = {}
 
     # ------------------------------------------------------------------ generation numbers
 
@@ -639,6 +643,7 @@ class HeldObjectV2(SamplerV2):
         if chosen is None:
             raise Reject("goal_infeasible", "no precomputed (grasp, goal) confirmed at this base pose: " + "; ".join(errors[-4:]))
         g, obj0, goal, info, q_goal, wps = chosen
+        self._start_q = q_init.clone()  # the hold: the drive targets the recorded start settles under
         info = self.describe_goal(info, base2d)
         d.object_poses[tname] = obj0
         d.goal_poses[tname] = goal
@@ -942,6 +947,11 @@ class HeldObjectV2(SamplerV2):
     # ------------------------------------------------------------------ writing / constraints
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        self.settle_start(draft)
+        # the sidecar's init configuration is the state the TRO records: demo and evaluator start from one pose
+        st = self.sidecar.stances.get("init")
+        if st is not None:
+            st.q = self.kit.q_current()
         path = super().write_instance(draft, index, seed)
         self.release()
         target = self.obj("target")
@@ -949,6 +959,61 @@ class HeldObjectV2(SamplerV2):
         og.sim.step_physics()
         self.kit.sync_world()
         return path
+
+    def settle_start(self, draft: Draft) -> None:
+        """The recorded start is an equilibrium under recorded drive targets. The right arm is held at ``_start_q``
+        (the hold for mental rotation, the start's IK solution for object scaling), the trunk and the left arm at their
+        current joints, the fingers where the grasp left them; the payload settles the arm (it rests a steady offset
+        below its targets) until it stops moving, and the targets go into the TRO's ``robot_state.controller_targets``,
+        which the instance loader holds - a loader holding the loaded joints themselves lets the payload sag once more.
+        The grasp record and the subtask's start quantities (:meth:`record_settled_start`) are read from the settled
+        state."""
+        state = ActionState(self.robot)
+        state.set_from_q(self._start_q, arms=(ARM,), trunk=False)
+        gidx = self.robot.gripper_control_idx[ARM]
+        lo, hi = self.robot.joint_lower_limits[gidx], self.robot.joint_upper_limits[gidx]
+        fingers = self.robot.get_joint_positions()[gidx]
+        state.gripper_cmd[ARM] = float(th.clamp(2.0 * (fingers.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
+        steps, moved = 0, float("inf")
+        while steps < START_SETTLE_MAX_STEPS and moved > START_SETTLE_TOL_RAD:
+            q0 = self.robot.get_joint_positions().clone()
+            self.world.control_step(state.action(), n=START_SETTLE_CHUNK)
+            steps += START_SETTLE_CHUNK
+            moved = float(th.max(th.abs(self.robot.get_joint_positions() - q0)))
+        draft.summary["start_settle"] = {"steps": steps, "last_chunk_motion_rad": moved}
+        names = list(self.robot.joints.keys())
+        self._controller_targets = {}
+        for idx, vals in ((self.robot.trunk_control_idx, state.trunk_target), (self.robot.arm_control_idx["left"], state.arm_target["left"]),
+                          (self.robot.arm_control_idx[ARM], state.arm_target[ARM])):
+            for i, v in zip(th.as_tensor(idx).tolist(), vals.tolist()):
+                self._controller_targets[names[int(i)]] = float(v)
+        eef = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+        self.record_settled_start(draft, eef)
+        # the grasp as the loader restores it: fingers, in-hand pose and the assisted-grasp joint's anchor (the finger
+        # contact point OmniGibson chose, in the eef frame) from the settled state
+        rel = C.relative(tuple(x.float() for x in self.obj("target").get_position_orientation()), eef)
+        finger_q = self.robot.get_joint_positions()[gidx].tolist()
+        gr = draft.extras["grasps"][0]
+        gr["object_pose_in_eef_frame"] = {"position": rel[0].tolist(), "orientation": rel[1].tolist()}
+        gr["finger_q"] = finger_q
+        params = (getattr(self.robot, "_ag_obj_constraint_params", None) or {}).get(ARM) or {}
+        if params.get("parent_frame_pos") is not None:
+            gr["ag_anchor_in_eef"] = (th.as_tensor(params["parent_frame_pos"], dtype=th.float32) * th.as_tensor(self.robot.scale, dtype=th.float32)).tolist()
+        rec = self.sidecar.grasp_of(self.target_name)
+        if rec is not None:
+            rec.grasp = eef
+            rec.pre_grasp = IK.pre_pose(eef)
+            rec.finger_q = finger_q
+            rec.eef_in_object = C.invert(rel)
+
+    def record_settled_start(self, draft: Draft, eef: C.Pose) -> None:
+        """The subtask's start quantities read from the settled state (``eef`` = the settled hand pose)."""
+
+    def tro_meta_block(self, draft: Draft, instance_id: str, seed: int) -> Dict[str, Any]:
+        meta = super().tro_meta_block(draft, instance_id, seed)
+        if self._controller_targets:
+            meta["robot_state"]["controller_targets"] = dict(self._controller_targets)
+        return meta
 
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         """The ``hold`` constant (once per entry) and the confirmed (grasp, goal) as a ``grasp_set`` prior."""
@@ -1075,43 +1140,11 @@ class ObjectScalingV2(HeldObjectV2):
         q_rel[[self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
         return q_rel, C.relative(eef_w, base3), C.relative(obj_w, base3)
 
-    def write_instance(self, draft: Draft, index: int, seed: int) -> str:
-        self.settle_start(draft)
-        # the sidecar's init configuration is the state the TRO records: demo and evaluator start from one pose
-        st = self.sidecar.stances.get("init")
-        if st is not None:
-            st.q = self.kit.q_current()
-        return super().write_instance(draft, index, seed)
-
-    def settle_start(self, draft: Draft) -> None:
-        """The recorded start is an equilibrium under recorded drive targets. The right arm is held at the start
-        configuration's IK solution, the trunk and the left arm at their current joints, the fingers where the grasp left
-        them; the payload settles the arm (it rests a steady offset below its targets) until it stops moving, and the
-        targets go into the TRO's ``robot_state.controller_targets``, which the instance loader holds - a loader holding
-        the loaded joints themselves lets the payload sag once more. The start the sidecar and the summary record (hand
-        pose, object depth, pad depth) is read from the settled state."""
-        state = ActionState(self.robot)
-        state.set_from_q(self._start_q, arms=(ARM,), trunk=False)
-        gidx = self.robot.gripper_control_idx[ARM]
-        lo, hi = self.robot.joint_lower_limits[gidx], self.robot.joint_upper_limits[gidx]
-        fingers = self.robot.get_joint_positions()[gidx]
-        state.gripper_cmd[ARM] = float(th.clamp(2.0 * (fingers.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
-        steps, moved = 0, float("inf")
-        while steps < START_SETTLE_MAX_STEPS and moved > START_SETTLE_TOL_RAD:
-            q0 = self.robot.get_joint_positions().clone()
-            self.world.control_step(state.action(), n=START_SETTLE_CHUNK)
-            steps += START_SETTLE_CHUNK
-            moved = float(th.max(th.abs(self.robot.get_joint_positions() - q0)))
-        draft.summary["start_settle"] = {"steps": steps, "last_chunk_motion_rad": moved}
-        names = list(self.robot.joints.keys())
-        self._controller_targets = {}
-        for idx, vals in ((self.robot.trunk_control_idx, state.trunk_target), (self.robot.arm_control_idx["left"], state.arm_target["left"]),
-                          (self.robot.arm_control_idx[ARM], state.arm_target[ARM])):
-            for i, v in zip(th.as_tensor(idx).tolist(), vals.tolist()):
-                self._controller_targets[names[int(i)]] = float(v)
+    def record_settled_start(self, draft: Draft, eef: C.Pose) -> None:
+        """The start the summary, the sidecar and the language record (object depth, pad depth, depth change) from the
+        settled state."""
         cam = self.world.camera_pose()
         axis = self.world.camera_model.optical_axis(cam)
-        eef = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
         d0 = float(th.dot(G.t(self.obj("target").get_position_orientation()[0]).float() - G.t(cam[0]), axis))
         info = draft.summary["goal"]
         info["init_depth_m"] = d0
@@ -1119,29 +1152,7 @@ class ObjectScalingV2(HeldObjectV2):
         hold = draft.summary["hold"]  # the same dict as the sidecar's init stance and goal blocks
         hold["start_depth_m"] = d0
         hold["depth_m"] = round(float(th.dot(G.t(C.pad_center(eef)) - G.t(cam[0]), axis)), 6)
-        # the grasp as the loader restores it: fingers, in-hand pose and the assisted-grasp joint's anchor (the finger
-        # contact point OmniGibson chose, in the eef frame) from the settled state
-        rel = C.relative(tuple(x.float() for x in self.obj("target").get_position_orientation()), eef)
-        finger_q = self.robot.get_joint_positions()[gidx].tolist()
-        gr = draft.extras["grasps"][0]
-        gr["object_pose_in_eef_frame"] = {"position": rel[0].tolist(), "orientation": rel[1].tolist()}
-        gr["finger_q"] = finger_q
-        params = (getattr(self.robot, "_ag_obj_constraint_params", None) or {}).get(ARM) or {}
-        if params.get("parent_frame_pos") is not None:
-            gr["ag_anchor_in_eef"] = (th.as_tensor(params["parent_frame_pos"], dtype=th.float32) * th.as_tensor(self.robot.scale, dtype=th.float32)).tolist()
-        rec = self.sidecar.grasp_of(self.target_name)
-        if rec is not None:
-            rec.grasp = eef
-            rec.pre_grasp = IK.pre_pose(eef)
-            rec.finger_q = finger_q
-            rec.eef_in_object = C.invert(rel)
         self.sidecar.language["goal_numbers"].update(self.goal_numbers(info))
-
-    def tro_meta_block(self, draft: Draft, instance_id: str, seed: int) -> Dict[str, Any]:
-        meta = super().tro_meta_block(draft, instance_id, seed)
-        if getattr(self, "_controller_targets", None):
-            meta["robot_state"]["controller_targets"] = dict(self._controller_targets)
-        return meta
 
     def sample_start_base(self, rng: np.random.Generator, q_rel: th.Tensor) -> Tuple[float, float, float]:
         """``sample_base`` for the instance's start configuration ``q_rel`` instead of the reference hold."""

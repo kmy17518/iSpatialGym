@@ -586,8 +586,11 @@ The sampler only guarantees what the loader can reproduce. Beyond the BEHAVIOR o
   hopping 1–7 mm seconds after the release; the loader re-applies the mass (inertia scaled along) after every reset).
 - `grasps` — the held object of object scaling / mental rotation: the object is placed at
   `grasps[0].object_pose_in_eef_frame`, the recorded finger joints are applied and the assisted grasp is attached
-  before the first policy step; an attach failure fails the load (`grasp_restore_failed`), it never silently starts
-  ungrasped.
+  (at the recorded joint anchor `grasps[0].ag_anchor_in_eef`) before the first policy step; an attach failure fails
+  the load (`grasp_restore_failed`), it never silently starts ungrasped. The payload holds the position-controlled arm
+  a steady offset below its drive targets, so the sampler records the start settled under the commanded start
+  configuration and writes those targets to `robot_state.controller_targets`; the loader holds them (holding the loaded
+  joints themselves would let the payload sag the arm a second time; owner 2026‑09‑26, both held-object tasks).
 - `attachments` — the named male / female meta-link pair and the collision filter between the two members, both at
   load and when the policy attaches during the episode (the v1 open point is closed by the loader, not by sampling).
 - `articulation_targets` and the initial joint values of every non-fixed joint of the target, with the moving link
