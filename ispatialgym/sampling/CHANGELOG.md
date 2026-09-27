@@ -112,8 +112,9 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   hand is C2-symmetric about its approach axis except for the wrist camera, so wherever a generator yields a contact in both
   wrist turns - a library pinch of a free object and its twin (`tabletop.pick_twin`), the tabletop / block-design pushes, the
   braces and blades (touching, attachment, axial, wall, block-design pack / row / column, the small-articulation base-link
-  braces), the push-under blade, the handle pinches (small and large articulation), the block-design cube picks (a pick and
-  its twin grouped, ordered on the pick IK the chain search runs first) - `orient.choose` decides between them.
+  braces), the push-under blade, the handle pinches (small and large articulation), the block-design cube picks and the
+  flip-in-place re-grasp (a pick and its twin grouped, ordered on the pick IK the chain search runs first) - `orient.choose`
+  decides between them.
   Each turn is evaluated with the generator's own checks; each solution (and the witnesses a failed chain left - B2's rescue
   path) also offers the other turn in its shoulder / elbow branch (`IKChecker.twin_q`, verified when it is the one to try).
   Order: joint-limit safe (every configuration of the action's chain at least `JOINT_LIMIT_MARGIN` 0.05 rad from every arm
@@ -127,8 +128,9 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   stance). The axial push scores its contact configuration from the pre witness (tracked, else the plain IK) - no new
   rejection. Records: `orient` in the contact extras (every option's margin, nearest joint, reach, verdict; `against_default`
   when the chosen turn is not the generator's first), grasps `twin_choice.orient`, the summary `kit` counters
-  `orient_choices`, `orient_reason.*`, `orient_source.map`, `orient_against_default`. Tests: `test_orient.py`,
-  `test_grasp_twins.py`.
+  `orient_choices`, `orient_reason.*`, `orient_source.map`, `orient_against_default`. Every proposal and record carries the
+  `arm` making the contact (default: the arm of the call; scoring, the camera check and the wrist-twin pairing / mapping use
+  each proposal's own arm; no arm choice yet). Tests: `test_orient.py`, `test_grasp_twins.py`.
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

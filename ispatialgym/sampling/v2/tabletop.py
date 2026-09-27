@@ -1683,7 +1683,7 @@ def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pr
 
     take = chosen is not None and chosen.proposal.payload[0] == "twin"
     why = decision["reason"] if chosen is not None else "neither feasible"
-    facts = {"stage": where, "chosen": "twin" if take else "row", "reason": why, "source": decision["source"],
+    facts = {"stage": where, "arm": arm, "chosen": "twin" if take else "row", "reason": why, "source": decision["source"],
              "row": dict(side(str(row_name)), name=row_name), "twin": dict(side(str(twin_name)), name=twin_name), "orient": decision}
     if take:
         _count(s, "twin_taken")

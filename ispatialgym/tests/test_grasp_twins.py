@@ -385,7 +385,8 @@ def test_pick_twin_takes_the_twin_when_the_row_fails_at_joint_5():
     assert len(s.calls) == 2 and "q_first" not in s.calls[0] and s.calls[0]["ignore_for_last"] == []
     assert s.calls[1]["cache"] is False and th.allclose(s.calls[1]["q_first"], _twin_of(s, q_pre)) and s.calls[1]["scale_key"] is None
     f = pick.facts
-    assert f["stage"] == "test" and f["chosen"] == "twin" and f["reason"] == "only feasible" and f["source"] == "map"
+    assert f["stage"] == "test" and f["arm"] == "right" and f["chosen"] == "twin" and f["reason"] == "only feasible" and f["source"] == "map"
+    assert f["twin"]["arm"] == "right" and f["orient"]["arm"] == "right"
     assert f["row"]["name"] == "grasp_4" and f["row"]["ok"] is False and f["row"]["why"].startswith("ik_joint_limit: right_arm_joint5")
     assert f["twin"]["name"] == "grasp_4~r180" and f["twin"]["ok"] and f["twin"]["source"] == "map" and f["twin"]["margin_rad"] == pytest.approx(0.597, abs=2e-3)
     assert f["orient"]["against_default"] is True

@@ -1902,7 +1902,7 @@ class BlockDesign(SamplerV2):
                     if i_ < len(lst):
                         ordered.append(lst[i_])
             tag = "re-grasp" if st2 is manip else f"re-grasp@{st2.translate:.2f}/{st2.tilt:+.2f}/sh{float(st2.extras.get('block_stance_shift_m', 0.0)):+.2f}"
-            for label2, pair2, g2, place2, clr2 in ordered[: int(self.gen("max_regrasp_classes", 12))]:
+            for label2, pair2, g2, place2, clr2 in self._pick_turns(ordered[: int(self.gen("max_regrasp_classes", 12))], st2, support, block, d_pick):
                 pre_pick2 = IK.pre_pose(g2.eef, d_pick)
                 lift2 = (g2.eef[0] + th.tensor([0.0, 0.0, carry]), g2.eef[1])
                 place2m = (place2[0] + _xy3(right) * self._place_margin() + _xy3(toward) * self._place_margin(), place2[1])

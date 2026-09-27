@@ -281,3 +281,52 @@ def test_block_design_pick_turns_pairs_the_twins_and_orders_each_pair():
     assert next(gen)[0] == "a/y2" and calls == ["a/y0", "a/y2"], "lazy: only the first pair solved; its twin (0.3 rad of wrist away) first"
     assert [c[0] for c in gen] == ["a/y0", "b/y1"], "b/y3's camera fails at the pick: dropped; b/y1 kept"
     assert ikc.kit.stats["orient_reason.reach"] == 1 and ikc.kit.stats["orient_choices"] == 2
+
+
+def _ikc2():
+    """An IKChecker whose kit knows both arms (the right arm's slots and limits mirrored onto the left arm's)."""
+    ikc = _ikc()
+    left = th.tensor([M.ALL_JOINTS.index(n) for n in M.ARM_JOINTS["left"]])
+    ikc.kit.robot.arm_control_idx["left"] = left
+    ikc.kit.robot.joint_lower_limits[left] = th.tensor(ARM_LO)
+    ikc.kit.robot.joint_upper_limits[left] = th.tensor(ARM_HI)
+    return ikc, left
+
+
+def test_proposals_and_records_carry_the_arm_of_the_call_by_default():
+    ikc = _ikc()
+    q = _q([0.0, -1.0, 0.0, -1.5, -1.2, 0.0, 0.0])
+    props = _pair()
+    chosen, dec = O.choose(ikc, "right", props, _Solver(ikc, {"row": [q, q], "twin": [q, q]}), q, map_twins=False)
+    assert all(p.arm == "right" for p in props) and chosen.proposal.arm == "right" and dec["arm"] == "right"
+    assert {o["arm"] for o in dec["options"]} == {"right"}
+    # nothing chosen: the record names the arm of the call
+    _, dec_none = O.choose(ikc, "left", _pair(), lambda p: (False, None, None, "no"), q)
+    assert dec_none["arm"] == "left" and dec_none["chosen"] is None
+
+
+def test_wrist_twins_pair_and_map_within_one_arm_only():
+    ikc, left = _ikc2()
+    chain = _contact()
+    q_r = _q([0.0, -1.0, 0.0, -1.5, -1.2, 0.0, 0.0])
+    q_l = q_r.clone()
+    q_l[left] = q_r[ARM_IDX]
+    # the twin pose offered to the other arm: two single proposals, no flipped option across the arms
+    props = [O.Proposal("row", 0, "row", chain, arm="right"), O.Proposal("twin", 1, "twin", _twin_chain(chain), arm="left")]
+
+    def ev(p):
+        q = q_r if p.arm == "right" else q_l
+        for pose in p.chain:
+            ikc.solutions[(p.arm, ikc._pose_key(pose))] = q.clone()
+        return True, q, None, ""
+
+    chosen, dec = O.choose(ikc, "right", props, ev, q_r)
+    assert all(o["source"] == "ik" for o in dec["options"]) and {o["arm"]: o["label"] for o in dec["options"]} == {"right": "row", "left": "twin"}
+    # choose_first: candidates of two arms are never one orientation group
+    cands = [("r", chain, "right"), ("l", _twin_chain(chain), "left")]
+    groups = list(O.pairs(cands, key=lambda c: c[1][1], arm_of=lambda c: c[2]))
+    assert [len(g) for g in groups] == [1, 1]
+    assert [len(g) for g in O.pairs(cands, key=lambda c: c[1][1])] == [2], "without arm_of every candidate is the call's arm"
+    got, dec2, _ = O.choose_first(ikc, "right", cands, key=lambda c: c[1][1], label=lambda c: c[0], chain=lambda c: c[1], evaluate=ev, q_start=q_r,
+                                  arm_of=lambda c: c[2])
+    assert got.proposal.arm == "right" and dec2["arm"] == "right" and dec2["options"][0]["arm"] == "right"

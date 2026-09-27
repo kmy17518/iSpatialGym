@@ -16,7 +16,9 @@ Besides the proposals the caller solves, each solution contributes the wrist-fli
 (source ``map``): the same shoulder / elbow branch, scored from the mapped configurations and checked by the caller only when it
 is the one to try (0927 estimate: bar soap / sprouts reached the library pose in the rotated grasp's branch with its clearance
 and 1.2-1.3 rad less travel). A proposal that failed contributes the witnesses it left from its chain's start (B2's rescues:
-the library grasp stalled at joint 5 at the end of its approach, its twin left from the mapped pre-grasp witness)."""
+the library grasp stalled at joint 5 at the end of its approach, its twin left from the mapped pre-grasp witness). Every
+proposal and decision record carries the arm making the contact (by default the arm of the call; there is no arm choice
+yet)."""
 from __future__ import annotations
 
 import functools
@@ -45,7 +47,9 @@ Pose = Tuple[th.Tensor, th.Tensor]
 class Proposal:
     """One orientation of a contact: ``label`` (the generator's name), ``rank`` (its order in the generator, 0 = its default),
     ``payload`` (what the caller records), ``chain`` (the poses the arm goes through, the pre-pose first), ``q_first`` (the
-    configuration the chain starts from: a wrist-flipped solution of the twin proposal), ``source`` ``ik`` | ``map``."""
+    configuration the chain starts from: a wrist-flipped solution of the twin proposal), ``source`` ``ik`` | ``map``, ``arm``
+    (the arm making the contact; None = the arm of the :func:`choose` call - there is no arm choice yet, the field carries
+    the arm through the scoring and the records)."""
 
     label: str
     rank: int
@@ -53,6 +57,7 @@ class Proposal:
     chain: List[Pose]
     q_first: Optional[th.Tensor] = None
     source: str = "ik"
+    arm: Optional[str] = None
 
 
 @dataclass
@@ -68,7 +73,7 @@ class Scored:
     predicted: bool = False
 
     def facts(self) -> Dict[str, Any]:
-        return {"label": self.proposal.label, "rank": self.proposal.rank, "source": self.proposal.source, "ok": bool(self.ok),
+        return {"label": self.proposal.label, "arm": self.proposal.arm, "rank": self.proposal.rank, "source": self.proposal.source, "ok": bool(self.ok),
                 "margin_rad": None if self.margin is None else round(float(self.margin), 4), "nearest_joint": self.nearest,
                 "reach_rad": None if self.reach is None else round(float(self.reach), 3), **({"why": str(self.why)[:120]} if self.why else {}),
                 **({"predicted": True} if self.predicted else {})}
@@ -177,23 +182,28 @@ def choose(ikc, arm: str, proposals: Sequence[Proposal], evaluate: Callable[[Pro
     ``downstream(scored)``: the caller's checks that need the chosen chain (the pushes with a brace arm locked at it); an option
     failing them is passed over for the next in the order ("if that one fails, try the other one"). ``map_twins`` False: no
     wrist-flipped options (a downstream that solves the contact again from its own seeds would not keep the flipped branch).
-    Returns ``(the chosen Scored or None, the decision record)``. A single proposal (the generator allows one turn: a camera-up-only
-    fist) is only evaluated: its orientation is the generator's hard rule and the camera check guards the reordering only."""
+    Each proposal is scored on its own ``arm`` (default: ``arm``, the arm of the call); wrist twins are paired and mapped within
+    one arm. Returns ``(the chosen Scored or None, the decision record)``. A single proposal (the generator allows one turn: a
+    camera-up-only fist) is only evaluated: its orientation is the generator's hard rule and the camera check guards the
+    reordering only."""
     check_camera = check_camera and len(proposals) > 1
+    for p in proposals:
+        if p.arm is None:
+            p.arm = arm
     scored: List[Scored] = []
 
     def score(p: Proposal, ok: bool, result: Any, qs: Optional[List[th.Tensor]], why: str, predicted: bool = False) -> Scored:
         if ok and qs is None:
-            qs = chain_qs(ikc, arm, p.chain)
+            qs = chain_qs(ikc, p.arm, p.chain)
         if ok and check_camera and qs:
             idx = list(camera_idx) if camera_idx is not None else [len(p.chain) - 1]
-            bad = [i for i in idx if 0 <= i < len(qs) and not camera_clear(ikc, qs[i], arm)]
+            bad = [i for i in idx if 0 <= i < len(qs) and not camera_clear(ikc, qs[i], p.arm)]
             if bad:
                 ok, why = False, f"wrist camera within {CAMERA_MARGIN * 1000:.0f} mm of the world at chain pose {bad[0] + 1}/{len(p.chain)}"
         s = Scored(p, bool(ok), result=result, qs=qs, why=why, predicted=predicted)
         if qs:
-            s.margin, s.nearest = chain_margin(ikc, qs, arm)
-            s.reach = reach(ikc, qs[0], q_start, arm)
+            s.margin, s.nearest = chain_margin(ikc, qs, p.arm)
+            s.reach = reach(ikc, qs[0], q_start, p.arm)
         return s
 
     for p in proposals:
@@ -202,18 +212,19 @@ def choose(ikc, arm: str, proposals: Sequence[Proposal], evaluate: Callable[[Pro
     passing = [s for s in scored if s.ok]
     mapped: List[Scored] = []
     for s in (scored if map_twins else []):
-        src = s.qs if s.ok else witnesses(ikc, arm, s.proposal.chain)
+        a = s.proposal.arm
+        src = s.qs if s.ok else witnesses(ikc, a, s.proposal.chain)
         if not src:
             continue
         for p in proposals:
-            if p is s.proposal or not is_twin(s.proposal.chain[0], p.chain[0]):
+            if p is s.proposal or p.arm != a or not is_twin(s.proposal.chain[0], p.chain[0]):
                 continue
-            mq = [ikc.twin_q(q, arm) for q in src]
+            mq = [ikc.twin_q(q, a) for q in src]
             if any(q is None for q in mq):
                 continue
-            m = Scored(Proposal(p.label, p.rank, p.payload, p.chain, q_first=mq[0], source="map"), True, qs=mq, predicted=True)
-            m.margin, m.nearest = chain_margin(ikc, mq, arm)
-            m.reach = reach(ikc, mq[0], q_start, arm)
+            m = Scored(Proposal(p.label, p.rank, p.payload, p.chain, q_first=mq[0], source="map", arm=a), True, qs=mq, predicted=True)
+            m.margin, m.nearest = chain_margin(ikc, mq, a)
+            m.reach = reach(ikc, mq[0], q_start, a)
             mapped.append(m)
     key = functools.cmp_to_key(prefer)
     pool = sorted(passing + mapped, key=key)
@@ -239,7 +250,7 @@ def choose(ikc, arm: str, proposals: Sequence[Proposal], evaluate: Callable[[Pro
         chosen = s
         break
     rest = [o for o in pool if o.ok]
-    decision: Dict[str, Any] = {"stage": stage, "arm": arm, "chosen": None if chosen is None else chosen.proposal.label,
+    decision: Dict[str, Any] = {"stage": stage, "arm": arm if chosen is None else chosen.proposal.arm, "chosen": None if chosen is None else chosen.proposal.label,
                                 "source": None if chosen is None else chosen.proposal.source,
                                 "reason": None if chosen is None else reason(chosen, rest),
                                 "against_default": bool(chosen is not None and chosen.proposal.rank > 0),
@@ -253,7 +264,7 @@ def choose(ikc, arm: str, proposals: Sequence[Proposal], evaluate: Callable[[Pro
             _count(ikc, "orient_source.map")
         if decision["against_default"]:
             _count(ikc, "orient_against_default")
-        log.info("orient [%s] %s (%s%s)%s | %s", stage, chosen.proposal.label, decision["reason"], ", wrist-flipped branch" if chosen.proposal.source == "map" else "",
+        log.info("orient [%s] %s (%s%s)%s | %s", f"{stage}, {chosen.proposal.arm} arm", chosen.proposal.label, decision["reason"], ", wrist-flipped branch" if chosen.proposal.source == "map" else "",
                  " AGAINST the generator's order" if decision["against_default"] else "",
                  " | ".join(_side(o) for o in decision["options"]))
     return chosen, decision
@@ -274,12 +285,14 @@ def _count(ikc, key: str) -> None:
 def choose_first(ikc, arm: str, stream, *, key: Callable[[Any], Pose], label: Callable[[Any], str], chain: Callable[[Any], List[Pose]],
                  evaluate: Callable[[Proposal], Tuple[bool, Any, Optional[List[th.Tensor]], str]], q_start: Optional[th.Tensor],
                  camera_idx: Optional[Sequence[int]] = None, stage: str = "",
-                 downstream: Optional[Callable[["Scored"], Tuple[bool, str]]] = None) -> Tuple[Optional[Scored], Optional[Dict[str, Any]], List[str]]:
-    """A generator's candidates in its own order, its wrist twins grouped (:func:`pairs` by ``key``): the first group with a
-    passing member, the member :func:`choose` picks. Returns ``(chosen, decision, the failures of the groups before it)``."""
+                 downstream: Optional[Callable[["Scored"], Tuple[bool, str]]] = None,
+                 arm_of: Optional[Callable[[Any], str]] = None) -> Tuple[Optional[Scored], Optional[Dict[str, Any]], List[str]]:
+    """A generator's candidates in its own order, its wrist twins grouped (:func:`pairs` by ``key``, within one arm): the first
+    group with a passing member, the member :func:`choose` picks. ``arm_of(candidate)``: the candidate's arm (default ``arm``).
+    Returns ``(chosen, decision, the failures of the groups before it)``."""
     fails: List[str] = []
-    for group in pairs(stream, key):
-        props = [Proposal(label(c), i, c, chain(c)) for i, c in enumerate(group)]
+    for group in pairs(stream, key, arm_of):
+        props = [Proposal(label(c), i, c, chain(c), arm=arm_of(c) if arm_of is not None else None) for i, c in enumerate(group)]
         chosen, decision = choose(ikc, arm, props, evaluate, q_start, camera_idx=camera_idx, stage=stage, downstream=downstream)
         if chosen is not None:
             return chosen, decision, fails
@@ -287,12 +300,14 @@ def choose_first(ikc, arm: str, stream, *, key: Callable[[Any], Pose], label: Ca
     return None, None, fails
 
 
-def pairs(stream, key: Callable[[Any], Pose]):
-    """Group a candidate stream into orientation groups: consecutive candidates whose ``key`` poses are wrist twins form one group
-    (a generator yields a contact's two turns back to back); every other candidate is a group of its own. Order kept."""
+def pairs(stream, key: Callable[[Any], Pose], arm_of: Optional[Callable[[Any], str]] = None):
+    """Group a candidate stream into orientation groups: consecutive candidates of one arm (``arm_of``, default: all one arm)
+    whose ``key`` poses are wrist twins form one group (a generator yields a contact's two turns back to back); every other
+    candidate is a group of its own. Order kept."""
     group: List[Any] = []
+    same_arm = (lambda a, b: arm_of(a) == arm_of(b)) if arm_of is not None else (lambda a, b: True)
     for item in stream:
-        if group and len(group) == 1 and is_twin(key(group[0]), key(item)):
+        if group and len(group) == 1 and same_arm(group[0], item) and is_twin(key(group[0]), key(item)):
             group.append(item)
             yield group
             group = []
