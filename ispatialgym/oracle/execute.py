@@ -1517,6 +1517,13 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         # the part is in the air above the partner: re-aim the descent for its live in-hand pose (and the carry's residual)
         targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
         yield from clear_fingers_over_partner(action, motions, state, targets, ctx, cfg)
+        if ctx["finger_clearance"].get("applied"):
+            # the opened pads let the part settle in the assisted grasp (cap 0927-040231: 1.25 mm / 1.4 deg in the hand, which then
+            # stood as the offset before the snap and cost a correction pass): the descent is aimed again for that in-hand pose
+            first = ctx["inhand_reaim"]
+            targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
+            ctx["finger_clearance"]["reaim"] = ctx["inhand_reaim"]
+            ctx["inhand_reaim"] = first
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
     # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
