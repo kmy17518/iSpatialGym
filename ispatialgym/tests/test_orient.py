@@ -252,3 +252,32 @@ def test_choose_first_takes_the_first_group_with_a_passing_member():
     assert chosen.proposal.payload[0] == "y" and dec["chosen"] == "y" and fails == ["x: x collides", "x-: x- collides"]
     assert "orient_choices" in ikc.kit.stats and ikc.kit.stats["orient_choices"] == 1, "the pair was a choice (nothing chosen); y alone is not"
     assert O.choose_first(ikc, "right", cands[:2], key=lambda c: c[1][1], label=lambda c: c[0], chain=lambda c: c[1], evaluate=ev, q_start=q)[0] is None
+
+
+def test_block_design_pick_turns_pairs_the_twins_and_orders_each_pair():
+    from ispatialgym.sampling.v2 import ik as IK
+    from ispatialgym.sampling.v2.ik import IKResult
+    from ispatialgym.sampling.v2.tasks.block_design import BlockDesign
+
+    ikc = _ikc(links_clear=lambda q, links, margin: (float(q[ARM_IDX[6]]) < 1.0,))  # q7 >= 1: the camera within 5 mm of the world
+    a, b = _contact(0.5)[1], _contact(0.7)[1]
+    q_far, q_near, q_cam = (_q([0.0, -1.0, 0.0, -1.5, v, 0.0, q7]) for v, q7 in ((-1.2, 0.0), (1.9, 0.0), (0.3, 1.2)))
+    answer = {("a", False): q_far, ("a", True): q_near, ("b", False): q_near, ("b", True): q_cam}
+    cls = [("a/y0", a), ("b/y1", b), ("a/y2", C.twin_pose(a)), ("b/y3", C.twin_pose(b))]
+    screened = [(label, "x", SimpleNamespace(eef=eef), None, 0.001, None) for label, eef in cls]
+    calls = []
+
+    def exact2(poses, stance, **kw):
+        label = next(c[0] for c in screened if c[2].eef is poses[-1])
+        q = answer[(label[0], label.endswith(("y2", "y3")))]
+        calls.append(label)
+        for p in poses:
+            ikc.solutions[("right", ikc._pose_key(p))] = q.clone()
+        return IKResult(True, q.clone(), "", len(poses))
+
+    stub = SimpleNamespace(ikc=ikc, _exact2=exact2)
+    ikc.q_locked = lambda stance, **kw: _q([0.0, -1.0, 0.0, -1.5, 1.6, 0.0, 0.0])
+    gen = BlockDesign._pick_turns(stub, screened, None, "support", "block", IK.PRE_DIST)
+    assert next(gen)[0] == "a/y2" and calls == ["a/y0", "a/y2"], "lazy: only the first pair solved; its twin (0.3 rad of wrist away) first"
+    assert [c[0] for c in gen] == ["a/y0", "b/y1"], "b/y3's camera fails at the pick: dropped; b/y1 kept"
+    assert ikc.kit.stats["orient_reason.reach"] == 1 and ikc.kit.stats["orient_choices"] == 2

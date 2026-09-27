@@ -1262,6 +1262,35 @@ class BlockDesign(SamplerV2):
         out.sort(key=lambda t: (t[0], t[1]))
         return out
 
+    def _pick_turns(self, screened: List[Tuple[Any, ...]], manip: Stance, support, block, d_pick: float):
+        """``screened`` (cube-pick classes, the module's order) with a class and its twin - the same pick turned pi about the
+        approach (a straight-down pick at yaw k and k + 2) - next to each other where the first of them stands, the pair in the
+        order of the orientation rule (``orient.choose`` on the pick [pre-grasp, grasp], owner 2026-09-27: joint-limit safe,
+        then easier to reach from the stance, the module's order within the tolerance); a class whose wrist camera comes within
+        5 mm of the world at the pick is dropped. Lazy: a pair is solved when the chain search reaches it (the search's own
+        pick IK, cached); the search takes the first class whose whole chain passes, the other turn next."""
+        rest = list(screened)
+        q0 = self.ikc.q_locked(manip)
+
+        def evaluate(p):
+            res = self._exact2(list(p.chain), manip, ignore_for_last=[support, block], approached=[block])
+            return bool(res.ok), res, None, str(res.reason)
+
+        while rest:
+            c = rest.pop(0)
+            j = next((k for k, o in enumerate(rest) if O.is_twin(c[2].eef, o[2].eef)), None)
+            if j is None:
+                yield c
+                continue
+            grp = [c, rest.pop(j)]
+            props = [O.Proposal(g[0], r, g, [IK.pre_pose(g[2].eef, d_pick), g[2].eef]) for r, g in enumerate(grp)]
+            chosen, dec = O.choose(self.ikc, "right", props, evaluate, q0, stage="cube pick", map_twins=False)
+            camera = {o["label"] for o in dec["options"] if not o.get("ok") and str(o.get("why", "")).startswith("wrist camera")}
+            first = [] if chosen is None else [chosen.proposal.payload]
+            for g in first + [g for g in grp if not first or g is not first[0]]:
+                if g[0] not in camera:
+                    yield g
+
     def _exact2(self, poses: List[TT.Pose], stance: Stance, **kw):
         """``IKChecker.exact`` with one retry from FRESH seeds when the seeded solve ends in an untrackable branch or a miss:
         the checker seeds every solve from the nearest remembered witness (hundreds accumulate over the blocks of an
@@ -1495,7 +1524,7 @@ class BlockDesign(SamplerV2):
             if -d_left > float(self.gen("flip_direct_max_slot_left_m", 0.04)):
                 diag.append(f"direct flip skipped: the slot lies {-d_left * 100:.0f} cm left of the cell")
                 screened = []
-        for label, pair, g_pick, place_eef, clearance, lam in screened:
+        for label, pair, g_pick, place_eef, clearance, lam in self._pick_turns(screened, manip, support, block, d_pick):
             pre_pick = IK.pre_pose(g_pick.eef, d_pick)
             lift = (g_pick.eef[0] + th.tensor([0.0, 0.0, self._carry_height()]), g_pick.eef[1])
             pivot = self._centre(pick_pose)[0] + th.tensor([0.0, 0.0, self._carry_height()])
