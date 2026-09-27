@@ -2707,7 +2707,17 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
             gen.close()
             break
     note["motion_steps"] = k
-    if targets["mode"] == "arm" and cfg.follow_stop_at_goal and not reached() and (getattr(art, "extra", None) or {}).get("hinge_world") is not None:
+    # a stage-2 hand-over (``articulation.follow_to``, sampler ``stage2_push``): the program's fist push takes the joint on from
+    # q(follow_to), where the sampler found the hand's reach ends - the hand's part ends there, as post_base_follow judges it
+    handover = (getattr(art, "extra", None) or {}).get("follow_to")
+    q_hand = art.q_at(float(handover)) if handover is not None else art.q_goal
+
+    def hand_reached() -> bool:
+        return sign * (state.joint_position(art.object, art.joint) - q_hand) >= -band
+
+    if handover is not None:
+        note["handover"] = {"follow_to": float(handover), "q": q_hand}
+    if targets["mode"] == "arm" and cfg.follow_stop_at_goal and not hand_reached() and (getattr(art, "extra", None) or {}).get("hinge_world") is not None:
         # owner 2026-09-21: the recorded motion ended short of the goal band (0921-021042: 0.06 rad, the hand a few mm short of the last
         # pose) - the hand rides ON along the hinge arc by what is missing (+ the band), the live hinge (the object may have shifted),
         # until the joint reaches the band; the remaining shortfall stays in the record
@@ -2725,16 +2735,16 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
                 hinge = C.quat_rotate(dq_, hinge) + dp_
                 axis = C.unit(C.quat_rotate(dq_, axis))
             q_now = float(state.joint_position(art.object, art.joint))
-            d_ext = sign * (abs(art.q_goal - q_now) + band + 0.02)
+            d_ext = sign * (abs(q_hand - q_now) + band + 0.02)
             here = as_world_pose(state.eef_pose(action.arm))
             ext = C.orbit_waypoints(here, hinge, C.quat_from_axis_angle(axis, d_ext), n=3, frame="world")
-            log.info("base_follow(%s): the recorded motion ended at q %.3f (goal %.3f): riding on along the hinge arc by %.3f rad", action.arm, q_now, art.q_goal, d_ext)
+            log.info("base_follow(%s): the recorded motion ended at q %.3f (the hand's part ends at %.3f): riding on along the hinge arc by %.3f rad", action.arm, q_now, q_hand, d_ext)
             gen2 = motions.arm_along(action.arm, list(ext), converge=False)
             k2 = 0
             for a in gen2:
                 yield a
                 k2 += 1
-                if reached():
+                if hand_reached():
                     gen2.close()
                     break
             note["extended"] = {"rad": float(d_ext), "steps": k2, "q": float(state.joint_position(art.object, art.joint))}

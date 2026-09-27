@@ -1189,11 +1189,17 @@ class BaseFollow(Action):
         obj = sidecar.language.phrase(art.object)
         how = {"base": "driving the base", "hybrid": "driving the base and moving the arm together"}.get(art.follow_mode, "moving the arm")
         fine = f"{self.direction} {obj} by {how} while holding its handle with the {_hand(self.arm)}"
+        # a stage-2 hand-over (``articulation.follow_to``): the hand's part ends at q(follow_to), the program's push does the rest
+        handover = (art.extra or {}).get("follow_to")
+        q_end = art.q_at(float(handover)) if handover is not None else art.q_goal
         if art.joint_type == "prismatic":
-            span = f"{art.q_init:.2f} m to {art.q_goal:.2f} m ({_cm(art.q_goal - art.q_init)})"
+            span = f"{art.q_init:.2f} m to {q_end:.2f} m ({_cm(q_end - art.q_init)})"
         else:
-            span = f"{art.q_init:.2f} rad to {art.q_goal:.2f} rad ({_deg(abs(art.q_goal - art.q_init))})"
-        passive = f", letting go at {art.passive_from * 100:.0f} % where it continues on its own" if art.passive_from is not None else ""
+            span = f"{art.q_init:.2f} rad to {q_end:.2f} rad ({_deg(abs(q_end - art.q_init))})"
+        if handover is not None:
+            passive = ", letting go there for the push that takes it on"
+        else:
+            passive = f", letting go at {art.passive_from * 100:.0f} % where it continues on its own" if art.passive_from is not None else ""
         numbers = f"{fine}: joint {art.joint} from {span}{passive}"
         return fine, numbers
 

@@ -709,10 +709,12 @@ def parse_args(argv=None):
     p.add_argument("--video-size", type=int, default=None, help="downscale video frames to this square size")
     p.add_argument("--goal-image", action="store_true", help="capture the goal image after the settled check (>= 3 renders) and write goal_observation into the TRO")
     p.add_argument("--no-goal-override", action="store_true", help="do not write the settled values back into the TRO goal poses")
-    p.add_argument("--demo-gating", default="auto", choices=["auto", "placed_tilt", "placed_orientation", "none"],
+    p.add_argument("--demo-gating", default="auto", choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "none"],
                    help="demo-collection gate after the epilogue: placed_orientation = every placed object within its recorded orientation tolerance (full error; "
-                        "an object with a continuous symmetry about its long axis per the ICL survey - marker, pencil, bottles - modulo rotation about that axis) "
-                        "(auto = on for --mode oracle, off for replay / policy); placed_tilt = the retracted principal-axis tilt variant (unused by default); none")
+                        "an object with a continuous symmetry about its long axis per the ICL survey - marker, pencil, bottles - modulo rotation about that axis); "
+                        "root_moved = the root of a free-standing articulated object whose joint the program works stays within 5 mm / 0.02 rad at the end and "
+                        "10 mm / 0.04 rad of tilt throughout (auto = both on for --mode oracle, off for replay / policy); placed_tilt = the retracted "
+                        "principal-axis tilt variant (unused by default); none")
     p.add_argument("--carry-leg", default="straight", choices=["straight", "trajopt"],
                    help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
     p.add_argument("--max-steps", type=int, default=6000, help="episode step budget (30 Hz control steps)")
@@ -912,8 +914,9 @@ def main(argv=None) -> int:
             recorder.episode = episode_annotations(sidecar)
         if args.demo_gating == "auto":
             # the full placed_orientation gate (owner 2026-09-16 17:10 item 4: placed_tilt retracted; cylinders are compared
-            # modulo rotation about their long axis inside the gate, ExecutorConfig.demo_revolution_axes)
-            gating = ("placed_orientation",) if args.mode == "oracle" else ()
+            # modulo rotation about their long axis inside the gate, ExecutorConfig.demo_revolution_axes) and the operated
+            # articulated roots (owner 2026-09-27: the body of an object whose lid / flap / door the robot works stays put)
+            gating = ("placed_orientation", "root_moved") if args.mode == "oracle" else ()
         else:
             gating = () if args.demo_gating == "none" else (args.demo_gating,)
         ex_cfg = ExecutorConfig(max_steps=args.max_steps, retries=args.retries, settle_min_steps=args.settle_steps, goal_image=args.goal_image,

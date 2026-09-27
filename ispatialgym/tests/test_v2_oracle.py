@@ -31,7 +31,7 @@ from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
 from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow, Place, Reorient, Brace as QA_Brace
-from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, SimState, apply_goal_override
+from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, RootWatch, SimState, apply_goal_override
 from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError, as_world_pose
 from ispatialgym.oracle.programs import expand
 from ispatialgym.oracle.recorder import PHASE_ORACLE, PHASE_SETTLE, Recorder, RecorderConfig, sensor_name
@@ -3692,3 +3692,130 @@ def test_apply_recorded_targets_sets_the_groups_the_record_covers():
     assert th.allclose(hold.arm_target["right"], th.tensor([0.1 * i for i in range(11, 18)]))
     assert th.allclose(hold.arm_target["left"], th.zeros(7))
     assert apply_recorded_targets(hold, robot, {}) == []
+
+
+# ==========================================================================================
+# root_moved gate / stage-2 hand-over (owner 2026-09-27, blender 0926-073955)
+# ==========================================================================================
+
+
+def _tipping_plate_world(tip_deg: float):
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    plate = env.objects["plate.n.04_1"]
+    q0, p0 = plate.quat.clone(), plate.pos.clone()
+
+    def tip(step_action):
+        # the watched body tips while the arm is low with the apple in hand and rests flat again afterwards (position pinned)
+        plate.pos = p0.clone()
+        if env.robot._ag_obj_in_hand["right"] is not None and float(env.robot.eef_pose("right")[0][2]) < 0.90:
+            h = math.radians(tip_deg) / 2
+            plate.quat = C.qmul(q0, th.tensor([math.sin(h), 0.0, 0.0, math.cos(h)]))
+        else:
+            plate.quat = q0.clone()
+
+    env.after_step = tip
+    return sc, env, plate
+
+
+def test_root_moved_gates_a_tipped_articulated_body_only_when_enabled(tmp_path):
+    """Owner 2026-09-27: the root of a free-standing articulated object whose joint the program works is reported in
+    ``articulated_root`` (peak displacement / tilt / rotation with the action, end values) and, with ``demo_gating`` ``root_moved``,
+    a tilt above 2 x 0.02 rad at any step (or an end shift above 5 mm / 0.02 rad) fails the demo; a 1 deg rock passes."""
+    for gate, tip, ok in ((("root_moved",), 3.0, False), ((), 3.0, True), (("root_moved",), 1.0, True)):
+        sc, env, plate = _tipping_plate_world(tip)
+        ex, *_ = make_executor(env, sc, tmp_path / f"{len(gate)}_{tip}", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=gate))
+        ex.operated_roots = lambda plate=plate: ({"plate.n.04_1": plate}, {})
+        result = ex.run_program(expand(sc.alias, sc))
+        rep = result["articulated_root"]["objects"]["plate.n.04_1"]
+        assert abs(math.degrees(rep["peak"]["tilt_rad"]["value"]) - tip) < 0.05 and rep["peak"]["tilt_rad"]["action"] in ("place", "grasp", "lift")
+        assert rep["end"]["rotation_rad"] < 1e-5 and rep["end"]["displacement_m"] < 1e-6
+        assert result["success"] is ok, (gate, tip, result["verdict"])
+        if not ok:
+            assert result["reason"] == "root_moved" and result["verdict"]["details"]["targets"] == ["plate.n.04_1"]
+
+
+def test_operated_roots_watch_the_worked_free_articulated_object_only():
+    """The situation off the program: a handle grasp / follow / articulated push names the object whose body must stay put;
+    a fixed-base object is skipped (its root cannot move), a placed or plainly pushed object is never watched."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "configuration_matching-articulation_open_small_scale.json"))
+    box = FakeObject("toolbox_0", [6.0, 3.4, 0.9], category="toolbox")
+    table = FakeObject("breakfast_table_0", [7.0, 3.4, 0.4], category="breakfast_table")
+    box.fixed_base = table.fixed_base = False
+    ex = Executor.__new__(Executor)
+    ex.robot, ex.program_actions = object(), expand(sc.alias, sc)
+    ex.tracked = {"toolbox.n.01_1": box, "breakfast_table.n.01_1": table}
+    assert ex.operated_roots() == ({"toolbox.n.01_1": box}, {})
+    box.fixed_base = True
+    assert ex.operated_roots() == ({}, {"toolbox.n.01_1": "fixed base"})
+    sc2, env2 = iors_world()
+    ex2, *_ = make_executor(env2, sc2)
+    ex2.program_actions = expand(sc2.alias, sc2)
+    assert ex2.operated_roots() == ({}, {})
+
+
+def test_root_watch_checkpoint_forgets_a_rolled_back_attempt():
+    obj = FakeObject("lidded_0", [0.0, 0.0, 0.5])
+    w = RootWatch({"x": obj})
+    w.observe("grasp", 0)
+    snap = w.snapshot()
+    obj.pos = th.tensor([0.02, 0.0, 0.5])  # the failed attempt shoves the body 2 cm; the retry starts from the checkpoint
+    w.observe("base_follow", 1)
+    assert list(w.exceeded(0.005, 0.02, 2.0)) == ["x"]
+    w.load(snap)
+    obj.pos = th.tensor([0.0, 0.0, 0.5])
+    w.observe("base_follow", 1)
+    assert w.exceeded(0.005, 0.02, 2.0) == {}
+
+
+def test_base_follow_stage2_handover_does_not_ride_past_follow_to():
+    """A stage-2 record (``articulation.follow_to``: the fist push takes the joint on) ends the hand's part at q(follow_to): a
+    follow that reached it does not ride on toward q_goal (blender 0926-073955 rode 0.47 rad past it and tipped the body); one
+    short of it rides on only to it; without a hand-over the ride-on to the goal band is unchanged (0921-021042)."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "configuration_matching-articulation_open_small_scale.json"))
+    extra0 = dict(sc.articulation.extra)
+
+    class _Motions:
+        follow_phase = "arm"
+
+        def __init__(self, q, dq):
+            self.q, self.dq, self.legs = q, dq, 0
+
+        def arm_along(self, arm, waypoints, converge=True, **kw):
+            self.legs += 1
+            for _ in range(40 if self.legs == 1 else 20):
+                self.q[0] += self.dq if self.legs == 1 else 0.03
+                yield th.zeros(23)
+
+        def unwind(self, arm):
+            return 0.0
+
+        def hold(self, steps=1):
+            for _ in range(int(steps)):
+                yield th.zeros(23)
+
+    def run(follow_to, q_end):
+        follow = [a for a in expand(sc.alias, sc) if isinstance(a, BaseFollow)][0]
+        art = follow.articulation
+        art.passive_from = None
+        art.extra = {**extra0, "hinge_world": [6.0, 3.35, 1.15], "axis_world": [1.0, 0.0, 0.0],
+                     "object_pose": {"position": [6.0, 3.4, 0.9], "orientation": [0.0, 0.0, 0.0, 1.0]}}
+        if follow_to is not None:
+            art.extra["follow_to"] = follow_to
+        q = [0.0]
+        motions = _Motions(q, q_end / 40)
+        state = SimpleNamespace(joint_position=lambda o, j: float(q[0]),
+                                object_pose=lambda o: (th.tensor([6.0, 3.4, 0.9]), th.tensor([0.0, 0.0, 0.0, 1.0])),
+                                eef_pose=lambda a: (th.tensor([6.0, 3.32, 1.17]), th.tensor([0.0, 0.0, 0.0, 1.0])))
+        ctx = {}
+        for _ in EX.execute_base_follow(follow, motions, state, follow.targets(sc, None), ctx):
+            pass
+        return motions.legs, ctx["follow"], art
+
+    legs, note, art = run(0.75, 0.75 * 1.4)
+    assert legs == 1 and "extended" not in note and note["handover"] == {"follow_to": 0.75, "q": pytest.approx(1.05)}
+    legs, note, art = run(0.75, 0.9)
+    band = EX.CONFIG.follow_stop_frac * EX.joint_tolerance(art)
+    assert legs == 2 and 1.05 - band <= note["extended"]["q"] < 1.05 + 0.04
+    legs, note, art = run(None, 0.75 * 1.4)
+    assert legs == 2 and "handover" not in note and note["extended"]["q"] >= 1.4 - band

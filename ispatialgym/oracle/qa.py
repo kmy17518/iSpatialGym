@@ -14,6 +14,8 @@ Verdict categories (the executor's verdict / ``SkillError.reason``; this module 
 ``gripper_out_of_fov``      an acting gripper left the head camera's frame (5 % margin) during a manipulation action
 ``protected_contact``       during a transit, a robot link or held object touched a protected (goal) object (oracle.protection)
 ``protected_moved``         during a transit, a protected (goal) object moved more than protection.MOVE_TOL_M
+``root_moved``              the root (base link) of a free-standing articulated object moved or tipped while the program
+                            worked its joint (epilogue demo gate, ``executor.RootWatch``)
 ``failed_grasp``            the assisted grasp did not attach (grasp actions; push / brace exempt)
 ``no_motion``               a push / articulation moved nothing
 ``plan_failed``             trajopt (or the differential IK along recorded waypoints) found no trajectory
@@ -95,12 +97,14 @@ CATEGORIES: Tuple[str, ...] = (
     "placed_tilt",
     "protected_contact",
     "protected_moved",
+    "root_moved",
 )
 #: categories the per-step monitors can raise (``protected_*``: the transit span of oracle.protection, owner 2026-09-26)
 STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "gripper_out_of_fov", "timeout", "protected_contact", "protected_moved")
 #: categories of the epilogue (``placed_orientation`` = the demo-collection gate on a placed object's orientation
-#: against its recorded, non-gating TRO target — owner decision 2026-09-16 10:15; policy evaluation is unchanged)
-EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation", "placed_tilt")
+#: against its recorded, non-gating TRO target — owner decision 2026-09-16 10:15; ``root_moved`` = the demo gate on the root
+#: of an articulated object whose joint the program works; policy evaluation is unchanged)
+EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation", "placed_tilt", "root_moved")
 
 #: contacts with these object categories never count (the robot stands / drives on them)
 GROUND_CATEGORIES = frozenset({"floors", "carpet", "rug", "mat", "gym_mat", "yoga_mat", "lawn", "driveway", "ceramic_tile"})

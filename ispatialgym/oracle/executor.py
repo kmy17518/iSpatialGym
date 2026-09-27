@@ -151,6 +151,14 @@ class ExecutorConfig:
     #: ``placed_tilt`` (retracted as the default, owner 2026-09-16 17:10 item 4; the code path stays unused): the tilt of
     #: a placed object's principal axis against the recorded goal's (rad)
     demo_tilt_tolerance: float = math.radians(15.0)
+    #: ``root_moved`` gate (owner 2026-09-27, blender 0926-073955 tipped 2.6 deg and left 7.8 mm / 2.3 deg off by the first
+    #: open): the root of a free-standing articulated object whose joint the program works (:class:`RootWatch`) must end within
+    #: the executor's own "moved" band of its pose at the first step (``ExecuteConfig.moved_pos`` / ``moved_rot``) and stay
+    #: within ``root_transient_factor`` x that band at every step (10 mm = ``protection.MOVE_TOL_M``; 0.04 rad of up-axis
+    #: tilt). The 25 clean small-articulation demos of 0918-0926 peak at 4.1 mm / 1.11 deg tilt / 3.0 mm and 0.96 deg at the end
+    root_moved_pos: float = 0.005
+    root_moved_rot: float = 0.02
+    root_transient_factor: float = 2.0
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
     #: survives in the video / dataset (:meth:`Executor.render_restored`). ``restore_renders`` frames are always
     #: rendered; from then on the head camera is read after every render until its image is **fresh** - closer to the
@@ -314,6 +322,80 @@ class SupportLoad:
         }
 
 
+class RootWatch:
+    """QA fact and ``root_moved`` demo gate (owner 2026-09-27): the root pose of every free-standing articulated object whose
+    joint the program works (:meth:`Executor.operated_roots` - a lid, a flap, a door leaf; the body is meant to stay put)
+    against its pose at the first step: displacement, up-axis tilt and full rotation, the peak of each (with the action and
+    step) and the value at the end. Written as ``meta.articulated_root``; :meth:`exceeded` is the gate's reading."""
+
+    def __init__(self, objects: Dict[str, Any], skipped: Optional[Dict[str, str]] = None):
+        self.objects = dict(objects)
+        self.skipped = dict(skipped or {})
+        self.pose0: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+        self.peak: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self.end: Dict[str, Dict[str, float]] = {}
+        self.steps = 0
+
+    def observe(self, action_name: Optional[str], step: int) -> None:
+        self.steps += 1
+        z = th.tensor([0.0, 0.0, 1.0])
+        for name, obj in self.objects.items():
+            try:
+                p, q = (x.float().clone() for x in obj.get_position_orientation())
+            except Exception:  # noqa: BLE001
+                continue
+            if name not in self.pose0:
+                self.pose0[name] = (p, q)
+            p0, q0 = self.pose0[name]
+            cur = {"displacement_m": float(th.linalg.norm(p - p0)),
+                   "tilt_rad": math.acos(max(-1.0, min(1.0, float(th.dot(C.quat_rotate(q, z), C.quat_rotate(q0, z)))))),
+                   "rotation_rad": float(C.quat_angle(q, q0))}
+            peak = self.peak.setdefault(name, {})
+            for k, v in cur.items():
+                if k not in peak or v > peak[k]["value"]:
+                    peak[k] = {"value": v, "action": action_name or "epilogue", "step": int(step)}
+            self.end[name] = cur
+
+    def exceeded(self, pos_tol: float, rot_tol: float, transient_factor: float) -> Dict[str, List[str]]:
+        """``{object: [reasons]}``: a peak displacement / tilt above ``transient_factor`` x the band, or an end displacement /
+        rotation above the band."""
+        out: Dict[str, List[str]] = {}
+        for name, peak in self.peak.items():
+            end = self.end.get(name, {})
+            why = []
+            if peak["displacement_m"]["value"] > transient_factor * pos_tol:
+                why.append(f"moved {peak['displacement_m']['value'] * 1000:.1f} mm in {peak['displacement_m']['action']} (> {transient_factor * pos_tol * 1000:.0f})")
+            if peak["tilt_rad"]["value"] > transient_factor * rot_tol:
+                why.append(f"tipped {math.degrees(peak['tilt_rad']['value']):.2f} deg in {peak['tilt_rad']['action']} (> {math.degrees(transient_factor * rot_tol):.2f})")
+            if end.get("displacement_m", 0.0) > pos_tol:
+                why.append(f"ended {end['displacement_m'] * 1000:.1f} mm off (> {pos_tol * 1000:.0f})")
+            if end.get("rotation_rad", 0.0) > rot_tol:
+                why.append(f"ended {math.degrees(end['rotation_rad']):.2f} deg turned (> {math.degrees(rot_tol):.2f})")
+            if why:
+                out[name] = why
+        return out
+
+    def snapshot(self) -> Dict[str, Any]:
+        """The readings so far (a checkpoint's copy: a rolled-back attempt leaves no trace in the demo, nor in the gate)."""
+        return {"peak": {n: {k: dict(v) for k, v in p.items()} for n, p in self.peak.items()}, "end": {n: dict(e) for n, e in self.end.items()}, "steps": self.steps}
+
+    def load(self, snap: Optional[Dict[str, Any]]) -> None:
+        if snap is not None:
+            self.peak = {n: {k: dict(v) for k, v in p.items()} for n, p in snap["peak"].items()}
+            self.end = {n: dict(e) for n, e in snap["end"].items()}
+            self.steps = int(snap["steps"])
+
+    def report(self, pos_tol: float, rot_tol: float, transient_factor: float) -> Dict[str, Any]:
+        bad = self.exceeded(pos_tol, rot_tol, transient_factor)
+        objects = {}
+        for name in self.objects:
+            peak, end = self.peak.get(name, {}), self.end.get(name, {})
+            objects[name] = {"peak": {k: {**v, "value": round(v["value"], 5)} for k, v in peak.items()}, "end": {k: round(v, 5) for k, v in end.items()},
+                             "exceeded": bad.get(name, [])}
+        return {"objects": objects, "skipped": dict(self.skipped), "steps_observed": int(self.steps),
+                "band": {"pos_m": pos_tol, "rot_rad": rot_tol, "transient_factor": transient_factor}}
+
+
 @dataclass
 class Checkpoint:
     action_index: int
@@ -332,6 +414,8 @@ class Checkpoint:
     #: the gripper-in-FOV spans open at the checkpoint (rule (b): a span runs from the pre-grasp to the release across
     #: actions; a retry re-runs the action with the spans as they were)
     fov_spans: Dict[str, bool] = field(default_factory=dict)
+    #: the operated articulated roots' readings (``RootWatch.snapshot``)
+    root_watch: Optional[Dict[str, Any]] = None
 
 
 #: ``ISpatialGymTask`` success-tracking attributes that a rollback must restore (sticky "first success" steps)
@@ -716,6 +800,7 @@ class Executor:
         self.result: Dict[str, Any] = {}
         self.verdict: Optional[Verdict] = None
         self.support_load: Optional[SupportLoad] = None  # the support loading fact (meta.support_disturbance), built by run_program
+        self.root_watch: Optional[RootWatch] = None  # the operated articulated roots (meta.articulated_root, gate root_moved), built by run_program
 
     # ------------------------------------------------------------------ sim access
 
@@ -768,6 +853,8 @@ class Executor:
             except Exception as e:  # noqa: BLE001  (a fact, never a failure)
                 log.warning("support load monitor failed (%r); disabled", e)
                 self.support_load = None
+        if self.root_watch is not None:
+            self.root_watch.observe(self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None, self.n)
         if self.recorder is not None:
             state = self._dump_state(full=False) if (self.cfg.record_state and self.recorder.cfg.hdf5) else None
             sim_time = None
@@ -828,6 +915,7 @@ class Executor:
             env_step=getattr(self.env, "_current_step", None),
             task_tracking={k: getattr(self.task, k) for k in TASK_TRACKING_ATTRS if hasattr(self.task, k)},
             fov_spans=self.monitors.fov_spans() if self.monitors is not None and hasattr(self.monitors, "fov_spans") else {},
+            root_watch=self.root_watch.snapshot() if self.root_watch is not None else None,
         )
         return cp
 
@@ -892,6 +980,8 @@ class Executor:
                 setattr(self.task, k, v)
             except Exception:  # noqa: BLE001
                 pass
+        if self.root_watch is not None:
+            self.root_watch.load(cp.root_watch)
         self.last_obs, self.last_info = cp.obs, cp.info
         if self.recorder is not None:
             self.recorder.set_observation(cp.obs)
@@ -1215,11 +1305,48 @@ class Executor:
             scene_idx = 0
         self.support_load = SupportLoad(self.robot, supports, scene_idx=scene_idx)
 
+    def operated_roots(self) -> Tuple[Dict[str, Any], Dict[str, str]]:
+        """``(watched, skipped)``: the tracked articulated objects whose joint the program works without moving them as a whole -
+        the ``articulation.object`` of a handle grasp / base follow, the object of a push / brace / push-close carrying an
+        ``articulation`` record (a lid push, a flap press, a push-close segment) - minus any object a place, a body grasp or a
+        plain push moves on purpose. ``skipped`` names the operated objects not watched: fixed to the scene (an appliance, a
+        room door: the root cannot move) or not tracked."""
+        operated, moved = set(), set()
+        for a in self.program_actions:
+            art = getattr(a, "articulation", None)
+            if art is not None:
+                operated.add(art.object)
+            contact = getattr(a, "contact", None)
+            articulated = contact is not None and (getattr(contact, "extra", None) or {}).get("articulation") is not None
+            if articulated:
+                operated.add(contact.object)
+            if getattr(a, "name", None) == "push_close":
+                operated.add(a.object)
+            if isinstance(a, Place):
+                moved.add(a.object)
+            elif isinstance(a, Push) and not articulated:
+                moved.add(a.contact.object)
+            elif getattr(a, "name", None) == "grasp" and art is None:
+                moved.update(getattr(a, "objects", ()) or ())
+        watched: Dict[str, Any] = {}
+        skipped: Dict[str, str] = {}
+        for inst in sorted(operated - moved):
+            obj = self.tracked.get(inst)
+            if obj is None or obj is self.robot:
+                skipped[inst] = "not tracked"
+            elif bool(getattr(obj, "fixed_base", False)):
+                skipped[inst] = "fixed base"
+            else:
+                watched[inst] = obj
+        return watched, skipped
+
     def run_program(self, actions: Sequence[Action]) -> Dict[str, Any]:
         t0 = time.time()
         actions = list(actions)
         self.program_actions = actions
         self._init_support_load()
+        watched, skipped = self.operated_roots()
+        self.root_watch = RootWatch(watched, skipped) if (watched or skipped) else None
         # every tracked object's pose at the start (the loaded init): the reference for a partner displaced during the run
         # (attachment 0920-164504: the bottle knocked 4.7 cm during the grasp phase, the place aimed at its recorded pose)
         init_poses: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
@@ -1775,6 +1902,15 @@ class Executor:
                 verdict = Verdict("placed_orientation", "placed object orientation outside its recorded target tolerance: " + msg, step=self.n,
                                   details={"targets": failed, "errors": {o: rep[o] for o in failed}})
                 self.stats.record(verdict)
+        band = (self.cfg.root_moved_pos, self.cfg.root_moved_rot, self.cfg.root_transient_factor)
+        root_report = self.root_watch.report(*band) if self.root_watch is not None else {}
+        if "root_moved" in self.cfg.demo_gating and self.root_watch is not None:
+            failed_roots = self.root_watch.exceeded(*band)
+            if verdict is None and failed_roots:
+                msg = "; ".join(f"{o} " + ", ".join(w) for o, w in failed_roots.items())
+                verdict = Verdict("root_moved", "articulated object's root moved while its joint was worked: " + msg, step=self.n,
+                                  details={"targets": sorted(failed_roots), "report": {o: root_report["objects"][o] for o in failed_roots}})
+                self.stats.record(verdict)
         self.timings["settle_s"] = time.time() - t0
         goal_obs = None
         if verdict is None and self.cfg.goal_image:
@@ -1802,6 +1938,8 @@ class Executor:
             "binary_branch_log": branch_log,
             # owner 2026-09-16 23:00 (fact, no verdict): the support's pose drift and the finger-support contact loading
             "support_disturbance": self.support_load.report() if self.support_load is not None else {},
+            # owner 2026-09-27: the root drift of every articulated object whose joint the program works (gate root_moved)
+            "articulated_root": root_report,
             "settled_success": settled_task,
             "pose_settled_config": isg.get("pose_settled_config"),
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
