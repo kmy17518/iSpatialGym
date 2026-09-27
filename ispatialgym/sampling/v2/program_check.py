@@ -1297,10 +1297,9 @@ def _held_start_q(sampler, stance, grasp, carried: Optional[str], arm: str, fing
     §6.3): the object has been in the hand since the init stance (no grasp action before this one), the recorded stance
     names it as carried, the grasp record puts it in this arm and the arm has not moved yet. The in-hand chain leaves
     from it (:func:`_with_held_start`), as the sampler's draw check (``waypoints_ok([hold] + waypoints, q_seed=<hold>)``)
-    and the oracle do; checked from its first waypoint instead, that waypoint's fresh solve had to meet the joint-limit
-    margin of a chosen witness, which the hold need not (mental_rotation-banana: the hold's wrist joint 6 sits 3 mrad from
-    its limit, so a validator process without the sampler's remembered solutions found a branch with the margin or
-    failed, at random). None otherwise."""
+    and the oracle do; checked from its first waypoint instead, that waypoint was solved afresh and held to a chosen
+    witness's joint-limit margin, which next to a hold at a joint limit (the mental-rotation hold's wrist joint 6 sits
+    3 mrad from its limit) depends on the solver finding another branch. None otherwise."""
     if not held_since_init or carried is None or grasp is None or getattr(grasp, "arm", None) != arm or stance_obj is not None:
         return None
     if q_seed_prev is not None or q_end_prev is not None or getattr(stance, "carried", None) != carried:

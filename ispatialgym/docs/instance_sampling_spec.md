@@ -353,9 +353,9 @@ had to be re-tracked backward from the end's branch; a single pose that ends a c
 `arm_to` / `arm_along` chain passes through. The first in-hand chain of a held-object task (§6.3) leaves from the
 recorded start configuration as well — the object has been in the hand since init and the arm has not moved: the
 hand's start pose, which the waypoints leave out, heads the chain and is not re-solved, so the chain is checked as the
-sampler's draw check checks it (2026-09-26: checked from its first waypoint, that waypoint's fresh solve had to meet a
-chosen witness's joint-limit margin next to the mental-rotation hold, whose wrist joint 6 sits 3 mrad from its limit;
-`validate_instances` found another branch or failed, at random).
+sampler's draw check checks it (2026-09-26: checked from its first waypoint, that waypoint was solved afresh and held to
+a chosen witness's joint-limit margin, which next to the mental-rotation hold — wrist joint 6 3 mrad from its limit —
+depends on the solver finding another branch).
 
 **Travel with the arm as left** (owner 2026-09-24: "a teleoperator lifts the arm only as much as needed, then
 drives"). An empty-handed travel after an arm action — the consecutive navigate / transition actions between two arm
