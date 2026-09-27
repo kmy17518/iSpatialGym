@@ -14,7 +14,7 @@ controlled groups and fills the whole vector on every call; skills only modify t
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, List
 
 import torch as th
 
@@ -93,3 +93,24 @@ class ActionState:
     def trunk_error(self) -> float:
         q = self.robot.get_joint_positions()[self.robot.trunk_control_idx]
         return float(th.max(th.abs(q - self.trunk_target)))
+
+
+def apply_recorded_targets(hold, robot, targets: Dict[str, float]) -> List[str]:
+    """A TRO's ``robot_state.controller_targets`` (joint name -> drive target) into ``hold``'s targets of the
+    position-controlled groups the record covers completely (``trunk``, ``arm_left``, ``arm_right``); returns those
+    groups. A held payload keeps the arm a steady offset below its target, so the recorded joints are an equilibrium only
+    under the recorded targets - holding them at their own values lets the payload sag once more."""
+    names = list(robot.joints.keys())
+    groups = {"trunk": robot.trunk_control_idx, **{f"arm_{arm}": robot.arm_control_idx[arm] for arm in M.ARMS}}
+    done = []
+    for group, idx in groups.items():
+        joints = [names[int(i)] for i in as_tensor(idx, th.long).tolist()]
+        if not all(j in targets for j in joints):
+            continue
+        vals = th.tensor([float(targets[j]) for j in joints], dtype=th.float32)
+        if group == "trunk":
+            hold.trunk_target = vals
+        else:
+            hold.arm_target[group[len("arm_"):]] = vals
+        done.append(group)
+    return done

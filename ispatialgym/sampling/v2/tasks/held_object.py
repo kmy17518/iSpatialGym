@@ -93,6 +93,12 @@ ROTATION_ANGLE_STEP_DEG = 15.0
 GRASP_ATTACH_STEPS = 90
 #: settle steps under gravity after the attach (the object must stay in hand)
 GRASP_GRAVITY_STEPS = 30
+#: object scaling: the recorded start settles under its drive targets before the TRO is written, in chunks of
+#: ``START_SETTLE_CHUNK`` control steps until no joint moves more than ``START_SETTLE_TOL_RAD`` over a chunk (at most
+#: ``START_SETTLE_MAX_STEPS``)
+START_SETTLE_CHUNK = 10
+START_SETTLE_TOL_RAD = 1e-5
+START_SETTLE_MAX_STEPS = 600
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1070,12 +1076,60 @@ class ObjectScalingV2(HeldObjectV2):
         return q_rel, C.relative(eef_w, base3), C.relative(obj_w, base3)
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
-        # the sidecar's init configuration is the state the TRO records: the held arm settles by a few 1e-4 rad under the
-        # payload between the grasp and the write, and demo and evaluator must start from one pose
+        self.settle_start(draft)
+        # the sidecar's init configuration is the state the TRO records: demo and evaluator start from one pose
         st = self.sidecar.stances.get("init")
         if st is not None:
             st.q = self.kit.q_current()
         return super().write_instance(draft, index, seed)
+
+    def settle_start(self, draft: Draft) -> None:
+        """The recorded start is an equilibrium under recorded drive targets. The right arm is held at the start
+        configuration's IK solution, the trunk and the left arm at their current joints, the fingers where the grasp left
+        them; the payload settles the arm (it rests a steady offset below its targets) until it stops moving, and the
+        targets go into the TRO's ``robot_state.controller_targets``, which the instance loader holds - a loader holding
+        the loaded joints themselves lets the payload sag once more. The start the sidecar and the summary record (hand
+        pose, object depth, pad depth) is read from the settled state."""
+        state = ActionState(self.robot)
+        state.set_from_q(self._start_q, arms=(ARM,), trunk=False)
+        gidx = self.robot.gripper_control_idx[ARM]
+        lo, hi = self.robot.joint_lower_limits[gidx], self.robot.joint_upper_limits[gidx]
+        fingers = self.robot.get_joint_positions()[gidx]
+        state.gripper_cmd[ARM] = float(th.clamp(2.0 * (fingers.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
+        steps, moved = 0, float("inf")
+        while steps < START_SETTLE_MAX_STEPS and moved > START_SETTLE_TOL_RAD:
+            q0 = self.robot.get_joint_positions().clone()
+            self.world.control_step(state.action(), n=START_SETTLE_CHUNK)
+            steps += START_SETTLE_CHUNK
+            moved = float(th.max(th.abs(self.robot.get_joint_positions() - q0)))
+        draft.summary["start_settle"] = {"steps": steps, "last_chunk_motion_rad": moved}
+        names = list(self.robot.joints.keys())
+        self._controller_targets = {}
+        for idx, vals in ((self.robot.trunk_control_idx, state.trunk_target), (self.robot.arm_control_idx["left"], state.arm_target["left"]),
+                          (self.robot.arm_control_idx[ARM], state.arm_target[ARM])):
+            for i, v in zip(th.as_tensor(idx).tolist(), vals.tolist()):
+                self._controller_targets[names[int(i)]] = float(v)
+        cam = self.world.camera_pose()
+        axis = self.world.camera_model.optical_axis(cam)
+        eef = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+        d0 = float(th.dot(G.t(self.obj("target").get_position_orientation()[0]).float() - G.t(cam[0]), axis))
+        info = draft.summary["goal"]
+        info["init_depth_m"] = d0
+        info["depth_change_m"] = float(info["goal_depth_m"]) - d0
+        hold = draft.summary["hold"]  # the same dict as the sidecar's init stance and goal blocks
+        hold["start_depth_m"] = d0
+        hold["depth_m"] = round(float(th.dot(G.t(C.pad_center(eef)) - G.t(cam[0]), axis)), 6)
+        rec = self.sidecar.grasp_of(self.target_name)
+        if rec is not None:
+            rec.grasp = eef
+            rec.pre_grasp = IK.pre_pose(eef)
+        self.sidecar.language["goal_numbers"].update(self.goal_numbers(info))
+
+    def tro_meta_block(self, draft: Draft, instance_id: str, seed: int) -> Dict[str, Any]:
+        meta = super().tro_meta_block(draft, instance_id, seed)
+        if getattr(self, "_controller_targets", None):
+            meta["robot_state"]["controller_targets"] = dict(self._controller_targets)
+        return meta
 
     def sample_start_base(self, rng: np.random.Generator, q_rel: th.Tensor) -> Tuple[float, float, float]:
         """``sample_base`` for the instance's start configuration ``q_rel`` instead of the reference hold."""
@@ -1144,6 +1198,7 @@ class ObjectScalingV2(HeldObjectV2):
         if chosen is None:
             raise Reject("goal_infeasible", "no (grasp, start, goal) confirmed: " + "; ".join(errors[-4:]))
         g, obj0, eef0, goal, wps, q_goal, base2d, cam, axis, init, opt = chosen
+        self._start_q = init.q.clone()  # the start's IK solution: the drive targets the recorded start settles under
         d0 = float(th.dot(G.t(obj0[0]) - G.t(cam[0]), axis))
         d1 = float(th.dot(G.t(goal[0]) - G.t(cam[0]), axis))
         info = {"init_depth_m": d0, "goal_depth_m": d1, "depth_change_m": d1 - d0, "direction": "away" if d1 > d0 else "toward",

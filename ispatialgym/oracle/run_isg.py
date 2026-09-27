@@ -67,7 +67,7 @@ from ispatialgym.eval.group_entity import GroupEntity  # noqa: E402
 from ispatialgym.eval.targets import TRO_KEY  # noqa: E402
 from ispatialgym.eval.tro import TROFile, load_tro  # noqa: E402
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
-from ispatialgym.oracle.action import ActionState  # noqa: E402
+from ispatialgym.oracle.action import ActionState, apply_recorded_targets  # noqa: E402
 from ispatialgym.oracle.executor import Executor, ExecutorConfig, SimState, apply_goal_override  # noqa: E402
 from ispatialgym.oracle.motions import Motions  # noqa: E402
 from ispatialgym.oracle.programs import expand  # noqa: E402
@@ -225,6 +225,7 @@ def gripper_command_for(robot, arm: str, finger_q) -> float:
     return float(th.clamp(2.0 * (q.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
 
 
+
 def _first_key(d: Dict[str, Any], suffix: str) -> Optional[str]:
     for k in d:
         if k.endswith(suffix):
@@ -321,6 +322,8 @@ class InstanceLoader:
         for g in self.grasps:
             if g.get("finger_q"):
                 self.hold.gripper_cmd[g["arm"]] = gripper_command_for(robot, g["arm"], g["finger_q"])
+        recorded = (self.tro.meta.robot_state or {}).get("controller_targets") or {}
+        self.report["controller_targets_restored"] = apply_recorded_targets(self.hold, robot, recorded) if recorded else []
         robot.apply_action(self.hold.action())
         for _ in range(settle_physics_steps):
             og.sim.step_physics()
@@ -332,6 +335,8 @@ class InstanceLoader:
         task._reset_tracking()
         obs, info = env.reset()  # returns to the snapshot, activates pose_settled tracking, renders
         self.report["after_reset"] = self.restore_after_reset()
+        if self.report["controller_targets_restored"]:
+            robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
         return obs, info
 
     def _hold_entities(self):

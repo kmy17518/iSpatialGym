@@ -3655,3 +3655,23 @@ def test_arm_to_witness_retries_the_joint_plan_and_refuses_another_branch(tmp_pa
     assert ev["branch_gap_rad"] > 0.6 and ev["rounds"] == rounds
     assert backend.calls.count("plan_joint") == rounds and backend.calls.count("plan_pose") == 1
     assert abs(float(env.robot.get_joint_positions()[idx[3]]) - float(q_hint[idx[3]])) > 0.6
+
+
+def test_apply_recorded_targets_sets_the_groups_the_record_covers():
+    """The loader holds a TRO's recorded drive targets (``robot_state.controller_targets``) instead of the loaded joints for
+    every position-controlled group the record covers completely; a partly covered group keeps its hold target."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle.action import apply_recorded_targets
+
+    names = [f"torso_joint{k}" for k in range(1, 5)] + [f"left_arm_joint{k}" for k in range(1, 8)] + [f"right_arm_joint{k}" for k in range(1, 8)]
+    robot = SimpleNamespace(joints={n: None for n in names}, trunk_control_idx=th.arange(0, 4),
+                            arm_control_idx={"left": th.arange(4, 11), "right": th.arange(11, 18)})
+    hold = SimpleNamespace(trunk_target=th.zeros(4), arm_target={"left": th.zeros(7), "right": th.zeros(7)})
+    targets = {n: 0.1 * i for i, n in enumerate(names) if not n.startswith("left")}
+    targets["left_arm_joint1"] = 0.5
+    assert apply_recorded_targets(hold, robot, targets) == ["trunk", "arm_right"]
+    assert th.allclose(hold.trunk_target, th.tensor([0.0, 0.1, 0.2, 0.3]))
+    assert th.allclose(hold.arm_target["right"], th.tensor([0.1 * i for i in range(11, 18)]))
+    assert th.allclose(hold.arm_target["left"], th.zeros(7))
+    assert apply_recorded_targets(hold, robot, {}) == []

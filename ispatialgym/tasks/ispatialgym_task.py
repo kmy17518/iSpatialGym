@@ -394,7 +394,7 @@ class ISpatialGymTask(BehaviorTask):
                         vel[i] = float(velocities[name])
             robot.set_joint_velocities(vel)
         if robot_state.get("controller_targets"):
-            log.warning("robot_state.controller_targets are not restored yet")
+            log.info("robot_state.controller_targets: applied by the instance loader's hold (oracle.run_isg.InstanceLoader.restore), not here")
 
     # ------------------------------------------------------------------------------------------------------------
     # Scope helpers
