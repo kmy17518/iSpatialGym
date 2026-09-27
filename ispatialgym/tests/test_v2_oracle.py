@@ -1924,8 +1924,8 @@ def test_release_is_rate_limited_and_staged_until_the_hand_clears():
     ramp = [t for t in targets if t < 0.05 - 1e-9]
     assert len(ramp) == 22 and all(abs((ramp[i + 1] - ramp[i]) - 0.00225) < 1e-6 for i in range(len(ramp) - 1)), ramp
     assert cmds[len(ramp)] == 1.0 and cmds[-1] == 1.0 and not m.gripper_closed("right") and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
-    # (b) a held object with the grasp's pre-shape remembered: the release stops at the pre-shape width, the object is
-    # still attached (the assisted grasp releases only on the full open command), the deferred opening is pending
+    # (b) a held object with the grasp's pre-shape remembered: the release stops at the pre-shape width, the object is let
+    # go of (assisted grasp dropped, body woken) before the first opening step, the deferred opening is pending
     ep, _ = robot.eef_pose("right")
     marker = FakeObject("marker_xakoic_0", ep.tolist(), category="marker", extent=(0.1536, 0.0171, 0.0141))
     env.objects["marker.n.03_1"] = marker
@@ -1936,7 +1936,7 @@ def test_release_is_rate_limited_and_staged_until_the_hand_clears():
     cmds.clear()
     drive(env, m.gripper("right", close=False))
     stage = 0.017925
-    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and robot._ag_obj_in_hand["right"] is marker
+    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and robot._ag_obj_in_hand["right"] is None and marker.woken >= 1
     assert not m.gripper_closed("right") and "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == stage
     opened = [0.05 * (c + 1.0) / 2.0 for c in cmds]
     assert max(opened) <= stage + 1e-6 and all(opened[i + 1] - opened[i] <= 0.00225 + 1e-6 for i in range(len(opened) - 1))
@@ -3819,3 +3819,106 @@ def test_base_follow_stage2_handover_does_not_ride_past_follow_to():
     assert legs == 2 and 1.05 - band <= note["extended"]["q"] < 1.05 + 0.04
     legs, note, art = run(None, 0.75 * 1.4)
     assert legs == 2 and "handover" not in note and note["extended"]["q"] >= 1.4 - band
+
+
+
+def _held_marker(joints=None):
+    robot = FakeRobot()
+    env = FakeEnv(robot, {})
+    m = Motions(env, FakeBackend(robot), MotionsConfig(gripper_steps=30, settle_steps=5, cartesian_step=0.05, cartesian_rot_step=0.3))
+    ep, _ = robot.eef_pose("right")
+    marker = FakeObject("marker_xakoic_0", ep.tolist(), category="marker", extent=(0.1536, 0.0171, 0.0141), joints=joints)
+    env.objects["marker.n.03_1"] = marker
+    drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    assert robot._ag_obj_in_hand["right"] is marker
+    return robot, env, m, marker
+
+
+def test_a6_free_object_is_let_go_before_the_first_opening_step():
+    """First-demo v2 A6 (inside 0926-075013: the sprouts hung 1.3 s above the bowl): a free object leaves the hand as the
+    fingers start to open - the assisted grasp is gone from the first opening step on and the body is woken once."""
+    robot, env, m, marker = _held_marker()
+    seen = []
+    env.after_step = lambda a: seen.append(robot._ag_obj_in_hand["right"])
+    woken0 = marker.woken
+    drive(env, m.gripper("right", close=False))
+    env.after_step = None
+    assert seen and all(s is None for s in seen), "the assisted grasp must be gone from the first opening step on"
+    assert marker.woken == woken0 + 1 and "right" not in m.pending_wake
+    ev = m.release_events[-1]
+    assert ev["event"] == "staged" and ev["ag_released"] == "first_increment"
+    assert "right" in m.deferred_open  # the staged finger opening itself is unchanged: the full opening stays deferred
+
+
+def test_a6_articulated_link_keeps_the_callers_release():
+    robot, env, m, marker = _held_marker(joints=["flap_joint"])
+    drive(env, m.gripper("right", close=False))
+    assert robot._ag_obj_in_hand["right"] is marker and m.pending_wake.get("right") is marker
+    assert m.release_events[-1]["ag_released"] == "caller"
+
+
+def _arching(backend, robot, arm, rise):
+    idx = robot.arm_control_idx[arm]
+    orig = backend.plan_pose
+    n = {"calls": 0}
+
+    def plan_pose(emb, targets, q_start=None, max_attempts=4, sync_world=True):
+        res = orig(emb, targets, q_start=q_start, max_attempts=max_attempts, sync_world=sync_world)
+        n["calls"] += 1
+        if n["calls"] == 1 and res.success:
+            q = res.q_traj.clone()
+            k = th.linspace(0, 1, len(q))
+            q[:, idx[2]] = q[:, idx[2]] + (rise / ARM_SCALE) * th.sin(k * th.pi)  # toy FK: arm joint 3 is the hand height
+            res.q_traj = q
+        return res
+
+    def fk_batch(frame, q, emb_name="whole_body"):
+        q = C.as_tensor(q)
+        return th.stack([robot.pos + C.quat_rotate(robot.quat, ARM_OFFSET[arm] + ARM_SCALE * qq[idx][:3]) for qq in q]), None
+
+    backend.plan_pose = plan_pose
+    backend.fk_batch = fk_batch
+    return n
+
+
+def test_a7_clearing_pre_grasp_plan_that_detours_takes_the_via_above(tmp_path):
+    """First-demo v2 A7 (kielbasa 0926-074242: a graph-seeded plan arched 1.27 m / 19 cm high for a 0.53 m move): a
+    clearing pre-grasp plan that detours past the via-above's envelope takes the via-above."""
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    arm = "right"
+    p0, q0 = motions.eef_pose(arm)
+    target = (p0 + th.tensor([0.10, 0.0, -0.02]), q0)
+    backend.solve_ik = None
+    motions._protect_violations = lambda arms, q_traj, emb, P=None: []
+    _arching(backend, env.robot, arm, rise=0.40)
+    saucer = [("saucer.n.02_1", SimpleNamespace(name="partner_saucer_mgbeah_0"))]
+    with motions.protecting(saucer, leg="pre_grasp", task="t", action="grasp", index=1):
+        drive(env, motions.arm_to(arm, pose=target))
+    ev = motions.protect_events[-1]
+    assert ev["remedy"].startswith("via-above (the clearing plan detoured") and ev["objects"][0]["rise_m"] > 0.3, ev
+    assert float(th.linalg.norm(motions.eef_pose(arm)[0] - target[0])) < 5e-3
+
+
+def test_a7_plain_plan_and_other_legs_are_unchanged(tmp_path):
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    arm = "right"
+    p0, q0 = motions.eef_pose(arm)
+    backend.solve_ik = None
+    motions._protect_violations = lambda arms, q_traj, emb, P=None: []
+    saucer = [("saucer.n.02_1", SimpleNamespace(name="partner_saucer_mgbeah_0"))]
+    # a modest hump (8 cm) on a pre-grasp transit: below the via-above envelope, executed as planned
+    n = _arching(backend, env.robot, arm, rise=0.08)
+    with motions.protecting(saucer, leg="pre_grasp", task="t", action="grasp", index=1):
+        drive(env, motions.arm_to(arm, pose=(p0 + th.tensor([0.10, 0.0, 0.0]), q0)))
+    assert motions.protect_events == [] and n["calls"] == 1
+    # a big hump on another leg (the carry's finish): not judged
+    p1, _ = motions.eef_pose(arm)
+    backend2 = backend
+    backend2.plan_pose = FakeBackend.plan_pose.__get__(backend2)
+    n2 = _arching(backend2, env.robot, arm, rise=0.40)
+    with motions.protecting(saucer, leg="carry", task="t", action="place", index=3):
+        drive(env, motions.arm_to(arm, pose=(p1 + th.tensor([-0.10, 0.0, 0.0]), q0)))
+    assert motions.protect_events == [] and n2["calls"] == 1

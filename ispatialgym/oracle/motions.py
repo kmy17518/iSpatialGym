@@ -106,6 +106,11 @@ class MotionsConfig:
     protect_lift_m: float = 0.12
     protect_above_m: float = 0.12
     protect_replans: int = 3
+    #: a pre-grasp transit plan that clears the protected objects only the long way round - its hand path longer than this
+    #: times the via-above's nominal one (``protect_lift_m`` + the straight distance + ``protect_above_m``) and its hand higher
+    #: than ``protect_lift_m`` above both ends - takes the via-above too (kielbasa 0926-074242: the direct plan to the witness
+    #: failed, the graph-seeded retry arched 1.27 m / 19 cm high for a 0.53 m move; the via-above on the same instance: 0.90 m / 12 cm)
+    protect_detour_ratio: float = 1.4
     #: a leg that starts with the eef link this far from the FK of the reported joints (the arm wound up under a
     #: contact load) first re-targets the joints onto the link's pose (``arm_along`` unwind)
     unwind_min_deflection: float = 0.005
@@ -573,6 +578,19 @@ class Motions:
             log.debug("wake of the released %s failed: %r", getattr(obj, "name", obj), e)
         self.pending_wake.pop(arm, None)
 
+    def _let_go(self, arm: str, obj) -> bool:
+        """A free held object leaves the hand as the fingers start to open: the assisted grasp is dropped before the first
+        opening increment (the pads still squeeze it for that step) and the body is woken. Dropped only after a staged opening,
+        the AG joint held it where the pads no longer did - long enough for PhysX to put it to sleep - and its wake waited for
+        the deferred full opening (inside 0926-075013: the sprouts hung 35 steps above the bowl, 18 on the AG with the pads
+        ~1 cm clear, then 16 asleep). Returns whether the assisted grasp was dropped here."""
+        release = getattr(self.robot, "release_grasp_immediately", None)
+        if not callable(release) or self.held_object(arm) is not obj:
+            return False
+        release(arm)
+        self._wake_released(arm, obj)
+        return True
+
     def hold(self, steps: int = 1) -> Iterator[th.Tensor]:
         """Emit hold actions (zero base velocity, current targets)."""
         self.state.stop_base()
@@ -667,6 +685,7 @@ class Motions:
         self.gripper_intent_closed[arm] = bool(close)
         q_now = float(self.robot.get_joint_positions()[idx].float().mean())
         held_before = None if close else self.held_object(arm)
+        let_go = False
         if close:
             self.release_opening.pop(arm, None)  # the pre-shape of the grasp this closure completes stays: the release's first stage
             contact_hold = None
@@ -716,6 +735,8 @@ class Motions:
                     if stage <= q_now + 1e-6:
                         stage = None  # the pads already stand clear of that width: nothing to stage
             target = hi if stage is None else stage
+            if held_before is not None and staged and not (getattr(held_before, "n_joints", 0) or len(getattr(held_before, "joints", {}) or {})):
+                let_go = self._let_go(arm, held_before)
             open_rate = self.cfg.gripper_open_rate
             if open_rate:
                 q_target = q_now
@@ -733,7 +754,7 @@ class Motions:
                 self.deferred_open[arm] = {"pos": pos, "steps": 0, "stage_m": float(stage)}
                 self.release_events.append({"arm": arm, "event": "staged", "stage_m": round(float(stage), 4), "from_m": round(q_now, 4),
                                             "source": "opening" if opening is not None else ("release_opening" if arm in self.release_opening else "preshape"),
-                                            "clearance_m": float(self.cfg.gripper_release_clearance_m)})
+                                            "clearance_m": float(self.cfg.gripper_release_clearance_m), "ag_released": "first_increment" if let_go else "caller"})
         steps = self.cfg.gripper_steps if steps is None else int(steps)
         for i in range(steps):
             yield self._emit()
@@ -743,7 +764,7 @@ class Motions:
                 if float(self.robot.get_joint_velocities()[idx].abs().max()) < 1e-3:
                     break
         yield from self.hold(5)
-        if held_before is not None:
+        if held_before is not None and not let_go:
             if self.held_object(arm) is held_before:
                 self.pending_wake[arm] = held_before  # released later (the deferred full opening): woken then
             else:
@@ -1074,18 +1095,44 @@ class Motions:
         yield from self.arm_along(arm, [(gp.float(), gq.float())], soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
         return True, f"{lifted}; above the goal by {self.cfg.protect_above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'}), straight down"
 
+    def _plan_detour(self, arm: str, q_traj: Any) -> Optional[Dict[str, Any]]:
+        """The hand path of a planned transit that detours past the via-above's - longer than ``protect_detour_ratio`` x
+        (``protect_lift_m`` + the straight distance + ``protect_above_m``) and higher than ``protect_lift_m`` above both of its
+        ends: ``{"path_m", "straight_m", "via_above_m", "rise_m"}``; None otherwise or without a batched FK."""
+        fk_batch = getattr(self.backend, "fk_batch", None)
+        if fk_batch is None or q_traj is None:
+            return None
+        try:
+            q = C.as_tensor(q_traj)
+            if q.ndim != 2 or len(q) < 3:
+                return None
+            p = C.as_tensor(fk_batch(M.EEF_LINK[arm], q, f"{arm}_arm")[0]).float()
+        except Exception as e:  # noqa: BLE001 - advisory, like the clearance check
+            log.debug("transit detour check unavailable (%r)", e)
+            return None
+        path = float(th.linalg.norm(p[1:] - p[:-1], dim=1).sum())
+        straight = float(th.linalg.norm(p[-1] - p[0]))
+        via = float(self.cfg.protect_lift_m) + straight + float(self.cfg.protect_above_m)
+        rise = float(p[:, 2].max()) - max(float(p[0, 2]), float(p[-1, 2]))
+        if path <= float(self.cfg.protect_detour_ratio) * via or rise <= float(self.cfg.protect_lift_m):
+            return None
+        return {"object": "-", "path_m": round(path, 3), "straight_m": round(straight, 3), "via_above_m": round(via, 3), "rise_m": round(rise, 3)}
+
     def _protect_gate(self, arms: Sequence[str], emb: str, res: Any, goal_pose: Any, q_goal: Optional[th.Tensor],
                       replan: Callable[[], Any]) -> Generator[th.Tensor, None, Tuple[bool, Any]]:
         """Before ``arm_to`` streams ``res``: inside a protect context, check it; a plan that clears is kept (``(False, res)``).
         One that does not (or every plan, after a run-time protected verdict) is re-planned via the point above the goal
         (``(True, res)``: done, nothing left to execute), else re-planned directly up to ``protect_replans`` times (the first
-        plan that clears, else the one that keeps farthest from the protected objects - the run-time check is the backstop)."""
+        plan that clears, else the one that keeps farthest from the protected objects - the run-time check is the backstop).
+        A pre-grasp plan that clears but detours past the via-above (``_plan_detour``) takes the via-above as well; when that
+        fails before the arm moved, the clearing plan is used."""
         P = self._protect
         if P is None or len(arms) != 1:
             return False, res
         arm = arms[0]
         viol = [] if P["force"] else self._protect_violations(arms, res.q_traj, emb, P)
-        if not viol and not P["force"]:
+        detour = self._plan_detour(arm, res.q_traj) if not viol and not P["force"] and P.get("leg") == "pre_grasp" else None
+        if not viol and not P["force"] and detour is None:
             return False, res
         if goal_pose is None and q_goal is not None:
             try:
@@ -1098,11 +1145,16 @@ class Motions:
             if goal_pose is not None:
                 done, why = yield from self._via_above(arm, emb, goal_pose, q_goal, P)
                 if done:
-                    self._protect_record(P, arm, viol, "via-above" + (" (forced after a run-time protected verdict)" if P["force"] else ""), why)
+                    self._protect_record(P, arm, viol or ([detour] if detour else []), "via-above" + (" (forced after a run-time protected verdict)" if P["force"] else "")
+                                         + (f" (the clearing plan detoured: hand path {detour['path_m']} m for {detour['straight_m']} m, {detour['rise_m']} m above both ends)" if detour else ""), why)
                     return True, res
             best, best_clear = res, (min(v["clearance_m"] for v in viol) if viol else -1.0)
             idx_a = self.robot.arm_control_idx[arm]
-            if float(th.max(th.abs(self.backend.q_full()[idx_a] - C.as_tensor(res.q_traj[0]).reshape(-1)[idx_a]))) > 1e-3:
+            moved = float(th.max(th.abs(self.backend.q_full()[idx_a] - C.as_tensor(res.q_traj[0]).reshape(-1)[idx_a]))) > 1e-3
+            if detour is not None and not moved:
+                self._protect_record(P, arm, [detour], "kept", f"via-above failed ({why}); the detouring plan clears the protected objects and is used")
+                return False, res
+            if moved:
                 best, best_clear = None, float("-inf")  # the via-above lift moved the arm: the original plan no longer starts here
             for k in range(int(self.cfg.protect_replans)):
                 try:
