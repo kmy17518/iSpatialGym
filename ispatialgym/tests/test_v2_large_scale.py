@@ -501,9 +501,10 @@ def test_wall_contacts_act_in_the_wall_plane():
 
 
 def test_wall_push_finger_side_carries_the_corner():
-    """With the gripper assets: the closed fist's hull at the recorded push poses overlaps the (rotating) painting by < 1 mm
-    at init, δ/2 and the goal (the corner sits CORNER_ON_FACE_M on the finger side, the target's two edges recede from the
-    finger), and is clear of it at the pre-contact."""
+    """With the gripper assets: the corner meets the middle of the finger side - the closed fist's hull at the recorded push
+    poses overlaps the (rotating) painting only where its lower edge rests on the finger's leading edge beside the corner
+    (< half the finger's width across the tangent) at init, δ/2 and the goal, identically along the arc, and is clear of it
+    at the pre-contact."""
     from ispatialgym.oracle import r1pro_model as M
 
     pts = M.finger_points_eef(C.FINGER_CLOSED, "right")
@@ -523,13 +524,16 @@ def test_wall_push_finger_side_carries_the_corner():
         delta = math.radians(deg)
         geo = S.contacts_for(spot, delta)
         p0, q0 = geo["pose_tilted"]
+        across = AW.fist_half_extents(t / 2)[1]
         for v in geo["push"]["variants"]:
             assert overlap(v["pre"], geo["pose_tilted"]) < -0.02
+            ov = []
             for frac in (0.0, 0.5, 1.0):
                 rot = C.quat_from_axis_angle(n, -delta * frac)
                 pose_o = (geo["C"] + C.quat_rotate(rot, p0 - geo["C"]), C.qmul(rot, q0))
                 pose_f = (geo["C"] + C.quat_rotate(rot, v["init"][0] - geo["C"]), C.qmul(rot, v["init"][1]))
-                assert overlap(pose_f, pose_o) < 0.001, f"{v['wrist']} at {frac}: the fist overlaps the target"
+                ov.append(overlap(pose_f, pose_o))
+            assert max(ov) < 0.5 * across and max(ov) - min(ov) < 1e-4, f"{v['wrist']}: the fist overlaps the target {ov}"
 
 
 def test_brace_order():

@@ -64,9 +64,6 @@ WALL_CONTACT_CLASSES = ("fwd_pinch_v", "fwd_pinch_h")
 #: joint 0, 0-2 cm behind the tips)
 FIST_TIP_HALF_WIDTH_M = 0.0083
 FIST_TIP_HALF_DEPTH_M = 0.0069
-#: how far the pushed corner lies inside the finger side's edge (m): the fist sits below the corner so that the target's
-#: edges recede from it on both sides of the corner
-CORNER_ON_FACE_M = 0.003
 AXES = {"+x": (1, 0, 0), "-x": (-1, 0, 0), "+y": (0, 1, 0), "-y": (0, -1, 0), "+z": (0, 0, 1), "-z": (0, 0, -1)}
 STRUCTURE = ("walls", "floors", "ceilings")
 
@@ -440,18 +437,19 @@ class AlignmentWall(SamplerV2):
         # (off the wall). The pitched pads before this pressed the painting's face toward the wall on their diagonal
         # approach (0926-065156: the arm drove 3.6 cm into the face, the torso bent back 0.03 rad and sprang back).
         tilts = [math.radians(float(v)) for v in (self.param("wall_contact_tilt_deg") or (0.0, 25.0, -25.0))]
-        face, across = fist_half_extents(thickness / 2)
+        face, _ = fist_half_extents(thickness / 2)
         # push: the corner of the low end (``push_end: "high"``, owner 2026-09-17 23:39: of the high end, pushed down) is
         # carried along its circle about C — the finger side stands square to the circle's tangent, so the corner stays
         # where it touches the finger along the whole arc (a push at the middle of the end runs parallel to its side face)
         push_high = str(self.param("push_end", "low")).lower() == "high"
         E_push = on_plane(extreme_z_point(pts_t, lowest=not push_high), mid_plane, n)
         a_push = leveling_tangent(E_push, C_, n, delta, rises=not push_high)
-        # the fist sits on the outer side of the corner (``inward`` = toward the target across the tangent): the corner meets
-        # the finger side CORNER_ON_FACE_M inside its edge, both edges of the target recede from the finger; a tilted fist
-        # leans its palm away from the target (the finger crosses the target's front half beside the corner, never its face)
+        # the corner meets the middle of the finger side (0927-010159: with the corner 3 mm inside the finger's edge the first
+        # arc lost it after 0.1 rad - the loaded fist sags across the tangent); the target's lower edge then rests on the
+        # finger's leading edge beside the corner. A tilted fist leans its palm away from the target (``inward`` = toward
+        # the target across the tangent: the finger crosses the target's front half beside the corner, never its face)
         inward = C.unit((C_ - E_push) - a_push * float(th.dot(C_ - E_push, a_push)) - n * float(th.dot(C_ - E_push, n)))
-        E_fist = E_push - inward * max(across - CORNER_ON_FACE_M, 0.0)
+        E_fist = E_push
         push_variants = []
         for tilt in sorted({abs(t) for t in tilts}):
             for label, sgn in (("+", 1.0), ("-", -1.0)):  # the two wrist turns: either finger's outer side meets the corner
