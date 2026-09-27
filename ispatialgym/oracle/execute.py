@@ -659,7 +659,148 @@ def stance_fingers(record) -> Optional[float]:
     return None if f is None else float(f)
 
 
-def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q: Optional[Dict[str, Sequence[float]]] = None) -> Iterator[th.Tensor]:
+#: rad: a kept branch's chain may come this close to a joint limit where the recorded chain came closer (the sampler's
+#: ``IKChecker.JOINT_LIMIT_MARGIN``); clearances within ``orient.CLEARANCE_EQ`` of each other count as equal
+KEEP_BRANCH_LIMIT_MARGIN = 0.05
+
+
+def _arm_limit_margin(robot, q28, arm: str) -> float:
+    """Smallest distance (rad) of ``arm``'s joints in ``q28`` to their limits."""
+    idx = robot.arm_control_idx[arm]
+    q = C.as_tensor(q28).reshape(-1).float()[idx]
+    lo, hi = C.as_tensor(robot.joint_lower_limits).float()[idx], C.as_tensor(robot.joint_upper_limits).float()[idx]
+    return float(th.min(th.minimum(q - lo, hi - q)))
+
+
+def keep_arm_branch(motions: Motions, state, arm: str, q_rec, sweep: Sequence[th.Tensor], nxt: Optional[Dict[str, Any]], ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Owner 2026-09-27 (first-demo v2.1 A2, block design 0927-040243: before the third grasp the base stood still while the transition
+    swung the hand 41 cm out to the right and back, 382 steps): a travel leg brings an empty arm to the joints the sampler swept it
+    with (``arms_q``, "the arm as the previous motion left it") - but the arm can hold that hand pose in another IK branch (grasp 2's
+    via-above planned the pose goal in cuRobo's own branch and the Cartesian actions after it stayed there). The arm then stays where it
+    is when (1) its hand is at the recorded one (``witness_residual_accept_pos`` or the retreat's own acceptance ``retreat_partial_accept_m``
+    / ``witness_residual_accept_rot``), (2) the leg's configurations ``sweep`` with the arm as it is are collision-free and keep the
+    protected objects' distance (``oracle.protection``), and (3) the arm's next contact ``nxt`` (``Executor.next_contact``) is reached
+    from here: the IK of its first pose seeded at the arm on the contact's stance lands nearer than the recorded witness, and the
+    contact's chain up to the arm's next travel leg tracks from there no closer to a joint limit than the recorded chain (or
+    ``KEEP_BRANCH_LIMIT_MARGIN``). Returns the facts; ``keep`` True carries ``witnesses`` ({action index: {key: 28-D q}}): the chain's
+    configurations from here, which replace the sampler's witnesses of those actions so the next contact goes straight to its pre-pose."""
+    from ispatialgym.sampling.v2.orient import CLEARANCE_EQ
+
+    backend, cfg = motions.backend, motions.cfg
+    idx, eef = state.robot.arm_control_idx[arm], M.EEF_LINK[arm]
+    q_now = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+    q_r = q_now.clone()
+    q_r[idx] = C.as_tensor(q_rec).reshape(-1).float()
+    dp, da = _pose_error(backend.fk([eef], q_now)[eef], backend.fk([eef], q_r)[eef])
+    f: Dict[str, Any] = {"keep": False, "joint_gap_rad": round(float(th.max(th.abs(q_now[idx] - q_r[idx]))), 3), "hand_gap_m": round(dp, 4), "hand_gap_rad": round(da, 4)}
+    # the recorded joints are where the sampler's previous motion ended (``choose_departure_arms``); the executor accepts that motion's end
+    # within ``retreat_partial_accept_m`` (0927-040243 leg 16: the recorded retreat stalled at right_arm_joint2's limit, the kept branch
+    # retreated the full 10 cm - the hands 22 mm apart)
+    if dp > max(cfg.witness_residual_accept_pos, _cfg(ctx).retreat_partial_accept_m) or da > cfg.witness_residual_accept_rot:
+        return {**f, "why": "the hand is not at the recorded pose"}
+    if not nxt or not nxt.get("chain"):
+        return {**f, "why": "no contact of the arm follows the travel legs"}
+    f["next"] = nxt["index"]
+    qs = th.stack([C.as_tensor(q).reshape(-1).float() for q in sweep]) if sweep else q_now.unsqueeze(0)
+    if bool(C.as_tensor(backend.check_collision(qs, sync_world=True)).any()):
+        return {**f, "why": "the arm as it is collides during the leg"}
+    objs = _protected_for(ctx, state, nxt.get("object"))
+    if objs and len(qs) >= 3 and hasattr(motions, "_protect_violations"):
+        from ispatialgym.oracle import protection as PROT
+
+        viol = motions._protect_violations([arm], qs, "whole_body", {"objects": objs, "inflation": PROT.INFLATION_M})
+        if viol:
+            return {**f, "why": f"the arm as it is comes within the protection distance of {viol[0].get('object')} during the leg"}
+    base, trunk = nxt["stance"]
+    q0 = _q_at_base(motions, q_now, *base)
+    q0[state.robot.trunk_control_idx] = C.as_tensor(trunk).reshape(-1).float()
+    first = nxt["chain"][0]
+    q_first = backend.solve_ik(f"{arm}_arm", {eef: as_world_pose(first["pose"])}, q_seed=q0, sync_world=False)
+    if q_first is None:
+        return {**f, "why": f"no IK of the next {nxt['name']}'s {first['key']} from the arm as it is"}
+    q_first = C.as_tensor(q_first).reshape(-1).float()
+    reach = float(th.max(th.abs(q_first[idx] - q0[idx])))
+    reach_rec = float(th.max(th.abs(C.as_tensor(first["q"]).reshape(-1).float()[idx] - q0[idx])))
+    f.update({"reach_rad": round(reach, 3), "recorded_reach_rad": round(reach_rec, 3)})
+    if reach >= reach_rec:
+        return {**f, "why": "the IK from here is no nearer than the recorded witness"}
+    out: Dict[int, Dict[str, th.Tensor]] = {first["action"]: {first["key"]: q_first}}
+    q, prev = q_first, first["pose"]
+    for w in nxt["chain"][1:]:
+        dense = motions._densify(as_world_pose(prev), [w["pose"]])
+        res = backend.solve_ik_path(f"{arm}_arm", [{eef: p} for p in dense], q_start=q, pos_tol=cfg.diff_ik_pos_tol, rot_tol=cfg.diff_ik_rot_tol,
+                                    max_iters=cfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=cfg.diff_ik_soft_pos_tol_free)
+        if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+            return {**f, "why": f"the next chain does not track from here at {w['action']}:{w['key']} ({res.status})"[:200]}
+        q = C.as_tensor(res.q_traj[-1]).reshape(-1).float()
+        out.setdefault(w["action"], {})[w["key"]] = q
+        prev = w["pose"]
+    margin = min(_arm_limit_margin(state.robot, qq, arm) for d in out.values() for qq in d.values())
+    floor = min(nxt["margin"], KEEP_BRANCH_LIMIT_MARGIN) if nxt.get("margin") is not None else KEEP_BRANCH_LIMIT_MARGIN
+    f.update({"chain_margin_rad": round(margin, 4), "recorded_margin_rad": nxt.get("margin")})
+    if margin < floor - CLEARANCE_EQ:
+        return {**f, "why": f"the chain from here comes {margin:.4f} rad from a joint limit (recorded {nxt.get('margin')})"}
+    return {**f, "keep": True, "chain": [f"{a}:{k}" for a, d in sorted(out.items()) for k in d], "witnesses": out}
+
+
+def _base_legs(motions: Motions, q: th.Tensor, start, goal, step_m: float = 0.05, step_rad: float = 0.1) -> List[th.Tensor]:
+    """Configurations along a straight base leg ``start`` -> ``goal`` ([x, y, yaw] world) with the joints of ``q`` otherwise."""
+    (x0, y0, a0), (x1, y1, a1) = (float(v) for v in start), (float(v) for v in goal)
+    da = C.wrap_angle(a1 - a0)
+    n = max(1, int(math.ceil(max(math.hypot(x1 - x0, y1 - y0) / step_m, abs(da) / step_rad))))
+    return [_q_at_base(motions, q, x0 + (x1 - x0) * s / n, y0 + (y1 - y0) * s / n, a0 + da * s / n) for s in range(1, n + 1)]
+
+
+def transition_sweep(motions: Motions, state, targets) -> List[th.Tensor]:
+    """A transition's configurations after the drive-back with the arms as they are: the trunk swept to its target, then the drive-in."""
+    q = C.as_tensor(motions.backend.q_full()).reshape(-1).float().clone()
+    tidx = state.robot.trunk_control_idx
+    t, k = targets["trunk"]
+    q_t = C.as_tensor(C.torso_q(float(t), float(k), C.TORSO_JOINT_LIMITS)).reshape(-1).float()
+    out = [q]
+    for s in range(1, 9):
+        qq = q.clone()
+        qq[tidx] = q[tidx] + (q_t - q[tidx]) * (s / 8)
+        out.append(qq)
+    return out + _base_legs(motions, out[-1], state.base_pose2d(), as_pose2d(targets["drive_in"]))
+
+
+def path_sweep(motions: Motions, state, waypoints) -> List[th.Tensor]:
+    """A recorded base path's configurations with the arms and the trunk as they are."""
+    q = C.as_tensor(motions.backend.q_full()).reshape(-1).float().clone()
+    out, prev = [q], state.base_pose2d()
+    for w in waypoints:
+        w = as_pose2d(w)
+        out += _base_legs(motions, q, prev, w)
+        prev = w
+    return out
+
+
+def _keep_branches(motions: Motions, state, ctx: Dict[str, Any], move: Dict[str, th.Tensor], sweep_fn: Callable[[], List[th.Tensor]]) -> Dict[str, th.Tensor]:
+    """``keep_arm_branch`` for every arm a travel leg would re-pose to its recorded joints: the kept arms leave ``move``; the facts go to
+    ``ctx["branch_kept"]`` and the kept arms' chain configurations to ``ctx["witness_overrides"]`` (the executor applies them to the next
+    contact's actions once the leg passes)."""
+    nxt = ctx.get("next_contact") or {}
+    kept: Dict[str, Any] = {}
+    sweep: Optional[List[th.Tensor]] = None
+    for arm in sorted(move):
+        try:
+            if sweep is None:
+                sweep = sweep_fn()
+            facts = keep_arm_branch(motions, state, arm, move[arm], sweep, nxt.get(arm), ctx)
+        except Exception as e:  # noqa: BLE001 - a backend without FK / IK / frames (the test stubs): the recorded joints
+            facts = {"keep": False, "why": f"no branch check ({e!r})"[:160]}
+        kept[arm] = {k: v for k, v in facts.items() if k != "witnesses"}
+        if facts.get("keep"):
+            ctx.setdefault("witness_overrides", {})[arm] = facts["witnesses"]
+            log.info("travel leg: the %s arm holds the recorded hand pose %.1f mm off in another IK branch (%.2f rad): kept, the next %s runs from here",
+                     arm, facts["hand_gap_m"] * 1000, facts["joint_gap_rad"], (nxt.get(arm) or {}).get("name"))
+    ctx["branch_kept"] = kept
+    return {arm: q for arm, q in move.items() if not kept[arm].get("keep")}
+
+
+def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q: Optional[Dict[str, Sequence[float]]] = None,
+                   keep_sweep: Optional[Callable[[], List[th.Tensor]]] = None) -> Iterator[th.Tensor]:
     """Put the arms into the stance's recorded drive-in posture before the trunk motion / drive-in (A6 + owner
     decision 2026-09-16 10:47): the recorded finger opening (``fingers``: closed pads for the wall two-arm stance) and
     the recorded joints (``arms_q`` / ``arm_posture``) on **every arm that holds nothing** — working arms included —
@@ -669,7 +810,9 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
 
     ``arms_q`` (owner 2026-09-24): the arm joints the *transition record* itself was swept with (``transitions[].arms_q``
     — the arm left where the previous motion ended it, ``program_check.choose_departure_arms``); they replace the stance's
-    arm targets, so an arm already there does not move (the fingers still follow the stance record)."""
+    arm targets, so an arm already there does not move (the fingers still follow the stance record). ``keep_sweep`` (the leg's
+    configurations with the arms as they are): an arm that holds the recorded hand pose in another IK branch may stay
+    (``keep_arm_branch``, first-demo v2.1 A2)."""
     holding = [arm for arm in M.ARMS if state.held_object(arm) is not None]
     fingers = stance_fingers(record)
     set_fingers = []
@@ -705,6 +848,8 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
         source = "arms_q" if extra.get("arms_q") else (extra.get("arm_posture") or extra.get("idle_posture") or None)
     q = state.robot.get_joint_positions()
     move = {arm: qa for arm, qa in targets.items() if arm not in holding and float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
+    if arms_q and keep_sweep is not None and move:
+        move = _keep_branches(motions, state, ctx, move, keep_sweep)
     ctx["arms_posture"] = {"moved": sorted(move), "kept_holding": [a for a in holding if a in targets], "source": source}
     ctx["idle_arms_moved"] = sorted(a for a in move if a not in set(getattr(record, "working_arms", []) or []))
     if move:
@@ -742,6 +887,9 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
             qa = C.as_tensor(list(arms_q[arm])).reshape(-1).float()
             if float(th.max(th.abs(q_now[idx].float() - qa))) > IDLE_ARM_TOL:
                 move[arm] = qa
+        if move and ctx.get("next_contact"):
+            # first-demo v2.1 A2: an arm holding the recorded hand pose in another IK branch drives as it is when the path clears it
+            move = _keep_branches(motions, state, ctx, move, lambda: path_sweep(motions, state, targets["waypoints"]))
         ctx["navigate_arms_reposed"] = sorted(move)
         ctx["navigate_arms_source"] = "record arms_q"
         if move:
@@ -771,8 +919,10 @@ def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:
 def execute_transition(action: Transition, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     yield from motions.track_path([targets["drive_back"]])
     # A6: the arriving stance's idle arm(s) to their recorded posture before the trunk moves (at the stand-off) - or, when the
-    # record was swept with the arm where the previous motion left it (``arms_q``, owner 2026-09-24), to exactly that
-    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"))
+    # record was swept with the arm where the previous motion left it (``arms_q``, owner 2026-09-24), to exactly that; an arm
+    # holding that hand pose in another IK branch may stay (first-demo v2.1 A2)
+    keep_sweep = (lambda: transition_sweep(motions, state, targets)) if ctx.get("next_contact") else None
+    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"), keep_sweep=keep_sweep)
     t, k = targets["trunk"]
     yield from motions.trunk_to(float(t), float(k))
     yield from motions.track_path([targets["drive_in"]])

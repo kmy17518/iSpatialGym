@@ -54,7 +54,7 @@ import torch as th
 
 from ispatialgym import ASSETS_ROOT
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.actions import Action, Brace, Place, Push
+from ispatialgym.oracle.actions import Action, Brace, Navigate, Place, Push, Transition
 from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
@@ -451,6 +451,8 @@ NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, cart
 NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
 #: first-demo v2.1 A1 (cap 0927-040231): an attach place opened the fingers that would meet the partner before the part seats
 NOTE_KEYS = NOTE_KEYS + ("finger_clearance",)
+#: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
+NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
 
 
 @dataclass
@@ -799,6 +801,9 @@ class Executor:
         # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
         self.protected_goal: List[Tuple[str, Any]] = []
         self._protect_force: set = set()
+        # first-demo v2.1 A2: the witnesses of a kept arm's next contact, tracked from the branch a travel leg kept it in
+        # ({action index: {"arm", "witnesses", "leg"}}, execute.keep_arm_branch)
+        self._witness_overrides: Dict[int, Dict[str, Any]] = {}
         self.program_actions: List[Action] = []
         self.checkpoint_reports: List[Dict[str, Any]] = []
         self.timings: Dict[str, float] = {}
@@ -1099,6 +1104,50 @@ class Executor:
                     out[key] = th.tensor([float(v) for v in q], dtype=th.float32)
         return out
 
+    def next_contact(self, index: int, arm: str) -> Optional[Dict[str, Any]]:
+        """The next contact of ``arm`` after the travel legs that follow action ``index`` (``execute.keep_arm_branch``, first-demo v2.1
+        A2): the first action past the transitions / navigates, when it moves ``arm``, with its chain - the actions of ``arm`` up to the
+        next travel leg - as the sampler's witnesses in order (``[{action, key, pose, q, margin, base}]``), the contact's stance (the base
+        pose and the trunk joints of its first witness) and the chain's smallest recorded joint-limit margin. None when another action
+        comes first or no witness with a stance is recorded."""
+        acts = list(self.program_actions)
+        entries = (getattr(self.sidecar, "extra", None) or {}).get("ik_witnesses") or []
+        j = index + 1
+        while j < len(acts) and isinstance(acts[j], (Transition, Navigate)):
+            j += 1
+        if j >= len(acts) or arm not in tuple(getattr(acts[j], "arms", ()) or ()):
+            return None
+        chain: List[Dict[str, Any]] = []
+        k = j
+        while k < len(acts) and not isinstance(acts[k], (Transition, Navigate)):
+            if arm in tuple(getattr(acts[k], "arms", ()) or ()):
+                for e in entries:
+                    if not isinstance(e, dict) or e.get("action") != k or (e.get("arm") or arm) != arm:
+                        continue
+                    for key, w in (e.get("targets") or {}).items():
+                        if not isinstance(w, dict) or w.get("q") is None or len(w["q"]) != 28 or not isinstance(w.get("pose"), dict):
+                            continue
+                        p = w["pose"]
+                        chain.append({"action": k, "key": key, "q": th.tensor([float(v) for v in w["q"]], dtype=th.float32), "margin": w.get("joint_limit_margin_rad"),
+                                      "pose": (th.tensor([float(v) for v in p["position"]]), th.tensor([float(v) for v in p["orientation"]])), "base": w.get("base_pose2d")})
+            k += 1
+        if not chain or chain[0]["base"] is None:
+            return None
+        margins = [c["margin"] for c in chain if c["margin"] is not None]
+        return {"index": j, "name": acts[j].name, "object": (tuple(getattr(acts[j], "objects", ()) or ()) or (None,))[0], "chain": chain,
+                "stance": ([float(v) for v in chain[0]["base"]], chain[0]["q"][self.robot.trunk_control_idx]), "margin": min(margins) if margins else None}
+
+    def _absorb_branch_decisions(self, index: int, ctx: Dict[str, Any]) -> None:
+        """After a travel leg passed: a kept arm's next contact runs on the configurations tracked from it (``_witness_overrides``); an
+        arm the leg re-posed to the recorded joints drops them (its next contact runs on the sampler's witnesses)."""
+        reposed = set((ctx.get("arms_posture") or {}).get("moved") or []) | set(ctx.get("navigate_arms_reposed") or [])
+        reposed |= {arm for arm, f in (ctx.get("branch_kept") or {}).items() if not f.get("keep")}
+        if reposed:
+            self._witness_overrides = {i: o for i, o in self._witness_overrides.items() if o["arm"] not in reposed}
+        for arm, per_action in (ctx.get("witness_overrides") or {}).items():
+            for i, ws in per_action.items():
+                self._witness_overrides[int(i)] = {"arm": arm, "witnesses": ws, "leg": index}
+
     def release_stage_opening(self, action: Place) -> Optional[float]:
         """The first-stage opening (m per finger) of the staged release of ``action.object`` (owner 2026-09-16 21:18):
         the library pinch width / 2 + ``MotionsConfig.gripper_preshape_margin`` (the pre-shape width, ~1 cm past the
@@ -1189,6 +1238,12 @@ class Executor:
             return v, ctx
         ctx["targets_keys"] = sorted(targets.keys())
         ctx["witnesses"] = self.witnesses_for(index)
+        ov = self._witness_overrides.get(index)
+        if ov:
+            ctx["witnesses"].update(ov["witnesses"])
+            ctx["witnesses_rebranched"] = {"arm": ov["arm"], "keys": sorted(ov["witnesses"]), "leg": ov["leg"]}
+        if isinstance(action, (Transition, Navigate)) and targets.get("arms_q"):
+            ctx["next_contact"] = {arm: self.next_contact(index, arm) for arm in targets["arms_q"]}
         ctx["sidecar"] = self.sidecar  # attachment: the correction regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
             # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep
@@ -1271,6 +1326,7 @@ class Executor:
                 self.motions.release_events.clear()
             rec.attempts.append(None if verdict is None else verdict.to_dict())
             if verdict is None:
+                self._absorb_branch_decisions(index, ctx)
                 self._commit()
                 log.info("action %d %s ok in %d steps (%.1fs)", index, action.summary() if hasattr(action, "summary") else action.name, self.n - rec.step_start, time.time() - t0)
                 break

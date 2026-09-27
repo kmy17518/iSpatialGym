@@ -157,3 +157,153 @@ def test_a1_attach_place_leaves_clear_fingers_alone(monkeypatch):
     list(EX.clear_fingers_over_partner(SimpleNamespace(arm="right", on="bottle", object="cap"), motions, state,
                                         {"pre_place": _pose([0.0, 0.0, 0.93]), "place": _pose([0.0, 0.0, 0.83])}, ctx, EX.ExecuteConfig()))
     assert not ctx["finger_clearance"]["applied"] and ctx["finger_clearance"]["before_seat_m"] is None and motions.state.gripper_cmd == {}
+
+
+# ------------------------------------------------------------------------------------------------ A2
+
+
+class _BranchBackend:
+    """Toy kinematics with two IK branches per hand pose: the hand sits at (|q0|, q1, q2) of the arm's first three joints, so q0 and -q0
+    hold the same pose; the IK keeps the seed's sign of q0."""
+
+    def __init__(self, robot, arm="right"):
+        self.robot, self.arm = robot, arm
+        self.idx = robot.arm_control_idx[arm]
+        self.q = robot.q.clone()
+        self._jidx = {n: i for i, n in enumerate(M.ALL_JOINTS)}
+        self.collide = False
+        self.fail_path = False
+
+    def q_full(self):
+        return self.q.clone()
+
+    def fk(self, frames, q=None):
+        q = self.q if q is None else q
+        a = q[self.idx]
+        return {f: (th.stack([a[0].abs(), a[1], a[2]]), th.tensor([0.0, 0.0, 0.0, 1.0])) for f in frames}
+
+    def _solve(self, pose, seed):
+        q = seed.clone()
+        p = C.as_tensor(pose[0]).float()
+        sign = 1.0 if float(seed[self.idx][0]) >= 0.0 else -1.0
+        q[self.idx[0]], q[self.idx[1]], q[self.idx[2]] = sign * float(p[0]), float(p[1]), float(p[2])
+        return q
+
+    def check_collision(self, qs, sync_world=False):
+        return th.full((len(qs),), bool(self.collide))
+
+    def solve_ik(self, emb, targets, q_seed=None, sync_world=True):
+        return self._solve(next(iter(targets.values())), q_seed)
+
+    def solve_ik_path(self, emb, waypoints, q_start=None, **kw):
+        if self.fail_path:
+            return SimpleNamespace(success=False, q_traj=None, status="stalled (fake)")
+        q, out = q_start.clone(), []
+        for wp in waypoints:
+            q = self._solve(next(iter(wp.values())), q)
+            out.append(q.clone())
+        return SimpleNamespace(success=True, q_traj=th.stack(out), status="ok")
+
+    def world_to_root(self, pose):
+        return pose
+
+
+def _branch_setup(x0=0.5, first=(0.6, 0.1, 0.2), second=(0.65, 0.1, 0.15)):
+    from ispatialgym.oracle.motions import MotionsConfig
+    from ispatialgym.tests.test_v2_oracle import FakeRobot
+
+    robot = FakeRobot()
+    backend = _BranchBackend(robot)
+    idx = backend.idx
+    backend.q[idx[0]], backend.q[idx[1]], backend.q[idx[2]] = -x0, 0.1, 0.2  # the arm holds the pose in the "negative" branch
+    q_rec = backend.q[idx].clone()
+    q_rec[0] = x0  # the recorded joints: the same hand pose, the other branch
+    motions = SimpleNamespace(backend=backend, cfg=MotionsConfig(), _densify=lambda start, wps: list(wps))
+    state = SimpleNamespace(robot=robot)
+    rec_q = backend.q.clone()
+    rec_q[idx[0]] = first[0]  # the sampler's witness of the next pre-grasp: the recorded ("positive") branch
+
+    def w(action, key, xyz):
+        return {"action": action, "key": key, "pose": (th.tensor(xyz, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0])), "q": rec_q, "margin": 0.2, "base": [0.0, 0.0, 0.0]}
+
+    nxt = {"index": 5, "name": "grasp", "object": None, "chain": [w(5, "pre_grasp", first), w(5, "grasp", second), w(6, "lift", second)],
+           "stance": ([0.0, 0.0, 0.0], robot.q[robot.trunk_control_idx].clone()), "margin": 0.2}
+    return motions, state, backend, q_rec, nxt
+
+
+def test_a2_keep_arm_branch_keeps_the_arm_and_tracks_the_next_contact_from_it():
+    motions, state, backend, q_rec, nxt = _branch_setup()
+    f = EX.keep_arm_branch(motions, state, "right", q_rec, [backend.q_full()], nxt, {})
+    assert f["keep"], f
+    assert f["joint_gap_rad"] == pytest.approx(1.0, abs=1e-3) and f["hand_gap_m"] == pytest.approx(0.0, abs=1e-6)
+    assert f["reach_rad"] == pytest.approx(0.1, abs=1e-4) and f["recorded_reach_rad"] == pytest.approx(1.1, abs=1e-4)
+    idx0 = backend.idx[0]
+    assert sorted(f["witnesses"]) == [5, 6] and sorted(f["witnesses"][5]) == ["grasp", "pre_grasp"]
+    assert float(f["witnesses"][5]["pre_grasp"][idx0]) == pytest.approx(-0.6) and float(f["witnesses"][6]["lift"][idx0]) == pytest.approx(-0.65)
+
+
+def test_a2_keep_arm_branch_refuses_outside_its_situation():
+    motions, state, backend, q_rec, nxt = _branch_setup()
+    far = q_rec.clone()
+    far[0] = 0.56  # 6 cm from the hand: another hand pose
+    assert EX.keep_arm_branch(motions, state, "right", far, [], nxt, {})["why"] == "the hand is not at the recorded pose"
+    assert "no contact" in EX.keep_arm_branch(motions, state, "right", q_rec, [], None, {})["why"]
+    backend.collide = True
+    assert "collides" in EX.keep_arm_branch(motions, state, "right", q_rec, [backend.q_full()], nxt, {})["why"]
+    backend.collide, backend.fail_path = False, True
+    assert "does not track" in EX.keep_arm_branch(motions, state, "right", q_rec, [], nxt, {})["why"]
+    motions, state, backend, q_rec, nxt = _branch_setup(second=(3.135, 0.1, 0.15))  # the chain from here ends 5 mrad from joint 1's limit
+    f = EX.keep_arm_branch(motions, state, "right", q_rec, [], nxt, {})
+    assert not f["keep"] and "joint limit" in f["why"] and f["chain_margin_rad"] < 0.01
+    motions, state, backend, q_rec, nxt = _branch_setup(first=(0.6, 1.5, 0.2))  # the recorded witness (0.6, 0.1, 0.2) lies nearer than the IK from here
+    f = EX.keep_arm_branch(motions, state, "right", q_rec, [], nxt, {})
+    assert not f["keep"] and "no nearer" in f["why"] and f["reach_rad"] > f["recorded_reach_rad"]
+
+
+def test_a2_move_idle_arms_leaves_a_kept_arm_and_hands_its_witnesses_over(monkeypatch):
+    sc, env = iors_world()
+    robot = env.robot
+    ridx = robot.arm_control_idx["right"]
+    manip = sc.stance("manipulation")
+    ex, motions, backend, rec = make_executor(env, sc)
+    here = robot.q[ridx].clone()
+    want = here + th.tensor([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    lidx = robot.arm_control_idx["left"]
+    arms_q = {"right": want.tolist(), "left": robot.q[lidx].tolist()}
+    over = {3: {"pre_grasp": th.zeros(28)}}
+    monkeypatch.setattr(EX, "keep_arm_branch", lambda motions, state, arm, q_rec, sweep, nxt, ctx: {"keep": True, "hand_gap_m": 0.003, "joint_gap_rad": 1.0, "witnesses": over})
+    ctx = {"next_contact": {"right": {"index": 3, "name": "grasp"}}}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx, arms_q=arms_q, keep_sweep=lambda: []):
+        env.step(a)
+    assert ctx["arms_posture"]["moved"] == [] and th.allclose(robot.q[ridx], here, atol=1e-6)
+    assert ctx["branch_kept"]["right"]["keep"] and "witnesses" not in ctx["branch_kept"]["right"] and ctx["witness_overrides"] == {"right": over}
+    monkeypatch.setattr(EX, "keep_arm_branch", lambda motions, state, arm, q_rec, sweep, nxt, ctx: {"keep": False, "why": "the hand is not at the recorded pose"})
+    ctx = {"next_contact": {"right": {"index": 3, "name": "grasp"}}}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx, arms_q=arms_q, keep_sweep=lambda: []):
+        env.step(a)
+    assert ctx["arms_posture"]["moved"] == ["right"] and th.allclose(robot.q[ridx], want, atol=1e-4) and "witness_overrides" not in ctx
+
+
+def test_a2_executor_looks_ahead_past_travel_legs_and_applies_the_kept_witnesses():
+    from ispatialgym.oracle.programs import expand
+
+    sc, env = iors_world()
+    ex, motions, backend, rec = make_executor(env, sc)
+    ex.program_actions = expand(sc.alias, sc)
+    names = [a.name for a in ex.program_actions]
+    assert names[:5] == ["transition", "grasp", "lift", "place", "retreat"]
+    q = [0.0] * 28
+
+    def wit(key, margin):
+        return {key: {"q": q, "pose": {"position": [0.5, 0.0, 1.0], "orientation": [0.0, 0.0, 0.0, 1.0]}, "base_pose2d": [0.1, 0.2, 0.3], "joint_limit_margin_rad": margin}}
+
+    sc.extra["ik_witnesses"] = [{"action": 1, "arm": "right", "targets": {**wit("pre_grasp", 0.3), **wit("grasp", 0.2)}}, {"action": 2, "arm": "right", "targets": wit("lift", 0.1)}]
+    nc = ex.next_contact(0, "right")
+    assert nc["index"] == 1 and nc["name"] == "grasp" and [(c["action"], c["key"]) for c in nc["chain"]] == [(1, "pre_grasp"), (1, "grasp"), (2, "lift")]
+    assert nc["margin"] == pytest.approx(0.1) and nc["stance"][0] == [0.1, 0.2, 0.3]
+    assert ex.next_contact(0, "left") is None  # the next action is the right arm's
+    q_kept = th.full((28,), 0.5)
+    ex._absorb_branch_decisions(0, {"branch_kept": {"right": {"keep": True}}, "arms_posture": {"moved": []}, "witness_overrides": {"right": {1: {"pre_grasp": q_kept}}}})
+    assert ex._witness_overrides[1]["leg"] == 0 and th.equal(ex._witness_overrides[1]["witnesses"]["pre_grasp"], q_kept)
+    ex._absorb_branch_decisions(3, {"arms_posture": {"moved": ["right"]}})
+    assert ex._witness_overrides == {}
