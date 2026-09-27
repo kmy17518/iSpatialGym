@@ -81,7 +81,8 @@ ARTICULATION_COMMON: Dict[str, Any] = {
 #: §5.5 wall alignment (world vertical) numbers.
 ALIGNMENT_WALL_COMMON: Dict[str, Any] = {
     "hang_height_m": 1.45,  # §5.5 centre at height 1.45 m
-    "wall_offset_extra_m": 0.01,  # §5.5 thickness/2 + 0.01 off the wall
+    "wall_gap_m": 0.003,  # §5.5 the target's back 3 mm off the most protruding wall point of its patch (hangs against the wall)
+    "wall_contact_tilt_deg": [0.0, 25.0, -25.0],  # §5.5 wall contacts: fingers into the wall, turned about the closing axis by these
     "deviation_range_deg": [15.0, 25.0],  # §5.5 δ = sign · U(15°, 25°) (owner decision 2026-09-16 A8; was U(15°, 45°))
     "max_deviation_deg": 25.0,  # §5.5 A8: |δ| > 25° is beyond the one-stroke push (two-stroke push = later, D list)
     "stance_arm_posture": "tucked",  # §5.5 A6: the two-arm manipulation stance is checked / driven in with hanging arms, closed pads

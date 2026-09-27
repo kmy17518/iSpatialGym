@@ -15,9 +15,11 @@ survivors (arms excluded: δ-, target- and scale-independent, cached per (scene,
 spot when steps 1–3 pass for δ = +30° and δ = −30° at the configured scale; none → ``Reject("no_stance")`` with the
 ``scale_hint`` diagnostic (uniform s ∈ {0.9, …, 0.5} on the same spots, never applied).
 
-Instance (:meth:`sample_instance`): spot drawn weighted by its survivors, δ = sign · U(15°, 45°), Phase 1 (β_max 35°,
-d 0.5–1.5 m, the whole tilted target in frame), Phase 2 steps 2–4 (contacts of §5.5: push arm at E_low with the arc
-waypoints δ/2 and goal, brace kinds ``below_high`` → ``above_low`` → ``side_high``; focus C; C, E_low and B in frame),
+Instance (:meth:`sample_instance`): spot drawn weighted by its survivors, δ = sign · U(15°, 45°), the target's back
+``wall_gap_m`` off the wall, Phase 1 (β_max 35°, d 0.5–1.5 m, the whole tilted target in frame), Phase 2 steps 2–4
+(contacts of §5.5, all acting in the wall plane: the fingers point into the wall and a finger's outer side meets the
+edge; the push carries the corner of the low end along its circle about C with the arc waypoints δ/2 and goal, brace
+kinds ``below_high`` → ``above_low`` → ``side_high`` at the goal edge; focus C; C, the pushed corner and B in frame),
 step 5 (brace arm first with the target not ignored, then the push arm with the brace locked and the target ignored
 for the contact poses, combined whole-body check), step 6 path + transition; the hinge at the COM after apply; hinge
 drift ≤ 0.03 rad and ≥ 5 visible objects after settling; goal = the upright pose, tolerance 0.08 rad, equivalences from
@@ -56,7 +58,15 @@ BRACE_KINDS = ("below_high", "above_low", "side_high")
 #: A8 (owner decision 2026‑09‑16): |δ| ≤ 25° until the two-stroke push for larger tilts exists (TODO: two strokes with a
 #: re-grasp of the push point between them, each within the arm's arc reach; the ±30° template filter then returns)
 MAX_DEVIATION_DEG = 25.0
-PUSH_CLASSES = ("push_up", "push_down", "push_left", "push_right")
+#: reach-volume classes of the wall contacts (the fingers point into the wall, the pads close in the wall plane)
+WALL_CONTACT_CLASSES = ("fwd_pinch_v", "fwd_pinch_h")
+#: closed-fist half-widths at the fingertips along / across the closing axis (``r1pro_model.finger_points_eef`` at finger
+#: joint 0, 0-2 cm behind the tips)
+FIST_TIP_HALF_WIDTH_M = 0.0083
+FIST_TIP_HALF_DEPTH_M = 0.0069
+#: how far the pushed corner lies inside the finger side's edge (m): the fist sits below the corner so that the target's
+#: edges recede from it on both sides of the corner
+CORNER_ON_FACE_M = 0.003
 AXES = {"+x": (1, 0, 0), "-x": (-1, 0, 0), "+y": (0, 1, 0), "-y": (0, -1, 0), "+z": (0, 0, 1), "-z": (0, 0, -1)}
 STRUCTURE = ("walls", "floors", "ceilings")
 
@@ -167,6 +177,60 @@ def brace_point(level_pts: th.Tensor, kind: str, side_axis, high_sign: float, C_
             a = -s * high_sign
         return B, a / th.linalg.norm(a)
     raise ValueError(kind)
+
+
+def extreme_z_point(pts: th.Tensor, lowest: bool = True, band: float = 0.003) -> th.Tensor:
+    """Mean of the hull points within ``band`` of the lowest (highest) z: the corner of the low (high) end of a tilted target."""
+    z = pts[:, 2]
+    sel = pts[z <= float(z.min()) + band] if lowest else pts[z >= float(z.max()) - band]
+    return sel.mean(dim=0)
+
+
+def fist_half_extents(depth: float, arm: str = "right") -> Tuple[float, float]:
+    """(along the closing axis, across it) half-widths (m) of the closed fist over the ``depth`` behind the fingertips:
+    the outer side of a finger stands the first from the eef axis where a wall contact touches the target, the second
+    bounds the finger's width on that side (``FIST_TIP_HALF_WIDTH_M`` / ``FIST_TIP_HALF_DEPTH_M`` without the assets)."""
+    from ispatialgym.oracle import r1pro_model as M
+
+    pts = M.finger_points_eef(C.FINGER_CLOSED, arm)
+    if pts is None:
+        return FIST_TIP_HALF_WIDTH_M, FIST_TIP_HALF_DEPTH_M
+    sel = pts[pts[:, 2] >= float(pts[:, 2].max()) - max(float(depth), 1e-3)]
+    return float(np.abs(sel[:, 1]).max()), float(np.abs(sel[:, 0]).max())
+
+
+def wall_fist_axes(normal, closing, tilt: float = 0.0) -> Tuple[th.Tensor, th.Tensor]:
+    """(approach a, closing c) of a wall contact that acts in the wall plane: the fingers point into the wall (a = −n),
+    turned by ``tilt`` (rad) about c, and the pads close along ``closing`` (in the wall plane) — the outer side of a finger
+    (normal ±c) meets the target's edge, so the contact normal lies in the wall plane."""
+    n = C.unit(th.as_tensor(normal, dtype=th.float32))
+    c = th.as_tensor(closing, dtype=th.float32)
+    c = C.unit(c - n * float(th.dot(c, n)))
+    k = C.unit(th.cross(c, n, dim=0))
+    a = C.unit(-n * math.cos(tilt) + k * math.sin(tilt))
+    return a, c
+
+
+def wall_contact_pose(point, normal, direction, face: float, gap: float = 0.0, tilt: float = 0.0, turn: float = 1.0) -> Tuple[th.Tensor, th.Tensor]:
+    """eef pose of a wall contact acting along ``direction`` (in the wall plane, toward the target): the outer side of a
+    finger (``face`` from the eef axis) stands ``gap`` before ``point``, the fingertips at ``point``'s depth (on the target's
+    mid-plane), the pads closing along ``turn`` · direction (either wrist turn puts a finger side on the point)."""
+    d = th.as_tensor(direction, dtype=th.float32)
+    a, c = wall_fist_axes(normal, d * (1.0 if turn >= 0 else -1.0), tilt)
+    tip = th.as_tensor(point, dtype=th.float32) - C.unit(d) * (float(face) + float(gap))
+    return tip - C.FINGERTIP_LENGTH * a, C.eef_quat(a, c)
+
+
+def wall_screen_pose(pose, normal) -> Tuple[th.Tensor, th.Tensor]:
+    """Reach-volume stand-in of a wall contact pose (``WALL_CONTACT_CLASSES``): its position, the fingers straight into
+    the wall and the pads closing along the nearer of vertical / horizontal in the wall plane."""
+    p, q = pose
+    n = C.unit(th.as_tensor(normal, dtype=th.float32))
+    c = C.closing_axis(q)
+    up = th.tensor([0.0, 0.0, 1.0])
+    lateral = C.unit(th.cross(up, n, dim=0))
+    c2 = up if abs(float(th.dot(c, up))) >= abs(float(th.dot(c, lateral))) else lateral
+    return p, C.eef_quat(-n, c2)
 
 
 def push_arm_of(E_low, C_, tangent_left) -> str:
@@ -322,14 +386,32 @@ class AlignmentWall(SamplerV2):
         _, w, h = self.dims(hull)
         return w, h
 
+    def depth_extents(self, hull: Optional[th.Tensor] = None, com: Optional[th.Tensor] = None) -> Tuple[float, float]:
+        """(back, thickness) of the canonical hull along the front axis: its extent from the COM toward the wall, and its
+        thickness."""
+        pts = self.hull if hull is None else hull
+        c = self.com_local if com is None else com
+        s = pts @ self.front
+        return float(c @ self.front) - float(s.min()), float(s.max() - s.min())
+
+    def wall_offset(self, spot: Dict[str, Any]) -> float:
+        """Distance (m) along n from the spot point to the target's back: the most protruding wall point of the patch
+        (``_flat_patch``) plus ``generation.wall_gap_m``, so the target hangs against the wall."""
+        return float(spot.get("wall_protrusion_m", 0.0)) + float(self.param("wall_gap_m", 0.003))
+
+    def mid_plane_point(self, spot: Dict[str, Any], hull: Optional[th.Tensor] = None, com: Optional[th.Tensor] = None) -> th.Tensor:
+        """A point of the hanging target's mid-thickness plane (the plane of the push and brace contacts)."""
+        _, t = self.depth_extents(hull, com)
+        return spot["point"] + spot["normal"] * (self.wall_offset(spot) + t / 2)
+
     def hang_pose(self, spot: Dict[str, Any], delta: float, hull: Optional[th.Tensor] = None, com: Optional[th.Tensor] = None) -> G.Pose:
-        """§5.5 hang pose: up axis along world z, front axis along n, centre at hang height, thickness/2 + 0.01 off the
-        wall, rotated in-plane by δ about n through the COM."""
+        """§5.5 hang pose: up axis along world z, front axis along n, the COM at hang height with the target's back
+        ``wall_offset`` off the wall, rotated in-plane by δ about n through the COM."""
         n = spot["normal"]
         q_up = hang_quat(n, self.front, self.side, self.up)
         q = G.qmul(G.quat_about_axis(n, delta), q_up)
-        thickness = self.dims(hull)[0]
-        centre = spot["point"] + n * (thickness / 2 + float(self.param("wall_offset_extra_m", 0.01)))
+        back, _ = self.depth_extents(hull, com)
+        centre = spot["point"] + n * (self.wall_offset(spot) + back)
         centre = th.tensor([float(centre[0]), float(centre[1]), spot["hang_z"]])
         return centre - G.rotate(q, self.com_local if com is None else com), q
 
@@ -347,90 +429,85 @@ class AlignmentWall(SamplerV2):
         pose_l = self.hang_pose(spot, 0.0, hull, com)
         pts_t, pts_l = self.hull_at(pose_t, hull), self.hull_at(pose_l, hull)
         C_ = pose_t[0] + G.rotate(pose_t[1], self.com_local if com is None else com)
-        thickness = self.dims(hull)[0]
-        mid_plane = spot["point"] + n * (thickness / 2 + float(self.param("wall_offset_extra_m", 0.01)))
+        _, thickness = self.depth_extents(hull, com)
+        mid_plane = self.mid_plane_point(spot, hull, com)
         level_axis_t = G.rotate(pose_t[1], self.side)  # ℓ_δ = the level axis rotated by δ
         E_low, E_high = extreme_points(pts_t, level_axis_t, band)
         E_low, E_high = on_plane(E_low, mid_plane, n), on_plane(E_high, mid_plane, n)
-        # push: tangent about C through E_low, signed so the low end rises; c = n. ``generation.push_end: "high"``
-        # (owner 2026-09-17 23:39) pushes the HIGH end down instead - the arm on the high end's side pushes from above,
-        # the other arm braces (the brace kinds below stay valid stops: below_high under the descending end, above_low
-        # over the rising end); the geometry keys keep their names (E_low = the pushed end's counterpart)
+        # Every wall contact acts in the wall plane (owner 2026-09-27, first-demo v1.2 review): the fingers point into the
+        # wall and the outer side of a finger (normal ±c, c in the wall plane) meets the target's edge, the pre-contact lies
+        # PRE_DIST back along the contact direction in the same plane, and the fingertips stay on the target's mid-plane
+        # (off the wall). The pitched pads before this pressed the painting's face toward the wall on their diagonal
+        # approach (0926-065156: the arm drove 3.6 cm into the face, the torso bent back 0.03 rad and sprang back).
+        tilts = [math.radians(float(v)) for v in (self.param("wall_contact_tilt_deg") or (0.0, 25.0, -25.0))]
+        face, across = fist_half_extents(thickness / 2)
+        # push: the corner of the low end (``push_end: "high"``, owner 2026-09-17 23:39: of the high end, pushed down) is
+        # carried along its circle about C — the finger side stands square to the circle's tangent, so the corner stays
+        # where it touches the finger along the whole arc (a push at the middle of the end runs parallel to its side face)
         push_high = str(self.param("push_end", "low")).lower() == "high"
-        E_push = E_high if push_high else E_low
+        E_push = on_plane(extreme_z_point(pts_t, lowest=not push_high), mid_plane, n)
         a_push = leveling_tangent(E_push, C_, n, delta, rises=not push_high)
-        push_init = C.contact_eef(E_push, a_push, closing=n)
-        arc = C.arc_waypoints(push_init, C_, n, -delta, n=2)  # [δ/2, goal] (the material point carried, a re-tangent)
-        push_mid, push_goal = arc[0], arc[1]
-        push_pre = C.pre_pose(push_init)
-        # the other wrist turn (closing axis −n): the same pad contact with the gripper's broad faces swapped — the wrist
-        # camera (right_realsense_link) sits on one of them and ends inside the wall for one of the two turns (first demo
-        # 2026‑09‑16); step 5 picks the turn whose configuration clears the wall
-        # ... and the closing axis IN the wall plane (⟂ a and n): the gripper's thin side then faces the wall — with the
-        # closing axis along n the palm (far wider than the fingers along the closing axis) sits centred 2 cm off the
-        # wall and penetrates it whichever way the wrist turns (first-demo loop 12:12: both turns "inside the wall")
-        # ... and the approach PITCHED off the wall plane toward the room (θ = 30° / 45°: a' = cos θ·a − sin θ·n): with the
-        # approach in the wall plane the forearm / wrist lie along the wall 2 cm from it and penetrate it at any wrist
-        # turn (first-demo loop 12:36: every closing variant "inside the wall"); the pitched hand comes down onto the
-        # contact from the room side and the wrist stands sin θ · (wrist offset) off the wall. The arc waypoints rotate
-        # the pitched init pose about C (the pitch is kept), the reach-volume class stays the nearest push class.
+        # the fist sits on the outer side of the corner (``inward`` = toward the target across the tangent): the corner meets
+        # the finger side CORNER_ON_FACE_M inside its edge, both edges of the target recede from the finger; a tilted fist
+        # leans its palm away from the target (the finger crosses the target's front half beside the corner, never its face)
+        inward = C.unit((C_ - E_push) - a_push * float(th.dot(C_ - E_push, a_push)) - n * float(th.dot(C_ - E_push, n)))
+        E_fist = E_push - inward * max(across - CORNER_ON_FACE_M, 0.0)
         push_variants = []
-        for pitch_deg in [float(v) for v in (self.param("contact_pitch_deg") or (30.0, 45.0, 0.0))]:
-            th_ = math.radians(pitch_deg)
-            a_v = C.unit(a_push * math.cos(th_) - n * math.sin(th_))
-            c_in = C.unit(th.cross(a_v, n, dim=0))
-            c_out = C.unit(th.cross(c_in, a_v, dim=0))  # the third axis (n-like, ⟂ a')
-            for label, closing in (("in+", c_in), ("in-", -c_in), ("n+", c_out), ("n-", -c_out)):
-                init_v = C.contact_eef(E_push, a_v, closing=closing)
-                arc_v = C.arc_waypoints(init_v, C_, n, -delta, n=2)
-                push_variants.append({"wrist": f"p{pitch_deg:.0f}/{label}", "pitch_deg": pitch_deg, "pre": C.pre_pose(init_v), "init": init_v, "mid": arc_v[0], "goal": arc_v[1]})
-        # brace candidates on the level pose; E_high's side along the level axis
+        for tilt in sorted({abs(t) for t in tilts}):
+            for label, sgn in (("+", 1.0), ("-", -1.0)):  # the two wrist turns: either finger's outer side meets the corner
+                k = th.cross(a_push * sgn, n, dim=0)
+                tilt_s = tilt * (1.0 if float(th.dot(k, inward)) >= 0 else -1.0)
+                init_v = wall_contact_pose(E_fist, n, a_push, face, tilt=tilt_s, turn=sgn)
+                arc_v = C.arc_waypoints(init_v, C_, n, -delta, n=2)  # [δ/2, goal]: the finger side carried with the corner
+                pre_v = (init_v[0] - C.PRE_DIST * a_push, init_v[1])
+                push_variants.append({"wrist": f"s{math.degrees(tilt_s):+.0f}/{label}", "tilt_deg": math.degrees(tilt_s), "pre": pre_v, "init": init_v,
+                                      "mid": arc_v[0], "goal": arc_v[1]})
+        push_init, push_mid, push_goal, push_pre = (push_variants[0][k] for k in ("init", "mid", "goal", "pre"))
+        # brace candidates on the level pose (the stop at the goal edge); E_high's side along the level axis
         side_l = G.rotate(pose_l[1], self.side)
         C_l = pose_l[0] + G.rotate(pose_l[1], self.com_local if com is None else com)
         high_sign = 1.0 if float(th.dot(E_high - C_, level_axis_t)) > 0 else -1.0
         _, w, h = self.dims(hull)
+        gap_b = float(self.param("brace_offset_m", 0.005))
         braces = []
         for kind in brace_candidate_order(h, w, self.param("brace_kinds", BRACE_KINDS)):
             B, a = brace_point(pts_l, kind, side_l, high_sign, C_l, band)
             B = on_plane(B, mid_plane, n)
-            # brace pre-contact = eef − 0.10·a (spec §5.5): the approach slides along the wall from outside the hull.
-            # ``generation.brace_pre_offset_wall_m`` (default 0) adds an offset off the wall along +n. Smoke findings
-            # (2026‑09‑16): the closed gripper's sphere model is flagged at the 1 cm margin at every pose within ≈ 5 cm of
-            # the wall, so neither an offset of 8 cm (diagonal approach) nor an approach normal to the wall (which passes
-            # through the tilted target's plane region) makes the intermediate poses pass with the wall present — the wall
-            # has to be ignored along the whole brace chain (as along the push chain), in the sampler and in the program
-            # check alike.
-            off_wall = float(self.param("brace_pre_offset_wall_m", 0.0))
-            for pitch_deg in [float(v) for v in (self.param("contact_pitch_deg") or (30.0, 45.0, 0.0))]:  # pitched off the wall (see the push variants)
-                th_ = math.radians(pitch_deg)
-                a_v = C.unit(a * math.cos(th_) - n * math.sin(th_))
-                c_in_b = C.unit(th.cross(a_v, n, dim=0))
-                c_out_b = C.unit(th.cross(c_in_b, a_v, dim=0))
-                for label, closing in (("in+", c_in_b), ("in-", -c_in_b), ("n+", c_out_b), ("n-", -c_out_b)):
-                    eef_w = C.fingertip_eef(B, a_v, closing=closing, clearance=float(self.param("brace_offset_m", 0.005)))
-                    pre_a = C.pre_pose(eef_w)
-                    pre = (pre_a[0] + off_wall * n, pre_a[1]) if off_wall else pre_a
-                    braces.append({"kind": kind, "B": B, "a": a_v, "pose": eef_w, "pre": pre, "wrist": f"p{pitch_deg:.0f}/{label}", "pitch_deg": pitch_deg})
+            # the stop: a finger's outer side ``brace_offset_m`` before B along a (toward the target), reached along a in the
+            # wall plane from PRE_DIST out (spec §5.5: "the approach slides along the wall from outside the hull")
+            for tilt in tilts:
+                for label, sgn in (("+", 1.0), ("-", -1.0)):
+                    eef_w = wall_contact_pose(B, n, a, face, gap=gap_b, tilt=tilt, turn=sgn)
+                    pre = (eef_w[0] - C.PRE_DIST * a, eef_w[1])
+                    braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": f"s{math.degrees(tilt):+.0f}/{label}",
+                                   "tilt_deg": math.degrees(tilt), "face_m": face})
         push_arm = push_arm_of(E_push, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))  # the arm on the pushed end's side
-        return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "E_low": E_low, "E_high": E_high, "E_push": E_push,
+        return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "normal": n, "E_low": E_low, "E_high": E_high, "E_push": E_push,
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,
-                         "distance": float(th.linalg.norm(push_goal[0] - push_init[0])), "variants": push_variants, "end": "high" if push_high else "low"},
+                         "distance": float(th.linalg.norm(push_goal[0] - push_init[0])), "variants": push_variants, "end": "high" if push_high else "low",
+                         "face_m": face},
                 "braces": braces, "brace_arm": other_arm(push_arm), "delta": delta}
 
     def brace_clear(self, geo: Dict[str, Any], brace: Dict[str, Any]) -> bool:
-        """§5.5: at init the brace hand must be ≥ 2 cm clear of the tilted hull (fingertip and pad-centre points)."""
+        """§5.5: at init the brace hand must be ≥ 2 cm clear of the tilted hull (fingertip, pad centre and the finger side
+        that stops the target)."""
         clear = float(self.param("brace_clearance_m", 0.02))
         pts = geo["hull_tilted"]
-        for p in (C.fingertip(brace["pose"]), C.pad_center(brace["pose"]), brace["pose"][0]):
+        side = C.fingertip(brace["pose"]) + brace["a"] * float(brace.get("face_m", 0.0))
+        for p in (C.fingertip(brace["pose"]), C.pad_center(brace["pose"]), brace["pose"][0], side):
             if float(th.linalg.norm(pts - p, dim=1).min()) < clear:
                 return False
         return True
 
     def contact_specs(self, geo: Dict[str, Any]) -> Tuple[P0.ContactSpec, List[Tuple[Dict[str, Any], P0.ContactSpec]]]:
         push = geo["push"]
-        spec_p = P0.ContactSpec("push", push["arm"], push["init"], push["pre"], waypoints=[push["mid"], push["goal"]], after=True, classes=PUSH_CLASSES,
-                                ignore_for_last=[self.target], ignore_waypoints=[self.target])
-        braces = [(b, P0.ContactSpec(f"brace_{b['kind']}", geo["brace_arm"], b["pose"], b["pre"], classes=PUSH_CLASSES)) for b in geo["braces"]
+
+        def rv(pose):
+            return wall_screen_pose(pose, geo["normal"])
+
+        spec_p = P0.ContactSpec("push", push["arm"], rv(push["init"]), rv(push["pre"]), waypoints=[rv(push["mid"]), rv(push["goal"])], after=True,
+                                classes=WALL_CONTACT_CLASSES, ignore_for_last=[self.target], ignore_waypoints=[self.target])
+        braces = [(b, P0.ContactSpec(f"brace_{b['kind']}", geo["brace_arm"], rv(b["pose"]), rv(b["pre"]), classes=WALL_CONTACT_CLASSES)) for b in geo["braces"]
                   if self.brace_clear(geo, b)]
         return spec_p, braces
 
@@ -494,7 +571,9 @@ class AlignmentWall(SamplerV2):
     def _walls(self) -> Dict[str, Any]:
         return {l.prim_path: o for o in self.world.scene.objects if o.category == "walls" for l in o.links.values()}
 
-    def _flat_patch(self, point, normal, w, h, wall) -> bool:
+    def _flat_patch(self, point, normal, w, h, wall) -> Optional[float]:
+        """None when the patch is not flat within ``flat_patch_tolerance_m``, else how far its most protruding wall point
+        stands in front of ``point`` along the normal (m, ≥ 0): the target hangs that far out (``wall_offset``)."""
         nu, nv = self.param("flat_patch_rays", [5, 5])
         tol = float(self.param("flat_patch_tolerance_m", 0.01))
         tangent = th.tensor([-float(normal[1]), float(normal[0]), 0.0])
@@ -507,10 +586,12 @@ class AlignmentWall(SamplerV2):
                 ends.append(p - normal * 0.1)
         hits = self.world.raycast(th.stack(starts), th.stack(ends))
         prims = {l.prim_path for l in wall.links.values()}
+        protrusion = 0.0
         for hh in hits:
             if not hh["hit"] or hh["rigidBody"] not in prims or abs(float(hh["distance"]) - 0.5) > tol:
-                return False
-        return True
+                return None
+            protrusion = max(protrusion, 0.5 - float(hh["distance"]))
+        return protrusion
 
     def _front_clear(self, point, normal, w, h) -> bool:
         depth = float(self.param("front_clearance_m", 0.35))
@@ -561,9 +642,11 @@ class AlignmentWall(SamplerV2):
                 if float(th.linalg.norm(normal)) < 0.5:
                     continue
                 normal = normal / th.linalg.norm(normal)
-                if not self._flat_patch(point, normal, w, h, wall) or not self._front_clear(point, normal, w, h):
+                protrusion = self._flat_patch(point, normal, w, h, wall)
+                if protrusion is None or not self._front_clear(point, normal, w, h):
                     continue
-                out.append({"wall_name": wall.name, "wall_link": hh["rigidBody"], "point": point, "normal": normal, "hang_z": z, "region": r.get("id")})
+                out.append({"wall_name": wall.name, "wall_link": hh["rigidBody"], "point": point, "normal": normal, "hang_z": z, "region": r.get("id"),
+                            "wall_protrusion_m": protrusion})
         return out
 
     def _ray_spots(self, w, h, hang_z: float) -> List[Dict[str, Any]]:
@@ -587,9 +670,11 @@ class AlignmentWall(SamplerV2):
             if float(th.linalg.norm(normal)) < 0.5:
                 continue
             normal = normal / th.linalg.norm(normal)
-            if not self._flat_patch(point, normal, w, h, wall) or not self._front_clear(point, normal, w, h):
+            protrusion = self._flat_patch(point, normal, w, h, wall)
+            if protrusion is None or not self._front_clear(point, normal, w, h):
                 continue
-            out.append({"wall_name": wall.name, "wall_link": hh["rigidBody"], "point": point, "normal": normal, "hang_z": hang_z, "region": None})
+            out.append({"wall_name": wall.name, "wall_link": hh["rigidBody"], "point": point, "normal": normal, "hang_z": hang_z, "region": None,
+                        "wall_protrusion_m": protrusion})
         return out
 
     def find_spots(self) -> List[Dict[str, Any]]:
@@ -674,7 +759,7 @@ class AlignmentWall(SamplerV2):
             if all(v > 0 for v in n_ok.values()):
                 kept.append(s)
         self.template_facts["spots"] = [{"id": s["id"], "point": s["point"].tolist(), "normal": s["normal"].tolist(), "n_step1": len(self.step1[s["id"]]),
-                                         "survivors_pm_filter": s.get("n_survivors")} for s in self.spots]
+                                         "survivors_pm_filter": s.get("n_survivors"), "wall_protrusion_m": s.get("wall_protrusion_m")} for s in self.spots]
         if not kept:
             hint = self.scale_hint(filt)
             self.template_meta["scale_hint"] = hint
@@ -779,7 +864,9 @@ class AlignmentWall(SamplerV2):
         d.summary.update({"wall": spot["wall_name"], "spot": spot["id"], "deviation_deg": math.degrees(delta), "push_arm": geo["push"]["arm"], "brace_arm": geo["brace_arm"],
                           "brace_kind": self.sidecar.contacts["brace"].brace_kind, "scale": self.choice.models["target"].scale, "phase2": stats,
                           "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip), "symmetric_180": self.symmetric_180(),
-                          "frame": dict(self.template_facts.get("frame") or {})})
+                          "frame": dict(self.template_facts.get("frame") or {}),
+                          "hang": {"back_off_wall_m": self.wall_offset(spot), "wall_protrusion_m": spot.get("wall_protrusion_m"),
+                                   "back_from_com_m": self.depth_extents()[0], "thickness_m": self.depth_extents()[1]}})
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), deviation_deg=math.degrees(delta),
                               push_distance_cm=100 * geo["push"]["distance"])
         self._spot = spot
@@ -853,9 +940,9 @@ class AlignmentWall(SamplerV2):
                 if not tips_in_frame([push["pre"], push["init"], push["mid"], push["goal"]]):
                     why.append(f"{ptag}: push fingertips out of the head camera frame along pre / arc")
                     continue
-                # the push pre-contact lies 10 cm along -a from E_low (the low *side* of the target), i.e. alongside the hull
-                # with ~2 cm of air: the target is removed for it as for the contact poses (the approach pre -> init runs along
-                # the side and the pads only meet the target at init; documented relaxation of §3.6 for the wall push)
+                # the push pre-contact lies 10 cm back along the corner's tangent, in the target's plane beside the hull: the
+                # target is removed for it as for the contact poses (the approach pre -> init runs along the tangent and the
+                # finger meets the target at init; documented relaxation of §3.6 for the wall push)
                 r_pre = self.ikc.exact([push["pre"]], manip, push_arm, ignore_for_last=[target] + wall, q_seed=q_seed, cache=False)
                 if not r_pre.ok:
                     alone = self.ikc.exact([push["pre"]], manip, push_arm, ignore_for_last=[target] + wall, q_seed=q0, cache=False)
@@ -897,8 +984,10 @@ class AlignmentWall(SamplerV2):
         P0.connect(self, init, manip, float(self.param("path_max_m", P0.PATH_MAX_M)))
         tname = self.tname
         self.sidecar.add_contact(ContactRecord("push", push_arm, push["pre"], push["init"], push["mid"], push["goal"], geo["push"]["direction"], geo["push"]["distance"],
-                                               object=tname))
-        self.sidecar.add_contact(ContactRecord("brace", brace_arm, b["pre"], b["pose"], direction=b["a"], brace_kind=b["kind"], object=tname))
+                                               object=tname, extras={"contact_face": "finger_side", "wrist": push.get("wrist")}))
+        # the stop stands at the GOAL edge already (brace_point on the level pose): the oracle keeps it where it is recorded
+        self.sidecar.add_contact(ContactRecord("brace", brace_arm, b["pre"], b["pose"], direction=b["a"], brace_kind=b["kind"], object=tname,
+                                               extras={"contact_face": "finger_side", "placed_at": "goal", "wrist": b.get("wrist")}))
         self.sidecar.waypoint_policy = "push arc: screening at δ/2, exact at init and goal; brace: exact pre / approach / contact; wall-present margin-0 re-check of every contact configuration"
 
     # ------------------------------------------------------------------ pipeline hooks (§5.5 Phase 3)

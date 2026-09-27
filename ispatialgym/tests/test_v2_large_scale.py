@@ -430,6 +430,98 @@ def test_wall_frame_written_per_model_and_never_defaulted():
     assert GI.write_wall_frame({}, "alignment-world_vertical", "x", "y", {"frame_front": "", "frame_up": ""}) == {}
 
 
+def _wall_stub(gap=0.003):
+    """An AlignmentWall without a simulator: the painting_s070 box (2.91 × 35.1 × 29.3 cm, front +x / up +z), its COM at
+    the box centre, the wall spot of the first-demo instance (normal −y)."""
+    S = object.__new__(AW.AlignmentWall)
+    t, w, h = 0.0291, 0.351, 0.293
+    S.hull = th.tensor([[sx * t / 2, sy * w / 2, sz * h / 2] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)])
+    S.com_local = th.zeros(3)
+    S.front, S.side, S.up = AW.frame_axes("+x", "+z")
+    gen = {"wall_gap_m": gap, "contact_extreme_band_m": 0.03, "brace_offset_m": 0.005, "brace_clearance_m": 0.02,
+           "brace_kinds": ["below_high", "above_low", "side_high"]}
+    S.param = lambda k, d=None, v1=None: gen.get(k, d)
+    spot = {"point": th.tensor([17.507, 3.94606, 1.449]), "normal": th.tensor([0.0, -1.0, 0.0]), "hang_z": 1.449, "wall_protrusion_m": 0.004}
+    return S, spot, (t, w, h)
+
+
+def test_wall_target_hangs_against_the_wall():
+    """Owner 2026-09-27 (first-demo v1.2 review, 0926-065156): the painting hung 1 cm off the wall by construction
+    (thickness/2 + 1 cm). Its back now stands ``wall_gap_m`` in front of the most protruding wall point of the patch."""
+    S, spot, (t, w, h) = _wall_stub()
+    for deg in (0.0, 20.0, -23.97):
+        p, q = S.hang_pose(spot, math.radians(deg))
+        back = (S.hull @ C.quat_to_mat(q).T + p) @ -spot["normal"]
+        wall = float(spot["point"] @ -spot["normal"])
+        assert wall - float(back.max()) == pytest.approx(0.004 + 0.003, abs=1e-5)  # protrusion + gap, at every tilt
+    assert S.depth_extents() == (pytest.approx(t / 2), pytest.approx(t))
+
+
+def test_wall_contacts_act_in_the_wall_plane():
+    """Owner 2026-09-27 (0926-065156): push and brace act in the wall plane. The fingers point into the wall at every push
+    and brace pose, the pads close in the wall plane (a finger's outer side meets the edge, its normal in the plane), every
+    pre-contact lies in the contact's plane (the approach slides along the wall), the fingertips never pass the target's
+    mid-plane (the fist stays off the wall), and the push carries the low end's CORNER: the finger side stands square to
+    the corner's circle tangent at init and along the arc."""
+    S, spot, (t, w, h) = _wall_stub()
+    n = spot["normal"]
+    for deg in (-23.97, 23.97, -15.0, 25.0):
+        delta = math.radians(deg)
+        geo = S.contacts_for(spot, delta)
+        corner, tangent = geo["E_push"], geo["push"]["direction"]
+        assert float(corner[2]) == pytest.approx(float(geo["hull_tilted"][:, 2].min()), abs=1e-4)  # the lowest point = the low end's corner
+        assert float(tangent[2]) > 0 and abs(float(th.dot(tangent, n))) < 1e-6  # the corner rises, in the wall plane
+        assert geo["push"]["arm"] == ("right" if deg < 0 else "left")  # the arm on the low end's side
+        mid_depth = float(geo["C"] @ -n)
+        for v in geo["push"]["variants"]:
+            for key in ("pre", "init", "mid", "goal"):
+                p, q = v[key]
+                a, c = C.approach_axis(q), C.closing_axis(q)
+                assert float(th.dot(a, -n)) >= math.cos(math.radians(26.0)) - 1e-6, f"{v['wrist']} {key}: the fingers do not point into the wall"
+                assert abs(float(th.dot(c, n))) < 1e-5, f"{v['wrist']} {key}: the pads do not close in the wall plane"
+                assert float(C.fingertip(v[key]) @ -n) <= mid_depth + 1e-5  # the fingertips on the mid-plane, off the wall
+            assert abs(float(th.dot(v["pre"][0] - v["init"][0], n))) < 1e-6  # in-plane approach
+            assert float(th.dot(v["init"][0] - v["pre"][0], tangent)) == pytest.approx(C.PRE_DIST, abs=1e-5)
+            assert abs(abs(float(th.dot(C.closing_axis(v["init"][1]), tangent))) - 1.0) < 1e-5  # the finger side square to the tangent
+        for b in geo["braces"]:
+            a, c = C.approach_axis(b["pose"][1]), C.closing_axis(b["pose"][1])
+            assert float(th.dot(a, -n)) >= math.cos(math.radians(26.0)) - 1e-6 and abs(float(th.dot(c, n))) < 1e-5
+            assert abs(float(th.dot(b["pre"][0] - b["pose"][0], n))) < 1e-6 and abs(float(th.dot(b["a"], n))) < 1e-6
+            assert b["kind"] in AW.BRACE_KINDS and S.brace_clear(geo, b)
+
+
+def test_wall_push_finger_side_carries_the_corner():
+    """With the gripper assets: the closed fist's hull at the recorded push poses overlaps the (rotating) painting by < 1 mm
+    at init, δ/2 and the goal (the corner sits CORNER_ON_FACE_M on the finger side, the target's two edges recede from the
+    finger), and is clear of it at the pre-contact."""
+    from ispatialgym.oracle import r1pro_model as M
+
+    pts = M.finger_points_eef(C.FINGER_CLOSED, "right")
+    if pts is None:
+        pytest.skip("robot assets unavailable")
+    fist = th.tensor(pts, dtype=th.float32)
+    S, spot, (t, w, h) = _wall_stub()
+    half = th.tensor([t / 2, w / 2, h / 2])
+
+    def overlap(pose_f, pose_o):
+        world = fist @ C.quat_to_mat(pose_f[1]).T + pose_f[0]
+        loc = (world - pose_o[0]) @ C.quat_to_mat(pose_o[1])
+        return float((half - loc.abs()).min(dim=1).values.max())
+
+    n = spot["normal"]
+    for deg in (-23.97, 18.0):
+        delta = math.radians(deg)
+        geo = S.contacts_for(spot, delta)
+        p0, q0 = geo["pose_tilted"]
+        for v in geo["push"]["variants"]:
+            assert overlap(v["pre"], geo["pose_tilted"]) < -0.02
+            for frac in (0.0, 0.5, 1.0):
+                rot = C.quat_from_axis_angle(n, -delta * frac)
+                pose_o = (geo["C"] + C.quat_rotate(rot, p0 - geo["C"]), C.qmul(rot, q0))
+                pose_f = (geo["C"] + C.quat_rotate(rot, v["init"][0] - geo["C"]), C.qmul(rot, v["init"][1]))
+                assert overlap(pose_f, pose_o) < 0.001, f"{v['wrist']} at {frac}: the fist overlaps the target"
+
+
 def test_brace_order():
     assert AW.brace_candidate_order(height=0.6, width=0.8) == ["below_high", "above_low", "side_high"]
     assert AW.brace_candidate_order(height=0.1, width=0.8) == ["below_high", "above_low"]  # side_high needs height >= width/2

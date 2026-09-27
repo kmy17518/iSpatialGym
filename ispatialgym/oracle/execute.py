@@ -2475,6 +2475,8 @@ def brace_targets_at_goal(contact, state, cfg: ExecuteConfig, fraction: float = 
     initial pose, though before the goal."""
     if cfg.brace_at_goal_gap_m < 0 or getattr(contact, "kind", None) not in HINGE_BRACE_KINDS:
         return None
+    if (getattr(contact, "extra", None) or {}).get("placed_at") == "goal":
+        return None  # the sampler placed the stop at the goal edge already (a second rotation would move it off the target)
     fraction = min(max(float(fraction), 0.0), 1.0)
     if fraction <= 0.0:
         return None
