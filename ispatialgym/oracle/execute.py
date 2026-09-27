@@ -1970,8 +1970,6 @@ def push_tangent(geom: PushGeometry, pose) -> th.Tensor:
 
 #: length of the closed fingers' section from the tip to the palm (m; ``sampling.v2.tabletop.PALM_FROM_TIP`` = FINGER_PROFILE[-1][0])
 PALM_FROM_TIP_M = 0.07
-#: the closed fingers' thinnest half extent: the side half width at the tips (m; ``sampling.v2.tabletop.FINGER_SIDE_PROFILE[0][1]``)
-BLADE_TIP_HALF_M = 0.007
 
 
 def _pitched_blade(motions: Motions, state, arm: str, targets: Dict[str, Any], pitch: float) -> Optional[Dict[str, Any]]:
@@ -2617,50 +2615,9 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
                 ctx["brace_touch_stop"] = {"steps": k, "moved_m": moved, "backoff_m": cfg.brace_touch_backoff_m}
                 yield from motions.arm_along(arm, [here, back])
                 break
-        x_b = getattr(action.contact, "extra", None) or {}
-        if not ctx.get("brace_touch_stop") and x_b.get("blade_closing") == "edge_on" and x_b.get("blade_half_thickness_m") is not None:
-            yield from _seek_brace_face(action, motions, state, obj, x_b, cfg, ctx)
     else:
         yield from motions.arm_along(arm, targets["approach"], loaded=True)
     _hook(ctx, "fov")(False)  # the contact span ends with the contact leg (the brace then holds still)
-
-
-def _seek_brace_face(action: Brace, motions: Motions, state, obj: str, extra: Dict[str, Any], cfg: ExecuteConfig, ctx: Dict[str, Any]) -> Iterator[th.Tensor]:
-    """An EDGE-ON blade (the fingers' narrow side toward the face, the two-flap lever's stop) was placed with the plate's long side
-    (``blade_half_thickness_m``, 18 mm), but beside the face below the rim the closed fingers reach only ~7 mm (visual) / ~11 mm
-    (collision hull) toward it: the blade stood 9-10 mm off the wall and the box slid that far under the lever before the stop caught
-    it (0922-153357 ... 0926-073750). The blade goes on along the brace direction by what the thinnest section may leave open, watched
-    like the approach (the hand touching the object, or the object moving ``brace_touch_stop_m``), and rests the recorded stop
-    clearance off the face it met."""
-    arm = action.contact.arm
-    clear = float(extra.get("stop_clearance_m") or 0.0)
-    seek = float(extra["blade_half_thickness_m"]) + clear - BLADE_TIP_HALF_M
-    if seek <= clear:
-        return
-    d_b = C.unit(C.as_tensor(action.contact.direction).reshape(-1)[:3].float())
-    here = as_world_pose(state.eef_pose(arm))
-    target = state.object(obj)
-    p0 = C.as_tensor(state.object_pose(obj)[0]).float().clone()
-    gen = motions.arm_along(arm, [(here[0] + d_b * seek, here[1])], loaded=True, speed=cfg.push_speed_arc)
-    k, touched, moved = 0, None, 0.0
-    for a in gen:
-        yield a
-        k += 1
-        moved = float(th.linalg.norm(C.as_tensor(state.object_pose(obj)[0]).float() - p0))
-        if any(o is target for o in (getattr(state, "hand_contacts", lambda _arm: [])(arm) or [])):
-            touched = "contact"
-        elif moved > cfg.brace_touch_stop_m:
-            touched = "moved"
-        if touched is not None:
-            gen.close()
-            break
-    stop = as_world_pose(state.eef_pose(arm))
-    if touched is not None and clear > 0:
-        yield from motions.arm_along(arm, [(stop[0] - d_b * clear, stop[1])])
-    ctx["brace_seek"] = {"seek_m": round(seek, 4), "travel_m": round(float(th.dot(stop[0] - here[0], d_b)), 4), "steps": k, "touched": touched,
-                         "moved_m": round(moved, 4), "backoff_m": clear if touched is not None else 0.0}
-    log.info("brace(%s): the edge-on blade sought the face %.1f mm on along its direction (%s after %d steps, object moved %.1f mm)", obj,
-             1000 * ctx["brace_seek"]["travel_m"], touched or "no touch", k, 1000 * moved)
 
 
 def post_brace(action: Brace, state, targets, ctx) -> Optional[str]:
@@ -2746,22 +2703,7 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
         else:
             gen = motions.base_follow_hybrid(targets["follow_path"], action.arm, axis=axis)
     else:
-        live = _live_hinge(state, art)
-        fixed = getattr(state.object(art.object), "fixed_base", None) if hasattr(state, "object") else None
-        free = fixed is not None and not bool(fixed)
-        if free and live is not None and targets.get("handle_poses") and hasattr(motions, "arm_arc_closed_loop"):
-            # a free-standing object (owner 2026-09-27, blender_eyedvd 0927-014528): the hand follows the lid's arc CLOSED-LOOP about
-            # its live hinge, as the sequential arm segments do - streamed open-loop through the recorded handle poses, any mismatch
-            # with the lid's real arc wound the arm up 0.056 rad against the grasp and the unwind that released it tipped the body
-            # 2.6 deg; a fixed-base appliance takes that strain without moving and keeps the recorded path
-            h_end = (getattr(art, "extra", None) or {}).get("follow_to")
-            q_to_hand = art.q_at(float(h_end)) if h_end is not None else art.q_goal
-            note["closed_loop"] = {"hinge": [round(float(v), 4) for v in live[0].tolist()], "axis": [round(float(v), 4) for v in live[1].tolist()], "q_to": float(q_to_hand)}
-            gen = motions.arm_arc_closed_loop(action.arm, live[0], live[1], as_world_pose(targets["handle_poses"][-1]),
-                                              lambda: float(state.joint_position(art.object, art.joint)), float(q_to_hand),
-                                              speed=motions.cfg.follow_eef_speed, band_rad=cfg.follow_arm_band_rad)
-        else:
-            gen = motions.arm_along(action.arm, targets["handle_poses"], converge=False)
+        gen = motions.arm_along(action.arm, targets["handle_poses"], converge=False)
     k = 0
     stopping = 0
     q_phase0 = None

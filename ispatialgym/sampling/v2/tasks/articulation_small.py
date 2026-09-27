@@ -1852,11 +1852,13 @@ class ArticulationSmall(SamplerV2):
             for pitch_deg in [float(v) for v in self.gen("v4_fist_pitches_deg", [0.0, 15.0, 25.0])]:
                 pa = math.radians(pitch_deg)
                 a_w = C.unit(a_h * math.cos(pa) - z * math.sin(pa))
-                # the pads close horizontally (along the seam at yaw 0); eef x = c x a = +z: the wrist camera's 8 cm protrusion (the
-                # gripper's +x side, r1pro.urdf left_realsense_joint) points UP, away from the box (owner: "wrist camera protrusion to the top")
-                c_flat = C.unit(th.cross(a_h, z, dim=0))
+                # the wrist camera's protrusion sits on the eef's -x / -c side (``iors_small.HAND_SPHERES_EEF``: x -5.6 cm, c 0 ... -5.7 cm,
+                # 7.6 cm behind the tips) and points UP, away from the box (owner: "wrist camera protrusion to the top"): flat (pads closing
+                # along the seam) eef x = c x a = -z, on edge c = -z. With eef x = +z / c = +z it hung below the fist and rode on the pressed
+                # flap during the slide: the flap hit its stop and the box was dragged 5-12 mm (carton lever 0926-073750, every lever run)
+                c_flat = C.unit(th.cross(z, a_h, dim=0))
                 h_flat, h_edge = float(self.gen("v4_fist_half_height_m", 0.016)), float(self.gen("v4_fist_half_height_edge_m", 0.022))
-                for roll_name, c_w, h_half in (("flat", c_flat, h_flat), ("edge", z, h_edge)):
+                for roll_name, c_w, h_half in (("flat", c_flat, h_flat), ("edge", -z, h_edge)):
                     q_fist = C.eef_quat(a_w, c_w)
                     # (1) the press: the fingertip region on the left flap d_press left of the seam, the fist h_half above the top face
                     tip_press = seam_pt + left_h * d_press + z * (0.5 * t_flap + 0.002 + h_half)
