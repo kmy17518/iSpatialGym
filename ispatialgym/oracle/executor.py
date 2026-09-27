@@ -1333,6 +1333,11 @@ class Executor:
             log.warning("action %d %s attempt %d failed: %s", index, action.name, k, verdict)
             if verdict.category in ("protected_contact", "protected_moved"):
                 self._protect_force.add(index)  # the retry re-plans the transit via the point above its goal (oracle.protection)
+            if (ctx.get("grasp_support_lift") or {}).get("applied") and self.motions is not None:
+                # first-demo v2.1 A3: a grasp lifted off its support failed - the retry runs the recorded grasp
+                if not hasattr(self.motions, "support_lift_refused"):
+                    self.motions.support_lift_refused = set()
+                self.motions.support_lift_refused.add(index)
             if k < self.cfg.retries:
                 # roll back: the failed attempt leaves no trace in the demo (kept under rollbacks), retry from the checkpoint
                 if self.recorder is not None:

@@ -66,23 +66,30 @@ def test_a3_grasp_kept_when_clear_or_when_the_pads_would_leave_the_object(monkey
     assert ctx == {}
 
 
-def test_a3_grasp_kept_when_the_lifted_grasp_leaves_the_witness_branch(monkeypatch):
-    """Sandal 0927-030120 replayed: the lifted grasp lay 3.2 rad away in another IK branch and the approach's finish was refused."""
+def test_a3_grasp_kept_when_the_lifted_approach_does_not_track_or_failed_before(monkeypatch):
+    """Sandal 0927-030120 replayed on a pod: its pre-grasp and grasp witnesses lie in different IK branches; the approach to the grasp
+    lifted 13.7 mm stalled at waypoint 8 / 12 and the finish toward the grasp witness (3.1 rad away) was refused, twice."""
     action, state, targets = _grasp_setup()
-    state.object = lambda name: SimpleNamespace(aabb=(th.tensor([0.5, -0.05, 0.80]), th.tensor([0.6, 0.05, 0.86])))
     monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.794)
-    monkeypatch.setattr(EX, "contact_ignores", lambda state, name, extra=(): [])
     seen = {}
 
-    def reach(motions, arm, pose, q_hint, ignore=()):
-        seen["z"] = float(pose.position[2])
+    def tracks(motions, arm, q_hint, poses):
+        seen["z"] = [float(p.position[2]) for p in poses]
         return False
 
-    monkeypatch.setattr(EX, "_reachable_near", reach)
+    monkeypatch.setattr(EX, "_approach_tracks", tracks)
     ctx = {}
     assert EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig()) is targets
-    assert not ctx["grasp_support_lift"]["applied"] and "IK branch" in ctx["grasp_support_lift"]["reason"]
-    assert seen["z"] == pytest.approx(targets["grasp"].position[2] + 0.010, abs=1e-6)
+    assert not ctx["grasp_support_lift"]["applied"] and "does not track" in ctx["grasp_support_lift"]["reason"]
+    assert seen["z"][0] == pytest.approx(targets["pre_grasp"].position[2] + 0.010, abs=1e-6) and seen["z"][-1] == pytest.approx(targets["grasp"].position[2] + 0.010, abs=1e-6)
+    # a lifted grasp whose attempt failed: the retry of that action runs the recorded grasp
+    monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
+    ctx = {"protect": {"index": 7}}
+    assert EX.lift_grasp_off_support(action, SimpleNamespace(support_lift_refused={7}), state, targets, ctx, EX.ExecuteConfig()) is targets
+    assert not ctx["grasp_support_lift"]["applied"] and "previous attempt" in ctx["grasp_support_lift"]["reason"]
+    ctx = {"protect": {"index": 8}}
+    assert EX.lift_grasp_off_support(action, SimpleNamespace(support_lift_refused={7}), state, targets, ctx, EX.ExecuteConfig())["grasp"] is not targets["grasp"]
+    assert ctx["grasp_support_lift"]["applied"]
 
 
 def _place_setup(hang_extra):

@@ -1167,28 +1167,29 @@ def _raised(pose, dz: float) -> Pose:
     return Pose(position=[float(p[0]), float(p[1]), float(p[2]) + float(dz)], orientation=[float(v) for v in q.tolist()])
 
 
-def _reachable_near(motions: Optional[Motions], arm: str, pose, q_hint, ignore: Sequence[Any] = ()) -> Optional[bool]:
-    """Whether the backend's collision-aware IK (world minus ``ignore``) reaches ``pose`` within ``witness_refine_max_jump`` of
-    ``q_hint``'s arm joints - the IK branch the recorded approach runs in (the current configuration without a hint); None without
-    a backend IK (the test stubs)."""
+def _approach_tracks(motions: Optional[Motions], arm: str, q_hint, poses: Sequence[Any]) -> Optional[bool]:
+    """Whether the differential IK tracks the straight legs through ``poses`` (a lifted pre-grasp, its approach, the lifted grasp)
+    from ``q_hint``'s arm joints - the pre-grasp witness the transit ends in and the approach leaves from (the current configuration
+    without a hint), as ``Motions.arm_along`` will; None without a backend (the test stubs)."""
     backend = getattr(motions, "backend", None)
-    solve_ik = getattr(backend, "solve_ik", None)
+    solve = getattr(backend, "solve_ik_path", None)
     robot = getattr(motions, "robot", None)
-    if solve_ik is None or robot is None:
+    if solve is None or robot is None or not poses:
         return None
+    cfg = motions.cfg
     try:
         q0 = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
         idx = robot.arm_control_idx[arm]
         if q_hint is not None:
             q0[idx] = C.as_tensor(q_hint).reshape(-1).float()[idx]
-        backend.update_world(ignore_objects=list(ignore))
-        sol = solve_ik(f"{arm}_arm", {M.EEF_LINK[arm]: as_world_pose(pose)}, q_seed=q0, sync_world=False)
+        start = backend.fk([M.EEF_LINK[arm]], q0)[M.EEF_LINK[arm]]
+        dense = motions._densify(as_world_pose(start), [as_world_pose(p) for p in poses])
+        res = solve(f"{arm}_arm", [{M.EEF_LINK[arm]: p} for p in dense], q_start=q0, pos_tol=cfg.diff_ik_pos_tol, rot_tol=cfg.diff_ik_rot_tol,
+                    max_iters=cfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=cfg.diff_ik_soft_pos_tol_free)
     except Exception as e:  # noqa: BLE001
-        log.debug("reach probe of %s failed (%r)", arm, e)
+        log.debug("approach probe of %s failed (%r)", arm, e)
         return None
-    if sol is None:
-        return False
-    return float(th.max(th.abs(C.as_tensor(sol).reshape(-1).float()[idx] - q0[idx]))) <= float(motions.cfg.witness_refine_max_jump)
+    return bool(res.success)
 
 
 def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Dict[str, Any]:
@@ -1198,9 +1199,11 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     resting on a support must not put a finger below the object's lowest point - nothing of the hand fits there. When the finger
     envelope at the grasp pose reaches below the object's bottom + ``grasp_support_clearance_m``, the grasp, its pre-grasp and approach
     are lifted by the deficit along world z, provided the pads' fingertip-side end stays ``grasp_support_pad_margin_m`` below the
-    object's top and the lifted grasp is reached in the grasp witness's IK branch (``_reachable_near``; sandal 0927-030120 replayed:
-    the 13.7 mm lifted grasp lay 3.2 rad away in another branch and the approach's finish was refused) - else the recorded grasp
-    runs. ``ctx["grasp_support_lift"]`` records the facts."""
+    object's top and the lifted approach tracks from the pre-grasp witness the approach leaves from (``_approach_tracks``; sandal
+    0927-030120 replayed on a pod: its pre-grasp and grasp witnesses lie in different IK branches, the approach to the grasp lifted
+    13.7 mm stalled at waypoint 8 of 12 and its finish toward the grasp witness, 3.1 rad away, was refused) - else the recorded grasp
+    runs; a lifted grasp whose attempt failed is not lifted on the retry (``Executor.run_action`` keeps ``support_lift_refused``).
+    ``ctx["grasp_support_lift"]`` records the facts."""
     if action.kind != "library" or targets.get("grasp") is None:
         return targets
     try:
@@ -1222,18 +1225,17 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     if pad_end + need > top - cfg.grasp_support_pad_margin_m:
         rec["reason"] = f"a {need * 1000:.1f} mm lift leaves the pads {(top - pad_end - need) * 1000:.1f} mm below the object's top"
         return targets
-    lifted = _raised(targets["grasp"], need)
-    try:
-        ignore = [state.object(action.object)] + list(contact_ignores(state, action.object))
-    except Exception:  # noqa: BLE001
-        ignore = []
-    if _reachable_near(motions, action.arm, lifted, _witness(ctx, "grasp"), ignore) is False:
-        rec["reason"] = f"the {need * 1000:.1f} mm lifted grasp is not reached in the grasp witness's IK branch"
+    index = (ctx.get("protect") or {}).get("index")
+    if index is not None and index in getattr(motions, "support_lift_refused", ()):
+        rec["reason"] = "the lifted grasp failed the previous attempt of this action: the recorded grasp runs"
         return targets
     out = dict(targets)
-    out["grasp"] = lifted
+    out["grasp"] = _raised(targets["grasp"], need)
     out["pre_grasp"] = _raised(targets["pre_grasp"], need)
     out["approach"] = [_raised(p, need) for p in targets["approach"]]
+    if _approach_tracks(motions, action.arm, _witness(ctx, "pre_grasp"), [out["pre_grasp"]] + list(out["approach"]) + [out["grasp"]]) is False:
+        rec["reason"] = f"the approach to the {need * 1000:.1f} mm lifted grasp does not track from the pre-grasp witness: the recorded grasp runs"
+        return targets
     rec.update({"applied": True, "lift_m": round(need, 4)})
     log.info("grasp(%s): the finger envelope reaches %.1f mm below the object's bottom + %.0f mm: the grasp is lifted by that", action.object,
              need * 1000, cfg.grasp_support_clearance_m * 1000)
