@@ -166,6 +166,21 @@ def follow_mode_by_class(cls: str, joint_type: str, axis_world) -> str:
     return follow_mode(joint_type, axis_world)
 
 
+def base_follow_policy(configured: Any, direction: str, cls: str) -> str:
+    """Policy of a hybrid follow that has to move the base (the arm alone cannot do it from the stance): the alias's
+    ``generation.hybrid_follow.policy`` when it names one; else ``sequential`` - pull with the arm, move the base with the
+    door stationary and the hand off the handle, pull again (owner 2026-09-27, dishwasher close 0926-065206: arm -> base ->
+    arm as the open large-scale aliases, never the base driving while the hand pulls / pushes the door) - wherever the
+    oracle drives the recorded follow with the hand on the handle. A room door's close is pushed shut instead
+    (``programs.program_articulation_large`` -> ``push_close``): its follow is a sampling gate only and keeps the knob's
+    default."""
+    if configured:
+        return str(configured)
+    if direction == "close" and cls == "room_door":
+        return str(AH.DEFAULTS["policy"])
+    return "sequential"
+
+
 def axis_is_vertical(axis_world, tol_deg: float = 20.0) -> bool:
     a = th.as_tensor(axis_world, dtype=th.float32)
     a = a / th.linalg.norm(a)
@@ -1240,6 +1255,36 @@ class ArticulationLarge(SamplerV2):
             raise Reject("handle_unreachable", f"closing from {q_init:.3f} needs the arm to reach up to it; the limit from stance {key} is {q_reach:.3f}")
         return float(self.lower), goal_set, info
 
+    def arm_alone_follows(self, manip: Stance, q_init: float, q_goal: float, by_k: Dict[float, C.HandleWaypoint], required: List[float],
+                          arm_reach: Dict[str, bool], arm_q: Dict[str, Optional[th.Tensor]]) -> Tuple[bool, str]:
+        """Whether the arm alone moves the joint through the whole follow from ``manip`` (the oracle's arm follow, no base
+        motion): the grasp pose of every required waypoint has an exact arm IK with the joint there (``arm_reach``); a goal
+        short of the joint's limit is also reached ``reach_margin`` beyond it (the drives' authority for the last
+        centimetres, :data:`REACH_MARGIN`); and the program's retreat after the follow - ``PRE_DIST`` back along -a of the
+        last handle pose - has an IK from the same stance (``reach_check_retreat``, as :meth:`arm_reach_limit`). Returns
+        ``(feasible, the first check that fails)``."""
+        missing = [fraction_key(k) for k in required if not arm_reach.get(fraction_key(k), False)]
+        if missing:
+            return False, f"no arm-only IK at the required waypoints {missing}"
+        k_last = max(required)
+        w = by_k[k_last]
+        sign = 1.0 if q_goal >= q_init else -1.0
+        room = sign * ((self.upper if sign > 0 else self.lower) - q_goal)
+        try:
+            if k_last >= 1.0 and room > 1e-6:
+                q_auth = q_goal + sign * min(self.reach_margin(), room)
+                self.pose_joint(q_auth)
+                if not self.ikc.exact([self.h([q_auth])[0].eef], manip, self.arm, ignore_for_last=[self.target], q_seed=arm_q.get(fraction_key(k_last)), cache=False).ok:
+                    return False, f"no arm-only IK {abs(q_auth - q_goal):.3f} past the goal {q_goal:.3f}"
+            if bool(self.gp.gen("reach_check_retreat", True)):
+                self.pose_joint(w.q)
+                back = self.ikc.exact([C.pre_pose(w.eef, C.PRE_DIST)], manip, self.arm, q_seed=arm_q.get(fraction_key(k_last)), cache=False)
+                if not back.ok:
+                    return False, f"the retreat from h(q = {w.q:.3f}): {back.reason}"
+        finally:
+            self.pose_joint(q_init)
+        return True, ""
+
     def _solve_from(self, manip: Stance, init: Stance, q_init: float, q_goal: float, wps: List[C.HandleWaypoint], required: List[float],
                     contact: P0.ContactSpec, h0: C.HandleWaypoint, goal_set: Optional[List[float]] = None, reach_info: Optional[Dict[str, Any]] = None) -> Draft:
         """Steps 5–6 of §5.2 for one drawn manipulation stance plus the §5.3 base-follow feasibility; fills the sidecar
@@ -1257,12 +1302,14 @@ class ArticulationLarge(SamplerV2):
         fractions = list(self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS))
         by_k = {k: w for (k, _), w in zip(waypoint_values(q_init, q_goal, fractions), wps[1:])}
         arm_reach: Dict[str, bool] = {}
+        arm_q: Dict[str, Optional[th.Tensor]] = {}
         try:
             for k in fractions:
                 w = by_k[k]
                 self.pose_joint(w.q)
                 res = self.ikc.exact([w.eef], manip, self.arm, ignore_for_last=[obj], q_seed=q_star, cache=False)
                 arm_reach[fraction_key(k)] = bool(res.ok)
+                arm_q[fraction_key(k)] = res.q if res.ok else None
         finally:
             self.pose_joint(q_init)
         # the primary mode decides ``handle_reach`` (F6: every followed waypoint must be reachable in the recorded mode):
@@ -1271,10 +1318,23 @@ class ArticulationLarge(SamplerV2):
         base_follow: Optional[Dict[str, List[float]]] = None
         follow_path: Optional[Dict[str, Any]] = None  # hybrid: the dense base + arm path (``articulation.base_follow_path``)
         mode, base_follow_reason = self.mode, None
+        arm_alone: Optional[Dict[str, Any]] = None
+        if mode == "hybrid":
+            # owner 2026-09-27: arm-only whenever feasible - the hybrid search skips the arm-only step whenever its torso-to-
+            # handle pre-filter says "too far" and moves the base, although the exact IK reaches (0926-065206: 0.63-0.77 m
+            # against the 0.59 m pre-filter, arm_reach all true, the base driven 0.32 m toward the dishwasher with the hand on it)
+            feasible, why_not = self.arm_alone_follows(manip, q_init, q_goal, by_k, required, arm_reach, arm_q)
+            arm_alone = {"feasible": feasible, "why_not": why_not or None}
+            if feasible:
+                mode = "arm"
+                log.info("%s: stance %s: the arm alone follows every required waypoint %s and retreats -> follow_mode arm (no base motion)", self.gp.alias,
+                         self._stance_key(manip), [fraction_key(k) for k in required])
         if mode in ("base", "hybrid"):
             try:
                 if mode == "hybrid":
-                    hp = AH.search_follow_path(self, manip, q_star, h0, q_init, q_goal, fractions, required, fraction_key)
+                    policy = base_follow_policy((self.gp.gen("hybrid_follow") or {}).get("policy"), self.direction, self.door_class)
+                    log.info("%s: stance %s: the follow needs the base (%s) -> %s follow search", self.gp.alias, self._stance_key(manip), (arm_alone or {}).get("why_not"), policy)
+                    hp = AH.search_follow_path(self, manip, q_star, h0, q_init, q_goal, fractions, required, fraction_key, policy=policy)
                     base_follow, follow_path = hp.base_follow, hp.to_sidecar(bool(self.gp.gen("hybrid_follow_record_eef", True)))
                 else:
                     base_follow = self._base_follow(manip, q_star, h0, by_k, required, q_init)
@@ -1309,7 +1369,7 @@ class ArticulationLarge(SamplerV2):
                                      "handle": {"kind": self.handle.get("kind"), "classes": list(contact.classes or ()), "width_m": self.handle.get("width"),
                                                 "pinch_sign": float(self.pinch_sign), "bar_offset_m": float(self.bar_offset)},
                                      "required_fractions": [fraction_key(k) for k in required], "arm_reach": arm_reach,
-                                     "primary_follow_mode": self.mode, "base_follow_blocked": base_follow_reason,
+                                     "primary_follow_mode": self.mode, "base_follow_blocked": base_follow_reason, "arm_alone_follow": arm_alone,
                                      # A4: the class and the stance-side rule behind the follow mode; the goal set of this stance
                                      "door_class": self.door_class, "hinge_side": self.hinge_side, "goal_set": [float(s) for s in (goal_set or self.stable)],
                                      "reachable_fraction": reach_info.get("reachable_fraction"), "q_reach": reach_info.get("q_reach"),
@@ -1356,6 +1416,7 @@ class ArticulationLarge(SamplerV2):
         d.summary["base_follow"] = base_follow
         d.summary["follow_mode"] = mode
         d.summary["base_follow_blocked"] = base_follow_reason
+        d.summary["arm_alone_follow"] = arm_alone
         if follow_path is not None:
             d.summary["hybrid_follow"] = dict(follow_path.get("stats") or {})
         return d

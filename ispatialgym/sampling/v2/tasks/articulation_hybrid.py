@@ -1142,15 +1142,20 @@ class FollowSearch:
 
 
 def search_follow_path(s, manip: Stance, q_star: th.Tensor, h0: C.HandleWaypoint, q_init: float, q_goal: float, fractions: Sequence[float],
-                       required: Sequence[float], fraction_key) -> HybridPath:
+                       required: Sequence[float], fraction_key, policy: Optional[str] = None) -> HybridPath:
     """The single entry point of the sampler (``ArticulationLarge._solve_from``): the hybrid path from q_init to the last
-    required §5.3 waypoint. ``fraction_key`` = ``articulation_large.fraction_key`` (the sidecar key of a fraction)."""
+    required §5.3 waypoint. ``fraction_key`` = ``articulation_large.fraction_key`` (the sidecar key of a fraction);
+    ``policy`` = the follow policy the caller resolved (``articulation_large.base_follow_policy``) over
+    ``generation.hybrid_follow.policy``."""
     if not required:
         raise Reject("hybrid_follow_infeasible", "no required waypoint to follow")
     k_last = max(float(k) for k in required)
     q_last = float(q_init) + k_last * (float(q_goal) - float(q_init))
     marks = {fraction_key(k): float(q_init) + float(k) * (float(q_goal) - float(q_init)) for k in fractions if float(k) <= k_last + 1e-9}
-    fs = FollowSearch(s, manip, q_star, h0, q_init, q_goal)
+    gen = dict(s.gp.gen("hybrid_follow") or {})
+    if policy is not None:
+        gen["policy"] = str(policy)
+    fs = FollowSearch(s, manip, q_star, h0, q_init, q_goal, gen=gen)
     step = math.radians(float(fs.k["step_revolute_deg"])) if s.joint.is_revolute else float(fs.k["step_prismatic_m"])
     q_values = dense_values(q_init, q_last, list(marks.values()), step)
     log.info("%s: %s follow search %s from %.3f to %.3f (%d dense steps of <= %.3f, fractions %s), arm %s, leaf links %s, %d body boxes, reach <= %.2f m", s.gp.alias,

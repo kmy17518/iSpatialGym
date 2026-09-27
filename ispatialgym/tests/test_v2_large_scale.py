@@ -203,6 +203,16 @@ def test_a4_door_class_follow_mode_and_hinge_side():
     assert AL.arm_for_hinge_side("left") == "right" and AL.arm_for_hinge_side("right") == "left"
 
 
+def test_a_follow_that_needs_the_base_is_sequential_where_the_hand_drives_it():
+    # owner 2026-09-27 (dishwasher close 0926-065206): no base motion while the hand pulls / pushes the door
+    assert AL.base_follow_policy(None, "close", "cabinet") == "sequential"
+    assert AL.base_follow_policy(None, "open", "room_door") == "sequential"
+    assert AL.base_follow_policy("sequential", "open", "cabinet") == "sequential"
+    assert AL.base_follow_policy("hybrid", "close", "cabinet") == "hybrid"  # an explicit customs policy wins
+    # a room door's close is pushed shut (push_close): its follow is a sampling gate, the knob's default stays
+    assert AL.base_follow_policy(None, "close", "room_door") == AL.AH.DEFAULTS["policy"]
+
+
 def test_edge_pinch_leaf_plane_approach():
     # office cabinet rvunhj_0 / j_link_2 (B4 edge_door fallback): approach parallel to the pinch axis -> repaired along the leaf toward the hinge
     handle = {"contact": [0.262, -0.0352, -0.1119], "pinch_axis": [1.0, 0.0, 0.0], "approach_dir": [-0.9999, -0.0122, 0.0]}
