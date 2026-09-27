@@ -88,6 +88,14 @@ Tagged states of this repository and what passed on them.
 - **Unit tests** on this commit: 1285 passed; the same 4 known failures as v1.0.
 - **Collected demos:** `runlogs/first-demo-v2.0/` (the 28 runs above copied, `videos/`, `manifest.json`). The videos are also
   linked from `runlogs/pilot_20260915/first_demo_latest_success_videos/manifest.json`.
+- **Pinned for reproduction** (pushed to GitHub):
+  - code: tag `first-demo-v2.0`;
+  - reach bands the sampler read: commit `20c89d11` on this branch;
+  - simulator: tag `ispatialgym-first-demo-v2.0` of `kmy17518/BEHAVIOR-1K` (`14e06b710`). It downloads behavior-1k-assets
+    3.9.0 and robot assets 3.8.2 (the pods); the local machine had 3.9.0rc9 / 3.8.2;
+  - demos: branch `first-demo-v2.0-artifacts` / tag `first-demo-v2.0-demos`, an orphan branch with no code history. It holds
+    the collection and `runlogs/first-demo-v2.0/pins/PIN.json`: package versions, robot-asset checksums, the local sampler
+    cache, and the sweep's ledger rows, job markers and driver.
 - **Known limits at this tag:**
   - **Carton lever pinch:** the first closing does not attach (both pads are on the flap, but no assisted grasp forms within
     60 steps); the retry attaches. Its transit into the witness branch takes the protection's via-above.
