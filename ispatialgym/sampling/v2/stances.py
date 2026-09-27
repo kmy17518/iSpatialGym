@@ -311,11 +311,20 @@ class Stance:
             d["extras"] = _jsonable(self.extras)
         return d
 
+    #: the ``stances.<name>`` keys :meth:`to_sidecar` writes from the stance's own fields; every other key is an extra
+    SIDECAR_FIELDS = ("base_pose2d", "translate", "tilt", "arms", "stand_off", "edge", "lateral", "face", "d", "lambda", "focus", "contacts", "carried",
+                      "idle_posture")
+
     @staticmethod
     def from_sidecar(name: str, d: Dict[str, Any], edge: Optional[EdgeFrame] = None, face: Optional[FaceFrame] = None) -> "Stance":
+        """The stance a written sidecar recorded, with its extras - among them ``arms_q``, the arm joint values the sampler's
+        checks used (:func:`ik.stance_arm_vectors` reads them when there is no recorded ``q``) - ``fingers`` and
+        ``idle_posture``."""
+        extras = {k: v for k, v in d.items() if k not in Stance.SIDECAR_FIELDS}
         return Stance(name, tuple(float(v) for v in d["base_pose2d"]), float(d.get("translate", 0.5)), float(d.get("tilt", 0.0)), d.get("stand_off"),
                       edge, face, float(d.get("lateral", 0.0)), None if d.get("focus") is None else _t(d["focus"]), d.get("arms", "untucked"),
-                      list(d.get("contacts", [])), None, d.get("carried"))
+                      list(d.get("contacts", [])), None, d.get("carried"), extras, None if d.get("fingers") is None else float(d["fingers"]),
+                      d.get("idle_posture"))
 
 
 # ----------------------------------------------------------------------------------------------------------------

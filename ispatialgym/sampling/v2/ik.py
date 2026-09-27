@@ -110,8 +110,10 @@ def stance_arm_vectors(kit, stance: Stance, arms: Optional[str] = None, right_ar
                        fingers: Optional[float] = None) -> Tuple[th.Tensor, th.Tensor, float]:
     """``(right_arm, left_arm, fingers)`` of a stance, in this order of precedence: the explicit arguments, the stance's
     **recorded configuration** ``stance.q`` (§3.3 exceptions: the held-object hold, the camera-relocalization reset arms)
-    and ``stance.fingers``, then per arm: the working arms (``stance.arms`` list) untucked, the idle arm in
-    ``stance.idle_posture`` (A6: untucked / ready / tucked), a posture string ``arms`` / ``stance.arms`` for both."""
+    and ``stance.fingers``, the arm joint values a written sidecar recorded (``arms_q``, a stance loaded by
+    ``Stance.from_sidecar``: what the sampler's checks used, so ``validate_instances`` checks the same arms), then per
+    arm: the working arms (``stance.arms`` list) untucked, the idle arm in ``stance.idle_posture`` (A6: untucked /
+    ready / tucked), a posture string ``arms`` / ``stance.arms`` for both."""
     robot = kit.robot
     if stance.q is not None:
         if right_arm is None:
@@ -120,6 +122,12 @@ def stance_arm_vectors(kit, stance: Stance, arms: Optional[str] = None, right_ar
             left_arm = stance.q[robot.arm_control_idx["left"]].clone()
         if fingers is None and stance.fingers is None:
             fingers = float(stance.q[robot.gripper_control_idx["right"]][0])
+    recorded = (stance.extras or {}).get("arms_q") if stance.q is None else None
+    if recorded:
+        if right_arm is None and recorded.get("right") is not None:
+            right_arm = th.tensor(recorded["right"], dtype=th.float32)
+        if left_arm is None and recorded.get("left") is not None:
+            left_arm = th.tensor(recorded["left"], dtype=th.float32)
     if fingers is None:
         fingers = stance.fingers if stance.fingers is not None else FINGER_OPEN_DEFAULT
     both = POSTURES.get(arms or stance.posture, "untucked")

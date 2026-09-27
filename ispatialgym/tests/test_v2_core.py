@@ -431,6 +431,31 @@ def test_program_check_held_start_leaves_from_the_recorded_configuration():
         assert PC._held_start_q(sampler, stance, g, carried, arm, None, since_init, stance_obj, prev, end) is None
 
 
+def test_loaded_stance_keeps_the_recorded_arms():
+    """``validate_instances`` rebuilds stances from the sidecar: the arm joint values the sampler's checks used (``arms_q``),
+    the fingers and the idle posture come back, and ``stance_arm_vectors`` uses the recorded arms instead of the default
+    postures (a held-object init: the hold and the reset left arm, not both arms untucked - mental_rotation-banana 0002's
+    untucked left arm reached into the gas fireplace)."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+    hold = [-1.3561, -0.0534, 0.5577, -0.5514, -0.0924, -1.044, 1.0925]
+    d = {"base_pose2d": [17.1, -0.7, -1.093], "translate": 0.5, "tilt": 0.0, "arms": ["right"], "carried": "banana.n.02_1", "idle_posture": "untucked",
+         "arms_q": {"right": hold, "left": [0.0] * 7}, "fingers": 0.0228, "hold": {"depth_m": 0.5}}
+    st = Stance.from_sidecar("init", d)
+    assert st.idle_posture == "untucked" and abs(st.fingers - 0.0228) < 1e-9 and st.carried == "banana.n.02_1"
+    assert st.extras["arms_q"]["right"] == hold and st.extras["hold"] == {"depth_m": 0.5} and "base_pose2d" not in st.extras and "idle_posture" not in st.extras
+    untucked = th.full((7,), 0.5)
+    kit = SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": th.arange(7), "left": th.arange(7, 14)}, gripper_control_idx={"right": th.arange(14, 16)}),
+                          arm_q=lambda name, arm: untucked.clone())
+    r, l, f = stance_arm_vectors(kit, st)
+    assert th.allclose(r, th.tensor(hold)) and th.equal(l, th.zeros(7)) and abs(f - 0.0228) < 1e-9
+    bare = Stance.from_sidecar("init", {k: v for k, v in d.items() if k != "arms_q"})  # no record: the default postures
+    r, l, _ = stance_arm_vectors(kit, bare)
+    assert th.equal(r, untucked) and th.equal(l, untucked)
+
+
 def test_program_check_held_start_heads_the_chain():
     """The hand's recorded start pose heads a held-object init's chain when the action's waypoints leave it out (a
     reorient's orbit starts a quarter turn in), so the chain is checked as the draw check's ``[hold] + waypoints``."""
