@@ -1141,6 +1141,17 @@ class Executor:
         return {"index": j, "name": acts[j].name, "object": (tuple(getattr(acts[j], "objects", ()) or ()) or (None,))[0], "chain": chain,
                 "stance": ([float(v) for v in chain[0]["base"]], chain[0]["q"][self.robot.trunk_control_idx]), "margin": min(margins) if margins else None}
 
+    def next_place_kind(self, index: int, action: Grasp) -> Optional[str]:
+        """The kind of the place that puts down what the grasp ``index`` picks (the first ``Place`` of its arm and object before that
+        arm grasps again); None when none follows."""
+        acts = list(self.program_actions)
+        for a in acts[index + 1:]:
+            if isinstance(a, Grasp) and a.arm == action.arm:
+                return None
+            if isinstance(a, Place) and a.arm == action.arm and a.object == action.object:
+                return a.kind
+        return None
+
     def _absorb_branch_decisions(self, index: int, ctx: Dict[str, Any]) -> None:
         """After a travel leg passed: a kept arm's next contact runs on the configurations tracked from it (``_witness_overrides``); an
         arm the leg re-posed to the recorded joints drops them (its next contact runs on the sampler's witnesses)."""
@@ -1248,6 +1259,8 @@ class Executor:
             ctx["witnesses_rebranched"] = {"arm": ov["arm"], "keys": sorted(ov["witnesses"]), "leg": ov["leg"]}
         if isinstance(action, (Transition, Navigate)) and targets.get("arms_q"):
             ctx["next_contact"] = {arm: self.next_contact(index, arm) for arm in targets["arms_q"]}
+        if isinstance(action, Grasp):
+            ctx["next_place_kind"] = self.next_place_kind(index, action)
         ctx["sidecar"] = self.sidecar  # attachment: the correction regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
             # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep

@@ -41,7 +41,7 @@ def _grasp_setup(bottom=0.80, top=0.86):
 def test_a3_grasp_lifted_by_the_finger_deficit_below_the_object(monkeypatch):
     action, state, targets = _grasp_setup()
     monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.794)  # 6 mm under the object's bottom
-    ctx = {}
+    ctx = {"next_place_kind": "support"}
     out = EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig())
     need = 0.80 + EX.ExecuteConfig().grasp_support_clearance_m - 0.794
     assert ctx["grasp_support_lift"]["applied"] and ctx["grasp_support_lift"]["lift_m"] == pytest.approx(need, abs=1e-4)
@@ -81,18 +81,55 @@ def test_a3_grasp_kept_when_the_lifted_approach_does_not_track_or_failed_before(
         return False
 
     monkeypatch.setattr(EX, "_approach_tracks", tracks)
-    ctx = {}
+    ctx = {"next_place_kind": "support"}
     assert EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig()) is targets
     assert not ctx["grasp_support_lift"]["applied"] and "does not track" in ctx["grasp_support_lift"]["reason"]
     assert seen["z"][0] == pytest.approx(targets["pre_grasp"].position[2], abs=1e-6) and seen["z"][-1] == pytest.approx(targets["grasp"].position[2] + 0.010, abs=1e-6)
     # a lifted grasp whose attempt failed: the retry of that action runs the recorded grasp
     monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
-    ctx = {"protect": {"index": 7}}
+    ctx = {"protect": {"index": 7}, "next_place_kind": "support"}
     assert EX.lift_grasp_off_support(action, SimpleNamespace(support_lift_refused={7}), state, targets, ctx, EX.ExecuteConfig()) is targets
     assert not ctx["grasp_support_lift"]["applied"] and "previous attempt" in ctx["grasp_support_lift"]["reason"]
-    ctx = {"protect": {"index": 8}}
+    ctx = {"protect": {"index": 8}, "next_place_kind": "attach"}
     assert EX.lift_grasp_off_support(action, SimpleNamespace(support_lift_refused={7}), state, targets, ctx, EX.ExecuteConfig())["grasp"] is not targets["grasp"]
     assert ctx["grasp_support_lift"]["applied"]
+
+
+def test_a3_grasp_kept_when_the_object_is_dropped_next(monkeypatch):
+    """Sandal 0927-030120 on 503be065: lifted 14 mm at its grasp, the drop landed 9.6 deg / 7 mm off the recorded one and the push
+    under the table turned it 78 deg (v2.0: 2 deg) - a drop does not follow the in-hand pose, so its grasp is not lifted."""
+    action, state, targets = _grasp_setup()
+    monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.794)
+    monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
+    for nxt in ("drop", None):
+        ctx = {"next_place_kind": nxt}
+        assert EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig()) is targets
+        assert not ctx["grasp_support_lift"]["applied"] and "next place" in ctx["grasp_support_lift"]["reason"]
+
+
+def test_executor_next_place_kind_follows_the_grasped_object():
+    from ispatialgym.oracle.executor import Executor
+
+    ex = SimpleNamespace(program_actions=None)
+
+    def grasp(arm, obj):
+        a = EX.Grasp.__new__(EX.Grasp)
+        object.__setattr__(a, "arm", arm)
+        object.__setattr__(a, "object", obj)
+        return a
+
+    def place(arm, obj, kind):
+        a = EX.Place.__new__(EX.Place)
+        for k, v in (("arm", arm), ("object", obj), ("kind", kind)):
+            object.__setattr__(a, k, v)
+        return a
+
+    ex.program_actions = [grasp("right", "sandal"), place("left", "sandal", "support"), place("right", "sandal", "drop"), grasp("right", "cube"),
+                          place("right", "cube", "support")]
+    assert Executor.next_place_kind(ex, 0, ex.program_actions[0]) == "drop"
+    assert Executor.next_place_kind(ex, 3, ex.program_actions[3]) == "support"
+    ex.program_actions = [grasp("right", "sandal"), grasp("right", "cube"), place("right", "sandal", "support")]
+    assert Executor.next_place_kind(ex, 0, ex.program_actions[0]) is None  # the arm grasps again first
 
 
 def _place_setup(hang_extra):
@@ -126,11 +163,10 @@ def test_a3_place_never_lowered_and_only_for_support_places():
     action = SimpleNamespace(kind="attach", object="soap", arm="right")
     ctx = {}
     assert EX.raise_place_for_inhand_pose(action, state, sidecar, targets, ctx, EX.ExecuteConfig()) is targets and ctx == {}
-    # a drop releases where the recorded drop did (sandal 0927-030120: lifted 14 mm at its grasp, dropped 14 mm lower)
-    action, state, sidecar, targets = _place_setup(0.012)
+    action, state, sidecar, targets = _place_setup(0.012)  # a drop: never lifted at its grasp, released as recorded
     ctx = {}
-    out = EX.raise_place_for_inhand_pose(SimpleNamespace(kind="drop", object="soap", arm="right"), state, sidecar, targets, ctx, EX.ExecuteConfig())
-    assert ctx["place_inhand_raise"]["applied"] and out["place"].position[2] == pytest.approx(targets["place"].position[2] + 0.012, abs=1e-5)
+    assert EX.raise_place_for_inhand_pose(SimpleNamespace(kind="drop", object="soap", arm="right"), state, sidecar, targets, ctx, EX.ExecuteConfig()) is targets
+    assert ctx == {}
 
 
 # ------------------------------------------------------------------------------------------------ A1

@@ -1214,7 +1214,10 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     ``support_lift_refused``). The pre-grasp stays where it was recorded, and with it the transit there: the sandal 0927-030120 with
     its pre-grasp lifted too took the transit's via-above into a posture its approach stalled from (13 mm short 4.7 cm before the grasp,
     the finish toward the grasp witness 3.06 rad away refused - 8b572a12 on a pod and locally, both attempts). A vertical approach (the
-    bar soap's) is the same line either way. ``ctx["grasp_support_lift"]`` records the facts."""
+    bar soap's) is the same line either way. Only an object set down or attached next is lifted (``ctx["next_place_kind"]``): those
+    places follow the in-hand pose (``raise_place_for_inhand_pose``, the attach re-aim); a drop does not - the sandal lifted 14 mm
+    landed 9.6 deg / 7 mm off its recorded drop and the push under the table then turned it 78 deg (503be065, local 0927-163758;
+    v2.0: 2 deg). ``ctx["grasp_support_lift"]`` records the facts."""
     if action.kind != "library" or targets.get("grasp") is None:
         return targets
     try:
@@ -1235,6 +1238,11 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
         return targets
     if pad_end + need > top - cfg.grasp_support_pad_margin_m:
         rec["reason"] = f"a {need * 1000:.1f} mm lift leaves the pads {(top - pad_end - need) * 1000:.1f} mm below the object's top"
+        return targets
+    nxt = ctx.get("next_place_kind")
+    if nxt not in ("support", "attach"):
+        rec["reason"] = (f"the object's next place ({nxt}) does not follow its in-hand pose (a drop lands as the release throws it): the "
+                         f"recorded grasp runs")
         return targets
     index = (ctx.get("protect") or {}).get("index")
     if index is not None and index in getattr(motions, "support_lift_refused", ()):
@@ -1257,9 +1265,8 @@ def raise_place_for_inhand_pose(action: Place, state, sidecar, targets: Dict[str
     (``grasps[].eef_in_object``); an object that hangs LOWER in the hand (a grasp that ended higher on it - stopped short on the
     support, 1 cm on the bar soap's tray floor, or lifted by ``lift_grasp_off_support``) was driven into its support by that much, the
     fingertips pressing ~100 N into the destination tray through the release. The pre-place, place, descent and retreat are raised by
-    the difference (z only, never lowered) and the carry ramps up to the raised pre-place; a drop releases where the recorded drop
-    did (the sandal lifted 14 mm at its grasp was dropped 14 mm lower). ``ctx["place_inhand_raise"]`` records it."""
-    if action.kind not in ("support", "drop") or targets.get("place") is None:
+    the difference (z only, never lowered) and the carry ramps up to the raised pre-place. ``ctx["place_inhand_raise"]`` records it."""
+    if action.kind != "support" or targets.get("place") is None:
         return targets
     try:
         obj = state.object(action.object)
@@ -1527,7 +1534,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
     if action.kind == "attach" and action.on:
         targets = _reaim_attach_targets(action, state, targets, ctx, cfg)
-    elif action.kind in ("support", "drop"):
+    elif action.kind == "support":
         targets = raise_place_for_inhand_pose(action, state, ctx.get("sidecar"), targets, ctx, cfg)
     carry = list(targets.get("carry") or ())
     if cfg.carry_leg == "straight" and carry:
