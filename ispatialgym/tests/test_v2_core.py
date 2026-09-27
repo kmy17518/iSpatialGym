@@ -431,6 +431,24 @@ def test_program_check_held_start_leaves_from_the_recorded_configuration():
         assert PC._held_start_q(sampler, stance, g, carried, arm, None, since_init, stance_obj, prev, end) is None
 
 
+def test_program_check_held_start_heads_the_chain():
+    """The hand's recorded start pose heads a held-object init's chain when the action's waypoints leave it out (a
+    reorient's orbit starts a quarter turn in), so the chain is checked as the draw check's ``[hold] + waypoints``."""
+    from types import SimpleNamespace
+
+    start = _pose(0.3)
+    reaches = lambda q, pose, arm: float(th.linalg.norm(pose[0] - start[0])) < 1e-6  # noqa: E731 - FK of q_held is `start`
+    sampler = SimpleNamespace(ikc=SimpleNamespace(reaches=reaches), kit=SimpleNamespace(eef_pose=lambda q, arm="right": start))
+    q_held = th.zeros(28)
+    orbit = [_pose(0.4), _pose(0.5), _pose(0.6)]
+    chain, prepended = PC._with_held_start(orbit, q_held, sampler, "right")
+    assert prepended and len(chain) == 4 and chain[0] is start and chain[1:] == orbit
+    chain, prepended = PC._with_held_start([start] + orbit, q_held, sampler, "right")  # already leaves from the start
+    assert not prepended and len(chain) == 4
+    chain, prepended = PC._with_held_start(orbit, None, sampler, "right")  # not a held start
+    assert not prepended and chain == orbit
+
+
 def test_program_check_tracker_handle_grasp_carries_nothing():
     """Large articulation (Rs_int drawer bamfsz_1): a kind="handle" grasp must not set ``carried`` - the cabinet stays in the
     world, only its handle link follows the hand; library / cube grasps carry their object until the place."""

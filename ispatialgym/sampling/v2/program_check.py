@@ -1296,15 +1296,26 @@ def _held_start_q(sampler, stance, grasp, carried: Optional[str], arm: str, fing
     """The configuration the acting arm starts the program in when it already holds ``carried`` (a held-object init,
     §6.3): the object has been in the hand since the init stance (no grasp action before this one), the recorded stance
     names it as carried, the grasp record puts it in this arm and the arm has not moved yet. The in-hand chain leaves
-    from it, as the sampler's draw check (``waypoints_ok(q_seed=<hold>)``) and the oracle do; a fresh solve of that first
-    pose must meet the joint-limit margin of a chosen witness, which the hold need not (mental_rotation-banana: the hold's
-    wrist joint 6 sits 3 mrad from its limit, so a validator process without the sampler's remembered solutions found a
-    branch with the margin or failed, at random). None otherwise."""
+    from it (:func:`_with_held_start`), as the sampler's draw check (``waypoints_ok([hold] + waypoints, q_seed=<hold>)``)
+    and the oracle do; checked from its first waypoint instead, that waypoint's fresh solve had to meet the joint-limit
+    margin of a chosen witness, which the hold need not (mental_rotation-banana: the hold's wrist joint 6 sits 3 mrad from
+    its limit, so a validator process without the sampler's remembered solutions found a branch with the margin or
+    failed, at random). None otherwise."""
     if not held_since_init or carried is None or grasp is None or getattr(grasp, "arm", None) != arm or stance_obj is not None:
         return None
     if q_seed_prev is not None or q_end_prev is not None or getattr(stance, "carried", None) != carried:
         return None
     return sampler.ikc.q_locked(stance, fingers=fingers).clone()
+
+
+def _with_held_start(chain: List[Any], q_held: Optional[th.Tensor], sampler, arm: str) -> Tuple[List[Any], bool]:
+    """``chain`` leaving from the hand's recorded start pose (FK of the held start ``q_held``, :func:`_held_start_q`),
+    which the action's waypoints leave out - an orbit (a reorient) has no straight-line start to recover - unless the
+    chain already starts there. With ``q_seed = q_held`` the start is then pinned (``IKChecker.exact``) and the chain is
+    checked as the sampler's draw check checks ``[hold] + waypoints``. Returns ``(chain, prepended)``."""
+    if q_held is None or not chain or sampler.ikc.reaches(q_held, chain[0], arm):
+        return list(chain), False
+    return [sampler.kit.eef_pose(q_held, arm)] + list(chain), True
 
 
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
@@ -1382,6 +1393,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     attach_arm = (g.arm if g is not None and g.arm else arm) if carried_obj is not None else None
     # the IK seed / locked-joint source: the stance configuration, with every arm that holds a contact put at it
     q_seed = None
+    q_held: Optional[th.Tensor] = None
     if locked:
         q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
         for a, qa in locked.items():
@@ -1393,7 +1405,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         idx = sampler.kit.robot.arm_control_idx[arm]
         q_seed[idx] = th.as_tensor(q_seed_prev, dtype=th.float32)[idx]
     else:
-        q_seed = _held_start_q(sampler, stance, g, carried, arm, fingers, held_since_init, stance_obj, q_seed_prev, q_end_prev)
+        q_held = q_seed = _held_start_q(sampler, stance, g, carried, arm, fingers, held_since_init, stance_obj, q_seed_prev, q_end_prev)
     if name == "grasp" and getattr(action, "kind", None) == "cube" and getattr(sidecar, "blocks", None):
         # a block's grasp IK is seeded with the sampler's pick configuration (``blocks[].pick_q``): the branch its tracked legs passed in
         pq = _block_pick_q(sidecar, sampler, getattr(action, "object", None))
@@ -1529,6 +1541,10 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             prepend = pre_
                             break
                 chain = ([_chain_starts(poses)[1][0]] if prepend else []) + list(poses)
+                if q_start is None and q_first is None:
+                    chain, held_start = _with_held_start(chain, q_held, sampler, arm)
+                    if held_start:
+                        chain_notes[key] = "leaves from the held object's recorded start configuration"
                 if q_start is not None:
                     # the arm is at the chain's start: tracked from there, as the oracle's arm_along runs it (a reorient has no
                     # finish in the oracle; the free legs are finished within free_leg_finish_max_stall)
