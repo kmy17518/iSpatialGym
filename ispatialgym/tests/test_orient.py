@@ -330,3 +330,62 @@ def test_wrist_twins_pair_and_map_within_one_arm_only():
     got, dec2, _ = O.choose_first(ikc, "right", cands, key=lambda c: c[1][1], label=lambda c: c[0], chain=lambda c: c[1], evaluate=ev, q_start=q_r,
                                   arm_of=lambda c: c[2])
     assert got.proposal.arm == "right" and dec2["arm"] == "right" and dec2["options"][0]["arm"] == "right"
+
+
+def test_close_push_runs_the_preferred_fist_turn_and_falls_back_to_the_other(monkeypatch):
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.tasks.base import Draft
+    from ispatialgym.sampling.v2.ik import IKResult
+    from ispatialgym.sampling.v2.stances import ContactRecord, SidecarDraft, Stance
+    from ispatialgym.sampling.v2.tasks import articulation_small as AS
+
+    ikc = _ikc()
+    handle0 = {"kind": "tip_push", "contact": [0.6, -0.2, 0.8], "approach_dir": [0.0, 0.0, -1.0], "pinch_axis": [0.0, 1.0, 0.0]}
+
+    def handle_waypoints(h, jinfo, qs, pose):
+        eef = (th.tensor(h["contact"]), C.eef_quat(h["approach_dir"], h["pinch_axis"]))
+        return [SimpleNamespace(eef=eef, pre_grasp=C.pre_pose(eef))]
+
+    monkeypatch.setattr(C, "handle_waypoints", handle_waypoints)
+    q_own = _q([0.0, -1.0, 0.0, -1.5, -1.2, 0.0, 0.0])  # the handle's own turn: 2.8 rad of joint 5 from the stance posture
+    q_twin = ikc.twin_q(q_own, "right")  # the twin: 0.34 rad
+
+    def exact(poses, stance, arm="right", *a, **kw):
+        q = q_own if float(C.closing_axis(poses[-1][1])[1]) > 0 else q_twin
+        for p in poses:
+            ikc.solutions[(arm, ikc._pose_key(p))] = q.clone()
+        return IKResult(True, q.clone(), "", len(poses))
+
+    ikc.exact = exact
+    ikc.q_locked = lambda stance, **kw: _q([0.0, -1.0, 0.0, -1.5, 1.6, 0.0, 0.0])
+    manip = Stance("manipulation", (0.0, 0.0, 0.0), 0.5, 0.0)
+    init = Stance("init", (0.0, 0.0, 0.0), 0.5, 0.0)
+    runs = []
+    stub = SimpleNamespace(handle=handle0, _close_push_handle0=handle0, handle_arm="right", q_init=0.5, jinfo={}, all_jinfo={}, joint_name="j", ikc=ikc,
+                           kit=SimpleNamespace(sync_world=lambda: None), sidecar=SidecarDraft("a", "f"), _set_joint=lambda t, q: None, _set_named_joint=lambda t, n, q: None)
+    stub._pinch_variants = lambda h: AS.ArticulationSmall._pinch_variants(stub, h)
+
+    def flow(rng, d, init_, manip_, k, target, support, pose, cam_init):
+        runs.append((stub.handle["pinch_axis"], manip_.name, dict(manip_.extras), len(stub.sidecar.contacts)))
+        manip_.name, manip_.extras["second_stance"] = "manipulation2", True
+        stub.sidecar.add_contact(ContactRecord("push", "right", None, None, None, None, None, 0.1, object="t"))
+        if stub.handle["pinch_axis"][1] < 0:
+            raise Reject("push_unreachable", "the twin fist covers no arc from any stance")
+        return d
+
+    stub._close_push_flow = flow
+    target = SimpleNamespace(joints={"j": None})
+    d = Draft()
+    out = AS.ArticulationSmall._sample_with_close_push(stub, None, d, init, manip, 0, target, "support", None, None)
+    assert [r[0][1] for r in runs] == [-1.0, 1.0], "the twin (easier to reach) first, the handle's own turn after its flow rejected"
+    assert runs[1][1:] == ("manipulation", {}, 0), "the second flow starts from the untouched stance and an empty sidecar"
+    assert out is not d, "the second flow fills a fresh draft"
+    dec = out.summary["close_push_orient"]
+    assert dec["chosen"] == "fist [0.0, 1.0, 0.0]" and dec["against_default"] is False and dec["reason"] == "only feasible" and dec["arm"] == "right"
+    assert any(o.get("why", "").startswith("downstream: [push_unreachable]") for o in dec["options"])
+    assert stub.sidecar.contacts["push"].extras["orient"] is dec and stub.handle["pinch_axis"][1] > 0
+    # both turns reject: the preferred turn's reason, with the other's message
+    stub._close_push_flow = lambda *a: (_ for _ in ()).throw(Reject("push_unreachable", "no arc"))
+    with pytest.raises(Reject) as e:
+        AS.ArticulationSmall._sample_with_close_push(stub, None, Draft(), init, manip, 0, target, "support", None, None)
+    assert e.value.reason == "push_unreachable" and "the other fist turn" in str(e.value) and stub.handle is handle0

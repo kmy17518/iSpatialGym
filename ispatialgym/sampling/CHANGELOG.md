@@ -112,9 +112,10 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   hand is C2-symmetric about its approach axis except for the wrist camera, so wherever a generator yields a contact in both
   wrist turns - a library pinch of a free object and its twin (`tabletop.pick_twin`), the tabletop / block-design pushes, the
   braces and blades (touching, attachment, axial, wall, block-design pack / row / column, the small-articulation base-link
-  braces), the push-under blade, the handle pinches (small and large articulation), the block-design cube picks and the
-  flip-in-place re-grasp (a pick and its twin grouped, ordered on the pick IK the chain search runs first) - `orient.choose`
-  decides between them.
+  braces), the push-under blade, the handle pinches (small and large articulation), the push-close fist (the tip handle and
+  its twin ranked on the first contact from the Phase-2 stance, the whole push-close flow as the downstream check, the other
+  turn when it rejects), the block-design cube picks and the flip-in-place re-grasp (a pick and its twin grouped, ordered on
+  the pick IK the chain search runs first) - `orient.choose` decides between them.
   Each turn is evaluated with the generator's own checks; each solution (and the witnesses a failed chain left - B2's rescue
   path) also offers the other turn in its shoulder / elbow branch (`IKChecker.twin_q`, verified when it is the one to try).
   Order: joint-limit safe (every configuration of the action's chain at least `JOINT_LIMIT_MARGIN` 0.05 rad from every arm

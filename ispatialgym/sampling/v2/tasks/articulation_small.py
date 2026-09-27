@@ -662,6 +662,7 @@ class ArticulationSmall(SamplerV2):
         base = {k: v for k, v in self.handle.items() if k not in ("contact", "approach_dir", "approach_dir_obj", "pinch_axis", "pull_dir", "width", "length", "depth")}
         self.handle = dict(base, kind="tip_push", contact=[float(c[0]), float(c[1]), top_z], approach_dir=[0.0, 0.0, -1.0], pinch_axis=[float(v) for v in axis.tolist()],
                            width=None, note="push-close: the closed fist on the tip's top face, riding the closing arc (owner 2026-09-19 22:59)")
+        self._close_push_handle0 = self.handle  # the fist's own turn: every attempt ranks its two turns from here
         self.grasp_fingers = C.FINGER_CLOSED
         log.info("%s: push-close handle: tip contact %s (r %.3f m from the hinge), q_init %.3f -> q_goal %.3f", self.gp.alias,
                  [round(v, 4) for v in self.handle["contact"]], r_c, self.q_init, self.q_goal)
@@ -1421,6 +1422,66 @@ class ArticulationSmall(SamplerV2):
     # ------------------------------------------------------------------ push-close (owner 2026-09-19 22:59)
 
     def _sample_with_close_push(self, rng, d: Draft, init: Stance, manip: Stance, k: int, target, support, pose: TT.Pose, cam_init) -> Draft:
+        """:meth:`_close_push_flow` with the fist's wrist turn chosen by the orientation rule (owner 2026-09-27): the tip handle and
+        its twin (the fist turned pi about its downward approach - the wrist camera on the other side) are ranked on their first
+        contact at q_init from the Phase-2 stance (joint-limit safe, then easier to reach, the handle's own turn within the
+        tolerance; a turn that does not solve there stays in unscored - the flow searches other stances; a turn whose wrist camera
+        comes within 5 mm of the world at the contact is out), the flow runs with the preferred turn, with the other one when it
+        rejects."""
+        base = getattr(self, "_close_push_handle0", None) or self.handle
+        arm, q0 = self.handle_arm, float(self.q_init)
+        for n in target.joints:  # as the flow checks: every other joint closed, the target's at q_init
+            if n != self.joint_name:
+                self._set_named_joint(target, n, float(self.all_jinfo.get(n, {}).get("closed_q", 0.0)) if n in getattr(self, "all_jinfo", {}) else float(target.joints[n].lower_limit))
+        self._set_joint(target, q0)
+        self.kit.sync_world()
+        props = []
+        for rank, h in enumerate(self._pinch_variants(base)):
+            wp = C.handle_waypoints(h, self.jinfo, [q0], pose)[0]
+            props.append(O.Proposal(f"fist {[round(v, 2) for v in h['pinch_axis']]}", rank, h, [wp.pre_grasp, wp.eef]))
+
+        def evaluate(p):
+            r = self.ikc.exact(list(p.chain), manip, arm, [support, target], cache=False, fingers=C.FINGER_CLOSED)
+            return True, r, (None if r.ok else []), ""
+
+        state0 = (None if manip.q is None else manip.q.clone(), manip.name, dict(manip.extras))
+        runs: Dict[str, Any] = {"n": 0, "rejects": []}
+
+        def flow(sc):
+            if runs["n"]:
+                # the other turn after a rejected flow: back to the state the flow starts from
+                self.sidecar.reset_instance()
+                self.sidecar.add_stance(init)
+                manip.q, manip.name = (None if state0[0] is None else state0[0].clone()), state0[1]
+                manip.extras.clear()
+                manip.extras.update(state0[2])
+            runs["n"] += 1
+            self.handle = sc.proposal.payload
+            try:
+                runs["draft"] = self._close_push_flow(rng, d if runs["n"] == 1 else Draft(), init, manip, k, target, support, pose, cam_init)
+            except Reject as e:
+                runs["rejects"].append(e)
+                return False, str(e)[:240]
+            return True, ""
+
+        chosen, dec = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(manip, fingers=C.FINGER_CLOSED), stage="close push fist", downstream=flow, map_twins=False)
+        if chosen is None:
+            self.handle = base
+            rej = runs["rejects"]
+            if not rej:
+                raise Reject("push_unreachable", f"push-close: neither fist turn passes ({'; '.join(str(o.get('why', '')) for o in dec['options'])[:300]})")
+            if len(rej) == 1:
+                raise rej[0]
+            raise Reject(rej[0].reason, f"{str(rej[0])[:700]} | the other fist turn: {str(rej[1])[:400]}")
+        draft = runs["draft"]
+        if sum(1 for o in dec["options"] if o.get("source") == "ik") > 1:
+            draft.summary["close_push_orient"] = dec
+            for name, rec in list(self.sidecar.contacts.items()):
+                if str(name).startswith("push") and isinstance(getattr(rec, "extras", None), dict):
+                    rec.extras["orient"] = dec
+        return draft
+
+    def _close_push_flow(self, rng, d: Draft, init: Stance, manip: Stance, k: int, target, support, pose: TT.Pose, cam_init) -> Draft:
         """Close by pushing the moving link's tip along the closing arc with the closed fist (no grasp): from the stance the
         fist rides the arc as far as the arm reaches (the required fractions of the remaining travel, exact IK), the segment
         is recorded as a push (``contacts.push``, ``push2``, ...), the brake holds the link there, the robot re-stances
