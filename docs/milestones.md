@@ -40,14 +40,18 @@ Tagged states of this repository and what passed on them.
 - **Measured against the v1.2 demos:**
   - **Attempts:** attempt 0 for 21/28 aliases (v1.2: 18/28). Earlier: world_vertical 7 → 0, cork 6 → 1, apple 2 → 0,
     axial / blender close / sandal 1 → 0. Later: footstool 1 → 2, cap 2 → 3, lid 0 → 1, milk 0 → 1.
-  - **Twins:** recorded for 6 aliases (shampoo and kielbasa: the row infeasible; bar soap, sprouts, cork, apple: margin).
+  - **Twins:** evaluated on 13 aliases, recorded on 6. Four rescue a library row that was infeasible at a joint limit:
+    shampoo (joint 5 within 5 mrad; twin margin 0.48 rad), apple (joint 2, 3 mrad; 0.07), cork (joint 5, 32 mrad; 0.058),
+    kielbasa (joint 7, 33 mrad; 0.055). Two win on margin: bar soap (0.007 → 0.19 rad), sprouts (0.063 → 0.18). Inside the
+    searches the twin also rescued draws that were not the recorded one (shampoo 16, sandal 8, milk 2). Pushes, braces,
+    blades, handles and cube grasps are not affected: they already tried both wrist turns.
   - **Witness margins:** the smallest IK-witness joint-limit margin rose on 13 aliases (bar soap 0.029 → 0.186 rad, sprouts
     0.025 → 0.180, sandal 0.008 → 0.102, cork 0.015 → 0.073, world_vertical 0.056 → 0.190) and fell on 7 (apple 0.109 →
     0.002, teacup 0.107 → 0.044, cap 0.153 → 0.065, lid 0.052 → 0.023, kielbasa 0.085 → 0.056).
   - **Random re-solves** in the recorded attempt: cork 92, lid 26, cap 26, sprouts 10 (all attempts ≥ 1).
-  - **Smoothness:** no new joint jumps (largest per-step arm-joint change 0.041 rad in both). A twin chosen on margin swings
-    the wrist further: the arm-joint path grows by 3.4–6.6 rad for bar soap, sprouts, shampoo, apple and kielbasa (cork:
-    −4.9).
+  - **Smoothness:** no new joint jumps (largest per-step arm-joint change 0.041 rad in both). Within the same draw, a twin
+    picked on margin starts further from the stance posture: the pre-grasp swing grows 1.42 → 3.10 rad (bar soap) and
+    2.42 → 3.37 rad (sprouts).
   - **Demo length:** 33598 demo steps in total (v1.2: 34693).
 
 | alias | demo on this commit (collected) | other copies (phase 1) | sampling attempt (v1.2) | steps (v1.2) |
@@ -89,8 +93,9 @@ Tagged states of this repository and what passed on them.
     60 steps); the retry attaches. Its transit into the witness branch takes the protection's via-above.
   - **Flipped-witness check:** it depends on the raw IK branch, which differs between processes. `validate_instances`
     rejects the axial Y instances that sampling accepts.
-  - **Twin wrist travel:** twin grasps chosen on margin lengthen the wrist travel (above), and 7 aliases drew instances with
-    a smaller witness margin than v1.2.
+  - **Twin wrist travel:** a twin picked on margin lengthens the swing to the pre-grasp (above), and 7 aliases drew instances
+    with a smaller witness margin than v1.2. There was no run with twins off, so the twins' share of the attempt and time
+    changes is not isolated from B1.
   - **Oracle fallbacks:** both are still in the code. Neither fired in any v2 run; removing them needs another sweep.
   - **Close pushes:** the attempt-0 draws need more than one push segment (blender 2, carton 3). Each later segment is
     reached directly from the previous one's end.
