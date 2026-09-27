@@ -48,6 +48,7 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.articulation import scale_handle, scale_joint_info
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
+from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
@@ -671,41 +672,62 @@ class ArticulationSmall(SamplerV2):
         return [handle, dict(handle, pinch_axis=[-float(v) for v in handle["pinch_axis"]])]
 
     def _best_pinch(self, handle, q: float, stance: Stance, arm: str, target, support, pose: TT.Pose, q_seed=None, fingers: Optional[float] = None):
-        """The pinch variant (``_pinch_variants`` of ``handle`` - one dict or a list of dicts, e.g. several approach pitches) at
-        joint value ``q`` whose [pre-grasp, grasp] passes the exact IK from ``stance`` with the largest joint-limit margin.
-        Returns ``(handle, waypoint, IKResult)`` or ``(None, None, None)``."""
-        best = None
+        """The pinch at joint value ``q``: per approach variant of ``handle`` (one dict or a list of dicts, e.g. several approach
+        pitches) its two finger assignments (``_pinch_variants``: +pinch / -pinch, the hand rolled 180 deg about the approach) are
+        chosen by the orientation rule (``orient.choose``, owner 2026-09-27: joint-limit safe, then easier to reach from where the
+        arm starts - ``q_seed`` or the stance - with +pinch within the tolerance; each assignment also in the other's wrist-flipped
+        branch), a pinch passing when its [pre-grasp, grasp] passes the exact IK from ``stance`` with at least
+        ``v2_accept_margin_rad``; across the variants the owner's order (below). Returns ``(handle, waypoint, IKResult)`` or
+        ``(None, None, None)``."""
         whys = []
-        passing_all = []
+        passing_all = []  # (h, wp, r, m): per approach variant its passing assignments, the orientation rule's choice first
         handles = list(handle) if isinstance(handle, (list, tuple)) else [handle]
         handle = handles[0]
         fng = self.grasp_fingers if fingers is None else float(fingers)
-        for h in [v for hh in handles for v in self._pinch_variants(hh)]:
-            wp = C.handle_waypoints(h, self.jinfo, [q], pose)[0]
-            r = self.ikc.exact([wp.pre_grasp, wp.eef], stance, arm, ignore_for_last=[support, target], q_seed=q_seed, cache=False, fingers=fng)
-            if not r.ok:
-                whys.append(f"pinch {[round(v, 1) for v in h['pinch_axis']]}: {str(r.reason)[:90]}")
+        accept_m = float(self.gen("v2_accept_margin_rad", 0.03))
+        q_start = q_seed if q_seed is not None else self.ikc.q_locked(stance)
+        chosen_all = []
+        for hh in handles:
+            props = []
+            for rank, h in enumerate(self._pinch_variants(hh)):
+                wp = C.handle_waypoints(h, self.jinfo, [q], pose)[0]
+                props.append(O.Proposal(f"pinch {[round(v, 1) for v in h['pinch_axis']]}", rank, (h, wp), [wp.pre_grasp, wp.eef]))
+            ok_here: Dict[int, Tuple[Any, ...]] = {}
+
+            def evaluate(p):
+                h, wp = p.payload
+                r = self.ikc.exact([wp.pre_grasp, wp.eef], stance, arm, ignore_for_last=[support, target], q_seed=q_seed, cache=False, fingers=fng, q_first=p.q_first)
+                if not r.ok:
+                    whys.append(f"{p.label}: {str(r.reason)[:90]}")
+                    return False, r, None, str(r.reason)
+                m, _ = self.ikc.joint_limit_margin(r.q, arm)
+                if m < accept_m:
+                    whys.append(f"{p.label} yaw {h.get('yaw_deg', '-')}: margin {1000 * m:.0f} mrad < {1000 * accept_m:.0f}")
+                    return False, r, None, f"margin {1000 * m:.0f} mrad < {1000 * accept_m:.0f}"
+                ok_here[id(p)] = (h, wp, r, m)
+                return True, r, None, ""
+
+            chosen, _dec = O.choose(self.ikc, arm, props, evaluate, q_start, stage=f"handle pinch q {q:.2f}")
+            if chosen is None:
                 continue
-            m, _ = self.ikc.joint_limit_margin(r.q, arm)
-            if m < float(self.gen("v2_accept_margin_rad", 0.03)):
-                whys.append(f"pinch {[round(v, 1) for v in h['pinch_axis']]} yaw {h.get('yaw_deg', '-')}: margin {1000 * m:.0f} mrad < {1000 * float(self.gen('v2_accept_margin_rad', 0.03)):.0f}")
-                continue
-            passing_all.append((h, wp, r, m))
-            if best is None or m > best[3]:
-                best = (h, wp, r, m)
+            h_c, wp_c = chosen.proposal.payload
+            m_c, _ = self.ikc.joint_limit_margin(chosen.result.q, arm)
+            first = (h_c, wp_c, chosen.result, m_c)
+            chosen_all.append(first)
+            passing_all.append(first)
+            passing_all.extend(v for k, v in ok_here.items() if v[2] is not chosen.result)
         self._pinch_passing = passing_all
-        if best is None:
+        if not chosen_all:
             log.info("%s: %s pinch at q %.3f fails both finger assignments (%s; contact base %s)", self.gp.alias, arm, q, "; ".join(whys),
                      [round(float(v), 3) for v in stance.world_to_base(C.handle_waypoints(handle, self.jinfo, [q], pose)[0].contact[:2]).tolist()])
             return None, None, None
+        best = max(chosen_all, key=lambda c: c[3])
         # owner 2026-09-19 16:55: the hand pointing straight across the seam (yaw 0) is the wanted pinch; a diagonal only when the
-        # straight one has no solution with a sane margin - among the passing variants the lowest yaw with margin >= v2_min_margin
-        passing = getattr(self, "_pinch_passing", None)
-        if passing:
-            floor_m = float(self.gen("v2_min_margin_rad", 0.05))
-            ok = sorted([c for c in passing if c[3] >= floor_m], key=lambda c: (abs(float(c[0].get("yaw_deg", 0.0))), float(c[0].get("pitch_deg", 0.0)), -c[3]))
-            if ok:
-                best = ok[0]
+        # straight one has no solution with a sane margin - among the variants the lowest yaw with margin >= v2_min_margin
+        floor_m = float(self.gen("v2_min_margin_rad", 0.05))
+        ok = sorted([c for c in chosen_all if c[3] >= floor_m], key=lambda c: (abs(float(c[0].get("yaw_deg", 0.0))), float(c[0].get("pitch_deg", 0.0)), -c[3]))
+        if ok:
+            best = ok[0]
         log.info("%s: %s pinch at q %.3f: closing along %s, pitch %s / yaw %s deg (joint margin %.0f mrad)", self.gp.alias, arm, q, [round(v, 2) for v in best[0]["pinch_axis"]],
                  best[0].get("pitch_deg", "-"), best[0].get("yaw_deg", "-"), 1000 * best[3])
         return best[0], best[1], best[2]
@@ -926,26 +948,43 @@ class ArticulationSmall(SamplerV2):
         freedom). Returns ``(chosen | None, cands, fails, extras)``."""
         cands, extras = self._brace_candidates_at(stance, pose, q_values)
         fails: List[str] = []
-        handle_ok = None
-        for kind, (b_pre, b_contact) in cands:
+        state: Dict[str, Any] = {"handle_ok": None}
+
+        class _HandleFails(Exception):
+            pass
+
+        def evaluate(p):
+            kind, (b_pre, b_contact) = p.payload
             self._check_deadline()
             res = TT.brace_second_arm(self, stance, self.handle_arm, grasp_pair, self.brace_arm, [b_pre, b_contact], ignore_work_last=[support, target],
-                                      ignore_brace_last=[target])
+                                      ignore_brace_last=[target], q_first_brace=p.q_first)
             if res.ok:
-                return (kind, b_pre, b_contact, res.q), cands, fails, extras
+                return True, res, None, ""
             if res.reason.startswith(f"{self.handle_arm}:"):
-                handle_ok = False
-                fails.append(f"{kind}: {res.reason}")
-                break  # the handle grasp alone fails at this stance: no brace can help
-            handle_ok = True
+                raise _HandleFails(f"{kind}: {res.reason}")  # the handle grasp alone fails at this stance: no brace can help
+            state["handle_ok"] = True
             # the handle arm's first solution may be the one branch the brace cannot live with (0916-205838: at the one stance
             # where both pass alone, every two-arm pair failed): the other order gives the brace arm its solution first
             res2 = TT.brace_second_arm(self, stance, self.brace_arm, [b_pre, b_contact], self.handle_arm, grasp_pair, ignore_work_last=[target],
                                        ignore_brace_last=[support, target])
             if res2.ok:
-                return (kind, b_pre, b_contact, res2.q), cands, fails, extras
-            fails.append(f"{kind}: {res.reason} / reversed: {res2.reason}")
-        extras["handle_alone"] = handle_ok
+                return True, res2, None, ""
+            return False, None, None, f"{res.reason} / reversed: {res2.reason}"
+
+        # the orientation rule (owner 2026-09-27) orders each pad contact's two closing signs (``kind`` / ``kind-``)
+        try:
+            chosen, decision, fails = O.choose_first(self.ikc, self.brace_arm, cands, key=lambda c: c[1][1], label=lambda c: c[0], chain=lambda c: [c[1][0], c[1][1]],
+                                                     evaluate=evaluate, q_start=self.ikc.q_locked(stance), stage="articulation brace")
+        except _HandleFails as e:
+            fails.append(str(e))
+            extras["handle_alone"] = False
+            return None, cands, fails, extras
+        if chosen is not None:
+            kind, (b_pre, b_contact) = chosen.proposal.payload
+            if sum(1 for o in decision["options"] if not o.get("predicted") and o.get("source") == "ik") > 1:
+                extras["orient"] = decision
+            return (kind, b_pre, b_contact, chosen.result.q), cands, fails, extras
+        extras["handle_alone"] = state["handle_ok"]
         return None, cands, fails, extras
 
     SECOND_STANCE_LATERALS = (0.10, -0.10, 0.20, -0.20)
@@ -2030,7 +2069,7 @@ class ArticulationSmall(SamplerV2):
             h_free, wp_free, r_free = self._best_pinch(getattr(self, "handle_variants", None) or self.handle, qa, st, main_arm, target, support, pose)
             if h_free is None:
                 return None
-            for h_c, wp_c, r_c, m_c in sorted(getattr(self, "_pinch_passing", []) or [], key=lambda c: (abs(float(c[0].get("yaw_deg", 0.0))), float(c[0].get("pitch_deg", 0.0)), -c[3])):
+            for h_c, wp_c, r_c, m_c in sorted(getattr(self, "_pinch_passing", []) or [], key=lambda c: (abs(float(c[0].get("yaw_deg", 0.0))), float(c[0].get("pitch_deg", 0.0)))):
                 q_pre = self.ikc.solutions.get((main_arm, self.ikc._pose_key(wp_c.pre_grasp)))
                 if q_pre is None or r_c.q is None:
                     continue

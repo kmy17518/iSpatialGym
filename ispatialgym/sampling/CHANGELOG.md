@@ -108,6 +108,26 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   `eef_in_object` (the oracle executes it unchanged; `conventions.grasp_entry` resolves the alias), `grasps[].wrist_flip` /
   `twin_choice`, and the instance summary's `kit` counts the choices and the joint-limit re-solves. `generation.grasp_twins`
   (default on; off = the previous behaviour exactly).
+- **The wrist turn of every contact by one rule** (owner 2026-09-27, first-demo v2.1; replaces B2's capped-margin rule). The
+  hand is C2-symmetric about its approach axis except for the wrist camera, so wherever a generator yields a contact in both
+  wrist turns - a library pinch of a free object and its twin (`tabletop.pick_twin`), the tabletop / block-design pushes, the
+  braces and blades (touching, attachment, axial, wall, block-design pack / row / column, the small-articulation base-link
+  braces), the push-under blade, the handle pinches (small and large articulation) - `orient.choose` decides between them.
+  Each turn is evaluated with the generator's own checks; each solution (and the witnesses a failed chain left - B2's rescue
+  path) also offers the other turn in its shoulder / elbow branch (`IKChecker.twin_q`, verified when it is the one to try).
+  Order: joint-limit safe (every configuration of the action's chain at least `JOINT_LIMIT_MARGIN` 0.05 rad from every arm
+  limit) before unsafe, neither safe: more clearance first; then the smaller largest joint change from where the arm starts,
+  the generator's own order within `REACH_TOL` 0.30 rad (its first turn: camera away / camera up, the library row). The first
+  option that passes wins; a `downstream` check (the pushes with the brace arm locked at it) failing moves on to the next
+  option. Where two turns compete the wrist camera (`<arm>_realsense_link`) must keep `CAMERA_MARGIN` 5 mm from the world
+  with the contacted objects present; a generator's single turn (the camera-up lever fist, the camera-up flip) is its hard
+  rule and is not re-checked. B2's 5 mm camera-above-support test applies to the library row as well. The large articulation
+  orders its two pinch signs by their step-5a solutions without a flipped branch (the follow solves the grasp again from the
+  stance). The axial push scores its contact configuration from the pre witness (tracked, else the plain IK) - no new
+  rejection. Records: `orient` in the contact extras (every option's margin, nearest joint, reach, verdict; `against_default`
+  when the chosen turn is not the generator's first), grasps `twin_choice.orient`, the summary `kit` counters
+  `orient_choices`, `orient_reason.*`, `orient_source.map`, `orient_against_default`. Tests: `test_orient.py`,
+  `test_grasp_twins.py`.
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

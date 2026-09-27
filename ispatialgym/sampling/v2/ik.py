@@ -1222,7 +1222,7 @@ class IKChecker:
 
     def exact_both_arms(self, work: Tuple[str, Sequence[Pose]], other: Tuple[str, Sequence[Pose]], stance: Stance, ignore_for_last: Sequence[Any] = (),
                         ignore_other_last: Sequence[Any] = (), fingers: Optional[float] = None,
-                        brace_only_check: Optional[Tuple[Sequence[Any], float]] = None) -> IKResult:
+                        brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, q_first_other: Optional[th.Tensor] = None) -> IKResult:
         """Brace / second-arm rule (§4.6 step 6): the working arm's poses first; then the other arm with the working arm
         locked at its solution; combined whole-body check of the final configuration **with the objects the two final
         poses touch removed** (``ignore_for_last`` ∪ ``ignore_other_last``: the support and the pushed / braced object —
@@ -1231,14 +1231,20 @@ class IKChecker:
         opening of both hands (closed for push + brace contacts). ``brace_only_check = (ignored objects, margin)``: an
         extra check of the brace arm's final configuration with the working arm back at the stance posture against
         everything but the ignored objects at ``margin`` (a stop blade against the target at its goal pose while the
-        push hand, which touches the target, is out of the picture)."""
+        push hand, which touches the target, is out of the picture). ``q_first_other``: the other arm's chain starts from this
+        arm configuration (``exact``'s ``q_first``; a wrist-flipped solution, ``orient``)."""
         arm_w, poses_w = work
         arm_o, poses_o = other
         r1 = self.exact(poses_w, stance, arm_w, ignore_for_last, cache=False, fingers=fingers)
         if not r1.ok:
             return IKResult(False, None, f"{arm_w}: {r1.reason}")
         q_seed = r1.q.clone()
-        r2 = self.exact(poses_o, stance, arm_o, ignore_other_last, q_seed=q_seed, cache=False, fingers=fingers)
+        q_f = None
+        if q_first_other is not None:
+            q_f = q_seed.clone()
+            idx_o = self.kit.robot.arm_control_idx[arm_o]
+            q_f[idx_o] = G.t(q_first_other)[idx_o]
+        r2 = self.exact(poses_o, stance, arm_o, ignore_other_last, q_seed=q_seed, cache=False, fingers=fingers, q_first=q_f)
         if not r2.ok:
             return IKResult(False, None, f"{arm_o} (brace): {r2.reason}")
         touched = list(ignore_for_last) + [o for o in ignore_other_last if all(o is not w for w in ignore_for_last)]

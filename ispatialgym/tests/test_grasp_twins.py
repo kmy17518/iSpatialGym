@@ -1,7 +1,8 @@
 """Tests of the gripper-symmetry ("twin") grasps: ``conventions.twin_pose`` / ``split_twin`` / ``twin_arm_q`` (checked against
-a numpy FK of ``r1pro.urdf``) and the ``~r180`` alias of ``grasp_entry``, ``grasp_library.twin`` / ``with_twins``, the choice
-rule, the wrist-camera clearance and ``pick_twin`` of ``sampling/v2/tabletop.py`` on a stub IK, the band write-back of an
-alias and the call sites ``phase3_target`` / ``IORSSmall.reselect_grasp`` / ``IORSSmall.grasp_facts``. No simulator is launched.
+a numpy FK of ``r1pro.urdf``) and the ``~r180`` alias of ``grasp_entry``, ``grasp_library.twin`` / ``with_twins``, the
+wrist-camera clearance and ``pick_twin`` of ``sampling/v2/tabletop.py`` (the orientation rule of ``sampling/v2/orient.py``,
+tested on its own in ``test_orient.py``) on a stub IK, the band write-back of an alias and the call sites ``phase3_target`` /
+``IORSSmall.reselect_grasp`` / ``IORSSmall.grasp_facts``. No simulator is launched.
 """
 
 import importlib.util
@@ -218,25 +219,8 @@ def test_library_twin_stored_twin_and_with_twins():
 
 
 # ------------------------------------------------------------------------------------------------------------------
-# the choice rule, the switch, the wrist camera, the band write-back
+# the switch, the wrist camera, the band write-back
 # ------------------------------------------------------------------------------------------------------------------
-
-
-def test_twin_rule_is_feasibility_then_capped_margin_then_continuity():
-    assert TT.twin_rule(None, None) == (False, "neither feasible")
-    assert TT.twin_rule((0.5, 1.0), None) == (False, "twin infeasible")
-    assert TT.twin_rule(None, (0.01, 3.0)) == (True, "row infeasible")
-    # the capped margin decides beyond the hysteresis, in either direction
-    assert TT.twin_rule((0.05, 1.0), (0.20, 2.5)) == (True, "margin")
-    assert TT.twin_rule((0.90, 2.0), (0.10, 0.0)) == (False, "margin")
-    # margins above the cap compare equal; a gain within the hysteresis is no decision
-    assert TT.twin_rule((0.25, 2.0), (1.40, 2.0)) == (False, "tie")
-    assert TT.twin_rule((0.12, 1.0), (0.20, 1.0)) == (False, "tie")
-    # then continuity: the twin's pre-grasp witness closer to the start by more than the tolerance
-    assert TT.twin_rule((0.12, 1.0), (0.20, 0.2)) == (True, "continuity")
-    assert TT.twin_rule((0.5, 2.0), (0.5, 1.6)) == (True, "continuity")
-    assert TT.twin_rule((0.5, 2.0), (0.5, 1.75)) == (False, "tie")
-    assert TT.twin_rule((0.5, 1.0), (0.5, 3.0)) == (False, "tie")
 
 
 def test_grasp_twins_switch_defaults_on():
@@ -307,7 +291,7 @@ def _q(arm_values):
 
 class _Sampler:
     """A sampler stand-in for ``pick_twin``: a real ``IKChecker`` on a kit with the URDF arm limits, the stance configuration
-    ``q_start`` and an ``exact`` answered by ``answer(poses, kw) -> (q_pre, q_end, reason)`` (``q_end`` None = failed); the
+    ``q_start`` and an ``exact`` answered by ``self.answer(poses, kw) -> (q_pre, q_end, reason)`` (``q_end`` None = failed); the
     witnesses it returns are remembered like ``IKChecker.exact`` does."""
 
     def __init__(self, q_start, answer=None, witness_ok=True, twins=True):
@@ -320,11 +304,12 @@ class _Sampler:
         ikc.q_locked = lambda stance, **kw: q_start.clone()
         ikc._witness_ok = lambda q, pose, arm: witness_ok
         self.calls = []
+        self.answer = answer
         self.gen = lambda key, default=None: (twins if key == "grasp_twins" else default)
 
         def exact(poses, stance, arm="right", **kw):
             self.calls.append(kw)
-            q_pre, q_end, reason = answer(poses, kw)
+            q_pre, q_end, reason = self.answer(poses, kw)
             if q_pre is not None:
                 ikc.solutions[(arm, ikc._pose_key(poses[0]))] = q_pre.clone()
             if q_end is None:
@@ -358,6 +343,21 @@ def _twin_of(s, q):
     return s.ikc.twin_q(q, "right")
 
 
+def _answer(s, eef, row, twin):
+    """``exact`` answers by chain: ``row`` / ``twin`` = the fresh chain's ``(q_pre, q_end, reason)`` (told apart by the closing
+    axis of the chain's last pose); a chain started from ``q_first`` (a wrist-flipped configuration) ends at the joint map of
+    the other chain's end."""
+    c_row = C.closing_axis(eef[1])
+
+    def answer(poses, kw):
+        is_row = float(th.dot(C.closing_axis(poses[-1][1]), c_row)) > 0.0
+        if kw.get("q_first") is not None:
+            return kw["q_first"], _twin_of(s, (twin if is_row else row)[1]), ""
+        return row if is_row else twin
+
+    return answer
+
+
 def test_ik_twin_q_maps_the_arm_joints_only():
     s = _Sampler(_q([0.0] * 7))
     q = th.arange(28, dtype=th.float32) * 0.01
@@ -374,53 +374,85 @@ def test_pick_twin_takes_the_twin_when_the_row_fails_at_joint_5():
     g, eio, eef, pre = _top_down_row()
     q_pre = _q([0.3, -1.0, 0.2, -1.2, 2.20, 0.4, -0.5])
     q_end_row = _q([0.3, -1.1, 0.2, -1.3, 2.35, 0.45, -0.55])  # the row's tracked approach ends on joint 5's limit
-    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, -1.57, 0.0, 0.0]), answer=lambda poses, kw: (kw.get("q_first"), _twin_of(s, q_end_row), ""))
+    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, -1.57, 0.0, 0.0]))
+    s.answer = _answer(s, eef, row=(q_pre, q_end_row, ""), twin=(None, None, "exact IK failed at pose 1 of 2"))
     res = s.row(pre, eef, q_pre, None, "ik_joint_limit: right_arm_joint5 within 5 mrad of its limit at the end of the tracked approach")
     pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, res, {"ignore_for_last": [], "scale_key": None}, support_z=0.75, where="test")
     assert pick.twin and pick.passed and pick.res.ok and pick.grasp.name == "grasp_4~r180" and pick.grasp.finger_q == [0.02, 0.05]
     assert th.allclose(pick.eef[0], eef[0]) and _same_quat(pick.eef[1], C.twin_pose(eef)[1]) and _same_quat(pick.eef_in_object[1], C.twin_pose(eio)[1])
     assert th.allclose(pick.pre[0], pre[0], atol=1e-6), "the twin's pre-grasp stands where the row's does"
-    # the twin chain left from the row's pre-grasp witness through the joint map (no fresh solve, never a cached verdict)
-    assert len(s.calls) == 1 and s.calls[0]["cache"] is False and th.allclose(s.calls[0]["q_first"], _twin_of(s, q_pre))
+    # the twin's own solve failed; the row's pre-grasp witness, wrist-flipped, is the twin chain's start (B2's rescue path)
+    assert len(s.calls) == 2 and "q_first" not in s.calls[0] and s.calls[0]["ignore_for_last"] == []
+    assert s.calls[1]["cache"] is False and th.allclose(s.calls[1]["q_first"], _twin_of(s, q_pre)) and s.calls[1]["scale_key"] is None
     f = pick.facts
-    assert f["stage"] == "test" and f["chosen"] == "twin" and f["reason"] == "row infeasible"
-    assert f["row"]["name"] == "grasp_4" and f["row"]["ok"] is False and f["row"]["reason"].startswith("ik_joint_limit: right_arm_joint5")
-    assert f["twin"]["name"] == "grasp_4~r180" and f["twin"]["ok"] and f["twin"]["source"] == "map" and f["twin"]["margin_rad"] > 0.5
-    assert f["twin"]["camera_clearance_m"] > 0.1
+    assert f["stage"] == "test" and f["chosen"] == "twin" and f["reason"] == "only feasible" and f["source"] == "map"
+    assert f["row"]["name"] == "grasp_4" and f["row"]["ok"] is False and f["row"]["why"].startswith("ik_joint_limit: right_arm_joint5")
+    assert f["twin"]["name"] == "grasp_4~r180" and f["twin"]["ok"] and f["twin"]["source"] == "map" and f["twin"]["margin_rad"] == pytest.approx(0.597, abs=2e-3)
+    assert f["orient"]["against_default"] is True
     assert pick.other is None, "the row did not solve: nothing to fall back to"
-    assert s.kit.stats["twin_picks"] == 1 and s.kit.stats["twin_taken"] == 1 and s.kit.stats["twin_taken.row_infeasible"] == 1
-    assert s.kit.stats["twin_source.map"] == 1 and s.kit.stats["twin_solves"] == 1
+    assert s.kit.stats["twin_picks"] == 1 and s.kit.stats["twin_taken"] == 1 and s.kit.stats["twin_taken.only_feasible"] == 1 and s.kit.stats["twin_solves"] == 2
+    assert s.kit.stats["orient_choices"] == 1 and s.kit.stats["orient_source.map"] == 1 and s.kit.stats["orient_against_default"] == 1
 
 
-def test_pick_twin_prefers_the_twin_on_margin_and_keeps_the_row_as_the_fallback():
+def test_pick_twin_takes_the_safe_twin_over_a_row_near_a_limit_in_the_rows_branch():
     g, eio, eef, pre = _top_down_row()
     q_pre = _q([0.3, -1.0, 0.2, -1.2, 2.25, 0.3, -0.4])
-    q_end = _q([0.3, -1.1, 0.2, -1.3, 2.30, 0.35, -0.45])  # 56 mrad from joint 5's limit
-    s = _Sampler(_q([0.3, -1.0, 0.2, -1.2, 2.0, 0.3, -0.4]), answer=lambda poses, kw: (kw.get("q_first"), _twin_of(s, q_end), ""))
+    q_end = _q([0.3, -1.1, 0.2, -1.3, 2.33, 0.35, -0.45])  # 26 mrad from joint 5's limit: within the 50 mrad joint-limit margin
+    s = _Sampler(_q([0.3, -1.0, 0.2, -1.2, 2.0, 0.3, -0.4]))
+    s.answer = _answer(s, eef, row=(q_pre, q_end, ""), twin=(None, None, "exact IK failed at pose 1 of 2"))
     pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, s.row(pre, eef, q_pre, q_end), {"ignore_for_last": []}, support_z=0.75, where="B")
-    assert pick.twin and pick.facts["reason"] == "margin" and pick.facts["twin"]["source"] == "map"
-    assert pick.facts["row"]["nearest_joint"] == "right_arm_joint5" and pick.facts["row"]["margin_rad"] == pytest.approx(0.056, abs=2e-3)
-    assert pick.facts["twin"]["margin_rad"] >= 0.3
+    assert pick.twin and pick.facts["reason"] == "safety" and pick.facts["source"] == "map"
+    assert pick.facts["row"]["nearest_joint"] == "right_arm_joint5" and pick.facts["row"]["margin_rad"] == pytest.approx(0.026, abs=2e-3)
+    assert pick.facts["twin"]["margin_rad"] >= 0.3 and th.allclose(s.calls[-1]["q_first"], _twin_of(s, q_pre))
     assert pick.other is not None and pick.other[0] is g and pick.other[2] is eef, "the row solved: a late flip may still record it"
 
 
-def test_pick_twin_keeps_the_row_on_a_tie_without_solving_the_twin():
+def test_pick_twin_keeps_a_safe_row_that_is_easier_to_reach():
     g, eio, eef, pre = _top_down_row()
-    q = _q([0.0, -1.0, 0.0, -1.5, -1.57, 0.0, 0.0])  # the untucked wrist: the twin has the same margins, 3.14 rad of wrist spin away
-    s = _Sampler(q.clone(), answer=lambda poses, kw: pytest.fail("the twin must not be solved"))
+    q_pre = _q([0.3, -1.0, 0.2, -1.2, 2.10, 0.3, -0.4])
+    q_end = _q([0.3, -1.1, 0.2, -1.3, 2.15, 0.35, -0.45])  # 206 mrad from joint 5's limit: safe; the twin is safe too
+    s = _Sampler(_q([0.3, -1.0, 0.2, -1.2, 2.0, 0.3, -0.4]))
+    s.answer = _answer(s, eef, row=(q_pre, q_end, ""), twin=(_twin_of(s, q_pre), _twin_of(s, q_end), ""))
+    pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, s.row(pre, eef, q_pre, q_end), {}, support_z=0.75)
+    assert not pick.twin and pick.passed and pick.grasp is g and pick.eef is eef and pick.facts["reason"] == "reach"
+    assert pick.facts["row"]["reach_rad"] == pytest.approx(0.10, abs=1e-3) and pick.facts["twin"]["reach_rad"] == pytest.approx(math.pi - 0.10, abs=1e-3)
+    assert len(s.calls) == 1, "the twin solved once; the row is the caller's solve"
+    assert pick.other is not None and pick.other[0].name == "grasp_4~r180"
+    assert "twin_taken" not in s.kit.stats and s.kit.stats["orient_reason.reach"] == 1 and "orient_against_default" not in s.kit.stats
+
+
+def test_pick_twin_keeps_the_row_within_the_reach_tolerance():
+    g, eio, eef, pre = _top_down_row()
+    q = _q([0.0, -1.0, 0.0, -1.5, -1.57, 0.0, 0.0])
+    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, 0.0, 0.0, 0.0]))  # joint 5 halfway between the row's and the twin's wrist
+    s.answer = _answer(s, eef, row=(q, q, ""), twin=(_twin_of(s, q), _twin_of(s, q), ""))
     pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, s.row(pre, eef, q, q), {}, support_z=0.75)
-    assert not pick.twin and pick.passed and pick.grasp is g and pick.eef is eef and pick.facts["reason"] == "tie"
-    assert pick.facts["twin"]["source"] == "predicted" and pick.facts["twin"]["swing_rad"] == pytest.approx(math.pi, abs=0.01)
-    assert pick.other is None and s.calls == [] and "twin_taken" not in s.kit.stats and s.kit.stats["twin_source.predicted"] == 1
+    assert not pick.twin and pick.facts["reason"] == "default" and pick.facts["chosen"] == "row"
+    assert pick.facts["row"]["reach_rad"] == pytest.approx(pick.facts["twin"]["reach_rad"], abs=0.01)
 
 
-def test_pick_twin_takes_the_twin_for_continuity():
+def test_pick_twin_takes_the_twin_that_is_easier_to_reach():
     g, eio, eef, pre = _top_down_row()
     q_row = _q([0.0, -1.0, 0.0, -1.5, -1.2, 0.0, 0.0])  # 2.8 rad of joint 5 from the stance posture; the twin (1.94) 0.34 rad
-    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, 1.6, 0.0, 0.0]), answer=lambda poses, kw: (kw.get("q_first"), _twin_of(s, q_row), ""))
+    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, 1.6, 0.0, 0.0]))
+    s.answer = _answer(s, eef, row=(q_row, q_row, ""), twin=(_twin_of(s, q_row), _twin_of(s, q_row), ""))
     pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, s.row(pre, eef, q_row, q_row), {}, support_z=0.75)
-    assert pick.twin and pick.facts["reason"] == "continuity"
-    assert pick.facts["row"]["swing_rad"] == pytest.approx(2.8, abs=1e-3) and pick.facts["twin"]["swing_rad"] == pytest.approx(math.pi - 2.8, abs=1e-3)
+    assert pick.twin and pick.facts["reason"] == "reach" and pick.facts["source"] == "ik", "the fresh solve before its mapped copy"
+    assert pick.facts["row"]["reach_rad"] == pytest.approx(2.8, abs=1e-3) and pick.facts["twin"]["reach_rad"] == pytest.approx(math.pi - 2.8, abs=1e-3)
+
+
+def test_pick_twin_with_neither_safe_takes_the_branch_with_more_clearance():
+    g, eio, eef, pre = _top_down_row()
+    q_row = _q([0.3, 0.15, 0.2, -1.2, -1.5, 0.2, 0.1])  # joint 2 25 mrad from its limit
+    q_tw = _q([0.3, 0.13, 0.2, -1.2, 1.6, -0.2, -0.1])  # the twin's own solve: joint 2 45 mrad from it
+    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, 0.0, 0.0, 0.0]))
+    s.answer = _answer(s, eef, row=(q_row, q_row, ""), twin=(q_tw, q_tw, ""))
+    pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, s.row(pre, eef, q_row, q_row), {}, support_z=0.75)
+    # the twin's branch has the clearance (both assignments in it); within the reach tolerance the row comes before the twin
+    assert not pick.twin and pick.facts["reason"] == "default" and pick.facts["source"] == "map"
+    assert [o["label"] for o in pick.facts["orient"]["options"] if o["ok"] and not o.get("predicted")] == ["grasp_4", "grasp_4~r180", "grasp_4"]
+    assert pick.facts["row"]["margin_rad"] == pytest.approx(0.0445, abs=1e-3) and th.allclose(s.calls[-1]["q_first"], _twin_of(s, q_tw))
+    assert th.allclose(pick.res.q[ARM_IDX], _twin_of(s, q_tw)[ARM_IDX])
 
 
 def test_pick_twin_skips_a_row_at_the_reach_boundary_and_solves_an_out_of_range_twin_from_scratch():
@@ -428,12 +460,13 @@ def test_pick_twin_skips_a_row_at_the_reach_boundary_and_solves_an_out_of_range_
     s = _Sampler(_q([0.0] * 7), answer=lambda poses, kw: pytest.fail("no twin solve at the reach boundary"))
     res = s.row(pre, eef, None, None, "ik_reach: witness FK residual 12.0 mm > 5 mm at pose 2 of 2")
     pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, res, {})
-    assert not pick.twin and not pick.passed and pick.facts["twin"]["source"] == "skipped" and pick.facts["reason"] == "twin skipped"
+    assert not pick.twin and not pick.passed and pick.res is res and pick.facts["reason"] == "neither feasible"
+    assert "reach boundary" in pick.facts["twin"]["why"]
     # |q5| < 45°: the joint map has no twin; the twin chain is solved from scratch (and fails here)
     q_row = _q([0.0, -1.0, 0.0, -1.5, 0.3, 0.0, 0.0])
     s2 = _Sampler(_q([0.0] * 7), answer=lambda poses, kw: (None, None, "exact IK failed at pose 1 of 2"))
     pick2 = TT.pick_twin(s2, None, "right", g, eio, eef, pre, s2.row(pre, eef, q_row, q_row), {"cache": True})
-    assert not pick2.twin and pick2.passed and pick2.facts["twin"]["source"] == "ik" and pick2.facts["reason"] == "twin infeasible"
+    assert not pick2.twin and pick2.passed and pick2.facts["twin"]["source"] == "ik" and pick2.facts["reason"] == "only feasible"
     assert len(s2.calls) == 1 and "q_first" not in s2.calls[0] and s2.calls[0]["cache"] is True
 
 
@@ -445,29 +478,43 @@ def test_pick_twin_turns_the_wrist_camera_out_of_the_support():
     eef = IK.grasp_pose((th.tensor([0.6, 0.0, 0.75]), C.IDENTITY_QUAT), g.pose)
     pre = IK.pre_pose(eef)
     q = _q([0.0, -1.0, 0.0, -1.5, -1.9, 0.2, 0.3])
-    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, -1.9, 0.2, 0.3]), answer=lambda poses, kw: (kw.get("q_first"), _twin_of(s, q), ""))
+    s = _Sampler(q.clone())
+    s.answer = _answer(s, eef, row=(q, q, ""), twin=(_twin_of(s, q), _twin_of(s, q), ""))
     pick = TT.pick_twin(s, None, "right", g, g.pose, eef, pre, s.row(pre, eef, q, q), {}, support_z=0.70)
-    assert pick.twin and pick.facts["reason"] == "row infeasible"
-    assert pick.facts["row"]["camera_clearance_m"] == pytest.approx(-0.024, abs=1e-4) and "wrist camera" in pick.facts["row"]["reason"]
-    assert pick.facts["twin"]["camera_clearance_m"] == pytest.approx(0.088, abs=1e-4)
-    assert pick.other is not None and pick.other[0] is g, "the row's own verdict (solved) stands as the fallback"
-    # without the support height the camera is not judged: equal capped margins, the twin 3.14 rad of wrist spin away -> the row
-    s2 = _Sampler(_q([0.0, -1.0, 0.0, -1.5, -1.9, 0.2, 0.3]), answer=lambda poses, kw: pytest.fail("predicted"))
-    assert not TT.pick_twin(s2, None, "right", g, g.pose, eef, pre, s2.row(pre, eef, q, q), {}).twin
+    assert pick.twin and pick.facts["reason"] == "only feasible"
+    assert "wrist camera -24 mm from the support top" in pick.facts["row"]["why"]
+    assert pick.other is None, "the row fails the camera check in either branch"
+    # without the support height the camera is not judged: both safe, the twin 3.14 rad of wrist spin away -> the row
+    s2 = _Sampler(q.clone())
+    s2.answer = _answer(s2, eef, row=(q, q, ""), twin=(_twin_of(s2, q), _twin_of(s2, q), ""))
+    pick2 = TT.pick_twin(s2, None, "right", g, g.pose, eef, pre, s2.row(pre, eef, q, q), {})
+    assert not pick2.twin and pick2.facts["reason"] == "reach"
 
 
 def test_pick_twin_applies_the_callers_check_to_both_assignments():
     g, eio, eef, pre = _top_down_row()
     q_row = _q([0.0, -1.0, 0.0, -1.5, -1.9, 0.0, 0.0])
-    s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, -1.9, 0.0, 0.0]), answer=lambda poses, kw: (kw.get("q_first"), _twin_of(s, q_row), ""))
+    s = _Sampler(q_row.clone())
+    s.answer = _answer(s, eef, row=(q_row, q_row, ""), twin=(_twin_of(s, q_row), _twin_of(s, q_row), ""))
     row_end = float(q_row[ARM_IDX[4]])
     only_twin = lambda q: abs(float(q[ARM_IDX[4]]) - row_end) > 1.0  # noqa: E731
     pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, s.row(pre, eef, q_row, q_row), {}, accept=only_twin)
-    assert pick.twin and pick.passed and pick.facts["reason"] == "row infeasible" and pick.facts["row"]["reason"] == "fails the caller's check"
+    assert pick.twin and pick.passed and pick.facts["row"]["why"] == "fails the caller's check"
     assert pick.other is None
-    s2 = _Sampler(_q([0.0] * 7), answer=lambda poses, kw: (kw.get("q_first"), _twin_of(s2, q_row), ""))
+    s2 = _Sampler(_q([0.0] * 7))
+    s2.answer = _answer(s2, eef, row=(q_row, q_row, ""), twin=(_twin_of(s2, q_row), _twin_of(s2, q_row), ""))
     pick2 = TT.pick_twin(s2, None, "right", g, eio, eef, pre, s2.row(pre, eef, q_row, q_row), {}, accept=lambda q: False)
-    assert not pick2.twin and not pick2.passed and pick2.res.ok, "the row keeps its verdict; the caller sees it failed its check"
+    assert not pick2.twin and not pick2.passed and not pick2.res.ok and "caller's check" in pick2.res.reason
+
+
+def test_pick_twin_never_offers_a_barred_row():
+    g, eio, eef, pre = _top_down_row()
+    q = _q([0.0, -1.0, 0.0, -1.5, -1.9, 0.0, 0.0])
+    s = _Sampler(q.clone())
+    s.answer = _answer(s, eef, row=(q, q, ""), twin=(_twin_of(s, q), _twin_of(s, q), ""))
+    # the caller's own verdict passed (it solved the row before barring it): still the twin, the row in neither branch
+    pick = TT.pick_twin(s, None, "right", g, eio, eef, pre, s.row(pre, eef, q, q), {}, row_allowed=False)
+    assert pick.twin and pick.facts["row"]["why"] == "the row is barred by the caller" and pick.other is None
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -475,16 +522,18 @@ def test_pick_twin_applies_the_callers_check_to_both_assignments():
 # ------------------------------------------------------------------------------------------------------------------
 
 
-def _phase3_stub(twins, row_answer, row_end):
-    """``phase3_target``'s sampler with one library row in F: ``row_answer`` = the row chain's ``(q_pre, q_end, reason)``; the
-    twin chain leaves from its ``q_first`` and ends at the joint map of ``row_end``."""
+def _phase3_stub(twins, row_answer, row_end, twin_answer=(None, None, "exact IK failed at pose 1 of 2")):
+    """``phase3_target``'s sampler with one library row in F: ``row_answer`` / ``twin_answer`` = the row / twin chain's own
+    ``(q_pre, q_end, reason)``; a chain started from ``q_first`` ends at the joint map of the other chain's end (the row's:
+    ``row_end``)."""
     g = _grasp("grasp_4", [0.0, 0.0, 0.12], C.eef_quat([0.0, 0.0, -1.0], [0.0, 1.0, 0.0]))
     c_row = th.tensor([0.0, 1.0, 0.0])  # the row's closing axis at yaw 0; the jittered yaw stays within ±22.5°
 
     def answer(poses, kw):
-        if float(th.dot(C.closing_axis(poses[-1][1]), c_row)) > 0.0:
-            return row_answer
-        return (kw.get("q_first"), _twin_of(s, row_end), "")
+        is_row = float(th.dot(C.closing_axis(poses[-1][1]), c_row)) > 0.0
+        if kw.get("q_first") is not None:
+            return kw["q_first"], _twin_of(s, twin_answer[1] if is_row else row_end), ""
+        return row_answer if is_row else twin_answer
 
     s = _Sampler(_q([0.0, -1.0, 0.0, -1.5, -1.57, 0.0, 0.0]), answer=answer, twins=twins)
     s.world = SimpleNamespace(bottom_offset=lambda hull, quat: 0.02, footprint=lambda hull, pose: th.zeros(4, 2))
@@ -504,7 +553,8 @@ def test_phase3_target_records_the_twin_the_oracle_executes():
     s, g, manip, top = _phase3_stub(True, (q_pre, None, "ik_joint_limit: right_arm_joint5 within 5 mrad of its limit"), q_end)
     pose, rec = _phase3(s, g, manip, top)
     assert rec.grasp_key == "k" and rec.grasp_name == "grasp_4~r180" and rec.finger_q == [0.02, 0.05]
-    assert rec.extras["wrist_flip"] is True and rec.extras["twin_choice"]["reason"] == "row infeasible" and rec.extras["twin_choice"]["stage"] == "phase3_target"
+    assert rec.extras["wrist_flip"] is True and rec.extras["twin_choice"]["reason"] == "only feasible" and rec.extras["twin_choice"]["stage"] == "phase3_target"
+    assert rec.extras["twin_choice"]["source"] == "map", "the twin left from the row's pre-grasp witness"
     assert _same_quat(rec.eef_in_object[1], C.twin_pose(g.pose)[1])
     # what the oracle executes (``Grasp.grasp_pose``: object pose ∘ the recorded eef_in_object) is the recorded grasp pose
     e = C.compose(pose, rec.eef_in_object)
@@ -515,20 +565,21 @@ def test_phase3_target_records_the_twin_the_oracle_executes():
 
 
 def test_phase3_target_without_twins_records_the_row_as_before():
-    q = _q([0.0, -1.0, 0.0, -1.5, -2.2, 0.0, 0.0])  # 0.16 rad from joint 5's limit: the twin would win on margin
+    q = _q([0.0, -1.0, 0.0, -1.5, -2.2, 0.0, 0.0])  # 0.16 rad from joint 5's limit: safe, 0.63 rad of wrist from the stance
     s, g, manip, top = _phase3_stub(False, (q, q, ""), q)
     _, rec = _phase3(s, g, manip, top)
     assert rec.grasp_name == "grasp_4" and "wrist_flip" not in rec.extras and "twin_choice" not in rec.extras and len(s.calls) == 1
     assert rec.eef_in_object[0] is g.position and "twin_picks" not in s.kit.stats
+    # with twins the safe row stays: its twin (the wrist flipped, 2.5 rad from the stance) is the harder one to reach
     s_on, g_on, _, _ = _phase3_stub(True, (q, q, ""), q)
     _, rec_on = _phase3(s_on, g_on, manip, top)
-    assert rec_on.grasp_name == "grasp_4~r180" and rec_on.extras["wrist_flip"] is True and rec_on.extras["twin_choice"]["reason"] == "margin"
-    # a row with a comfortable wrist keeps its name; the facts are recorded all the same
-    q_ok = _q([0.0, -1.0, 0.0, -1.5, -1.57, 0.0, 0.0])
-    s_ok, g_ok, _, _ = _phase3_stub(True, (q_ok, q_ok, ""), q_ok)
-    _, rec_ok = _phase3(s_ok, g_ok, manip, top)
-    assert rec_ok.grasp_name == "grasp_4" and rec_ok.extras["wrist_flip"] is False and rec_ok.extras["twin_choice"]["reason"] == "tie"
-    assert len(s_ok.calls) == 1, "the twin was not solved"
+    assert rec_on.grasp_name == "grasp_4" and rec_on.extras["wrist_flip"] is False and rec_on.extras["twin_choice"]["reason"] == "reach"
+    assert len(s_on.calls) == 2, "the row, then the twin's own solve; its mapped configuration was not needed"
+    # a row 26 mrad from joint 5's limit and a safe twin (its own solve, |q5| < 45 deg: no flipped counterpart): the twin
+    q_bad = _q([0.0, -1.0, 0.0, -1.5, -2.33, 0.0, 0.0])
+    s_tw, g_tw, _, _ = _phase3_stub(True, (q_bad, q_bad, ""), q_bad, twin_answer=(_q([0.0, -1.0, 0.0, -1.5, 0.5, 0.0, 0.0]),) * 2 + ("",))
+    _, rec_tw = _phase3(s_tw, g_tw, manip, top)
+    assert rec_tw.grasp_name == "grasp_4~r180" and rec_tw.extras["twin_choice"]["reason"] == "safety" and rec_tw.extras["twin_choice"]["source"] == "ik"
 
 
 def _reselect_stub(twins, pads_ok):
@@ -571,17 +622,17 @@ def test_reselect_grasp_offers_the_twin_of_the_barred_grasp():
     assert chosen == "grasp_1~r180" and rec.grasp_name == "grasp_1~r180" and rec.finger_q == [0.02, 0.05]
     assert _same_quat(rec.eef_in_object[1], C.twin_pose(g1.pose)[1]) and _same_quat(rec.grasp[1], C.twin_pose(C.compose(draft.object_poses["apple.n.01_1"], g1.pose))[1])
     assert rec.extras["wrist_flip"] is True and rec.extras["twin_choice"]["stage"] == "reselect_grasp"
-    assert rec.extras["twin_choice"]["row"]["reason"] == "excluded by name"
-    assert len(s.calls) == 1 and s.calls[0]["q_first"] is not None and s.calls[0]["approached"] == ["target"], \
-        "only the twin was solved, seeded at the remembered pre-grasp, with the caller's IK options"
+    assert rec.extras["twin_choice"]["row"]["why"] == "excluded by name" and rec.extras["twin_choice"]["source"] == "map"
+    assert len(s.calls) == 2 and "q_first" not in s.calls[0] and s.calls[1]["q_first"] is not None and s.calls[1]["approached"] == ["target"], \
+        "the twin's own solve (pads on the support), then the twin from the remembered pre-grasp, with the caller's IK options"
     # without twins the barred grasp is skipped and the next library row is taken (today's behaviour)
     s_off, draft_off, rec_off, _ = _reselect_stub(False, lambda q_: True)
     assert IS.IORSSmall.reselect_grasp(s_off, draft_off, rec_off, None, "apple.n.01_1", require_pad_clearance=True) == "grasp_2"
     assert "wrist_flip" not in rec_off.extras and len(s_off.calls) == 1
-    # exclude applies to each finger assignment by name; grasp_2's twin ties with the row, which is kept
+    # exclude applies to each finger assignment by name; grasp_2's twin is as easy to reach as the row, which is kept
     s_ex, draft_ex, rec_ex, _ = _reselect_stub(True, lambda q_: True)
     assert IS.IORSSmall.reselect_grasp(s_ex, draft_ex, rec_ex, None, "apple.n.01_1", exclude=["grasp_1", "grasp_1~r180"]) == "grasp_2"
-    assert rec_ex.extras["wrist_flip"] is False and rec_ex.extras["twin_choice"]["reason"] == "tie"
+    assert rec_ex.extras["wrist_flip"] is False and rec_ex.extras["twin_choice"]["reason"] == "default"
     # a drawn twin excluded (the descent retry's ``tried``): its row is re-selected alone and the draw's facts are dropped
     s_tw, draft_tw, rec_tw, _ = _reselect_stub(True, lambda q_: True)
     rec_tw.grasp_name, rec_tw.extras = "grasp_1~r180", {"wrist_flip": True, "twin_choice": {"stage": "phase3_target", "chosen": "twin"}}

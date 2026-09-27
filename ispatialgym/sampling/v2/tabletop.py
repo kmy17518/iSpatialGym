@@ -1558,14 +1558,7 @@ def reach_margin(s, stance: Stance, point_world) -> float:
 # Gripper symmetry: a library pinch or its twin (the eef turned π about the approach axis, the fingers swapped)
 # ----------------------------------------------------------------------------------------------------------------
 
-#: joint-limit margins (rad) above this compare equal: the twin wins on margin only when a chain comes close to a limit
-TWIN_MARGIN_CAP = 0.30
-#: hysteresis (rad): one capped margin decides only when it exceeds the other by more than this
-TWIN_MARGIN_GAIN = 0.10
-#: on equal margins the twin is recorded when its pre-grasp witness lies this much closer (rad, L-inf over the arm joints)
-#: to the configuration the arm starts from
-TWIN_SWING_TOL = 0.30
-#: the twin of a support-ignored grasp pose must keep the wrist camera's spheres this far above the support top (m)
+#: a support-ignored grasp pose (the row or its twin) must keep the wrist camera's spheres this far above the support top (m)
 TWIN_CAMERA_CLEARANCE_M = 0.005
 #: the wrist camera (``<arm>_realsense_link``), the one part of the hand that is not C2-symmetric about the approach axis: its
 #: cuRobo spheres in the eef frame (as ``iors_small.HAND_SPHERES_EEF["wrist camera"]``) and their radius (m)
@@ -1586,25 +1579,6 @@ def wrist_camera_clearance(eef: Pose, plane_z: float) -> float:
     the camera dips below it)."""
     pts = C.transform_points((_t(eef[0]), _t(eef[1])), th.tensor(WRIST_CAMERA_SPHERES_EEF, dtype=th.float32))
     return float(pts[:, 2].min()) - WRIST_CAMERA_SPHERE_R - float(plane_z)
-
-
-def twin_rule(row: Optional[Tuple[float, float]], twin: Optional[Tuple[float, float]]) -> Tuple[bool, str]:
-    """``(record the twin instead of the library row, why)``. ``row`` / ``twin`` = ``(joint-limit margin, swing)`` in rad of a
-    chain that passed every check, None for one that did not. Lexicographic: feasibility; the margin capped at
-    ``TWIN_MARGIN_CAP``, deciding only beyond ``TWIN_MARGIN_GAIN``; the twin's swing smaller by more than ``TWIN_SWING_TOL``;
-    otherwise the row."""
-    if twin is None:
-        return False, ("twin infeasible" if row is not None else "neither feasible")
-    if row is None:
-        return True, "row infeasible"
-    m, mt = min(float(row[0]), TWIN_MARGIN_CAP), min(float(twin[0]), TWIN_MARGIN_CAP)
-    if mt > m + TWIN_MARGIN_GAIN:
-        return True, "margin"
-    if m > mt + TWIN_MARGIN_GAIN:
-        return False, "margin"
-    if float(twin[1]) < float(row[1]) - TWIN_SWING_TOL:
-        return True, "continuity"
-    return False, "tie"
 
 
 @dataclass
@@ -1635,102 +1609,97 @@ def _count(s, key: str) -> None:
 def _twin_side(d: Dict[str, Any]) -> str:
     src = f"{d['source']} " if d.get("source") else ""
     if d.get("margin_rad") is None:
-        return f"{src}fail: {str(d.get('reason', ''))[:120]}"
-    cam = "" if d.get("camera_clearance_m") is None else f" camera {d['camera_clearance_m'] * 1000:+.0f} mm"
-    verdict = "ok" if d.get("ok") else f"rejected ({d.get('reason', '')})"
-    return f"{src}{verdict} margin {d['margin_rad']:.3f} ({d.get('nearest_joint')}) swing {d['swing_rad']:.2f}{cam}"
+        return f"{src}fail: {str(d.get('why', d.get('reason', '')))[:120]}"
+    verdict = "ok" if d.get("ok") else f"rejected ({d.get('why', d.get('reason', ''))})"
+    return f"{src}{verdict} margin {d['margin_rad']:.3f} ({d.get('nearest_joint')}) reach {d.get('reach_rad')}"
 
 
 def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pre: Pose, res, exact_kw: Dict[str, Any], *,
-              support_z: Optional[float] = None, accept: Optional[Callable[[th.Tensor], bool]] = None, where: str = "") -> TwinPick:
+              support_z: Optional[float] = None, accept: Optional[Callable[[th.Tensor], bool]] = None, where: str = "",
+              row_allowed: bool = True) -> TwinPick:
     """The library pinch ``g`` drawn for a free object, or its twin (``conventions.twin_pose``: the same pinch with the fingers
-    swapped), by :func:`twin_rule`. ``eef_in_object`` is the row's ``T_obj→eef``, ``eef`` / ``pre`` its grasp / pre-grasp
-    poses and ``res`` their exact IK (``s.ikc.exact([pre, eef], stance, arm, **exact_kw)``; it may have failed).
+    swapped), by the orientation rule of :mod:`ispatialgym.sampling.v2.orient` (owner 2026-09-27: success, then joint-limit
+    safe, then easier to reach; the library row wins within ``orient.REACH_TOL``). ``eef_in_object`` is the row's
+    ``T_obj→eef``, ``eef`` / ``pre`` its grasp / pre-grasp poses and ``res`` their exact IK (``s.ikc.exact([pre, eef], stance,
+    arm, **exact_kw)``; it may have failed).
 
-    The twin's chain is solved with the same ``exact_kw``, from the row's pre-grasp witness mapped by ``IKChecker.twin_q``
-    when that is collision-free (source ``map``), else from scratch (``ik``). A solved row whose mapped chain could not win
-    keeps the row without a solve (``predicted``); a row rejected at the reach boundary (``ik_reach``) is final - the twin
-    has the same wrist centre (``skipped``). A chain passes when it solved, ``accept`` holds at its grasp configuration and,
-    given ``support_z`` (the support top ignored at the grasp pose), the wrist camera clears that top by
-    ``TWIN_CAMERA_CLEARANCE_M``. Only a passing twin is taken; otherwise the row stands with its own verdict. Margins are the
-    smallest arm joint-limit margin over the two witnesses, swings the L-inf distance of the pre-grasp witness from the
-    stance configuration (``IKChecker.q_locked``), where the pre-grasp transit starts."""
+    The twin's chain is solved with the same ``exact_kw``; each passing chain also offers the other finger assignment in its own
+    shoulder / elbow branch (``IKChecker.twin_q``, checked when it is the one to try). A row rejected at the reach boundary
+    (``ik_reach``) is final - the twin has the same wrist centre. A chain passes when it solved, ``accept`` holds at its grasp
+    configuration, given ``support_z`` (the support top ignored at the grasp pose) the wrist camera clears that top by
+    ``TWIN_CAMERA_CLEARANCE_M``, and the camera clears the world (``orient.camera_clear``). Margins are the smallest arm
+    joint-limit margin over the two witnesses, reach the largest joint change of the pre-grasp witness from the stance
+    configuration (``IKChecker.q_locked``), where the pre-grasp transit starts. ``row_allowed`` False (the caller bars the row by
+    name): the row is offered in no branch."""
     from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.sampling.v2 import orient as O
 
     IK = _ik()
     ikc = s.ikc
-    idx = s.kit.robot.arm_control_idx[arm]
-    q_start = _t(ikc.q_locked(stance))[idx]
+    q_start = _t(ikc.q_locked(stance))
     gt = GL.twin(g)
     eio_t = C.twin_pose((_t(eef_in_object[0]), _t(eef_in_object[1])))
     eef_t = C.twin_pose((_t(eef[0]), _t(eef[1])))
     pre_t = IK.pre_pose(eef_t)
+    row_name, twin_name = getattr(g, "name", None), gt.name
+    reach_limited = (not res.ok) and str(res.reason).startswith("ik_reach")
 
-    def witness(p):
-        return ikc.solutions.get((arm, ikc._pose_key(p)))
-
-    def accepted(q_end) -> bool:
-        return accept is None or bool(accept(_t(q_end)))
-
-    def judge(solved: bool, q_pre, q_end, e: Pose, why: str, acc: bool) -> Tuple[Dict[str, Any], Optional[Tuple[float, float]]]:
-        cam = None if support_z is None else wrist_camera_clearance(e, float(support_z))
-        d: Dict[str, Any] = {"ok": False, "camera_clearance_m": None if cam is None else round(cam, 4)}
-        if not solved or q_end is None:
-            d["reason"] = str(why)[:160]
-            return d, None
-        m, jn = min((ikc.joint_limit_margin(_t(q), arm) for q in (q_pre, q_end) if q is not None), key=lambda mj: mj[0])
-        swing = float(th.max(th.abs(_t(q_pre if q_pre is not None else q_end)[idx] - q_start)))
-        d.update({"margin_rad": round(float(m), 4), "nearest_joint": jn, "swing_rad": round(swing, 3)})
+    def evaluate(p) -> Tuple[bool, Any, Optional[List[th.Tensor]], str]:
+        side = p.payload[0]
+        if side == "row" and p.q_first is None:
+            if not row_allowed and res.ok:
+                return False, None, None, "the row is barred by the caller"
+            r = res
+        elif side == "row" and not row_allowed:
+            return False, None, None, "the row is barred by the caller"
+        elif reach_limited:
+            return False, None, None, "the row failed at the arm's reach boundary; the twin has the same wrist centre"
+        else:
+            kw = dict(exact_kw)
+            if p.q_first is not None:
+                kw.update({"q_first": p.q_first, "cache": False})
+            _count(s, "twin_solves")
+            r = ikc.exact(p.chain, stance, arm, **kw)
+        if not r.ok or r.q is None:
+            return False, r, None, str(r.reason)
+        cam = None if support_z is None else wrist_camera_clearance(p.chain[-1], float(support_z))
         if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M:
-            d["reason"] = f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
-            return d, None
-        if not acc:
-            d["reason"] = "fails the caller's check"
-            return d, None
-        d["ok"] = True
-        return d, (float(m), swing)
+            return False, r, None, f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
+        if accept is not None and not bool(accept(_t(r.q))):
+            return False, r, None, "fails the caller's check"
+        return True, r, None, ""
 
     _count(s, "twin_picks")
-    q_pre_row = witness(pre)
-    row_acc = bool(res.ok and res.q is not None and accepted(res.q))
-    row_f, row_s = judge(res.ok, q_pre_row, res.q, eef, res.reason, row_acc)
-    q_pre_map = ikc.twin_q(q_pre_row, arm)
-    twin_s, res_t = None, None
-    if not res.ok and str(res.reason).startswith("ik_reach"):
-        twin_f = {"ok": False, "source": "skipped", "reason": "the row failed at the arm's reach boundary; the twin has the same wrist centre"}
-        take, why = False, "twin skipped"
-    else:
-        twin_f = None
-        q_end_map = ikc.twin_q(res.q, arm) if res.ok else None
-        if res.ok and q_pre_map is not None and q_end_map is not None:
-            pf, ps = judge(True, q_pre_map, q_end_map, eef_t, "", accepted(q_end_map))
-            take, why = twin_rule(row_s, ps)
-            if not take:
-                twin_f = dict(pf, source="predicted")
-        if twin_f is None:
-            seed = q_pre_map if q_pre_map is not None and ikc._witness_ok(q_pre_map, pre_t, arm) else None
-            kw = dict(exact_kw)
-            if seed is not None:
-                kw.update({"q_first": seed, "cache": False})
-            _count(s, "twin_solves")
-            res_t = ikc.exact([pre_t, eef_t], stance, arm, **kw)
-            twin_f, twin_s = judge(res_t.ok, witness(pre_t), res_t.q, eef_t, res_t.reason,
-                                   bool(res_t.ok and res_t.q is not None and accepted(res_t.q)))
-            twin_f["source"] = "map" if seed is not None else "ik"
-            take, why = twin_rule(row_s, twin_s)
-    facts = {"stage": where, "chosen": "twin" if take else "row", "reason": why, "row": dict(row_f, name=getattr(g, "name", None)),
-             "twin": dict(twin_f, name=gt.name)}
-    _count(s, f"twin_source.{twin_f.get('source')}")
+    props = [O.Proposal(str(row_name), 0, ("row", g, eef_in_object, eef, pre), [pre, eef]),
+             O.Proposal(str(twin_name), 1, ("twin", gt, eio_t, eef_t, pre_t), [pre_t, eef_t])]
+    chosen, decision = O.choose(ikc, arm, props, evaluate, q_start, stage=f"grasp {where}".strip())
+    opts = decision["options"]
+
+    def side(label: str) -> Dict[str, Any]:
+        """The chosen configuration for the chosen assignment, the caller's / fresh solve for the other."""
+        if chosen is not None and chosen.proposal.label == label:
+            return chosen.facts()
+        return next((dict(o) for o in opts if o["label"] == label and o["source"] == "ik"), {"ok": False})
+
+    take = chosen is not None and chosen.proposal.payload[0] == "twin"
+    why = decision["reason"] if chosen is not None else "neither feasible"
+    facts = {"stage": where, "chosen": "twin" if take else "row", "reason": why, "source": decision["source"],
+             "row": dict(side(str(row_name)), name=row_name), "twin": dict(side(str(twin_name)), name=twin_name), "orient": decision}
     if take:
         _count(s, "twin_taken")
         _count(s, f"twin_taken.{why.replace(' ', '_')}")
-    log.info("grasp twin [%s] %s (%s, %s) | row %s: %s | twin %s: %s", where, gt.name if take else getattr(g, "name", None), facts["chosen"], why,
-             getattr(g, "name", None), _twin_side(row_f), gt.name, _twin_side(twin_f))
+    log.info("grasp twin [%s] %s (%s, %s%s) | row %s: %s | twin %s: %s", where, twin_name if take else row_name, facts["chosen"], why,
+             ", wrist-flipped branch" if decision["source"] == "map" else "", row_name, _twin_side(facts["row"]), twin_name, _twin_side(facts["twin"]))
+    ok_labels = {o["label"] for o in opts if o.get("ok") and not o.get("predicted")}
+    if chosen is None:
+        # the row's own verdict: its IK failure, or the check it failed after solving (camera, the caller's check)
+        failed = res if not res.ok else IK.IKResult(False, None, str(facts["row"].get("why") or "the row fails the camera / caller's check"), len(props[0].chain))
+        return TwinPick(False, g, eef_in_object, eef, pre, failed, False, None, facts)
     if take:
-        other = (g, eef_in_object, eef, pre) if row_acc else None
-        return TwinPick(True, gt, eio_t, eef_t, pre_t, res_t, True, other, facts)
-    other = (gt, eio_t, eef_t, pre_t) if twin_s is not None else None
-    return TwinPick(False, g, eef_in_object, eef, pre, res, row_acc, other, facts)
+        other = (g, eef_in_object, eef, pre) if str(row_name) in ok_labels else None
+        return TwinPick(True, gt, eio_t, eef_t, pre_t, chosen.result, True, other, facts)
+    other = (gt, eio_t, eef_t, pre_t) if str(twin_name) in ok_labels else None
+    return TwinPick(False, g, eef_in_object, eef, pre, chosen.result, True, other, facts)
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1941,7 +1910,8 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
                      ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None,
-                     brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None):
+                     brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None,
+                     q_first_brace: Optional[th.Tensor] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
     arm locked at its solution, combined whole-body check of the final configuration. Same steps as
     ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
@@ -1950,7 +1920,8 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     ``brace_only_check = (ignored objects, margin)``: an extra check of the brace arm's final configuration with the
     working arm back at the stance posture against everything but the ignored objects at ``margin`` — the way to test
     a stop blade against the target at its goal pose (teleported there by the caller) while the push hand, which
-    touches the target, is not in the picture. Returns the ``IKResult``."""
+    touches the target, is not in the picture. ``q_first_brace``: the brace chain starts from this arm configuration (``exact``'s
+    ``q_first``; a wrist-flipped solution, ``orient``). Returns the ``IKResult``."""
     IK = _ik()
     ikc = s.ikc
     r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
@@ -1962,8 +1933,14 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     # the locked arm touches (``ignore_while_locked``, default = the working pose's ignore set; a caller may pass just the touched
     # link) leave the world for the whole brace chain; the final pose ignores ``ignore_brace_last`` on top, as before.
     locked_ign = list(ignore_work_last) if ignore_while_locked is None else list(ignore_while_locked)
+    q_f = None
+    if q_first_brace is not None:
+        q_f = r1.q.clone()
+        idx_b = s.kit.robot.arm_control_idx[brace_arm]
+        q_f[idx_b] = _t(q_first_brace)[idx_b]
     with ikc.ignoring(locked_ign):
-        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers)
+        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers,
+                       q_first=q_f)
     if not r2.ok:
         return IK.IKResult(False, None, f"{brace_arm} (brace): {r2.reason}")
     touched = list(ignore_work_last) + [o for o in ignore_brace_last if all(o is not w for w in ignore_work_last)]

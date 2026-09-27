@@ -48,6 +48,7 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.articulation import scale_handle, scale_joint_info
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.v2 import navigation as NAV
+from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.sampling.v2.stances import FaceFrame, Stance
@@ -1009,22 +1010,43 @@ class ArticulationLarge(SamplerV2):
             if not P0.in_frame(self, cam, patch) or not P0.in_frame(self, cam, h0.contact.reshape(1, 3), P0.IN_FRAME_MARGIN):
                 errors.append("drawn tilt: the handle contact / face patch leaves the frame")
                 continue
-            contact = P0.ContactSpec("handle", self.arm, h0.eef, h0.pre_grasp, classes=classes, ignore_for_last=[obj])
             # both closing signs of the pinch (the wrist turned by a half turn about the approach): the reach-volume class is
-            # the same, the exact IK is not — one of the two is usually reachable where the other is not
-            for sign in (1.0, -1.0):
+            # the same, the exact IK is not — one of the two is usually reachable where the other is not. The orientation rule
+            # (owner 2026-09-27) orders them by the [pre-grasp, grasp] solutions at q_init (step 5a, joint-limit safe, then
+            # easier to reach from the stance, +1 within the tolerance) and the follow is solved in that order, the other sign
+            # when the first falls; no wrist-flipped branch (the follow solves the grasp again from the stance's seed)
+            props = []
+            for rank, sign in enumerate((1.0, -1.0)):
                 self.pinch_sign = sign
                 h0s = self.h([q_init])[0]
-                contact_s = P0.ContactSpec("handle", self.arm, h0s.eef, h0s.pre_grasp, classes=classes, ignore_for_last=[obj])
+                props.append(O.Proposal(f"pinch {sign:+.0f}", rank, (sign, h0s, P0.ContactSpec("handle", self.arm, h0s.eef, h0s.pre_grasp, classes=classes, ignore_for_last=[obj])),
+                                        [h0s.pre_grasp, h0s.eef]))
+
+            def grasp_ok(p):
+                sign, _, contact_s = p.payload
+                sol = P0.exact_contacts(self, manip, [contact_s], ignore_combined=[obj])
+                if not sol.ok:
+                    errors.append(f"pinch {sign:+.0f}: handle_unreachable: {sol.reason}")
+                    if arm_mode:
+                        self.pinch_sign = sign
+                        self.debug_handle_ik(manip, contact_s)
+                return bool(sol.ok), sol, None, "" if sol.ok else str(sol.reason)
+
+            solved: Dict[str, Any] = {}
+
+            def follow(sc):
+                sign, h0s, contact_s = sc.proposal.payload
+                self.pinch_sign = sign
                 try:
                     goal_set = None
                     reach_info: Dict[str, Any] = {}
+                    q_goal_s = q_goal
                     if arm_mode:
-                        q_goal, goal_set, reach_info = self.goal_for_stance(manip, init, q_init, contact_s, rng)
-                    wps = self.h([q_init] + [qk for _, qk in waypoint_values(q_init, q_goal, fractions)])
-                    pf = self.passive_for(q_init, q_goal)
+                        q_goal_s, goal_set, reach_info = self.goal_for_stance(manip, init, q_init, contact_s, rng)
+                    wps = self.h([q_init] + [qk for _, qk in waypoint_values(q_init, q_goal_s, fractions)])
+                    pf = self.passive_for(q_init, q_goal_s)
                     required = required_fractions(pf, fractions, self.gp.gen("require_goal_handle", "auto"))
-                    d = self._solve_from(manip, init, q_init, q_goal, wps, required, contact_s, h0s, goal_set=goal_set, reach_info=reach_info)
+                    d = self._solve_from(manip, init, q_init, q_goal_s, wps, required, contact_s, h0s, goal_set=goal_set, reach_info=reach_info)
                 except Reject as e:
                     errors.append(f"pinch {sign:+.0f}: {e.reason}: {e}")
                     # a stance that got as far as a full hybrid follow (5 min) and then fell at step 6 was invisible until the
@@ -1034,11 +1056,18 @@ class ArticulationLarge(SamplerV2):
                     self.sidecar.transitions.clear()
                     self.sidecar.paths.clear()
                     self.sidecar.articulation = None
-                    continue
-                d.summary.update({"direction": self.direction, "joint": self.joint_name, "q_init": q_init, "q_goal": q_goal, "required_fractions": required,
+                    return False, f"{e.reason}: {str(e)[:120]}"
+                d.summary.update({"direction": self.direction, "joint": self.joint_name, "q_init": q_init, "q_goal": q_goal_s, "required_fractions": required,
                                   "passive_from": pf, "arm": self.arm, "follow_mode": self.mode, "door_class": self.door_class, "hinge_side": self.hinge_side,
                                   "pinch_sign": sign, "phase2": stats, "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip),
                                   **reach_info})
+                solved["draft"] = d
+                return True, ""
+
+            chosen, decision = O.choose(self.ikc, self.arm, props, grasp_ok, self.ikc.q_locked(manip), stage="handle pinch", downstream=follow, map_twins=False)
+            if chosen is not None:
+                d = solved["draft"]
+                d.summary["pinch_orient"] = decision
                 return d
         self.pinch_sign = 1.0
         # every distinct reason once (the last 4 alone hid the hybrid search's verdict behind the tilt re-check draws, door 0919-023637)

@@ -40,6 +40,7 @@ from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import PAD_BAND_MARGIN, SamplerV2, register
 from ispatialgym.sampling.v2.navigation import attached
@@ -653,8 +654,12 @@ class Attachment(SamplerV2):
         self.sidecar.add_stance(manip)
         self.sidecar.add_grasp(grasp)
         if brace is not None:
+            b_extras = {"pose_class": brace_kind, "stop_clearance_m": 0.0}
+            b_orient = att.get("brace_orient") if att is not None else None
+            if b_orient and len([o for o in b_orient.get("options", []) if o.get("source") == "ik"]) > 1:
+                b_extras["orient"] = b_orient
             self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=brace_dir, brace_kind="partner_face", object=pname,
-                                                    stance=work_st.name, extras={"pose_class": brace_kind, "stop_clearance_m": 0.0}))
+                                                    stance=work_st.name, extras=b_extras))
             work_st.contacts = ["brace"]
             work_st.arms = ["right", "left"]
         work_st.extras.update({"brace": brace_state, "brace_class": brace_kind, "left_band": self.left_bands is not None})
@@ -1258,21 +1263,27 @@ class Attachment(SamplerV2):
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
                                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)))
                         continue
-                    brace_rec = None
+                    brace_rec, brace_orient = None, None
                     if joint_ok and brace:
-                        for pre_c, c_pose, kind in self._brace_candidates(st, point, b_dir, brace_classes):
+                        def eval_brace(p):
                             self._check_deadline()
-                            res_b = TT.brace_second_arm(self, st, "right", [eef_pre, eef_attach], "left", [pre_c, c_pose], ignore_work_last=[support, female],
-                                                        ignore_brace_last=[support, female])
-                            if res_b.ok:
-                                brace_rec = (pre_c, c_pose, kind)
-                                break
+                            res_b = TT.brace_second_arm(self, st, "right", [eef_pre, eef_attach], "left", list(p.chain), ignore_work_last=[support, female],
+                                                        ignore_brace_last=[support, female], q_first_brace=p.q_first)
+                            return bool(res_b.ok), res_b, None, str(res_b.reason)
+
+                        # a class's two wrist turns by the orientation rule (owner 2026-09-27); the classes in their order
+                        b_chosen, b_dec, _b_fails = O.choose_first(self.ikc, "left", self._brace_candidates(st, point, b_dir, brace_classes), key=lambda c: c[1],
+                                                                   label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=eval_brace,
+                                                                   q_start=self.ikc.q_locked(st), stage="attachment brace")
+                        if b_chosen is not None:
+                            brace_rec = tuple(b_chosen.proposal.payload)
+                            brace_orient = b_dec
                     if joint_ok and brace and brace_rec is None:
                         fails["brace_ik"] += 1
                         if require_joint:
                             continue
             return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace_rec, "b_dir": b_dir,
-                    "point": point, "slerp_policy": r_w.reason}
+                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient}
         return None
 
     def _second_base_pose(self, rng, manip: Stance, m_pose: TT.Pose, grasp, cam_init, tname: str, require_joint: bool = True, brace: bool = True):

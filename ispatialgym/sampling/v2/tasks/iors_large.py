@@ -61,6 +61,7 @@ from ispatialgym.sampling.sim_utils import Reject, SupportTop
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
@@ -660,17 +661,26 @@ class IORSLarge(SamplerV2):
             goal = th.tensor([float(gc[0]), float(gc[1]), z_push]) - d3 * (half_d + standoff - float(self.num("push_goal_extra_m", 0.03)))
             mid = 0.5 * (start + goal)
             low = (z_tip - self.floor_z) < self.SLAB_TIP_M
-            for c_sign in (1.0, -1.0):
+            props = []
+            for rank, c_sign in enumerate((1.0, -1.0)):
                 q = C.eef_quat(a_vec, c_sign * d3)
                 poses = [(start, q), (mid, q), (goal, q)]
-                pre = C.pre_pose(poses[0])
+                props.append(O.Proposal(f"pitch {pitch:.0f}{'' if c_sign > 0 else '-'}", rank, c_sign, [C.pre_pose(poses[0])] + poses))
+
+            def evaluate(p, low=low):
                 with self.ikc.ignoring([floor, target], ground=not low):
-                    res = self.ikc.exact([pre] + poses, place, "right", cache=False, fingers=C.FINGER_CLOSED)
-                if res.ok:
-                    return {"pre": pre, "start": poses[0], "mid": poses[1], "goal": poses[2], "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
-                            "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": c_sign,
-                            "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low)}
-                why.append(f"pitch {pitch:.0f}{'' if c_sign > 0 else '-'}: {res.reason}")
+                    res = self.ikc.exact(p.chain, place, "right", cache=False, fingers=C.FINGER_CLOSED, q_first=p.q_first)
+                return bool(res.ok), res, None, str(res.reason)
+
+            # the two wrist turns by the orientation rule (owner 2026-09-27); the camera is checked at the blade's start, where the
+            # target and the floor left the IK's world
+            chosen, decision = O.choose(self.ikc, "right", props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitch {pitch:.0f}")
+            if chosen is not None:
+                pre, start_p, mid_p, goal_p = chosen.proposal.chain
+                return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
+                        "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": chosen.proposal.payload,
+                        "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low), "orient": decision}
+            why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
         log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.alias, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)),
                  [round(float(v), 2) for v in P0.to_base_frame(th.tensor([float(cd[0]), float(cd[1]), 0.0]) - d3 * half_d, place.base_pose2d, P0.base_z(self)).tolist()],
@@ -2313,7 +2323,8 @@ class IORSLarge(SamplerV2):
                                                              tname, stance="push" if push_st is not None else "placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],
                                                              push_height_m=chain["push_height_m"], half_extent_m=chain["half_extent_m"], fingertip_z_m=chain["fingertip_z_m"],
                                                              ground_ignored=bool(chain.get("ground_ignored", False)),
-                                                             drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname))
+                                                             drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname,
+                                                             **({"orient": chain["orient"]} if chain.get("orient") else {})))
                 cam = self.camera_pose_at(init)
                 if not self.frustum_ok(cam, self.hull_corners_world(self.hull, t_pose), 0.05):
                     raise Reject("not_in_frame", "target not in the init image (5 %)")

@@ -26,6 +26,7 @@ from ispatialgym.sampling.sim_utils import Reject, SupportTop
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, contact_height_extra, register, requested_height_extra
 from ispatialgym.sampling.v2.navigation import attached
@@ -52,6 +53,13 @@ HAND_SPHERES_EEF: Dict[str, Tuple[Tuple[Tuple[float, float, float], ...], float]
 }
 
 log = logging.getLogger("ispatialgym.sampling.v2")
+
+
+def _with_orient(extras: Dict[str, Any], decision: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The contact record's extras with the orientation decision (``orient.choose``) when the class had two wrist turns."""
+    if decision is None or len([o for o in decision.get("options", []) if o.get("source") == "ik"]) < 2:
+        return dict(extras)
+    return dict(extras, orient=decision)
 
 RELATION_OF_SUBTASK = {
     "inter_object_relation_satisfaction-ontop_small_scale": "ontop",
@@ -1181,7 +1189,8 @@ class IORSSmall(SamplerV2):
             pick = None
             if twin_open:
                 pick = TT.pick_twin(self, manip, grasp.arm, g, eef_in_object, eef, pre, res, kw, support_z=float(self.top.z),
-                                    accept=self.open_pads_clear_of_support if require_pad_clearance else None, where="reselect_grasp")
+                                    accept=self.open_pads_clear_of_support if require_pad_clearance else None, where="reselect_grasp",
+                                    row_allowed=not barred(name))
                 if not pick.passed:
                     continue
                 g, eef_in_object, eef, pre, res = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res
@@ -1479,29 +1488,17 @@ class IORSSmall(SamplerV2):
         ignore_brace = self.support_objects() + [self.obj("partner")]
         n_brace = int(self.gen("brace_search_candidates", 12))
         with self.posed("target", t_place_pose):
-            for push_kind, push_init, _extras in self.touching_push_candidates(st, p_init, t_face_z, direction):
-                push_goal = (push_init[0] + direction * dist, push_init[1])
-                if self.push_hand_overlap(push_init, push_goal, t_place_pose, direction, dist) is not None:
-                    continue
-                pre = IK.pre_pose(push_init, float(_extras.get("pre_dist_m") or IK.PRE_DIST))
-                r = self.ikc.exact([pre, push_init, push_goal], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
-                if not r.ok:
-                    continue
-                r2 = self.ikc.exact([IK.pre_pose(push_goal)], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
-                if not r2.ok:
-                    continue
-                if not with_brace:
-                    return push_kind
-                for i, (b_pre, b_contact, b_kind, _bx) in enumerate(self.touching_brace_candidates(st, b_point, face_z, -direction, partner_hull_w=p_hull, push_point=p_init)):
-                    if i >= n_brace:
-                        break
-                    if self.hand_overlap(b_contact, "partner", p_pose) is not None:
-                        continue
-                    with self.posed("target", (G.t(t_place_pose[0]) + direction * dist, G.t(t_place_pose[1]))), self.ikc.ignoring([self.obj("target")]):
-                        res = self.ikc.exact_both_arms(("right", [pre, push_init, push_goal]), ("left", [b_pre, b_contact]), st, ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
-                    if res.ok and self.ikc.exact([IK.pre_pose(b_contact, RETREAT_DIST_M)], st, "left", ignore_for_last=ignore_brace, cache=False).ok:
-                        return f"{push_kind}+{b_kind}"
-                return None  # the push class passes but no brace joins it from this stance
+            chosen, _dec, _fails = self._touching_push_choice(st, t_place_pose, p_init, t_face_z, direction, dist, ignore_push)
+            if chosen is None:
+                return None
+            push_kind = chosen.proposal.payload[0]
+            if not with_brace:
+                return push_kind
+            b_chosen, _bdec, _bfails = self._touching_brace_choice(st, chosen.proposal.chain, t_place_pose, p_pose, b_point, face_z, direction, dist, p_hull, p_init,
+                                                                   ignore_push, ignore_brace, limit=n_brace, diagnose=False)
+            if b_chosen is not None:
+                return f"{push_kind}+{b_chosen.proposal.payload[2]}"
+            return None  # the push class passes but no brace joins it from this stance
         return None
 
     def place_infeasible_why(self, st: Stance, t_place_pose: G.Pose, grasp: GraspRecord) -> Optional[str]:
@@ -1664,57 +1661,20 @@ class IORSSmall(SamplerV2):
         # place for the chain's checks (the pre-contact of the placed box lies inside the box at its init pose otherwise -
         # 0918-170804: 'exact IK failed at pose 1 of 3' on 6/12 attempts)
         with self.posed("target", t_pose):
-            for push_kind, push_init, push_extras in self.touching_push_candidates(manip, p_init, t_face_z, direction):
-                push_goal = (push_init[0] + direction * dist, push_init[1])
-                push_pre = IK.pre_pose(push_init, float(push_extras.get("pre_dist_m") or IK.PRE_DIST))
-                # (0) the hand beyond the finger profile (wrist camera, knuckles, body) clear of the box at the contact and the goal
-                overlap = self.push_hand_overlap(push_init, push_goal, t_pose, direction, dist)
-                if overlap is not None:
-                    why.append(f"{push_kind}: {overlap}")
-                    continue
-                # (1) the push chain on its own - the requirement (brace optional, owner 2026-09-16 17:10: the axial rule)
-                r_push = self.ikc.exact([push_pre, push_init, push_goal], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
-                if not r_push.ok:
-                    why.append(f"{push_kind}: right: {r_push.reason}")
-                    continue
-                # the oracle's retreat after the push ends 10 cm back along the approach axis from the push GOAL (above it for a
-                # blade): a class whose clear pose has no configuration dies in the program check (9/16 of 0918-173814)
-                r_ret = self.ikc.exact([IK.pre_pose(push_goal)], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
-                if not r_ret.ok:
-                    why.append(f"{push_kind}: retreat clear pose: {r_ret.reason}")
-                    continue
-                push_chosen = (push_kind, push_pre, push_init, push_goal, push_extras)
+            chosen, dec_p, fails_p = self._touching_push_choice(manip, t_pose, p_init, t_face_z, direction, dist, ignore_push)
+            why.extend(fails_p)
+            if chosen is not None:
+                push_kind, push_init, push_extras = chosen.proposal.payload
+                push_pre, _, push_goal = chosen.proposal.chain
+                push_chosen = (push_kind, push_pre, push_init, push_goal, _with_orient(push_extras, dec_p))
                 # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
                 if try_brace:
-                    for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction, partner_hull_w=p_hull, push_point=p_init):
-                        overlap = self.hand_overlap(contact, "partner", p_pose)  # camera / knuckles / body vs the braced partner
-                        if overlap is not None:
-                            why.append(f"{push_kind}/{kind}: {overlap}")
-                            continue
-                        # owner 2026-09-18 22:29: the two-arm solve locks the right arm at its push GOAL - with the box still at the
-                        # place in the collision world the right fingertips sit ~5 cm inside it and every whole-body configuration
-                        # is 'in collision' whatever the left arm does (every brace class failed at its first pose while passing
-                        # alone, 0918-211933 .. 220534); the box is posed where the push leaves it
-                        # the target leaves the collision world for the two-arm solve: the right tips locked 5 mm before its face sit
-                        # inside the checker's margin ('collides with target', 0918-223037 attempt 2) - the push chain itself was
-                        # validated above with its own ignores; the brace is 20 cm away from it
-                        with self.posed("target", (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))), self.ikc.ignoring([self.obj("target")]):
-                            res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
-                                                           ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
-                        if res.ok:
-                            # the brace arm's retreat after its release (oracle: 10 cm back along the approach, fingers open) must have
-                            # a configuration too - 0918-223037 attempt 0 died in the program check on left_arm_joint7's limit there
-                            r_ret = self.ikc.exact([IK.pre_pose(contact, RETREAT_DIST_M)], manip, "left", ignore_for_last=ignore_brace, cache=False)
-                            if not r_ret.ok:
-                                why.append(f"{push_kind}/{kind}: brace retreat clear pose: {r_ret.reason}")
-                                continue
-                            brace_chosen = (pre, contact, kind, extras)
-                            break
-                        # diagnostic (owner 2026-09-18 20:48): the left chain on its own, the right arm at the stance posture - a pass
-                        # here names the two-arm combination (self-collision / the locked right arm) as the blocker
-                        alone = self.ikc.exact([pre, contact], manip, "left", ignore_for_last=ignore_brace, cache=False, fingers=IK.FINGER_CLOSED)
-                        why.append(f"{push_kind}/{kind}: {res.reason} [left alone: {'ok' if alone.ok else alone.reason}]")
-                break
+                    b_chosen, dec_b, fails_b = self._touching_brace_choice(manip, chosen.proposal.chain, t_pose, p_pose, b_point, face_z, direction, dist, p_hull, p_init,
+                                                                           ignore_push, ignore_brace)
+                    why.extend(f"{push_kind}/{w}" for w in fails_b)
+                    if b_chosen is not None:
+                        pre, contact, kind, extras = b_chosen.proposal.payload
+                        brace_chosen = (pre, contact, kind, _with_orient(extras, dec_b))
         if push_chosen is None:
             d_i, l_i = manip.local(G.t(p_init)[:2])
             raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the {manip.name} stance (push init at depth {d_i:.2f} "
@@ -1742,6 +1702,79 @@ class IORSSmall(SamplerV2):
             manip.arms = ["right"]
             manip.contacts = ["push"]
             self.sidecar.contacts.pop("brace", None)
+
+    def _touching_push_choice(self, st: Stance, t_pose: G.Pose, p_init: th.Tensor, t_face_z: Tuple[float, float], direction: th.Tensor, dist: float,
+                              ignore_push: Sequence[Any]):
+        """The push of the touching task (the box posed at the place by the caller): ``touching_push_candidates`` in their order,
+        a class's two wrist turns chosen by ``orient.choose`` (owner 2026-09-27). A candidate passes when (0) the hand beyond the
+        finger profile (wrist camera, knuckles, body) clears the box at the contact and the goal, (1) the [pre, init, goal] chain
+        passes the exact IK on its own (the requirement; the brace is optional, owner 2026-09-16 17:10: the axial rule) and (2)
+        the oracle's retreat after the push - 10 cm back along the approach axis from the push GOAL (above it for a blade) - has a
+        configuration (a class without one dies in the program check, 9/16 of 0918-173814). Returns ``orient.choose_first``'s
+        ``(chosen, decision, failures)``."""
+
+        def chain(c):
+            _kind, init, extras = c
+            return [IK.pre_pose(init, float(extras.get("pre_dist_m") or IK.PRE_DIST)), init, (init[0] + direction * dist, init[1])]
+
+        def evaluate(p):
+            pre, init, goal = p.chain
+            overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist)
+            if overlap is not None:
+                return False, None, None, overlap
+            r_push = self.ikc.exact(p.chain, st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED, q_first=p.q_first)
+            if not r_push.ok:
+                return False, r_push, None, f"right: {r_push.reason}"
+            qs = O.chain_qs(self.ikc, "right", p.chain)
+            r_ret = self.ikc.exact([IK.pre_pose(goal)], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+            if not r_ret.ok:
+                return False, r_push, None, f"retreat clear pose: {r_ret.reason}"
+            return True, r_push, qs, ""
+
+        return O.choose_first(self.ikc, "right", self.touching_push_candidates(st, p_init, t_face_z, direction), key=lambda c: c[1], label=lambda c: c[0],
+                              chain=chain, evaluate=evaluate, q_start=self.ikc.q_locked(st), camera_idx=[1], stage="touching push")
+
+    def _touching_brace_choice(self, st: Stance, push_chain: List[G.Pose], t_pose: G.Pose, p_pose: G.Pose, b_point: th.Tensor, face_z: Tuple[float, float],
+                               direction: th.Tensor, dist: float, p_hull: th.Tensor, p_init: th.Tensor, ignore_push: Sequence[Any], ignore_brace: Sequence[Any],
+                               limit: Optional[int] = None, diagnose: bool = True):
+        """The left brace joining the chosen push: ``touching_brace_candidates`` in their order (the first ``limit``), a class's two
+        wrist turns chosen by ``orient.choose``. A candidate passes when the hand beyond the finger profile clears the braced
+        partner, the two-arm solve holds with the right arm locked at its push GOAL, and the brace arm's retreat after its release
+        (10 cm back along the approach, fingers open) has a configuration (0918-223037 attempt 0 died in the program check on
+        left_arm_joint7's limit there). Owner 2026-09-18 22:29: with the box still at the place the right fingertips locked at the
+        goal sit ~5 cm inside it and every whole-body configuration read 'in collision' (0918-211933 .. 220534) - the box is posed
+        where the push leaves it and leaves the collision world for the two-arm solve (the tips 5 mm before its face sat inside
+        the checker's margin, 0918-223037 attempt 2); the push chain itself was validated with its own ignores."""
+        import itertools
+
+        pushed = (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))
+
+        def evaluate(p):
+            pre, contact = p.chain
+            overlap = self.hand_overlap(contact, "partner", p_pose)  # camera / knuckles / body vs the braced partner
+            if overlap is not None:
+                return False, None, None, overlap
+            with self.posed("target", pushed), self.ikc.ignoring([self.obj("target")]):
+                res = self.ikc.exact_both_arms(("right", list(push_chain)), ("left", [pre, contact]), st, ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED,
+                                               q_first_other=p.q_first)
+            if not res.ok:
+                if not diagnose:
+                    return False, res, None, str(res.reason)
+                # diagnostic (owner 2026-09-18 20:48): the left chain on its own, the right arm at the stance posture - a pass here names
+                # the two-arm combination (self-collision / the locked right arm) as the blocker
+                alone = self.ikc.exact([pre, contact], st, "left", ignore_for_last=ignore_brace, cache=False, fingers=IK.FINGER_CLOSED)
+                return False, res, None, f"{res.reason} [left alone: {'ok' if alone.ok else alone.reason}]"
+            qs = O.chain_qs(self.ikc, "left", [pre, contact])
+            r_ret = self.ikc.exact([IK.pre_pose(contact, RETREAT_DIST_M)], st, "left", ignore_for_last=ignore_brace, cache=False)
+            if not r_ret.ok:
+                return False, res, None, f"brace retreat clear pose: {r_ret.reason}"
+            return True, res, qs, ""
+
+        stream = self.touching_brace_candidates(st, b_point, face_z, -direction, partner_hull_w=p_hull, push_point=p_init)
+        if limit is not None:
+            stream = itertools.islice(stream, int(limit))
+        return O.choose_first(self.ikc, "left", stream, key=lambda c: c[1], label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=evaluate,
+                              q_start=self.ikc.q_locked(st), stage="touching brace")
 
     def touching_push_candidates(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
         """Push poses of the closed right gripper at the target's right face (``face_point``, mid height), pushing along
