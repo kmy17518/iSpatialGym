@@ -279,6 +279,16 @@ class ExecuteConfig:
     #: partner's displacement since the program start when it exceeds this (0920-164504: the bottle knocked 4.7 cm during the grasp
     #: phase, the descent came down 4 cm beside the neck)
     partner_shift_min_m: float = 0.005
+    #: (owner 2026-09-27, first-demo v2.1 A3, bar soap 0927-034001: "the robot wobbles at the grasp and the release") a library pinch
+    #: whose finger envelope (both finger meshes, closed..open) at the grasp pose reaches below the grasped object's lowest point + this
+    #: is lifted by the deficit along world z, the pads' fingertip-side end kept ``grasp_support_pad_margin_m`` below the object's top
+    #: (the attachment rule's FINGER_SUPPORT_CLEARANCE_M): the recorded bar-soap pinch aimed the fingertips 1 cm into the tray floor,
+    #: the hand stopped on it and the arm pressed ~100 N into it for the whole closure, bending torso_joint1 by 7.6 mrad ...
+    grasp_support_clearance_m: float = 0.004
+    grasp_support_pad_margin_m: float = 0.005
+    #: ... and a support place whose object hangs lower in the hand than the recorded ``eef_in_object`` by more than this is raised by
+    #: the difference, so the object meets its support instead of being driven into it (the same pinch pressed the destination tray)
+    place_inhand_raise_min_m: float = 0.002
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -976,8 +986,107 @@ def _transit(ctx, motions: Motions, state, action, leg: str, target: Optional[st
             pass
 
 
+def _finger_low_z(pos: th.Tensor, quat: th.Tensor, arm: str) -> Optional[float]:
+    """Lowest world z of the finger meshes at the eef pose (pos, quat) over the closure (closed and open), None without the assets."""
+    R = C.quat_to_mat(quat.float()).numpy()
+    p = pos.float().numpy()
+    lows = []
+    for q in (C.FINGER_CLOSED, C.FINGER_OPEN):
+        pts = M.finger_points_eef(q, arm)
+        if pts is None:
+            return None
+        lows.append(float((pts @ R.T + p)[:, 2].min()))
+    return min(lows)
+
+
+def _raised(pose, dz: float) -> Pose:
+    p, q = as_world_pose(pose)
+    return Pose(position=[float(p[0]), float(p[1]), float(p[2]) + float(dz)], orientation=[float(v) for v in q.tolist()])
+
+
+def lift_grasp_off_support(action: Grasp, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Dict[str, Any]:
+    """Owner 2026-09-27 (first-demo v2.1 A3, bar soap 0927-034001: "the wrist camera contacts the table during grasp & release and
+    pushes against it, causing robot to wobble" - a replay's contact dump showed only the two finger links, pressing 91-154 N into the
+    tray floor while the hand stood still, and torso_joint1 bent 7.6 mrad; the camera never touched): a library pinch of an object
+    resting on a support must not put a finger below the object's lowest point - nothing of the hand fits there. When the finger
+    envelope at the grasp pose reaches below the object's bottom + ``grasp_support_clearance_m``, the grasp, its pre-grasp and approach
+    are lifted by the deficit along world z, provided the pads' fingertip-side end stays ``grasp_support_pad_margin_m`` below the
+    object's top (else the recorded grasp runs). ``ctx["grasp_support_lift"]`` records the facts."""
+    if action.kind != "library" or targets.get("grasp") is None:
+        return targets
+    try:
+        lo, hi = state.object(action.object).aabb
+        bottom, top = float(lo[2]), float(hi[2])
+        pos, quat = (C.as_tensor(x).float() for x in as_world_pose(targets["grasp"]))
+        low = _finger_low_z(pos, quat, action.arm)
+    except Exception as e:  # noqa: BLE001 - no aabb / no finger meshes: the recorded grasp
+        ctx["grasp_support_lift"] = {"applied": False, "reason": f"{e!r}"[:120]}
+        return targets
+    if low is None:
+        return targets
+    need = bottom + cfg.grasp_support_clearance_m - low
+    pad_end = float((pos + C.PAD_Z_RANGE[1] * C.approach_axis(quat))[2])
+    rec: Dict[str, Any] = {"applied": False, "finger_low_z": round(low, 4), "object_bottom_z": round(bottom, 4), "deficit_m": round(need, 4), "object_top_z": round(top, 4)}
+    ctx["grasp_support_lift"] = rec
+    if need <= 0.0:
+        return targets
+    if pad_end + need > top - cfg.grasp_support_pad_margin_m:
+        rec["reason"] = f"a {need * 1000:.1f} mm lift leaves the pads {(top - pad_end - need) * 1000:.1f} mm below the object's top"
+        return targets
+    out = dict(targets)
+    out["grasp"] = _raised(targets["grasp"], need)
+    out["pre_grasp"] = _raised(targets["pre_grasp"], need)
+    out["approach"] = [_raised(p, need) for p in targets["approach"]]
+    rec.update({"applied": True, "lift_m": round(need, 4)})
+    log.info("grasp(%s): the finger envelope reaches %.1f mm below the object's bottom + %.0f mm: the grasp is lifted by that", action.object,
+             need * 1000, cfg.grasp_support_clearance_m * 1000)
+    return out
+
+
+def raise_place_for_inhand_pose(action: Place, state, sidecar, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Dict[str, Any]:
+    """Owner 2026-09-27 (first-demo v2.1 A3): the recorded place pose sets the object down only with the recorded in-hand transform
+    (``grasps[].eef_in_object``); an object that hangs LOWER in the hand (a grasp that ended higher on it - stopped short on the
+    support, 1 cm on the bar soap's tray floor, or lifted by ``lift_grasp_off_support``) was driven into its support by that much, the
+    fingertips pressing ~100 N into the destination tray through the release. The pre-place, place, descent and retreat are raised by
+    the difference (z only, never lowered) and the carry ramps up to the raised pre-place. ``ctx["place_inhand_raise"]`` records it."""
+    if action.kind != "support" or targets.get("place") is None:
+        return targets
+    try:
+        obj = state.object(action.object)
+        if state.held_object(action.arm) is not obj:
+            return targets
+        g = next((g for g in (getattr(sidecar, "grasps", None) or []) if g.object == action.object and getattr(g, "arm", None) in (None, action.arm)), None)
+        eio = (getattr(g, "extra", None) or {}).get("eef_in_object") if g is not None else None
+        if not isinstance(eio, dict) or eio.get("position") is None or eio.get("orientation") is None:
+            return targets
+        eio_rec = (th.tensor([float(v) for v in eio["position"]]), th.tensor([float(v) for v in eio["orientation"]]))
+        eio_live = C.relative(tuple(C.as_tensor(x).float() for x in state.eef_pose(action.arm)), tuple(C.as_tensor(x).float() for x in state.object_pose(action.object)))
+        place = tuple(C.as_tensor(x).float() for x in as_world_pose(targets["place"]))
+        live = C.compose(C.compose(place, C.invert(eio_rec)), eio_live)  # the hand pose that sets the object where the recorded place does
+        dz = float(live[0][2] - place[0][2])
+    except Exception as e:  # noqa: BLE001
+        ctx["place_inhand_raise"] = {"applied": False, "reason": f"{e!r}"[:120]}
+        return targets
+    rec: Dict[str, Any] = {"applied": False, "dz_m": round(dz, 4)}
+    ctx["place_inhand_raise"] = rec
+    if dz <= cfg.place_inhand_raise_min_m:
+        return targets
+    out = dict(targets)
+    for k in ("pre_place", "place"):
+        out[k] = _raised(targets[k], dz)
+    out["descent"] = [_raised(p, dz) for p in targets["descent"]]
+    out["retreat"] = [_raised(p, dz) for p in targets["retreat"]]
+    carry = list(targets.get("carry") or ())
+    if carry:
+        out["carry"] = [_raised(p, dz * (i + 1) / len(carry)) for i, p in enumerate(carry)]
+    rec.update({"applied": True, "raised_m": round(dz, 4)})
+    log.info("place(%s): the object hangs %.1f mm lower in the hand than recorded: the place is raised by that", action.object, dz * 1000)
+    return out
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
+    targets = lift_grasp_off_support(action, state, targets, ctx, _cfg(ctx))
     _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
     yield from motions.gripper(arm, close=False)
     # the container / support the object rests in (the source tray of disembedding, the table; ``grasps[].grasp_from``
@@ -1208,6 +1317,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
     if action.kind == "attach" and action.on:
         targets = _reaim_attach_targets(action, state, targets, ctx, cfg)
+    elif action.kind == "support":
+        targets = raise_place_for_inhand_pose(action, state, ctx.get("sidecar"), targets, ctx, cfg)
     carry = list(targets.get("carry") or ())
     if cfg.carry_leg == "straight" and carry:
         # the carry leg: a straight Cartesian leg from where the hand is (the lift end) to the recorded pre-place, through
