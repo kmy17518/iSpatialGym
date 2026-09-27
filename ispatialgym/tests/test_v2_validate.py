@@ -484,7 +484,7 @@ def _target(frame="world", position=None, orientation=None, position_metric=None
 
 def _task(satisfied=True):
     compiled = types.SimpleNamespace(binary_goal_head_idxs=[0], check_goal=lambda fn: (satisfied, {"satisfied": [0] if satisfied else [], "unsatisfied": [] if satisfied else [0]}))
-    return types.SimpleNamespace(compiled_task=compiled, _evaluate_predicate=lambda *a: True, group_entities={}, groups={},
+    return types.SimpleNamespace(compiled_task=compiled, evaluate_predicate=lambda *a: True, group_entities={}, groups={},
                                  problem=types.SimpleNamespace(goal=[["ontop", "apple.n.01_1", "plate.n.04_1"]], init=[]))
 
 

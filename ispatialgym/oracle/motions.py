@@ -396,11 +396,11 @@ class PathTracker(BaseTrajectoryTracker):
 
 
 class Motions:
-    """The eight Layer-1 motions bound to one R1Pro (``env.robots[0]``) and one cuRobo backend."""
+    """The eight Layer-1 motions bound to one R1Pro (``env.scene.robots[0]``) and one cuRobo backend."""
 
     def __init__(self, env, planner, cfg: Optional[MotionsConfig] = None, robot=None):
         self.env = env
-        self.robot = robot if robot is not None else env.robots[0]
+        self.robot = robot if robot is not None else env.scene.robots[0]
         self.backend = planner
         self.cfg = cfg or MotionsConfig()
         self.dt = float(getattr(planner, "control_dt", 1.0 / 30.0))

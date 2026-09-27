@@ -141,7 +141,7 @@ class SimWorld:
         self.env = og.Environment(configs=cfg)
         self._set_measurement_render_settings()
         self.scene = self.env.scene
-        self.robot = self.env.robots[0]
+        self.robot = self.env.scene.robots[0]
         # the BEHAVIOR-1K evaluator's 250 kg chassis, so the sampler's physics probes (passive continuation, stable set,
         # the drop tests) see the grader's robot (owner 2026-09-21 23:49; ``r1pro_model.apply_eval_base_mass``)
         self.base_link_mass_kg = M.apply_eval_base_mass(self.robot)

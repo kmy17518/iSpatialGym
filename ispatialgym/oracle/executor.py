@@ -53,6 +53,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym import ASSETS_ROOT
+from ispatialgym import single_env as SE
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action, Brace, Place, Push
 from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
@@ -774,7 +775,7 @@ class Executor:
                  tracked_objects: Optional[Dict[str, Any]] = None, cam_key: Optional[str] = None):
         self.env, self.task, self.sidecar = env, task, sidecar
         self.cfg = cfg or ExecutorConfig()
-        self.robot = env.robots[0]
+        self.robot = env.scene.robots[0]
         self.cam_key = cam_key or (state.cam_key if state is not None else None)
         self.recorder = recorder
         self.motions = motions
@@ -843,7 +844,7 @@ class Executor:
     # ------------------------------------------------------------------ stepping (the only env.step)
 
     def step(self, action: th.Tensor, phase: int = PHASE_ORACLE, action_index: int = -1, attempt: int = 0, monitor: bool = True) -> Optional[Verdict]:
-        obs, reward, terminated, truncated, info = self.env.step(action, n_render_iterations=self.cfg.n_render_iterations)
+        obs, reward, terminated, truncated, info = SE.step(self.env, action, n_render_iterations=self.cfg.n_render_iterations)
         self.n += 1
         self.phase_steps[phase] = self.phase_steps.get(phase, 0) + 1
         self.last_obs, self.last_info = obs, info
@@ -1981,7 +1982,7 @@ class Executor:
         physics-synced sensor pose (``goal_observation.camera_pose_world``) and the pinhole intrinsics."""
         for _ in range(int(self.cfg.goal_image_renders)):
             self.sim.render()
-        obs, _info = self.env.get_obs()
+        obs, _info = SE.get_obs(self.env)
         robs = obs.get(self.robot.name, obs) if isinstance(obs, dict) else obs
         rgb = to_uint8_rgb(robs[self.cam_key]["rgb"])
         sensor = self.robot.sensors[self.cam_key]

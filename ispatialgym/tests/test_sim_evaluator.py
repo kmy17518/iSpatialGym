@@ -26,6 +26,7 @@ gm.ENABLE_TRANSITION_RULES = False
 
 import omnigibson.utils.transform_utils as T  # noqa: E402
 from bddl import predicates as bddl_predicates  # noqa: E402
+from ispatialgym import single_env as SE  # noqa: E402
 from omnigibson.object_states import LayoutReached, Open, PoseReached, PoseSettled  # noqa: E402
 from omnigibson.objects import DatasetObject  # noqa: E402
 from omnigibson.robots import Robot  # noqa: E402
@@ -416,7 +417,7 @@ def test_alignment_task_two_level_evaluation(task_env):
     assert task.measured_pose_instances == ["fishing_rod.n.01_1"]
     report = rod.states[PoseReached].get_error_report()
     assert report["position_error"] is None and report["orientation_error"] == pytest.approx(0.6, abs=0.02)
-    ok, status = task.compiled_task.check_initial_conditions(task._evaluate_predicate)
+    ok, status = task.compiled_task.check_initial_conditions(task.evaluate_predicate)
     assert ok, status
 
     teleport_step = 5
@@ -428,7 +429,7 @@ def test_alignment_task_two_level_evaluation(task_env):
             p, _ = rod.get_position_orientation()
             rod.set_position_orientation(position=p, orientation=q_goal)
             rod.keep_still()
-        return th.zeros(env.robots[0].action_dim)
+        return th.zeros(env.scene.robots[0].action_dim)
 
     def on_step(i, info):
         isg = isg_info(info)
@@ -459,7 +460,7 @@ def test_alignment_task_two_level_evaluation(task_env):
 
     # A reset returns to the snapshotted initial state: goal not reached, tracking cleared
     env.reset()
-    _, _, _, _, info = env.step(th.zeros(env.robots[0].action_dim))
+    _, _, _, _, info = SE.step(env, th.zeros(env.scene.robots[0].action_dim))
     isg = isg_info(info)
     assert not isg["binary_success"] and isg["first_success_step"] == -1 and isg["settle_latency_steps"] == -1
     assert isg["errors"]["max_orientation_error"] == pytest.approx(0.6, abs=0.05)
@@ -493,7 +494,7 @@ def test_alignment_task_non_gating_measure_atom(measure_task_env):
             p, _ = rod.get_position_orientation()
             rod.set_position_orientation(position=p, orientation=q_goal)
             rod.keep_still()
-        return th.zeros(env.robots[0].action_dim)
+        return th.zeros(env.scene.robots[0].action_dim)
 
     result = run_episode(env, policy)
 

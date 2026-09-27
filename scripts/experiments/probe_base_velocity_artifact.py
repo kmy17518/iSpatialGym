@@ -245,7 +245,7 @@ def run_scene(scene: str, variants: List[Dict[str, Any]], warmup: int, steps: in
         robot["position"], robot["orientation"] = EMPTY_POSE
     t0 = time.time()
     env = og.Environment(configs={"env": dict(ENV_CFG), "scene": scene_cfg, "robots": [robot]})
-    r = env.robots[0]
+    r = env.scene.robots[0]
     out: Dict[str, Any] = {"scene": scene, "posture": posture_name, "load_s": round(time.time() - t0, 1), "physics_dt": float(og.sim.get_physics_dt()),
                            "solver_stock": {"velocity_iterations": int(r.solver_velocity_iteration_count), "position_iterations": int(r.solver_position_iteration_count)},
                            "chassis_mass_stock_kg": float(r.base_footprint_link.mass), "variants": {}}

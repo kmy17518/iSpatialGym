@@ -137,8 +137,8 @@ class ISpatialGymTask(BehaviorTask):
         self.future_obj_instances = set()
         self._pose_settled_insts = []
         self._other_goal_head_idxs = []
-        self._pose_settled_other_success = {}
-        self._t_other_success = -1
+        self._pose_settled_other_success = [{}]  # BehaviorTask keeps this per env; an ISpatialGymTask drives one env
+        self._t_other_success = [-1]
         self.instruction_order = None
         self.currently_viewed_index = None
         self.currently_viewed_instruction = None
@@ -171,7 +171,18 @@ class ISpatialGymTask(BehaviorTask):
         # No scene-instance rewriting: iSpatialGym instances name their scene explicitly (TRO ``scene``).
         BaseTask.verify_scene_and_task_config(scene_cfg=scene_cfg, task_cfg=task_cfg)
 
+    @property
+    def object_scopes(self):
+        """The per-env scopes the (vectorized) ``BehaviorTask`` reads: an ISpatialGymTask binds exactly one env, whose
+        scope is :attr:`object_scope`."""
+        return None if self.object_scope is None else [self.object_scope]
+
+    @object_scopes.setter
+    def object_scopes(self, scopes):
+        self.object_scope = None if scopes is None else scopes[0]
+
     def _load(self, env):
+        assert env.num_envs == 1, f"ISpatialGymTask binds one environment, got num_envs={env.num_envs}"
         self.update_activity(env=env, activity_name=self.activity_name, activity_definition_id=self.activity_definition_id)
         if self._tro_path is not None:
             self._tro = load_tro(self._tro_path)
@@ -408,8 +419,13 @@ class ISpatialGymTask(BehaviorTask):
     def physical_object_scope(self) -> Dict[str, Any]:
         return {k: v for k, v in (self.object_scope or {}).items() if not isinstance(v, GroupEntity)}
 
-    def _evaluate_predicate(self, predicate_name, *entities):
+    def evaluate_predicate(self, predicate_name, *entities):
+        """``evaluate_fn`` of ``compiled_task.check_goal`` / ``check_initial_conditions`` against this task's scope."""
         return PRED.evaluate_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
+
+    def _evaluate_predicate(self, env_idx, predicate_name, *entities):
+        # BehaviorTask's per-env evaluator (potential reward, goal options); an ISpatialGymTask has one env
+        return self.evaluate_predicate(predicate_name, *entities)
 
     @staticmethod
     def predicate_branches() -> Dict[str, str]:
@@ -450,13 +466,13 @@ class ISpatialGymTask(BehaviorTask):
     def _update_bddl_scope_from_system_clear(self, system):
         return
 
-    def _get_obs(self, env):
+    def _get_obs(self, env, env_idx=0):
         # Same as BehaviorTask but restricted to physical entities (groups have no pose).
         group_names = set(self.group_entities)
         scope_backup = self.object_scope
         try:
             self.object_scope = {k: v for k, v in scope_backup.items() if k not in group_names}
-            return super()._get_obs(env)
+            return super()._get_obs(env, env_idx)
         finally:
             self.object_scope = scope_backup
 
@@ -479,14 +495,14 @@ class ISpatialGymTask(BehaviorTask):
         terminations["predicate"] = PredicateGoal(check_goal_fn=self._check_goal)
         return terminations
 
-    def _check_goal(self):
+    def _check_goal(self, env_idx=0):
         """Evaluate all goal heads once; decide termination.
 
         Returns ``(done, goal_status)`` like ``CompiledTask.check_goal``. ``done`` is the first settled success
         (``G and S``) when the goal has ``pose_settled`` atoms and ``terminate_on_binary_success`` is False,
         otherwise the first binary success.
         """
-        _, status = self.compiled_task.check_goal(self._evaluate_predicate)
+        _, status = self.compiled_task.check_goal(self.evaluate_predicate)
         satisfied = set(status["satisfied"])
         binary = set(self._other_goal_head_idxs).issubset(satisfied)
         settled = set(self._pose_settled_head_idxs).issubset(satisfied)
@@ -501,21 +517,21 @@ class ISpatialGymTask(BehaviorTask):
         self._first_settled_success_step = -1
         self._errors_at_first_success = None
         self._settled_history = {}
-        self._pose_settled_other_success = {}
-        self._t_other_success = -1
+        self._pose_settled_other_success = [{}]
+        self._t_other_success = [-1]
 
-    def _reset_variables(self, env):
-        super()._reset_variables(env)
+    def _reset_variables(self, env, env_indices):
+        super()._reset_variables(env, env_indices)
         self._reset_tracking()
 
-    def reset(self, env):
-        super().reset(env)
+    def reset(self, env, env_indices=None):
+        super().reset(env, env_indices=env_indices)
         for entity in self.group_entities.values():
             entity.invalidate()
 
-    def _reset_pose_settled_tracking(self):
-        self._pose_settled_other_success = {}
-        self._t_other_success = -1
+    def _reset_pose_settled_tracking(self, env_indices=None):
+        self._pose_settled_other_success = [{}]
+        self._t_other_success = [-1]
         for inst in self._pose_settled_insts:
             entity = self.object_scope.get(inst)
             if entity is not None and not isinstance(entity, GroupEntity) and PoseSettled in entity.states:
@@ -528,22 +544,23 @@ class ISpatialGymTask(BehaviorTask):
             return self._first_settled_success_step >= 0
         return self._first_success_step >= 0
 
-    def _step_termination(self, env, action, info=None):
-        done, info = BaseTask._step_termination(self, env=env, action=action, info=info)
-        info["goal_status"] = self._termination_conditions["predicate"].goal_status
+    def _step_termination(self, env, action, infos=None):
+        dones, infos = BaseTask._step_termination(self, env=env, action=action, infos=infos)
+        info = infos[0]
+        info["goal_status"] = self._termination_conditions["predicate"].goal_status[0]
         self._update_success_tracking(env)
         info["success"] = self.official_success
         info["termination_conditions"]["predicate"]["success"] = self.official_success
         self._populate_isg_info(env, info)
         if self._pose_settled_insts:
-            self._populate_pose_settled_info(info)
-        return done, info
+            self._populate_pose_settled_info(info, 0)
+        return dones, infos
 
     def _update_success_tracking(self, env):
         if self._last_goal_eval is None:
             return
         binary, settled, _ = self._last_goal_eval
-        t = env.episode_steps
+        t = int(env.episode_steps[0])
         if binary and self._first_success_step < 0:
             self._first_success_step = t
             self._errors_at_first_success = self.collect_errors()
@@ -666,7 +683,7 @@ class ISpatialGymTask(BehaviorTask):
             "first_settled_success_step": first_settled,
             "settle_latency_steps": latency,
             "settle_latency_seconds": (latency * dt) if latency >= 0 else None,
-            "step": env.episode_steps,
+            "step": int(env.episode_steps[0]),
             "conditions": self.goal_conditions_report(status),
             "measured": self.measured_conditions_report(current_errors),
             "errors": current_errors,

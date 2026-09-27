@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
+from ispatialgym import single_env as SE
+
 ISG_INFO_KEY = "ispatialgym"
 
 
@@ -74,13 +76,13 @@ def run_episode(
     ``n_render_iterations`` is forwarded to ``env.step`` and defaults to the BEHAVIOR convention
     (:data:`N_RENDER_ITERATIONS`).
     """
-    obs = env.reset()[0] if reset else env.get_obs()[0]
+    obs = SE.reset(env)[0] if reset else SE.get_obs(env)[0]
     info: Optional[Dict[str, Any]] = None
     steps = 0
     terminated = truncated = False
     while True:
         action = policy(obs, info)
-        obs, _, terminated, truncated, info = env.step(action, n_render_iterations=n_render_iterations)
+        obs, _, terminated, truncated, info = SE.step(env, action, n_render_iterations=n_render_iterations)
         steps += 1
         if on_step is not None:
             on_step(steps, info)

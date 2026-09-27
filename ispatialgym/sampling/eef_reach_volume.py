@@ -211,7 +211,7 @@ class _RobotOnly:
                "robots": [M.joylo_robot_config("robot_r1", position=[0.0, 0.0, 0.0])]}
         self.env = og.Environment(configs=cfg)
         self.og = og
-        self.robot = self.env.robots[0]
+        self.robot = self.env.scene.robots[0]
         for _ in range(5):
             og.sim.step()
         self.backend = R1ProCuRobo(self.robot, prebuild=tuple(f"{a}_arm" for a in arms))

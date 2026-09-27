@@ -155,7 +155,7 @@ class EmptyWorld(SimWorld):
         self.env = og.Environment(configs=cfg)
         self._set_measurement_render_settings()
         self.scene = self.env.scene
-        self.robot = self.env.robots[0]
+        self.robot = self.env.scene.robots[0]
         self.cam_key = [k for k in self.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
         self.cam = self.robot.sensors[self.cam_key]
         self.cam.horizontal_aperture = HEAD_APERTURE_MM

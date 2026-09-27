@@ -119,7 +119,7 @@ def run(env, gen: Iterator[th.Tensor], on_step=None, max_steps: int = 20000) -> 
 class Skills:
     def __init__(self, env, robot=None, backend: Optional[R1ProCuRobo] = None, cfg: Optional[SkillsConfig] = None, prebuild=("right_arm", "base")):
         self.env = env
-        self.robot = robot if robot is not None else env.robots[0]
+        self.robot = robot if robot is not None else env.scene.robots[0]
         self.cfg = cfg or SkillsConfig()
         self.arm = self.cfg.arm
         self.backend = backend if backend is not None else R1ProCuRobo(self.robot, prebuild=prebuild)

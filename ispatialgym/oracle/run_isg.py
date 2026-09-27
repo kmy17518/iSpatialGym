@@ -58,6 +58,7 @@ os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 import torch as th  # noqa: E402
 
 from ispatialgym.oracle.curobo_planner import R1ProCuRobo  # noqa: E402  (import before omnigibson: warp pinning)
+from ispatialgym import single_env as SE  # noqa: E402
 
 import omnigibson as og  # noqa: E402
 from omnigibson.macros import gm  # noqa: E402
@@ -288,7 +289,7 @@ class InstanceLoader:
         self.report["trav_cells_freed"] = patch_trav_map_from_meta(self.env.scene, self.tmeta)
         self.report["trav_cells_blocked"] = block_trav_map_from_meta(self.env.scene, self.tro.meta.scene or {})
         self.task = self.env.task
-        self.robot = self.env.robots[0]
+        self.robot = self.env.scene.robots[0]
         # the BEHAVIOR-1K evaluator's 250 kg chassis (owner 2026-09-21 23:49): the stock 47.6 kg base tipped 0.8 deg on
         # its wheel spheres under the dishwasher pull and snapped back at the release - the grader's physics, not ours
         self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot)
@@ -333,7 +334,7 @@ class InstanceLoader:
             self._hold_entities()
         env.scene.update_initial_file()
         task._reset_tracking()
-        obs, info = env.reset()  # returns to the snapshot, activates pose_settled tracking, renders
+        obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
         self.report["after_reset"] = self.restore_after_reset()
         if self.report["controller_targets_restored"]:
             robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action

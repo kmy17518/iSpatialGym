@@ -923,7 +923,7 @@ def _condition_texts(conditions: Optional[Sequence[Any]], idxs: Iterable[int]) -
 
 
 def _binary_goal(task) -> Tuple[bool, List[str]]:
-    _, status = task.compiled_task.check_goal(task._evaluate_predicate)
+    _, status = task.compiled_task.check_goal(task.evaluate_predicate)
     binary = set(task.compiled_task.binary_goal_head_idxs)
     satisfied = set(status["satisfied"])
     return binary <= satisfied, _condition_texts(getattr(task.problem, "goal", None), sorted(binary - satisfied))
@@ -1074,7 +1074,7 @@ def _adopt_env(loader, env, cfg) -> None:
     loader.env = env
     loader.cfg = cfg
     loader.task = env.task
-    loader.robot = env.robots[0]
+    loader.robot = env.scene.robots[0]
     loader.cam_key = next(k for k in loader.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX))
     loader.report["head_camera_key"] = loader.cam_key
     loader.report["evaluation_profile"] = loader.tro.meta.extras.get("evaluation_profile") or "isg-v1"
@@ -1165,7 +1165,7 @@ def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] =
                 cfg = loader.cfg
                 report["loader"] = {"scene_load_s": round(time.time() - t0, 1), **{k: loader.report.get(k) for k in ("trav_cells_freed", "head_camera_key", "head_camera_aperture_mm", "evaluation_profile")}}
             else:
-                _release_previous(prev_loader, env.robots[0], og)
+                _release_previous(prev_loader, env.scene.robots[0], og)
                 _adopt_env(loader, env, cfg)
             try:
                 obs, _info = loader.restore()
@@ -1195,7 +1195,7 @@ def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] =
                 rec["checks"]["exact"] = exact_checks(ex_loaded, ex_settled, stored, _read_json(inst.sidecar_path) if inst.sidecar_path else None,
                                                       _read_json(inst.summary_path) if inst.summary_path else None)
             # -- :init true, binary goal false ---------------------------------------------------------------------
-            ok_init, status = task.compiled_task.check_initial_conditions(task._evaluate_predicate)
+            ok_init, status = task.compiled_task.check_initial_conditions(task.evaluate_predicate)
             rec["checks"]["init_true"] = bool(ok_init)
             if not ok_init:
                 rec["failures"].append(f"init false: {_condition_texts(getattr(task.problem, 'init', None), status.get('unsatisfied', []))}")
@@ -1380,7 +1380,7 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
 
     results["trav_cells_freed"] = patch_trav_map_from_meta(env.scene, meta)  # what evaluation must do as well
     task = env.task
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     for path in tros:
         iid = os.path.basename(path).replace("-tro_state.json", "")
         rec = {"ok": True, "checks": {}, "notes": []}
@@ -1416,7 +1416,7 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
                 rec["ok"] = False
                 rec["notes"].append(f"template differs from the stable scene json for {len(devs)} non-task objects (max {max(d['pos'] for d in devs.values()):.3f} m)")
             # init conditions
-            ok_init, status = task.compiled_task.check_initial_conditions(task._evaluate_predicate)
+            ok_init, status = task.compiled_task.check_initial_conditions(task.evaluate_predicate)
             if not ok_init and constrained:
                 rec["checks"]["init"] = "skipped (grasp/constraint)"
             else:
@@ -1425,7 +1425,7 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
                     rec["ok"] = False
                     rec["notes"].append(f"init false: {status}")
             # goal not satisfied at init
-            _, gstatus = task.compiled_task.check_goal(task._evaluate_predicate)
+            _, gstatus = task.compiled_task.check_goal(task.evaluate_predicate)
             binary = set(task.compiled_task.binary_goal_head_idxs)
             goal_now = binary <= set(gstatus["satisfied"])
             rec["checks"]["goal_false_at_init"] = not goal_now
@@ -1480,7 +1480,7 @@ def _goal_feasible(env, task, tro, physical, constrained, og, to_torch):
     moved = False
     for inst, tgt in meta.pose_targets.items():
         ent = physical.get(inst)
-        if ent is None or ent is env.robots[0] or inst in constrained:
+        if ent is None or ent is env.scene.robots[0] or inst in constrained:
             continue
         if tgt.frame != "world" or tgt.position is None or tgt.orientation is None or tgt.position_metric != "full":
             continue
@@ -1518,7 +1518,7 @@ def _goal_feasible(env, task, tro, physical, constrained, og, to_torch):
         return "skipped (no world-frame targets)"
     for _ in range(120):
         og.sim.step_physics()
-        env.robots[0].keep_still()
+        env.scene.robots[0].keep_still()
     # kinematic predicates treat sleeping objects as unchanged: wake everything and take one full step first
     for ent in physical.values():
         if hasattr(ent, "wake"):
@@ -1526,7 +1526,7 @@ def _goal_feasible(env, task, tro, physical, constrained, og, to_torch):
     og.sim.step()
     for ent in task.group_entities.values():
         ent.invalidate()
-    _, status = task.compiled_task.check_goal(task._evaluate_predicate)
+    _, status = task.compiled_task.check_goal(task.evaluate_predicate)
     binary = set(task.compiled_task.binary_goal_head_idxs)
     ok = binary <= set(status["satisfied"])
     if not ok:

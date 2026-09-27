@@ -270,7 +270,7 @@ def render_template_v2(template_dir: str, goal: bool = False, topdown: bool = Tr
                 env = loader.build_env()
                 cfg = loader.cfg
             else:
-                V._release_previous(prev, env.robots[0], og)
+                V._release_previous(prev, env.scene.robots[0], og)
                 V._adopt_env(loader, env, cfg)
             try:
                 loader.restore()
@@ -395,7 +395,7 @@ def render_template(template_dir: str, robot_name: str = "robot_r1", res: int = 
     }
     env = og.Environment(configs=cfg)
     task = env.task
-    robot = env.robots[0]
+    robot = env.scene.robots[0]
     head_key = [k for k in robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
     left_key = [k for k in robot.sensors if "left" in k][0]
     right_key = [k for k in robot.sensors if "right" in k][0]

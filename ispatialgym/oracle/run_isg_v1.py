@@ -61,6 +61,7 @@ import numpy as np  # noqa: E402
 import torch as th  # noqa: E402
 
 from ispatialgym.oracle.curobo_planner import R1ProCuRobo  # noqa: E402, F401  (import before omnigibson: warp pinning)
+from ispatialgym import single_env as SE  # noqa: E402
 
 import omnigibson as og  # noqa: E402
 import omnigibson.utils.transform_utils as T  # noqa: E402
@@ -526,7 +527,7 @@ class Executor:
         self.phase_steps: Counter = Counter()
 
     def step(self, action: th.Tensor, phase: int) -> dict:
-        obs, _reward, _term, _trunc, info = self.env.step(action)
+        obs, _reward, _term, _trunc, info = SE.step(self.env, action)
         self.n += 1
         self.phase_steps[phase] += 1
         self.last_info, self.last_obs = info, obs
@@ -739,7 +740,7 @@ def main(argv=None) -> int:
         # (TRO ``ispatialgym.scene.scene_variant.blocked_footprints``, spec 6.2); no-op for every other instance
         meta["trav_cells_blocked"] = block_trav_map_from_meta(env.scene, tro.meta.scene or {})
         task = env.task
-        robot = env.robots[0]
+        robot = env.scene.robots[0]
         cam_key = _first_key(robot.sensors, M.HEAD_CAMERA_SENSOR_SUFFIX)
         if cam_key is None:
             raise RuntimeError(f"robot {robot.name} has no head camera sensor ({M.HEAD_CAMERA_SENSOR_SUFFIX})")
@@ -770,7 +771,7 @@ def main(argv=None) -> int:
                 ent.keep_still()
         env.scene.update_initial_file()
         task._reset_tracking()
-        obs, _ = env.reset()  # returns to the snapshot, activates pose_settled tracking, renders
+        obs, _ = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
         timings["load_s"] = time.time() - t0
         for g in grasps:
             g["attached_after_reset"] = robot._ag_obj_in_hand.get(g["arm"]) is physical[g["object"]]

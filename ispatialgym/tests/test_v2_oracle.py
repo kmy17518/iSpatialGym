@@ -329,6 +329,7 @@ class FakeScene:
     idx = 0
 
     def __init__(self, objects: Dict[str, Any], robot):
+        self.robots = [robot]
         self.objects_by_name = {o.name: o for o in objects.values()}
         self.objects_by_name[robot.name] = robot
         self.object_registry = FakeRegistry(self.objects_by_name)
