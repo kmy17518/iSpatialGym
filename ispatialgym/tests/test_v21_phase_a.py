@@ -399,8 +399,16 @@ def _via_self(stall_down=True, climb_to=0.07, plan_ok=True, violations=()):
 
 
 def test_via_above_takes_the_point_above_in_the_goal_witness_branch_when_the_planned_one_stalls():
-    """Sandal 0927-030120 on 8b572a12: the pose-goal point above the lifted pre-grasp lay 3.06 rad from its witness and the descent
-    from it stalled 13 mm short; the hand tracked straight up from the witness gives the point above, the descent retraces it."""
+    """Sandal 0927-030120 on 8b572a12 / f0591a6d: the pose-goal point above the lifted pre-grasp lay 3.06 rad from its witness; the
+    arm reached the pre-grasp in that branch and the approach from there stalled 13 mm short. The hand tracked straight up from the
+    witness gives the point above, the descent retraces it into the witness's branch - also when the other branch's descent tracks."""
+    for stall in (True, False):
+        s, calls, wba = _via_self(stall_down=stall)
+        goal = (th.tensor([0.5, 0.0, 0.85]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        q_goal = th.tensor([0.5, 0.0, 0.85, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        q_start = th.tensor([0.3, 0.1, 1.10, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        q_top = th.tensor([0.5, 0.0, 0.97, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        assert wba("right", "right_arm", goal, q_goal, q_start, q_top, {}) is not None
     s, calls, wba = _via_self()
     goal = (th.tensor([0.5, 0.0, 0.85]), th.tensor([0.0, 0.0, 0.0, 1.0]))
     q_goal = th.tensor([0.5, 0.0, 0.85, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -411,7 +419,7 @@ def test_via_above_takes_the_point_above_in_the_goal_witness_branch_when_the_pla
     res, why = out
     planned = [c[1] for c in calls if c[0] == "plan"]
     assert len(planned) == 1 and float(planned[0][3]) == 1.0 and float(planned[0][2]) == pytest.approx(0.92)  # the witness's branch, 7 cm up
-    assert "goal witness's branch" in why and "0.07 m" in why and "stalls" in why
+    assert "goal witness's branch" in why and "0.07 m" in why and "2.00 rad" in why and "another IK branch" in why
 
 
 def test_via_above_keeps_the_planned_point_outside_that_situation():
@@ -423,8 +431,6 @@ def test_via_above_keeps_the_planned_point_outside_that_situation():
     s, calls, wba = _via_self()
     assert wba("right", "right_arm", goal, None, q_start, far, {}) is None  # no witness of the goal
     assert wba("right", "right_arm", goal, q_goal, q_start, near, {}) is None and calls == []  # the goal's branch: its descent is the planned one
-    s, calls, wba = _via_self(stall_down=False)
-    assert wba("right", "right_arm", goal, q_goal, q_start, far, {}) is None  # another branch, but its descent reaches the goal
     s, calls, wba = _via_self(climb_to=0.02)
     assert wba("right", "right_arm", goal, q_goal, q_start, far, {}) is None  # the witness's branch rises < 3 cm
     s, calls, wba = _via_self(plan_ok=False)

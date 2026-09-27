@@ -1120,22 +1120,21 @@ class Motions:
 
     def _witness_branch_above(self, arm: str, emb: str, goal: Pose, q_goal: Optional[th.Tensor], q_start: th.Tensor, q_top: th.Tensor,
                               P: Dict[str, Any]) -> Optional[Tuple[Any, str]]:
-        """The via-above's point above the goal when the planned one leaves the goal out of reach: its configuration ``q_top`` lies
-        in another IK branch than the goal's witness ``q_goal`` (farther than ``witness_refine_max_jump``) and the straight descent
-        from it stalls - its finish toward the witness would be refused and cuRobo's IK in that branch swings the arm (sandal
-        0927-030120 on 8b572a12: the grasp lifted 14 mm off the table, the witness's branch has no IK 12 cm above the pre-grasp, the
-        pose-goal branch stalled 13 mm short 4.7 cm above it, both attempts failed plan_failed). The hand is tracked straight up
-        from the witness instead; the highest point it gets to (at least ``protect_above_witness_min_m`` above the goal) is planned
-        to in joint space, checked against the protected objects, and the descent retraces that climb. Returns ``(plan, why)`` or
-        None (the planned point above stays)."""
+        """The via-above's point above the goal when the planned one lies in another IK branch than the goal's witness ``q_goal``
+        (``q_top`` farther than ``witness_refine_max_jump`` from it): the descent keeps that branch, so the arm would reach the goal
+        in a posture the legs chained from it were never checked in - the pre-grasp witness is where the sampler tracked the approach
+        (sandal 0927-030120 on 8b572a12 and f0591a6d: the grasp lifted 14 mm off the table, the witness's branch has no IK 12 cm above
+        the pre-grasp, the pose-goal point above lay 3.06 rad from it; the descent reached the pre-grasp, the approach from there
+        stalled 13 mm short 4.7 cm before the grasp, its finish toward the grasp witness was refused and cuRobo's IK swung 3.2 rad -
+        plan_failed in both attempts). The hand is tracked straight up from the witness instead; the highest point it gets to (at
+        least ``protect_above_witness_min_m`` above the goal) is planned to in joint space, checked against the protected objects,
+        and the descent retraces that climb into the witness's branch. Returns ``(plan, why)`` or None (the planned point stays)."""
         if q_goal is None:
             return None
         idx = self.robot.arm_control_idx[arm]
         q_goal = C.as_tensor(q_goal).reshape(-1)
-        if float(th.max(th.abs(q_top[idx] - q_goal[idx]))) <= self.cfg.witness_refine_max_jump:
-            return None
-        down = self._tracks_from(arm, q_top, [goal])
-        if down is None or down.success:
+        gap = float(th.max(th.abs(q_top[idx] - q_goal[idx])))
+        if gap <= self.cfg.witness_refine_max_jump:
             return None
         q0 = C.as_tensor(q_start).reshape(-1).clone()
         q0[idx] = q_goal[idx]
@@ -1157,7 +1156,7 @@ class Motions:
         if not getattr(res, "success", False) or res.q_traj is None or self._protect_violations([arm], res.q_traj, emb, P):
             return None
         why = (f"above the goal by {h:.2f} m in the goal witness's branch (tracked up from the witness; the planned point above lies "
-               f"{float(th.max(th.abs(q_top[idx] - q_goal[idx]))):.2f} rad from it and its descent stalls: {str(down.status)[:70]})")
+               f"{gap:.2f} rad from it, another IK branch)")
         log.info("via-above(%s): %s", arm, why)
         return res, why
 
