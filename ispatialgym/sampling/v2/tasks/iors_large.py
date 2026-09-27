@@ -1927,7 +1927,10 @@ class IORSLarge(SamplerV2):
             order.sort(key=lambda k: int(c_pool[k].extras.get("edge_rank", 0)))  # ontop / place variants: nearest edge first, random within
         yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
-        b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, G.Pose, G.Pose]]] = {}  # (yaw bucket, grasp) -> (yaw, target pose, grasp eef, pre-grasp) at B, None = infeasible
+        # (yaw bucket, grasp) -> (yaw, target pose, [(grasp row or twin, grasp eef, pre-grasp, is twin), ...] preferred first, twin_choice) at B,
+        # None = infeasible
+        b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, List[Tuple[Any, G.Pose, G.Pose, bool]], Optional[Dict[str, Any]]]]] = {}
+        twins_b = TT.grasp_twins_on(self)
         errors = []
         carry_margin = float(self.gp.gen("carry_collision_margin_m", 0.04))
         carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
@@ -2079,12 +2082,12 @@ class IORSLarge(SamplerV2):
                     if hit is None:
                         fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
                         continue
-                    yaw, t_pose, eef, pre = hit
+                    yaw, t_pose, b_opts, b_facts = hit
                 else:
                     # the exact IK at B is tried at the screened pose first (the focus cell, the grid yaw: what F_init passed) and then
                     # at up to two jittered poses; a pair is cached as infeasible only when all fail, with the reasons logged
                     # (0920-235717/8/36: 7-8 of 8 toe-first draws failed here with one jittered pose each, no reason recorded)
-                    res, t_pose, eef, pre = None, None, None, None
+                    res, t_pose, eef, pre, pick = None, None, None, None, None
                     why_b: List[str] = []
                     for k_try in range(int(self.num("b_ik_tries", 3))):
                         yaw_k = yaw0 if k_try == 0 else yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
@@ -2105,6 +2108,11 @@ class IORSLarge(SamplerV2):
                         eef = IK.grasp_pose(t_pose, g.pose)
                         pre = IK.pre_pose(eef)
                         res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+                        if twins_b and getattr(g, "name", None):
+                            pick = TT.pick_twin(self, manip, "right", g, g.pose, eef, pre, res,
+                                                {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
+                                                support_z=float(z_init), where="B")
+                            res = pick.res
                         if res.ok:
                             yaw = yaw_k
                             break
@@ -2122,32 +2130,51 @@ class IORSLarge(SamplerV2):
                         fails["B: the A -> B drive passes the placed target"] = fails.get("B: the A -> B drive passes the placed target", 0) + 1
                         log.info("%s: %s", self.gp.alias, why_ab)
                         continue
-                    b_ik_cache[bk] = (yaw, t_pose, eef, pre)
+                    if pick is None:
+                        b_opts, b_facts = [(g, eef, pre, False)], None
+                    else:
+                        b_opts = [(pick.grasp, pick.eef, pick.pre, pick.twin)]
+                        if pick.other is not None:
+                            b_opts.append((pick.other[0], pick.other[2], pick.other[3], not pick.twin))
+                        b_facts = pick.facts
+                    b_ik_cache[bk] = (yaw, t_pose, b_opts, b_facts)
                 goal_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
                 goal = release_pose(release_xy, goal_quat)
-                place_eef = IK.grasp_pose(goal, g.pose)
-                pre_place = IK.pre_pose(place_eef)
-                # the place / drop IK is seeded with the LIFT configuration (the arm the object is carried with, and the branch the
-                # carry pose's straight line stays in) and must land in the same branch: the oracle reaches the pre-place from the
-                # carry with a bounded joint swing (0920-135625: the recorded witness lay 2.09 rad away, 'plan_failed' at the drop)
-                q_lift_seed = self.lift_arm_q(manip, eef, float(self.num("carry_height_m", 0.12)), target, g.pose)
-                q_seed = None
-                if q_lift_seed is not None:
-                    q_seed = self.ikc.q_locked(place).clone()
-                    q_seed[self.kit.robot.arm_control_idx["right"]] = q_lift_seed
-                with attached(self.kit, "right", target, eef_in_object=g.pose):
-                    r2 = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False, q_seed=q_seed)
-                if not r2.ok:
-                    fails[f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)"] = fails.get(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)", 0) + 1
-                    continue
-                if q_lift_seed is not None and r2.q is not None:
-                    # a loose sanity bound only (2026-09-21 01:30): the branch the oracle reaches the pre-place in is decided by the straight
-                    # carry leg it tracks from the carry configuration - checked below by ``track_chain`` once the carry leg is recorded
-                    # (0921-005514/6/8: the 1.2 rad proxy against the LIFT configuration rejected 1-4 draws per C)
-                    swing = float(th.max(th.abs(r2.q[self.kit.robot.arm_control_idx["right"]] - q_lift_seed)))
-                    if swing > float(self.num("place_branch_max_rad", 2.6)):
-                        fails["C: place branch differs from the carry (joint swing)"] = fails.get("C: place branch differs from the carry (joint swing)", 0) + 1
+                # the recorded finger assignment first; the other one (its B chain passed as well) only when the first fails here
+                c_fails: List[str] = []
+                for j_opt, (g, eef, pre, flip) in enumerate(b_opts):
+                    place_eef = IK.grasp_pose(goal, g.pose)
+                    pre_place = IK.pre_pose(place_eef)
+                    # the place / drop IK is seeded with the LIFT configuration (the arm the object is carried with, and the branch the
+                    # carry pose's straight line stays in) and must land in the same branch: the oracle reaches the pre-place from the
+                    # carry with a bounded joint swing (0920-135625: the recorded witness lay 2.09 rad away, 'plan_failed' at the drop)
+                    q_lift_seed = self.lift_arm_q(manip, eef, float(self.num("carry_height_m", 0.12)), target, g.pose)
+                    q_seed = None
+                    if q_lift_seed is not None:
+                        q_seed = self.ikc.q_locked(place).clone()
+                        q_seed[self.kit.robot.arm_control_idx["right"]] = q_lift_seed
+                    with attached(self.kit, "right", target, eef_in_object=g.pose):
+                        r2 = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False, q_seed=q_seed)
+                    if not r2.ok:
+                        c_fails.append(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)")
                         continue
+                    if q_lift_seed is not None and r2.q is not None:
+                        # a loose sanity bound only (2026-09-21 01:30): the branch the oracle reaches the pre-place in is decided by the straight
+                        # carry leg it tracks from the carry configuration - checked below by ``track_chain`` once the carry leg is recorded
+                        # (0921-005514/6/8: the 1.2 rad proxy against the LIFT configuration rejected 1-4 draws per C)
+                        swing = float(th.max(th.abs(r2.q[self.kit.robot.arm_control_idx["right"]] - q_lift_seed)))
+                        if swing > float(self.num("place_branch_max_rad", 2.6)):
+                            c_fails.append("C: place branch differs from the carry (joint swing)")
+                            continue
+                    break
+                if len(c_fails) == len(b_opts):
+                    fails[c_fails[0]] = fails.get(c_fails[0], 0) + 1
+                    continue
+                twin_facts = b_facts
+                if b_facts is not None and j_opt > 0:
+                    twin_facts = dict(b_facts, chosen="twin" if flip else "row", late_flip=f"the {'row' if flip else 'twin'} failed at C: {c_fails[0]}")
+                    log.info("%s: grasp twin [C] %s: the %s's place failed at C (%s), the %s's passes", self.gp.alias, g.name, "row" if flip else "twin", c_fails[0],
+                             "twin" if flip else "row")
                 if self.relation == "ontop" and not push:
                     # owner 2026-09-26 (shampoo, waves 6-8: 8 of 22 attempts rejected in goal_check 'place eef pose outside the placement image
                     # (5 %)' after 7-13 min of sampling each): the goal check's own frame test, applied to this C candidate's place now, so a C
@@ -2187,6 +2214,8 @@ class IORSLarge(SamplerV2):
                 floor_name = self.bindings.one("floor").name if self.bindings.has("floor") else None
                 grasp = GraspRecord(tname, "right", g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose,
                                     place_on=(floor_name or pname) if push else pname)
+                if twin_facts is not None:
+                    grasp.extras.update({"wrist_flip": bool(flip), "twin_choice": twin_facts})
                 if push:  # the release is a drop on the floor outside the edge (like the inside rule's ``place_kind: drop``)
                     grasp.extras.update({"place_kind": "drop", "drop_height_m": float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M)),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})

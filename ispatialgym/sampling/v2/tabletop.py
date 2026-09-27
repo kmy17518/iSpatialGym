@@ -811,13 +811,13 @@ def store_feasible_set(bands: RB.ReachBands, stance: Stance, F: Sequence[Tuple[f
         rows = []
         for yaw, g in F:
             yi = min(range(len(yaws)), key=lambda j: abs(C.wrap_angle(float(yaw) - yaws[j])))
-            gname = getattr(g, "name", str(g))
+            gname = C.split_twin(getattr(g, "name", str(g)))[0]  # the band indexes library rows; a twin is its row's pinch
             gi = names.index(gname) if gname in names else -1
             rows.append((i, yi, gi))
         p = bands.pairs.get(k)
         p = np.zeros((0, 3), dtype=np.int32) if p is None else p
         bands.pairs[k] = np.concatenate([p, np.array(rows, dtype=np.int32).reshape(-1, 3)]) if rows else p
-        fs.append({"trunk": list(k), "cell": [float(v) for v in cell_base], "feasible": [[round(float(y), 3), getattr(g, "name", str(g))] for y, g in F]})
+        fs.append({"trunk": list(k), "cell": [float(v) for v in cell_base], "feasible": [[round(float(y), 3), C.split_twin(getattr(g, "name", str(g)))[0]] for y, g in F]})
     if bands.path:
         try:
             arrays = {RB.trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in bands.cells.items()}
@@ -1555,6 +1555,185 @@ def reach_margin(s, stance: Stance, point_world) -> float:
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# Gripper symmetry: a library pinch or its twin (the eef turned π about the approach axis, the fingers swapped)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: joint-limit margins (rad) above this compare equal: the twin wins on margin only when a chain comes close to a limit
+TWIN_MARGIN_CAP = 0.30
+#: hysteresis (rad): one capped margin decides only when it exceeds the other by more than this
+TWIN_MARGIN_GAIN = 0.10
+#: on equal margins the twin is recorded when its pre-grasp witness lies this much closer (rad, L-inf over the arm joints)
+#: to the configuration the arm starts from
+TWIN_SWING_TOL = 0.30
+#: the twin of a support-ignored grasp pose must keep the wrist camera's spheres this far above the support top (m)
+TWIN_CAMERA_CLEARANCE_M = 0.005
+#: the wrist camera (``<arm>_realsense_link``), the one part of the hand that is not C2-symmetric about the approach axis: its
+#: cuRobo spheres in the eef frame (as ``iors_small.HAND_SPHERES_EEF["wrist camera"]``) and their radius (m)
+WRIST_CAMERA_SPHERES_EEF = ((-0.056, -0.002, -0.076), (-0.056, -0.030, -0.076), (-0.056, -0.057, -0.076))
+WRIST_CAMERA_SPHERE_R = 0.018
+
+
+def grasp_twins_on(s) -> bool:
+    """``generation.grasp_twins`` (default on; ``false`` / ``"off"`` switch it off): whether a library pinch drawn for a free
+    object may be recorded as its twin."""
+    gen = getattr(getattr(s, "gp", None), "gen", None) or getattr(s, "gen", None)
+    v = gen("grasp_twins", True) if gen is not None else True
+    return v is None or (v is not False and str(v).strip().lower() not in ("off", "false", "0", "no"))
+
+
+def wrist_camera_clearance(eef: Pose, plane_z: float) -> float:
+    """Smallest height (m) of the wrist camera's spheres above the plane ``z = plane_z`` at the eef pose ``eef`` (negative:
+    the camera dips below it)."""
+    pts = C.transform_points((_t(eef[0]), _t(eef[1])), th.tensor(WRIST_CAMERA_SPHERES_EEF, dtype=th.float32))
+    return float(pts[:, 2].min()) - WRIST_CAMERA_SPHERE_R - float(plane_z)
+
+
+def twin_rule(row: Optional[Tuple[float, float]], twin: Optional[Tuple[float, float]]) -> Tuple[bool, str]:
+    """``(record the twin instead of the library row, why)``. ``row`` / ``twin`` = ``(joint-limit margin, swing)`` in rad of a
+    chain that passed every check, None for one that did not. Lexicographic: feasibility; the margin capped at
+    ``TWIN_MARGIN_CAP``, deciding only beyond ``TWIN_MARGIN_GAIN``; the twin's swing smaller by more than ``TWIN_SWING_TOL``;
+    otherwise the row."""
+    if twin is None:
+        return False, ("twin infeasible" if row is not None else "neither feasible")
+    if row is None:
+        return True, "row infeasible"
+    m, mt = min(float(row[0]), TWIN_MARGIN_CAP), min(float(twin[0]), TWIN_MARGIN_CAP)
+    if mt > m + TWIN_MARGIN_GAIN:
+        return True, "margin"
+    if m > mt + TWIN_MARGIN_GAIN:
+        return False, "margin"
+    if float(twin[1]) < float(row[1]) - TWIN_SWING_TOL:
+        return True, "continuity"
+    return False, "tie"
+
+
+@dataclass
+class TwinPick:
+    """What :func:`pick_twin` chose. ``twin``: the recorded eef is the row's twin; ``grasp``: the library row or
+    ``grasp_library.twin(row)`` (name ``<row>~r180``, key, reversed ``finger_q``); ``eef_in_object`` / ``eef`` / ``pre`` /
+    ``res``: the recorded chain; ``passed``: that chain solved and passed the caller's check; ``other``: ``(grasp,
+    eef_in_object, eef, pre)`` of the other finger assignment when it could be recorded as well (the row: its chain passed
+    the caller's check; the twin: every check); ``facts``: the grasp record's ``twin_choice``."""
+
+    twin: bool
+    grasp: Any
+    eef_in_object: Pose
+    eef: Pose
+    pre: Pose
+    res: Any
+    passed: bool
+    other: Optional[Tuple[Any, Pose, Pose, Pose]]
+    facts: Dict[str, Any]
+
+
+def _count(s, key: str) -> None:
+    st = getattr(getattr(s, "kit", None), "stats", None)
+    if isinstance(st, dict):
+        st[key] = st.get(key, 0) + 1
+
+
+def _twin_side(d: Dict[str, Any]) -> str:
+    src = f"{d['source']} " if d.get("source") else ""
+    if d.get("margin_rad") is None:
+        return f"{src}fail: {str(d.get('reason', ''))[:120]}"
+    cam = "" if d.get("camera_clearance_m") is None else f" camera {d['camera_clearance_m'] * 1000:+.0f} mm"
+    verdict = "ok" if d.get("ok") else f"rejected ({d.get('reason', '')})"
+    return f"{src}{verdict} margin {d['margin_rad']:.3f} ({d.get('nearest_joint')}) swing {d['swing_rad']:.2f}{cam}"
+
+
+def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pre: Pose, res, exact_kw: Dict[str, Any], *,
+              support_z: Optional[float] = None, accept: Optional[Callable[[th.Tensor], bool]] = None, where: str = "") -> TwinPick:
+    """The library pinch ``g`` drawn for a free object, or its twin (``conventions.twin_pose``: the same pinch with the fingers
+    swapped), by :func:`twin_rule`. ``eef_in_object`` is the row's ``T_obj→eef``, ``eef`` / ``pre`` its grasp / pre-grasp
+    poses and ``res`` their exact IK (``s.ikc.exact([pre, eef], stance, arm, **exact_kw)``; it may have failed).
+
+    The twin's chain is solved with the same ``exact_kw``, from the row's pre-grasp witness mapped by ``IKChecker.twin_q``
+    when that is collision-free (source ``map``), else from scratch (``ik``). A solved row whose mapped chain could not win
+    keeps the row without a solve (``predicted``); a row rejected at the reach boundary (``ik_reach``) is final - the twin
+    has the same wrist centre (``skipped``). A chain passes when it solved, ``accept`` holds at its grasp configuration and,
+    given ``support_z`` (the support top ignored at the grasp pose), the wrist camera clears that top by
+    ``TWIN_CAMERA_CLEARANCE_M``. Only a passing twin is taken; otherwise the row stands with its own verdict. Margins are the
+    smallest arm joint-limit margin over the two witnesses, swings the L-inf distance of the pre-grasp witness from the
+    stance configuration (``IKChecker.q_locked``), where the pre-grasp transit starts."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    IK = _ik()
+    ikc = s.ikc
+    idx = s.kit.robot.arm_control_idx[arm]
+    q_start = _t(ikc.q_locked(stance))[idx]
+    gt = GL.twin(g)
+    eio_t = C.twin_pose((_t(eef_in_object[0]), _t(eef_in_object[1])))
+    eef_t = C.twin_pose((_t(eef[0]), _t(eef[1])))
+    pre_t = IK.pre_pose(eef_t)
+
+    def witness(p):
+        return ikc.solutions.get((arm, ikc._pose_key(p)))
+
+    def accepted(q_end) -> bool:
+        return accept is None or bool(accept(_t(q_end)))
+
+    def judge(solved: bool, q_pre, q_end, e: Pose, why: str, acc: bool) -> Tuple[Dict[str, Any], Optional[Tuple[float, float]]]:
+        cam = None if support_z is None else wrist_camera_clearance(e, float(support_z))
+        d: Dict[str, Any] = {"ok": False, "camera_clearance_m": None if cam is None else round(cam, 4)}
+        if not solved or q_end is None:
+            d["reason"] = str(why)[:160]
+            return d, None
+        m, jn = min((ikc.joint_limit_margin(_t(q), arm) for q in (q_pre, q_end) if q is not None), key=lambda mj: mj[0])
+        swing = float(th.max(th.abs(_t(q_pre if q_pre is not None else q_end)[idx] - q_start)))
+        d.update({"margin_rad": round(float(m), 4), "nearest_joint": jn, "swing_rad": round(swing, 3)})
+        if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M:
+            d["reason"] = f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
+            return d, None
+        if not acc:
+            d["reason"] = "fails the caller's check"
+            return d, None
+        d["ok"] = True
+        return d, (float(m), swing)
+
+    _count(s, "twin_picks")
+    q_pre_row = witness(pre)
+    row_acc = bool(res.ok and res.q is not None and accepted(res.q))
+    row_f, row_s = judge(res.ok, q_pre_row, res.q, eef, res.reason, row_acc)
+    q_pre_map = ikc.twin_q(q_pre_row, arm)
+    twin_s, res_t = None, None
+    if not res.ok and str(res.reason).startswith("ik_reach"):
+        twin_f = {"ok": False, "source": "skipped", "reason": "the row failed at the arm's reach boundary; the twin has the same wrist centre"}
+        take, why = False, "twin skipped"
+    else:
+        twin_f = None
+        q_end_map = ikc.twin_q(res.q, arm) if res.ok else None
+        if res.ok and q_pre_map is not None and q_end_map is not None:
+            pf, ps = judge(True, q_pre_map, q_end_map, eef_t, "", accepted(q_end_map))
+            take, why = twin_rule(row_s, ps)
+            if not take:
+                twin_f = dict(pf, source="predicted")
+        if twin_f is None:
+            seed = q_pre_map if q_pre_map is not None and ikc._witness_ok(q_pre_map, pre_t, arm) else None
+            kw = dict(exact_kw)
+            if seed is not None:
+                kw.update({"q_first": seed, "cache": False})
+            _count(s, "twin_solves")
+            res_t = ikc.exact([pre_t, eef_t], stance, arm, **kw)
+            twin_f, twin_s = judge(res_t.ok, witness(pre_t), res_t.q, eef_t, res_t.reason,
+                                   bool(res_t.ok and res_t.q is not None and accepted(res_t.q)))
+            twin_f["source"] = "map" if seed is not None else "ik"
+            take, why = twin_rule(row_s, twin_s)
+    facts = {"stage": where, "chosen": "twin" if take else "row", "reason": why, "row": dict(row_f, name=getattr(g, "name", None)),
+             "twin": dict(twin_f, name=gt.name)}
+    _count(s, f"twin_source.{twin_f.get('source')}")
+    if take:
+        _count(s, "twin_taken")
+        _count(s, f"twin_taken.{why.replace(' ', '_')}")
+    log.info("grasp twin [%s] %s (%s, %s) | row %s: %s | twin %s: %s", where, gt.name if take else getattr(g, "name", None), facts["chosen"], why,
+             getattr(g, "name", None), _twin_side(row_f), gt.name, _twin_side(twin_f))
+    if take:
+        other = (g, eef_in_object, eef, pre) if row_acc else None
+        return TwinPick(True, gt, eio_t, eef_t, pre_t, res_t, True, other, facts)
+    other = (gt, eio_t, eef_t, pre_t) if twin_s is not None else None
+    return TwinPick(False, g, eef_in_object, eef, pre, res, row_acc, other, facts)
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # Phase 3 step 1 — target init pose (§4.6)
 # ----------------------------------------------------------------------------------------------------------------
 
@@ -1568,8 +1747,9 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     draw (yaw, grasp) uniformly from F, jitter ±22.5°, place the object within 5 cm of the focus with its footprint on
     the top (``margin``; a tray floor passes ``top`` = the tray raster and ``support_z`` = its floor), derive grasp =
     object pose ∘ T_obj→eef and pre-grasp 10 cm back, confirm both with the exact IK; next element of F without
-    replacement on failure; ``Reject("grasp_unreachable")`` when F is exhausted. Returns the object pose and the
-    ``GraspRecord`` (``yaw``, ``grasp_key``, ``grasp_name``, both eef poses, ``eef_in_object``)."""
+    replacement on failure; ``Reject("grasp_unreachable")`` when F is exhausted. With ``generation.grasp_twins`` each drawn
+    pinch may be recorded as its twin (:func:`pick_twin`; extras ``wrist_flip`` / ``twin_choice``). Returns the object pose
+    and the ``GraspRecord`` (``yaw``, ``grasp_key``, ``grasp_name``, both eef poses, ``eef_in_object``)."""
     IK = _ik()
     top = _top(s, top)
     z = float(support_z) if support_z is not None else float(top.z)
@@ -1579,6 +1759,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     fx = focus[:2]
     eef_of = eef_of_grasp or (lambda g: g.pose)
     grasps = list(grasps)
+    twins = grasp_twins_on(s)
 
     def pose_at(cell, yaw):
         return object_pose_on(s, hull, rest_quat, cell, yaw, z)
@@ -1604,12 +1785,19 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
             eef = IK.grasp_pose(pose, eef_of(g))
             pre = IK.pre_pose(eef)
             res = s.ikc.exact([pre, eef], manip, arm, ignore_for_last=list(ignore_for_grasp), scale_key=scale_key)
+            g_rec, eef_in_object, pick = g, eef_of(g), None
+            if twins and getattr(g, "name", None):
+                pick = pick_twin(s, manip, arm, g, eef_in_object, eef, pre, res, {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key},
+                                 support_z=z, where="phase3_target")
+                g_rec, eef_in_object, eef, pre, res = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res
             if not res.ok:
                 fails["ik"] += 1
                 last_reason = res.reason
                 continue
-            finger_q = list(getattr(g, "finger_q", []) or []) or None
-            rec = GraspRecord(name, arm, getattr(g, "key", None), getattr(g, "name", None), yaw, pre, eef, finger_q=finger_q, eef_in_object=eef_of(g))
+            finger_q = list(getattr(g_rec, "finger_q", []) or []) or None
+            rec = GraspRecord(name, arm, getattr(g_rec, "key", None), getattr(g_rec, "name", None), yaw, pre, eef, finger_q=finger_q, eef_in_object=eef_in_object)
+            if pick is not None:
+                rec.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts})
             rec.stance = manip.name
             return pose, rec
     _reject("grasp_unreachable", f"F ({len(F)} pairs) exhausted without an exact-IK confirmation ({fails}; last: {last_reason[:160]})")

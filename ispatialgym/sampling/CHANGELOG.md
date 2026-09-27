@@ -97,6 +97,17 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   follow passed the program check only through such a rescue. The core sets `ikc.attempt` per attempt: attempt 0 solves as
   before the re-solves existed, every later attempt with them (verified before: sandal 0926-030813 and bar soap 0926-031126
   found their instance at attempt 0, job `ik_attempt_gate_20260926`).
+- **Twin grasps: a library pinch is also considered turned 180 deg about its approach axis** (first-demo v2 B2). The R1Pro
+  gripper is C2-symmetric (finger meshes, joint origins and drives; only the wrist camera is not) and its wrist is spherical,
+  so `T o R_z(pi)` is the same grasp with the fingers swapped, held with (q5 -/+ pi, -q6, -q7). No library-pinch path used it
+  (handles, pushes / braces and cube grasps already try both signs). `tabletop.pick_twin` compares the row and its twin per
+  drawn pinch (`phase3_target`: iors_small / disembedding / attachment targets; the iors_large B stage with a C fallback;
+  `iors_small.reselect_grasp`): feasibility, then the joint-limit margin (capped at 0.30 rad, deciding beyond a 0.10 rad gain),
+  then continuity (the pre-grasp witness closer to the stance posture by more than 0.30 rad); ties keep the row. A twin must
+  keep the wrist camera 5 mm above the support top at the grasp pose. It is recorded as `<row>~r180` with its own
+  `eef_in_object` (the oracle executes it unchanged; `conventions.grasp_entry` resolves the alias), `grasps[].wrist_flip` /
+  `twin_choice`, and the instance summary's `kit` counts the choices and the joint-limit re-solves. `generation.grasp_twins`
+  (default on; off = the previous behaviour exactly).
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

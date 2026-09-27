@@ -52,6 +52,8 @@ __all__ = [
     "relative", "transform_points", "pose2d_to_pose", "pose_to_pose2d",
     # eef frame
     "approach_axis", "closing_axis", "eef_quat", "pad_center", "fingertip",
+    # gripper symmetry (twin grasps)
+    "HALF_TURN_Z", "TWIN_SUFFIX", "WRIST_ROLL_LIMIT", "twin_pose", "split_twin", "twin_name", "twin_arm_q",
     # gripper constants
     "FINGER_OPEN", "FINGER_CLOSED", "CONTACT_CENTER_Z", "FINGERTIP_LENGTH", "PAD_Z_RANGE", "GRIPPER_OPEN_M",
     "GRIPPER_MAX_OPENING_M", "HANDLE_EEF_OFFSET", "PRE_DIST", "pad_clearance",
@@ -434,6 +436,58 @@ def fingertip(pose: PoseLike) -> th.Tensor:
     return pos + FINGERTIP_LENGTH * approach_axis(quat)
 
 
+#: xyzw half turn about the eef's own z (approach) axis. The R1Pro fingers are C2-symmetric about that axis and the eef
+#: origin lies on it, so ``T ∘ R_z(π)`` is the same pinch with the fingers swapped - the *twin* of ``T``; only the wrist
+#: camera (on the eef's -x side) changes side.
+HALF_TURN_Z = th.tensor([0.0, 0.0, 1.0, 0.0])
+#: grasp-name suffix of a library row's twin (``grasp_3~r180``); :func:`grasp_entry` resolves it
+TWIN_SUFFIX = "~r180"
+#: limit (rad) of ``<arm>_arm_joint5``, both arms (r1pro.urdf); joints 6 and 7 have symmetric limits
+WRIST_ROLL_LIMIT = 2.356196
+
+
+def twin_pose(pose: PoseLike):
+    """``pose ∘ R_z(π)``: the same origin and approach axis, the closing axis negated (a FramedPose keeps its frame)."""
+    pos, quat = as_pose(pose)
+    return _like(pose, pos.clone(), qmul(quat, HALF_TURN_Z))
+
+
+def split_twin(grasp_name: str) -> Tuple[str, bool]:
+    """``(library row name, whether the name is the row's twin)``: ``"grasp_3~r180"`` -> ``("grasp_3", True)``."""
+    name = str(grasp_name)
+    if name.endswith(TWIN_SUFFIX):
+        return name[: -len(TWIN_SUFFIX)], True
+    return name, False
+
+
+def twin_name(grasp_name: str) -> str:
+    """Name of the other finger assignment: a row's twin alias, or the row of a twin alias."""
+    base, flipped = split_twin(grasp_name)
+    return base if flipped else base + TWIN_SUFFIX
+
+
+def twin_arm_q(q_arm) -> Optional[th.Tensor]:
+    """Arm joint values ``(7,)`` (``<arm>_arm_joint1..7``) that hold the twin of the grasp ``q_arm`` holds, with the same
+    shoulder and elbow: the wrist is spherical (the joint 5 / 6 / 7 axes meet 0.22065 m behind the eef origin, on its
+    approach axis), so ``FK(q1..q4, q5 ∓ π, -q6, -q7) = FK(q) ∘ R_z(π)`` for both arms. Only joint 5's margin changes
+    (``|q5| - π/4`` instead of ``WRIST_ROLL_LIMIT - |q5|``). None when ``q5 ∓ π`` leaves joint 5's range (``|q5| < π/4``):
+    the twin then needs another arm branch."""
+    if isinstance(q_arm, th.Tensor):
+        q = q_arm.detach().to("cpu").clone().reshape(-1)
+    else:
+        q = th.as_tensor(q_arm, dtype=th.float32).clone().reshape(-1)
+    if q.numel() != 7:
+        raise ValueError(f"twin_arm_q expects the 7 arm joint values, got {q.numel()}")
+    q5 = float(q[4])
+    q5t = q5 - math.pi if q5 > 0.0 else q5 + math.pi
+    if abs(q5t) > WRIST_ROLL_LIMIT:
+        return None
+    q[4] = q5t
+    q[5] = -q[5]
+    q[6] = -q[6]
+    return q
+
+
 # ==================================================================================================================
 # 3. Grasp library -> eef poses
 # ==================================================================================================================
@@ -442,17 +496,19 @@ def fingertip(pose: PoseLike) -> th.Tensor:
 @lru_cache(maxsize=4096)
 def grasp_entry(grasp_key: str, grasp_name: str):
     """The :class:`ispatialgym.sampling.grasp_library.Grasp` named ``grasp_name`` of library key ``grasp_key``
-    (validated grasps first, then the unfiltered list, so a row that was later flagged still resolves)."""
+    (validated grasps first, then the unfiltered list, so a row that was later flagged still resolves). ``<row>~r180``
+    (``TWIN_SUFFIX``) is that row's twin, ``grasp_library.twin(row)``: pose ``∘ R_z(π)``, the same ``meta`` (pinch width)."""
     from ispatialgym.sampling import grasp_library as GL
 
+    base, flipped = split_twin(grasp_name)
     for clean in (True, False):
         try:
             grasps = GL.load_grasps(grasp_key, require_clean=clean)
         except ValueError:
             continue
         for g in grasps:
-            if g.name == grasp_name:
-                return g
+            if g.name == base:
+                return GL.twin(g) if flipped else g
     raise KeyError(f"grasp {grasp_name!r} not found in library entry {grasp_key!r}")
 
 

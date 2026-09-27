@@ -461,7 +461,10 @@ class IORSSmall(SamplerV2):
             return out
         out["pinch_vs_long_axis_deg"] = round(self.pinch_vs_long_axis_deg(grasp.eef_in_object), 1)
         out["pinch_offset_m"] = round(self.pinch_offset(grasp.eef_in_object), 4)
-        out["pinch_offset_original_m"] = round(float((self.template_facts.get("grasp_pinch_offset_m") or {}).get(grasp.grasp_name, out["pinch_offset_m"])), 4)
+        row_name, flipped = C.split_twin(grasp.grasp_name or "")
+        orig = (self.template_facts.get("grasp_pinch_offset_m") or {}).get(row_name)
+        # the offset is measured along the closing axis, which a twin negates
+        out["pinch_offset_original_m"] = round(float(out["pinch_offset_m"] if orig is None else (-orig if flipped else orig)), 4)
         out["closing_tilt_deg"] = round(self.closing_tilt_deg(grasp.eef_in_object), 1)
         out["pivot_arm_m"] = round(self.pivot_arm(grasp.eef_in_object), 4)
         ext = TT.hull_extents(self.hull["target"], self.rest["target"])
@@ -1153,26 +1156,50 @@ class IORSSmall(SamplerV2):
         """Try the library grasps (flush tier first, then the rest; all attachable) at the *settled* target pose from the
         manipulation stance — pre-grasp + grasp exactly, support removed for the grasp, the target removed along the
         approach, optionally the open pads clear of the support — and rewrite the grasp record with the first that passes.
+        With ``generation.grasp_twins`` each library pinch is recorded as the row or its twin (``tabletop.pick_twin``; the
+        name rules - ``exclude``, the current grasp under ``require_pad_clearance`` - apply to each finger assignment).
         Returns its name or None."""
         t_pose = draft.object_poses[tname]
         order = list(self.grasps_flush) + [g for g in self.grasps if g not in self.grasps_flush]
+        twins = TT.grasp_twins_on(self)
+        kw = {"ignore_for_last": self.support_objects(), "scale_key": self.choice.models["target"].scale, "cache": False, "approached": [self.obj("target")]}
+
+        def barred(name) -> bool:
+            return (name == grasp.grasp_name and require_pad_clearance) or name in exclude
+
         for g in order:
             eef_in_object = getattr(g, "pose", None)
-            if eef_in_object is None or (getattr(g, "name", None) == grasp.grasp_name and require_pad_clearance) or getattr(g, "name", None) in exclude:
+            name = getattr(g, "name", None)
+            if eef_in_object is None:
+                continue
+            twin_open = twins and name is not None and not barred(C.twin_name(name))
+            if barred(name) and not twin_open:
                 continue
             eef = IK.grasp_pose(t_pose, eef_in_object)
             pre = IK.pre_pose(eef)
-            res = self.ikc.exact([pre, eef], manip, grasp.arm, ignore_for_last=self.support_objects(), scale_key=self.choice.models["target"].scale,
-                                 cache=False, approached=[self.obj("target")])
-            if not res.ok:
-                continue
-            if require_pad_clearance and res.q is not None and not self.open_pads_clear_of_support(res.q):
-                continue
+            res = IK.IKResult(False, None, "excluded by name") if barred(name) else self.ikc.exact([pre, eef], manip, grasp.arm, **kw)
+            pick = None
+            if twin_open:
+                pick = TT.pick_twin(self, manip, grasp.arm, g, eef_in_object, eef, pre, res, kw, support_z=float(self.top.z),
+                                    accept=self.open_pads_clear_of_support if require_pad_clearance else None, where="reselect_grasp")
+                if not pick.passed:
+                    continue
+                g, eef_in_object, eef, pre, res = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res
+            else:
+                if not res.ok:
+                    continue
+                if require_pad_clearance and res.q is not None and not self.open_pads_clear_of_support(res.q):
+                    continue
             self._reselected_q = res.q
             grasp.grasp_key, grasp.grasp_name = getattr(g, "key", grasp.grasp_key), getattr(g, "name", grasp.grasp_name)
             grasp.finger_q = list(getattr(g, "finger_q", []) or []) or None
             grasp.eef_in_object = eef_in_object
             grasp.grasp, grasp.pre_grasp = eef, pre
+            if pick is not None:
+                grasp.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts})
+            elif "wrist_flip" in grasp.extras:  # a library row replaced the drawn grasp: the draw's choice no longer describes it
+                grasp.extras["wrist_flip"] = False
+                grasp.extras.pop("twin_choice", None)
             self.apply_height_extra_to_grasp(grasp, t_pose, manip)  # the A/B lift applies to the re-selected library grasp too
             return str(grasp.grasp_name)
         return None

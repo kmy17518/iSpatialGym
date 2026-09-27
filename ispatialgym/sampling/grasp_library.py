@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import glob
 import json
+import math
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -140,6 +141,44 @@ def load_grasps(key: str, require_clean: bool = True) -> List[Grasp]:
     if not out:
         raise ValueError(f"grasp key {key!r} has no validated (clean) grasps")
     return out
+
+
+def twin(g) -> Grasp:
+    """The same pinch with the fingers swapped: the eef turned π about its approach axis (``conventions.twin_pose``),
+    named ``<row>~r180`` (``conventions.twin_name``), ``finger_q`` reversed, the row's ``meta`` (pinch width) with
+    ``twin_of`` = the row. The twin of a twin is the row again (same name and rotation)."""
+    from ispatialgym.robot import conventions as C
+
+    base, flipped = C.split_twin(g.name)
+    pos, quat = C.twin_pose((g.position, g.quat))
+    meta = dict(getattr(g, "meta", None) or {})
+    if flipped:
+        meta.pop("twin_of", None)
+    else:
+        meta["twin_of"] = base
+    return Grasp(key=getattr(g, "key", None), name=C.twin_name(g.name), position=pos, quat=quat,
+                 finger_q=list(reversed([float(v) for v in (getattr(g, "finger_q", None) or [])])), meta=meta,
+                 verdict=getattr(g, "verdict", "ok"), flags=list(getattr(g, "flags", None) or []), note=getattr(g, "note", ""))
+
+
+def stored_twin(g, grasps: List[Grasp], pos_tol: float = 0.015, ang_tol_deg: float = 20.0) -> Optional[Grasp]:
+    """A row of ``grasps`` other than ``g`` that already is ``g``'s twin within ``pos_tol`` (m) / ``ang_tol_deg``: the
+    candidate NMS compares rotations without the half turn, so ~40 % of the validated rows have one."""
+    from ispatialgym.robot import conventions as C
+
+    t = twin(g)
+    for h in grasps:
+        if h is g or h.name == g.name:
+            continue
+        if float(th.linalg.norm(h.position - t.position)) <= pos_tol and C.quat_angle(h.quat, t.quat) <= math.radians(ang_tol_deg):
+            return h
+    return None
+
+
+def with_twins(grasps: List[Grasp]) -> List[Grasp]:
+    """Both finger assignments of every pinch: the rows, then the twin of each row that has no stored twin among them."""
+    rows = list(grasps)
+    return rows + [twin(g) for g in rows if stored_twin(g, rows) is None]
 
 
 def default_key(category: str, model: str, task_kind: str) -> str:

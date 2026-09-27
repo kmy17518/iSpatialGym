@@ -727,6 +727,7 @@ class IKChecker:
         m, jn = self.joint_limit_margin(q, arm)
         if m >= self.JOINT_LIMIT_MARGIN:
             return q, ""
+        self._count("limit_retry_poses")
         best, best_m = q, m
         seeds = self._retry_seeds(q0, pose, arm) + [q0] * max(0, tries - 1)
         for q_s in seeds[:tries]:
@@ -737,6 +738,7 @@ class IKChecker:
             if m_alt > best_m:
                 best, best_m = q_alt, m_alt
             if best_m >= self.JOINT_LIMIT_MARGIN:
+                self._count("limit_retry_seeded_rescued")
                 return best, ""
         if self.LIMIT_RETRY_RANDOM > 0 and (self.attempt is None or self.attempt >= self.LIMIT_RETRY_RANDOM_FROM_ATTEMPT):
             # owner 2026-09-26 (bar soap 0926-011542 / 0925-235551: every solution of the place pose within 2-12 mrad of
@@ -748,6 +750,7 @@ class IKChecker:
             hi = self.kit.robot.joint_upper_limits[idx].float()
             gen = th.Generator().manual_seed(hash(tuple(round(float(v), 4) for v in list(G.t(pose[0]).tolist()) + list(G.t(pose[1]).tolist()))) % (2 ** 31))
             for k in range(self.LIMIT_RETRY_RANDOM):
+                self._count("limit_retry_random")
                 q_s = G.t(q0).clone().float()
                 q_s[idx] = lo + (hi - lo) * th.rand(len(idx), generator=gen)
                 q_alt = self.kit.ik(pose, q_s, arm=arm)
@@ -757,11 +760,33 @@ class IKChecker:
                 if m_alt > best_m:
                     best, best_m = q_alt, m_alt
                 if best_m >= self.JOINT_LIMIT_MARGIN:
+                    self._count("limit_retry_random_rescued")
                     log.info("ik: a solution %.0f mrad from every joint limit after %d random re-solves (the first solutions stood within %.0f mrad of %s's limit)",
                              best_m * 1000, k + 1, m * 1000, jn)
                     return best, ""
         m_b, jn_b = self.joint_limit_margin(best, arm)
+        self._count(f"limit_reject.{jn_b}")
         return None, f"ik_joint_limit: {jn_b} within {m_b * 1000:.0f} mrad of its limit at the pose (every solution found; the approach from it would stall)"
+
+    def _count(self, key: str, n: int = 1) -> None:
+        """Add ``n`` to the kit's call counter ``key`` (``RobotKit.stats``: per instance in ``summary.json["kit"]``)."""
+        st = getattr(self.kit, "stats", None)
+        if isinstance(st, dict):
+            st[key] = st.get(key, 0) + n
+
+    # -- gripper symmetry (twin grasps) ---------------------------------------------------------------------------
+    def twin_q(self, q: Optional[th.Tensor], arm: str) -> Optional[th.Tensor]:
+        """Configuration holding the twin (``conventions.twin_pose``) of the grasp ``q`` holds: ``conventions.twin_arm_q`` on
+        ``arm``'s joints, every other joint kept. None when ``q`` is None or joint 5 would leave its range."""
+        if q is None:
+            return None
+        idx = self.kit.robot.arm_control_idx[arm]
+        qa = C.twin_arm_q(G.t(q)[idx])
+        if qa is None:
+            return None
+        out = G.t(q).clone()
+        out[idx] = qa.to(out.dtype)
+        return out
 
     def polish_witness(self, q: th.Tensor, pose: Pose, arm: str, ignore: Sequence[Any] = ()) -> Tuple[th.Tensor, float]:
         """``(q', residual_m)``: a few damped-least-squares iterations drive the arm from ``q`` onto ``pose`` exactly (the IK

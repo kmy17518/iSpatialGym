@@ -565,7 +565,8 @@ class Disembedding(SamplerV2):
         d_pose, side, dest_diag = self._place_destination(rng, init, manip, cam_init, s_pose)
         dst_w = self.dst_floor.at(d_pose)
         # distractors on the source floor (spacing along the pinch axis, budget)
-        width = TT.grasp_pinch_width(next((g for g in self.grasps if g.name == grasp.grasp_name), None))
+        row_name = C.split_twin(grasp.grasp_name or "")[0]  # a twin pinches the same width as its library row
+        width = TT.grasp_pinch_width(next((g for g in self.grasps if g.name == row_name), None))
         spacing = TT.distractor_spacing(width if width is not None else 0.0, float(self.g("distractor_spacing_extra_m")))
         pinch_axis = C.closing_axis(grasp.grasp[1])
         items = [(n, self.hull[n], self.rest[n]) for n in dnames]
