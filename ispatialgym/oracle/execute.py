@@ -1167,8 +1167,18 @@ def _raised(pose, dz: float) -> Pose:
     return Pose(position=[float(p[0]), float(p[1]), float(p[2]) + float(dz)], orientation=[float(v) for v in q.tolist()])
 
 
+def _ramped(start, waypoints: Sequence[Any], end, dz: float) -> List[Pose]:
+    """``waypoints`` between ``start`` (kept) and ``end`` (raised by ``dz``) raised by ``dz`` x their path fraction from ``start``."""
+    pts = [as_world_pose(p)[0] for p in [start] + list(waypoints) + [end]]
+    cum = [0.0]
+    for a, b in zip(pts[:-1], pts[1:]):
+        cum.append(cum[-1] + float(th.linalg.norm(b.float() - a.float())))
+    total = cum[-1]
+    return [_raised(p, dz * (cum[i + 1] / total if total > 1e-9 else 1.0)) for i, p in enumerate(waypoints)]
+
+
 def _approach_tracks(motions: Optional[Motions], arm: str, q_hint, poses: Sequence[Any]) -> Optional[bool]:
-    """Whether the differential IK tracks the straight legs through ``poses`` (a lifted pre-grasp, its approach, the lifted grasp)
+    """Whether the differential IK tracks the straight legs through ``poses`` (the pre-grasp, its approach, the lifted grasp)
     from ``q_hint``'s arm joints - the pre-grasp witness the transit ends in and the approach leaves from (the current configuration
     without a hint), as ``Motions.arm_along`` will; None without a backend (the test stubs)."""
     backend = getattr(motions, "backend", None)
@@ -1197,13 +1207,14 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     pushes against it, causing robot to wobble" - a replay's contact dump showed only the two finger links, pressing 91-154 N into the
     tray floor while the hand stood still, and torso_joint1 bent 7.6 mrad; the camera never touched): a library pinch of an object
     resting on a support must not put a finger below the object's lowest point - nothing of the hand fits there. When the finger
-    envelope at the grasp pose reaches below the object's bottom + ``grasp_support_clearance_m``, the grasp, its pre-grasp and approach
-    are lifted by the deficit along world z, provided the pads' fingertip-side end stays ``grasp_support_pad_margin_m`` below the
-    object's top and the lifted approach tracks from the pre-grasp witness the approach leaves from (``_approach_tracks``; sandal
-    0927-030120 replayed on a pod: its pre-grasp and grasp witnesses lie in different IK branches, the approach to the grasp lifted
-    13.7 mm stalled at waypoint 8 of 12 and its finish toward the grasp witness, 3.1 rad away, was refused) - else the recorded grasp
-    runs; a lifted grasp whose attempt failed is not lifted on the retry (``Executor.run_action`` keeps ``support_lift_refused``).
-    ``ctx["grasp_support_lift"]`` records the facts."""
+    envelope at the grasp pose reaches below the object's bottom + ``grasp_support_clearance_m``, the grasp is lifted by the deficit
+    along world z and the approach ramps up to it from the recorded pre-grasp, provided the pads' fingertip-side end stays
+    ``grasp_support_pad_margin_m`` below the object's top and that approach tracks from the pre-grasp witness (``_approach_tracks``) -
+    else the recorded grasp runs; a lifted grasp whose attempt failed is not lifted on the retry (``Executor.run_action`` keeps
+    ``support_lift_refused``). The pre-grasp stays where it was recorded, and with it the transit there: the sandal 0927-030120 with
+    its pre-grasp lifted too took the transit's via-above into a posture its approach stalled from (13 mm short 4.7 cm before the grasp,
+    the finish toward the grasp witness 3.06 rad away refused - 8b572a12 on a pod and locally, both attempts). A vertical approach (the
+    bar soap's) is the same line either way. ``ctx["grasp_support_lift"]`` records the facts."""
     if action.kind != "library" or targets.get("grasp") is None:
         return targets
     try:
@@ -1231,8 +1242,7 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
         return targets
     out = dict(targets)
     out["grasp"] = _raised(targets["grasp"], need)
-    out["pre_grasp"] = _raised(targets["pre_grasp"], need)
-    out["approach"] = [_raised(p, need) for p in targets["approach"]]
+    out["approach"] = _ramped(targets["pre_grasp"], list(targets["approach"]), targets["grasp"], need)
     if _approach_tracks(motions, action.arm, _witness(ctx, "pre_grasp"), [out["pre_grasp"]] + list(out["approach"]) + [out["grasp"]]) is False:
         rec["reason"] = f"the approach to the {need * 1000:.1f} mm lifted grasp does not track from the pre-grasp witness: the recorded grasp runs"
         return targets

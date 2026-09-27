@@ -45,10 +45,13 @@ def test_a3_grasp_lifted_by_the_finger_deficit_below_the_object(monkeypatch):
     out = EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig())
     need = 0.80 + EX.ExecuteConfig().grasp_support_clearance_m - 0.794
     assert ctx["grasp_support_lift"]["applied"] and ctx["grasp_support_lift"]["lift_m"] == pytest.approx(need, abs=1e-4)
-    for k in ("grasp", "pre_grasp"):
-        assert out[k].position[2] == pytest.approx(targets[k].position[2] + need, abs=1e-6)
-        assert out[k].position[:2] == pytest.approx(targets[k].position[:2])
-    assert [p.position[2] for p in out["approach"]] == pytest.approx([p.position[2] + need for p in targets["approach"]])
+    assert out["grasp"].position[2] == pytest.approx(targets["grasp"].position[2] + need, abs=1e-6)
+    assert out["grasp"].position[:2] == pytest.approx(targets["grasp"].position[:2])
+    assert out["pre_grasp"] is targets["pre_grasp"]  # the transit to the pre-grasp stays the recorded one (sandal 0927-030120)
+    # the approach ramps from the recorded pre-grasp up to the lifted grasp
+    assert [p.position[2] for p in out["approach"]] == pytest.approx([targets["approach"][0].position[2], targets["approach"][1].position[2] + need])
+    mid = EX._ramped(_pose([0.0, 0.0, 1.0]), [_pose([0.0, 0.0, 0.9]), _pose([0.0, 0.0, 0.8])], _pose([0.0, 0.0, 0.6]), 0.01)
+    assert [p.position[2] for p in mid] == pytest.approx([0.9025, 0.805])
 
 
 def test_a3_grasp_kept_when_clear_or_when_the_pads_would_leave_the_object(monkeypatch):
@@ -81,7 +84,7 @@ def test_a3_grasp_kept_when_the_lifted_approach_does_not_track_or_failed_before(
     ctx = {}
     assert EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig()) is targets
     assert not ctx["grasp_support_lift"]["applied"] and "does not track" in ctx["grasp_support_lift"]["reason"]
-    assert seen["z"][0] == pytest.approx(targets["pre_grasp"].position[2] + 0.010, abs=1e-6) and seen["z"][-1] == pytest.approx(targets["grasp"].position[2] + 0.010, abs=1e-6)
+    assert seen["z"][0] == pytest.approx(targets["pre_grasp"].position[2], abs=1e-6) and seen["z"][-1] == pytest.approx(targets["grasp"].position[2] + 0.010, abs=1e-6)
     # a lifted grasp whose attempt failed: the retry of that action runs the recorded grasp
     monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
     ctx = {"protect": {"index": 7}}
@@ -361,95 +364,3 @@ def test_wide_stop_keeps_the_push_line_between_its_fingertips():
     # a face too short for a stop around the line: nothing to try (the next brace kind)
     assert wide_stop_positions(0.04, -0.02, 0.04, (-0.045, 0.045)) == []
 
-
-# ------------------------------------------------------------------------------------------------ via-above in the goal witness's branch (A3 follow-up)
-
-
-def _via_self(climb_to=0.07, plan_ok=True, violations=()):
-    """A toy arm (joints 0-2: the hand position, joint 3: the IK branch sign) with the backend calls of ``Motions._via_above``; the
-    goal's witness has no IK at the point above (the seeded IK lands in the other branch)."""
-    from ispatialgym.oracle.motions import Motions, MotionsConfig
-
-    calls = []
-    q_now = th.tensor([0.3, 0.1, 1.10, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-    def fk(frames, q):
-        q = C.as_tensor(q).reshape(-1)
-        return {frames[0]: (q[:3].clone(), th.tensor([0.0, 0.0, 0.0, 1.0]))}
-
-    def solve_ik_path(emb, waypoints, q_start=None, **kw):
-        q = C.as_tensor(q_start).reshape(-1).clone()
-        calls.append(("climb", float(q[3])))
-        top = q.clone()
-        top[2] = q[2] + climb_to
-        return SimpleNamespace(success=False, q_traj=th.stack([q, top]), status="stalled")
-
-    def solve_ik(emb, targets, q_seed=None, sync_world=False):
-        q = C.as_tensor(q_seed).reshape(-1).clone()
-        q[3] = -q[3]  # the other branch: farther than witness_refine_max_jump
-        return q
-
-    def plan_joint(emb, q_goal, q_start=None, **kw):
-        calls.append(("plan_joint", C.as_tensor(q_goal).reshape(-1).clone()))
-        return SimpleNamespace(success=plan_ok, q_traj=th.stack([C.as_tensor(q_start).reshape(-1), C.as_tensor(q_goal).reshape(-1)]), status="ok")
-
-    def plan_pose(emb, targets, q_start=None, **kw):
-        calls.append(("plan_pose", None))
-        return SimpleNamespace(success=True, q_traj=th.stack([q_now, q_now]), status="ok")
-
-    def arm_along(arm, waypoints, **kw):
-        calls.append(("along", len(waypoints)))
-        yield th.zeros(3)
-
-    def execute(q_traj, arms=None):
-        calls.append(("execute", C.as_tensor(q_traj)[-1].clone()))
-        yield th.zeros(3)
-
-    cfg = MotionsConfig(cartesian_step=0.05, cartesian_rot_step=0.3)
-    s = SimpleNamespace(cfg=cfg, robot=SimpleNamespace(arm_control_idx={"right": th.arange(7)}),
-                        backend=SimpleNamespace(fk=fk, solve_ik_path=solve_ik_path, solve_ik=solve_ik, plan_joint=plan_joint, plan_pose=plan_pose,
-                                                update_world=lambda **kw: None, q_full=lambda: q_now.clone()),
-                        _protect_violations=lambda arms, q_traj, emb, P=None: list(violations), arm_along=arm_along, execute_joint_trajectory=execute,
-                        eef_pose=lambda arm: (q_now[:3].clone(), th.tensor([0.0, 0.0, 0.0, 1.0])))
-    s._densify = lambda start, wps: Motions._densify(s, start, wps)
-    s._tracks_from = lambda arm, q, wps: Motions._tracks_from(s, arm, q, wps)
-    s._witness_climb_above = lambda *a: Motions._witness_climb_above(s, *a)
-    goal = (th.tensor([0.5, 0.0, 0.85]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-    q_goal = th.tensor([0.5, 0.0, 0.85, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-    def via():
-        gen = Motions._via_above(s, "right", "right_arm", goal, q_goal, {})
-        try:
-            while True:
-                next(gen)
-        except StopIteration as stop:
-            return stop.value
-
-    return calls, via
-
-
-def test_via_above_climbs_from_the_goal_witness_when_it_has_no_ik_at_the_point_above():
-    """Sandal 0927-030120 (8b572a12 / f0591a6d / 55c8d74f): the pre-grasp witness had no IK 12 cm up, the pose-goal point above
-    descended into another posture and the approach from there stalled 13 mm short of the grasp. The hand tracked straight up from
-    the witness gives the point above; the descent retraces it into the witness's posture."""
-    calls, via = _via_self()
-    done, why = via()
-    assert done and "goal branch: tracked up from its witness" in why and "0.07 m" in why
-    kinds = [c[0] for c in calls]
-    assert "plan_pose" not in kinds and kinds.count("climb") == 1
-    target = [c[1] for c in calls if c[0] == "plan_joint"][0]
-    assert float(target[3]) == 1.0 and float(target[2]) == pytest.approx(0.92)  # the witness's branch, 7 cm up
-    assert float([c[1] for c in calls if c[0] == "execute"][-1][2]) == pytest.approx(0.92) and kinds[-1] == "along"
-
-
-@pytest.mark.parametrize("kw", [{"climb_to": 0.02}, {"plan_ok": False}, {"violations": [{"object": "saucer", "clearance_m": -0.01}]}])
-def test_via_above_falls_back_to_the_pose_goal_point_when_the_climb_does_not_serve(kw):
-    """The witness's branch rises < 3 cm, or no plan reaches the climbed point, or that plan passes a protected object: the
-    pose-goal point above, as before."""
-    calls, via = _via_self(**kw)
-    done, why = via()
-    kinds = [c[0] for c in calls]
-    if "violations" in kw:  # the pose-goal plan passes the protected object too (the toy's check fires on every plan)
-        assert not done and "still passes saucer" in why and "plan_pose" in kinds
-    else:
-        assert done and "(pose goal)" in why and "plan_pose" in kinds

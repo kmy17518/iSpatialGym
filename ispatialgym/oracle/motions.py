@@ -105,9 +105,6 @@ class MotionsConfig:
     #: is, the plan goes to the point this much above the transit's goal, then straight down; direct re-plans when that fails
     protect_lift_m: float = 0.12
     protect_above_m: float = 0.12
-    #: when the goal's witness has no IK ``protect_above_m`` above the goal (within ``witness_refine_max_jump``), the point above is
-    #: where the hand, tracked straight up from the witness, gets to - at least this high above the goal (else the pose-goal point)
-    protect_above_witness_min_m: float = 0.03
     protect_replans: int = 3
     #: a pre-grasp transit plan that clears the protected objects only the long way round - its hand path longer than this
     #: times the via-above's nominal one (``protect_lift_m`` + the straight distance + ``protect_above_m``) and its hand higher
@@ -1085,74 +1082,18 @@ class Motions:
                 if float(th.max(th.abs(q_ik[idx] - q_goal[idx]))) <= self.cfg.witness_refine_max_jump:
                     q_above = q_start.clone()
                     q_above[idx] = q_ik[idx]
-        res = None
-        if q_above is None and q_goal is not None:
-            res, where = self._witness_climb_above(arm, emb, (gp.float(), gq.float()), C.as_tensor(q_goal).reshape(-1), q_start, P)
-        if res is None:
-            if q_above is not None:
-                res = self.backend.plan_joint(emb, q_above, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
-            else:
-                res = self.backend.plan_pose(emb, {M.EEF_LINK[arm]: above}, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
-            if not res.success:
-                return False, f"{lifted}; no plan to the point above the goal ({res.status})"
-            viol = self._protect_violations([arm], res.q_traj, emb, P)
-            if viol:
-                return False, f"{lifted}; the plan to the point above still passes {viol[0]['object']} at {viol[0]['clearance_m']} m"
-            where = f"above the goal by {self.cfg.protect_above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'})"
+        if q_above is not None:
+            res = self.backend.plan_joint(emb, q_above, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+        else:
+            res = self.backend.plan_pose(emb, {M.EEF_LINK[arm]: above}, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+        if not res.success:
+            return False, f"{lifted}; no plan to the point above the goal ({res.status})"
+        viol = self._protect_violations([arm], res.q_traj, emb, P)
+        if viol:
+            return False, f"{lifted}; the plan to the point above still passes {viol[0]['object']} at {viol[0]['clearance_m']} m"
         yield from self.execute_joint_trajectory(res.q_traj, arms=[arm])
         yield from self.arm_along(arm, [(gp.float(), gq.float())], soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
-        return True, f"{lifted}; {where}, straight down"
-
-    def _tracks_from(self, arm: str, q_start: th.Tensor, waypoints: Sequence[Any]) -> Optional[Any]:
-        """``solve_ik_path`` of :meth:`arm_along`'s densified leg through ``waypoints`` started from the configuration ``q_start``
-        (nothing executed, no collision check); None when the backend cannot tell."""
-        solve = getattr(self.backend, "solve_ik_path", None)
-        if solve is None:
-            return None
-        try:
-            start = self.backend.fk([M.EEF_LINK[arm]], q_start)[M.EEF_LINK[arm]]
-            dense = self._densify(as_world_pose(start), list(waypoints))
-            return solve(f"{arm}_arm", [{M.EEF_LINK[arm]: wp} for wp in dense], q_start=q_start, pos_tol=self.cfg.diff_ik_pos_tol,
-                         rot_tol=self.cfg.diff_ik_rot_tol, max_iters=self.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False,
-                         soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
-        except Exception as e:  # noqa: BLE001
-            log.debug("_tracks_from(%s) failed (%r)", arm, e)
-            return None
-
-    def _witness_climb_above(self, arm: str, emb: str, goal: Pose, q_goal: th.Tensor, q_start: th.Tensor,
-                             P: Dict[str, Any]) -> Tuple[Optional[Any], str]:
-        """The via-above's point above the goal when the goal's witness ``q_goal`` has no IK there within ``witness_refine_max_jump``:
-        the hand tracked straight up from the witness, as high as it gets (at least ``protect_above_witness_min_m`` above the goal),
-        planned to in joint space and checked against the protected objects - the descent retraces that climb and reaches the goal in
-        the witness's posture, where the legs chained from it were checked (the pre-grasp witness: the sampler's approach). A pose-goal
-        point above descends into whatever posture its IK chose (sandal 0927-030120 on 8b572a12 / f0591a6d / 55c8d74f: the grasp
-        lifted 14 mm off the table, the witness has no IK 12 cm above the pre-grasp; the descent from the pose-goal point reached the
-        pre-grasp, the approach from there stalled 13 mm short 4.7 cm before the grasp, its finish toward the grasp witness - 3.06 rad
-        away - was refused and cuRobo's IK swung 3.2 rad: plan_failed in both attempts). Returns ``(plan, why)``, ``(None, "")``
-        when the climb or its plan fails (the pose-goal point above then)."""
-        idx = self.robot.arm_control_idx[arm]
-        q0 = C.as_tensor(q_start).reshape(-1).clone()
-        q0[idx] = q_goal[idx]
-        gp, gq = goal
-        up = self._tracks_from(arm, q0, [(gp + th.tensor([0.0, 0.0, float(self.cfg.protect_above_m)]), gq)])
-        if up is None or up.q_traj is None or len(up.q_traj) < 2:
-            return None, ""
-        q_hi = C.as_tensor(up.q_traj)[-1].reshape(-1)
-        try:
-            h = float(self.backend.fk([M.EEF_LINK[arm]], q_hi)[M.EEF_LINK[arm]][0][2]) - float(gp[2])
-        except Exception:  # noqa: BLE001
-            return None, ""
-        if h < float(self.cfg.protect_above_witness_min_m):
-            return None, ""
-        try:
-            res = self.backend.plan_joint(emb, q_hi, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
-        except SkillError:
-            return None, ""
-        if not getattr(res, "success", False) or res.q_traj is None or self._protect_violations([arm], res.q_traj, emb, P):
-            return None, ""
-        why = f"above the goal by {h:.2f} m (goal branch: tracked up from its witness, which has no IK {self.cfg.protect_above_m:.2f} m up)"
-        log.info("via-above(%s): %s", arm, why)
-        return res, why
+        return True, f"{lifted}; above the goal by {self.cfg.protect_above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'}), straight down"
 
     def _plan_detour(self, arm: str, q_traj: Any) -> Optional[Dict[str, Any]]:
         """The hand path of a planned transit that detours past the via-above's - longer than ``protect_detour_ratio`` x
