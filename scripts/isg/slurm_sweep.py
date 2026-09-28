@@ -101,6 +101,16 @@ def job_script(runs, args):
     if args.local_appdata:  # Kit's portable root (caches, logs) per run instead of the checkout's, shared by every job on NFS
         cold += 'export OMNIGIBSON_APPDATA_PATH="$TMPDIR/appdata"; '
     launches = "\n".join(f"run_one {q(d)} {int(t)} &" for d, t in runs)
+    stage = ""
+    if args.stage_datasets:
+        # one copy per node, made by the first job that lands there (the others wait on the lock); OmniGibson then reads the
+        # scenes and objects from the local disk instead of NFS
+        src = os.path.realpath(os.path.join(REPO, "Behavior-1K", "datasets"))
+        dst = args.stage_datasets
+        stage = f"""mkdir -p {q(os.path.dirname(dst.rstrip('/')))}
+( flock 9; [ -f {q(dst)}/.isg_staged ] || {{ rsync -aL --delete {q(src)}/ {q(dst)}/ && touch {q(dst)}/.isg_staged; }} ) 9>{q(dst.rstrip('/') + '.lock')}
+[ -f {q(dst)}/.isg_staged ] && export OMNIGIBSON_DATA_PATH={q(dst)}
+"""
     return f"""#!/bin/bash
 export HOME={q(args.home)}
 if [ -n "${{TMPDIR:-}}" ] && [ -d "$TMPDIR" ] && [ -w "$TMPDIR" ] && [ "$(df -Pk "$TMPDIR" | awk 'NR==2{{print $4}}')" -gt {min_kb} ]; then
@@ -112,7 +122,7 @@ source {q(args.conda_sh)}
 conda activate {q(args.env)}
 cd {q(REPO)} || exit 2
 export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES
-gpu="$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | head -1)"
+{stage}gpu="$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | head -1)"
 run_one() {{
   local d="$1" t="$2"
   (
@@ -299,6 +309,10 @@ def main():
     s.add_argument("--min-scratch-gb", type=float, default=50.0)
     s.add_argument("--pack", type=int, default=1, help="runs per job, concurrently on its one GPU (a run peaks at ~10 GB: 2 on 24 GB cards, "
                                                         "3-4 on 46-48 GB); --cpus and --mem are per run")
+    s.add_argument("--stage-datasets", default=None, metavar="NODE_DIR",
+                   help="node-local directory (e.g. /tmp/$USER/isg_datasets) that the first job on a node fills with a copy of "
+                        "Behavior-1K/datasets (~35 GB) and every job then reads through OMNIGIBSON_DATA_PATH; the copy stays on the "
+                        "node for later sweeps (remove it when done)")
     s.add_argument("--local-appdata", action="store_true", help="a cold Kit appdata per run in the node scratch (~3 min of cache building "
                                                                 "per launch) instead of the checkout's warm one, which every job shares on NFS")
     s.add_argument("--shared-caches", dest="cold_caches", action="store_false",
