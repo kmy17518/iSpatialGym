@@ -286,7 +286,7 @@ def main():
     s.add_argument("--partition", default="viscam")
     s.add_argument("--account", default="viscam")
     s.add_argument("--gres", default="gpu:1")
-    s.add_argument("--cpus", type=int, default=8)
+    s.add_argument("--cpus", type=int, default=12, help="per run (viscam GPU nodes: 96-128 CPUs for 8 GPUs; with 8 a node of eight runs was CPU-bound)")
     s.add_argument("--mem", default="48G")
     s.add_argument("--exclude", default="viscam-hgx-1,viscam-hgx-2,viscam1,viscam9",
                    help="nodes to avoid: H200s (no RT cores), the 11 GB 2080 Ti node, a node whose /tmp is full")
