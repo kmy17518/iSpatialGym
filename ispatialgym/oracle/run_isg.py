@@ -73,6 +73,7 @@ from ispatialgym.oracle.motions import Motions  # noqa: E402
 from ispatialgym.oracle.programs import expand  # noqa: E402
 from ispatialgym.oracle.qa import Monitors, QAConfig  # noqa: E402
 from ispatialgym.oracle.recorder import EpisodeAnnotations, Recorder, RecorderConfig, dump_json, json_default, save_png  # noqa: E402
+from ispatialgym.oracle import start_state
 from ispatialgym.oracle.sidecar import IDDL_ROOT, Sidecar, SidecarError, family_of_subtask, sha256_of_file  # noqa: E402
 from ispatialgym.robot import conventions as C  # noqa: E402
 from ispatialgym.tasks import ISpatialGymTask  # noqa: E402, F401  (registers the task type)
@@ -727,6 +728,8 @@ def parse_args(argv=None):
     p.add_argument("--frame-buffer", default="jpeg", choices=["jpeg", "raw"], help="how pending rgb frames are buffered until an action commits")
     p.add_argument("--all-cameras", action="store_true", help="LeRobot: every rgb sensor (default: the head camera only)")
     p.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
+    p.add_argument("--load-only", action="store_true", help="load the instance, record its start state (meta.start_state) and exit: no program, no demo, no "
+                                                            "TRO writes - the fresh-reload reference a warm demo's start state is compared with")
     return p.parse_args(argv)
 
 
@@ -865,6 +868,12 @@ def main(argv=None) -> int:
         timings["load_s"] = time.time() - t0
         task, robot, cam_key = loader.task, loader.robot, loader.cam_key
         meta["loader"] = loader.report
+        meta["start_state"] = start_state.fingerprint(loader)  # what the executor starts from (engineering track: warm vs fresh loads)
+        if args.load_only:
+            meta.update({"status": "loaded"})
+            result.update({"status": "loaded", "success": True, "start_state_sha256": meta["start_state"]["sha256"]})
+            exit_code = EXIT_SUCCESS
+            return exit_code
         rp, rq = robot.get_position_orientation()
         meta["robot_base_init"] = {"position": rp.tolist(), "orientation": rq.tolist()}
         try:

@@ -30,6 +30,7 @@ import glob
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -38,6 +39,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 ROOT = os.path.join(REPO, "runlogs", "pilot_20260915")
 FD = os.path.join(ROOT, "first_demo")
+FD_WARM = os.path.join(ROOT, "first_demo_warm")
 LEDGER = os.path.join(FD, "ledger.jsonl")
 FIXLOG = os.path.join(ROOT, "fix_log.jsonl")
 BOARD = os.path.join(ROOT, "first_demo_board.md")
@@ -175,7 +177,9 @@ def cmd_run(args):
     customs = json.load(open(CUSTOMS))
     st = subtask_of(args.alias, customs)
     run_id = time.strftime("%m%d-%H%M%S")
-    out_dir = os.path.join(FD, st, run_id)
+    # warm runs live outside first_demo/: the latest-success manifest takes every successful demo under it, and a warm demo is not
+    # evidence until the warm-vs-fresh start states are proven equal
+    out_dir = os.path.join(FD_WARM if getattr(args, "warm", False) else FD, st, run_id)
     commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--", "ispatialgym", "scripts"))
     t0 = time.time()
     scene = f" --scene {args.scene}" if args.scene else ""
@@ -188,10 +192,15 @@ def cmd_run(args):
            f"tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json 2>/dev/null | head -1); "
            + ("if [ -n \"$tro\" ]; then echo TRO=$tro; fi" if getattr(args, "sample_only", False) else
               f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540{extra}; echo DEMO_EXIT $?; fi"))
+    if getattr(args, "warm", False):
+        # engineering track (owner 2026-09-27): the sampler and the demo in one warm Isaac process (scripts/isg/warm_task.py); the
+        # demo records its start state and a pristine TRO copy stays for the fresh-load comparison. Not release evidence until proven.
+        cmd = (f"python scripts/isg/warm_task.py --alias {args.alias}{scene}{customs_opt} --max-attempts {args.max_attempts} --seed {args.seed}"
+               + (" --sample-only" if getattr(args, "sample_only", False) else "") + (f" --run-isg-args={shlex.quote(args.run_isg_args.strip())}" if extra else ""))
     rc = run_local(cmd, out_dir, args.timeout) if args.local else run_remote(cmd, out_dir, args.timeout)
     samp = parse_sampling(os.path.join(out_dir, "inst"))
     demo = parse_meta(os.path.join(out_dir, "demo"))
-    rec = {"time": now(), "kind": ("sample-only" if getattr(args, "sample_only", False) else "sample+demo") + (" (local)" if args.local else ""), "subtask": st, "alias": args.alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
+    rec = {"time": now(), "kind": ("sample-only" if getattr(args, "sample_only", False) else "sample+demo") + (" (warm)" if getattr(args, "warm", False) else "") + (" (local)" if args.local else ""), "subtask": st, "alias": args.alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
            "wall_s": round(time.time() - t0), "code_commit": commit, "dirty": dirty, "sampler_version": samp["sampler_version"],
            "sampling": {k: samp[k] for k in ("n_written", "rejections", "error", "time_s")}, "tro": samp["tro"] and os.path.relpath(samp["tro"], REPO),
            "demo": demo and {**demo, "meta": os.path.relpath(demo["meta"], REPO)}, "note": args.note}
@@ -397,6 +406,8 @@ def main():
     s.add_argument("--note", default="")
     s.add_argument("--customs", default=None, help="experiment copy of the customs for sample_isg (repo-relative, under runlogs/smoke_inputs/)")
     s.add_argument("--sample-only", action="store_true", help="sample the instance, no demo (owner 2026-09-26: compare a re-sampled sidecar with its record)")
+    s.add_argument("--warm", action="store_true", help="engineering track: the sampler and the demo in one warm Isaac process (scripts/isg/warm_task.py); "
+                                                     "records the demo's start state, keeps a pristine TRO copy - not release evidence until proven")
     s.add_argument("--run-isg-args", default="", help="extra run_isg arguments appended verbatim to the demo, as for demo-only (owner 2026-09-27: "
                                                       "--run-isg-args=--dev also records the over-the-shoulder view, external_rgb.mp4; the '=' form is "
                                                       "needed for a value that starts with '--')")
