@@ -314,7 +314,8 @@ def main():
     s.add_argument("--stage-datasets", default=None, metavar="NODE_DIR",
                    help="node-local directory (e.g. /tmp/$USER/isg_datasets) that the first job on a node fills with a copy of "
                         "Behavior-1K/datasets (~35 GB) and every job then reads through OMNIGIBSON_DATA_PATH; the copy stays on the "
-                        "node for later sweeps (remove it when done)")
+                        "node for later sweeps (remove it when done). The first copy is slow from NFS (~6.5 MB/s measured from "
+                        "/vision on viscam12 2026-09-27, ~1.5 h): worth it only for nodes reused across many sweeps")
     s.add_argument("--local-appdata", action="store_true", help="a cold Kit appdata per run in the node scratch (~3 min of cache building "
                                                                 "per launch) instead of the checkout's warm one, which every job shares on NFS")
     s.add_argument("--shared-caches", dest="cold_caches", action="store_false",
