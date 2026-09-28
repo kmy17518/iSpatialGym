@@ -176,6 +176,9 @@ class IORSSmall(SamplerV2):
         self.manip_candidates: List[Stance] = []
         self.pair: Dict[str, Any] = {}
         self.bands = None
+        self.segment_arms: List[str] = ["right"]  # the arms offered for the target's segment (sample_template)
+        self.arm_offer_why = ""  # why the other arm is not offered for the template (``tabletop.arm_offer``)
+        self.arm_bands: Dict[str, Any] = {}
         self.goal_side: Optional[str] = None  # nextto / touching: partner side the target goes to ("left" / "right", robot frame)
         self.release: Optional[Dict[str, Any]] = None  # inside: release-height facts of :meth:`release_pose`
         self.release_surface_z: Optional[float] = None  # ontop / under: the raycast surface under the goal footprint centre
@@ -298,14 +301,28 @@ class IORSSmall(SamplerV2):
         if self.init_stance is None:
             raise Reject("no_free_edge", "; ".join(errors) or f"{self.support.name}: no edge with a free, collision-free stance")
         self.init_stance.name = "init"
+        # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm when
+        # it has no role besides the segment and the target is free; its band is its own or the default arm's mirrored
+        self.segment_arms, self.arm_offer_why = TT.arm_offer(self, other_arm_roles=self.other_arm_roles())
+        self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands) if len(self.segment_arms) > 1 else {}
         # Phase 2: manipulation stance survivors of the best angle class (each with its focus)
         self.manip_candidates = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
-                                                              target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top)
+                                                              target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top,
+                                                              arm_bands=self.arm_bands)
         if not self.manip_candidates:
             raise Reject("no_manipulation_stance", "Phase 2 left no survivor")
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
-                                    "bands": getattr(getattr(self, "bands", None), "path", None), "H_max": H_max})
+                                    "bands": getattr(getattr(self, "bands", None), "path", None), "H_max": H_max, "segment_arms": list(self.segment_arms)})
+
+    def other_arm_roles(self) -> Tuple[str, ...]:
+        """Contacts planned besides the grasp -> carry -> place -> release segment: touching pushes the placed target on with the
+        grasping hand while the other hand braces the partner (``touching_contacts``); the other relations plan none."""
+        return ("push", "brace") if self.relation == "touching" else ()
+
+    def band_of_arm(self, arm: str):
+        """The reach band of ``arm`` (the default arm's own; the other arm's own or mirrored, ``tabletop.arm_band``)."""
+        return (getattr(self, "arm_bands", None) or {}).get(arm) or self.bands
 
     def apply_height_extra_to_grasp(self, grasp: GraspRecord, t_pose: G.Pose, manip: Stance) -> None:
         """A/B knob ``generation.contact_height_extra_m`` on the grasp (owner 2026-09-16 23:00): the pinch moves up the object
@@ -335,9 +352,10 @@ class IORSSmall(SamplerV2):
                 eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept"
         grasp.extras.update({"height_extra_m": x, "height_extra_effective_m": round(eff, 4), "height_extra_clip_reason": why})
 
-    def phase3_two_tier(self, manip: Stance, rng: np.random.Generator):
+    def phase3_two_tier(self, manip: Stance, rng: np.random.Generator, arms: Optional[Sequence[str]] = None):
         """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
-        feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp."""
+        feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp. ``arms``: the arms
+        offered for the segment at this focus (the chosen one is the record's ``arm``)."""
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
@@ -345,7 +363,8 @@ class IORSSmall(SamplerV2):
         for i, gs in enumerate(tiers):
             try:
                 t_pose, grasp = TT.phase3_target(self, manip, rng, gs, self.hull["target"], self.rest["target"], self.support_objects(),
-                                                 top=self.top, scale_key=self.choice.models["target"].scale)
+                                                 top=self.top, scale_key=self.choice.models["target"].scale, arms=arms,
+                                                 arm_bands=getattr(self, "arm_bands", None) or None)
                 if i > 0:
                     log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.alias, grasp.grasp_name)
                 return t_pose, grasp
@@ -577,61 +596,46 @@ class IORSSmall(SamplerV2):
         cam_init = self.camera_pose_at(init)
         order = rng.permutation(len(self.manip_candidates))
         errors = []
+        default = self.segment_arms[0]
         for k in order[:6]:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
-            manip.focus, manip.arms = cand.focus, ["right"]
+            manip.focus, manip.arms = cand.focus, [default]
             manip.extras.update(cand.extras)
+            # the other arm is tried only where its band covers the focus (owner 2026-09-27)
+            arms_here = [a for a in self.segment_arms if a == default or a in (cand.extras.get("focus_arms") or [])]
             try:
                 # §4.5 step 5: transition init -> manipulation
                 self.sidecar.transitions.clear()
                 self.record_transition(init, manip)
                 # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation)
-                t_pose, grasp = self.phase3_two_tier(manip, rng)
+                t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
+                if grasp.arm != default:
+                    self.sidecar.transitions.clear()
+                    self.record_transition(init, manip)  # the other arm idles now
                 self.apply_height_extra_to_grasp(grasp, t_pose, manip)  # A/B knob generation.contact_height_extra_m (0 = no-op)
-                # §4.6 step 2: partner on a random side (touching: robot's left) at gap g ∈ [g_lo, D_p]
-                p_pose = self.place_partner(rng, t_pose, manip, cam_init)
-                if self.edge_aligned():
-                    d.summary["edge_alignment"] = {
-                        "edge_yaw_deg": round(math.degrees(math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))), 1),
-                        "target_inhand_yaw_deg": round(math.degrees(self.edge_yaw_delta(self.hull["target"], t_pose[1], manip)), 1),
-                        "partner_yaw_deg": round(math.degrees(G.yaw_of(p_pose[1])), 1),
-                        "partner_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["partner"], p_pose[1], manip)), 2),
-                    }
-                # §4.6 step 4: every object fully in frame (5 %) in the init image
-                for role, pose in (("target", t_pose), ("partner", p_pose)):
-                    if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
-                        raise Reject("not_in_frame", f"{role} not in the init image (5 %)")
-                grasp.place_on = pname
-                self.sidecar.add_stance(manip)
-                self.sidecar.add_grasp(grasp)  # (popped again by the except below when this candidate is rejected)
-                # the place / pre-place of this candidate must project into its manipulation image (owner 1b: the FOV
-                # monitor arms from the pre-pose): checked here, before the settle, so the next candidate is tried instead of
-                # the attempt dying in the goal check (inside: release rim + 4-5 cm and the pre-place 10 cm above it)
-                if self.relation != "touching":
-                    cam_manip = self.camera_pose_at(manip)
-                    goal_guess = self.goal_pose(t_pose, p_pose)
-                    place_guess = IK.grasp_pose(goal_guess, grasp.eef_in_object)
-                    for what, pose in (("place", place_guess), ("pre-place", IK.pre_pose(place_guess))):
-                        if not self.ikc.eef_in_frame(pose, cam_manip):
-                            raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
-                                                                 f"(trunk {manip.translate}, {manip.tilt:.2f})")
-                # (owner 2026-09-18 01:33, (a)) reach screening of the place at the draw: the pre-place -> place descent with the
-                # object attached must pass the exact IK (margin + reach quality) from THIS candidate's stance - else the
-                # next candidate is tried instead of the attempt dying in the goal check 20-60 s later (touching re-samples
-                # 0917-235350 .. 0918-011947: 5/8 attempts lost to ik_joint_limit / witness residual at the place descent)
-                if bool(self.gen("reach_screen_place", True)):
-                    obj_at_place = self.place_pose_for(t_pose, p_pose, manip) if self.relation == "touching" else self.goal_pose(t_pose, p_pose)
-                    place_guess = IK.grasp_pose(obj_at_place, grasp.eef_in_object)
-                    ign_place = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
-                    # touching (owner 2026-09-18 16:32): the place is made from the second base pose the box is carried to
-                    st_place = (self.push_stance_for(manip, obj_at_place) if self.relation == "touching" else None) or manip
-                    with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-                        res_place = self.ikc.exact([IK.pre_pose(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
-                                                   scale_key=self.choice.models["target"].scale, cache=False, approached=ign_place)
-                    if not res_place.ok:
-                        raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
-                                                                            f"{manip.tilt:.2f}, from the {st_place.name} stance): {res_place.reason}")
+                # the segment's later contacts; when they fail with the chosen arm, the whole segment is retried with the other arm if
+                # its grasp passed too (owner 2026-09-27: the fallback spans the segment)
+                tried: List[str] = []
+                while True:
+                    try:
+                        p_pose = self._segment_draw(rng, d, int(k), t_pose, grasp, manip, cam_init, pname)
+                        break
+                    except Reject as e:
+                        tried.append(grasp.arm)
+                        others = [a for a in TT.fallback_arms(grasp) if a not in tried]
+                        if not others:
+                            raise
+                        self.sidecar.stances.pop("manipulation", None)
+                        self.sidecar.grasps.clear()
+                        g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.grasps, others[0], ignore_for_grasp=self.support_objects(),
+                                                       scale_key=self.choice.models["target"].scale, support_z=float(self.top.z), why=f"[{e.reason}] {e}")
+                        if g2 is None:
+                            raise
+                        grasp = g2
+                        self.sidecar.transitions.clear()
+                        self.record_transition(init, manip)
+                        self.apply_height_extra_to_grasp(grasp, t_pose, manip)
                 # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
                 grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
                 d.object_poses[tname] = t_pose
@@ -639,7 +643,8 @@ class IORSSmall(SamplerV2):
                 d.robot_q = self.stance_q(init)
                 d.base_pose2d = tuple(init.base_pose2d)
                 d.summary.update({"relation": self.relation, "manipulation_candidate": int(k), "grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw},
-                                  "manipulation_stance": manip.to_meta(), "pair": self.pair})
+                                  "manipulation_stance": manip.to_meta(), "pair": self.pair, "arm": TT.segment_arm_summary(grasp, arms_here)})
+                grasp.extras["arm_offer"] = TT.arm_offer_record(self.segment_arms, arms_here, grasp, self.arm_offer_why)
                 d.pose_targets[pname] = self._pose_target("partner", p_pose)
                 d.pose_targets[tname] = self._pose_target("target", t_pose)
                 d.summary["target_draft_pose"] = [[float(v) for v in t_pose[0]], [float(v) for v in t_pose[1]]]
@@ -651,6 +656,54 @@ class IORSSmall(SamplerV2):
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.grasps.clear()
         raise Reject("target_placement", "; ".join(errors[-3:]))
+
+    def _segment_draw(self, rng: np.random.Generator, d: Draft, k: int, t_pose: G.Pose, grasp: GraspRecord, manip: Stance, cam_init: G.Pose, pname: str) -> G.Pose:
+        """The draw's checks of the segment after its grasp, with the grasp's arm: §4.6 step 2 (the partner in that arm's band), step 4
+        (frame), the place in the manipulation image and the place screening. Records the stance and the grasp; returns the partner pose."""
+        # §4.6 step 2: partner on a random side (touching: robot's left) at gap g ∈ [g_lo, D_p]
+        p_pose = self.place_partner(rng, t_pose, manip, cam_init)
+        if self.edge_aligned():
+            d.summary["edge_alignment"] = {
+                "edge_yaw_deg": round(math.degrees(math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))), 1),
+                "target_inhand_yaw_deg": round(math.degrees(self.edge_yaw_delta(self.hull["target"], t_pose[1], manip)), 1),
+                "partner_yaw_deg": round(math.degrees(G.yaw_of(p_pose[1])), 1),
+                "partner_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["partner"], p_pose[1], manip)), 2),
+            }
+        # §4.6 step 4: every object fully in frame (5 %) in the init image
+        for role, pose in (("target", t_pose), ("partner", p_pose)):
+            if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
+                raise Reject("not_in_frame", f"{role} not in the init image (5 %)")
+        grasp.place_on = pname
+        self.sidecar.add_stance(manip)
+        self.sidecar.add_grasp(grasp)  # (popped again by the caller when this candidate is rejected)
+        # the place / pre-place of this candidate must project into its manipulation image (owner 1b: the FOV
+        # monitor arms from the pre-pose): checked here, before the settle, so the next candidate is tried instead of
+        # the attempt dying in the goal check (inside: release rim + 4-5 cm and the pre-place 10 cm above it)
+        if self.relation != "touching":
+            cam_manip = self.camera_pose_at(manip)
+            goal_guess = self.goal_pose(t_pose, p_pose)
+            place_guess = IK.grasp_pose(goal_guess, grasp.eef_in_object)
+            for what, pose in (("place", place_guess), ("pre-place", IK.pre_pose(place_guess))):
+                if not self.ikc.eef_in_frame(pose, cam_manip):
+                    raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
+                                                         f"(trunk {manip.translate}, {manip.tilt:.2f})")
+        # (owner 2026-09-18 01:33, (a)) reach screening of the place at the draw: the pre-place -> place descent with the
+        # object attached must pass the exact IK (margin + reach quality) from THIS candidate's stance - else the
+        # next candidate is tried instead of the attempt dying in the goal check 20-60 s later (touching re-samples
+        # 0917-235350 .. 0918-011947: 5/8 attempts lost to ik_joint_limit / witness residual at the place descent)
+        if bool(self.gen("reach_screen_place", True)):
+            obj_at_place = self.place_pose_for(t_pose, p_pose, manip) if self.relation == "touching" else self.goal_pose(t_pose, p_pose)
+            place_guess = IK.grasp_pose(obj_at_place, grasp.eef_in_object)
+            ign_place = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
+            # touching (owner 2026-09-18 16:32): the place is made from the second base pose the box is carried to
+            st_place = (self.push_stance_for(manip, obj_at_place) if self.relation == "touching" else None) or manip
+            with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+                res_place = self.ikc.exact([IK.pre_pose(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
+                                           scale_key=self.choice.models["target"].scale, cache=False, approached=ign_place)
+            if not res_place.ok:
+                raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
+                                                                    f"{manip.tilt:.2f}, from the {st_place.name} stance): {res_place.reason}")
+        return p_pose
 
     def _pose_target(self, role: str, pose: G.Pose) -> Dict[str, Any]:
         tgt = full_pose_target(pose[0], pose[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
@@ -698,12 +751,14 @@ class IORSSmall(SamplerV2):
         """§4.6 step 2 with the gap range per side cut to the reach band of the manipulation trunk (§4.1 / principle 3:
         placements come from the cached reachability sets): the goal position of the target — the partner's centre for
         ontop / under / inside — must be a lateral the band covers at the target's depth, otherwise the place pose of
-        §6.11 cannot pass. Sides with an empty admissible gap range are not drawn; touching keeps the robot's left."""
+        §6.11 cannot pass. Sides with an empty admissible gap range are not drawn; touching keeps the robot's left. The band is the
+        one of the arm that makes the segment (``manip``'s working arm)."""
         g_lo, g_hi = self.gap_range()
         sides = [1.0] if self.relation == "touching" else [1.0, -1.0]
         ranges: Dict[float, Tuple[float, float]] = {}
-        if self.relation in ("ontop", "under", "inside") and getattr(self, "bands", None) is not None:
-            cells = self.bands.band(manip.translate, manip.tilt)
+        band = self.band_of_arm((manip.working_arms or self.segment_arms)[0])
+        if self.relation in ("ontop", "under", "inside") and band is not None:
+            cells = band.band(manip.translate, manip.tilt)
             t_fp = self.world.footprint(self.hull["target"], t_pose)
             t_lat = (t_fp - manip.base_xy) @ manip.tangent
             depth_t = float(manip.world_to_base(t_pose[0][:2])[0])
@@ -726,11 +781,11 @@ class IORSSmall(SamplerV2):
             # touching with the push stance (owner 2026-09-18 16:32): the place is judged by the exact-IK screening of the
             # draw (``reach_screen_place``) and the push by its own stance - the band cut on the place gap is not applied
             ranges = {sd: (g_lo, g_hi) for sd in sides}
-        elif getattr(self, "bands", None) is not None:
+        elif band is not None:
             # nextto / touching: the target's *place* position (its origin at the goal gap — touching: the nextto position
             # the push starts from) must be a band lateral at the target's depth, else the place IK of §6.11 fails
             # (touching box_of_sanitary_napkins: every attempt place_unreachable with the goal 4-9 cm left of centre)
-            cells = self.bands.band(manip.translate, manip.tilt)
+            cells = band.band(manip.translate, manip.tilt)
             base_t = manip.world_to_base(t_pose[0][:2])  # band cells are base-frame (x ahead, lateral + left)
             depth_t, lat_t = float(base_t[0]), float(base_t[1])
             near = cells[np.abs(cells[:, 0] - depth_t) <= 0.12] if len(cells) else cells
@@ -1262,6 +1317,22 @@ class IORSSmall(SamplerV2):
             why = self.recheck_carried_travel(self.bindings.one("target").name, arm_q=arm_q, stances=False)
             if why:
                 return f"carried drive: {why}"
+        return None
+
+    def arm_switch(self, draft: Draft, grasp: GraspRecord, arm: str) -> Optional[str]:
+        """``tabletop.held_arms``: the segment's stance switched to ``arm`` in place - the manipulation stance with ``arm`` working and
+        the other arm in its first collision-free idle posture, the init -> manipulation transition recorded again (with the objects at
+        their settled poses, as ``check_stances_with_objects`` sweeps it). Touching is not offered (its push stance and brace are the
+        grasping arm's). None when the switch is made, else why not."""
+        if self.relation == "touching":
+            raise TT.TurnNotOffered("touching: the push and the brace belong to the arms as recorded")
+        manip, init = self.sidecar.stance("manipulation"), self.sidecar.stance("init")
+        st = TT.stance_for_arm(self, manip, arm)
+        if st is None:
+            return f"no collision-free idle posture of the {TT.RB.other_arm(arm)} arm with the {arm} arm working"
+        TT.adopt_arm(manip, st)
+        self.sidecar.transitions[:] = [t for t in self.sidecar.transitions if not (t.frm == init.name and t.to == manip.name)]
+        self.record_transition(init, manip)
         return None
 
     def refine_targets_from_goal(self, draft: Draft):

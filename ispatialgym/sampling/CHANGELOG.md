@@ -152,6 +152,35 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   reason, both chains' margins, nearest joint, where, reach, `against_default`), log `orient [held chain, <arm> arm] ...`, kit
   `held_turn_checks` / `held_turn_switched` / `held_turn_kept` / `held_turn_not_offered` / `held_turn_errors`. Tests:
   `test_grasp_twins.py`.
+- **The arm of a single-arm segment by the same rule** (owner 2026-09-27, first-demo v2.2). Per arm-bound segment (grasp ->
+  carry -> place -> release, + the push-under blade of under-large; a held object's hold -> reorient / present), not per
+  contact: the other arm is offered (`tabletop.offered_arms`) when it has no role besides the segment (no brace, push or hold
+  planned) and the object is free (not articulated, not attached at the goal); `generation.other_arm` false switches it off.
+  Candidates are arm x wrist turn x configuration (`orient.with_arms`: every proposal of the default arm - `generation.arm`,
+  right - ranked before the other arm's, so within `REACH_TOL` the default arm, then the generator's turn), each solved with
+  its arm's IK at the stance with that arm working (`tabletop.stance_for_arm`: the other arm idles in its first A6 posture) and
+  checked against its own wrist camera; each arm's reach is measured from its own starting posture (`q_start` per arm).
+  Decisions record `arm_choice` (offered, chosen, reason, `against_default`, viable arms), instance summaries `arm`, the kit
+  counters `orient_arm.*` / `orient_arm_reason.*`. Stance first: Phase 2 (`arm_bands`) takes its foci from every offered arm's
+  band (survivors tagged `focus_arms`), the reach order ranks by whichever arm reaches better (`best_reach_margin`; IORS large's
+  B order too), and the other arm is tried only where its band covers the focus. The fallback spans the segment: when the
+  chosen arm's grasp passed but a later contact of its segment fails at the draw (IORS small: partner / frame / place
+  screening; disembedding: destination, placement stance, place, carried path; IORS large: the C coupling; held objects: the
+  goal search), the segment is retried once with the other arm if its grasp passed (`segment_fallback_grasp`, extras
+  `segment_fallback`). Left bands: the right band mirrored in memory (`ReachBands.mirrored` / `load_arm`: cells (x, λ) ->
+  (x, -λ), yaw -> -yaw, extent, shoulders and idle postures to the other side; meta `mirrored_from` / `mirror_source`; never
+  written - `store_feasible_set` keeps its sets in memory - never computed in-process; a band of the arm's own always wins;
+  tabletop and floor bands only). Counters `arm_band_mirrored.foci / empty_F / ik_tried / ik_failed` measure the mirrors' cost.
+  IORS large mirrors its right-side laterals for the left arm (floor-B offsets, carry poses, frontal push lane, side push
+  stance). Held objects: the left hold is the right hold's mirror image (approach base -y, roll -roll), its own hold-cache key,
+  no B7 prior (rendered with the right hand). `IKChecker` reads a recorded stance's finger opening from its working arm's
+  gripper. The arm is also ranked on the whole held chain (`tabletop.held_arms`, after `held_turns`): when another arm stayed
+  viable at the grasp and the chosen arm's held chain (`program_check.turn_chain`) is below `JOINT_LIMIT_MARGIN`, the segment
+  is solved again with the other arm (the module's `arm_switch` + `turn_recheck`: IORS small, disembedding; IORS large and held
+  objects record "not offered") and `orient.prefer` keeps the better chain; the loser is restored exactly; records
+  `twin_choice.held_arm`, kit `held_arm_*`. Every grasp record carries `extras.arm_offer` (fired / not fired and why, template
+  and offered arms, the arm, `against_default`, the mirrored band), copied by the executor into the grasp action's notes.
+  Tests: `test_left_arm.py`, `test_left_arm_held.py`, `test_left_arm_large.py`.
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

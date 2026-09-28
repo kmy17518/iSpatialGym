@@ -121,7 +121,8 @@ def stance_arm_vectors(kit, stance: Stance, arms: Optional[str] = None, right_ar
         if left_arm is None:
             left_arm = stance.q[robot.arm_control_idx["left"]].clone()
         if fingers is None and stance.fingers is None:
-            fingers = float(stance.q[robot.gripper_control_idx["right"]][0])
+            w = stance.working_arms
+            fingers = float(stance.q[robot.gripper_control_idx[w[0] if len(w) == 1 else "right"]][0])
     recorded = (stance.extras or {}).get("arms_q") if stance.q is None else None
     if recorded:
         if right_arm is None and recorded.get("right") is not None:

@@ -916,6 +916,8 @@ class SamplerV2(TaskSampler):
         report = PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask)
         # the wrist turn of a library pinch ranked on its whole held chain (owner 2026-09-27; ranking only, never a rejection)
         report = TT.held_turns(self, draft, report, lambda: PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask))
+        # the arm of the segment ranked on its whole held chain (owner 2026-09-27, first-demo v2.2; ranking only, never a rejection)
+        report = TT.held_arms(self, draft, report, lambda: PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask))
         self.last_program_check = report
         draft.summary["program_check"] = report
         return report

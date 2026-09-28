@@ -900,6 +900,15 @@ class Executor:
     def _backend(self):
         return getattr(self.motions, "backend", None)
 
+    def _arm_offer_note(self, action) -> Optional[Dict[str, Any]]:
+        """The sampler's arm offer of the segment an action belongs to (first-demo v2.2; fired / not fired): ``grasps[].arm_offer`` of
+        the grasp record of the action's object made by the action's arm; None for any other action."""
+        obj, arms = getattr(action, "object", None), tuple(getattr(action, "arms", ()) or ())
+        g = next((g for g in (getattr(self.sidecar, "grasps", None) or []) if g.object == obj and g.arm in arms), None) if obj and arms else None
+        ex = getattr(g, "extra", None) if g is not None else None
+        offer = ex.get("arm_offer") if isinstance(ex, dict) else None
+        return dict(offer) if isinstance(offer, dict) else None
+
     def checkpoint(self, action_index: int) -> Checkpoint:
         robot = self.robot
         backend = self._backend()
@@ -1335,6 +1344,9 @@ class Executor:
             self.last_ctx = ctx
             rec.targets_keys = ctx.get("targets_keys", [])
             rec.notes = {key: val for key, val in ctx.items() if key in NOTE_KEYS}
+            offer = self._arm_offer_note(action)
+            if offer is not None:
+                rec.notes["arm_offer"] = offer
             left = getattr(self.motions, "last_witness_residual", None) if self.motions is not None else None
             if left is not None:  # an arm_to left a small witness residual unclosed (a witness on a joint limit)
                 rec.notes["witness_residual_left"] = {"pos_m": round(float(left[0]), 4), "rot_rad": round(float(left[1]), 4)}

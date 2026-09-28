@@ -1,15 +1,26 @@
 """Held-object tasks (spec §6.3): ``object_scaling`` and ``mental_rotation`` on ``SamplerV2`` (TODO D3 + B7).
 
-Init: base = random free cell of the eroded map in the task room + yaw ~ U(−π, π); trunk and left arm at the JoyLo
-reset pose; right arm at the **fixed hold** solved once per robot (§6.3, §10 ``[pilot]``): pad centre on the head
-camera's optical axis at depth ``hold.depth_m`` (0.50), trunk ``hold.trunk`` (0.5, 0), approach axis = base +y (the
-robot's left), closing axis = world down rolled ``hold.roll_deg`` about the approach axis: 90° for object scaling
-(fingers horizontal, closing toward the robot, so a side-gripped object faces the camera with its side; owner
-2026-09-26), 15° for mental rotation. The hold is a
+Init: base = random free cell of the eroded map in the task room + yaw ~ U(−π, π); trunk and the idle arm at the JoyLo
+reset pose; the holding arm (right unless the arm choice below picks the left) at the **fixed hold** solved once per robot
+(§6.3, §10 ``[pilot]``): pad centre on the head camera's optical axis at depth ``hold.depth_m`` (0.50), trunk ``hold.trunk``
+(0.5, 0), approach axis = base +y (the robot's left), closing axis = world down rolled ``hold.roll_deg`` about the approach
+axis: 90° for object scaling (fingers horizontal, closing toward the robot, so a side-gripped object faces the camera with
+its side; owner 2026-09-26), 15° for mental rotation. The hold is a
 constant: it is cached under ``~/.cache/ispatialgym/held_hold.json`` (key = robot + hold constants) and written into
 the customs entry as a ``hold`` constraint through the core's constraints write-back. There are no depth or trunk
 fallbacks (v1 ``init_depth_fallbacks`` / ``hold_trunks`` are gone): a hold without an IK solution rejects the template
 (``hold_pose``).
+
+Arm (owner 2026-09-27, first-demo v2.2): the holding arm is one more dimension of the orientation rule (``orient.choose``) for
+the segment hold -> reorient / present. The arms offered are ``tabletop.offered_arms`` (the default arm ``generation.arm``, and
+the other arm: it has no role and the held object is free); each solves its hold with its own IK from the default posture, the
+left hand's hold being the right hold's mirror image (approach base -y, roll -> -roll: the same closing axis, the right hold
+turned π about it through the pad centre). Order: success, joint-limit safe (the hold configuration >= 0.05 rad from every arm
+joint limit; neither safe: more clearance), easier to reach (the largest arm-joint change from the default posture); within
+``orient.REACH_TOL`` the default arm. A hold whose goal search leaves no option hands the template to the other viable arm once
+(``segment_fallback``). ``template_facts["hold_arm"]`` and every summary's ``arm`` record the arm, the reason and
+``against_default``. The right hold keeps its cache key and entry, constraint record, B7 prior and record fields; a left hold
+has its own cache key (arm + approach), ``left_arm_q`` fields and no B7 prior (the survey was rendered with the right hand).
 
 Grasp: a library grasp of the ``floating`` pipeline (§2.2), realised as v1 §5.2 (fingers advanced 1 mm/step until both
 pads touch, 4 mm press through the assisted-grasp window, gravity re-enabled, still held); a row whose attach fails is
@@ -19,7 +30,7 @@ contract §3.14).
 
 Goal sets are precomputed **once per template** (they depend on the hold and the object, not on the base pose). Mental
 rotation = 13 rotation axes (face / edge / corner directions of the base frame, one per antipodal pair) × signed angles
-on a 15° grid inside ``goal_angle_range_deg`` (position unchanged), each candidate screened with the right-arm
+on a 15° grid inside ``goal_angle_range_deg`` (position unchanged), each candidate screened with the holding arm's
 embodiment only (the oracle moves the arm, not the torso) at the three intermediate waypoints of §3.9 (SLERP about the
 object root, ``conventions.orbit_waypoints``) with the object attached to the planner, the whole object in frame (5 %);
 each instance draws a (grasp, goal) from the feasible set and confirms it once with the exact IK at its base pose
@@ -42,19 +53,20 @@ TRO: ``grasps[0]`` (agent, arm, object, key, name, ``object_pose_in_eef_frame``,
 from the settled start (``HeldObjectV2.settle_start``); ``pose_targets[target]``
 = depth metric in the camera frame (scaling; tolerance max(0.02, 0.20·|Δd|), §8) or the world orientation with the
 model's ``orientation_equivalences`` (rotation; 0.15 rad; symmetric models rejected per §3.13 rule 1). Sidecar:
-``stances.init`` (arms ``["right"]``, ``carried`` = target), ``grasps[0]`` (hold eef, waypoints = 3 intermediate + the
-goal eef pose), ``goal`` (base, trunk, arms ``same`` + the goal right-arm configuration), ``language``.
+``stances.init`` (arms ``[<holding arm>]``, ``carried`` = target), ``grasps[0]`` (hold eef, waypoints = 3 intermediate + the
+goal eef pose), ``goal`` (base, trunk, arms ``same`` + the holding arm's goal configuration ``<arm>_arm_q``), ``language``.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
 import math
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -63,10 +75,13 @@ from ispatialgym import REPO_ROOT
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import grasp_library as GL
+from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import pose_target
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import orient as O
+from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import GraspRecord, Stance
@@ -78,8 +93,11 @@ from ispatialgym.oracle.action import ActionState  # noqa: E402
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
+#: the holding arm until the template's arm choice (``HeldObjectV2.arm``); its hold keeps the cache key, entry and records
+#: written before the choice existed (owner 2026-09-27, first-demo v2.2)
 ARM = "right"
-#: the idle (left) arm and the trunk are at the JoyLo reset pose (§3.3 exception): arms zero = the kit's ``tucked`` mode
+#: the idle arm (the one not holding) and the trunk are at the JoyLo reset pose (§3.3 exception): arms zero = the kit's
+#: ``tucked`` mode
 IDLE_ARMS = "tucked"
 #: grasp pipeline of the held-object tasks (§2.2): the iddl fixes it, the customs entry cannot change it
 PIPELINE = "floating"
@@ -129,6 +147,15 @@ class HoldConstants:
         return {"depth_m": self.depth_m, "trunk": [self.translate, self.tilt], "roll_deg": self.roll_deg}
 
 
+#: sign of each arm's hold: the approach along base ±y and the roll about it (the left hold mirrors the right one)
+HOLD_SIDE = {"right": 1.0, "left": -1.0}
+
+
+def hold_approach(arm: str) -> str:
+    """The approach of ``arm``'s hold as the cache entry / constraint record words it."""
+    return "base +y" if HOLD_SIDE[arm] > 0 else "base -y"
+
+
 def hold_cache_key(robot_model: str, hold: HoldConstants, extras: Optional[Dict[str, Any]] = None) -> str:
     """Cache key of the hold solution: robot + hold constants + everything else the solution depends on (idle-arm
     posture, pad offset, camera offset)."""
@@ -136,25 +163,67 @@ def hold_cache_key(robot_model: str, hold: HoldConstants, extras: Optional[Dict[
     return hashlib.sha256(json.dumps(d, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:16]
 
 
-def hold_cache_extras(kit) -> Dict[str, Any]:
+def hold_cache_extras(kit, arm: str = ARM) -> Dict[str, Any]:
     """The non-constant inputs of the hold solution (rounded so that every process computes the same key): the idle-arm
-    posture, the pad offset and the head-camera offset in the zed link."""
+    posture, the pad offset and the head-camera offset in the zed link; a left hold adds its arm and approach (the right
+    hold's key is the one cached before the arm choice, owner 2026-09-27 first-demo v2.2)."""
     cam = [[round(float(v), 4) for v in kit.cam_in_zed[0]], [round(float(v), 4) for v in kit.cam_in_zed[1]]]
-    return {"idle_arms": IDLE_ARMS, "contact_center_z": round(float(C.CONTACT_CENTER_Z), 5), "cam_in_zed": cam, "robot_model": "r1pro"}
+    d = {"idle_arms": IDLE_ARMS, "contact_center_z": round(float(C.CONTACT_CENTER_Z), 5), "cam_in_zed": cam, "robot_model": "r1pro"}
+    if arm != "right":
+        d.update({"arm": arm, "approach": hold_approach(arm)})
+    return d
 
 
-def hold_eef_pose(cam_pose: C.Pose, base_yaw: float, hold: HoldConstants) -> Tuple[C.Pose, th.Tensor]:
+def hold_eef_pose(cam_pose: C.Pose, base_yaw: float, hold: HoldConstants, arm: str = ARM) -> Tuple[C.Pose, th.Tensor]:
     """The hold eef pose (world) for a head-camera pose and base yaw: pad centre on the optical axis at
     ``hold.depth_m``, approach ``a`` = base +y (robot's left), closing ``c`` = world down rolled ``roll_deg`` about
-    ``a``; eef origin = pad − CONTACT_CENTER_Z·a (conventions ``pad_center``). Returns ``((pos, quat), pad)``."""
+    ``a``; eef origin = pad − CONTACT_CENTER_Z·a (conventions ``pad_center``). Returns ``((pos, quat), pad)``. The left
+    hand's hold is the mirror image (owner 2026-09-27, first-demo v2.2): ``a`` = base -y and the roll negated, which keeps
+    the closing axis (it lies in the base x-z plane) - the right hold turned π about the closing axis through the pad
+    centre, the exact mirror conjugate of the right hold up to the wrist twin."""
+    side = HOLD_SIDE[arm]
     cam_pos, cam_quat = C.as_pose(cam_pose)
     axis = C.quat_rotate(cam_quat, th.tensor([0.0, 0.0, -1.0]))
     pad = cam_pos + axis * float(hold.depth_m)
-    a = C.quat_rotate(C.quat_from_yaw(base_yaw), th.tensor([0.0, 1.0, 0.0]))
-    c = C.quat_rotate(C.quat_from_axis_angle(a, math.radians(hold.roll_deg)), th.tensor([0.0, 0.0, -1.0]))
+    a = C.quat_rotate(C.quat_from_yaw(base_yaw), th.tensor([0.0, side, 0.0]))
+    c = C.quat_rotate(C.quat_from_axis_angle(a, math.radians(side * hold.roll_deg)), th.tensor([0.0, 0.0, -1.0]))
     quat = C.eef_quat(a, c)
     origin = pad - C.CONTACT_CENTER_Z * a
     return (origin, quat), pad
+
+
+def hold_json(hold: HoldConstants, arm: str = ARM) -> Dict[str, Any]:
+    """The ``hold`` record of the sidecar / summary: the constants, a left hold with its arm and approach."""
+    d = hold.to_json()
+    if arm != "right":
+        d.update({"arm": arm, "approach": hold_approach(arm)})
+    return d
+
+
+def hold_posture(arm: str) -> Dict[str, str]:
+    """The init stance's ``posture`` record: the holding ``arm`` at the hold, the idle arm at the JoyLo reset pose."""
+    return {f"{a}_arm": ("hold" if a == arm else "reset") for a in ("left", "right")}
+
+
+def hold_init_arms(arm: str) -> str:
+    """``template_meta["init_arms"]`` of a template whose holding arm is ``arm``."""
+    return f"{RB.other_arm(arm)} {IDLE_ARMS} (JoyLo reset), {arm} hold"
+
+
+def hold_record(sol: Dict[str, Any], arm: str = ARM) -> Dict[str, Any]:
+    """The ``hold`` constraint (robot-level: empty scope) of ``arm``'s hold solution ``sol``; a left hold names its arm and
+    carries ``left_arm_q`` (the right hold's record is the one written before the arm choice)."""
+    q_key = f"{arm}_arm_q"
+    return {"scope": {}, "type": "hold", "robot": sol["robot"], **({} if arm == "right" else {"arm": arm}), "depth_m": sol["depth_m"],
+            "trunk": list(sol["trunk"]), "roll_deg": sol["roll_deg"], "approach": sol["approach"], "closing": sol["closing"], "eef_in_base": sol["eef_in_base"],
+            q_key: sol[q_key], "idle_arms": sol["idle_arms"], "hard": False}
+
+
+def same_hold(rec: Dict[str, Any], sol: Dict[str, Any], arm: str = ARM) -> bool:
+    """A written ``hold`` constraint ``rec`` records ``arm``'s hold ``sol``: robot, depth, trunk, roll and the arm (a record without
+    one is the right hand's)."""
+    return (rec.get("robot") == sol.get("robot") and rec.get("depth_m") == sol.get("depth_m") and list(rec.get("trunk", [])) == list(sol.get("trunk", []))
+            and rec.get("roll_deg") == sol.get("roll_deg") and rec.get("arm", "right") == arm)
 
 
 def depth_grid(depth_range: Sequence[float], grid_m: float) -> List[float]:
@@ -269,27 +338,39 @@ def visible_fraction(visible_px: int, reference_px: int) -> float:
     return min(1.0, float(visible_px) / float(reference_px))
 
 
-def survey_matches_hold(surveyed: Optional[Dict[str, Any]], hold: HoldConstants) -> bool:
-    """The survey's ``hold`` record (depth, trunk, roll) equals ``hold``; a survey without one matches no hold."""
+def survey_arm(surveyed: Dict[str, Any]) -> str:
+    """The hand a survey's ``hold`` record was rendered with: its ``arm``, else the arm of its configuration / approach (the B7
+    survey predates the arm choice: ``right_arm_q``, ``base +y``)."""
+    if surveyed.get("arm"):
+        return str(surveyed["arm"])
+    return "left" if ("left_arm_q" in surveyed or surveyed.get("approach") == hold_approach("left")) else "right"
+
+
+def survey_matches_hold(surveyed: Optional[Dict[str, Any]], hold: HoldConstants, arm: str = ARM) -> bool:
+    """The survey's ``hold`` record (depth, trunk, roll, hand) equals ``hold`` held by ``arm``; a survey without one matches no
+    hold. A left hold never matches a right-hand survey (owner 2026-09-27, first-demo v2.2): the same row shows the camera
+    another side of the object."""
     if not surveyed:
         return False
     try:
         s = HoldConstants.from_generation(surveyed)
     except (KeyError, TypeError, ValueError):
         return False
+    if survey_arm(surveyed) != arm:
+        return False
     return all(math.isclose(a, b, abs_tol=1e-6) for a, b in ((s.depth_m, hold.depth_m), (s.translate, hold.translate),
                                                               (s.tilt, hold.tilt), (s.roll_deg, hold.roll_deg)))
 
 
-def load_visibility_prior(path: str = VISIBILITY_PRIOR_PATH, hold: Optional[HoldConstants] = None) -> Dict[Tuple[str, str], Dict[str, Any]]:
+def load_visibility_prior(path: str = VISIBILITY_PRIOR_PATH, hold: Optional[HoldConstants] = None, arm: str = ARM) -> Dict[Tuple[str, str], Dict[str, Any]]:
     """The B7 survey (``visibility.json``): ``{(grasp_key, grasp_name): {"visible_fraction", "in_frame", ...}}``; an empty
-    dict when the file does not exist, or when ``hold`` is given and the survey was rendered at another hold (a visible
-    fraction measured with the fingers at one roll says nothing about another)."""
+    dict when the file does not exist, or when ``hold`` is given and the survey was rendered at another hold or with the
+    other hand (a visible fraction measured with the fingers at one roll says nothing about another)."""
     if not path or not os.path.exists(path):
         return {}
     with open(path) as f:
         data = json.load(f)
-    if hold is not None and not survey_matches_hold(data.get("hold"), hold):
+    if hold is not None and not survey_matches_hold(data.get("hold"), hold, arm):
         return {}
     out: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for rec in data.get("records", []):
@@ -316,6 +397,66 @@ def floating_key(category: str, model: str, preferred: Optional[str]) -> str:
     return key
 
 
+def start_controller_targets(robot, state, arm: str) -> Dict[str, float]:
+    """``robot_state.controller_targets`` of a settled start (joint name -> drive target of ``state``): the trunk, the idle arm
+    and the holding ``arm``, each group complete - the loader applies complete groups only
+    (``oracle.action.apply_recorded_targets``)."""
+    names = list(robot.joints.keys())
+    out: Dict[str, float] = {}
+    groups = [(robot.trunk_control_idx, state.trunk_target)] + [(robot.arm_control_idx[a], state.arm_target[a]) for a in (RB.other_arm(arm), arm)]
+    for idx, vals in groups:
+        for i, v in zip(th.as_tensor(idx).tolist(), vals.tolist()):
+            out[names[int(i)]] = float(v)
+    return out
+
+
+@dataclass
+class HoldSolution:
+    """One arm's fixed hold at the template's parked base pose (``HeldObjectV2.solve_hold``): the configuration ``q`` (28-D) and
+    ``q_rel`` (base virtual joints zero), the base-frame eef pose / pad centre / head camera and the record ``sol`` (the cache
+    entry, ``template_facts["hold"]``)."""
+
+    arm: str
+    q: th.Tensor
+    q_rel: th.Tensor
+    eef_in_base: C.Pose
+    pad_in_base: th.Tensor
+    cam_in_base: C.Pose
+    sol: Dict[str, Any]
+
+
+def hold_arm_choice(ikc, default: str, offered: Sequence[str], targets: Dict[str, C.Pose], q_start: Dict[str, th.Tensor],
+                    solve: Callable[[str], Tuple[Any, Optional[th.Tensor], str]]) -> Tuple[Optional[O.Scored], Dict[str, Any]]:
+    """The holding arm by the orientation rule (owner 2026-09-27, first-demo v2.2; ``orient.choose``): one proposal per offered
+    arm (the default arm first), its hold eef pose ``targets[arm]`` solved by ``solve(arm)`` -> ``(result, 28-D hold configuration
+    or None, why)``. Success, then joint-limit safe (the hold configuration >= ``IKChecker.JOINT_LIMIT_MARGIN`` from every arm
+    joint limit; neither safe: more clearance), then easier to reach (the largest arm-joint change from ``q_start[arm]``, the
+    default posture the hold IK starts from); within ``orient.REACH_TOL`` the default arm. Returns ``orient.choose``'s
+    ``(chosen, decision)``; ``chosen.result`` is the chosen arm's ``solve`` result."""
+
+    def evaluate(p: O.Proposal):
+        result, q, why = solve(p.arm)
+        if q is None:
+            return False, None, None, why
+        return True, result, [q], ""
+
+    props = O.with_arms([(a, [O.Proposal("hold", 0, a, [targets[a]])]) for a in offered])
+    return O.choose(ikc, default, props, evaluate, dict(q_start), stage="hold", check_camera=False, map_twins=False)
+
+
+def hold_arm_record(arm: str, default: str, offered: Sequence[str], decision: Dict[str, Any],
+                    fallback: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """``template_facts["hold_arm"]``: the holding arm, why (the chooser's ``arm_choice`` reason, the segment fallback or the only
+    arm offered, as ``tabletop.segment_arm_summary``), whether it is not the default arm, the arms offered, the chooser's
+    ``arm_choice`` and record, and the fallback. ``arm`` / ``reason`` / ``against_default`` go into every instance summary."""
+    ac = decision.get("arm_choice")
+    why = "segment fallback" if fallback else ((ac or {}).get("reason") or "only arm offered")
+    rec = {"arm": arm, "reason": why, "against_default": arm != default, "default": default, "offered": list(offered), "arm_choice": ac, "decision": decision}
+    if fallback is not None:
+        rec["segment_fallback"] = fallback
+    return rec
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # sampler
 # ----------------------------------------------------------------------------------------------------------------
@@ -329,6 +470,8 @@ class HeldObjectV2(SamplerV2):
 
     def __init__(self, ctx):
         super().__init__(ctx)
+        self.arm: str = ARM  # the holding arm: the template's arm choice (``choose_hold``)
+        self.hold_arm: Dict[str, Any] = {}  # the choice's record (``hold_arm_record``)
         self.hold: Optional[HoldConstants] = None
         self.hold_solution: Dict[str, Any] = {}
         self.q_hold_rel: Optional[th.Tensor] = None  # 28-D, base virtual joints zero
@@ -413,59 +556,149 @@ class HeldObjectV2(SamplerV2):
 
     # ------------------------------------------------------------------ the fixed hold (§6.3)
 
-    def solve_hold(self) -> Dict[str, Any]:
-        """The hold configuration at the current (parked) base pose: cache hit verified by FK, else one exact IK; a
-        failure is ``Reject("hold_pose")`` for the template — no depth / trunk / roll fallbacks."""
+    def hold_start(self) -> Tuple[HoldConstants, Tuple[float, float, float], C.Pose, th.Tensor, C.Pose]:
+        """The hold constants and, at the current (parked) base pose, the base pose2d, the base pose, the default posture ``q0``
+        (arms zero, trunk ``hold.trunk``: where every hold IK starts) and the head camera there."""
         hc = self.hold_constants()
-        self.hold = hc
         x, y, yaw = self.kit.world_base_pose2d()
-        base3 = self.base_pose3d((x, y, yaw))
         q0 = self.kit.q_at_base_pose(self.kit.q_config(arms=IDLE_ARMS, translate=hc.translate, tilt=hc.tilt), x, y, yaw)
-        cam = self.kit.camera_pose(q0)
-        eef_w, pad_w = hold_eef_pose(cam, yaw, hc)
-        key = hold_cache_key("r1pro", hc, hold_cache_extras(self.kit))
-        arm_idx = self.robot.arm_control_idx[ARM]
+        return hc, (x, y, yaw), self.base_pose3d((x, y, yaw)), q0, self.kit.camera_pose(q0)
+
+    def solve_hold(self, arm: str, scene_removed: bool = False) -> HoldSolution:
+        """``arm``'s hold configuration at the current (parked) base pose: cache hit verified by FK, else one exact IK from the
+        default posture; a failure is ``Reject("hold_pose")`` — no depth / trunk / roll fallbacks. Solves only
+        (:meth:`adopt_hold` makes a solution the template's hold); the right hold's cache key and entry are the ones written
+        before the arm choice, a left hold has its own (``hold_cache_extras``, ``left_arm_q``). ``scene_removed``: the caller
+        already removed the scene from the planner world (one world re-sync for every offered arm's hold)."""
+        hc, (x, y, yaw), base3, q0, cam = self.hold_start()
+        self.hold = hc
+        eef_w, pad_w = hold_eef_pose(cam, yaw, hc, arm)
+        key = hold_cache_key("r1pro", hc, hold_cache_extras(self.kit, arm))
+        arm_idx = self.robot.arm_control_idx[arm]
+        q_key = f"{arm}_arm_q"
         cache = _read_json(HOLD_CACHE_PATH)
         source = "solved"
         q = None
         hit = cache.get(key)
         if hit is not None:
             qc = q0.clone()
-            qc[arm_idx] = th.tensor(hit["right_arm_q"], dtype=th.float32)
-            eef_fk = self.kit.eef_pose(qc, ARM)
+            qc[arm_idx] = th.tensor(hit[q_key], dtype=th.float32)
+            eef_fk = self.kit.eef_pose(qc, arm)
             if float(th.linalg.norm(G.t(eef_fk[0]) - eef_w[0])) < 0.002 and C.quat_angle(eef_fk[1], eef_w[1]) < math.radians(1.0):
                 q, source = qc, "cache"
             else:
                 log.warning("held hold cache %s: FK mismatch, re-solving", key)
-        with self.kit.ignoring(self.scene_obstacles()):  # a robot-only fact: solved and checked against the robot itself
+        with contextlib.nullcontext() if scene_removed else self.kit.ignoring(self.scene_obstacles()):  # a robot-only fact: solved and checked against the robot itself
             if q is None:
-                q = self.kit.ik(eef_w, q0, arm=ARM)
+                q = self.kit.ik(eef_w, q0, arm=arm)
                 if q is None:
-                    raise Reject("hold_pose", f"no right-arm IK solution for the fixed hold (depth {hc.depth_m}, trunk ({hc.translate}, {hc.tilt}), roll {hc.roll_deg} deg; "
+                    raise Reject("hold_pose", f"no {arm}-arm IK solution for the fixed hold (depth {hc.depth_m}, trunk ({hc.translate}, {hc.tilt}), roll {hc.roll_deg} deg; "
                                               f"pad in base {[round(float(v), 3) for v in C.relative((pad_w, C.IDENTITY_QUAT), base3)[0]]})")
             if not bool(self.kit.collision_free(q, margin=0.01)[0]):
                 raise Reject("hold_pose", "the hold configuration self-collides")
         q_rel = q.clone()
         q_rel[[self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
-        self.q_hold_rel = q_rel
-        self.eef_in_base = C.relative(eef_w, base3)
-        self.pad_in_base = C.relative((pad_w, C.IDENTITY_QUAT), base3)[0]
-        self.cam_in_base = C.relative(cam, base3)
-        sol = {"key": key, "source": source, "robot": "r1pro", **hc.to_json(), "approach": "base +y", "closing": f"world down rolled {hc.roll_deg} deg about the approach",
-               "eef_in_base": {"position": self.eef_in_base[0].tolist(), "orientation": self.eef_in_base[1].tolist()},
-               "pad_in_base": self.pad_in_base.tolist(), "camera_in_base": {"position": self.cam_in_base[0].tolist(), "orientation": self.cam_in_base[1].tolist()},
-               "right_arm_q": q[arm_idx].tolist(), "idle_arms": IDLE_ARMS}
+        eef_in_base = C.relative(eef_w, base3)
+        pad_in_base = C.relative((pad_w, C.IDENTITY_QUAT), base3)[0]
+        cam_in_base = C.relative(cam, base3)
+        roll = hc.roll_deg * HOLD_SIDE[arm]
+        sol = {"key": key, "source": source, "robot": "r1pro", **({} if arm == "right" else {"arm": arm}), **hc.to_json(), "approach": hold_approach(arm),
+               "closing": f"world down rolled {roll} deg about the approach",
+               "eef_in_base": {"position": eef_in_base[0].tolist(), "orientation": eef_in_base[1].tolist()},
+               "pad_in_base": pad_in_base.tolist(), "camera_in_base": {"position": cam_in_base[0].tolist(), "orientation": cam_in_base[1].tolist()},
+               q_key: q[arm_idx].tolist(), "idle_arms": IDLE_ARMS}
         if source == "solved":
             cache[key] = {k: v for k, v in sol.items() if k not in ("source",)}
             _write_json(HOLD_CACHE_PATH, cache)
-        self.hold_solution = sol
-        log.info("%s: fixed hold (%s) depth %.2f trunk (%.2f, %.2f) roll %.0f deg", self.gp.alias, source, hc.depth_m, hc.translate, hc.tilt, hc.roll_deg)
-        return sol
+        log.info("%s: fixed %s-arm hold (%s) depth %.2f trunk (%.2f, %.2f) roll %.0f deg", self.gp.alias, arm, source, hc.depth_m, hc.translate, hc.tilt, hc.roll_deg)
+        return HoldSolution(arm, q, q_rel, eef_in_base, pad_in_base, cam_in_base, sol)
+
+    def adopt_hold(self, h: HoldSolution) -> None:
+        """Make ``h`` the template's hold: the holding arm (:attr:`arm`), the hold configuration, its base-frame quantities and
+        the B7 prior of that hold (none for a left hold: every library row is realised and measured)."""
+        self.arm = h.arm
+        self.q_hold_rel, self.eef_in_base, self.pad_in_base, self.cam_in_base = h.q_rel, h.eef_in_base, h.pad_in_base, h.cam_in_base
+        self.hold_solution = h.sol
+        self.template_meta["init_arms"] = hold_init_arms(h.arm)
+        self.prior = load_visibility_prior(VISIBILITY_PRIOR_PATH, self.hold, h.arm)
+        if not self.prior:
+            log.info("%s: no B7 visibility prior for this hold (%s arm, roll %.0f deg); every library row is realised and measured", self.gp.alias, h.arm,
+                     self.hold.roll_deg)
+
+    def choose_hold(self) -> None:
+        """The holding arm and the template's goal set (owner 2026-09-27, first-demo v2.2): every offered arm
+        (``tabletop.offered_arms``: the default arm, and the other arm - it has no role, the held object is free) solves its
+        hold, :func:`hold_arm_choice` orders them, and the goal search (:meth:`precompute_options`) runs with the first. The
+        goal search is the segment's later check: when it leaves no option the next viable arm's hold gets the template's
+        goal search once (``segment_fallback``). ``template_facts["hold_arm"]`` records the choice."""
+        default, offered = TT.default_arm(self), TT.offered_arms(self, free=True)
+        hc, (_, _, yaw), _, q0, cam = self.hold_start()
+        solved: Dict[str, HoldSolution] = {}
+        failed: Dict[str, Reject] = {}
+
+        def solve(arm: str):
+            try:
+                solved[arm] = self.solve_hold(arm, scene_removed=True)
+            except Reject as e:
+                failed[arm] = e
+                return None, None, str(e)
+            except Exception as e:  # noqa: BLE001 - the other arm is an offer: its planner failing never costs the default arm's template
+                if arm == default:
+                    raise
+                log.warning("%s: the %s arm's hold could not be solved (%r); not offered", self.gp.alias, arm, e)
+                failed[arm] = Reject("hold_pose", f"the {arm} arm's hold raised {e!r}"[:300])
+                return None, None, str(failed[arm])
+            return solved[arm], solved[arm].q, ""
+
+        with self.kit.ignoring(self.scene_obstacles()):  # robot-only facts: every offered arm's hold against the robot itself
+            chosen, decision = hold_arm_choice(self.ikc, default, offered, {a: hold_eef_pose(cam, yaw, hc, a)[0] for a in offered}, {a: q0 for a in offered}, solve)
+        if chosen is None:
+            if len(failed) == 1:
+                raise next(iter(failed.values()))
+            raise Reject("hold_pose", "; ".join(f"{a} arm: {e}" for a, e in failed.items()))
+        self.adopt_hold(chosen.result)
+        self.hold_arm = self.template_facts["hold_arm"] = hold_arm_record(self.arm, default, offered, decision)
+        try:
+            self.precompute_options()
+            return
+        except Reject as e:
+            others = [a for a in O.viable_arms(decision) if a != self.arm and a in solved]
+            if e.reason != "goal_infeasible" or not others:
+                raise
+            first = e
+        fallback = {"from_arm": self.arm, "why": str(first)[:300], "goal_options": self.template_facts.get("goal_options")}
+        TT._count(self, "segment_fallbacks")
+        log.info("%s: segment fallback: the %s arm's hold leaves no goal option (%s); the goal search runs with the %s arm's hold", self.gp.alias, self.arm,
+                 str(first)[:160], others[0])
+        self.adopt_hold(solved[others[0]])
+        self.hold_arm = self.template_facts["hold_arm"] = hold_arm_record(self.arm, default, offered, decision, fallback)
+        try:
+            self.precompute_options()
+        except Reject as e:
+            if e.reason != "goal_infeasible":
+                raise
+            fallback["failed"] = str(e)[:300]
+            raise Reject("goal_infeasible", f"{fallback['from_arm']} arm: {first}; {self.arm} arm (segment fallback): {e}")
+        TT._count(self, f"segment_fallback_taken.{self.arm}")
+
+    def arm_summary(self) -> Dict[str, Any]:
+        """Every instance's ``summary["arm"]``: the template's holding arm, why, and whether it is not the default arm."""
+        return {"arm": self.arm, "reason": self.hold_arm.get("reason"), "against_default": bool(self.hold_arm.get("against_default", False))}
+
+    def arm_offer_record(self) -> Dict[str, Any]:
+        """``grasps[].arm_offer`` (fired / not fired; the oracle copies it into the notes of the segment's actions): ``fired`` when both
+        arms' holds competed (``hold_arm_choice``), the arms offered, the holding arm and why, else why the other arm was not offered."""
+        offered = list(self.hold_arm.get("offered") or [self.arm])
+        out = {"fired": len(offered) > 1, "template_arms": offered, "arms": offered, "arm": self.arm, "reason": self.hold_arm.get("reason"),
+               "against_default": bool(self.hold_arm.get("against_default", False)), "mirrored_band": False}
+        if len(offered) < 2:
+            out["not_fired"] = TT.arm_offer(self, free=True)[1] or "one arm offered"
+        return out
 
     # ------------------------------------------------------------------ template (§6.3 precomputation)
 
     def sample_template(self):
-        self.template_meta["init_arms"] = f"left {IDLE_ARMS} (JoyLo reset), right hold"
+        self.template_meta["init_arms"] = hold_init_arms(self.arm)
         target = self.obj("target")
         choice = self.choice.models["target"]
         self.hull = self.world.local_hull(target)
@@ -478,15 +711,12 @@ class HeldObjectV2(SamplerV2):
             raise Reject(f"missing_grasps:{PIPELINE}", f"{choice.category}/{choice.model}: {e}")
         self.equivalences = self.gp.orientation_equivalences("target", choice.category, choice.model)
         self.check_symmetry()
-        self.solve_hold()
-        self.prior = load_visibility_prior(VISIBILITY_PRIOR_PATH, self.hold)
-        if not self.prior:
-            log.info("%s: no B7 visibility prior for this hold (roll %.0f deg); every library row is realised and measured", self.gp.alias, self.hold.roll_deg)
-        self.precompute_options()
+        self.choose_hold()
         self.template_facts.update({"hold": self.hold_solution, "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "orientation_equivalences": None if self.equivalences is None else len(self.equivalences),
                                     "visibility_prior_rows": len(self.prior)})
         self.template_meta["hold"] = self.hold_solution
+        self.template_meta["hold_arm"] = self.hold_arm
 
     def check_symmetry(self):
         """§3.13 rule 1 hook (mental rotation only)."""
@@ -501,8 +731,8 @@ class HeldObjectV2(SamplerV2):
 
     def precompute_options(self):
         """Per library grasp (B7 prior first): held object in frame at the hold, then every goal candidate whose key
-        poses pass the screening IK (right arm only, object attached) with the object in frame at the goal. Expressed in
-        the base frame so the options hold for any base pose; each instance confirms its draw with the exact IK."""
+        poses pass the screening IK (the holding arm only, object attached) with the object in frame at the goal. Expressed
+        in the base frame so the options hold for any base pose; each instance confirms its draw with the exact IK."""
         target = self.obj("target")
         ref = self.kit.world_base_pose2d()
         base3 = self.base_pose3d(ref)
@@ -544,8 +774,8 @@ class HeldObjectV2(SamplerV2):
             self.kit.sync_world()
             poses = [p for _, _, _, wps in entries for p in wps]
             # robot + held object only (the world is re-checked per instance at the sampled base pose)
-            with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, ARM, target):
-                ok = self.kit.ik_batch(poses, q_hold, arm=ARM)
+            with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, self.arm, target):
+                ok = self.kit.ik_batch(poses, q_hold, arm=self.arm)
             n_wp = len(entries[0][3])
             ok = ok.view(len(entries), n_wp).all(dim=1)
             opts = []
@@ -605,9 +835,9 @@ class HeldObjectV2(SamplerV2):
         q_init = self.q_init_at(base2d)
         cam = self.camera_at(base2d)
         eef0 = C.compose(base3, self.eef_in_base)
-        init = Stance("init", base2d, hc.translate, hc.tilt, arms=[ARM], carried=tname)
+        init = Stance("init", base2d, hc.translate, hc.tilt, arms=[self.arm], carried=tname)
         init.q = q_init
-        init.extras.update({"posture": {"left_arm": "reset", "right_arm": "hold"}, "hold": self.hold.to_json()})
+        init.extras.update({"posture": hold_posture(self.arm), "hold": hold_json(self.hold, self.arm)})
         n_wp = int(self.g("waypoints"))
         chosen = None
         errors = []
@@ -618,7 +848,7 @@ class HeldObjectV2(SamplerV2):
             target.set_position_orientation(obj0[0], obj0[1])
             target.keep_still()
             self.kit.sync_world()
-            with attached(self.kit, ARM, target):
+            with attached(self.kit, self.arm, target):
                 if not bool(self.kit.collision_free(q_init, margin=0.01)[0]):
                     errors.append(f"{gname}: hold collides with the object attached")
                     continue
@@ -628,7 +858,7 @@ class HeldObjectV2(SamplerV2):
                     wps = [C.compose(base3, p) for p in opt["wps_in_base"]]
                     if len(wps) != n_wp + 1:
                         raise Reject("spec", f"{len(wps) - 1} intermediate waypoints precomputed, generation.waypoints = {n_wp}")
-                    res = self.ikc.waypoints_ok([eef0] + wps, init, ARM, q_seed=q_init, scale_key=self.choice.models["target"].scale)
+                    res = self.ikc.waypoints_ok([eef0] + wps, init, self.arm, q_seed=q_init, scale_key=self.choice.models["target"].scale)
                     if not res.ok:
                         errors.append(f"{gname}/{oi}: {res.reason}")
                         continue
@@ -651,20 +881,22 @@ class HeldObjectV2(SamplerV2):
         d.base_pose2d = base2d
         d.settle_free = []
         obj_in_eef = C.invert(g.pose)
-        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": ARM, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
+        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": self.arm, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
                                "object_pose_in_eef_frame": {"position": obj_in_eef[0].tolist(), "orientation": obj_in_eef[1].tolist()}}]
         d.extras["goal_robot_q"] = q_goal
-        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{ARM}_arm"},
-                          "hold": self.hold.to_json()})
+        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"},
+                          "hold": hold_json(self.hold, self.arm)})
+        d.summary["arm"] = self.arm_summary()
         d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
         # sidecar: init stance (held), the grasp with the in-hand key poses, the goal arm configuration, language
         self.sidecar.add_stance(init)
-        rec = GraspRecord(tname, ARM, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0, finger_q=list(g.finger_q),
+        rec = GraspRecord(tname, self.arm, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0, finger_q=list(g.finger_q),
                           eef_in_object=g.pose, stance="init", waypoints=wps)
+        rec.extras["arm_offer"] = self.arm_offer_record()
         self.sidecar.add_grasp(rec)
         goal_block = self.sidecar.set_goal(base2d, hc.translate, hc.tilt, arms="same")
-        goal_block.update({"right_arm_q": q_goal[self.robot.arm_control_idx[ARM]].tolist(), "embodiment": f"{ARM}_arm",
-                           "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}, "hold": self.hold.to_json()})
+        goal_block.update({f"{self.arm}_arm_q": q_goal[self.robot.arm_control_idx[self.arm]].tolist(), "embodiment": f"{self.arm}_arm",
+                           "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}, "hold": hold_json(self.hold, self.arm)})
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), **self.goal_numbers(info))
         return d
 
@@ -703,13 +935,13 @@ class HeldObjectV2(SamplerV2):
         p, q = target.get_position_orientation()
         draft.object_poses[tname] = (p.clone(), q.clone())
         draft.robot_q = self.kit.q_current()
-        eef = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+        eef = tuple(x.float() for x in self.robot.eef_links[self.arm].get_position_orientation())
         rel = C.relative((p.float(), q.float()), eef)
         draft.extras["grasps"][0]["object_pose_in_eef_frame"] = {"position": rel[0].tolist(), "orientation": rel[1].tolist()}
-        finger_q = self.robot.get_joint_positions()[self.robot.gripper_control_idx[ARM]].tolist()
+        finger_q = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]].tolist()
         draft.extras["grasps"][0]["finger_q"] = finger_q
         q_goal = G.t(draft.extras["goal_robot_q"])
-        eef_goal = self.kit.eef_pose(q_goal, ARM)
+        eef_goal = self.kit.eef_pose(q_goal, self.arm)
         goal = C.compose(eef_goal, rel)
         draft.goal_poses[tname] = goal
         cam_goal = self.kit.camera_pose(q_goal)
@@ -729,10 +961,10 @@ class HeldObjectV2(SamplerV2):
         return next(g for g in self.grasps if g.name == name)
 
     def finger_joints(self):
-        """Gripper joint indices of ``ARM`` paired with the finger link each one moves (``JointPrim.body1``)."""
-        gidx = [int(i) for i in self.robot.gripper_control_idx[ARM].tolist()]
+        """Gripper joint indices of the holding arm paired with the finger link each one moves (``JointPrim.body1``)."""
+        gidx = [int(i) for i in self.robot.gripper_control_idx[self.arm].tolist()]
         names = list(self.robot.joints.keys())
-        finger_paths = {l.prim_path for l in self.robot.finger_links[ARM]}
+        finger_paths = {l.prim_path for l in self.robot.finger_links[self.arm]}
         pairs = []
         for i in gidx:
             body1 = str(self.robot.joints[names[i]].body1)
@@ -759,14 +991,14 @@ class HeldObjectV2(SamplerV2):
             return float(th.clamp(2.0 * (q.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
 
         def touching():
-            _, links = self.robot._find_gripper_contacts(ARM)
+            _, links = self.robot._find_gripper_contacts(self.arm)
             touched = set()
             for p in target_paths:
                 touched |= set(links.get(p, ()))
             return [path in touched for _, path in pairs]
 
         q = hi.clone()
-        state.gripper_cmd[ARM] = cmd_for(q)
+        state.gripper_cmd[self.arm] = cmd_for(q)
         for _ in range(8):
             target.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
             target.keep_still()
@@ -785,7 +1017,7 @@ class HeldObjectV2(SamplerV2):
             if not moved:
                 raise Reject("grasp_failed", f"fingers closed without both pads touching the object (contact {contact})")
             self.robot.set_joint_positions(q, indices=gidx, drive=False)
-            state.gripper_cmd[ARM] = cmd_for(q)
+            state.gripper_cmd[self.arm] = cmd_for(q)
             target.keep_still()
             self.world.control_step(state.action())
             contact = touching()
@@ -793,31 +1025,31 @@ class HeldObjectV2(SamplerV2):
             raise Reject("grasp_failed", f"pads not both in contact after closing (contact {contact})")
         q_contact = q.clone()
         press = float(self.g("grasp_press_m"))
-        state.gripper_cmd[ARM] = cmd_for(th.clamp(q_contact - press, min=lo))
+        state.gripper_cmd[self.arm] = cmd_for(th.clamp(q_contact - press, min=lo))
         attached_ok = False
         for _ in range(GRASP_ATTACH_STEPS):
-            if self.robot._ag_obj_in_hand[ARM] is None:
+            if self.robot._ag_obj_in_hand[self.arm] is None:
                 target.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
                 target.keep_still()
             self.world.control_step(state.action())
-            if self.robot._ag_obj_in_hand[ARM] is target:
+            if self.robot._ag_obj_in_hand[self.arm] is target:
                 attached_ok = True
                 break
         if not attached_ok:
             raise Reject("grasp_failed", "assisted grasping did not attach the object (both pads in contact)")
 
         def offset_now():
-            eef = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+            eef = tuple(x.float() for x in self.robot.eef_links[self.arm].get_position_orientation())
             return C.relative(tuple(x.float() for x in target.get_position_orientation()), eef)
 
-        eef0 = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+        eef0 = tuple(x.float() for x in self.robot.eef_links[self.arm].get_position_orientation())
         lib_rel = C.relative(pose, eef0)
         rel_attach = offset_now()
         self.robot.set_joint_positions(q_contact, indices=gidx, drive=False)
-        state.gripper_cmd[ARM] = cmd_for(q_contact)
+        state.gripper_cmd[self.arm] = cmd_for(q_contact)
         target.enable_gravity()
         self.world.control_step(state.action(), n=GRASP_GRAVITY_STEPS)
-        if self.robot._ag_obj_in_hand[ARM] is not target:
+        if self.robot._ag_obj_in_hand[self.arm] is not target:
             raise Reject("grasp_failed", "object dropped after gravity was re-enabled")
         rel_grav = offset_now()
         self.grasp_debug = {
@@ -836,13 +1068,13 @@ class HeldObjectV2(SamplerV2):
 
     def release(self):
         try:
-            if self.robot._ag_obj_in_hand.get(ARM) is not None:
-                self.robot.release_grasp_immediately(ARM)
+            if self.robot._ag_obj_in_hand.get(self.arm) is not None:
+                self.robot.release_grasp_immediately(self.arm)
         except Exception:
             pass
         state = ActionState(self.robot)
         state.hold_current()
-        state.set_gripper(ARM, close=False)
+        state.set_gripper(self.arm, close=False)
         self.world.control_step(state.action(), n=10)
 
     def on_reject(self, err: Reject):
@@ -927,12 +1159,12 @@ class HeldObjectV2(SamplerV2):
         pass
 
     def check_stances_with_objects(self, draft: Draft):
-        """§4.6 step 5 for a stance that *holds* the object: the realised init configuration (hold arm, reset left arm)
+        """§4.6 step 5 for a stance that *holds* the object: the realised init configuration (hold arm, reset idle arm)
         is checked with the target attached to the planner — the core's generic check locks the arms untucked and keeps
-        the object as a world obstacle, which puts the untucked right hand into the held object. TEMP until the core
+        the object as a world obstacle, which puts the untucked holding hand into the held object. TEMP until the core
         honours ``Stance.q`` / ``Stance.carried``."""
         self.kit.sync_world()
-        with attached(self.kit, ARM, self.obj("target")):
+        with attached(self.kit, self.arm, self.obj("target")):
             if not bool(self.kit.collision_free(G.t(draft.robot_q), margin=0.01)[0]):
                 raise Reject("stance_collision_with_objects", "the hold configuration collides with the world at the init base pose (object attached)")
 
@@ -941,7 +1173,7 @@ class HeldObjectV2(SamplerV2):
         (``stances.init.carried``), no ``Grasp`` precedes it, so the object is attached to the planner for the whole
         check (the realised in-hand pose is what the simulator holds at this point). TEMP until the core's program
         check seeds its carried-object tracker from ``stances.init.carried``."""
-        with attached(self.kit, ARM, self.obj("target")):
+        with attached(self.kit, self.arm, self.obj("target")):
             return super().program_check(draft)
 
     # ------------------------------------------------------------------ writing / constraints
@@ -961,19 +1193,19 @@ class HeldObjectV2(SamplerV2):
         return path
 
     def settle_start(self, draft: Draft) -> None:
-        """The recorded start is an equilibrium under recorded drive targets. The right arm is held at ``_start_q``
-        (the hold for mental rotation, the start's IK solution for object scaling), the trunk and the left arm at their
+        """The recorded start is an equilibrium under recorded drive targets. The holding arm is held at ``_start_q``
+        (the hold for mental rotation, the start's IK solution for object scaling), the trunk and the idle arm at their
         current joints, the fingers where the grasp left them; the payload settles the arm (it rests a steady offset
-        below its targets) until it stops moving, and the targets go into the TRO's ``robot_state.controller_targets``,
-        which the instance loader holds - a loader holding the loaded joints themselves lets the payload sag once more.
-        The grasp record and the subtask's start quantities (:meth:`record_settled_start`) are read from the settled
-        state."""
+        below its targets) until it stops moving, and the targets go into the TRO's ``robot_state.controller_targets``
+        (:func:`start_controller_targets`), which the instance loader holds - a loader holding the loaded joints themselves
+        lets the payload sag once more. The grasp record and the subtask's start quantities (:meth:`record_settled_start`)
+        are read from the settled state."""
         state = ActionState(self.robot)
-        state.set_from_q(self._start_q, arms=(ARM,), trunk=False)
-        gidx = self.robot.gripper_control_idx[ARM]
+        state.set_from_q(self._start_q, arms=(self.arm,), trunk=False)
+        gidx = self.robot.gripper_control_idx[self.arm]
         lo, hi = self.robot.joint_lower_limits[gidx], self.robot.joint_upper_limits[gidx]
         fingers = self.robot.get_joint_positions()[gidx]
-        state.gripper_cmd[ARM] = float(th.clamp(2.0 * (fingers.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
+        state.gripper_cmd[self.arm] = float(th.clamp(2.0 * (fingers.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
         steps, moved = 0, float("inf")
         while steps < START_SETTLE_MAX_STEPS and moved > START_SETTLE_TOL_RAD:
             q0 = self.robot.get_joint_positions().clone()
@@ -981,13 +1213,8 @@ class HeldObjectV2(SamplerV2):
             steps += START_SETTLE_CHUNK
             moved = float(th.max(th.abs(self.robot.get_joint_positions() - q0)))
         draft.summary["start_settle"] = {"steps": steps, "last_chunk_motion_rad": moved}
-        names = list(self.robot.joints.keys())
-        self._controller_targets = {}
-        for idx, vals in ((self.robot.trunk_control_idx, state.trunk_target), (self.robot.arm_control_idx["left"], state.arm_target["left"]),
-                          (self.robot.arm_control_idx[ARM], state.arm_target[ARM])):
-            for i, v in zip(th.as_tensor(idx).tolist(), vals.tolist()):
-                self._controller_targets[names[int(i)]] = float(v)
-        eef = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+        self._controller_targets = start_controller_targets(self.robot, state, self.arm)
+        eef = tuple(x.float() for x in self.robot.eef_links[self.arm].get_position_orientation())
         self.record_settled_start(draft, eef)
         # the grasp as the loader restores it: fingers, in-hand pose and the assisted-grasp joint's anchor (the finger
         # contact point OmniGibson chose, in the eef frame) from the settled state
@@ -996,7 +1223,7 @@ class HeldObjectV2(SamplerV2):
         gr = draft.extras["grasps"][0]
         gr["object_pose_in_eef_frame"] = {"position": rel[0].tolist(), "orientation": rel[1].tolist()}
         gr["finger_q"] = finger_q
-        params = (getattr(self.robot, "_ag_obj_constraint_params", None) or {}).get(ARM) or {}
+        params = (getattr(self.robot, "_ag_obj_constraint_params", None) or {}).get(self.arm) or {}
         if params.get("parent_frame_pos") is not None:
             gr["ag_anchor_in_eef"] = (th.as_tensor(params["parent_frame_pos"], dtype=th.float32) * th.as_tensor(self.robot.scale, dtype=th.float32)).tolist()
         rec = self.sidecar.grasp_of(self.target_name)
@@ -1016,19 +1243,16 @@ class HeldObjectV2(SamplerV2):
         return meta
 
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
-        """The ``hold`` constant (once per entry) and the confirmed (grasp, goal) as a ``grasp_set`` prior."""
+        """The ``hold`` constant (once per entry and holding arm) and the confirmed (grasp, goal) as a ``grasp_set`` prior."""
         recs: List[Dict[str, Any]] = []
         sol = self.hold_solution
-        have = [r for r in self.gp.constraints_for("hold") if r.get("robot") == sol.get("robot") and r.get("depth_m") == sol.get("depth_m")
-                and list(r.get("trunk", [])) == list(sol.get("trunk", [])) and r.get("roll_deg") == sol.get("roll_deg")]
-        if not have:
-            recs.append({"scope": {}, "type": "hold", "robot": sol["robot"], "depth_m": sol["depth_m"], "trunk": list(sol["trunk"]), "roll_deg": sol["roll_deg"],
-                         "approach": sol["approach"], "closing": sol["closing"], "eef_in_base": sol["eef_in_base"], "right_arm_q": sol["right_arm_q"],
-                         "idle_arms": sol["idle_arms"], "hard": False})
+        if not any(same_hold(r, sol, self.arm) for r in self.gp.constraints_for("hold")):
+            recs.append(hold_record(sol, self.arm))
         g = draft.summary.get("grasp") or {}
         choice = self.choice.models["target"]
         recs.append({"scope": {"target": f"{choice.category}/{choice.model}"}, "type": "grasp_set", "trunk": [self.hold.translate, self.hold.tilt],
-                     "hold": True, "feasible": [[0.0, g.get("name")]], "goal": draft.summary.get("goal"), "hard": False})
+                     "hold": True, **({} if self.arm == "right" else {"arm": self.arm}), "feasible": [[0.0, g.get("name")]], "goal": draft.summary.get("goal"),
+                     "hard": False})
         return recs
 
 
@@ -1048,7 +1272,7 @@ class ObjectScalingV2(HeldObjectV2):
     def precompute_options(self):
         """Per library grasp (B7 prior first): the depth window. The object at the reference hold is slid along the
         optical axis over the ``depth_search_grid_m`` grid of ``depth_search_range_m``; a depth passes when the whole
-        object is in frame (5 %) and the screening IK (right arm from the default posture, object attached, robot +
+        object is in frame (5 %) and the screening IK (the holding arm from the default posture, object attached, robot +
         object only) reaches the hand pose. The window is the continuous run of passing depths through the reference
         depth, shrunk by ``depth_margin_m`` at both ends; a grasp whose window does not admit a ``min_depth_change_m``
         move gets no options. Base-frame quantities: the windows hold at any base pose."""
@@ -1097,8 +1321,8 @@ class ObjectScalingV2(HeldObjectV2):
                 target.set_position_orientation(obj_ref[0], obj_ref[1])
                 target.keep_still()
                 self.kit.sync_world()
-                with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, ARM, target):
-                    ok = self.kit.ik_batch([poses[i] for i in idx], q_default, arm=ARM)
+                with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, self.arm, target):
+                    ok = self.kit.ik_batch([poses[i] for i in idx], q_default, arm=self.arm)
                 for i, s in zip(idx, ok.tolist()):
                     reach[i] = bool(s)
             window, run = depth_window(grid, [v and r for v, r in zip(in_view, reach)], d_ref, margin)
@@ -1133,7 +1357,7 @@ class ObjectScalingV2(HeldObjectV2):
         cam = C.compose(base3, self.cam_in_base)
         eef_w, obj_w = slide_to_depth(C.compose(base3, self.eef_in_base), g.pose, cam[0], self.world.camera_model.optical_axis(cam), d0)
         with self.kit.ignoring(self.scene_obstacles()):
-            q = self.kit.ik(eef_w, self.default_q_at(ref), arm=ARM)
+            q = self.kit.ik(eef_w, self.default_q_at(ref), arm=self.arm)
             if q is None or not bool(self.kit.collision_free(q, margin=0.01)[0]):
                 return None
         q_rel = q.clone()
@@ -1201,15 +1425,15 @@ class ObjectScalingV2(HeldObjectV2):
             target.set_position_orientation(obj0[0], obj0[1])
             target.keep_still()
             self.kit.sync_world()
-            init = Stance("init", base2d, hc.translate, hc.tilt, arms=[ARM], carried=tname)
+            init = Stance("init", base2d, hc.translate, hc.tilt, arms=[self.arm], carried=tname)
             init.q = q_init
-            with attached(self.kit, ARM, target):
+            with attached(self.kit, self.arm, target):
                 if not bool(self.kit.collision_free(q_init, margin=0.01)[0]):
                     errors.append(f"{gname}: start at {d0:.3f} m collides with the object attached")
                     continue
                 eef1, goal = slide_to_depth(eef0, g.pose, cam[0], axis, d1)
                 wps = self.key_poses(eef0, eef1, obj0)
-                res = self.ikc.waypoints_ok([eef0] + wps, init, ARM, q_seed=q_init, scale_key=self.choice.models["target"].scale)
+                res = self.ikc.waypoints_ok([eef0] + wps, init, self.arm, q_seed=q_init, scale_key=self.choice.models["target"].scale)
                 if not res.ok:
                     errors.append(f"{gname} {d0:.3f} -> {d1:.3f} m: {res.reason}")
                     continue
@@ -1227,27 +1451,29 @@ class ObjectScalingV2(HeldObjectV2):
         info = {"init_depth_m": d0, "goal_depth_m": d1, "depth_change_m": d1 - d0, "direction": "away" if d1 > d0 else "toward",
                 "window_m": list(opt["window"])}
         # the hold of this instance: the reference hold's pad slid with the object (depth_m = pad depth, as HoldConstants)
-        hold = {**hc.to_json(), "depth_m": round(hc.depth_m + d0 - float(opt["reference_depth"]), 6), "start_depth_m": d0,
+        hold = {**hold_json(hc, self.arm), "depth_m": round(hc.depth_m + d0 - float(opt["reference_depth"]), 6), "start_depth_m": d0,
                 "reference_depth_m": hc.depth_m}
-        init.extras.update({"posture": {"left_arm": "reset", "right_arm": "hold"}, "hold": hold})
+        init.extras.update({"posture": hold_posture(self.arm), "hold": hold})
         d.object_poses[tname] = obj0
         d.goal_poses[tname] = goal
         d.robot_q = init.q
         d.base_pose2d = base2d
         d.settle_free = []
         obj_in_eef = C.invert(g.pose)
-        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": ARM, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
+        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": self.arm, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
                                "object_pose_in_eef_frame": {"position": obj_in_eef[0].tolist(), "orientation": obj_in_eef[1].tolist()}}]
         d.extras["goal_robot_q"] = q_goal
-        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{ARM}_arm"},
+        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"},
                           "hold": hold})
+        d.summary["arm"] = self.arm_summary()
         d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
         self.sidecar.add_stance(init)
-        rec = GraspRecord(tname, ARM, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0, finger_q=list(g.finger_q),
+        rec = GraspRecord(tname, self.arm, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0, finger_q=list(g.finger_q),
                           eef_in_object=g.pose, stance="init", waypoints=wps)
+        rec.extras["arm_offer"] = self.arm_offer_record()
         self.sidecar.add_grasp(rec)
         goal_block = self.sidecar.set_goal(base2d, hc.translate, hc.tilt, arms="same")
-        goal_block.update({"right_arm_q": q_goal[self.robot.arm_control_idx[ARM]].tolist(), "embodiment": f"{ARM}_arm",
+        goal_block.update({f"{self.arm}_arm_q": q_goal[self.robot.arm_control_idx[self.arm]].tolist(), "embodiment": f"{self.arm}_arm",
                            "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}, "hold": hold})
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), **self.goal_numbers(info))
         return d

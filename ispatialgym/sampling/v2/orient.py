@@ -17,8 +17,14 @@ Besides the proposals the caller solves, each solution contributes the wrist-fli
 is the one to try (0927 estimate: bar soap / sprouts reached the library pose in the rotated grasp's branch with its clearance
 and 1.2-1.3 rad less travel). A proposal that failed contributes the witnesses it left from its chain's start (B2's rescues:
 the library grasp stalled at joint 5 at the end of its approach, its twin left from the mapped pre-grasp witness). Every
-proposal and decision record carries the arm making the contact (by default the arm of the call; there is no arm choice
-yet)."""
+proposal and decision record carries the arm making the contact (by default the arm of the call).
+
+The arm is one more dimension of the choice (owner 2026-09-27, first-demo v2.2): the proposals of a contact may span both arms
+(:func:`with_arms`: every proposal of the default arm ranked before the other arm's, each arm's own order kept, so within
+:data:`REACH_TOL` the default arm wins), each solved with its arm's IK and checked against its arm's wrist camera; the reach of
+an arm is measured from that arm's own starting posture (``q_start`` per arm). The decision then records ``arm_choice``: the
+arms offered, the arm chosen, why it came before the best viable option of the other arm (:func:`arm_reason`) and whether it is
+not the default arm."""
 from __future__ import annotations
 
 import functools
@@ -112,8 +118,11 @@ def chain_margin(ikc, qs: Sequence[th.Tensor], arm: str) -> Tuple[float, str]:
     return worst, joint
 
 
-def reach(ikc, q: th.Tensor, q_start: Optional[th.Tensor], arm: str) -> Optional[float]:
-    """Largest arm-joint change from ``q_start`` to ``q`` (rad): what sets the length of the transit to the pre-pose."""
+def reach(ikc, q: th.Tensor, q_start, arm: str) -> Optional[float]:
+    """Largest arm-joint change from ``q_start`` to ``q`` (rad): what sets the length of the transit to the pre-pose. ``q_start``
+    may be a dict ``{arm: configuration}`` (proposals of both arms: each arm from its own starting posture)."""
+    if isinstance(q_start, dict):
+        q_start = q_start.get(arm)
     if q_start is None or q is None:
         return None
     idx = ikc.kit.robot.arm_control_idx[arm]
@@ -172,6 +181,37 @@ def reason(chosen: Scored, rest: Sequence[Scored]) -> str:
     return "default"
 
 
+def arm_reason(chosen: Scored, rest: Sequence[Scored]) -> str:
+    """Why ``chosen``'s arm came before the other arm: :func:`reason` against the best viable option of another arm in ``rest``."""
+    return reason(chosen, [r for r in rest if r.proposal.arm != chosen.proposal.arm])
+
+
+def with_arms(proposals_by_arm: Sequence[Tuple[str, Sequence[Proposal]]]) -> List[Proposal]:
+    """One contact's proposals for several arms, the default arm first: every proposal carries its arm, each arm's own order is
+    kept and ranked after every proposal of the arms before it (within :data:`REACH_TOL` the default arm wins, then the
+    generator's order); with more than one arm the labels are prefixed with the arm (``left:grasp_3~r180``)."""
+    out: List[Proposal] = []
+    base = 0
+    many = len(proposals_by_arm) > 1
+    for a, props in proposals_by_arm:
+        for p in props:
+            out.append(Proposal(f"{a}:{p.label}" if many else p.label, base + int(p.rank), p.payload, p.chain, p.q_first, p.source, a))
+        base += max((int(p.rank) for p in props), default=-1) + 1
+    return out
+
+
+def viable_arms(decision: Dict[str, Any]) -> List[str]:
+    """The arms with a passing option in a decision record, the chosen arm first (the order of a segment's fallback)."""
+    arms: List[str] = []
+    first = decision.get("arm")
+    if decision.get("chosen") is not None and first:
+        arms.append(first)
+    for o in decision.get("options", []):
+        if o.get("ok") and not o.get("predicted") and o.get("arm") and o["arm"] not in arms:
+            arms.append(o["arm"])
+    return arms
+
+
 def choose(ikc, arm: str, proposals: Sequence[Proposal], evaluate: Callable[[Proposal], Tuple[bool, Any, Optional[List[th.Tensor]], str]],
            q_start: Optional[th.Tensor], camera_idx: Optional[Sequence[int]] = None, stage: str = "", check_camera: bool = True,
            downstream: Optional[Callable[["Scored"], Tuple[bool, str]]] = None, map_twins: bool = True) -> Tuple[Optional[Scored], Dict[str, Any]]:
@@ -182,8 +222,9 @@ def choose(ikc, arm: str, proposals: Sequence[Proposal], evaluate: Callable[[Pro
     ``downstream(scored)``: the caller's checks that need the chosen chain (the pushes with a brace arm locked at it); an option
     failing them is passed over for the next in the order ("if that one fails, try the other one"). ``map_twins`` False: no
     wrist-flipped options (a downstream that solves the contact again from its own seeds would not keep the flipped branch).
-    Each proposal is scored on its own ``arm`` (default: ``arm``, the arm of the call); wrist twins are paired and mapped within
-    one arm. Returns ``(the chosen Scored or None, the decision record)``. A single proposal (the generator allows one turn: a
+    Each proposal is scored on its own ``arm`` (default: ``arm``, the arm of the call, which is also the default arm of
+    ``arm_choice``); wrist twins are paired and mapped within one arm; ``q_start`` is one configuration or ``{arm: configuration}``
+    (each arm's reach from its own starting posture). Returns ``(the chosen Scored or None, the decision record)``. A single proposal (the generator allows one turn: a
     camera-up-only fist) is only evaluated: its orientation is the generator's hard rule and the camera check guards the
     reordering only."""
     check_camera = check_camera and len(proposals) > 1
@@ -255,17 +296,29 @@ def choose(ikc, arm: str, proposals: Sequence[Proposal], evaluate: Callable[[Pro
                                 "reason": None if chosen is None else reason(chosen, rest),
                                 "against_default": bool(chosen is not None and chosen.proposal.rank > 0),
                                 "options": [s.facts() for s in scored] + [m.facts() for m in mapped] + [t.facts() for t in tried]}
+    arms = sorted({p.arm for p in proposals}, key=lambda a: (a != arm, a))
+    if len(arms) > 1:
+        decision["arm_choice"] = {"default": arm, "offered": arms, "chosen": None if chosen is None else chosen.proposal.arm,
+                                  "reason": None if chosen is None else arm_reason(chosen, rest),
+                                  "against_default": bool(chosen is not None and chosen.proposal.arm != arm), "viable": viable_arms(decision)}
     if len(proposals) < 2:
         return chosen, decision
     _count(ikc, "orient_choices")
+    ac = decision.get("arm_choice")
+    if ac is not None:
+        _count(ikc, "orient_arm_choices")
     if chosen is not None:
         _count(ikc, f"orient_reason.{decision['reason'].replace(' ', '_')}")
         if chosen.proposal.source == "map":
             _count(ikc, "orient_source.map")
         if decision["against_default"]:
             _count(ikc, "orient_against_default")
-        log.info("orient [%s] %s (%s%s)%s | %s", f"{stage}, {chosen.proposal.arm} arm", chosen.proposal.label, decision["reason"], ", wrist-flipped branch" if chosen.proposal.source == "map" else "",
+        if ac is not None:
+            _count(ikc, f"orient_arm.{ac['chosen']}")
+            _count(ikc, f"orient_arm_reason.{ac['reason'].replace(' ', '_')}")
+        log.info("orient [%s] %s (%s%s)%s%s | %s", f"{stage}, {chosen.proposal.arm} arm", chosen.proposal.label, decision["reason"], ", wrist-flipped branch" if chosen.proposal.source == "map" else "",
                  " AGAINST the generator's order" if decision["against_default"] else "",
+                 f" [arm {ac['chosen']} of {'/'.join(ac['offered'])}: {ac['reason']}]" if ac is not None else "",
                  " | ".join(_side(o) for o in decision["options"]))
     return chosen, decision
 

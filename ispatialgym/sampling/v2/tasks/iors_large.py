@@ -40,6 +40,20 @@ the push), ``direction``, ``distance_m``, ``push_height_m``, ``drop_cell`` / ``g
 the drop (floor ignored, object attached) and the push chain (floor + target ignored, partner present). The program
 appends ``push → retreat`` after ``place(drop) → retreat``; ``under`` is read in the epilogue; the goal-feasibility check
 teleports the target to the goal cell as before.
+
+**The arm of the segment (owner 2026-09-27, first-demo v2.2).** Grasp at B → carry → place / drop at C (→ the push-under blade:
+``programs.py`` wants the grasp arm) is one single-arm segment; the other arm idles in its recorded posture (A6, re-derived per
+working arm). ``tabletop.offered_arms`` offers both arms (the other arm has no role, the target is free); the other arm's bands
+are its own cached bands, else the working arm's tabletop / floor bands mirrored in memory (never written, never computed
+in-process). B candidates are generated for every offered arm (floor: the lateral offsets mirrored; support: Phase 2 with both
+bands), each tagged ``focus_arms`` (the bands that hold the target) and ranked by the arm that reaches better; F_init is
+screened per arm (the default arm always, the other one where its band holds the target). At B one coupling runs per arm
+with pairs, the arms whose band holds the target first (the default arm first among them): the grasp is
+``tabletop.pick_twin`` over the arms whose F_init holds the drawn pair (the
+orientation rule decides; a pair the other arm wins waits for that arm's coupling), and C, the carry poses, the place, the
+push lane and every record follow the segment arm (right-side laterals mirrored for the left arm). A coupling that fails
+after its grasps passed hands the pairs it won to the other arm: a regrasp at B with that arm at the same target pose and
+library row (``grasps[0].extras.segment_fallback``). With one arm offered (``generation.other_arm`` false) nothing changes.
 """
 
 from __future__ import annotations
@@ -49,6 +63,7 @@ import logging
 import math
 import os
 import time
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -248,6 +263,107 @@ def intersect_feasible(F_init: Sequence[Tuple[float, Any]], F_goal: Sequence[Tup
     return [yg for yg in F_init if key(yg) in goal_keys]
 
 
+def pair_key(yaw: float, grasp: Any, yaw_step: float = math.pi / 8) -> Tuple[int, Any]:
+    """A (yaw, grasp) pair's key on the screening grid (:func:`intersect_feasible`'s): yaw bucket, grasp name."""
+    return int(round(float(yaw) / yaw_step)), getattr(grasp, "name", grasp)
+
+
+def union_feasible(F_by_arm: Dict[str, Sequence[Tuple[float, Any]]], yaw_step: float = math.pi / 8) -> List[Tuple[float, Any]]:
+    """The usable pairs of a B over its arms (owner 2026-09-27, first-demo v2.2): the first arm's F in order, then the pairs only
+    the next arms hold."""
+    out: List[Tuple[float, Any]] = []
+    seen = set()
+    for F in F_by_arm.values():
+        for yg in F:
+            k = pair_key(yg[0], yg[1], yaw_step)
+            if k not in seen:
+                seen.add(k)
+                out.append(yg)
+    return out
+
+
+# ---- the arm of the segment (owner 2026-09-27, first-demo v2.2): the module's right-side laterals, laid out for the right arm,
+# mirrored for the left arm ----------------------------------------------------------------------------------------------------
+
+
+def arm_sign(arm: str) -> float:
+    """+1 for the right arm, -1 for the left: the sign of the module's right-side laterals (floor B offsets, carry poses, frontal
+    push lane, side push stance) for ``arm``."""
+    return 1.0 if arm == "right" else -1.0
+
+
+def mirrored_offsets(offsets: Sequence[float], arm: str) -> List[float]:
+    """Stance B's lateral offsets of the floor anchor cell for ``arm``: ``floor_init_lateral_offsets_m`` put c_t to the robot's right
+    (the right arm's floor band), negated for the left arm (the base turned the other way, c_t to the robot's left)."""
+    return [arm_sign(arm) * float(v) for v in offsets]
+
+
+def offset_yaw(yaw0: float, y_off: float, dist: float) -> float:
+    """Base yaw that puts the point ``dist`` away at the bearing ``yaw0`` at the base-frame lateral ``y_off`` (+ = the robot's left)."""
+    return yaw0 + math.asin(-y_off / dist)
+
+
+def carry_poses_for(poses: Sequence[Sequence[Any]], arm: str) -> List[Tuple[float, Optional[float], float]]:
+    """``CARRY_POSES`` / ``generation.carry_poses`` (ahead, lateral, raise) for ``arm``: the lateral beside the body on the arm's side
+    (the right arm's -0.35..-0.45 m positive for the left arm); None (= the lift's lateral) kept."""
+    s = arm_sign(arm)
+    return [(ahead, None if lat is None else s * float(lat), raise_m) for ahead, lat, raise_m in poses]
+
+
+def frontal_lane_lateral(lane_lat: float, offset: float, arm: str) -> float:
+    """Base lateral (along the edge tangent, + = the robot's left facing the edge) of a frontal push-under stance whose push lane at
+    ``lane_lat`` lies ``offset`` to ``arm``'s side of the base (right arm: the base left of the lane)."""
+    return float(lane_lat) + arm_sign(arm) * float(offset)
+
+
+def side_push_pose(mid: th.Tensor, tangent: th.Tensor, inward: th.Tensor, lane_lat: float, x_ahead: float, b: float, arm: str) -> Tuple[float, float, float]:
+    """Base pose of a side push-under stance: ``b`` outside the edge, ``x_ahead`` short of the lane point along the edge, facing along
+    the edge with the partner on ``arm``'s side (right arm: facing +tangent, the robot's right = inward; left arm: facing -tangent)."""
+    s = arm_sign(arm)
+    xy = mid + tangent * (float(lane_lat) - s * float(x_ahead)) - inward * float(b)
+    return float(xy[0]), float(xy[1]), math.atan2(s * float(tangent[1]), s * float(tangent[0]))
+
+
+@dataclass
+class SegmentArms:
+    """The arms of the segment at one stance B (owner 2026-09-27, first-demo v2.2): ``stances[arm]`` (the arm working, the other one
+    in its A6 idle posture) and ``F_init[arm]``, the default arm first; ``bands[arm]`` the band that shortlisted B; ``b_ik`` the grasps
+    at B shared by the arms' couplings ((yaw bucket, grasp) -> None or the pick: ``yaw``, ``t_pose``, the ``arm`` that won it, the arms
+    ``viable`` there, ``opts`` per arm, ``after`` the arms holding the pair whose segment had failed); ``done`` the arms whose coupling
+    failed, ``failed`` a pair's first failure after its grasp, ``why`` a coupling's error; ``leg`` the version of the recorded A -> B
+    leg and ``leg_ok`` the drive's clearance of the placed target per (pair, leg)."""
+
+    stances: Dict[str, Stance]
+    F_init: Dict[str, List[Tuple[float, Any]]]
+    bands: Dict[str, Any] = field(default_factory=dict)
+    yaw_step: float = math.pi / 8
+    b_ik: Dict[Tuple[int, Any], Optional[Dict[str, Any]]] = field(default_factory=dict)
+    done: List[str] = field(default_factory=list)
+    failed: Dict[Tuple[int, Any], str] = field(default_factory=dict)
+    why: Dict[str, str] = field(default_factory=dict)
+    leg: int = 0
+    leg_ok: Dict[Tuple[Any, int], Optional[str]] = field(default_factory=dict)
+
+    @property
+    def arms(self) -> List[str]:
+        return list(self.stances)
+
+    def arms_of(self, yaw: float, grasp: Any) -> List[str]:
+        """The arms whose F_init holds the pair, in order (the arms a grasp at B offers)."""
+        k = pair_key(yaw, grasp, self.yaw_step)
+        return [a for a in self.stances if any(pair_key(y, g, self.yaw_step) == k for y, g in self.F_init.get(a, []))]
+
+    def role(self, chosen: str, viable: Sequence[str], arm: str) -> str:
+        """What a pair whose grasp at B went to ``chosen`` is in ``arm``'s coupling: ``own`` (chosen is the arm), ``defer`` (the chosen
+        arm's coupling has not run yet), ``fallback`` (the chosen arm's coupling failed and ``arm`` was viable at the grasp) or
+        ``none``."""
+        if chosen == arm:
+            return "own"
+        if chosen not in self.done:
+            return "defer"
+        return "fallback" if arm in viable else "none"
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # the task module
 # ----------------------------------------------------------------------------------------------------------------
@@ -266,9 +382,10 @@ class IORSLarge(SamplerV2):
         self.band_spec: Optional[TT.BandSpec] = None  # what ``ensure_bands`` computes on a miss (set once the grasps are loaded)
         self.grasps: List[Any] = []
         self.grasp_key: Optional[str] = None
-        self.surface: Dict[str, Any] = {}  # kind, obj, top, band, edge, init, manip candidates
+        self.surface: Dict[str, Any] = {}  # kind, obj, top, band, arm_bands, edge, init, manip candidates
         self.place: Dict[str, Any] = {}  # partner geometry for C: top / under cells, edges, band
         self.floor_z = 0.0
+        self.seg_arm: str = TT.default_arm(self)  # the arm of the grasp -> carry -> place -> release segment being coupled
 
     # ------------------------------------------------------------------ roles
 
@@ -575,25 +692,38 @@ class IORSLarge(SamplerV2):
         proj = pts[sel][:, :2] @ d
         return float(-proj.min())
 
-    def reach_margin(self, stance: Stance, point_world) -> float:
-        """W2 (owner 2026-09-20 22:15): the right arm's stretched length minus the shoulder -> ``point_world`` distance at the
-        stance's trunk (shoulder through the shared torso FK, ``conventions.shoulder_position``; the stretched length
-        once through the kit's FK with the arm joints at zero). Positive = inside the envelope; the trunk that bows the
-        tallest torso forward (154503 / 154504: B at (0.0, -0.61), the grasp 0.88 m out, 250-365 steps) scores lowest."""
-        if not hasattr(self, "_arm_len_right"):
+    def reach_margin(self, stance: Stance, point_world, arm: Optional[str] = None) -> float:
+        """W2 (owner 2026-09-20 22:15): ``arm``'s (default: the segment arm) stretched length minus the shoulder -> ``point_world``
+        distance at the stance's trunk (shoulder through the shared torso FK, ``conventions.shoulder_position``; the stretched length
+        once per arm through the kit's FK with the arm joints at zero). Positive = inside the envelope; the trunk that bows the
+        tallest torso forward (154503 / 154504: B at (0.0, -0.61), the grasp 0.88 m out, 250-365 steps) scores lowest. The shoulder
+        height is measured from the floor object's top (``self.floor_z``; ``tabletop.reach_margin`` takes the kit's measured floor)."""
+        arm = arm or self.seg_arm
+        attr = f"_arm_len_{arm}"
+        if not hasattr(self, attr):
             from ispatialgym.oracle import r1pro_model as M
             q = self.kit.q_config(arms="untucked", translate=0.5, tilt=0.0)
-            q[self.kit.robot.arm_control_idx["right"]] = 0.0
-            fk = self.kit.fk(["torso_link4", M.EEF_LINK["right"]], q)
-            sh = G.compose(fk["torso_link4"], (th.as_tensor(C._SHOULDER_IN_TORSO4["right"], dtype=th.float32), G.IDENTITY_QUAT))[0]
-            self._arm_len_right = float(th.linalg.norm(fk[M.EEF_LINK["right"]][0] - sh))
+            q[self.kit.robot.arm_control_idx[arm]] = 0.0
+            fk = self.kit.fk(["torso_link4", M.EEF_LINK[arm]], q)
+            sh = G.compose(fk["torso_link4"], (th.as_tensor(C._SHOULDER_IN_TORSO4[arm], dtype=th.float32), G.IDENTITY_QUAT))[0]
+            setattr(self, attr, float(th.linalg.norm(fk[M.EEF_LINK[arm]][0] - sh)))
         # the URDF-clamped torso (a tilt past the torso_joint3 limit, e.g. (0.95, -1.2), is what the robot actually reaches)
-        sh_b = C.torso_fk(C.torso_q(float(stance.translate), float(stance.tilt), C.TORSO_JOINT_LIMITS))["right_shoulder"][0]
+        sh_b = C.torso_fk(C.torso_q(float(stance.translate), float(stance.tilt), C.TORSO_JOINT_LIMITS))[f"{arm}_shoulder"][0]
         x, y, yaw = (float(v) for v in stance.base_pose2d)
         c, s_ = math.cos(yaw), math.sin(yaw)
         sh_w = th.tensor([x + c * float(sh_b[0]) - s_ * float(sh_b[1]), y + s_ * float(sh_b[0]) + c * float(sh_b[1]), self.floor_z + C.NOMINAL_BASE_Z + float(sh_b[2])])
         p = th.as_tensor([float(v) for v in point_world], dtype=th.float32)
-        return self._arm_len_right - float(th.linalg.norm(p - sh_w))
+        return getattr(self, attr) - float(th.linalg.norm(p - sh_w))
+
+    def best_reach_margin(self, stance: Stance, point_world, arms: Sequence[str]) -> Tuple[float, str]:
+        """The largest :meth:`reach_margin` over ``arms`` and its arm, the first arm on a tie (``tabletop.best_reach_margin``'s rule):
+        a stance B ranked by whichever arm reaches better (owner 2026-09-27, first-demo v2.2)."""
+        best: Optional[Tuple[float, str]] = None
+        for a in arms:
+            m = self.reach_margin(stance, point_world, a)
+            if best is None or m > best[0] + 1e-9:
+                best = (m, a)
+        return best if best is not None else (self.reach_margin(stance, point_world), self.seg_arm)
 
     def half_extent_along(self, quat, direction_xy) -> float:
         """Half extent of the target's footprint along a horizontal direction at orientation ``quat``."""
@@ -628,8 +758,10 @@ class IORSLarge(SamplerV2):
         """The straight floor-level push from the drop position to the goal cell, exact IK from stance C (closed gripper,
         floor and target ignored, partner present): blade behind the target along the push direction (stand-off from
         ``tabletop.blade_standoff`` over the target's face height), approach pitched toward the push direction (0 / 30 /
-        45 / 60°, either wrist turn), poses ``[pre, start, mid, goal]``. Returns the record fields or None."""
+        45 / 60°, either wrist turn), poses ``[pre, start, mid, goal]``, with the segment arm (``programs.py``: the push-under blade
+        is the grasp arm). Returns the record fields or None."""
         floor, target = self.obj("floor"), self.target
+        arm = self.seg_arm
         d2 = th.as_tensor([float(d2[0]), float(d2[1])])
         d2 = d2 / th.linalg.norm(d2)
         d3 = th.tensor([float(d2[0]), float(d2[1]), 0.0])
@@ -654,7 +786,7 @@ class IORSLarge(SamplerV2):
                 why.append(f"pitch {pitch:.0f}: nothing of the target within the blade's height band")
                 continue
             half_d = off_m
-            a_vec = TT.pitched_approach(pitch, d2)  # pitched toward the push direction (= the robot's forward for a frontal stance, its right for a side stance)
+            a_vec = TT.pitched_approach(pitch, d2)  # pitched toward the push direction (= the robot's forward for a frontal stance, its arm's side for a side stance)
             start = th.tensor([float(cd[0]), float(cd[1]), z_push]) - d3 * (half_d + standoff)
             # the blade's goal runs ``push_goal_extra_m`` (3 cm) past the model's: the oracle's differential-IK leg stops 2-3 cm
             # short of its last waypoint (0920-143722 / 154503: eef 0.704-0.716 m ahead for a 0.736 m goal)
@@ -669,12 +801,12 @@ class IORSLarge(SamplerV2):
 
             def evaluate(p, low=low):
                 with self.ikc.ignoring([floor, target], ground=not low):
-                    res = self.ikc.exact(p.chain, place, "right", cache=False, fingers=C.FINGER_CLOSED, q_first=p.q_first)
+                    res = self.ikc.exact(p.chain, place, arm, cache=False, fingers=C.FINGER_CLOSED, q_first=p.q_first)
                 return bool(res.ok), res, None, str(res.reason)
 
             # the two wrist turns by the orientation rule (owner 2026-09-27); the camera is checked at the blade's start, where the
             # target and the floor left the IK's world
-            chosen, decision = O.choose(self.ikc, "right", props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitch {pitch:.0f}")
+            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitch {pitch:.0f}")
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
@@ -706,16 +838,26 @@ class IORSLarge(SamplerV2):
         return TT.BandSpec(object=f"{c.category}/{c.model}", grasp_key=self.grasp_key, grasps=self.grasps, hull=self.hull, rest_quat=self.rest,
                            scale=list(c.scale) if c.scale else None, height=self.target_dims()[1])
 
-    def band(self, kind: str, support_obj=None, under_partner=None) -> Optional[RB.ReachBands]:
+    def band(self, kind: str, support_obj=None, under_partner=None, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
         """The reach band of a factor set (§5.6): tabletop mode (init support / the partner's top) through
         ``tabletop.ensure_bands`` / ``compute_bands`` (``ReachBands.load`` on a hit, ``BandComputer`` on a miss), the
         floor modes (``--support floor [--under partner]``) through :meth:`compute_band` on a miss; memoised per
-        (kind, support, under) for the template. ``ISG_REACH_BANDS_COMPUTE=0`` turns a miss into ``Reject("missing_band")``."""
+        (kind, support, under) for the template. ``ISG_REACH_BANDS_COMPUTE=0`` turns a miss into ``Reject("missing_band")``.
+        ``arm`` (owner 2026-09-27, first-demo v2.2): that arm's band - the band above when it is that arm's, else
+        :meth:`other_arm_band`."""
         c = self.choice.models["target"]
         obj = f"{c.category}/{c.model}"
         support = "floor" if kind == "floor" else support_obj.name
         under = under_partner.name if under_partner is not None else None
         memo = self.__dict__.setdefault("_bands", {})
+        if arm is not None:
+            base = self.band(kind, support_obj, under_partner)
+            if base is None or base.arm == arm:
+                return base
+            key = (kind, support, under, arm)
+            if key not in memo:
+                memo[key] = self.other_arm_band(base, kind, support, under, arm)
+            return memo[key]
         key = (kind, support, under)
         if key in memo:
             return memo[key]
@@ -745,6 +887,24 @@ class IORSLarge(SamplerV2):
             self.template_facts.setdefault("empty_bands", []).append({"support": support, "under": under, "stance": rb.meta.get("stance")})
             rb = None
         memo[key] = rb
+        return rb
+
+    def other_arm_band(self, base: RB.ReachBands, kind: str, support: str, under: Optional[str], arm: str) -> Optional[RB.ReachBands]:
+        """``arm``'s band of the factors of ``base`` (the other arm's band; owner 2026-09-27, first-demo v2.2): its own cached band
+        (``ReachBands.load(..., arm=arm)``; an empty one is a miss), else ``base`` mirrored in memory (``ReachBands.mirrored``: tabletop
+        and floor bands only). Never written, never computed in-process: :meth:`compute_band` / ``compute_bands`` write files whose
+        names carry no arm. None when neither exists; recorded in ``template_facts["arm_bands_by_factor"]``."""
+        c = self.choice.models["target"]
+        try:
+            rb = RB.ReachBands.load(self.world.scene_model, support, f"{c.category}/{c.model}", self.grasp_key, under=under, scale=c.scale, arm=arm)
+            if int(rb.meta.get("n_reachable_total", 1) or 0) == 0:
+                raise FileNotFoundError("empty band")
+            log.info("%s: %s-arm reach band %s (%s) from %s", self.gp.alias, arm, support, under or "-", rb.path)
+        except FileNotFoundError:
+            rb = base.mirrored() if RB.mirrorable(base.meta) else None
+            log.info("%s: %s-arm reach band %s (%s): %s", self.gp.alias, arm, support, under or "-",
+                     f"the {base.arm} arm's band mirrored ({base.path})" if rb is not None else f"none (the {base.arm} arm's band is not mirrored)")
+        self.template_facts.setdefault("arm_bands_by_factor", {}).setdefault(f"{kind}:{support}{'-under-' + under if under else ''}", {})[arm] = TT.band_facts(rb)
         return rb
 
     def compute_band(self, kind: str, support_obj=None, under_partner=None) -> RB.ReachBands:
@@ -837,8 +997,12 @@ class IORSLarge(SamplerV2):
             self.try_floor_surface(rng)
         else:
             self.try_support_surface(cand, rng)
-        # stance C must exist for the init pose class (checked on the surface's representative init xy)
+        # stance C must exist for the init pose class (checked on the surface's representative init xy) for one of the offered arms
         c_survivors = self.placement_candidates(self.surface["init_xy"])
+        for arm in TT.offered_arms(self)[1:]:
+            if c_survivors:
+                break
+            c_survivors = self.placement_candidates(self.surface["init_xy"], arm=arm)
         if not c_survivors:
             raise Reject("no_placement_stance", f"no stance C at {self.partner.name} for an init pose at {self.surface['init_xy'].tolist()}")
         self.surface["n_c"] = len(c_survivors)
@@ -847,8 +1011,10 @@ class IORSLarge(SamplerV2):
     def try_support_surface(self, support, rng: np.random.Generator):
         """Stances A and B on a support (tabletop Phases 1a / 1b / 1c / 2 of ``tabletop.py``): per edge (random order)
         the init trunk, the lateral draw redrawn (≤ 6) until the partner is visible (≥ 4 / 8 corners + centre), the
-        Phase-2 survivors with the band of (support, target)."""
+        Phase-2 survivors with the band of (support, target) - with every offered arm's band (owner 2026-09-27, first-demo v2.2:
+        ``tabletop.arm_bands_for``, the other arm's a mirror when it has none; survivors tagged ``focus_arms``)."""
         self.kit.sync_world()
+        offered = TT.offered_arms(self)
         top = self.support_top(support, ignore=[self.target])
         if int(top.free.sum()) < 50:
             raise Reject("support_small", f"{support.name}: too little free top")
@@ -882,11 +1048,13 @@ class IORSLarge(SamplerV2):
                 errors.append(f"{edge.name}: goal_region_not_visible (the partner's top patch around the goal cell / nearest bottom edge out of frame)")
                 continue
             chosen.name = "init"
-            manip = TT.phase2_manipulation_stance(self, chosen, half, target_height=height, top=top)
+            arm_bands = TT.arm_bands_for(self, offered, top=top, edge=chosen.edge) if len(offered) > 1 else None
+            manip = TT.phase2_manipulation_stance(self, chosen, half, target_height=height, top=top, arm_bands=arm_bands)
             if not manip:
                 errors.append(f"{edge.name}: no_manipulation_stance")
                 continue
-            self.surface.update({"edge": edge, "init": chosen, "manip": manip, "init_xy": manip[0].focus[:2].clone(), "z": top.z, "band": getattr(self, "bands", None)})
+            self.surface.update({"edge": edge, "init": chosen, "manip": manip, "init_xy": manip[0].focus[:2].clone(), "z": top.z, "band": getattr(self, "bands", None),
+                                 "arm_bands": dict(arm_bands or {offered[0]: getattr(self, "bands", None)})})
             return
         raise Reject("no_free_edge", f"{support.name}: " + ("; ".join(errors) or "no edge with a free, collision-free stance"))
 
@@ -943,6 +1111,11 @@ class IORSLarge(SamplerV2):
         plo, phi = partner.aabb
         rb = self.band("floor")
         self.surface["band"] = rb
+        offered = TT.offered_arms(self)
+        arm_bands = {offered[0]: rb, **{a: self.band("floor", arm=a) for a in offered[1:]}}
+        self.surface["arm_bands"] = arm_bands
+        for a in offered[1:]:
+            self.template_facts.setdefault("arm_bands", {})[a] = TT.band_facts(arm_bands[a])
         half, height = self.target_dims()
         objs = self.floor_blocking_objects()
         aabbs = [(o.aabb[0][:2].float() - clearance, o.aabb[1][:2].float() + clearance) for o in objs]
@@ -989,7 +1162,7 @@ class IORSLarge(SamplerV2):
             if dist is None or dist > max_geo:
                 continue
             try:
-                manip = self.floor_stance_b(c_t, rb, half, rng)
+                manip = self.floor_stance_b(c_t, rb, half, rng, arm_bands=arm_bands)
                 init = self.floor_stance_a(c_t, rng, height, like=manip[0])
                 with self.ikc.ignoring([self.obj("floor")]):
                     self.record_leg_a_b(init, manip[0])  # §5.6: a path A -> B exists (navigate-then-torso, else torso-then-navigate)
@@ -1003,17 +1176,36 @@ class IORSLarge(SamplerV2):
             return
         raise Reject("no_floor_cell", f"no anchor cell admits stances A / B ({len(errors)} tried): " + "; ".join(sorted(set(errors))[-4:]))
 
-    def floor_stance_b(self, c_t: th.Tensor, rb: Optional[RB.ReachBands], half: float, rng: np.random.Generator) -> List[Stance]:
+    def floor_stance_b(self, c_t: th.Tensor, rb: Optional[RB.ReachBands], half: float, rng: np.random.Generator,
+                       arm_bands: Optional[Dict[str, Optional[RB.ReachBands]]] = None) -> List[Stance]:
         """Stance B candidates of the floor init: base facing c_t at {0.35, 0.45, 0.55} (bearing uniform), trunk from the
-        floor band (c_t must be a band cell), collision-free, target in frame, axis within 8° (else 20°) of c_t."""
+        floor band (c_t must be a band cell), collision-free, target in frame, axis within 8° (else 20°) of c_t.
+        ``arm_bands`` (owner 2026-09-27, first-demo v2.2: ``{arm: floor band}`` of the offered arms, the default arm's being ``rb``):
+        the other arm's candidates turn the base the mirror way (:func:`mirrored_offsets`: c_t to the robot's left for the left
+        arm) and hold c_t in that arm's band; every candidate records the arms whose band holds c_t at its trunk in
+        ``extras["focus_arms"]`` and works with the first of them."""
+        arm0 = TT.default_arm(self)
+        others = {a: b for a, b in (arm_bands or {}).items() if a != arm0 and b is not None} if rb is not None else {}
         trunks = rb.trunks() if rb is not None else [(t, k) for t in RB.TRANSLATES for k in list(RB.TILTS) + [RB.LOW_TOP_TILT]]
+        for b in others.values():
+            trunks += [k for k in b.trunks() if k not in trunks]
         focus = th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + 0.03])
         cands = []
         # the floor band lies to the robot's RIGHT of the centreline (B3 under-edge probe: lateral −0.40…−0.16; the floor
         # bands' cells at translate 0.95 likewise): the base is turned so that c_t sits at lateral ``y_off`` (0 = straight
         # ahead, negative = right) — a stance facing c_t squarely puts it between the arms where no floor cell is reachable
-        # (countertop-floor 18:50: 41 band cells, "c_t is in no band cell of any stance" for 29 anchors)
+        # (countertop-floor 18:50: 41 band cells, "c_t is in no band cell of any stance" for 29 anchors); the left arm's
+        # (mirrored) band lies to the robot's left
         offsets = [float(v) for v in (self.gp.gen("floor_init_lateral_offsets_m") or (-0.25, -0.15, -0.35, 0.0))]
+        lanes = list(offsets)
+        for a in others:
+            lanes += [v for v in mirrored_offsets(offsets, a) if all(abs(v - u) > 1e-9 for u in lanes)]
+        bands = {arm0: rb, **others}
+
+        def holds(b: RB.ReachBands, st: Stance) -> bool:
+            cells = self.band_cells_world(b, st)
+            return len(cells) > 0 and float(th.linalg.norm(cells - c_t, dim=1).min()) <= 0.51 * float(b.meta.get("lattice", RB.LATTICE))
+
         for _ in range(12):
             bearing = float(rng.uniform(-math.pi, math.pi))
             for dist in STAND_OFFS:
@@ -1021,17 +1213,20 @@ class IORSLarge(SamplerV2):
                 if not P0.base_ok(self, xy):
                     continue
                 yaw0 = math.atan2(float(c_t[1] - xy[1]), float(c_t[0] - xy[0]))
-                for y_off in offsets:
+                for y_off in lanes:
                     if abs(y_off) >= dist:
                         continue
-                    yaw = yaw0 + math.asin(-y_off / dist)  # turn left so that c_t moves to the robot's right
+                    yaw = offset_yaw(yaw0, y_off, dist)  # c_t at the base-frame lateral y_off (negative: the robot's right)
                     for tr, ti in trunks:
-                        st = Stance("manipulation", (float(xy[0]), float(xy[1]), yaw), tr, ti, dist, None, None, 0.0, focus.clone(), ["right"])
+                        st = Stance("manipulation", (float(xy[0]), float(xy[1]), yaw), tr, ti, dist, None, None, 0.0, focus.clone(), [arm0])
                         st.extras["lateral_offset_m"] = y_off
                         if rb is not None:
-                            cells = self.band_cells_world(rb, st)
-                            if len(cells) == 0 or float(th.linalg.norm(cells - c_t, dim=1).min()) > 0.51 * float(rb.meta.get("lattice", RB.LATTICE)):
+                            focus_arms = [a for a, b in bands.items() if holds(b, st)]
+                            if not focus_arms:
                                 continue
+                            if others:
+                                st.arms = [focus_arms[0]]
+                                st.extras["focus_arms"] = focus_arms
                         cands.append(st)
         if not cands:
             raise Reject("no_manipulation_stance", "floor init: c_t is in no band cell of any stance")
@@ -1117,13 +1312,15 @@ class IORSLarge(SamplerV2):
 
     # ------------------------------------------------------------------ stance C (placement)
 
-    def placement_candidates(self, init_xy) -> List[Stance]:
+    def placement_candidates(self, init_xy, arm: Optional[str] = None) -> List[Stance]:
         """§5.6 stance C survivors for an init pose: base square to the partner edge nearest ``init_xy`` — when that edge
         admits no stance (no free floor in front of it: countertop-floor 20:24, edge +v ``base_ok 0``), the other
         edges follow in order of distance from the init pose (§5.6 wording proposed: "the nearest edge that admits a
         stance") — stand-off {0.35, 0.45, 0.55}, lateral along the edge minus margins, trunk from the band; goal cell
         per relation; visibility per relation; the best angle class (each survivor carries its ``goal_cell`` in
-        ``extras``)."""
+        ``extras``). For ``arm`` (default: the segment arm; owner 2026-09-27, first-demo v2.2): its band, its push lanes, its
+        working arm (the other arm's idle posture derived for it)."""
+        arm = arm or self.seg_arm
         p = th.as_tensor([float(init_xy[0]), float(init_xy[1])])
         edges = sorted(self.place["edges"], key=lambda e: float(th.linalg.norm(e.mid - p)))
         allow = self.gp.gen("placement_edges")  # optional whitelist of partner edge names (+x / -x / +y / -y; top-raster edge names for ontop)
@@ -1136,7 +1333,7 @@ class IORSLarge(SamplerV2):
         pool = self.gp.gen("placement_pool_edges", True) is not False
         tried, out_all = [], []
         for rank, edge in enumerate(edges):
-            out = self._placement_candidates_at(edge, init_xy)
+            out = self._placement_candidates_at(edge, init_xy, arm)
             if out:
                 for st in out:
                     st.extras["edge_rank"] = rank
@@ -1152,13 +1349,15 @@ class IORSLarge(SamplerV2):
                      f" (no stance at {tried})" if tried else "")
         return out_all
 
-    def _placement_candidates_at(self, edge: EdgeFrame, init_xy) -> List[Stance]:
+    def _placement_candidates_at(self, edge: EdgeFrame, init_xy, arm: Optional[str] = None) -> List[Stance]:
+        arm = arm or self.seg_arm
         partner = self.partner
         half = self.place["half"]
         if self.push_under:
-            return self.push_under_candidates(edge, init_xy)
-        rb = self.band("tabletop", partner) if self.relation == "ontop" else self.band("floor", None, partner)
+            return self.push_under_candidates(edge, init_xy, arm)
+        rb = self.band("tabletop", partner, arm=arm) if self.relation == "ontop" else self.band("floor", None, partner, arm=arm)
         self.place["band"] = rb
+        self.place.setdefault("bands", {})[arm] = rb
         trunks = rb.trunks() if rb is not None else [(t, k) for t in RB.TRANSLATES for k in RB.TILTS]
         margin = half + 0.10
         L = edge.length
@@ -1176,7 +1375,7 @@ class IORSLarge(SamplerV2):
                     continue
                 stats["base_ok"] += len(trunks)
                 for tr, ti in trunks:
-                    st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), tr, ti, so, edge, None, lat, None, ["right"])
+                    st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), tr, ti, so, edge, None, lat, None, [arm])
                     cells = self.band_cells_world(rb, st)
                     if rb is not None and len(cells) == 0:
                         continue
@@ -1303,7 +1502,7 @@ class IORSLarge(SamplerV2):
         except Exception as e:  # noqa: BLE001 — diagnostics never fail the attempt
             log.info("%s: stance C visibility debug failed: %r", self.gp.alias, e)
 
-    def push_under_candidates(self, edge: EdgeFrame, init_xy) -> List[Stance]:
+    def push_under_candidates(self, edge: EdgeFrame, init_xy, arm: Optional[str] = None) -> List[Stance]:
         """Stance C of the push-under (owner decision 2026‑09‑16 item 7): base square to the partner's near AABB edge,
         facing inward (= the push direction); per lateral position λ the **goal cell** g = edge point + inward·0.07
         (target centre 5–10 cm inside the footprint, clear under: ray ≥ height + 3 cm) and the **drop cell** c_d = edge
@@ -1311,7 +1510,9 @@ class IORSLarge(SamplerV2):
         base (B3: the floor is reachable 0.24–0.64 m ahead at the deep trunks); trunks = the floor trunks (translate ≥
         0.75, tilt ≤ −0.9); whole-body collision-free (A6 idle-arm retry), the drop footprint and the edge's bottom line
         at λ ± (half + 0.10) in frame, optical axis within 20° of the drop cell. Each survivor carries ``goal_cell``,
-        ``drop_cell``, ``push_dir``, ``drop_ahead_m``."""
+        ``drop_cell``, ``push_dir``, ``drop_ahead_m``. The lanes are laid out for the right arm and mirrored for the left
+        (owner 2026-09-27, first-demo v2.2: :func:`frontal_lane_lateral`, :func:`side_push_pose`)."""
+        arm = arm or self.seg_arm
         partner = self.partner
         half, height = float(self.place["half"]), float(self.place["height"])
         need = float(self.place.get("need", height + 0.03))
@@ -1334,7 +1535,7 @@ class IORSLarge(SamplerV2):
         stats: Dict[str, Any] = {"laterals": len(laterals), "goal_clear": 0, "drop_free": 0, "base_ok": 0, "candidates": 0, "side_candidates": 0, "drop_blocked": {},
                                  "drop_out_m": round(out, 3), "edge_mid": [round(float(v), 2) for v in mid.tolist()], "inward": [round(float(v), 2) for v in d2.tolist()]}
         # side stances: the base stands BESIDE the push lane, facing along the edge with the partner on its right (the
-        # right arm pushes sideways, toward the partner); the lane lies ``x_ahead`` ahead of the base and the base centre
+        # right arm pushes sideways, toward the partner; the left arm faces the other way); the lane lies ``x_ahead`` ahead of the base and the base centre
         # ``b`` outside the edge — the whole lane (drop 0.22 m outside → goal 0.07 m inside) stays 0.35–0.45 m ahead, inside
         # the floor reach, and the crouched torso bends along the edge, not into the partner (the frontal stances need
         # s ≥ 0.75 m to keep the deep trunk clear of a bed, which puts the lane 0.46–0.82 m ahead: out of reach)
@@ -1342,7 +1543,6 @@ class IORSLarge(SamplerV2):
         # base's front edge and every push pre-pose fails the IK (run 16:04) — 0.45 m and more only
         side_ahead = [float(v) for v in (self.gp.gen("push_under_side_ahead_m") or (0.45, 0.55, 0.6))]
         side_b = [float(v) for v in (self.gp.gen("push_under_side_standoff_m") or (0.35, 0.40))]
-        yaw_side = math.atan2(float(tangent[1]), float(tangent[0]))  # facing +tangent: the robot's right = inward (the partner side)
         cands: List[Stance] = []
         lat_all = sorted({round(float(v), 4) for v in list(laterals) + list(laterals_side)})
         lat_frontal = {round(float(v), 4) for v in laterals}
@@ -1361,30 +1561,32 @@ class IORSLarge(SamplerV2):
                       "edge": edge.name}
             # frontal stances: the lane to the robot's RIGHT of the base centre by ``frontal_lane_offset_m`` — B3's under-edge
             # probe (bed_rrcvaq_0, briefcase, s = 0.6) reaches the edge strip at lateral −0.40…−0.16 only (the right arm's
-            # side), a centred lane at s = 0.45 / 0.6 has 0–1 cells
+            # side), a centred lane at s = 0.45 / 0.6 has 0–1 cells; the left arm's lane to its LEFT
             for off in ([float(v) for v in (self.gp.gen("frontal_lane_offset_m") or (0.25, 0.0))] if lat in lat_frontal else []):
                 for so in stand_offs:
                     ahead = so - out
                     if ahead < lo_ahead or ahead > hi_ahead:
                         continue
-                    xy = edge.base_xy(so, float(lat) + off)  # base left of the lane by ``off`` (+tangent = the robot's left)
+                    lat_b = frontal_lane_lateral(float(lat), off, arm)
+                    xy = edge.base_xy(so, lat_b)  # base beside the lane by ``off``, away from the arm's side (+tangent = the robot's left)
                     if not P0.base_ok(self, xy):
                         continue
                     stats["base_ok"] += 1
                     for tr, ti in trunks:
-                        st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), float(tr), float(ti), so, edge, None, float(lat) + off, None, ["right"])
+                        st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), float(tr), float(ti), so, edge, None, lat_b, None, [arm])
                         st.focus = th.tensor([float(c_d[0]), float(c_d[1]), self.floor_z + height / 2])
-                        st.extras.update(common, drop_ahead_m=float(ahead), stance_kind="frontal", lane_offset_m=off)
+                        st.extras.update(common, drop_ahead_m=float(ahead), stance_kind="frontal", lane_offset_m=arm_sign(arm) * off)
                         cands.append(st)
                         stats["candidates"] += 1
             for x_ahead in side_ahead:
                 for b in side_b:
-                    xy = mid + tangent * (float(lat) - x_ahead) - d2 * b
+                    x_b, y_b, yaw_b = side_push_pose(mid, tangent, d2, float(lat), x_ahead, b, arm)
+                    xy = th.tensor([x_b, y_b])
                     if not P0.base_ok(self, xy):
                         continue
                     stats["base_ok"] += 1
                     for tr, ti in trunks:
-                        st = Stance("placement", (float(xy[0]), float(xy[1]), yaw_side), float(tr), float(ti), b, None, None, float(lat), None, ["right"])
+                        st = Stance("placement", (x_b, y_b, yaw_b), float(tr), float(ti), b, None, None, float(lat), None, [arm])
                         st.focus = th.tensor([float(c_d[0]), float(c_d[1]), self.floor_z + height / 2])
                         st.extras.update(common, drop_ahead_m=float(x_ahead), stance_kind="side", side_standoff_m=b)
                         cands.append(st)
@@ -1476,9 +1678,9 @@ class IORSLarge(SamplerV2):
             parts = []
             for g in self.grasps[:3]:
                 eef = IK.grasp_pose(pose, g.pose)
-                r1 = self.ikc.exact([eef], place, "right", ignore_for_last=[floor], cache=False)
+                r1 = self.ikc.exact([eef], place, self.seg_arm, ignore_for_last=[floor], cache=False)
                 with self.ikc.ignoring(others):
-                    r2 = self.ikc.exact([eef], place, "right", cache=False)
+                    r2 = self.ikc.exact([eef], place, self.seg_arm, cache=False)
                 p_base = P0.to_base_frame(eef[0], place.base_pose2d, P0.base_z(self))
                 parts.append(f"{g.name}: floor-ignored {r1.ok}, world-free {r2.ok}, eef in base {[round(float(v), 2) for v in p_base.tolist()]}")
             return f"stance d {place.stand_off:.2f} trunk ({place.translate}, {place.tilt:.1f}) drop ahead {place.extras.get('drop_ahead_m')}: " + "; ".join(parts)
@@ -1608,9 +1810,11 @@ class IORSLarge(SamplerV2):
         is free — "a spot along the way it has moved before" — with the holding arm at its LIFT configuration and the
         object attached), the path from that pose at the travel trunk, and the arrival transition at C (the pre-place
         stand-off where C's trunk is set, then the drive-in). Every travel trunk of :meth:`travel_trunks` is tried.
-        Fallback: the drive at B's trunk (the earlier behaviour) with the arrival transition. Returns the path record."""
+        Fallback: the drive at B's trunk (the earlier behaviour) with the arrival transition. The holding arm is the segment arm.
+        Returns the path record."""
+        arm = self.seg_arm
         if q_lift_arm is not None:
-            self.record_carry_arm_q(tname, "right", q_lift_arm)
+            self.record_carry_arm_q(tname, arm, q_lift_arm)
         # the placement stance is reached WITH the object in hand: the objects-placed check attaches it there (and ignores it at
         # its init pose - 0920-004500: stance C 'collided' with the target still standing on its floor cell next to C)
         place.carried = tname
@@ -1619,21 +1823,21 @@ class IORSLarge(SamplerV2):
             if abs(tt[0] - manip.translate) < 1e-6 and abs(tt[1] - manip.tilt) < 1e-6:
                 continue  # B already straight: the plain leg below is the same thing
             try:
-                dep = self.record_departure_transition(manip, place, tt, carried=tname, arm="right")
+                dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm)
                 start = NAV.departure_pose(manip, dep.stand_off)
                 try:
-                    path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, trunk=tt, start_pose2d=start)
+                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start)
                 except Reject as e:
                     if e.reason != "path_collision":
                         raise
                     # the local (un-eroded) shortest path hugs the partner's corner with the object out front (0920-100543: stride 4/35
                     # at the table end); the eroded global map keeps the body's distance
                     self._drop_leg_records(place.name)
-                    dep = self.record_departure_transition(manip, place, tt, carried=tname, arm="right")
-                    path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, trunk=tt, start_pose2d=start, force_global=True)
+                    dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm)
+                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start, force_global=True)
                 # a carry into a deep crouch backs off further before the sweep (the hand frozen at the lift pose swings ~0.5 m
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
-                self.record_transition(manip, place, carried=tname, arm="right", trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
+                self.record_transition(manip, place, carried=tname, arm=arm, trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
                 where = "at the grasp spot" if dep.stand_off <= (manip.stand_off or 0.0) + 1e-6 else "after a drive-back"
                 log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.alias, tuple(round(v, 2) for v in tt), dep.stand_off, where,
                          path.length_m)
@@ -1646,13 +1850,13 @@ class IORSLarge(SamplerV2):
         # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
         try:
             try:
-                path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len)
+                path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len)
             except Reject as e:
                 if e.reason != "path_collision":
                     raise
                 self._drop_leg_records(place.name)
-                path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, force_global=True)
-            self.record_transition(manip, place, carried=tname, arm="right", extra_max=self.num("carry_transition_extra_m", 1.0))
+                path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=True)
+            self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
             log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.alias, "; ".join(errors),
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
@@ -1668,7 +1872,7 @@ class IORSLarge(SamplerV2):
     #: held to the right of the body swings down outside the base footprint and ends above the floor), then in front
     #: (0920-071230: the poses 0.20-0.30 m ahead fold the elbow onto its limit - right_arm_joint4 within 2-19 mrad, the 0.05 rad
     #: witness margin rejects them - so the beside-the-body poses sit 0.40-0.55 m ahead; the raise stays >= 0 so the straight
-    #: line from the lift never dips toward the partner's top edge)
+    #: line from the lift never dips toward the partner's top edge). The right arm's; the left arm holds them mirrored (:func:`carry_poses_for`)
     CARRY_POSES = ((0.45, -0.45, 0.0), (0.50, -0.40, 0.05), (0.40, -0.45, 0.10), (0.55, -0.35, 0.05), (0.35, -0.45, 0.15), (0.50, None, 0.10))
 
     def carry_poses_at_b(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> List[Tuple[G.Pose, List[G.Pose], th.Tensor]]:
@@ -1677,8 +1881,10 @@ class IORSLarge(SamplerV2):
         orientation kept — by a straight in-hand line (``Reorient`` mode "line", 3 intermediate waypoints + end), so that
         the trunk sweeps of the carry legs move a hand near the body, not one stretched 0.85 m over the partner
         (0920-043725: the frozen lift configuration swept the held sandal into the table top / the floor at every s_T up to
-        1.75 m). Solved from B with the object attached: exact IK at the carry pose, §3.9 waypoints from the lift.
-        Returns the feasible ``(carry pose, waypoints, 7 arm joints)`` candidates in order (the legs decide)."""
+        1.75 m). Solved from B with the object attached: exact IK at the carry pose, §3.9 waypoints from the lift; the segment
+        arm holds it (the poses beside the body on its side). Returns the feasible ``(carry pose, waypoints, 7 arm joints)``
+        candidates in order (the legs decide)."""
+        arm = self.seg_arm
         lift = (eef[0] + th.tensor([0.0, 0.0, float(carry_height)]), eef[1])
         base_xy = manip.base_xy
         fwd, left = manip.forward, manip.left
@@ -1686,7 +1892,7 @@ class IORSLarge(SamplerV2):
         lat_lift = float(rel @ left)
         out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
         why: List[str] = []
-        for ahead, lat, raise_m in (self.gp.gen("carry_poses") or self.CARRY_POSES):
+        for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm):
             lat_v = lat_lift if lat is None else float(lat)
             xy = base_xy + fwd * float(ahead) + left * lat_v
             carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
@@ -1699,16 +1905,16 @@ class IORSLarge(SamplerV2):
             if not all(self.ikc.eef_in_frame(w, cam_b) for w in wps):
                 why.append(f"{tag}: out of the head camera frame")
                 continue
-            with attached(self.kit, "right", target, eef_in_object=eef_in_object):
-                r = self.ikc.exact([carry], manip, "right", cache=False)
+            with attached(self.kit, arm, target, eef_in_object=eef_in_object):
+                r = self.ikc.exact([carry], manip, arm, cache=False)
                 if not r.ok or r.q is None:
                     why.append(f"{tag}: IK {r.reason}")
                     continue
-                ok = self.ikc.waypoints_ok([lift] + wps, manip, "right", cache=False)
+                ok = self.ikc.waypoints_ok([lift] + wps, manip, arm, cache=False)
             if not ok.ok:
                 why.append(f"{tag}: line from the lift {ok.reason}")
                 continue
-            out.append((carry, wps, r.q[self.kit.robot.arm_control_idx["right"]].clone()))
+            out.append((carry, wps, r.q[self.kit.robot.arm_control_idx[arm]].clone()))
         log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.alias, carry_height,
                  [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
@@ -1716,27 +1922,28 @@ class IORSLarge(SamplerV2):
     def lift_arm_q(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> Optional[th.Tensor]:
         """The 7 arm-joint values of the LIFT pose (the grasp raised ``carry_height`` straight up, orientation kept) solved
         from stance B with the object attached — the configuration the oracle carries with (``program_check`` solves the
-        same ``lift_end``); None when the lift has no solution (the leg then uses the stance posture, as before)."""
+        same ``lift_end``); None when the lift has no solution (the leg then uses the stance posture, as before). The segment arm's."""
+        arm = self.seg_arm
         lift = (eef[0] + th.tensor([0.0, 0.0, float(carry_height)]), eef[1])
         # owner 2026-09-25 (shampoo 0925-171050 / 194056: 8/8 draws lost at the program check's lift - 'lift: 1/11 tracked chain
         # configurations collide' - after this end-pose check had passed): the lift is TRACKED from the grasp configuration exactly
         # as the program check tracks it (IKChecker.continue_chain: the oracle's differential IK, the grasp's supports and the
         # ground off for a floor-class lift), so an untrackable lift drops the grasp / stance here instead of the whole draw later
-        q_grasp = self.ikc.solutions.get(("right", self.ikc._pose_key(eef)))
+        q_grasp = self.ikc.solutions.get((arm, self.ikc._pose_key(eef)))
         floor_class = (getattr(self, "surface", None) or {}).get("kind") == "floor"
         ignore = list(self.grasp_ignore_objects())
-        with attached(self.kit, "right", target, eef_in_object=eef_in_object):
-            if q_grasp is not None and self.ikc.reaches(q_grasp, eef, "right"):
-                r = self.ikc.continue_chain(q_grasp, [eef, lift], "right", ignore=ignore, ignore_end=[], soft_stall_m=self.ikc.FREE_LEG_STALL_M,
+        with attached(self.kit, arm, target, eef_in_object=eef_in_object):
+            if q_grasp is not None and self.ikc.reaches(q_grasp, eef, arm):
+                r = self.ikc.continue_chain(q_grasp, [eef, lift], arm, ignore=ignore, ignore_end=[], soft_stall_m=self.ikc.FREE_LEG_STALL_M,
                                             ignore_start=ignore + list(self.support_objects()), ground_along=not floor_class, ground_meshes_along=not floor_class)
                 if not r.ok:
                     log.info("%s: lift %.2f m untrackable from the grasp configuration (%s): grasp skipped", self.gp.alias, carry_height, r.reason[:200])
                     return None
             else:
-                r = self.ikc.exact([lift], manip, "right", ignore_for_last=ignore, cache=False)
+                r = self.ikc.exact([lift], manip, arm, ignore_for_last=ignore, cache=False)
         if not r.ok or r.q is None:
             return None
-        return r.q[self.kit.robot.arm_control_idx["right"]].clone()
+        return r.q[self.kit.robot.arm_control_idx[arm]].clone()
 
     # ------------------------------------------------------------------ per-attempt budget
 
@@ -1760,11 +1967,16 @@ class IORSLarge(SamplerV2):
         focus_xy = self.surface["c_t"] if kind == "floor" else None
         z_init = self.surface["z"]
         yaws = self.yaws()
+        # the arms of the segment (owner 2026-09-27, first-demo v2.2): F_init of the default arm at every B, of the other arm where its
+        # band holds the target, each at the B with that arm working; a B's usable pairs are the union
+        offered = TT.offered_arms(self)
+        self.seg_arm = offered[0]
+        arm_bands = self.surface.get("arm_bands") or {}
         # F_init pre-screen (countertop-floor 0919-222621: F_init 2-4 pairs per B at the floor crouch, 6 B tried blind and the
         # attempt spent its 900 s): the screening IK of F_init needs no leg, so it runs first over up to ``b_prescreen`` random B
         # candidates and the coupling starts from the B with the most (yaw, grasp) pairs
         n_pre = int(self.num("b_prescreen", 8))
-        pre: List[Tuple[int, Stance, List[Any]]] = []
+        pre: List[Tuple[int, Stance, List[Any], Dict[str, Tuple[Stance, List[Any]]]]] = []
 
         def _screen(n: int) -> None:
             for i_b in range(min(n, len(b_pool))):
@@ -1772,10 +1984,19 @@ class IORSLarge(SamplerV2):
                 kb = int(rng.integers(len(b_pool)))
                 b_grid = b_pool.pop(kb)
                 manip = b_grid.with_trunk(b_grid.translate, b_grid.tilt, "manipulation")
-                manip.focus, manip.arms = b_grid.focus, ["right"]
+                manip.focus = b_grid.focus
                 fxy = focus_xy if focus_xy is not None else manip.focus[:2]
-                F_b = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects()).get(0, [])
-                pre.append((len(F_b), manip, F_b))
+                by_arm: Dict[str, Tuple[Stance, List[Any]]] = {}
+                for a, st in self._b_stances(manip, offered).items():
+                    F_a = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), st, a, self.grasp_ignore_objects()).get(0, [])
+                    by_arm[a] = (st, F_a)
+                    if arm_bands.get(a) is not None and arm_bands[a].meta.get("mirrored_from"):
+                        TT._count(self, "arm_band_mirrored.foci")
+                        if not F_a:
+                            TT._count(self, "arm_band_mirrored.empty_F")
+                F_b = union_feasible({a: F for a, (_, F) in by_arm.items()}, 2.0 * math.pi / max(1, len(yaws)))
+                lead = next((by_arm[a][0] for a in self._segment_order(manip, by_arm)), next(iter(by_arm.values()), (manip, []))[0])
+                pre.append((len(F_b), lead, F_b, by_arm))
         _screen(n_pre)
         # order: a COMPACT grasp first (the target cell's distance ahead of the base, 10 cm buckets) among the B candidates whose F_init
         # has at least ``b_prescreen_min_f`` pairs, then the larger F_init - a grasp 0.85 m out over the table (0920-100542/3) leaves an
@@ -1786,25 +2007,35 @@ class IORSLarge(SamplerV2):
         # toe-first: 0.11 m; its strap: 0.03 m, the blade goal then 0.85 m ahead and out of reach, 0920-192539/40) is tried last
         pushable: Dict[int, float] = {}
         if self.push_under and pre:
-            try:
-                pool0 = self.placement_candidates(pre[0][1].focus[:2] if pre[0][1].focus is not None else self.surface["c_t"])
-            except Reject:
-                pool0 = []
-            faces = {(round(float(c.yaw), 2), tuple(round(float(v), 3) for v in c.extras["push_dir"])) for c in pool0 if c.extras.get("push_dir") is not None}
+            faces_of: Dict[str, Any] = {}
+
+            def _faces(a: str):
+                """The (base yaw, push direction) of ``a``'s stances C (the left arm's side stances face the other way)."""
+                if a not in faces_of:
+                    try:
+                        pool0 = self.placement_candidates(pre[0][1].focus[:2] if pre[0][1].focus is not None else self.surface["c_t"], arm=a)
+                    except Reject:
+                        pool0 = []
+                    faces_of[a] = {(round(float(c.yaw), 2), tuple(round(float(v), 3) for v in c.extras["push_dir"])) for c in pool0 if c.extras.get("push_dir") is not None}
+                return faces_of[a]
+            _faces(offered[0])
             z_lo = self.push_height(30.0)[1] - self.floor_z
             min_off_ = float(self.num("push_min_contact_m", 0.10))
 
             def _offsets() -> None:
-                for idx, (_, m, F_b) in enumerate(pre):
+                for idx, (_, m, _, by_arm) in enumerate(pre):
                     if idx in pushable:
                         continue
                     best = -1.0
-                    for c_yaw, pd in faces:
-                        d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(c_yaw - m.yaw)
-                        for y in sorted({float(yy) for yy, _ in F_b}):
-                            o = self.contact_offset_along(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), th.as_tensor(pd), z_lo, z_lo + self.BLADE_SPAN_M)
-                            if o is not None:
-                                best = max(best, o)
+                    for a, (_, F_a) in by_arm.items():
+                        if not F_a:
+                            continue
+                        for c_yaw, pd in _faces(a):
+                            d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(c_yaw - m.yaw)
+                            for y in sorted({float(yy) for yy, _ in F_a}):
+                                o = self.contact_offset_along(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), th.as_tensor(pd), z_lo, z_lo + self.BLADE_SPAN_M)
+                                if o is not None:
+                                    best = max(best, o)
                     pushable[idx] = best
             _offsets()
             # no pushable B among the first batch: screen more (up to ``b_prescreen_batches`` batches) before coupling blind
@@ -1822,25 +2053,31 @@ class IORSLarge(SamplerV2):
             f = m.focus[:2] if m.focus is not None else m.base_xy
             return float((th.as_tensor(f, dtype=th.float32) - m.base_xy) @ m.forward)
 
-        def _margin(m: Stance) -> float:
+        def _margin(t) -> float:
+            m = t[1]
             f = m.focus if m.focus is not None else th.tensor([float(m.base_xy[0]), float(m.base_xy[1]), z_init])
-            return self.reach_margin(m, [float(f[0]), float(f[1]), z_init + 0.5 * float(self.place["height"])])
+            # owner 2026-09-27 (first-demo v2.2): by whichever arm whose band holds the target at this B reaches better
+            arms = [a for a in (m.extras.get("focus_arms") or [offered[0]]) if a in t[3]] or [offered[0]]
+            return self.best_reach_margin(m, [float(f[0]), float(f[1]), z_init + 0.5 * float(self.place["height"])], arms)[0]
         order_mode = str(self.gp.gen("b_trunk_order", self.gp.gen("b_prescreen_order", "reach")))
         if order_mode == "reach":
             # W2 (owner 2026-09-20 22:15): the B whose trunk leaves the most reach margin to the target first (5 cm buckets, capped at
             # 0.30 m so a nearly-folded arm does not outrank a comfortable one), then a usable F_init, the compact grasp, the larger F_init
-            margins = {id(t): min(round(_margin(t[1]) / 0.05) * 0.05, 0.30) for t in pre}
+            margins = {id(t): min(round(_margin(t) / 0.05) * 0.05, 0.30) for t in pre}
             pre.sort(key=lambda t: (push_rank(t), -margins[id(t)], 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
             log.info("%s: pre-screen reach margins per B (trunk -> margin): %s", self.gp.alias,
-                     [(round(float(t[1].translate), 2), round(float(t[1].tilt), 2), round(_margin(t[1]), 3)) for t in pre])
+                     [(round(float(t[1].translate), 2), round(float(t[1].tilt), 2), round(_margin(t), 3)) for t in pre])
         elif order_mode == "compact":
             pre.sort(key=lambda t: (push_rank(t), 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
         else:
             pre.sort(key=lambda t: (push_rank(t), -t[0]))
-        self.template_facts.setdefault("F_init_prescreen", []).append([n for n, _, _ in pre])
-        log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s", self.gp.alias, len(pre), len(yaws), [n for n, _, _ in pre])
+        self.template_facts.setdefault("F_init_prescreen", []).append([t[0] for t in pre])
+        if len(offered) > 1:
+            self.template_facts.setdefault("F_init_prescreen_arms", []).append([{a: len(F) for a, (_, F) in t[3].items()} for t in pre])
+        log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s%s", self.gp.alias, len(pre), len(yaws), [t[0] for t in pre],
+                 "" if len(offered) < 2 else f" (per arm {[{a: len(F) for a, (_, F) in t[3].items()} for t in pre]})")
         n_couple = int(self.num("b_candidates_max", 6))
-        for i_b, (n_f, manip, F_init) in enumerate(pre[:n_couple]):
+        for i_b, (n_f, manip, F_init, by_arm) in enumerate(pre[:n_couple]):
             self._check_deadline(f"B candidate {i_b + 1} of {min(n_couple, len(pre))}")
             self.sidecar.transitions.clear()
             self.sidecar.paths.clear()
@@ -1852,10 +2089,7 @@ class IORSLarge(SamplerV2):
                 with self._floor_relaxed():
                     leg_ab = self.record_leg_a_b(init, manip)
                 focus_xy = self.surface["c_t"] if kind == "floor" else manip.focus[:2]
-                c_pool = self.placement_candidates(focus_xy)
-                if not c_pool:
-                    raise Reject("no_placement_stance", "no stance C survivor for this init pose")
-                d = self._couple(rng, init, manip, c_pool, F_init, focus_xy, z_init)
+                d, leg_ab = self._couple_segment(rng, init, manip, by_arm, focus_xy, z_init, leg_ab)
                 d.summary.update({"relation": self.relation, "init_surface": {"class": kind, "name": None if kind == "floor" else self.surface["obj"].name},
                                   "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip),
                                   "legs": {"A_B": leg_ab, "B_C": getattr(self, "_leg_bc", None)}})
@@ -1872,12 +2106,150 @@ class IORSLarge(SamplerV2):
                 self.carry_end_q.clear()
         raise Reject("target_placement", "; ".join(errors[-3:]))
 
-    def _couple(self, rng, init: Stance, manip: Stance, c_pool: List[Stance], F_init, focus_xy, z_init: float) -> Draft:
+    def _b_stances(self, manip: Stance, offered: Sequence[str]) -> Dict[str, Stance]:
+        """Stance B per offered arm (owner 2026-09-27, first-demo v2.2): the default arm's - ``manip`` itself when the B search solved it
+        for that arm - always, the other arm's where its band holds the target (``extras["focus_arms"]``); each with the other arm idle
+        in the posture re-derived for it (``tabletop.stance_for_arm``: A6 untucked / ready / tucked; an arm whose idle partner collides
+        in every posture is not offered)."""
+        arm0 = offered[0]
+        out: Dict[str, Stance] = {}
+        if manip.working_arms in ([], [arm0]):
+            manip.arms = [arm0]
+            out[arm0] = manip
+        else:
+            st = TT.stance_for_arm(self, manip, arm0)
+            if st is not None:
+                out[arm0] = st
+        focus_arms = manip.extras.get("focus_arms") or [arm0]
+        for a in offered[1:]:
+            if a in focus_arms:
+                st = TT.stance_for_arm(self, manip, a)
+                if st is not None:
+                    out[a] = st
+        return out
+
+    @staticmethod
+    def _segment_order(manip: Stance, by_arm: Dict[str, Tuple[Stance, List[Any]]]) -> List[str]:
+        """The arms with pairs at B in the order their couplings run: those whose band holds the target (``focus_arms``) first, the
+        default arm first among them (a B shortlisted by the other arm's band alone starts with that arm)."""
+        arms = [a for a, (_, F) in by_arm.items() if F]
+        focus = manip.extras.get("focus_arms") or arms[:1]
+        return [a for a in arms if a in focus] + [a for a in arms if a not in focus]
+
+    def _same_arm_q(self, a: Stance, b: Stance) -> bool:
+        """Both arms at the same joint values in the two stances (a leg checked at one holds at the other)."""
+        ra, la, _ = self.ikc.arm_vectors(a)
+        rb, lb, _ = self.ikc.arm_vectors(b)
+        return bool(th.equal(ra, rb) and th.equal(la, lb))
+
+    def _clear_segment_records(self, manip_name: str) -> None:
+        """What a failed coupling recorded past B: the C / push stances, the grasp, the push contact, the carry configurations and
+        every path / transition but the A -> B leg."""
+        self.sidecar.stances.pop("placement", None)
+        self.sidecar.stances.pop("push", None)
+        self.sidecar.contacts.pop("push", None)
+        self.sidecar.grasps.clear()
+        self.carry_arm_q.clear()
+        self.carry_end_q.clear()
+        self.sidecar.paths = [p for p in self.sidecar.paths if p.to == manip_name]
+        self.sidecar.transitions = [t for t in self.sidecar.transitions if t.to == manip_name]
+
+    def _couple_segment(self, rng, init: Stance, manip: Stance, by_arm: Dict[str, Tuple[Stance, List[Any]]], focus_xy, z_init: float,
+                        leg_ab: Dict[str, Any]) -> Tuple[Draft, Dict[str, Any]]:
+        """The grasp -> carry -> place -> release segment from stance B (owner 2026-09-27, first-demo v2.2): one coupling (:meth:`_couple`)
+        per arm with pairs in its F_init (:meth:`_segment_order`). ``manip`` (the record; its A -> B leg recorded) takes the coupling
+        arm's working arm and idle posture, the leg recorded again when that changes the arms' joint values. A pair whose grasp at B
+        another arm won waits for that arm's coupling; the pairs a failed coupling won are regrasped by the next arm (the segment
+        fallback). Returns the draft and the A -> B leg facts."""
+        arms = self._segment_order(manip, by_arm)
+        # ``manip`` takes each coupling's arm in place: the segment keeps a copy of the stance it was for its own arm
+        seg = SegmentArms({a: st.with_trunk(st.translate, st.tilt, st.name) if st is manip else st for a, (st, _) in by_arm.items()},
+                          {a: list(F) for a, (_, F) in by_arm.items()}, {a: (self.surface.get("arm_bands") or {}).get(a) for a in by_arm},
+                          2.0 * math.pi / max(1, len(self.yaws())))
+        errors: List[str] = []
+        last: Optional[Reject] = None
+        for k, arm in enumerate(arms):
+            st_a = by_arm[arm][0]
+            try:
+                if k > 0:
+                    self._clear_segment_records(manip.name)
+                if manip.working_arms != [arm] or manip.idle_posture != st_a.idle_posture:
+                    same = self._same_arm_q(manip, st_a)
+                    TT.adopt_arm(manip, st_a)
+                    if not same:
+                        self._drop_leg_records(manip.name)
+                        seg.leg += 1
+                        with self._floor_relaxed():
+                            leg_ab = self.record_leg_a_b(init, manip)
+                self.seg_arm = arm
+                c_pool = self.placement_candidates(focus_xy)
+                if not c_pool:
+                    raise Reject("no_placement_stance", "no stance C survivor for this init pose")
+                return self._couple(rng, init, manip, c_pool, by_arm[arm][1], focus_xy, z_init, seg), leg_ab
+            except Reject as e:
+                if e.reason == "time_budget" or len(arms) == 1:
+                    raise
+                seg.done.append(arm)
+                seg.why.setdefault(arm, f"{e.reason}: {str(e)[:300]}")
+                errors.append(f"{arm} arm: {e.reason}: {e}")
+                last = e
+                log.info("%s: B (%.2f, %.2f): the %s arm's segment failed (%s)%s", self.gp.alias, manip.translate, manip.tilt, arm, e.reason,
+                         f"; the {arms[k + 1]} arm's coupling next" if k + 1 < len(arms) else "")
+        raise Reject(last.reason if last is not None else "grasp_unreachable", " | ".join(errors) or "no arm has pairs in F_init at B")
+
+    @staticmethod
+    def _b_options(pick, g, eef: G.Pose, pre: G.Pose) -> Tuple[List[Tuple[Any, G.Pose, G.Pose, bool]], Optional[Dict[str, Any]]]:
+        """The finger assignments a grasp at B may be recorded with, the pick's first (``(grasp row or twin, eef, pre-grasp, is twin)``),
+        and its ``twin_choice``."""
+        if pick is None:
+            return [(g, eef, pre, False)], None
+        opts = [(pick.grasp, pick.eef, pick.pre, pick.twin)]
+        if pick.other is not None:
+            opts.append((pick.other[0], pick.other[2], pick.other[3], not pick.twin))
+        return opts, pick.facts
+
+    def _regrasp_at_b(self, g, t_pose: G.Pose, stance: Stance, arm: str, z_init: float, twins: bool, bands: Dict[str, Any]):
+        """The segment fallback's grasp at B (owner 2026-09-27, first-demo v2.2; ``tabletop.segment_fallback_grasp``'s rule, keeping the
+        other finger assignment for the place at C): the library row ``g`` at the target pose the first grasp was drawn at, with ``arm``
+        only (both turns by the orientation rule when the twins are on); :meth:`_b_options` or None."""
+        TT._count(self, "segment_fallbacks")
+        eef = IK.grasp_pose(t_pose, g.pose)
+        pre = IK.pre_pose(eef)
+        kw = {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False}
+        res = self.ikc.exact([pre, eef], stance, arm, **kw)
+        pick = None
+        if twins and getattr(g, "name", None):
+            pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
+            res = pick.res
+            self._count_mirrored_ik(pick, bands)
+        if not res.ok:
+            log.info("%s: segment fallback: the %s arm's regrasp of %s at B fails (%s)", self.gp.alias, arm, getattr(g, "name", g), str(res.reason)[:200])
+            return None
+        TT._count(self, f"segment_fallback_taken.{arm}")
+        return self._b_options(pick, g, eef, pre)
+
+    def _count_mirrored_ik(self, pick, bands: Dict[str, Any]) -> None:
+        """``arm_band_mirrored.ik_tried`` / ``.ik_failed`` for a grasp's solved options of an arm whose band is a mirror (as
+        ``tabletop.phase3_target`` counts them)."""
+        for o in pick.facts["orient"]["options"]:
+            b = bands.get(o.get("arm"))
+            if o.get("source") == "ik" and b is not None and b.meta.get("mirrored_from"):
+                TT._count(self, "arm_band_mirrored.ik_tried")
+                if not o.get("ok"):
+                    TT._count(self, "arm_band_mirrored.ik_failed")
+
+    def _couple(self, rng, init: Stance, manip: Stance, c_pool: List[Stance], F_init, focus_xy, z_init: float, seg: Optional[SegmentArms] = None) -> Draft:
         """B ↔ C coupling: for C survivors in random order, F_goal at the goal cell for the init yaws, the draw from
         F_init ∩ F_goal, the target pose at B's focus, the exact IK at B and at C (attached), the B → C path and
-        transition; the draft and the sidecar records."""
+        transition; the draft and the sidecar records. For the segment arm (``self.seg_arm``; owner 2026-09-27, first-demo v2.2):
+        ``F_init`` / ``c_pool`` are its own, the grasp at B is ``tabletop.pick_twin`` over the arms of ``seg`` whose F_init holds the
+        pair (shared with the other arm's coupling: a pair the other arm won is left to its coupling, one it won and lost later is
+        regrasped here - :meth:`SegmentArms.role`)."""
         tname, pname = self.tname, self.pname
         partner, target = self.partner, self.target
+        arm = self.seg_arm
+        arm0 = TT.default_arm(self)
+        offered = TT.offered_arms(self)
         # §5.6: B → C ≤ max_partner_geodesic + extra. The geodesic rule measures near side to near side; the recorded stances
         # sit at particular edges (the bar's short end → the sofa's front), so the stance-to-stance drive is longer — extra
         # 3 m (sofa-bar 17:04: every C survivor failed with path_too_long at 4 m; the B-C IK never got its turn)
@@ -1937,17 +2309,24 @@ class IORSLarge(SamplerV2):
             order.sort(key=lambda k: int(c_pool[k].extras.get("edge_rank", 0)))  # ontop / place variants: nearest edge first, random within
         yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
-        # (yaw bucket, grasp) -> (yaw, target pose, [(grasp row or twin, grasp eef, pre-grasp, is twin), ...] preferred first, twin_choice) at B,
-        # None = infeasible
-        b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, List[Tuple[Any, G.Pose, G.Pose, bool]], Optional[Dict[str, Any]]]]] = {}
+        seg = seg or SegmentArms({arm: manip}, {arm: list(F_init)}, yaw_step=yaw_step)
+        st_of = {**seg.stances, arm: manip}
+        # (yaw bucket, grasp) -> the grasp at B: yaw, target pose, the arm that won it, the arms viable there, per arm [(grasp row or twin,
+        # grasp eef, pre-grasp, is twin), ...] preferred first + twin_choice; None = infeasible for every arm
+        b_ik_cache = seg.b_ik
+        deferred: set = set()  # pairs whose grasp at B an arm with its coupling still to come won
         twins_b = TT.grasp_twins_on(self)
         errors = []
         carry_margin = float(self.gp.gen("carry_collision_margin_m", 0.04))
         carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
         for i_c, kc in enumerate(order[:n_try]):
             self._check_deadline(f"C candidate {i_c + 1} of {min(n_try, len(order))} (F_goal feasible set) at B ({manip.translate}, {manip.tilt:.2f})")
+            F_live = [yg for yg in F_init if pair_key(yg[0], yg[1], yaw_step) not in deferred] if deferred else F_init
+            if not F_live:
+                errors.append(f"every pair of the {arm} arm's F_init ({len(F_init)}) at B went to another arm's grasp")
+                break
             place = c_pool[int(kc)].with_trunk(c_pool[int(kc)].translate, c_pool[int(kc)].tilt, "placement")
-            place.focus, place.arms = c_pool[int(kc)].focus, ["right"]
+            place.focus, place.arms = c_pool[int(kc)].focus, [arm]
             place.extras = dict(c_pool[int(kc)].extras)
             gc = place.extras["goal_cell"]
             push = self.push_under
@@ -1987,11 +2366,11 @@ class IORSLarge(SamplerV2):
             push_st = None
             if push and str(self.gp.gen("push_under_drop_first", "on")) != "off":
                 push_st = place.with_trunk(place.translate, place.tilt, "push")
-                push_st.focus, push_st.arms, push_st.extras = place.focus, ["right"], dict(place.extras)
+                push_st.focus, push_st.arms, push_st.extras = place.focus, [arm], dict(place.extras)
                 drop_st = None
                 for tr, ti in [tuple(float(v) for v in t) for t in (self.gp.gen("drop_trunks") or ((0.5, -0.6), (0.5, -0.9), (0.75, -0.6), (0.25, -0.6), (0.75, -0.9)))]:
                     cand = place.with_trunk(tr, ti, "placement")
-                    cand.focus, cand.arms, cand.extras = place.focus, ["right"], dict(place.extras)
+                    cand.focus, cand.arms, cand.extras = place.focus, [arm], dict(place.extras)
                     with self._floor_relaxed():
                         if bool(P0.body_free(self, [cand])[0]):
                             drop_st = cand
@@ -2005,7 +2384,7 @@ class IORSLarge(SamplerV2):
                 if cl is not None and not under_admissible(cl, self.place["height"], self.num("under_clearance_extra_m", 0.17)):
                     errors.append(f"C: under clearance {cl:.2f} m at the goal cell < height + 0.17")
                     continue
-            yaws = sorted({float(y) for y, _ in F_init})
+            yaws = sorted({float(y) for y, _ in F_live})
             d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(place.yaw - manip.yaw)
             if push:
                 # chain FIRST (2026-09-20 19:20): the floor push's IK depends on where this C stands along the edge (0920-184335: 505 chains
@@ -2047,17 +2426,17 @@ class IORSLarge(SamplerV2):
             # only when B and C share a base yaw - countertop-floor 0916-231451: F_init 3-21 / F_goal 0-5 / F empty on
             # every candidate). The goal orientation written to the TRO is the rotated one.
             F_goal = self.ikc.feasible_sets([release_xy], [y + d_yaw for y in yaws], self.grasps,
-                                            lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right", ignore_place).get(0, [])
+                                            lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, arm, ignore_place).get(0, [])
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
-            F = intersect_feasible(F_init, F_goal, yaw_step=yaw_step)
+            F = intersect_feasible(F_live, F_goal, yaw_step=yaw_step)
             if push:
                 log.info("%s: push-under C try %s d %.2f λ %+.2f trunk (%.2f, %.1f): F_init %d, F_goal %d, F %d at drop %s", self.gp.alias, place.extras.get("stance_kind"),
-                         place.stand_off or 0.0, place.lateral, place.translate, place.tilt, len(F_init), len(F_goal), len(F), [round(float(v), 2) for v in release_xy])
+                         place.stand_off or 0.0, place.lateral, place.translate, place.tilt, len(F_live), len(F_goal), len(F), [round(float(v), 2) for v in release_xy])
             if not F:
                 if push and not F_goal and not getattr(self, "_drop_debugged", False):
                     self._drop_debugged = True
                     log.info("%s: drop IK debug — %s", self.gp.alias, self.debug_drop_ik(place, release_xy, yaws))
-                errors.append(f"C: F_init ({len(F_init)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
+                errors.append(f"C: F_init ({len(F_live)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
             fails: Dict[str, int] = {}
             # pairs of F tried per C: the push-under chain search (4 pitches x 2 wrist turns x exact IK) is the expensive leg, so the
@@ -2087,16 +2466,15 @@ class IORSLarge(SamplerV2):
                 # the grasp side (target pose at B's focus, pre-grasp + grasp exact IK from B) does not depend on C: solved once per
                 # (yaw bucket, grasp) for this B and reused across the C candidates (a failed pair is skipped everywhere)
                 bk = (int(round(yaw0 / yaw_step)), getattr(g, "name", str(g)))
-                if bk in b_ik_cache:
-                    hit = b_ik_cache[bk]
-                    if hit is None:
-                        fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
-                        continue
-                    yaw, t_pose, b_opts, b_facts = hit
-                else:
+                if bk not in b_ik_cache:
                     # the exact IK at B is tried at the screened pose first (the focus cell, the grid yaw: what F_init passed) and then
                     # at up to two jittered poses; a pair is cached as infeasible only when all fail, with the reasons logged
-                    # (0920-235717/8/36: 7-8 of 8 toe-first draws failed here with one jittered pose each, no reason recorded)
+                    # (0920-235717/8/36: 7-8 of 8 toe-first draws failed here with one jittered pose each, no reason recorded).
+                    # Owner 2026-09-27 (first-demo v2.2): the arms whose F_init holds the pair compete for it (the default arm first,
+                    # each at its own stance B) but an arm whose segment already failed at this B; the pick is shared by the couplings
+                    held = seg.arms_of(yaw0, g) or [arm]
+                    arms_p = [a for a in held if a not in seg.done] or [arm]
+                    a0 = arms_p[0]
                     res, t_pose, eef, pre, pick = None, None, None, None, None
                     why_b: List[str] = []
                     for k_try in range(int(self.num("b_ik_tries", 3))):
@@ -2117,12 +2495,13 @@ class IORSLarge(SamplerV2):
                             continue
                         eef = IK.grasp_pose(t_pose, g.pose)
                         pre = IK.pre_pose(eef)
-                        res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
-                        if twins_b and getattr(g, "name", None):
-                            pick = TT.pick_twin(self, manip, "right", g, g.pose, eef, pre, res,
+                        res = self.ikc.exact([pre, eef], st_of[a0], a0, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+                        if (twins_b or len(arms_p) > 1) and getattr(g, "name", None):
+                            pick = TT.pick_twin(self, st_of[a0], a0, g, g.pose, eef, pre, res,
                                                 {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
-                                                support_z=float(z_init), where="B")
+                                                support_z=float(z_init), where="B", arms=arms_p, stances=st_of, twins=twins_b)
                             res = pick.res
+                            self._count_mirrored_ik(pick, seg.bands)
                         if res.ok:
                             yaw = yaw_k
                             break
@@ -2133,21 +2512,49 @@ class IORSLarge(SamplerV2):
                         log.info("%s: B exact IK fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.alias, yaw0, getattr(g, "name", g), manip.translate, manip.tilt,
                                  " | ".join(why_b)[:600])
                         continue
-                    why_ab = self._leg_ab_clear_of_target(init, manip, t_pose)
-                    if why_ab:
-                        # the A -> B drive was swept before the target had a pose (parked): a draw on the drive's corridor is dropped
-                        b_ik_cache[bk] = None
-                        fails["B: the A -> B drive passes the placed target"] = fails.get("B: the A -> B drive passes the placed target", 0) + 1
-                        log.info("%s: %s", self.gp.alias, why_ab)
-                        continue
-                    if pick is None:
-                        b_opts, b_facts = [(g, eef, pre, False)], None
+                    arm_b = pick.arm if pick is not None else a0
+                    b_ik_cache[bk] = {"yaw": yaw, "t_pose": t_pose, "arm": arm_b, "viable": O.viable_arms(pick.facts["orient"]) if pick is not None else [arm_b],
+                                      "opts": {arm_b: self._b_options(pick, g, eef, pre)}, "after": [a for a in held if a in seg.done]}
+                hit = b_ik_cache[bk]
+                if hit is None:
+                    fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
+                    continue
+                role = seg.role(hit["arm"], hit["viable"], arm)
+                fallback = None
+                if role == "defer":
+                    deferred.add(bk)
+                    fails[f"B: the {hit['arm']} arm's grasp (its coupling next)"] = fails.get(f"B: the {hit['arm']} arm's grasp (its coupling next)", 0) + 1
+                    continue
+                if role == "fallback":
+                    # the segment fallback (owner 2026-09-27): the arm that won the grasp failed a later contact; this arm, viable at the
+                    # grasp, regrasps the library row at the same target pose (once per pair)
+                    if arm not in hit["opts"]:
+                        hit["opts"][arm] = self._regrasp_at_b(g, hit["t_pose"], manip, arm, z_init, twins_b, seg.bands)
+                    if hit["opts"][arm] is None:
+                        role = "none"
                     else:
-                        b_opts = [(pick.grasp, pick.eef, pick.pre, pick.twin)]
-                        if pick.other is not None:
-                            b_opts.append((pick.other[0], pick.other[2], pick.other[3], not pick.twin))
-                        b_facts = pick.facts
-                    b_ik_cache[bk] = (yaw, t_pose, b_opts, b_facts)
+                        won_opts, won_facts = hit["opts"].get(hit["arm"]) or ([(None,)], None)
+                        fallback = {"from_arm": hit["arm"], "from_grasp": getattr(won_opts[0][0], "name", None), "why": (seg.failed.get(bk) or seg.why.get(hit["arm"], ""))[:300],
+                                    "arm_choice": (won_facts or {}).get("arm_choice")}
+                elif hit.get("after"):
+                    # drawn after the segment of an arm that held the pair failed at this B: that arm is not offered again
+                    fallback = {"from_arm": hit["after"][0], "from_grasp": None, "why": seg.why.get(hit["after"][0], "")[:300]}
+                if role == "none":
+                    fails[f"B: no {arm}-arm grasp (the {hit['arm']} arm's)"] = fails.get(f"B: no {arm}-arm grasp (the {hit['arm']} arm's)", 0) + 1
+                    continue
+                yaw, t_pose = hit["yaw"], hit["t_pose"]
+                b_opts, b_facts = hit["opts"][arm]
+                lk = (bk, seg.leg)
+                if lk not in seg.leg_ok:
+                    seg.leg_ok[lk] = self._leg_ab_clear_of_target(init, manip, t_pose)
+                    if seg.leg_ok[lk]:
+                        # the A -> B drive was swept before the target had a pose (parked): a draw on the drive's corridor is dropped
+                        fails["B: the A -> B drive passes the placed target"] = fails.get("B: the A -> B drive passes the placed target", 0) + 1
+                        log.info("%s: %s", self.gp.alias, seg.leg_ok[lk])
+                        continue
+                elif seg.leg_ok[lk]:
+                    fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
+                    continue
                 goal_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
                 goal = release_pose(release_xy, goal_quat)
                 # the recorded finger assignment first; the other one (its B chain passed as well) only when the first fails here
@@ -2162,9 +2569,9 @@ class IORSLarge(SamplerV2):
                     q_seed = None
                     if q_lift_seed is not None:
                         q_seed = self.ikc.q_locked(place).clone()
-                        q_seed[self.kit.robot.arm_control_idx["right"]] = q_lift_seed
-                    with attached(self.kit, "right", target, eef_in_object=g.pose):
-                        r2 = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False, q_seed=q_seed)
+                        q_seed[self.kit.robot.arm_control_idx[arm]] = q_lift_seed
+                    with attached(self.kit, arm, target, eef_in_object=g.pose):
+                        r2 = self.ikc.exact([pre_place, place_eef], place, arm, ignore_for_last=ignore_place, cache=False, q_seed=q_seed)
                     if not r2.ok:
                         c_fails.append(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)")
                         continue
@@ -2172,13 +2579,14 @@ class IORSLarge(SamplerV2):
                         # a loose sanity bound only (2026-09-21 01:30): the branch the oracle reaches the pre-place in is decided by the straight
                         # carry leg it tracks from the carry configuration - checked below by ``track_chain`` once the carry leg is recorded
                         # (0921-005514/6/8: the 1.2 rad proxy against the LIFT configuration rejected 1-4 draws per C)
-                        swing = float(th.max(th.abs(r2.q[self.kit.robot.arm_control_idx["right"]] - q_lift_seed)))
+                        swing = float(th.max(th.abs(r2.q[self.kit.robot.arm_control_idx[arm]] - q_lift_seed)))
                         if swing > float(self.num("place_branch_max_rad", 2.6)):
                             c_fails.append("C: place branch differs from the carry (joint swing)")
                             continue
                     break
                 if len(c_fails) == len(b_opts):
                     fails[c_fails[0]] = fails.get(c_fails[0], 0) + 1
+                    seg.failed.setdefault(bk, c_fails[0])
                     continue
                 twin_facts = b_facts
                 if b_facts is not None and j_opt > 0:
@@ -2195,12 +2603,14 @@ class IORSLarge(SamplerV2):
                     rest = (goal[0] - th.tensor([0.0, 0.0, float(self.num("goal_drop_m", 0.01))]), goal[1])
                     if not (self.ikc.eef_in_frame(place_eef, cam_c) and self.ikc.eef_in_frame(IK.grasp_pose(rest, g.pose), cam_c)):
                         fails["C: place eef outside the placement image"] = fails.get("C: place eef outside the placement image", 0) + 1
+                        seg.failed.setdefault(bk, "C: place eef outside the placement image")
                         continue
                 chain = None
                 if push:  # the straight floor push drop → goal from the same stance (closed gripper, floor + target ignored)
                     chain = self._push_under_chain(push_st if push_st is not None else place, goal_quat, cd, gc, place.extras["push_dir"])
                     if chain is None:
                         errors.append("C: push chain unreachable")
+                        seg.failed.setdefault(bk, "C: push chain unreachable")
                         continue
                 # B -> C with the object attached (§3.7 ≤ max_partner_geodesic + 1 m; §3.8 transition; owner 2026-09-19 21:56 (iii'):
                 # straighten the torso first, navigate, set C's trunk at its pre-place stand-off). The grasp record goes in
@@ -2217,15 +2627,20 @@ class IORSLarge(SamplerV2):
                             self.record_transition(place, push_st)
                     except Reject as e:
                         errors.append(f"C: drop -> push trunk transition: {e}")
+                        seg.failed.setdefault(bk, f"C: drop -> push trunk transition: {e.reason}")
                         self.sidecar.stances.pop("placement", None)
                         self.sidecar.stances.pop("push", None)
                         self._drop_leg_records("push")
                         break
                 floor_name = self.bindings.one("floor").name if self.bindings.has("floor") else None
-                grasp = GraspRecord(tname, "right", g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose,
+                grasp = GraspRecord(tname, arm, g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose,
                                     place_on=(floor_name or pname) if push else pname)
                 if twin_facts is not None:
                     grasp.extras.update({"wrist_flip": bool(flip), "twin_choice": twin_facts})
+                if len(offered) > 1 or arm != arm0:
+                    grasp.extras["arm_bands"] = {a: TT.band_facts((self.surface.get("arm_bands") or {}).get(a)) for a in offered}
+                if fallback is not None:
+                    grasp.extras["segment_fallback"] = fallback
                 if push:  # the release is a drop on the floor outside the edge (like the inside rule's ``place_kind: drop``)
                     grasp.extras.update({"place_kind": "drop", "drop_height_m": float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M)),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
@@ -2264,11 +2679,12 @@ class IORSLarge(SamplerV2):
                         except Reject as e:
                             carry_errors.append(f"lift {h:.2f} m, {label}: {e.reason}: {str(e)[:700]}")
                             self._drop_leg_records("placement")
-                            self.record_carry_arm_q(tname, "right", None)
+                            self.record_carry_arm_q(tname, arm, None)
                     if path_bc is not None:
                         break
                 if path_bc is None:
                     errors.append("C: carry leg: " + "; ".join(carry_errors[-3:]))
+                    seg.failed.setdefault(bk, "C: carry leg: " + (carry_errors[0][:300] if carry_errors else "no carry option"))
                     log.info("%s: C (d %.2f λ %+.2f) carry leg failed: %s", self.gp.alias, place.stand_off or 0.0, place.lateral, " || ".join(carry_errors)[:1200])
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
                     carry_failed_bases.add(base_key)
@@ -2282,23 +2698,24 @@ class IORSLarge(SamplerV2):
                 # rad (0920-135625: a witness 2.09 rad away = 'plan_failed'). Track that line here from the carry configuration at C;
                 # its end configuration is the branch the witnesses must be in - the drop IK is re-solved from it and must stay within
                 # ``carry_finish_max_rad`` (0.5) of it; ``carry_end_q`` seeds the program check's place witness the same way
-                idx_r = self.kit.robot.arm_control_idx["right"]
+                idx_r = self.kit.robot.arm_control_idx[arm]
                 q_c = self.ikc.q_locked(place).clone()
                 q_c[idx_r] = self.carry_arm_q[tname]
                 from ispatialgym.oracle import r1pro_model as M
-                h0 = self.kit.fk([M.EEF_LINK["right"]], q_c)[M.EEF_LINK["right"]]
-                with attached(self.kit, "right", target, eef_in_object=g.pose), self._floor_relaxed():
-                    q_end, why_t = self.ikc.track_chain(q_c, [h0, pre_place], "right", ignore=[self.obj("floor")], soft_stall_m=float(self.num("carry_soft_stall_m", 0.02)))
+                h0 = self.kit.fk([M.EEF_LINK[arm]], q_c)[M.EEF_LINK[arm]]
+                with attached(self.kit, arm, target, eef_in_object=g.pose), self._floor_relaxed():
+                    q_end, why_t = self.ikc.track_chain(q_c, [h0, pre_place], arm, ignore=[self.obj("floor")], soft_stall_m=float(self.num("carry_soft_stall_m", 0.02)))
                     r2b = None
                     if q_end is not None:
-                        r2b = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False, q_seed=q_end)
+                        r2b = self.ikc.exact([pre_place, place_eef], place, arm, ignore_for_last=ignore_place, cache=False, q_seed=q_end)
                 if q_end is None or r2b is None or not r2b.ok or r2b.q is None:
                     reason = why_t if q_end is None else (r2b.reason if r2b is not None else "no IK")
                     errors.append(f"C: carry leg untrackable to the pre-place: {reason}")
+                    seg.failed.setdefault(bk, f"C: carry leg untrackable to the pre-place: {str(reason)[:200]}")
                     log.info("%s: C (d %.2f λ %+.2f) carry leg hand -> pre-place untrackable / drop IK from its end fails: %s", self.gp.alias, place.stand_off or 0.0, place.lateral, reason)
                     fails["C: carry leg untrackable"] = fails.get("C: carry leg untrackable", 0) + 1
                     self._drop_leg_records("placement")
-                    self.record_carry_arm_q(tname, "right", None)
+                    self.record_carry_arm_q(tname, arm, None)
                     self.sidecar.stances.pop("placement", None)
                     self.sidecar.stances.pop("push", None)
                     self._drop_leg_records("push")
@@ -2307,10 +2724,11 @@ class IORSLarge(SamplerV2):
                 fin_swing = float(th.max(th.abs(r2b.q[idx_r] - q_end[idx_r])))
                 if fin_swing > float(self.num("carry_finish_max_rad", 0.5)):
                     errors.append(f"C: pre-place witness {fin_swing:.2f} rad from the tracked carry end")
+                    seg.failed.setdefault(bk, f"C: pre-place witness {fin_swing:.2f} rad from the tracked carry end")
                     log.info("%s: C (d %.2f λ %+.2f) pre-place IK from the tracked carry end swings %.2f rad (> 0.5)", self.gp.alias, place.stand_off or 0.0, place.lateral, fin_swing)
                     fails["C: pre-place branch off the tracked carry"] = fails.get("C: pre-place branch off the tracked carry", 0) + 1
                     self._drop_leg_records("placement")
-                    self.record_carry_arm_q(tname, "right", None)
+                    self.record_carry_arm_q(tname, arm, None)
                     self.sidecar.stances.pop("placement", None)
                     self.sidecar.stances.pop("push", None)
                     self._drop_leg_records("push")
@@ -2319,7 +2737,7 @@ class IORSLarge(SamplerV2):
                 self.carry_end_q[tname] = q_end[idx_r].clone()
                 log.info("%s: carry leg hand -> pre-place tracked at C (%.2f rad swing at the finish)", self.gp.alias, fin_swing)
                 if push:
-                    self.sidecar.add_contact(PushUnderRecord("right", chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
+                    self.sidecar.add_contact(PushUnderRecord(arm, chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
                                                              tname, stance="push" if push_st is not None else "placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],
                                                              push_height_m=chain["push_height_m"], half_extent_m=chain["half_extent_m"], fingertip_z_m=chain["fingertip_z_m"],
                                                              ground_ignored=bool(chain.get("ground_ignored", False)),
@@ -2339,6 +2757,15 @@ class IORSLarge(SamplerV2):
                                   "path_length_m": place.extras["path_length_m"], "F_init": len(F_init), "F_goal": len(F_goal), "F": len(F),
                                   # the carried object's yaw follows the base: goal orientation = init orientation rotated by C.yaw - B.yaw
                                   "goal_quat": [float(v) for v in goal_quat], "carry_yaw_offset_rad": round(d_yaw, 4)})
+                d.summary["arm"] = TT.segment_arm_summary(grasp, offered)
+                band_c = None if push else (self.place.get("bands") or {}).get(arm)  # the partner-top band of the place is the segment arm's too
+                if band_c is not None and band_c.meta.get("mirrored_from"):
+                    d.summary["arm"]["mirrored_band"] = True
+                arms_here = (seg.arms_of(yaw0, g) if seg is not None else []) or [arm]
+                grasp.extras["arm_offer"] = TT.arm_offer_record(offered, [a for a in offered if a in arms_here] or [arm], grasp, TT.arm_offer(self)[1])
+                if arm != arm0 or fallback is not None:
+                    log.info("%s: segment grasp -> carry -> %s with the %s arm (%s)%s", self.gp.alias, "drop -> push" if push else "place", arm, d.summary["arm"]["reason"],
+                             f"; the {fallback['from_arm']} arm failed: {fallback['why'][:200]}" if fallback is not None else "")
                 if push:
                     d.summary["push_under"] = {"drop_cell": [float(v) for v in cd], "distance_m": chain["distance_m"], "pitch_deg": chain["pitch_deg"],
                                                "blade_standoff_m": chain["blade_standoff_m"], "push_height_m": chain["push_height_m"], "half_extent_m": chain["half_extent_m"],
@@ -2412,7 +2839,8 @@ class IORSLarge(SamplerV2):
             raise Reject("goal_partner_moved", f"partner moved {moved:.3f} m at the goal")
 
     def after_goal_check(self, draft: Draft):
-        """Place / pre-place at the settled goal pose re-checked from C with the object attached (the record kept)."""
+        """Place / pre-place at the settled goal pose re-checked from C with the object attached (the record kept), with the recorded
+        grasp's / push's arm (the segment arm)."""
         tname = self.tname
         grasp = self.sidecar.grasp_of(tname)
         place = self.sidecar.stance("placement")
@@ -2422,8 +2850,8 @@ class IORSLarge(SamplerV2):
         if self.push_under:
             # the release is the drop outside the edge (unchanged by the settle): re-check it as recorded; the push goal blade
             # follows the settled goal centre (a few mm), the chain start → mid → goal is re-solved (closed gripper)
-            with attached(self.kit, "right", self.target, eef_in_object=grasp.eef_in_object):
-                res = self.ikc.exact([grasp.pre_place, grasp.place], place, "right", ignore_for_last=ignore, cache=False)
+            with attached(self.kit, grasp.arm, self.target, eef_in_object=grasp.eef_in_object):
+                res = self.ikc.exact([grasp.pre_place, grasp.place], place, grasp.arm, ignore_for_last=ignore, cache=False)
             if not res.ok:
                 raise Reject("place_unreachable", f"pre-place / drop fail the exact IK from stance C at the goal check: {res.reason}")
             push = self.sidecar.contacts.get("push")
@@ -2437,7 +2865,7 @@ class IORSLarge(SamplerV2):
                 q = push.contact[1]
                 push_from = self.sidecar.stances.get("push") or place  # the chain is pushed from the deep push stance when the drop and the push split
                 with self.ikc.ignoring([self.obj("floor"), self.target], ground=not bool(push.extras.get("ground_ignored", False))):
-                    r3 = self.ikc.exact([push.pre, (start_b, q), (mid_b, q), (goal_b, q)], push_from, "right", cache=False, fingers=C.FINGER_CLOSED)
+                    r3 = self.ikc.exact([push.pre, (start_b, q), (mid_b, q), (goal_b, q)], push_from, push.arm, cache=False, fingers=C.FINGER_CLOSED)
                 if not r3.ok:
                     raise Reject("push_unreachable", f"push-under chain to the settled goal fails the exact IK from stance C: {r3.reason}")
                 push.mid, push.goal = (mid_b, q), (goal_b, q)
@@ -2446,8 +2874,8 @@ class IORSLarge(SamplerV2):
         else:
             place_eef = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
             pre_place = IK.pre_pose(place_eef)
-            with attached(self.kit, "right", self.target, eef_in_object=grasp.eef_in_object):
-                res = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore, cache=False)
+            with attached(self.kit, grasp.arm, self.target, eef_in_object=grasp.eef_in_object):
+                res = self.ikc.exact([pre_place, place_eef], place, grasp.arm, ignore_for_last=ignore, cache=False)
             if not res.ok:
                 raise Reject("place_unreachable", f"pre-place / place at the settled goal fail the exact IK from stance C: {res.reason}")
             grasp.pre_place, grasp.place = pre_place, place_eef

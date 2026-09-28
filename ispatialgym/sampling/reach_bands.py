@@ -53,11 +53,14 @@ Reading a band (the sampler)::
 ``ReachBands.load`` looks in ``ISPATIALGYM_REACH_BANDS`` (if set), then the committed ``runlogs/reach_bands_20260915/bands``,
 then ``~/.cache/ispatialgym/reach_bands``; the match is by the meta fields (scene, support, object, grasp key, spawn
 scale, placed objects, ``--under`` partner; brace: target, handle key, joint), not by the hashed file name.
+``ReachBands.load_arm(..., arm="left")`` returns the arm's own band, else the other arm's tabletop / floor band mirrored in
+memory (``ReachBands.mirrored``).
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import logging
@@ -326,6 +329,27 @@ def _index(d: str) -> List[Tuple[str, Dict[str, Any]]]:
     return out
 
 
+#: sign of each arm joint (``<arm>_arm_joint1..7``) between the two arms' mirror-image configurations (``r1pro_model.ARM_READY_Q``,
+#: the untucked posture): joints 2, 3, 5 and 7 change sign
+MIRROR_JOINT_SIGNS = (1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0)
+#: band modes whose other-arm band is their mirror image (owner 2026-09-27 13:01): tabletop bands (library grasps, generic pinches)
+#: and floor bands. Articulation brace / handle bands depend on the hinge side and contact bands on the face side: never mirrored.
+MIRRORABLE_MODES = ("tabletop", "floor")
+
+
+def other_arm(arm: str) -> str:
+    return "left" if arm == "right" else "right"
+
+
+def mirror_arm_q(q: Sequence[float]) -> List[float]:
+    """Joint values of the other arm in the mirror-image configuration (:data:`MIRROR_JOINT_SIGNS`)."""
+    return [float(s) * float(v) for s, v in zip(MIRROR_JOINT_SIGNS, q)]
+
+
+def mirrorable(meta: Dict[str, Any]) -> bool:
+    return meta.get("mode") in MIRRORABLE_MODES and not meta.get("contact_set")
+
+
 def _same_scale(a, b) -> bool:
     if a is None and b is None:
         return True
@@ -566,6 +590,69 @@ class ReachBands:
         c, s = math.cos(yaw), math.sin(yaw)
         w = np.asarray(xy_world, dtype=float).reshape(-1, 2) - np.array([x0, y0])
         return np.stack([c * w[:, 0] + s * w[:, 1], -s * w[:, 0] + c * w[:, 1]], axis=1)
+
+    # -- the other arm's band --------------------------------------------------------------------------------------
+    @property
+    def arm(self) -> str:
+        return str(self.meta.get("arm", "right"))
+
+    def mirrored(self) -> "ReachBands":
+        """The other arm's band by the robot's left-right symmetry (owner 2026-09-27 13:01), in memory: base-frame cells
+        (x, λ) -> (x, -λ), the object yaw offsets of the (yaw, grasp) pairs -> -yaw, the union extent [a, b] -> [-b, -a], every
+        trunk's shoulder position and idle-arm posture to the other side. The meta names its source (``mirrored_from``: the
+        source's arm, ``mirror_source``: its file). ``path`` is None: nothing writes the mirror into a band directory
+        (``tabletop.store_feasible_set`` keeps its feasible sets in memory). A chiral object (a sandal) mirrors only
+        approximately; the band shortlists cells and stances, the exact IK decides."""
+        if not mirrorable(self.meta):
+            raise ValueError(f"band {self.path or self.meta.get('key')} (mode {self.meta.get('mode')}) is not mirrored: only tabletop and floor bands are")
+        n = len(YAWS)
+        meta = copy.deepcopy(self.meta)
+        meta["arm"] = other_arm(self.arm)
+        meta["mirrored_from"] = self.arm
+        meta["mirror_source"] = self.path
+        ext = meta.get("union_extent")
+        if ext is not None and len(ext) == 2:
+            meta["union_extent"] = [-float(ext[1]), -float(ext[0])]
+        base = (meta.get("stance") or {}).get("base_pose2d")
+        for t in meta.get("trunks", []):
+            if t.get("idle_arm_q"):
+                t["idle_arm_q"] = {other_arm(a): [round(v, 4) for v in mirror_arm_q(q)] for a, q in t["idle_arm_q"].items()}
+            if t.get("shoulder_world") is not None:
+                if base is not None:
+                    sb = self.to_base(np.asarray([t["shoulder_world"][:2]], dtype=float), base)[0]
+                    sw = self.to_world(np.asarray([[sb[0], -sb[1]]]), base)[0]
+                    t["shoulder_world"] = [round(float(sw[0]), 4), round(float(sw[1]), 4)] + list(t["shoulder_world"][2:])
+                else:
+                    t.pop("shoulder_world")
+        for fs in meta.get("feasible_sets", []) or []:
+            if fs.get("cell") is not None:
+                fs["cell"] = [float(fs["cell"][0]), -float(fs["cell"][1])]
+            fs["feasible"] = [[round(float((-float(y)) % (2 * math.pi)), 3), g] if y != "generic" else [y, g] for y, g in fs.get("feasible", [])]
+        cells = {k: np.asarray(c, dtype=np.float32).reshape(-1, 2) * np.array([1.0, -1.0], dtype=np.float32) for k, c in self.cells.items()}
+        pairs = {}
+        for k, p in self.pairs.items():
+            p = np.asarray(p, dtype=np.int32).reshape(-1, 3).copy()
+            yi = p[:, 1]
+            p[:, 1] = np.where(yi >= 0, (-yi) % n, yi)
+            pairs[k] = p
+        return ReachBands(meta, cells, pairs, None, {k: np.asarray(m).copy() for k, m in self.classes.items()})
+
+    @staticmethod
+    def load_arm(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, arm: str = "right", **kw) -> "ReachBands":
+        """The band of ``arm``: its own when one exists (:meth:`load`), else - tabletop and floor bands - the other arm's band
+        mirrored in memory (:meth:`mirrored`). When the real band of the arm is computed later it wins with no code change.
+        ``FileNotFoundError`` when neither exists (or the other arm's band is of a kind that is never mirrored)."""
+        try:
+            return ReachBands.load(scene, support, object, grasp_key, arm=arm, **kw)
+        except FileNotFoundError as own:
+            try:
+                src = ReachBands.load(scene, support, object, grasp_key, arm=other_arm(arm), **kw)
+            except FileNotFoundError:
+                raise own
+        if not mirrorable(src.meta):
+            raise FileNotFoundError(f"no {arm}-arm band for scene={scene} support={support} object={object}; the {src.arm}-arm band {src.path} "
+                                    f"(mode {src.meta.get('mode')}) is not mirrored")
+        return src.mirrored()
 
 
 # ----------------------------------------------------------------------------------------------- computation
