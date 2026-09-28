@@ -2,6 +2,84 @@
 
 Tagged states of this repository and what passed on them.
 
+## `first-demo-v2.2` — the left arm as one more dimension of the orientation chooser; mirrored left bands; 28/28 green, scoped under the owner's 23:05 rules (2026-09-28)
+
+- **Tag / commit:** `first-demo-v2.2` → `bc78d77f` on `rush-20260917-2100` (`first-demo-v2.1` `5d6a7ff5` + `2b6e0904` the left arm +
+  `e6c62b73` / `db1b7555` / `1d8aa61d` engineering track + `bc78d77f` an oracle fix).
+- **How the 28 demos were made** (owner rules 2026-09-27 23:05): a full resampling sweep `v22_sweep_20260928-1` on `e6c62b73` - phase 1 =
+  the 11 in-scope aliases ×2 + touching + cap, phase 2 = the other 15 once, one queue longest first - went 37/39: both kielbasa copies
+  failed on one instance (seed 0 is deterministic on one commit). The fix `bc78d77f` is scoped (below); its exposed alias was re-run on
+  `bc78d77f` (`v22_sweep_20260928-2`, kielbasa ×2: 2/2 green, 0928-080032 / 080036, 942 steps each, the pre-grasp witness reached through the ready posture). 27 aliases keep their green run of `-1`; `made_on`, the scoping evidence
+  and the arm are in every manifest entry (`runlogs/first-demo-v2.2/manifest.json`).
+- **The rule** (owner 2026-09-27; `sampling/v2/orient.py`, `tabletop.py`, the task modules): per arm-bound segment (grasp → carry →
+  place → release, the push-under blade, a held object's hold) the other arm is offered when it has no role besides the segment and the
+  object is free (`tabletop.arm_offer`: reads the template and the BDDL goal only). Candidates are arm × wrist turn × configuration, each
+  solved with that arm's IK and checked against that arm's wrist camera; order: success, joint-limit safe (≥ 0.05 rad on every
+  configuration of the segment's chains, else more clearance), easier reach from that arm's own start posture; the right arm with the
+  generator's turn is the default and wins within 0.30 rad. Stance first: phase 2 takes foci from every offered arm's band and ranks by
+  whichever arm reaches better; the other arm is screened only where its band covers the target. The fallback spans the segment. The arm
+  is also ranked on the whole held chain after v2.1's `held_turns` (`tabletop.held_arms`). Records: `grasp.extras.arm_offer` (fired /
+  not fired and why), `arm_choice` in the orient decision, `summary.arm`, `notes.arm_offer` on the executor's grasp action.
+- **Mirrored left bands** (owner 13:01): the right tabletop / floor bands mirrored in memory (`ReachBands.mirrored` / `load_arm`: cells
+  (x, λ) → (x, −λ), yaw → −yaw, extent [a, b] → [−b, −a], shoulders and idle postures to the other side; meta `mirrored_from: right` +
+  `mirror_source`); never written, never computed in-process; a band of the arm's own replaces a mirror with no code change. Used: 8
+  tabletop bands on breakfast_table_rhjoby_0 (marker, milk, sprouts, bar soap, apple, kielbasa, teacup, sandal) and the shampoo floor
+  band (`reports/mirrored_bands.md`).
+- **Results vs v2.1** (`runlogs/first-demo-v2.2/reports/measurements.md`, per copy):
+  - *Arm:* the left arm on milk (2/2), shampoo (2/2), apple (2/2), bar soap (1/2); the right on sprouts, marker, teacup, kielbasa, sandal,
+    banana, canned food; touching - offer evaluated, not fired - and cap / the 15 phase-2 aliases (not in path) unchanged. Every left
+    choice is "only arm feasible at the draw": phase 2 ranked the stance by the best arm's reach and only the left arm reached from it; no
+    draw had both arms feasible at the same pose. Program and annotations name the acting hand in every run.
+  - *Right joint-2 limit lines (sampling log):* apple 19 → 0, milk 9 → 0, shampoo 0 → 0, marker 6 → 3, cap 21 → 13; up on bar soap 2 → 8,
+    sprouts 11 → 24, teacup 2 → 6, sandal 17 → 26 (more stances explored).
+  - *Smallest witness margin (rad):* sprouts 0.018 → 0.263, teacup 0.044 → 0.087, shampoo 0.002 → 0.009, sandal 0.122 → 0.141; down on
+    milk 0.141 → 0.065, apple 0.083 → 0.047, marker 0.131 → 0.061, bar soap 0.181 → 0.045 (left) / 0.001 (right copy).
+  - *Attempts:* shampoo 3 → 0, milk 1 → 0; up on sprouts 0 → 2, bar soap 0 → 2 / 1, teacup 0 → 1, sandal 0 → 1.
+  - *Demo steps / smoothness (largest per-step arm change, arm path rad):* shampoo 1715 → 1510 (0.041 → 0.040, 18.7 → 16.4), milk
+    890 → 904 (0.033 → 0.028, 12.6 → 10.8), apple 761 → 879 (0.021 → 0.036, 15.9 → 20.0), bar soap 876 → 940 left / 778 right.
+  - *Wall time:* median 994.5 s (v2.1) → 1104 s; IORS large sandal 3001 s → 3318 / 5032 s (its sampling 1497 s → up to 4599 s: the left
+    arm's coupling runs where the right arm's failed, and attempt 0 spends its 2400 s budget).
+  - *Mirrored-band candidates that failed the exact IK:* 170/236 = 72 % in the sweep (canaries 79/116, 30/54).
+- **Canaries** (`v22_canary_20260928`, on `e6c62b73`): the fragile aliases + the 11 exposed ones - replays of the v2.1 release instances on
+  L40S (13/13) and RTX 5090 (12/13), fresh samples 13/15; the task-specific test (fresh apple and sandal, where the owner expected the
+  left arm, + controls touching and cap vs v2.1): apple left, sandal right (only arm feasible), touching identical to v2.1 (strict no-op),
+  cap unchanged. Reds, all right-arm instances the v2.1 oracle fails identically: the sandal 5090 replay (v2.1's own red canary, A/B
+  `v21_sandal_ab_20260927`), kielbasa (A/B `v22_kielbasa_ab_20260928` on `5d6a7ff5`), a sandal instance's push-under joint jumps (A/B
+  `v22_sandal_ab_20260928`).
+- **The kielbasa fix, scoped per the owner's rules** (`bc78d77f`, `oracle/motions.py` `arm_to`):
+  - *Predicate:* every joint-space round to a recorded witness failed and the pose-goal fallback failed or ended past
+    `witness_branch_max_jump` without `accept_other_branch` - exactly where `arm_to` raised `plan_failed`; read from the planner outcomes it
+    already has.
+  - *Code paths:* when it fires, start → posture → witness as two joint-space plans through `witness_via_postures` (ready, then untucked),
+    streamed like the direct plan (protection gate, residual close); none → `plan_failed` as before. Otherwise a strict no-op (the notes
+    gain `witness_via_posture: "not fired"`). No sampling path.
+  - *Exposure* (log scan of every v2.1 / v2.2 sweep and canary run): 4 runs, all failed before - the kielbasa instance ×3 and cap
+    0927-221834 (v2.1); never on a green run (none of the 28 v2.1 release entries, none of the 37 green `-1` runs).
+  - *Canaries* (`v22_canary_20260928-2`, on `bc78d77f`): replays of the `-1` instances of the fragile aliases + the kielbasa instance on two
+    pod sets 12/12, fresh samples 5/6; kielbasa succeeds through the ready posture in all three runs (942 steps). Red: block design's fresh
+    sample (not_reached at the final layout check) - the same instance as its green `-1` run, the fix never fired in it: the known
+    block-design fragility.
+- **Engineering track** (owner 2026-09-27, separate from the evidence path): `oracle/start_state.py` fingerprints a loaded instance's
+  start state (robot base / joints / velocities / controller goals / assisted grasps, task objects' poses and joints, hinges, constraints,
+  attachments, render settings; `run_isg` writes it to `meta.start_state`); `first_demo.py run --warm` runs the sampler and the demo in one
+  Isaac process (stage 1: `og.clear()` between them), keeps a pristine TRO copy and loads it in a fresh process on the same pod. 8/8
+  representative aliases equal (`v22_warm_20260928`; 7 bit-identical, banana equal on every value - its sha differed only by an object's
+  repr address, fixed `1d8aa61d`). Stage 1 saves one process boot, not the scene load (warm load 86.8 s vs fresh 93.1 s median); stage 2
+  (the demo adopting the sampler's world) is next. Warm runs live under `first_demo_warm/`; release evidence stays on fresh processes
+  (`reports/warm_vs_fresh.md`).
+- **Known limits:**
+  - The left bands are mirrors of the right ones (9 bands, list above): 72 % of mirrored candidates fail the exact IK (the mirror does not
+    map library grasp indices), so the left arm wins only where it is the only arm feasible at the draw; the owner computes the real left
+    bands (TODO D6) - they replace the mirrors with no code change.
+  - IORS large with both arms is slow: sandal samples up to 3× longer (both arms' couplings per stance B; the carry-pose search repeats per
+    C candidate); `held_arms` is not offered for IORS large and held objects.
+  - Pre-existing oracle limits surfaced by v2.2's new draws, identical on `5d6a7ff5`: a sandal instance's push-under joint jumps; the
+    sandal's RTX 5090 replay; block design's final layout (run-to-run).
+  - Kielbasa's grasp is slow with the fix (job wall 1818 / 2116 s vs 706 s on v2.1): five joint-space rounds and the pose-goal fallback
+    fail before the posture route; the sampler still records a witness no direct plan reaches.
+  - Scope unchanged: touching (the other arm pushes / braces), attachment, the carton lever, block design, axial, world_vertical,
+    articulation and camera relocalization never offer the left arm.
+
 ## `first-demo-v2.1` — the owner's v2.0 findings fixed; orientation chooser and held-chain ranking; 28/28 green, scoped under the owner's 23:05 rules (2026-09-28)
 
 - **Tag / commit:** `first-demo-v2.1` → `5d6a7ff5` on `rush-20260917-2100` (`first-demo-v2.0` + the orientation-chooser session's
