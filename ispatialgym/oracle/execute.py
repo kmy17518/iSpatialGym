@@ -2325,12 +2325,13 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
                     if backend is not None and hasattr(backend, "world_collision_offenders"):
                         backend.update_world(ignore_objects=list(supports) + list(through), ignore_links=link_ign)
                         offs = backend.world_collision_offenders(q_now, limit=4)
+                        # by prim path, not name: the vectorized OmniGibson (BEHAVIOR-1K #2329) names the object's prim
+                        # articulated__<name>
+                        obj_path = str(getattr(obj_p, "prim_path", "") or "")
                         for o_ in offs:
-                            if f"/{getattr(obj_p, 'name', obj)}/" in str(o_):
-                                parts = str(o_).split("/")
-                                ln_i = parts.index(getattr(obj_p, "name", obj)) + 1 if getattr(obj_p, "name", obj) in parts else None
-                                if ln_i is not None and ln_i < len(parts):
-                                    link_ign.append((obj_p, parts[ln_i], parts[-1]))
+                            if obj_path and str(o_).startswith(obj_path + "/"):
+                                rel = str(o_)[len(obj_path) + 1:].split("/")
+                                link_ign.append((obj_p, rel[0], rel[-1]))
                 except Exception as e:  # noqa: BLE001
                     log.info("push(%s): start-collision offenders not resolved (%r)", obj, e)
                 if link_ign:
