@@ -453,6 +453,8 @@ NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
 NOTE_KEYS = NOTE_KEYS + ("finger_clearance",)
 #: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
 NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
+#: first-demo v2.1 (sandal on pods): the arm moved into the pre-grasp witness's posture before an approach that tracks only from there
+NOTE_KEYS = NOTE_KEYS + ("witness_posture",)
 
 
 @dataclass

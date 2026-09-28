@@ -1301,6 +1301,53 @@ def raise_place_for_inhand_pose(action: Place, state, sidecar, targets: Dict[str
     return out
 
 
+def _into_witness_posture(motions: Motions, targets, ctx, arm: str) -> Iterator[th.Tensor]:
+    """The transit to the pre-grasp may leave the arm in another IK branch than the pre-grasp witness: the via-above's pose-goal point
+    above descends in its own branch (sandal on pods, 0927-154128 / 0927-165511: at the pre-grasp the arm stood 2.91 rad from the
+    witness, shoulder and elbow flipped - v2.0 0927-030120 and the local replays 0.91 rad, the same branch - and the approach stalled
+    56 mm short of the grasp in both attempts). When the approach does not track from where the arm is but does from the pre-grasp
+    witness, where the sampler checked it, the arm first moves into the witness's posture: a joint-space plan to the witness refined
+    for the pre-grasp pose, checked against the protected objects of the enclosing transit; with no such plan nothing moves.
+    ``ctx["witness_posture"]`` records it."""
+    w = _witness(ctx, "pre_grasp")
+    backend = getattr(motions, "backend", None)
+    if w is None or backend is None or not hasattr(motions, "along_reaches"):
+        return
+    try:
+        if motions.along_reaches(arm, targets["approach"]):
+            return
+        if _approach_tracks(motions, arm, w, [targets["pre_grasp"]] + list(targets["approach"])) is not True:
+            return
+        emb = f"{arm}_arm"
+        idx = motions.robot.arm_control_idx[arm]
+        q_now = C.as_tensor(backend.q_full()).reshape(-1).float()
+        q_w = q_now.clone()
+        q_w[idx] = C.as_tensor(w).reshape(-1).float()[idx]
+        q_ik = backend.solve_ik(emb, {M.EEF_LINK[arm]: as_world_pose(targets["pre_grasp"])}, q_seed=q_w, sync_world=False)
+        if q_ik is not None:
+            q_ik = C.as_tensor(q_ik).reshape(-1).float()
+            if float(th.max(th.abs(q_ik[idx] - q_w[idx]))) <= motions.cfg.witness_refine_max_jump:
+                q_w[idx] = q_ik[idx]
+        rec: Dict[str, Any] = {"gap_rad": round(float(th.max(th.abs(q_w[idx] - q_now[idx]))), 3)}
+        ctx["witness_posture"] = rec
+        backend.update_world()  # the supports the transit left out of the world are obstacles again
+        res = backend.plan_joint(emb, q_w, q_start=q_now, max_attempts=motions.cfg.plan_attempts, sync_world=False)
+    except Exception as e:  # noqa: BLE001 - the approach from where the arm is, as before
+        log.debug("witness posture check of %s failed (%r)", arm, e)
+        return
+    if not getattr(res, "success", False) or res.q_traj is None:
+        rec["result"] = f"no plan ({getattr(res, 'status', '?')})"
+        return
+    viol = motions._protect_violations([arm], res.q_traj, emb)
+    if viol:
+        rec["result"] = f"the plan passes {viol[0]['object']} at {viol[0]['clearance_m']} m"
+        return
+    log.info("grasp(%s): the approach does not track from where the transit left the arm (%.2f rad from the pre-grasp witness) but "
+             "does from the witness: the arm moves into its posture first", arm, rec["gap_rad"])
+    yield from motions.execute_joint_trajectory(res.q_traj, arms=[arm])
+    rec["result"] = "moved into the witness posture"
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
@@ -1332,6 +1379,7 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     # (owner 2026-09-26, oracle.protection: teacup 0925-222212 / 235559 - the hand passed low over the saucer and shoved it 20 cm)
     with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
         yield from _grasp_transit(action, motions, state, targets, ctx, arm, supports, ignore_links)
+        yield from _into_witness_posture(motions, targets, ctx, arm)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)

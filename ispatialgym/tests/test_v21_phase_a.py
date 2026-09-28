@@ -132,6 +132,63 @@ def test_executor_next_place_kind_follows_the_grasped_object():
     assert Executor.next_place_kind(ex, 0, ex.program_actions[0]) is None  # the arm grasps again first
 
 
+
+def _posture_motions(reaches_here=False, plan_ok=True, violations=()):
+    """A motions stub for ``execute._into_witness_posture``: the arm at a posture 2.9 rad from the pre-grasp witness."""
+    calls = []
+    q_now = th.zeros(28)
+    q_now[th.arange(7)] = 2.9
+    backend = SimpleNamespace(q_full=lambda: q_now.clone(), update_world=lambda: calls.append(("world",)),
+                              solve_ik=lambda emb, targets, q_seed=None, sync_world=False: C.as_tensor(q_seed).clone() + 0.01,
+                              plan_joint=lambda emb, q, q_start=None, **kw: (calls.append(("plan", C.as_tensor(q).clone())) or
+                                                                           SimpleNamespace(success=plan_ok, q_traj=th.stack([q_start, C.as_tensor(q)]), status="ok")))
+
+    def execute(q_traj, arms=None):
+        calls.append(("execute", C.as_tensor(q_traj)[-1].clone()))
+        yield th.zeros(3)
+
+    m = SimpleNamespace(backend=backend, robot=SimpleNamespace(arm_control_idx={"right": th.arange(7)}), cfg=SimpleNamespace(witness_refine_max_jump=0.6, plan_attempts=2),
+                        along_reaches=lambda arm, wps: reaches_here, _protect_violations=lambda arms, q_traj, emb, P=None: list(violations),
+                        execute_joint_trajectory=execute)
+    return m, calls
+
+
+def test_grasp_moves_into_the_witness_posture_when_the_approach_tracks_only_from_there(monkeypatch):
+    """Sandal on pods (0927-154128 / 0927-165511): the via-above left the arm 2.91 rad from the pre-grasp witness and the approach
+    stalled 56 mm short; from the witness it tracks - the arm moves into the witness posture first."""
+    _, _, targets = _grasp_setup()
+    w = th.zeros(28)
+    monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
+    m, calls = _posture_motions()
+    ctx = {"witnesses": {"pre_grasp": w}}
+    list(EX._into_witness_posture(m, targets, ctx, "right"))
+    assert ctx["witness_posture"]["result"] == "moved into the witness posture" and ctx["witness_posture"]["gap_rad"] == pytest.approx(2.89, abs=1e-3)
+    plan = [c[1] for c in calls if c[0] == "plan"][0]
+    assert float(plan[0]) == pytest.approx(0.01)  # the witness refined by the IK of the pre-grasp pose
+    assert [c[0] for c in calls] == ["world", "plan", "execute"]
+
+
+def test_grasp_keeps_the_transit_posture_outside_that_situation(monkeypatch):
+    _, _, targets = _grasp_setup()
+    ctx = {"witnesses": {"pre_grasp": th.zeros(28)}}
+    monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
+    m, calls = _posture_motions(reaches_here=True)  # the approach tracks from where the arm is (v2.0, the local replays: 0.91 rad)
+    list(EX._into_witness_posture(m, targets, ctx, "right"))
+    assert calls == [] and "witness_posture" not in ctx
+    monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: False)  # nor from the witness: nothing to gain
+    m, calls = _posture_motions()
+    list(EX._into_witness_posture(m, targets, ctx, "right"))
+    assert calls == [] and "witness_posture" not in ctx
+    monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
+    for kw, why in (({"plan_ok": False}, "no plan"), ({"violations": [{"object": "sandal", "clearance_m": -0.01}]}, "passes sandal")):
+        m, calls = _posture_motions(**kw)
+        ctx = {"witnesses": {"pre_grasp": th.zeros(28)}}
+        list(EX._into_witness_posture(m, targets, ctx, "right"))
+        assert why in ctx["witness_posture"]["result"] and "execute" not in [c[0] for c in calls]
+    m, calls = _posture_motions()
+    list(EX._into_witness_posture(m, targets, {"witnesses": {}}, "right"))  # no pre-grasp witness
+    assert calls == []
+
 def _place_setup(hang_extra):
     """Recorded: the hand 5 cm above the object's origin; live: 5 cm + ``hang_extra`` (the object hangs lower in the hand)."""
     obj = SimpleNamespace(name="soap")

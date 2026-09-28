@@ -2128,7 +2128,8 @@ def test_grasp_plans_to_the_recorded_ik_witness_and_closes_the_residual(tmp_path
     n_after_transition = len(backend.calls)
     assert ex.run_action(1, grasp) is None
     calls = backend.calls[n_after_transition:]
-    assert calls[0] == "plan_joint" and "plan_pose" not in calls and calls.count("solve_ik_path") == 2  # residual + approach
+    # residual + the approach check from where the transit left the arm (execute._into_witness_posture) + approach
+    assert calls[0] == "plan_joint" and "plan_pose" not in calls and calls.count("solve_ik_path") == 3
     assert env.robot._ag_obj_in_hand["right"] is env.objects["apple.n.01_1"]
     # without a witness the pose goal is planned as before
     sc.extra["ik_witnesses"] = []
