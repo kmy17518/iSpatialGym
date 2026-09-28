@@ -1451,18 +1451,22 @@ class Motions:
         with relax_ctx as relaxed_start:
             if relaxed_start:
                 self.last_relaxed_links = list(relaxed_start)
-            res = self.backend.solve_ik_path(
-                f"{arm}_arm",
-                [{frame: wp} for wp in dense],
-                pos_tol=self.cfg.diff_ik_pos_tol,
-                rot_tol=self.cfg.diff_ik_rot_tol,
-                max_iters=self.cfg.diff_ik_max_iters,
-                check_collisions=bool(check_collisions),
-                sync_world=False,
-                soft_pos_tol=self.cfg.diff_ik_soft_pos_tol if soft_pos_tol is None else float(soft_pos_tol),
-                soft_rot_tol=self.cfg.diff_ik_soft_rot_tol if soft_rot_tol is None else float(soft_rot_tol),
-                **extra_kw,
-            )
+            solve_kw = dict(pos_tol=self.cfg.diff_ik_pos_tol, rot_tol=self.cfg.diff_ik_rot_tol, max_iters=self.cfg.diff_ik_max_iters, check_collisions=bool(check_collisions),
+                            sync_world=False, soft_pos_tol=self.cfg.diff_ik_soft_pos_tol if soft_pos_tol is None else float(soft_pos_tol),
+                            soft_rot_tol=self.cfg.diff_ik_soft_rot_tol if soft_rot_tol is None else float(soft_rot_tol), **extra_kw)
+            res = self.backend.solve_ik_path(f"{arm}_arm", [{frame: wp} for wp in dense], **solve_kw)
+            if not res.success and str(res.status).startswith("joint jump"):
+                # a fast but continuous turn near a singularity exceeds max_joint_step between two waypoints (shampoo 0927-183304 on
+                # 052de5eb: the carry to the floor jumped 0.23 rad at waypoint 44, both attempts); a branch flip jumps at any spacing
+                finer: List[Pose] = []
+                prev_wp = start
+                for wp in dense:
+                    finer.extend(C.line_waypoints(prev_wp, wp, 2))
+                    prev_wp = wp
+                res2 = self.backend.solve_ik_path(f"{arm}_arm", [{frame: wp} for wp in finer], **solve_kw)
+                if res2.success:
+                    log.info("arm_along(%s): %s at the tracking resolution; the leg tracks at half the waypoint spacing (%d waypoints)", arm, res.status, len(finer))
+                    res, dense = res2, finer
         if res.success and (res.diagnostics or {}).get("soft_waypoints"):
             log.info("arm_along(%s): %s", arm, res.status)
         speed = self.cfg.cartesian_speed if speed is None else float(speed)

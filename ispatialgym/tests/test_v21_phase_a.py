@@ -457,3 +457,37 @@ def test_wide_stop_keeps_the_push_line_between_its_fingertips():
     # a face too short for a stop around the line: nothing to try (the next brace kind)
     assert wide_stop_positions(0.04, -0.02, 0.04, (-0.045, 0.045)) == []
 
+
+
+# ------------------------------------------------------------------------------------------------ joint jump at the tracking resolution
+
+
+def test_arm_along_retries_a_joint_jump_at_half_the_waypoint_spacing(tmp_path):
+    """Shampoo 0927-183304 on 052de5eb: the carry to the floor jumped 0.23 rad (> max_joint_step) between two waypoints in both
+    attempts; at half the spacing a continuous fast turn stays under the limit - a branch flip does not, and still fails."""
+    from ispatialgym.oracle.motions import SkillError
+    from ispatialgym.tests.test_v2_oracle import drive
+
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    arm = "right"
+    p0, q0 = motions.eef_pose(arm)
+    target = (p0 + th.tensor([0.10, 0.0, 0.0]), q0)
+    orig = backend.solve_ik_path
+    seen = []
+
+    def jump_once(emb, waypoints, q_start=None, **kw):
+        seen.append(len(waypoints))
+        if len(seen) == 1:
+            return SimpleNamespace(success=False, q_traj=None, status="joint jump 0.23 rad at waypoint 1", diagnostics={})
+        return orig(emb, waypoints, q_start=q_start, **kw)
+
+    backend.solve_ik_path = jump_once
+    drive(env, motions.arm_along(arm, [target]))
+    assert seen[1] == 2 * seen[0] and float(th.linalg.norm(motions.eef_pose(arm)[0] - target[0])) < 5e-3
+    seen.clear()
+    backend.solve_ik_path = lambda emb, waypoints, q_start=None, **kw: (seen.append(len(waypoints)) or
+                                                                        SimpleNamespace(success=False, q_traj=None, status="joint jump 3.1 rad at waypoint 1", diagnostics={}))
+    with pytest.raises(SkillError):
+        drive(env, motions.arm_along(arm, [(p0, q0)]))
+    assert len(seen) == 2  # one retry at the finer spacing, then the leg fails as before
