@@ -185,8 +185,10 @@ def cmd_submit(args):
         timeout = args.timeout or timeout
         st = FDM.subtask_of(alias, customs)
         run_id = f"{stamp}-s{k:02d}"
+        while os.path.exists(os.path.join(FDM.FD, st, run_id)):  # another sweep submitted in the same second
+            run_id += "b"
         run_dir = os.path.join(FDM.FD, st, run_id)
-        os.makedirs(run_dir, exist_ok=True)
+        os.makedirs(run_dir)
         with open(os.path.join(run_dir, "chain.sh"), "w") as f:
             f.write(chain(alias, max_attempts, args.seed, args.sample_only) + "\n")
         runs.append({"alias": alias, "subtask": st, "run_id": run_id, "out": os.path.relpath(run_dir, REPO), "job_id": None,
