@@ -156,5 +156,8 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     rc = main()
-    og.shutdown()
+    try:
+        og.shutdown()
+    except OSError:  # Kit's temp-dir cleanup at exit; the datasets are written by then
+        pass
     sys.exit(rc)

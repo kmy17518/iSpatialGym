@@ -140,11 +140,15 @@ def main(argv=None) -> int:
         for d in batch:
             d["scene_states_filled"] = complete_scene_file(d["demo"])
         cmd = [sys.executable, script, "--demo", ",".join(d["demo"] for d in batch), "--root", root, "--repo-id", shard, "--task", task, "--one-world"]
-        if os.path.exists(os.path.join(root, shard, "meta", "info.json")):
+        info = os.path.join(root, shard, "meta", "info.json")
+        before = json.load(open(info))["total_episodes"] if os.path.exists(info) else 0
+        if os.path.exists(info):
             cmd.append("--resume")
         p = subprocess.run(cmd, capture_output=True, text=True)
         finished = [ln.split(" ", 1)[1].strip() for ln in p.stdout.splitlines() if ln.startswith("REPLAY_OBS_DONE ")]
-        if p.returncode != 0 or len(finished) != len(batch):
+        after = json.load(open(info))["total_episodes"] if os.path.exists(info) else 0
+        # the process's exit code is not the test: Kit's cleanup at exit can fail after the dataset is finalized
+        if len(finished) != len(batch) or after != before + len(batch):
             # the shard is finalized only when the whole process ends; a process that did not end leaves the batch out
             print("REPLAY_FAILED " + json.dumps({"rc": p.returncode, "demos": [d["demo"] for d in batch], "finished": finished,
                                                  "stderr_tail": p.stderr[-2000:]}), flush=True)
