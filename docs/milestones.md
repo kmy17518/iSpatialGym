@@ -2,6 +2,149 @@
 
 Tagged states of this repository and what passed on them.
 
+## `first-demo-v2.1` — the owner's v2.0 findings fixed; orientation chooser and held-chain ranking; 28/28 green, scoped under the owner's 23:05 rules (2026-09-28)
+
+- **Tag / commit:** `first-demo-v2.1` → `5d6a7ff5` on `rush-20260917-2100` (`first-demo-v2.0` + the orientation-chooser session's
+  commits `6313cfe0` … `576c8ef1` + this session's `06f45e24` … `5d6a7ff5`).
+- **How the 28 demos were made** (owner decisions 2026-09-27 23:05, rule 5): 25 aliases keep their green run of the sweep
+  `v21_sweep_20260927-6` on `6ef3110f`; the last fix (`8e26243f` + `5d6a7ff5`, milk) is scoped, its exposed aliases (milk,
+  kielbasa) and the alias -6 lost to a pod's TTL (object scaling) were re-run on the frozen `5d6a7ff5` (`v21_sweep_20260927-8`).
+  `made_on` and the scoping evidence are in every manifest entry (`runlogs/first-demo-v2.1/manifest.json`).
+- **Phase A.** Each owner finding on v2.0 was fixed so that it switches on only in its situation, detected at run time, and was
+  proven with a demo (head + overhead video) against its reference before the sweep (job markers `runlogs/jobs/v21_*_20260927/`):
+
+  | | finding (v2.0 run) | change (commit) | evidence (v2.0 → after) |
+  |---|---|---|---|
+  | A1 | cap: the attach offset before the snap (0927-040231; reference 0920-235831) | an attach place whose fingers, swept from the pre-place to the seat by raycasts, would meet the partner before the part seats opens them just enough (≤ 4 mm per finger, the assisted grasp keeps the cap; owner 14:46 accepted), then the descent is re-aimed for the part's settled in-hand pose (`11104778`, `8fd4da68`) | 0927-151320: offset before the snap 5.24 mm / 0.041 rad (Δz −5.1 mm) → 0.18 mm / 0.00009 rad (reference 1.1 mm / 0.0036); correction passes 1 → 0 (reference 0); the bottle moved 2.95 mm / 0.025 rad during the attach → unmoved; place 166 → 129 steps (reference 100); demo 927 → 882 steps |
+  | A2 | block design: before the third grasp the gripper swings out to the right and back (0927-040243) | a travel leg keeps an empty arm that holds the recorded hand pose in another IK branch, when the leg stays clear and the arm's next **grasp** tracks from there (IK nearer than the recorded witness, no closer to a joint limit); the grasp's chain then runs on the kept branch (`b33352b3`; grasps only `8b572a12`) | 0927-152526 (pod): the transition before the third grasp 382 → 80 steps (hand 2.8 mm from the recorded pose, joints 3.39 rad from `arms_q`); the demo 3936 → 3563 steps |
+  | A3 | bar soap: "the wrist camera contacts the table during grasp & release and pushes against it" (0927-034001) | not the camera (0 contacts): the two finger links pressed 91–154 N into the source tray at the closure and ~108 N into the destination tray at the release, torso_joint1 bent 7.6 mrad. A library pinch whose fingers would reach below the object's bottom + 4 mm is lifted by the deficit - the grasp raised, the approach ramped up to it from the recorded pre-grasp - when the object is set down or attached next, the pads stay 5 mm below its top, the faces at the lifted pads' end slope ≤ 20° and the approach tracks from the pre-grasp witness; a support place whose object hangs lower in the hand than recorded is raised by the difference (`48964d04`; gates `85887729` `c20fcb9d` `503be065` `ddc28f69` `8e26243f` `5d6a7ff5`) | torso deflection at the grasp / release 7.57 / 7.62 → 0.06 / 0.08 mrad; grasp lifted 14.4 mm, place raised 14.8–15.6 mm; no finger–tray contact (contact dump); demo 929 → 876 steps |
+
+- **Other changes since v2.0:**
+  - **Orientation chooser** (the other session, `6313cfe0` … `576c8ef1`): both wrist turns of a contact are proposals; order =
+    success > joint-limit safe (0.05 rad on every configuration of the chain) > easier reach, the generator's order within
+    0.30 rad. Details in `runlogs/jobs/v21_orient_chooser_20260927/`.
+  - **Held-chain ranking** (owner 14:46, `346a5144`): a library pinch's turn is ranked on its whole held chain (lift, carry,
+    pre-place, descent, place) - ranking only, never a rejection; IORS large records "not offered".
+  - **Carton close brace** (`056538be`): a push-close far-face stop whose fingertips the push line passes < 1 cm inside moves
+    onto the push line (the chooser's seed-0 instance failed `root_moved`: 0.0215 rad → 0.0020 rad, 0927-145609).
+  - **Harness** (`06f45e24`, `c827b3c4`): `first_demo.py run --run-isg-args=--dev` on every demo (head + overhead video;
+    `meta.json` records `external_video` / `external_video_error`). Cost, same machine and instance: +6.7 % demo time
+    (278.3 → 297.0 s, kielbasa 0927-170717 / 0927-171505).
+  - **Joint jump** (`5174c989`, `6ef3110f`): an `arm_along` leg whose differential IK jumps past `max_joint_step` is solved once
+    more at half the waypoint spacing, except the via-above's rise, which keeps its own planned-lift fallback (shampoo's carry:
+    0.21–0.28 rad jumps at 1 cm, tracked at 5 mm).
+  - **Witness posture** (`052de5eb`, not proven): after a grasp's pre-grasp transit, when the approach tracks only from the
+    pre-grasp witness, a protection-checked joint plan moves the arm into it. It never acted: on the sandal the plan passes the
+    sandal's protection box (−22.8 mm) and is refused.
+  - **Milk: no lift onto curved faces** (`8e26243f`, `5d6a7ff5`; scoped below).
+- **Sweeps and the last fix** (history in `runlogs/first-demo-v2.1/reports/freezes.md`): -2 `8b572a12`, -3 `ddc28f69`,
+  -4 `052de5eb`, -5 `5174c989` stopped or failed on the sandal, shampoo and the pre-existing block-design drop, each fixed and
+  re-frozen; -6 `6ef3110f`: 44 of 46 green, phase 1 33/33; milk failed `placed_orientation` 0.483 rad (A3 lifted the pinch of the
+  bottle lying on its side 13.1 mm; the lifted pads reached only 12 mm above its widest section and the bottle rolled 14.4°
+  under the closure - not in the carry: the place was raised for it), object scaling lost to a pod's TTL.
+- **The milk fix, scoped per the owner's rule 2:**
+  - *Predicate:* inside A3's lift, after every existing check passed - the faces of the grasped object at the lifted pads'
+    fingertip-side end slope more than 20° from vertical (two raycasts along the closing axis: PhysX scene queries, no state
+    change, no IK / planner call, no cuRobo random stream).
+  - *Code paths:* when it fires, that grasp runs the recorded (unlifted) pinch and the same object's place sees the recorded
+    in-hand pose; otherwise a strict no-op. No sampling path.
+  - *Exposure* (shadow over the recorded instances; demo-only replays on `5d6a7ff5`, identical to `6ef3110f` unless it fires):
+    over all 142 v2.1 sweep runs the predicate can only be evaluated on three instances (bar soap, milk, kielbasa); it fires on
+    milk (slope 0.875) and kielbasa (0.638), not on bar soap (0.0). On the v2.0 collection it fires on milk, kielbasa and apple
+    (0.543); bar soap no; marker, touching, teacup, cap, cork, lid never reach it (teacup and marker replays reproduce v2.0's
+    step counts exactly).
+  - *Canaries* (job `v21_canary_20260927`, on `5d6a7ff5`): the fragile aliases sandal, shampoo, milk, block design, carton close and the
+    exposed kielbasa, each replayed from its -6 instance on an L40S and an RTX 5090 pod plus a fresh sample - 17 of 18 green. The
+    sandal's RTX 5090 replay failed at its grasp; the same replay on the base commit on the same pod fails identically (job
+    `v21_sandal_ab_20260927`: the same clearances and swings), and the fix is not evaluated on the sandal's drop-bound grasp - so
+    it is pre-existing and the freeze went ahead (a decision against the letter of rule 3, recorded here). The first canary launch
+    was discarded: concurrent waves started runs of one subtask within a second and shared run directories; the driver now
+    spaces launches ≥ 2 s.
+  - *Re-run on the frozen `5d6a7ff5`:* `v21_sweep_20260927-8`: milk ×1 (0928-013557, the predicate fires: the recorded grasp), kielbasa ×2 (0928-013601,
+    0928-013605, fires), object scaling ×1 (0928-013609; its -6 run was lost to a pod's TTL, the predicate never runs for it) -
+    4/4 green. The other 25 aliases keep their -6 run: the fix changes no sampling path and its predicate does not fire on their
+    instances (bar soap: slope 0.0; the rest never reach it). Shampoo's -6 phase 1 has one finished copy (the second was running
+    when -6 was stopped); its canaries are green.
+- **Owner rules checked after phase 1:** the tie-breaker's against-the-generator choices (cap's `~r180` turns for reach) were
+  written and their demos passed - the rule stays; close-push fist: carton close took the default fist, blender close the
+  handle's own fist as the only feasible one (the twin dropped downstream), all green - kept as is.
+- **Measured against v2.0:**
+  - **Demo length:** 34130 demo steps in total (v2.0 33598). Shorter: block design 3936 → 3646 (A2), apple 960 → 761, carton
+    close 1464 → 1265, cap 927 → 858, footstool 999 → 624; longer on new instances: door close 2350 → 3028, door open 2246 →
+    2876, dishwasher open 1234 → 1557, shampoo 1545 → 1715.
+  - **Attempts:** attempt 0 for 21/28 aliases (v2.0 21/28). Earlier: cap 3 → 1, cork 1 → 0, sprouts 1 → 0, footstool 2 → 1;
+    later: axial 0 → 1, shampoo 0 → 3.
+  - **Orientation decisions** in the collected runs: 16 only feasible, 10 for reach, 3 default; 3 of 29 in the wrist-flipped
+    branch; 2 against the generator's order, both the only feasible turn.
+  - **Torso deflection at the grasp / release** (mrad): bar soap 7.57 / 7.62 → 0.06 / 0.08, apple 4.61 / 2.02 → 0.08 / 0.09,
+    marker release 3.95 → 0.67; sandal 12.1 → 10.3 and milk 0.6 → 0.75, kielbasa 0.9 → 1.95 (their recorded grasps); **sprouts
+    0.06 → 14** (the chooser's library turn puts the fingers 24 mm below the object's bottom and a drop follows, so A3 does not
+    lift it - see known limits).
+  - **Witness margins:** up on apple (0.002 → 0.083 rad), kielbasa (0.056 → 0.101), cap (0.065 → 0.087), lid (0.023 → 0.039);
+    down on sprouts (0.18 → 0.018), axial (0.107 → 0.056), cork (0.073 → 0.051), world_vertical (0.19 → 0.157).
+  - **Random re-solves** in the recorded attempt: axial 87, cap 76, shampoo 72, lid 56 (all attempts ≥ 1).
+  - **Smoothness:** the largest per-step arm-joint change is 0.048 rad (door close; v2.0's largest 0.041).
+  - **Wall time:** the `--dev` overhead camera costs +6.7 % demo time on one machine; pod-to-pod demo walls vary with the GPU.
+  - Full table: `runlogs/first-demo-v2.1/reports/measurements.md`.
+
+| alias | demo (made on) | other copies | sampling attempt (v2.0) | steps (v2.0) |
+|---|---|---|---|---|
+| `alignment-axial-board_game-breakfast_table` | 0927-212340 (`6ef3110f`) | 0927-212705 | 1 (0) | 518 (563) |
+| `alignment-world_vertical-painting_s070-walls` | 0927-205225 (`6ef3110f`) | 0927-205922 | 0 (0) | 1149 (1148) |
+| `camera_relocalization-obstructed-footstool_1` | 0927-211957 (`6ef3110f`) | – | 1 (2) | 624 (999) |
+| `camera_relocalization-standard` | 0927-211908 (`6ef3110f`) | – | 1 (1) | 400 (400) |
+| `configuration_matching-articulation_close_large_scale-dishwasher` | 0927-210926 (`6ef3110f`) | – | 0 (0) | 567 (567) |
+| `configuration_matching-articulation_close_large_scale-door` | 0927-202321 (`6ef3110f`) | – | 0 (0) | 3028 (2350) |
+| `configuration_matching-articulation_close_small_scale-blender-breakfast_table` | 0927-210241 (`6ef3110f`) | 0927-210444 | 0 (0) | 885 (857) |
+| `configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table` | 0927-202325 (`6ef3110f`) | 0927-202327 | 0 (0) | 1265 (1464) |
+| `configuration_matching-articulation_open_large_scale-dishwasher` | 0927-211314 (`6ef3110f`) | – | 0 (0) | 1557 (1234) |
+| `configuration_matching-articulation_open_large_scale-door` | 0927-202323 (`6ef3110f`) | – | 0 (0) | 2876 (2246) |
+| `configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table` | 0927-212718 (`6ef3110f`) | 0927-213014 | 0 (0) | 936 (936) |
+| `configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table` | 0927-202329 (`6ef3110f`) | 0927-202333, 0927-202331 | 0 (0) | 1604 (1604) |
+| `configuration_matching-attachment-cap-lemonade_bottle-breakfast_table` | 0927-202307 (`6ef3110f`) | 0927-202311, 0927-202309 | 1 (3) | 858 (927) |
+| `configuration_matching-attachment-cork-wine_bottle-breakfast_table` | 0927-205045 (`6ef3110f`) | – | 0 (1) | 950 (887) |
+| `configuration_matching-attachment-lid-teapot-breakfast_table` | 0927-204513 (`6ef3110f`) | – | 1 (1) | 950 (917) |
+| `configuration_matching-block_design-block_4-breakfast_table_board` | 0927-202313 (`6ef3110f`) | 0927-202315 | 0 (0) | 3646 (3936) |
+| `disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table` | 0927-213135 (`6ef3110f`) | 0927-213222, 0927-213504 | 0 (0) | 876 (929) |
+| `disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table` | 0928-013557 (`5d6a7ff5`) | – | 1 (1) | 890 (881) |
+| `inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table` | 0927-210516 (`6ef3110f`) | 0927-210632 | 0 (1) | 892 (969) |
+| `inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table` | 0927-211238 (`6ef3110f`) | – | 0 (0) | 806 (806) |
+| `inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor` | 0927-211643 (`6ef3110f`) | – | 3 (0) | 1715 (1545) |
+| `inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table` | 0927-212056 (`6ef3110f`) | 0927-212310 | 0 (0) | 761 (960) |
+| `inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table` | 0928-013601 (`5d6a7ff5`) | 0928-013605 | 0 (0) | 863 (945) |
+| `inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table` | 0927-205001 (`6ef3110f`) | 0927-205038 | 0 (0) | 1638 (1638) |
+| `inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table` | 0927-202317 (`6ef3110f`) | 0927-202319 | 0 (0) | 2754 (2768) |
+| `inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table` | 0927-210941 (`6ef3110f`) | – | 0 (0) | 891 (891) |
+| `mental_rotation-banana` | 0927-210824 (`6ef3110f`) | – | 0 (0) | 108 (108) |
+| `object_scaling-canned_food` | 0928-013609 (`5d6a7ff5`) | – | 0 (0) | 123 (123) |
+
+- **Unit tests** on this commit: 1335 passed; the same 4 known failures as v1.0.
+- **Collected demos:** `runlogs/first-demo-v2.1/` (28 runs copied, `videos/` = head camera, `videos_overhead/` = the `--dev`
+  overhead camera under the same names, `manifest.json` with `made_on` / `scoping` per entry, `reports/`). The head videos
+  are also linked from `runlogs/pilot_20260915/first_demo_latest_success_videos/manifest.json`.
+- **Known limits at this tag:**
+  - **Sandal grasp:** its pre-grasp transit takes the protection's via-above; on some pods the first plan succeeds with the
+    supports present and the via-above's pose-goal point descends into another IK branch - the approach stalls 56 mm short
+    in both attempts. v2.0's L40S pods, the local machine and the L40S canaries take a transit that works; the RTX 5090 canary
+    replay of the -6 instance fails, and the same replay on the base commit on the same pod fails identically (the fix is not
+    evaluated there). The witness-posture rule meant for it does not act (above).
+  - **Sandal wobble:** a drop-bound pinch keeps its recorded grasp, so the sandal's fingers still press the table at its grasp
+    as in v2.0 (171 N, 12.1 mrad torso deflection).
+  - **Sprouts wobble:** the chooser's library turn puts the fingers 24 mm below the sprouts' bottom; a drop follows, so A3
+    does not lift it and the torso deflects 14 mrad at the grasp (v2.0's turn: 0.06). Its witness margin is 0.018 rad (v2.0
+    0.18); the held-chain ranking found no other feasible turn.
+  - **Curved-face pinches** (milk, kielbasa, apple's v2.0 instance) keep their recorded grasp: A3 does not lift them, so their
+    fingertips press the support as in v2.0.
+  - **Block design release:** every board place releases its die ~2.3 cm above its goal (the die sits ~2.3 cm higher in the
+    hand than the sampler's model; the fingertips already stand at their release clearance) - as in v2.0. A die that slides
+    ~9 mm lands tilted on the raised slot's edge (-2 #2); it landed flat in every other run.
+  - **Scoping of earlier fixes:** the owner's rule 2 came after them. A2's situation check calls cuRobo IK (it consumes the
+    random stream when evaluated); the witness-posture rule's action does too (its predicate is two differential-IK checks).
+  - **A1:** the fingers open up to ~4 mm per side over the partner while the assisted grasp holds the cap (owner accepted).
+  - **A2:** only a grasp as the kept arm's next contact; pushes and braces keep the recorded posture.
+  - **Held-chain ranking:** not offered for IORS large; the chooser session's single-turn contact sites (top-rim brace, prep
+    and stage-2 pushes, the carton lever fist, held-object grasps, the block-design table flip) are not routed through it.
+
 ## `first-demo-v2.0` — the owner's v1.2 findings fixed; IK attempt gate and twin grasps; 28/28 on one commit (2026-09-27)
 
 - **Tag / commit:** `first-demo-v2.0` → `29a94212` on `rush-20260917-2100` (`first-demo-v1.2` + the other sessions' commits of
