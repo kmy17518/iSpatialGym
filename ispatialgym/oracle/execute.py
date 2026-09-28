@@ -299,8 +299,8 @@ class ExecuteConfig:
     #: the hand stopped on it and the arm pressed ~100 N into it for the whole closure, bending torso_joint1 by 7.6 mrad ...
     grasp_support_clearance_m: float = 0.004
     grasp_support_pad_margin_m: float = 0.005
-    #: ... unless the faces the lifted pads would close on slope more than this (|normal z|, sin 20 deg): a curved side above its widest
-    #: section - the milk bottle lying on its side, pinched 13 mm higher, rolled 14 deg under the closure (0927-210646)
+    #: ... unless the faces at the lifted pads' fingertip-side end slope more than this (|normal z|, sin 20 deg): a curved side above
+    #: its widest section - the milk bottle lying on its side, pinched 13 mm higher, rolled 14 deg under the closure (0927-210646)
     grasp_support_face_slope_max: float = 0.34
     #: ... and a support place whose object hangs lower in the hand than the recorded ``eef_in_object`` by more than this is raised by
     #: the difference, so the object meets its support instead of being driven into it (the same pinch pressed the destination tray)
@@ -1267,7 +1267,9 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
                          f"recorded grasp runs")
         return targets
     try:
-        centre = pos + th.tensor([0.0, 0.0, need]) + 0.5 * (C.PAD_Z_RANGE[0] + C.PAD_Z_RANGE[1]) * C.approach_axis(quat)
+        # the lifted pads' fingertip-side end: what grips an object the pads overhang (the milk: the lifted pads reached down only to
+        # 12 mm above the bottle's widest section; v2.0's pinch had them there)
+        centre = pos + th.tensor([0.0, 0.0, need]) + (C.PAD_Z_RANGE[1] - 0.001) * C.approach_axis(quat)
         slope = _pinch_face_slope(state.object(action.object), centre, C.closing_axis(quat))
     except Exception as e:  # noqa: BLE001 - no scene queries (the test stubs): the faces are not judged
         log.debug("pinch face probe of %s failed (%r)", action.object, e)

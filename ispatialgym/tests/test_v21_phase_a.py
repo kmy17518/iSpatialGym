@@ -130,9 +130,9 @@ def test_a3_grasp_kept_when_the_lifted_pads_would_close_on_a_curved_side(monkeyp
         assert ctx["grasp_support_lift"]["applied"] is lifted and (out is targets) is (not lifted)
         if slope == 0.57:
             assert "sloped 35 deg" in ctx["grasp_support_lift"]["reason"]
-    # the probe sits at the lifted pads' centre
-    pad_mid = 0.5 * (C.PAD_Z_RANGE[0] + C.PAD_Z_RANGE[1]) * float(C.approach_axis(C.as_tensor(targets["grasp"].orientation))[2])
-    assert seen["centre_z"] == pytest.approx(targets["grasp"].position[2] + need + pad_mid, abs=1e-6)
+    # the probe sits at the lifted pads' fingertip-side end
+    pad_end = (C.PAD_Z_RANGE[1] - 0.001) * float(C.approach_axis(C.as_tensor(targets["grasp"].orientation))[2])
+    assert seen["centre_z"] == pytest.approx(targets["grasp"].position[2] + need + pad_end, abs=1e-6)
 
 def test_executor_next_place_kind_follows_the_grasped_object():
     from ispatialgym.oracle.executor import Executor
