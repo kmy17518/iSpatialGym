@@ -188,6 +188,11 @@ class RecorderConfig:
     #: (run_isg --dev) name of an env external sensor (``obs["external"][name]["rgb"]``) written to ``external_rgb.mp4``
     #: next to the head video - the JoyLo replay viewpoint over the robot's shoulder
     external_camera: Optional[str] = None
+    #: ``<root>/<repo_id>`` of the LeRobot v3 shard the episode is appended to in BEHAVIOR's replay_obs format
+    #: (:mod:`ispatialgym.oracle.behavior_lerobot`; the robot must carry replay_obs's sensors); None: not written
+    behavior_shard: Optional[str] = None
+    #: task name of the shard's episodes (the alias)
+    behavior_task: Optional[str] = None
 
 
 class Recorder:
@@ -235,6 +240,8 @@ class Recorder:
         self.scene_file = None
         self.env_config = None
         self.hdf5_path = os.path.join(out_dir, "demo.hdf5") if self.cfg.hdf5 else None
+        self.behavior = None  # behavior_lerobot.ShardWriter of the episode
+        self.behavior_status: Optional[str] = None
 
     # ------------------------------------------------------------------ start
 
@@ -287,6 +294,17 @@ class Recorder:
             self._open_video()
         if self.cfg.lerobot:
             self._create_lerobot(robs)
+        if self.cfg.behavior_shard:
+            try:
+                from ispatialgym.oracle.behavior_lerobot import ShardWriter
+
+                root, repo_id = os.path.split(os.path.abspath(self.cfg.behavior_shard))
+                self.behavior = ShardWriter(self.env, root, repo_id, self.cfg.behavior_task or self.task_name or "")
+                self.behavior.begin(obs0, info0)
+                self.behavior_status = "recording"
+            except Exception as e:  # noqa: BLE001
+                log.warning("BEHAVIOR LeRobot shard not opened: %r", e)
+                self.behavior, self.behavior_status = None, f"error: {e!r}"
 
     def _snapshot_scene(self) -> None:
         try:
@@ -453,6 +471,13 @@ class Recorder:
             self._pending_lerobot.append(self._lerobot_frame(self._last_obs_lerobot, action, reward, terminated, truncated, action_index, self.current_task))
         if self.dataset is not None:
             self._last_obs_lerobot = self._lerobot_obs(robs)
+        if self.behavior is not None:
+            try:
+                self.behavior.step(r["action"][-1], obs, reward, terminated, truncated, info)
+            except Exception as e:  # noqa: BLE001
+                log.warning("BEHAVIOR LeRobot step not written: %r", e)
+                self.behavior.abort()
+                self.behavior_status = f"error: {e!r}"
 
     @property
     def n_pending(self) -> int:
@@ -496,6 +521,10 @@ class Recorder:
         the same group — the brace of a braced push) stay pending."""
         mark = max(0, min(int(mark), self.n_pending))
         n = self.n_pending - mark
+        if n and self.behavior is not None and not self.behavior.aborted:
+            # a mid-episode retry: the demo gets its BEHAVIOR episode by replaying demo.hdf5 (replay_obs_isg.py)
+            self.behavior.abort()
+            self.behavior_status = "rollback"
         if n and self.cfg.keep_rollbacks:
             states = list(self._pending_states[mark:])
             if state_before is not None:
@@ -648,6 +677,25 @@ class Recorder:
             except Exception as e:  # noqa: BLE001
                 self.lerobot_error = repr(e)
                 log.warning("LeRobot episode not saved: %r", e)
+        if self.behavior is not None or self.behavior_status:
+            index = None
+            if self.behavior is not None:
+                if self.cfg.hdf5 and not out.get("hdf5"):
+                    self.behavior_status = "no_hdf5"  # the demo is recorded again; its episode would come twice
+                try:
+                    index = self.behavior.end(save=bool(success) and self.behavior_status == "recording")
+                    self.behavior.close()
+                except Exception as e:  # noqa: BLE001
+                    log.warning("BEHAVIOR LeRobot episode not saved: %r", e)
+                    self.behavior_status = f"error: {e!r}"
+                self.behavior = None
+            if index is not None:
+                self.behavior_status = "saved"
+            elif self.behavior_status == "recording":
+                self.behavior_status = "not_saved"  # a failed demo
+            out["behavior_lerobot"] = {"shard": os.path.abspath(self.cfg.behavior_shard) if self.cfg.behavior_shard else None,
+                                       "episode_index": index, "status": self.behavior_status,
+                                       "needs_replay": bool(success) and index is None}
         out["video_error"] = self.video_error
         out["lerobot_error"] = self.lerobot_error
         return out

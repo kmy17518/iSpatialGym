@@ -403,7 +403,7 @@ def cmd_provenance(args):
                 a = json.loads(ln)
                 audit[(a["job_dir"], a["instance"])] = "no_hdf5" if a.get("hdf5_error") else ("disturbed" if a.get("disturbed") else "clean")
     n_rows = n_meta = 0
-    index = []
+    latest = {}
     for j in m["jobs"]:
         prov = job_provenance(j)
         j["provenance"] = prov
@@ -439,12 +439,17 @@ def cmd_provenance(args):
                 if _rewrite_json(meta, fill_meta):
                     n_meta += 1
             pr = r.get("provenance") or {}
-            index.append({"alias": j["alias"], "job_id": j["job_id"], "job_dir": j["dir"], "instance": r["instance"], "success": bool(r.get("success")),
-                          "status": r.get("status"), "reason": r.get("reason"), "n_steps": r.get("n_steps"), "reused_world": bool(r.get("reused_world")),
-                          "provisional": bool(r.get("provisional")), "snapshot": pr.get("snapshot") and os.path.basename(str(pr.get("snapshot"))),
-                          "isg_commit": pr.get("isg_commit"), "b1k_commit": pr.get("b1k_commit"), "track_state_updates": pr.get("track_state_updates"),
-                          "queue_scene_restore": pr.get("queue_scene_restore"),
-                          "audit": audit.get((j["dir"], r["instance"]), "unchecked"), "out": r.get("out")})
+            b = r.get("behavior_lerobot") or {}
+            # one entry per demo: a requeued slice appends the row of a demo recorded again, the latest row stands
+            latest[(j["dir"], r["instance"])] = {
+                "alias": j["alias"], "job_id": r.get("job_id") or j["job_id"], "job_dir": j["dir"], "instance": r["instance"], "success": bool(r.get("success")),
+                "status": r.get("status"), "reason": r.get("reason"), "n_steps": r.get("n_steps"), "reused_world": bool(r.get("reused_world")),
+                "provisional": bool(r.get("provisional")), "snapshot": pr.get("snapshot") and os.path.basename(str(pr.get("snapshot"))),
+                "isg_commit": pr.get("isg_commit"), "b1k_commit": pr.get("b1k_commit"), "track_state_updates": pr.get("track_state_updates"),
+                "queue_scene_restore": pr.get("queue_scene_restore"), "hdf5_ok": r.get("hdf5_ok"),
+                "behavior_shard": b.get("shard"), "behavior_episode": b.get("episode_index"), "behavior_status": b.get("status"),
+                "audit": audit.get((j["dir"], r["instance"]), "unchecked"), "out": r.get("out")}
+    index = list(latest.values())
     m["code_commit_note"] = "code_commit is the checkout that submitted the first jobs; each job's code is jobs[].provenance"
     with open(mpath + ".tmp", "w") as fh:
         json.dump(m, fh, indent=1)
