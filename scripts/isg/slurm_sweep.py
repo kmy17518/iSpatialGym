@@ -19,6 +19,7 @@ from one process, then rebuilds the board.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -140,6 +141,126 @@ run_one() {{
 wait
 rm -rf "$JOB_TMP"
 """
+
+
+def prod_job_script(job_dir, alias, start, count, max_attempts, args):
+    """One production job (``produce``): ``prod_worker.py`` for instances ``[start, start + count)`` of ``alias`` - the sampler
+    plus ``--demo-workers`` concurrent demos on the job's GPU. The job works in a private copy of the committed reach bands
+    (``cp -p``: the loader's newest-file tie break is unchanged) because the samplers write feasible sets back into the band
+    files they read, in place."""
+    q = shlex.quote
+    min_kb = int(args.min_scratch_gb * 1024 * 1024)
+    code = os.path.abspath(args.code_root or REPO)
+    bands = os.path.join(code, "runlogs", "reach_bands_20260915", "bands")
+    appdata = 'export OMNIGIBSON_APPDATA_PATH="$TMPDIR/appdata"\n' if args.local_appdata else ""
+    snapshot = ""
+    if args.b1k_root:
+        # a frozen checkout of both repos: its packages shadow the env's editable installs (their finders come after sys.path)
+        b1k = os.path.abspath(args.b1k_root)
+        snapshot = (f'export PYTHONPATH={q(code)}:{q(os.path.join(b1k, "OmniGibson"))}:{q(os.path.join(b1k, "bddl3"))}${{PYTHONPATH:+:$PYTHONPATH}}\n'
+                    f'export OMNIGIBSON_DATA_PATH={q(os.path.realpath(args.data_path or os.path.join(REPO, "Behavior-1K", "datasets")))}\n')
+    threads = int(args.cpus_per_proc)
+    worker = ["python", os.path.join(code, "scripts", "isg", "prod_worker.py"), "--alias", alias, "--start", str(start), "--count", str(count),
+              "--out", job_dir, "--seed", str(args.seed), "--max-attempts", str(max_attempts), "--demo-workers", str(args.demo_workers),
+              "--demo-mode", args.demo_mode]
+    return f"""#!/bin/bash
+export HOME={q(args.home)}
+if [ -n "${{TMPDIR:-}}" ] && [ -d "$TMPDIR" ] && [ -w "$TMPDIR" ] && [ "$(df -Pk "$TMPDIR" | awk 'NR==2{{print $4}}')" -gt {min_kb} ]; then
+  JOB_TMP="$TMPDIR/isg_$SLURM_JOB_ID"
+else
+  JOB_TMP={q(args.fallback_tmp)}/isg_$SLURM_JOB_ID
+fi
+source {q(args.conda_sh)}
+conda activate {q(args.env)}
+cd {q(code)} || exit 2
+{snapshot}export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES
+export TMPDIR="$JOB_TMP"
+mkdir -p "$TMPDIR/reach_bands"
+cp -p {q(bands)}/* "$TMPDIR/reach_bands/"
+export ISPATIALGYM_REACH_BANDS="$TMPDIR/reach_bands" ISPATIALGYM_CACHE_DIR="$TMPDIR/isg_cache" ISPATIALGYM_SAMPLING_CACHE="$TMPDIR/isg_cache/sampling" \\
+  ISPATIALGYM_HELD_HOLD_CACHE="$TMPDIR/isg_cache/held_hold.json"
+export OMP_NUM_THREADS={threads} MKL_NUM_THREADS={threads} OPENBLAS_NUM_THREADS={threads}
+{appdata}echo "PROD_JOB $SLURM_JOB_ID host=$(hostname -s) gpu=\\"$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)\\" TMPDIR=$TMPDIR start=$(date -Is)"
+deadline=$(( $(date +%s) + {int(args.hours * 3600) - int(args.grace_min * 60)} ))
+{' '.join(q(w) for w in worker)} --deadline $deadline
+rc=$?
+echo "PROD_JOB_END $SLURM_JOB_ID rc=$rc end=$(date -Is)"
+case "$JOB_TMP" in /vision/*) ;; *) rm -rf "$JOB_TMP" ;; esac
+exit $rc
+"""
+
+
+def cmd_produce(args):
+    """Submit ``--per-task`` instances + demos per alias as jobs of ``--slice`` instances each (see :func:`prod_job_script`)."""
+    aliases = list(V2_ALIASES) if args.all else list(args.aliases or [])
+    if not aliases:
+        raise SystemExit("slurm_sweep produce: --aliases or --all")
+    sweep = args.sweep or time.strftime("prod_%m%d-%H%M%S")
+    root = os.path.join(args.root, sweep)
+    if os.path.exists(os.path.join(root, "manifest.json")):
+        raise SystemExit(f"slurm_sweep produce: {root} exists")
+    os.makedirs(root, exist_ok=True)
+    code = os.path.abspath(args.code_root or REPO)
+    git = lambda *a: subprocess.run(["git", "-C", code, *a], capture_output=True, text=True).stdout.strip()  # noqa: E731
+    commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--", "ispatialgym", "scripts"))
+    b1k_commit = subprocess.run(["git", "-C", args.b1k_root or os.path.join(REPO, "Behavior-1K"), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    m = {"sweep": sweep, "kind": "produce", "submitted": FDM.now(), "code_root": code, "code_commit": commit, "dirty": dirty,
+         "b1k_root": args.b1k_root, "b1k_commit": b1k_commit, "demo_mode": args.demo_mode, "env": args.env, "note": args.note,
+         "per_task": args.per_task, "slice": args.slice, "seed": args.seed, "demo_workers": args.demo_workers, "hours": args.hours,
+         "sbatch": {"partition": args.partition, "account": args.account, "gres": args.gres, "cpus_per_proc": args.cpus_per_proc,
+                    "mem_per_proc": args.mem_per_proc, "exclude": args.exclude}, "jobs": []}
+    nproc = 1 + int(args.demo_workers)
+    mem_gb = float(str(args.mem_per_proc).rstrip("Gg"))
+    for alias in aliases:
+        max_attempts = args.max_attempts or budget(alias)[0]
+        for start in range(args.first_index, args.first_index + args.per_task, args.slice):
+            count = min(args.slice, args.first_index + args.per_task - start)
+            job_dir = os.path.join(root, alias, f"i{start:04d}")
+            os.makedirs(job_dir, exist_ok=True)
+            script = os.path.join(job_dir, "job.sh")
+            with open(script, "w") as f:
+                f.write(prod_job_script(job_dir, alias, start, count, max_attempts, args))
+            name = "isgp_" + re.sub(r"[^A-Za-z0-9_.-]", "_", alias)[:36] + f"_{start}"
+            cmd = ["sbatch", "--parsable", "-p", args.partition, "-A", args.account, f"--gres={args.gres}", "-c", str(args.cpus_per_proc * nproc),
+                   f"--mem={int(mem_gb * nproc)}G", f"--time={int(args.hours * 60)}", "-J", name, "-o", os.path.join(job_dir, "slurm.log")]
+            if args.exclude:
+                cmd.append(f"--exclude={args.exclude}")
+            cmd.append(script)
+            r = subprocess.run(cmd, capture_output=True, text=True, env=slurm_env())
+            if r.returncode != 0:
+                raise SystemExit(f"sbatch failed for {alias} [{start}, {start + count}): {r.stderr.strip()}")
+            job_id = r.stdout.strip().split(";")[0]
+            m["jobs"].append({"alias": alias, "start": start, "count": count, "max_attempts": max_attempts, "dir": job_dir, "job_id": job_id})
+            print(f"{job_id}  {alias}  [{start}, {start + count})")
+            with open(os.path.join(root, "manifest.json"), "w") as f:
+                json.dump(m, f, indent=1)
+    print(f"produce {sweep}: {len(m['jobs'])} jobs -> {root}")
+
+
+def cmd_pstatus(args):
+    """Per alias: instances sampled, demos finished / successful, jobs by state."""
+    root = os.path.join(args.root, args.sweep)
+    m = json.load(open(os.path.join(root, "manifest.json")))
+    states = job_states([j["job_id"] for j in m["jobs"]])
+    per = {}
+    for j in m["jobs"]:
+        a = per.setdefault(j["alias"], {"jobs": {}, "inst": 0, "demos": 0, "ok": 0, "steps": []})
+        st = states.get(j["job_id"], ("?",))[0]
+        a["jobs"][st] = a["jobs"].get(st, 0) + 1
+        a["inst"] += len(glob.glob(os.path.join(j["dir"], "inst", "*", "*", "instances", "*.summary.json")))
+        rp = os.path.join(j["dir"], "results.jsonl")
+        if os.path.exists(rp):
+            for line in open(rp):
+                if line.strip():
+                    row = json.loads(line)
+                    a["demos"] += 1
+                    a["ok"] += int(bool(row.get("success")))
+    tot = {"inst": 0, "demos": 0, "ok": 0}
+    for alias, a in sorted(per.items()):
+        for k in tot:
+            tot[k] += a[k]
+        print(f"{a['ok']:>4} ok / {a['demos']:>4} demos / {a['inst']:>4} inst  {' '.join(f'{k}:{v}' for k, v in sorted(a['jobs'].items())):<34} {alias}")
+    print(f"total: {tot['ok']} successful demos, {tot['demos']} demos, {tot['inst']} instances ({m['per_task']} per task requested)")
 
 
 def slurm_env():
@@ -321,6 +442,43 @@ def main():
     s.add_argument("--shared-caches", dest="cold_caches", action="store_false",
                    help="use the env's sampling / held-hold caches instead of a fresh per-job cache in the node scratch")
     s.set_defaults(fn=cmd_submit)
+    s = sub.add_parser("produce", help="many instances + demos per alias: jobs of --slice instances, each a sampler with concurrent demos")
+    s.add_argument("--aliases", nargs="*", default=None)
+    s.add_argument("--all", action="store_true", help="the 28 aliases of first-demo-v2.0")
+    s.add_argument("--per-task", type=int, default=100, help="instances (and demos) per alias")
+    s.add_argument("--slice", type=int, default=20, help="instances per job")
+    s.add_argument("--first-index", type=int, default=0, help="instance index of the first slice (a top-up run continues after an earlier one)")
+    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--max-attempts", type=int, default=None, help="per instance (default: the first-demo-v2.0 budget of the alias)")
+    s.add_argument("--demo-workers", type=int, default=1, help="concurrent demos per job next to its sampler (GPU memory: a process peaks at ~10 GB)")
+    s.add_argument("--hours", type=float, default=11.0, help="job time limit; no demo starts in the last --grace-min minutes")
+    s.add_argument("--grace-min", type=float, default=40.0)
+    s.add_argument("--root", default=os.path.join(os.path.dirname(REPO), "isg_prod"), help="output root (outside the checkout)")
+    s.add_argument("--sweep", default=None)
+    s.add_argument("--note", default="")
+    s.add_argument("--partition", default="viscam")
+    s.add_argument("--account", default="viscam")
+    s.add_argument("--gres", default="gpu:1")
+    s.add_argument("--cpus-per-proc", type=int, default=8)
+    s.add_argument("--mem-per-proc", default="32G")
+    s.add_argument("--exclude", default="viscam-hgx-1,viscam-hgx-2,viscam1,viscam9")
+    s.add_argument("--env", default=os.environ.get("CONDA_DEFAULT_ENV", ""))
+    s.add_argument("--conda-sh", default=os.path.join(os.path.dirname(os.path.dirname(os.environ.get("CONDA_EXE", "/opt/conda/bin/conda"))), "etc", "profile.d", "conda.sh"))
+    s.add_argument("--home", default=os.environ.get("HOME", ""))
+    s.add_argument("--fallback-tmp", default=os.environ.get("TMPDIR", "/tmp"))
+    s.add_argument("--min-scratch-gb", type=float, default=50.0)
+    s.add_argument("--local-appdata", action="store_true")
+    s.add_argument("--demo-mode", default="queue", choices=["queue", "fresh"], help="prod_worker --demo-mode")
+    s.add_argument("--code-root", default=None, help="iSpatialGym checkout the jobs run (default: this one); a frozen worktree keeps "
+                                                     "edits made while the jobs run out of them")
+    s.add_argument("--b1k-root", default=None, help="BEHAVIOR-1K checkout whose OmniGibson / bddl the jobs import (PYTHONPATH) instead "
+                                                    "of the env's editable installs")
+    s.add_argument("--data-path", default=None, help="OMNIGIBSON_DATA_PATH with --b1k-root (default: this checkout's Behavior-1K/datasets)")
+    s.set_defaults(fn=cmd_produce)
+    s = sub.add_parser("pstatus", help="progress of a produce run")
+    s.add_argument("--sweep", required=True)
+    s.add_argument("--root", default=os.path.join(os.path.dirname(REPO), "isg_prod"))
+    s.set_defaults(fn=cmd_pstatus)
     s = sub.add_parser("status")
     s.add_argument("--sweep", required=True)
     s.set_defaults(fn=cmd_status)

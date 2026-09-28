@@ -299,6 +299,9 @@ def main(argv=None):
     parser.add_argument("--scene", default=None, help="restrict to one scene")
     parser.add_argument("--templates", type=int, default=None, help="templates per alias and scene (default: generation.templates_max)")
     parser.add_argument("--instances-per-template", type=int, default=None, help="default: generation.instances_per_template")
+    parser.add_argument("--start-index", type=int, default=None,
+                        help="first instance index of every template (default: the number already written under --out); "
+                             "processes with the same --seed and disjoint index ranges write disjoint instances")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", default=DEFAULT_OUT)
     parser.add_argument("--overwrite", action="store_true")
@@ -387,7 +390,8 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
                 continue
             if os.path.exists(out_dir) and args.overwrite:
                 shutil.rmtree(out_dir)
-            entry = run_template(gp, choice, world, kit, args.out, n_inst, args.seed * 7919 + ti, args.max_attempts, args.variant, customs_sha)
+            entry = run_template(gp, choice, world, kit, args.out, n_inst, args.seed * 7919 + ti, args.max_attempts, args.variant, customs_sha,
+                                 start_index=args.start_index)
             report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
             if entry.get("n_written", 0) == 0:
                 entry["blacklisted"] = blacklist_after_failure(gp, choice, entry)

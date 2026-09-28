@@ -42,6 +42,7 @@ same monitors, recorder and epilogue.
 from __future__ import annotations
 
 import argparse
+import glob
 import importlib
 import json
 import logging
@@ -227,6 +228,10 @@ def gripper_command_for(robot, arm: str, finger_q) -> float:
 
 
 
+def _copy_map(m):
+    return m.clone() if hasattr(m, "clone") else m.copy()
+
+
 def _first_key(d: Dict[str, Any], suffix: str) -> Optional[str]:
     for k in d:
         if k.endswith(suffix):
@@ -287,6 +292,7 @@ class InstanceLoader:
 
         # the scene variant's freed footprints (template) and the instance's blocked footprints on the planner map
         self.report["trav_cells_freed"] = patch_trav_map_from_meta(self.env.scene, self.tmeta)
+        self._floor_map_template = _copy_map(self.env.scene.trav_map.floor_map[0])
         self.report["trav_cells_blocked"] = block_trav_map_from_meta(self.env.scene, self.tro.meta.scene or {})
         self.task = self.env.task
         self.robot = self.env.scene.robots[0]
@@ -302,6 +308,38 @@ class InstanceLoader:
         self.report["head_camera_key"] = self.cam_key
         self.report["head_camera_aperture_mm"] = float(self.robot.sensors[self.cam_key].horizontal_aperture)
         self.report["evaluation_profile"] = (self.tro.meta.extras.get("evaluation_profile") or EVALUATION_PROFILE)
+        return self.env
+
+    def share(self, shared: Dict[str, Any]) -> None:
+        """``--queue``: hand this loader's world to the next instances of the template."""
+        shared.update({"env": self.env, "task": self.task, "robot": self.robot, "cam_key": self.cam_key, "cfg": self.cfg,
+                       "template_dir": self.template_dir, "floor_map": self._floor_map_template,
+                       "build_report": {k: v for k, v in self.report.items() if k != "trav_cells_blocked"}})
+
+    def attach(self, shared: Dict[str, Any]):
+        """``--queue``: this instance in the world of the previous one (same template, :func:`instance_signature`) instead of
+        :meth:`build_env` - the previous instance's hinge prims, assisted grasps and planner attachments are removed and the
+        planner map goes back to the template's before this instance's footprints are blocked; :meth:`restore` follows."""
+        from ispatialgym.sampling.constraints import remove_hinge
+        from ispatialgym.sampling.scene_variants import block_trav_map_from_meta
+
+        if os.path.abspath(shared["template_dir"]) != os.path.abspath(self.template_dir):
+            raise RuntimeError(f"--queue: {self.iid} belongs to {self.template_dir}, the world to {shared['template_dir']}")
+        self.env, self.task, self.robot, self.cam_key, self.cfg = (shared[k] for k in ("env", "task", "robot", "cam_key", "cfg"))
+        prev = shared.get("loader")
+        for h in list(getattr(prev, "hinges", None) or []):
+            remove_hinge(h)
+        for arm, held in list(self.robot._ag_obj_in_hand.items()):
+            if held is not None:
+                self.robot.release_grasp_immediately(arm)
+        backend = shared.get("backend")
+        for arm in list(getattr(backend, "_attached", {}) or {}):
+            backend.detach_object(arm)
+        self.env.scene.trav_map.floor_map[0] = _copy_map(shared["floor_map"])
+        self._floor_map_template = shared["floor_map"]
+        self.report.update(shared["build_report"])
+        self.report["trav_cells_blocked"] = block_trav_map_from_meta(self.env.scene, self.tro.meta.scene or {})
+        self.report["reused_world"] = True
         return self.env
 
     # -- the loader contract --------------------------------------------------------------------------------------
@@ -696,7 +734,16 @@ def policy_actions(policy, executor: Executor, obs0, info0, max_steps: int) -> I
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--instance", required=True, help="path to <iid>-tro_state.json of a sampled instance")
+    p.add_argument("--instance", default=None, help="path to <iid>-tro_state.json of a sampled instance")
+    p.add_argument("--queue", default=None, metavar="INST_ROOT",
+                   help="instead of --instance: replay every instance a sampler writes under INST_ROOT (sample_isg --out), one after "
+                        "the other in this process's world (run_queue)")
+    p.add_argument("--claims", default=None, help="--queue: directory of the claim files (default: <INST_ROOT>/../claims)")
+    p.add_argument("--done-file", default=None, help="--queue: once this file exists, exit when no ready instance is left unclaimed")
+    p.add_argument("--results", default=None, help="--queue: append one JSON line per instance to this file")
+    p.add_argument("--deadline", type=float, default=None, help="--queue: epoch seconds after which no instance starts")
+    p.add_argument("--max-instances", type=int, default=None, help="--queue: instances per process")
+    p.add_argument("--poll-s", type=float, default=10.0, help="--queue: wait between scans for new instances")
     p.add_argument("--sidecar", default=None, help="oracle sidecar (default: <iid>.oracle.json next to the TRO)")
     p.add_argument("--mode", default="oracle", choices=["oracle", "replay", "policy"])
     p.add_argument("--replay", default=None, help="replay mode: LeRobot dataset root or demo.hdf5")
@@ -728,7 +775,10 @@ def parse_args(argv=None):
     p.add_argument("--frame-buffer", default="jpeg", choices=["jpeg", "raw"], help="how pending rgb frames are buffered until an action commits")
     p.add_argument("--all-cameras", action="store_true", help="LeRobot: every rgb sensor (default: the head camera only)")
     p.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    if (args.instance is None) == (args.queue is None):
+        p.error("exactly one of --instance and --queue")
+    return args
 
 
 def _result_line(result: dict) -> None:
@@ -793,6 +843,15 @@ def _apply_program_hook(spec: str, actions, sidecar, loader):
 def main(argv=None) -> int:
     args = parse_args(argv)
     logging.getLogger("ispatialgym").setLevel(args.log_level)
+    if args.queue:
+        return run_queue(args)
+    return run_instance(args, args.instance)[0]
+
+
+def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
+    """One instance end to end: load, oracle stack, episode, recording, ``meta.json`` and the ``RUN_ISG_RESULT`` line; returns
+    ``(exit code, result)``. ``shared`` (``--queue``): the world and planner of the previous instance of the same template,
+    reused (:meth:`InstanceLoader.attach`); the first instance fills it in."""
     t_start = time.time()
     timings: Dict[str, float] = {}
     meta: Dict[str, Any] = {"status": "error", "mode": args.mode, "argv": sys.argv[1:], "hostname": os.uname().nodename,
@@ -806,7 +865,7 @@ def main(argv=None) -> int:
     sidecar_path: Optional[str] = None
 
     try:
-        loader = InstanceLoader(args.instance, robot_name=args.robot_name, image_size=args.image_size, head_aperture=args.head_aperture)
+        loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=args.image_size, head_aperture=args.head_aperture)
         loader.external_camera = bool(args.dev)
         meta["dev"] = bool(args.dev)
         iid, tro_path = loader.iid, loader.tro_path
@@ -855,14 +914,21 @@ def main(argv=None) -> int:
 
         # ---------------------------------------------------------------- environment + loader contract
         t0 = time.time()
-        env = loader.build_env()
+        if shared is not None and shared.get("env") is not None:
+            env = loader.attach(shared)
+        else:
+            env = loader.build_env()
+            if shared is not None:
+                loader.share(shared)
+        if shared is not None:
+            shared["loader"] = loader
         try:
             obs, info = loader.restore()
         except LoadError as e:
             meta.update({"status": "oracle_failed", "reason": e.reason, "load_error": e.message, "loader": loader.report})
             result.update({"status": "oracle_failed", "success": False, "reason": e.reason, "n_steps": 0, "error": e.message})
             exit_code = EXIT_ORACLE_FAILED
-            return exit_code
+            return exit_code, result
         timings["load_s"] = time.time() - t0
         task, robot, cam_key = loader.task, loader.robot, loader.cam_key
         meta["loader"] = loader.report
@@ -880,13 +946,18 @@ def main(argv=None) -> int:
             meta.update({"status": "no_oracle", "reason": program_error})
             result.update({"status": "no_oracle", "reason": program_error, "success": False, "n_steps": 0})
             exit_code = EXIT_NO_ORACLE
-            return exit_code
+            return exit_code, result
 
         # ---------------------------------------------------------------- oracle stack
         t0 = time.time()
         arms = sorted({arm for a in (actions or []) for arm in a.arms}) or ["right"]
         prebuild = tuple(f"{arm}_arm" for arm in arms)
-        backend = R1ProCuRobo(robot, prebuild=prebuild)
+        if shared is not None and shared.get("backend") is not None:
+            backend = shared["backend"]
+        else:
+            backend = R1ProCuRobo(robot, prebuild=prebuild)
+            if shared is not None:
+                shared["backend"] = backend
         bounds = task_bounds(env.scene, loader.rooms) if loader.rooms else None
         backend.obstacle_filter = make_obstacle_filter(bounds, robot, [o.name for o in tracked.values()])
         # load the collision world *before* attaching the held objects (their meshes must be known to be disabled)
@@ -1004,7 +1075,7 @@ def main(argv=None) -> int:
             "settled_success": episode.get("settled_success"), "binary_branch": episode.get("binary_branch"), "collisions": (episode.get("qa") or {}).get("collisions", {}).get("n_events"),
             "qa_by_category": (episode.get("qa") or {}).get("stats", {}).get("by_category"), "goal_override": None if override is None else override.get("applied"),
         })
-        return exit_code
+        return exit_code, result
     except BaseException as e:  # noqa: BLE001  (KeyboardInterrupt / SystemExit included: the verdict must be written)
         meta["status"] = "error"
         meta["error"] = repr(e)
@@ -1012,7 +1083,7 @@ def main(argv=None) -> int:
         result.update({"status": "error", "success": False, "reason": "error", "error": repr(e)})
         traceback.print_exc()
         exit_code = EXIT_ERROR
-        return exit_code
+        return exit_code, result
     finally:
         timings["total_s"] = time.time() - t_start
         meta["timings"] = timings
@@ -1035,6 +1106,96 @@ def main(argv=None) -> int:
                 traceback.print_exc()
                 result["meta_error"] = repr(e)
         _result_line(result)
+
+
+# ==========================================================================================
+# --queue: many instances of one template in one world
+# ==========================================================================================
+
+#: ``run_queue``: the next instance needs a world of its own (another template, other simulator-side records); its claim is
+#: released for a fresh process
+EXIT_QUEUE_RESTART = 75
+_SUMMARY_SUFFIX = ".summary.json"
+
+
+def queue_ready(inst_root: str) -> List[Tuple[str, str]]:
+    """``[(instance id, tro path)]`` under a ``sample_isg --out`` root whose summary exists (the sampler writes it after the TRO
+    and the sidecar) and whose template meta is there."""
+    out = []
+    for s in sorted(glob.glob(os.path.join(inst_root, "*", "*", "instances", "*" + _SUMMARY_SUFFIX))):
+        iid = os.path.basename(s)[: -len(_SUMMARY_SUFFIX)]
+        tro = os.path.join(os.path.dirname(s), iid + TRO_SUFFIX)
+        if os.path.exists(tro) and os.path.exists(os.path.join(os.path.dirname(os.path.dirname(s)), "template_meta.json")):
+            out.append((iid, tro))
+    return out
+
+
+def _claim(claims: str, iid: str) -> bool:
+    try:
+        fd = os.open(os.path.join(claims, iid), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    os.write(fd, f"{os.uname().nodename} {os.getpid()} {time.strftime('%Y-%m-%dT%H:%M:%S')}\n".encode())
+    os.close(fd)
+    return True
+
+
+def instance_signature(tro_path: str) -> str:
+    """What an instance must share with the previous one to reuse its world: the template, the joint resistance /
+    counterbalance / mass records and the attachment filters (simulator edits the next instance only overwrites). Hinge
+    prims and assisted grasps are removed / re-established per instance and do not count."""
+    _, template_dir, _, _, _ = resolve_instance(tro_path)
+    extras = load_tro(tro_path).meta.extras or {}
+    records = [{k: v for k, v in rec.items() if k not in ("stock", "stock_friction")}
+               for rec in (extras.get("constraints") or []) if rec.get("type", "revolute") != "revolute"]
+    attachments = sorted((str(r.get("child")), str(r.get("parent"))) for r in (extras.get("attachment_targets") or []))
+    return json.dumps({"template": os.path.abspath(template_dir), "records": records, "attachments": attachments}, sort_keys=True, default=str)
+
+
+def run_queue(args) -> int:
+    """``--queue <inst root>``: replay the instances a sampler writes under the root one after the other in this process's
+    world (one scene load and one planner build for all of them, :meth:`InstanceLoader.attach`). Each instance is claimed
+    (an ``O_EXCL`` file under ``--claims``) so that several runners can share the queue; ``--results`` gets one JSON line per
+    instance. Returns 0 once ``--done-file`` exists and no ready instance is left unclaimed (or at ``--deadline`` /
+    ``--max-instances``), :data:`EXIT_QUEUE_RESTART` when the next instance needs a world of its own, and the instance's
+    exit code after an error (the world may be inconsistent)."""
+    claims = args.claims or os.path.join(os.path.dirname(os.path.abspath(args.queue.rstrip("/"))), "claims")
+    os.makedirs(claims, exist_ok=True)
+    shared: Dict[str, Any] = {}
+    n = 0
+    while True:
+        if (args.deadline and time.time() > args.deadline) or (args.max_instances and n >= args.max_instances):
+            return EXIT_SUCCESS
+        nxt = None
+        for iid, tro in queue_ready(args.queue):
+            if not os.path.exists(os.path.join(claims, iid)) and _claim(claims, iid):
+                nxt = (iid, tro)
+                break
+        if nxt is None:
+            if args.done_file and os.path.exists(args.done_file):
+                if all(os.path.exists(os.path.join(claims, i)) for i, _ in queue_ready(args.queue)):
+                    return EXIT_SUCCESS
+                continue
+            time.sleep(args.poll_s)
+            continue
+        iid, tro = nxt
+        sig = instance_signature(tro)
+        if shared.get("signature") not in (None, sig):
+            os.remove(os.path.join(claims, iid))
+            log.info("queue: %s needs a world of its own (another template or other simulator-side records)", iid)
+            return EXIT_QUEUE_RESTART
+        t0 = time.time()
+        code, result = run_instance(args, tro, shared)
+        shared["signature"] = sig
+        n += 1
+        if args.results:
+            row = {"instance": iid, "rc": code, "status": result.get("status"), "success": bool(result.get("success")), "reason": result.get("reason"),
+                   "n_steps": result.get("n_steps"), "wall_s": round(time.time() - t0, 1), "tro": tro, "out": result.get("out"), "reused_world": n > 1,
+                   "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "pid": os.getpid(), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
+            with open(args.results, "a") as f:
+                f.write(json.dumps(row, default=json_default) + "\n")
+        if code == EXIT_ERROR:
+            return code
 
 
 if __name__ == "__main__":
