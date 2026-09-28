@@ -30,8 +30,11 @@ CODE="$PROD_SNAP/ispatialgym"; B1K="$PROD_SNAP/Behavior-1K"
 cd "$CODE" || exit 2
 export PYTHONPATH="$CODE:$B1K/OmniGibson:$B1K/bddl3${PYTHONPATH:+:$PYTHONPATH}"
 export OMNIGIBSON_DATA_PATH="$PROD_DATA_PATH" OMNIGIBSON_APPDATA_PATH="$APPDATA" OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES
-# nothing in iSpatialGym reads is_active; the per-step change detection was ~half of an env step (mental_rotation queue
-# demos: same step counts and verdicts with it off, 56 / 33 s -> 26 / 25 s per demo)
+# the per-step change detection was ~half of an env step (mental_rotation queue demos: same step counts and verdicts with it
+# off, 56 / 33 s -> 26 / 25 s per demo). Its only reader in iSpatialGym is the executor's per-step hdf5 dump filter
+# (is_active): with it off, an object whose state changed while it slept is left out of that step's recorded state (its pose
+# is unchanged; mean state size 1264.3 -> 1263.7 floats per step on one demo, the same on the other). PROD_TRACK_STATE_UPDATES=1
+# restores it.
 export OMNIGIBSON_TRACK_STATE_UPDATES="${PROD_TRACK_STATE_UPDATES:-0}"
 export TMPDIR="$JOB_TMP"
 # the samplers write feasible sets back into the band files they read, in place: a private copy per job (cp -p keeps the

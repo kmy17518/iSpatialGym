@@ -270,14 +270,25 @@ def cmd_requeue(args):
     root = os.path.join(args.root, args.sweep)
     mpath = os.path.join(root, "manifest.json")
     m = json.load(open(mpath))
-    pargs = argparse.Namespace(**{**m["args"], **({"snapshot_link": args.snapshot_link} if args.snapshot_link else {})})
+    overrides = {k: v for k, v in (("snapshot_link", args.snapshot_link), ("demo_mode", args.demo_mode)) if v}
+    pargs = argparse.Namespace(**{**m["args"], **overrides})
     classes = (m.get("plan") or {}).get("classes") or {}
     states = job_states([j["job_id"] for j in m["jobs"]])
     n = 0
     for j in m["jobs"]:
-        if states.get(j["job_id"], ("?",))[0] != "PENDING":
+        state, elapsed, _ = states.get(j["job_id"], ("?", "", ""))
+        # --cancelled: jobs cancelled before they started; --empty: jobs that ended without writing a single instance (their
+        # directory moves aside: the sampler skips a template directory that exists)
+        never_ran = args.cancelled and state == "CANCELLED" and elapsed in ("00:00:00", "0:00", "")
+        empty = (args.empty and state in ENDED and state != "CANCELLED"
+                 and not glob.glob(os.path.join(j["dir"], "inst*", "*", "*", "instances", "*.summary.json")))
+        if not (state == "PENDING" or never_ran or empty):
             continue
-        subprocess.run(["scancel", j["job_id"]], env=slurm_env())
+        if state == "PENDING":
+            subprocess.run(["scancel", j["job_id"]], env=slurm_env())
+        if empty:
+            os.rename(j["dir"], f"{j['dir']}.empty-{j['job_id']}")
+            os.makedirs(j["dir"])
         cls = classes.get(j.get("class")) or {"gres": pargs.gres, "constraint": pargs.constraint, "cpus_per_proc": pargs.cpus_per_proc,
                                                "mem_per_proc": pargs.mem_per_proc, "demo_workers": pargs.demo_workers}
         jargs = argparse.Namespace(**{**vars(pargs), **{k: v for k, v in cls.items() if k != "constraint"}})
@@ -301,11 +312,10 @@ def cmd_requeue(args):
         j.setdefault("previous_job_ids", []).append(j["job_id"])
         j["job_id"] = r.stdout.strip().split(";")[0]
         n += 1
-    if args.snapshot_link:
-        m["args"]["snapshot_link"] = args.snapshot_link
+    m["args"].update(overrides)
     with open(mpath, "w") as f:
         json.dump(m, f, indent=1)
-    print(f"requeued {n} pending jobs of {args.sweep}")
+    print(f"requeued {n} jobs of {args.sweep}")
 
 
 def cmd_pstatus(args):
@@ -556,6 +566,9 @@ def main():
     s.add_argument("--sweep", required=True)
     s.add_argument("--root", default=os.path.join(os.path.dirname(REPO), "isg_prod"))
     s.add_argument("--snapshot-link", default=None, help="symlink to <snap>/{ispatialgym,Behavior-1K} the new job scripts resolve at start")
+    s.add_argument("--cancelled", action="store_true", help="also resubmit jobs that were cancelled before they started")
+    s.add_argument("--empty", action="store_true", help="also resubmit jobs that ended without writing an instance (e.g. a GPU crash at start)")
+    s.add_argument("--demo-mode", default=None, choices=["queue", "fresh"], help="override the run's prod_worker --demo-mode")
     s.set_defaults(fn=cmd_requeue)
     s = sub.add_parser("pstatus", help="progress of a produce run")
     s.add_argument("--sweep", required=True)

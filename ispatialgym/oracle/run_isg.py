@@ -42,6 +42,7 @@ same monitors, recorder and epilogue.
 from __future__ import annotations
 
 import argparse
+import copy
 import glob
 import importlib
 import json
@@ -309,18 +310,22 @@ class InstanceLoader:
         self.report["head_camera_key"] = self.cam_key
         self.report["head_camera_aperture_mm"] = float(self.robot.sensors[self.cam_key].horizontal_aperture)
         self.report["evaluation_profile"] = (self.tro.meta.extras.get("evaluation_profile") or EVALUATION_PROFILE)
+        # the whole scene as the template file loads it, for attach(): load_tro_instance rewrites only the task objects and
+        # the robot, and restore()'s update_initial_file would carry whatever a demo moved into the next instance's start
+        self._scene_state0 = copy.deepcopy(self.env.scene.dump_state(serialized=False))
         return self.env
 
     def share(self, shared: Dict[str, Any]) -> None:
         """``--queue``: hand this loader's world to the next instances of the template."""
         shared.update({"env": self.env, "task": self.task, "robot": self.robot, "cam_key": self.cam_key, "cfg": self.cfg,
-                       "template_dir": self.template_dir, "floor_map": self._floor_map_template,
+                       "template_dir": self.template_dir, "floor_map": self._floor_map_template, "scene_state0": self._scene_state0,
                        "build_report": {k: v for k, v in self.report.items() if k != "trav_cells_blocked"}})
 
     def attach(self, shared: Dict[str, Any]):
         """``--queue``: this instance in the world of the previous one (same template, :func:`instance_signature`) instead of
-        :meth:`build_env` - the previous instance's hinge prims, assisted grasps and planner attachments are removed and the
-        planner map goes back to the template's before this instance's footprints are blocked; :meth:`restore` follows."""
+        :meth:`build_env` - the previous instance's hinge prims, assisted grasps and planner attachments are removed, the
+        whole scene goes back to its state right after :meth:`build_env` and the planner map to the template's before this
+        instance's footprints are blocked; :meth:`restore` follows."""
         from ispatialgym.sampling.constraints import remove_hinge
         from ispatialgym.sampling.scene_variants import block_trav_map_from_meta
 
@@ -336,6 +341,10 @@ class InstanceLoader:
         backend = shared.get("backend")
         for arm in list(getattr(backend, "_attached", {}) or {}):
             backend.detach_object(arm)
+        # every scene object (poses, velocities, joints of doors / drawers, object states) back to the template's, so that
+        # only the TRO decides where this instance starts - as in a fresh process
+        self.env.scene.load_state(copy.deepcopy(shared["scene_state0"]), serialized=False)
+        self._scene_state0 = shared["scene_state0"]
         self.env.scene.trav_map.floor_map[0] = _copy_map(shared["floor_map"])
         self._floor_map_template = shared["floor_map"]
         self.report.update(shared["build_report"])
