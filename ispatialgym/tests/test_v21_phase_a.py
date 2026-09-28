@@ -491,3 +491,9 @@ def test_arm_along_retries_a_joint_jump_at_half_the_waypoint_spacing(tmp_path):
     with pytest.raises(SkillError):
         drive(env, motions.arm_along(arm, [(p0, q0)]))
     assert len(seen) == 2  # one retry at the finer spacing, then the leg fails as before
+    seen.clear()
+    backend.solve_ik_path = (lambda emb, waypoints, q_start=None, **kw: (seen.append(len(waypoints)) or
+                                                                                         SimpleNamespace(success=False, q_traj=None, status="joint jump 0.23 rad at waypoint 1", diagnostics={})))
+    with pytest.raises(SkillError):
+        drive(env, motions.arm_along(arm, [target], refine_jumps=False))
+    assert len(seen) == 1  # a caller that handles a jump itself (the via-above's rise plans a lift) gets it unrefined

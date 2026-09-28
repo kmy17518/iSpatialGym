@@ -1040,7 +1040,8 @@ class Motions:
         here = self.eef_pose(arm)
         ign_objs, ign_links = getattr(self, "_protect_ignores", ((), ()))
         try:
-            yield from self.arm_along(arm, [(here[0] + up, here[1])], check_collisions=True, ignore_objects=list(ign_objs), soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
+            yield from self.arm_along(arm, [(here[0] + up, here[1])], check_collisions=True, ignore_objects=list(ign_objs), soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free,
+                                      refine_jumps=False)
             lifted = "lifted"
         except SkillError as e:
             # the tracked straight rise jumps near the singular hanging posture (teacup 0926-010042: 'joint jump 0.22 rad at waypoint 1'):
@@ -1401,7 +1402,8 @@ class Motions:
 
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
                   soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False, converge: bool = True,
-                  check_collisions: bool = False, limit_margin: float = 0.0, ignore_objects: Sequence[Any] = (), soft_rot_tol: Optional[float] = None) -> Iterator[th.Tensor]:
+                  check_collisions: bool = False, limit_margin: float = 0.0, ignore_objects: Sequence[Any] = (), soft_rot_tol: Optional[float] = None,
+                  refine_jumps: bool = True) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto by default (contact motions must touch —
@@ -1423,7 +1425,10 @@ class Motions:
         7.2 mm stall to 7.0 mm), while the pose itself is reachable (the sampler's exact IK).
 
         ``converge=False``: the streamed trajectory returns after its last waypoint without the joint-convergence wait
-        (:meth:`execute_joint_trajectory`); the caller watches the object it moves."""
+        (:meth:`execute_joint_trajectory`); the caller watches the object it moves.
+
+        ``refine_jumps``: a leg failing on a joint jump (> ``max_joint_step`` between two waypoints) is solved once more at half
+        the waypoint spacing; off for a caller that handles a jump itself."""
         waypoints = list(waypoints)
         if not waypoints:
             return
@@ -1455,9 +1460,11 @@ class Motions:
                             sync_world=False, soft_pos_tol=self.cfg.diff_ik_soft_pos_tol if soft_pos_tol is None else float(soft_pos_tol),
                             soft_rot_tol=self.cfg.diff_ik_soft_rot_tol if soft_rot_tol is None else float(soft_rot_tol), **extra_kw)
             res = self.backend.solve_ik_path(f"{arm}_arm", [{frame: wp} for wp in dense], **solve_kw)
-            if not res.success and str(res.status).startswith("joint jump"):
+            if refine_jumps and not res.success and str(res.status).startswith("joint jump"):
                 # a fast but continuous turn near a singularity exceeds max_joint_step between two waypoints (shampoo 0927-183304 on
-                # 052de5eb: the carry to the floor jumped 0.23 rad at waypoint 44, both attempts); a branch flip jumps at any spacing
+                # 052de5eb: the carry to the floor jumped 0.23 rad at waypoint 44, both attempts); a branch flip jumps at any spacing.
+                # ``refine_jumps=False``: the caller handles a jump itself (the via-above's rise plans a lift instead - on the sandal
+                # that plan left the arm where the approach tracks; tracking the rise at half spacing did not, 0927-192757 on 5174c989)
                 finer: List[Pose] = []
                 prev_wp = start
                 for wp in dense:
