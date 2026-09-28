@@ -42,6 +42,21 @@ def result_record(log_path):
     return rec
 
 
+def job_gpus():
+    """The job's GPU indices (``CUDA_VISIBLE_DEVICES`` as Slurm set it), ``[]`` when unset."""
+    return [g for g in os.environ.get("CUDA_VISIBLE_DEVICES", "").split(",") if g.strip()]
+
+
+def proc_env(role, slot=0):
+    """Environment of a child process: with two or more GPUs in the job the sampler gets the first one and the demo runners
+    the others (round robin); with one GPU every process shares it."""
+    env = dict(os.environ)
+    gpus = job_gpus()
+    if len(gpus) >= 2:
+        env["CUDA_VISIBLE_DEVICES"] = gpus[0] if role == "sampler" else gpus[1 + slot % (len(gpus) - 1)]
+    return env
+
+
 def ready_instances(inst_root):
     """``{instance id: tro path}`` of the instances whose summary (written last) exists and whose template meta is there."""
     out = {}
@@ -87,7 +102,7 @@ def main(argv=None):
                    "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", inst_root, "--log-level", "INFO"]
     t_job = time.time()
     with open(os.path.join(out, "sample.log"), "a") as slog:
-        sampler = subprocess.Popen(sampler_cmd, stdout=slog, stderr=subprocess.STDOUT)
+        sampler = subprocess.Popen(sampler_cmd, stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
     running = {}  # iid -> (Popen, started, log path, tro)
     stopping = {"flag": False}
 
@@ -129,7 +144,7 @@ def main(argv=None):
                 cmd = [sys.executable, "-m", "ispatialgym.oracle.run_isg", "--instance", tro, "--mode", "oracle", "--out", os.path.join(out, "demo"),
                        "--video", "--video-size", "540"]
                 with open(lp, "w") as f:
-                    running[iid] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT), time.time(), lp, tro)
+                    running[iid] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=proc_env("demo", len(running))), time.time(), lp, tro)
         pending = [i for i in ready_instances(inst_root) if i not in done and i not in running]
         if sampler_rc is not None and not running and (stopping["flag"] or not pending):
             break
@@ -162,7 +177,7 @@ def run_queue_mode(args):
                    "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", inst_root, "--log-level", "INFO"]
     t_job = time.time()
     with open(os.path.join(out, "sample.log"), "a") as slog:
-        sampler = subprocess.Popen(sampler_cmd, stdout=slog, stderr=subprocess.STDOUT)
+        sampler = subprocess.Popen(sampler_cmd, stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
     runners = {}  # slot -> (Popen, log path)
     n_started = 0
     stopping = {"flag": False}
@@ -206,7 +221,7 @@ def run_queue_mode(args):
                 if args.deadline:
                     cmd += ["--deadline", str(args.deadline)]
                 with open(lp, "w") as f:
-                    runners[slot] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT), lp)
+                    runners[slot] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=proc_env("demo", slot)), lp)
         if sampler_rc is not None and not runners and (stopping["flag"] or not unclaimed()):
             break
         time.sleep(args.poll_s)

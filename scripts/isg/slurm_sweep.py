@@ -167,6 +167,8 @@ def prod_job_script(job_dir, alias, start, count, max_attempts, args):
 export HOME={q(args.home)}
 if [ -n "${{TMPDIR:-}}" ] && [ -d "$TMPDIR" ] && [ -w "$TMPDIR" ] && [ "$(df -Pk "$TMPDIR" | awk 'NR==2{{print $4}}')" -gt {min_kb} ]; then
   JOB_TMP="$TMPDIR/isg_$SLURM_JOB_ID"
+elif [ -w /dev/shm ] && [ "$(df -Pk /dev/shm | awk 'NR==2{{print $4}}')" -gt {min_kb} ]; then
+  JOB_TMP="/dev/shm/isg_$SLURM_JOB_ID"  # a node whose /tmp is full: RAM-backed scratch (charged to the job's --mem)
 else
   JOB_TMP={q(args.fallback_tmp)}/isg_$SLURM_JOB_ID
 fi
