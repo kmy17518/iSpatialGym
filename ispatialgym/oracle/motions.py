@@ -101,6 +101,10 @@ class MotionsConfig:
     #: the pose-goal fallback is accepted only within this joint distance of the witness; further is another IK branch, and the
     #: chained legs that follow (tracked from the witness's branch) would fail - the attempt fails instead and the executor retries
     witness_branch_max_jump: float = 0.6
+    #: first-demo v2.2 (kielbasa 0928-025936 / 050633 / 050708, cap 0927-221834): when every joint-space round to a witness fails
+    #: and the pose-goal fallback lands in another IK branch (where ``plan_failed`` was raised), the witness is planned to through
+    #: these arm postures in turn (start -> posture -> witness, two joint-space plans) before the attempt fails
+    witness_via_postures: Tuple[str, ...] = ("ready", "untucked")
     #: the protected-object transit remedy (owner 2026-09-26, ``Motions.protecting``): the hand first rises this much where it
     #: is, the plan goes to the point this much above the transit's goal, then straight down; direct re-plans when that fails
     protect_lift_m: float = 0.12
@@ -422,6 +426,8 @@ class Motions:
         self.protect_checks = 0
         # every witness whose other-branch pose-goal plan was kept (``arm_to(accept_other_branch=True)``, a push's pre-contact)
         self.witness_branch_accepted_events: List[Dict[str, Any]] = []
+        # every witness reached through an arm posture (``cfg.witness_via_postures``) instead of failing the attempt
+        self.witness_via_posture_events: List[Dict[str, Any]] = []
         self._joint_limits = (
             self.robot.joint_lower_limits[self.robot.trunk_control_idx],
             self.robot.joint_upper_limits[self.robot.trunk_control_idx],
@@ -1179,6 +1185,45 @@ class Motions:
         finally:
             self._protect = P
 
+    def _plan_via_posture(self, emb: str, arm: str, q_start: th.Tensor, q_goal: th.Tensor, relax, why: str):
+        """The witness ``q_goal`` reached through an arm posture (``cfg.witness_via_postures``, in turn): start -> posture -> witness
+        as two joint-space plans; the first posture both legs plan through wins and is recorded (``witness_via_posture_events``).
+        None when none does - the caller then raises ``plan_failed`` as before."""
+        import copy
+
+        idx = self.robot.arm_control_idx[arm]
+        tried: List[str] = []
+        for name in self.cfg.witness_via_postures:
+            q_via = q_start.clone()
+            if name == "ready":
+                q_via[idx] = th.tensor(M.ARM_READY_Q[arm], dtype=q_via.dtype)
+            elif name == "untucked":
+                q_via[idx] = C.as_tensor(self.robot.untucked_default_joint_pos)[idx].to(q_via.dtype)
+            else:
+                continue
+            legs: List[th.Tensor] = []
+            q_from, plan_time, r = q_start, 0.0, None
+            for q_to in (q_via, q_goal):
+                with (relax(emb, q_from, (arm,)) if relax is not None else nullcontext([])) as relaxed:
+                    if relax is not None:
+                        self.last_relaxed_links = list(relaxed)
+                    r = self.backend.plan_joint(emb, q_to, q_start=q_from, max_attempts=self.cfg.plan_attempts, sync_world=False)
+                if not r.success:
+                    break
+                legs.append(C.as_tensor(r.q_traj))
+                plan_time += float(getattr(r, "plan_time", 0.0) or 0.0)
+                q_from = legs[-1][-1].reshape(-1)
+            tried.append(f"{name}: " + ("ok" if len(legs) == 2 else f"leg {len(legs) + 1} failed"))
+            if len(legs) == 2:
+                self.witness_via_posture_events.append({"arm": arm, "posture": name, "why": why, "tried": list(tried)})
+                log.warning("arm_to(%s): VIA POSTURE - the joint-space plan to the witness failed every round and %s; the witness is reached through "
+                            "the %s posture (start -> %s -> witness)", arm, why, name, name)
+                out = copy.copy(r)
+                out.success, out.q_traj, out.status, out.plan_time = True, th.cat([legs[0], legs[1][1:]]), f"via the {name} posture", plan_time
+                return out
+        log.info("arm_to(%s): no posture carries the witness transit (%s)", arm, "; ".join(tried))
+        return None
+
     def arm_to(self, arms: Union[str, Sequence[str]], pose: Any = None, q: Any = None, ignore_objects=(), q_hint: Any = None,
                max_excursion: Optional[float] = None, ignore_links=(), accept_other_branch: bool = False) -> Iterator[th.Tensor]:
         """cuRobo trajopt of the arm(s) with the trunk locked, then streamed. Exactly one of ``pose`` (a world pose
@@ -1257,6 +1302,7 @@ class Motions:
                 # margin-0 test setting, or a sweep through the target). Fall back to the pose goal in cuRobo's own branch before
                 # giving up; the legs that follow start from wherever the hand is (arm_along tracks from the current configuration)
                 diag_js = dict(res.diagnostics)
+                q_goal_js = q_goal.clone()
                 targets = {M.EEF_LINK[arm]: as_world_pose(pose)}
                 if relax is not None:
                     with relax(emb, q_start, arms) as relaxed:
@@ -1264,30 +1310,39 @@ class Motions:
                         res = self.backend.plan_pose(emb, targets, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
                 else:
                     res = self.backend.plan_pose(emb, targets, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+                via = None
                 if not res.success:
-                    raise SkillError("plan_failed", f"arm_to({arm}, witness q): {diag_js.get('trajopt_verdict') or 'joint-space plan failed'}; pose-goal fallback: {res.status}",
-                                     diagnostics={"joint_goal": diag_js, "pose_goal": dict(res.diagnostics)}, stage="trajopt")
-                q_goal = C.as_tensor(res.q_traj[-1]).reshape(-1) if res.q_traj is not None and len(res.q_traj) else q_goal
-                branch_gap = float(th.max(th.abs(q_goal[idx] - q28[idx])))
-                if branch_gap > self.cfg.witness_branch_max_jump and accept_other_branch:
-                    # owner 2026-09-26 (axial 0926-043254 wave 10, 0926-050248 wave 11, 0926-051919 wave 12: the push pre-contact witness
-                    # 3.10 rad from cuRobo's branch - from the seeded IK too - trajopt reaches it only through the board and the push
-                    # arc is untrackable from it even when it is reached): the caller's legs start from wherever the hand is (a push:
-                    # Cartesian, closed-loop), so cuRobo's own branch is kept - where this raised before
-                    ev = {"arm": arm, "branch_gap_rad": round(branch_gap, 3), "rounds": 1 + self.cfg.witness_plan_retries}
-                    self.witness_branch_accepted_events.append(ev)
-                    log.warning("arm_to(%s): OTHER BRANCH accepted - the joint-space plan to the witness failed %d rounds; the pose-goal plan ends %.2f rad "
-                                "from it and is kept (the caller's legs are tracked from wherever the hand is)", arm, ev["rounds"], branch_gap)
-                elif branch_gap > self.cfg.witness_branch_max_jump:
-                    # owner 2026-09-25: with the sidecar's legs chained from this witness (the approach tracked from the pre-grasp, the
-                    # finish aimed at the grasp witness), a pre pose reached in another branch fails the leg that follows anyway
-                    # (0925-172723: pre-grasp 3.13 rad off the witness, the approach stalled, its finish 3.46 rad away, 'the plan swings
-                    # a joint by 3.21 rad'); failing here lets the executor's attempt retry re-plan from the checkpoint instead
-                    raise SkillError("plan_failed", f"arm_to({arm}, witness q): {diag_js.get('trajopt_verdict') or 'joint-space plan failed'} after {1 + self.cfg.witness_plan_retries} rounds; "
-                                     f"the pose-goal plan ends {branch_gap:.2f} rad from the witness (> {self.cfg.witness_branch_max_jump:.2f}: another IK branch, the chained legs would fail)",
-                                     diagnostics={"joint_goal": diag_js, "pose_goal": dict(res.diagnostics)}, stage="trajopt", excursion=branch_gap)
-                log.warning("arm_to(%s): joint-space plan to the witness failed (%s); planned to the pose in cuRobo's own branch instead (joint distance to the witness %.2f rad)",
-                            arm, diag_js.get("trajopt_verdict"), branch_gap)
+                    via = self._plan_via_posture(emb, arm, q_start, q_goal_js, relax, f"the pose-goal fallback failed too ({res.status})")
+                    if via is None:
+                        raise SkillError("plan_failed", f"arm_to({arm}, witness q): {diag_js.get('trajopt_verdict') or 'joint-space plan failed'}; pose-goal fallback: {res.status}",
+                                         diagnostics={"joint_goal": diag_js, "pose_goal": dict(res.diagnostics)}, stage="trajopt")
+                else:
+                    q_goal = C.as_tensor(res.q_traj[-1]).reshape(-1) if res.q_traj is not None and len(res.q_traj) else q_goal
+                    branch_gap = float(th.max(th.abs(q_goal[idx] - q28[idx])))
+                    if branch_gap > self.cfg.witness_branch_max_jump and accept_other_branch:
+                        # owner 2026-09-26 (axial 0926-043254 wave 10, 0926-050248 wave 11, 0926-051919 wave 12: the push pre-contact witness
+                        # 3.10 rad from cuRobo's branch - from the seeded IK too - trajopt reaches it only through the board and the push
+                        # arc is untrackable from it even when it is reached): the caller's legs start from wherever the hand is (a push:
+                        # Cartesian, closed-loop), so cuRobo's own branch is kept - where this raised before
+                        ev = {"arm": arm, "branch_gap_rad": round(branch_gap, 3), "rounds": 1 + self.cfg.witness_plan_retries}
+                        self.witness_branch_accepted_events.append(ev)
+                        log.warning("arm_to(%s): OTHER BRANCH accepted - the joint-space plan to the witness failed %d rounds; the pose-goal plan ends %.2f rad "
+                                    "from it and is kept (the caller's legs are tracked from wherever the hand is)", arm, ev["rounds"], branch_gap)
+                    elif branch_gap > self.cfg.witness_branch_max_jump:
+                        # owner 2026-09-25: with the sidecar's legs chained from this witness (the approach tracked from the pre-grasp, the
+                        # finish aimed at the grasp witness), a pre pose reached in another branch fails the leg that follows anyway
+                        # (0925-172723: pre-grasp 3.13 rad off the witness, the approach stalled, its finish 3.46 rad away, 'the plan swings
+                        # a joint by 3.21 rad'); failing here lets the executor's attempt retry re-plan from the checkpoint instead
+                        via = self._plan_via_posture(emb, arm, q_start, q_goal_js, relax, f"the pose-goal plan ends {branch_gap:.2f} rad from it")
+                        if via is None:
+                            raise SkillError("plan_failed", f"arm_to({arm}, witness q): {diag_js.get('trajopt_verdict') or 'joint-space plan failed'} after {1 + self.cfg.witness_plan_retries} rounds; "
+                                             f"the pose-goal plan ends {branch_gap:.2f} rad from the witness (> {self.cfg.witness_branch_max_jump:.2f}: another IK branch, the chained legs would fail)",
+                                             diagnostics={"joint_goal": diag_js, "pose_goal": dict(res.diagnostics)}, stage="trajopt", excursion=branch_gap)
+                    if via is None:
+                        log.warning("arm_to(%s): joint-space plan to the witness failed (%s); planned to the pose in cuRobo's own branch instead (joint distance to the witness %.2f rad)",
+                                    arm, diag_js.get("trajopt_verdict"), branch_gap)
+                if via is not None:
+                    res, q_goal = via, q_goal_js
             if max_excursion is not None:
                 idx = self.robot.arm_control_idx[arm]
                 exc = float(th.max(th.abs(q_goal[idx] - q_start[idx])))

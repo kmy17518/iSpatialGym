@@ -181,6 +181,16 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   `twin_choice.held_arm`, kit `held_arm_*`. Every grasp record carries `extras.arm_offer` (fired / not fired and why, template
   and offered arms, the arm, `against_default`, the mirrored band), copied by the executor into the grasp action's notes.
   Tests: `test_left_arm.py`, `test_left_arm_held.py`, `test_left_arm_large.py`.
+- **Oracle: a witness no direct plan reaches is planned to through an arm posture** (first-demo v2.2; kielbasa 0928-050633 /
+  050708 / 025936, one instance: every joint-space round to the pre-grasp witness failed and the pose-goal fallback ended
+  3.02 rad away, in another IK branch; cap 0927-221834 the same). Only where `arm_to(q_hint)` raised `plan_failed` - every
+  joint-space round failed and the pose-goal fallback failed or ended past `witness_branch_max_jump` without
+  `accept_other_branch` - start -> posture -> witness is planned as two joint-space plans through `witness_via_postures`
+  (ready, then untucked); the first that plans is streamed like the direct plan (protection gate, residual close), else
+  `plan_failed` as before. Recorded per action (`notes.witness_via_posture`: the events, or "not fired") and per episode.
+  Exposure over the v2.1 / v2.2 sweeps and canaries: 4 runs, all failed before (the kielbasa instance ×3, cap
+  0927-221834); the kielbasa instance succeeds with it (local replay 0928-054327: via the ready posture). Tests:
+  `test_v2_oracle.py::test_arm_to_witness_retries_the_joint_plan_and_refuses_another_branch`.
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

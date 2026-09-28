@@ -1355,6 +1355,10 @@ class Executor:
             if events:  # staged release: the first stage of this release and / or the deferred full opening a retreat completed
                 rec.notes["release"] = events
                 self.motions.release_events.clear()
+            via = list(getattr(self.motions, "witness_via_posture_events", None) or []) if self.motions is not None else []
+            seen = getattr(self, "_via_seen", 0)
+            rec.notes["witness_via_posture"] = via[seen:] if len(via) > seen else "not fired"
+            self._via_seen = len(via)
             rec.attempts.append(None if verdict is None else verdict.to_dict())
             if verdict is None:
                 self._absorb_branch_decisions(index, ctx)
@@ -2057,6 +2061,7 @@ class Executor:
             "kept_hold_arms": sorted(getattr(self.motions, "keep_hold_arms", ()) or ()),
             "jams": _jsonable(list(getattr(self.motions, "jams", []) or [])),
             "witness_branch_accepted": _jsonable(list(getattr(self.motions, "witness_branch_accepted_events", []) or [])),
+            "witness_via_posture": _jsonable(list(getattr(self.motions, "witness_via_posture_events", []) or [])),
             "protection": _jsonable({"protected": [getattr(o, "name", n) for n, o in self.protected_goal], "plan_checks": int(getattr(self.motions, "protect_checks", 0) or 0),
                                      "fired": list(getattr(self.motions, "protect_events", []) or []) + list(getattr(self.monitors, "protect_events", []) or [])}),
             "demo_gating": demo_gating,
