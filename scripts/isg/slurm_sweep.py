@@ -153,19 +153,23 @@ def prod_job_script(job_dir, alias, start, count, max_attempts, args):
     appdata = 'export OMNIGIBSON_APPDATA_PATH="$TMPDIR/appdata"\n' if args.local_appdata else ""
     data = q(os.path.realpath(args.data_path or os.path.join(REPO, "Behavior-1K", "datasets")))
     if getattr(args, "snapshot_link", None):
-        # a symlink to a frozen checkout of both repos (<snap>/ispatialgym, <snap>/Behavior-1K), resolved once when the job
-        # starts: a job runs one snapshot throughout, jobs that start later pick up whatever the link points to by then
-        resolve = f"SNAP=$(readlink -f {q(args.snapshot_link)})\nCODE=\"$SNAP/ispatialgym\"; B1K=\"$SNAP/Behavior-1K\"\n"
-        snapshot = ('export PYTHONPATH="$CODE:$B1K/OmniGibson:$B1K/bddl3${PYTHONPATH:+:$PYTHONPATH}"\n'
+        # everything but the job's parameters lives in the snapshot's scripts/isg/prod_job.sh
+        env = {"PROD_ALIAS": alias, "PROD_START": start, "PROD_COUNT": count, "PROD_OUT": job_dir, "PROD_SEED": args.seed,
+               "PROD_MAX_ATTEMPTS": max_attempts, "PROD_DEMO_WORKERS": args.demo_workers, "PROD_DEMO_MODE": args.demo_mode,
+               "PROD_HOURS": int(args.hours), "PROD_GRACE_MIN": int(args.grace_min), "PROD_THREADS": int(args.cpus_per_proc),
+               "PROD_HOME": args.home, "PROD_CONDA_SH": args.conda_sh, "PROD_ENV": args.env,
+               "PROD_DATA_PATH": os.path.realpath(args.data_path or os.path.join(REPO, "Behavior-1K", "datasets")),
+               "PROD_FALLBACK_TMP": args.fallback_tmp, "PROD_MIN_SCRATCH_KB": min_kb}
+        return ("#!/bin/bash\n" + f"export PROD_SNAP=\"$(readlink -f {q(args.snapshot_link)})\"\n"
+                + "".join(f"export {k}={q(str(v))}\n" for k, v in env.items())
+                + 'exec bash "$PROD_SNAP/ispatialgym/scripts/isg/prod_job.sh"\n')
+    resolve = f"CODE={q(os.path.abspath(args.code_root or REPO))}\n"
+    snapshot = ""
+    if args.b1k_root:
+        # a frozen checkout of both repos: its packages shadow the env's editable installs (their finders come after sys.path)
+        b1k = q(os.path.abspath(args.b1k_root))
+        snapshot = (f'export PYTHONPATH="$CODE":{b1k}/OmniGibson:{b1k}/bddl3${{PYTHONPATH:+:$PYTHONPATH}}\n'
                     f'export OMNIGIBSON_DATA_PATH={data}\n')
-    else:
-        resolve = f"CODE={q(os.path.abspath(args.code_root or REPO))}\n"
-        snapshot = ""
-        if args.b1k_root:
-            # a frozen checkout of both repos: its packages shadow the env's editable installs (their finders come after sys.path)
-            b1k = q(os.path.abspath(args.b1k_root))
-            snapshot = (f'export PYTHONPATH="$CODE":{b1k}/OmniGibson:{b1k}/bddl3${{PYTHONPATH:+:$PYTHONPATH}}\n'
-                        f'export OMNIGIBSON_DATA_PATH={data}\n')
     threads = int(args.cpus_per_proc)
     worker = ["--alias", alias, "--start", str(start), "--count", str(count), "--out", job_dir, "--seed", str(args.seed),
               "--max-attempts", str(max_attempts), "--demo-workers", str(args.demo_workers), "--demo-mode", args.demo_mode]
