@@ -96,6 +96,42 @@ def replay(demo_dirs, root: str, repo_id: str, task_name: str, resume: bool = Fa
         og.clear()
 
 
+def replay_group(demo_dirs, root: str, repo_id: str, task_name: str, resume: bool = False, flush_every_n_steps: int = 1000):
+    """Demos of one template (the same scene objects) into one dataset through one playback environment: replay_obs's writer
+    and settings (replay_hdf5_file's kwargs) with AlignedLeRobotPlaybackWrapper, built from the first demo; before each next
+    demo the wrapper's input file and scene file are switched (playback_episode restores the scene from the scene file)."""
+    import json
+
+    import h5py
+    from omnigibson.envs.data_wrapper import _align_scene_object_states_with_recorded_schema
+    from omnigibson.eval.utils.eval_utils import PROPRIOCEPTION_INDICES
+    from omnigibson.macros import gm
+
+    from ispatialgym.oracle.behavior_lerobot import ROBOT_OBS_MODALITIES, ROBOT_SENSOR_CONFIG
+
+    gm.ENABLE_TRANSITION_RULES = False
+    env = AlignedLeRobotPlaybackWrapper.create_from_hdf5(
+        input_path=os.path.join(demo_dirs[0], "demo.hdf5"), full_scene_file=None, load_room_instances=None, robot_sensor_config=ROBOT_SENSOR_CONFIG,
+        n_render_iterations=1, flush_every_n_steps=flush_every_n_steps, flush_every_n_traj=1, include_robot_control=False,
+        robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()), robot_obs_modalities=list(ROBOT_OBS_MODALITIES), include_contacts=False,
+        output_path=repo_id, root_dir=root, overwrite=not resume, robot_type="R1Pro", task_name=task_name, include_task_obs=False)
+    env.load_observation_space()
+    done = []
+    for k, demo_dir in enumerate(demo_dirs):
+        if k > 0:
+            env.input_hdf5.close()
+            env.input_hdf5 = h5py.File(os.path.join(demo_dir, "demo.hdf5"), "r")
+            env.recorded_scene_file = json.loads(env.input_hdf5["data"].attrs["scene_file"])
+            env.scene_file = env.recorded_scene_file
+            _align_scene_object_states_with_recorded_schema(scene=env.scene, recorded_scene_file=env.recorded_scene_file)
+        episodes = sorted(int(key.split("_", 1)[1]) for key in env.input_hdf5["data"].keys() if key.startswith("demo_"))
+        env.playback_episode(episode_id=episodes[-1], record_data=True)
+        done.append(demo_dir)
+        print(f"REPLAY_OBS_DONE {demo_dir}", flush=True)
+    env.save_data()
+    return done
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--demo", required=True, help="demo dir(s) holding demo.hdf5, comma-separated")
@@ -107,8 +143,14 @@ def main(argv=None) -> int:
     p.add_argument("--unmodified", action="store_true",
                    help="BEHAVIOR's LeRobotPlaybackWrapper as is (the observation of state[i - 1] with action i, velocities zeroed by "
                         "keep_still) instead of AlignedLeRobotPlaybackWrapper")
+    p.add_argument("--one-world", action="store_true",
+                   help="the demos share a template: one playback environment for all of them (replay_group) instead of replay_obs's "
+                        "replay_hdf5_file per demo")
     a = p.parse_args(argv)
-    replay(a.demo.split(","), a.root, a.repo_id, a.task, a.resume, a.flush_every_n_steps, aligned=not a.unmodified)
+    if a.one_world:
+        replay_group(a.demo.split(","), a.root, a.repo_id, a.task, a.resume, a.flush_every_n_steps)
+    else:
+        replay(a.demo.split(","), a.root, a.repo_id, a.task, a.resume, a.flush_every_n_steps, aligned=not a.unmodified)
     return 0
 
 

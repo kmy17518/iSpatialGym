@@ -109,37 +109,51 @@ def main(argv=None) -> int:
     ap.add_argument("--shard", required=True, help="replay shard name under <task dir>/replay/lerobot")
     ap.add_argument("--audit", default=None, help="glob of check_provisional.py reports")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--part", type=int, default=0, help="this job's share of the template groups (parallel replay jobs)")
+    ap.add_argument("--parts", type=int, default=1)
+    ap.add_argument("--group-size", type=int, default=8, help="demos per playback process (one world per template group)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
     task_dir = os.path.abspath(args.task_dir)
     task = os.path.basename(task_dir)
     demos, why = qualifying(task_dir, audit_labels(args.audit))
     demos = demos[: args.limit] if args.limit else demos
-    print("REPLAY_PLAN " + json.dumps({"task": task, "replay": len(demos), "retried": sum(d["retried"] for d in demos), "by_reason": why}), flush=True)
-    if args.dry_run or not demos:
+    groups = {}
+    for d in demos:
+        tro = json.load(open(os.path.join(d["demo"], "meta.json")))["tro_path"]
+        groups.setdefault(os.path.dirname(os.path.dirname(tro)), []).append(d)
+    batches = [ds[i: i + args.group_size] for _, ds in sorted(groups.items()) for i in range(0, len(ds), args.group_size)]
+    batches = batches[args.part:: args.parts]
+    print("REPLAY_PLAN " + json.dumps({"task": task, "replay": len(demos), "retried": sum(d["retried"] for d in demos), "by_reason": why,
+                                       "templates": len(groups), "this_part": sum(len(b) for b in batches)}), flush=True)
+    if args.dry_run or not batches:
         return 0
     import subprocess
 
     root = os.path.join(task_dir, "replay", "lerobot")
     os.makedirs(root, exist_ok=True)
-    manifest = os.path.join(root, args.shard + ".episodes.json")
+    shard = args.shard if args.parts == 1 else f"{args.shard}_p{args.part}"
+    manifest = os.path.join(root, shard + ".episodes.json")
     done = json.load(open(manifest)) if os.path.exists(manifest) else []
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "replay_obs_isg.py")
-    for d in demos:
-        n = complete_scene_file(d["demo"])
-        # a process per demo (a world per demo, as replay_obs.py)
-        cmd = [sys.executable, script, "--demo", d["demo"], "--root", root, "--repo-id", args.shard, "--task", task]
-        if os.path.exists(os.path.join(root, args.shard, "meta", "info.json")):
+    for batch in batches:
+        for d in batch:
+            d["scene_states_filled"] = complete_scene_file(d["demo"])
+        cmd = [sys.executable, script, "--demo", ",".join(d["demo"] for d in batch), "--root", root, "--repo-id", shard, "--task", task, "--one-world"]
+        if os.path.exists(os.path.join(root, shard, "meta", "info.json")):
             cmd.append("--resume")
-        rc = subprocess.run(cmd).returncode
-        if rc != 0 or not os.path.exists(os.path.join(root, args.shard, "meta", "info.json")):
-            print("REPLAY_FAILED " + json.dumps({**d, "rc": rc}), flush=True)
+        p = subprocess.run(cmd, capture_output=True, text=True)
+        finished = [ln.split(" ", 1)[1].strip() for ln in p.stdout.splitlines() if ln.startswith("REPLAY_OBS_DONE ")]
+        if p.returncode != 0 or len(finished) != len(batch):
+            # the shard is finalized only when the whole process ends; a process that did not end leaves the batch out
+            print("REPLAY_FAILED " + json.dumps({"rc": p.returncode, "demos": [d["demo"] for d in batch], "finished": finished,
+                                                 "stderr_tail": p.stderr[-2000:]}), flush=True)
             continue
-        done.append({**d, "scene_states_filled": n})
+        done.extend(batch)
         with open(manifest + ".tmp", "w") as f:
             json.dump(done, f, indent=1)
         os.replace(manifest + ".tmp", manifest)
-        print("REPLAYED " + json.dumps(done[-1]), flush=True)
+        print("REPLAYED " + json.dumps({"demos": len(batch), "shard": shard, "total": len(done)}), flush=True)
     return 0
 
 

@@ -63,13 +63,41 @@ def episode_sources(sweep_root: str, task: str) -> dict:
         for iid, r in rows.items():
             b = r.get("behavior_lerobot") or {}
             if b.get("shard") and b.get("episode_index") is not None:
-                src.setdefault(b["shard"], {})[int(b["episode_index"])] = {"instance": iid, "demo": r.get("out"), "job_dir": os.path.dirname(rp),
-                                                                          "source": "collection"}
+                src.setdefault(os.path.realpath(b["shard"]), {})[int(b["episode_index"])] = {
+                    "instance": iid, "demo": r.get("out"), "job_dir": os.path.dirname(rp), "source": "collection"}
     for mp in glob.glob(os.path.join(sweep_root, task, "replay", "lerobot", "*.episodes.json")):
-        shard = mp[: -len(".episodes.json")]
+        shard = os.path.realpath(mp[: -len(".episodes.json")])
         for k, e in enumerate(json.load(open(mp))):
             src.setdefault(shard, {})[k] = {**e, "source": "replay"}
     return src
+
+
+def fix_episode_meta_locations(root: str) -> int:
+    """Point every episode row's ``meta/episodes/{chunk,file}_index`` at the metadata file it sits in. A shard finalized after
+    each episode and resumed has one metadata file per episode, and aggregate_datasets copies the source indices into the
+    single destination file, so a later reader (another aggregation) looks for files that do not exist."""
+    import pandas as pd
+
+    fixed = 0
+    for p in sorted(glob.glob(os.path.join(root, "meta", "episodes", "chunk-*", "file-*.parquet"))):
+        chunk = int(os.path.basename(os.path.dirname(p)).split("-")[1])
+        file = int(os.path.basename(p).split("-")[1].split(".")[0])
+        e = pd.read_parquet(p)
+        if "meta/episodes/file_index" in e.columns and ((e["meta/episodes/file_index"] != file) | (e["meta/episodes/chunk_index"] != chunk)).any():
+            fixed += int(((e["meta/episodes/file_index"] != file) | (e["meta/episodes/chunk_index"] != chunk)).sum())
+            e["meta/episodes/chunk_index"] = chunk
+            e["meta/episodes/file_index"] = file
+            e.to_parquet(p)
+    return fixed
+
+
+def readable_dataset(root: str) -> None:
+    """lerobot opens the dataset and decodes the first and last frame."""
+    from lerobot.datasets import LeRobotDataset
+
+    ds = LeRobotDataset(repo_id="check", root=root)
+    for i in (0, len(ds) - 1):
+        _ = ds[i]
 
 
 def aggregate(inputs, repo_id: str, out_root: str, data_mb, video_mb) -> int:
@@ -79,7 +107,9 @@ def aggregate(inputs, repo_id: str, out_root: str, data_mb, video_mb) -> int:
     expected = sum(dataset_episodes(r) for r in inputs)
     aggregate_datasets(repo_ids=[os.path.relpath(r, os.path.dirname(r)) for r in inputs], roots=[Path(r) for r in inputs],
                        aggr_repo_id=repo_id, aggr_root=Path(tmp), data_files_size_in_mb=data_mb, video_files_size_in_mb=video_mb)
+    fix_episode_meta_locations(tmp)
     verify_aggregate(Path(tmp), expected, require_packed=expected > 1)
+    readable_dataset(tmp)
     if os.path.exists(out_root):
         shutil.rmtree(out_root)
     os.replace(tmp, out_root)
@@ -99,7 +129,7 @@ def aggregate_task(args, task: str) -> dict:
         k = 0
         for r in ready:
             for e in range(dataset_episodes(r)):
-                f.write(json.dumps({"episode_index": k, "shard": r, "shard_episode_index": e, **src.get(os.path.abspath(r), {}).get(e, {})}) + "\n")
+                f.write(json.dumps({"episode_index": k, "shard": r, "shard_episode_index": e, **src.get(os.path.realpath(r), {}).get(e, {})}) + "\n")
                 k += 1
     rec = {"task": task, "dataset": out_root, "episodes": n, "shards": len(ready), "skipped_shards": skipped}
     print("AGGREGATE_TASK " + json.dumps(rec), flush=True)
