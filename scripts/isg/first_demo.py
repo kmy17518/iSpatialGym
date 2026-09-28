@@ -197,6 +197,12 @@ def cmd_run(args):
         # demo records its start state and a pristine TRO copy stays for the fresh-load comparison. Not release evidence until proven.
         cmd = (f"python scripts/isg/warm_task.py --alias {args.alias}{scene}{customs_opt} --max-attempts {args.max_attempts} --seed {args.seed}"
                + (" --sample-only" if getattr(args, "sample_only", False) else "") + (f" --run-isg-args={shlex.quote(args.run_isg_args.strip())}" if extra else ""))
+        if not getattr(args, "sample_only", False):
+            # the comparison pair on the same pod: the pristine TRO copy loaded by a fresh process (start_state_compare.py
+            # <out>/demo <out>/fresh_load)
+            cmd += ("; ptro=$(ls $SMOKE_OUT/inst/*/*/instances/*_pristine-tro_state.json 2>/dev/null | head -1); "
+                    f"if [ -n \"$ptro\" ]; then python -m ispatialgym.oracle.run_isg --instance \"$ptro\" --mode oracle --out $SMOKE_OUT/fresh_load --load-only{extra}; "
+                    "echo FRESH_LOAD_EXIT $?; fi")
     rc = run_local(cmd, out_dir, args.timeout) if args.local else run_remote(cmd, out_dir, args.timeout)
     samp = parse_sampling(os.path.join(out_dir, "inst"))
     demo = parse_meta(os.path.join(out_dir, "demo"))
