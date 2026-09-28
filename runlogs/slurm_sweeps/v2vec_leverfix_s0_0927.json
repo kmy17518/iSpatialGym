@@ -1,0 +1,32 @@
+{
+ "sweep": "v2vec_leverfix_s0_0927",
+ "submitted": "2026-09-27 19:17 PDT",
+ "code_commit": "b54d966965aa271c8b7d71e6076bb4d2844771b9",
+ "dirty": false,
+ "env": "ispatialgym-vectorized-envs",
+ "home": "/vision/u/minyeong/projects/isg_home",
+ "note": "carton lever after b54d9669 (tensorized Open tables rebuilt by restrict_openable_joints)",
+ "sbatch": {
+  "partition": "viscam",
+  "account": "viscam",
+  "gres": "gpu:1",
+  "cpus": 12,
+  "mem": "48G",
+  "exclude": "viscam-hgx-1,viscam-hgx-2,viscam1,viscam9"
+ },
+ "runs": [
+  {
+   "alias": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "run_id": "0927-191744-s00",
+   "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_small_scale/0927-191744-s00",
+   "job_id": "17638906",
+   "max_attempts": 8,
+   "timeout": 9000,
+   "seed": 0,
+   "sample_only": false,
+   "collected": false
+  }
+ ],
+ "pack": 1
+}

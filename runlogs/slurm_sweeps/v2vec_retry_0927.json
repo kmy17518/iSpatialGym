@@ -1,0 +1,32 @@
+{
+ "sweep": "v2vec_retry_0927",
+ "submitted": "2026-09-27 17:36 PDT",
+ "code_commit": "c24df5813bac429d1386e5cc0513efd891d4ad20",
+ "dirty": false,
+ "env": "ispatialgym-vectorized-envs",
+ "home": "/vision/u/minyeong/projects/isg_home",
+ "note": "retry of v2vec_all_0927 s03 (stalled 33 min after Kit start with the shared appdata): per-run Kit appdata",
+ "sbatch": {
+  "partition": "viscam",
+  "account": "viscam",
+  "gres": "gpu:1",
+  "cpus": 12,
+  "mem": "48G",
+  "exclude": "viscam-hgx-1,viscam-hgx-2,viscam1,viscam9,viscam10"
+ },
+ "runs": [
+  {
+   "alias": "camera_relocalization-standard",
+   "subtask": "camera_relocalization-standard",
+   "run_id": "0927-173655-s00",
+   "out": "runlogs/pilot_20260915/first_demo/camera_relocalization-standard/0927-173655-s00",
+   "job_id": "17638338",
+   "max_attempts": 8,
+   "timeout": 9000,
+   "seed": 0,
+   "sample_only": false,
+   "collected": true
+  }
+ ],
+ "pack": 1
+}

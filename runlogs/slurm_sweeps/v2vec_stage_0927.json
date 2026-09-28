@@ -1,0 +1,32 @@
+{
+ "sweep": "v2vec_stage_0927",
+ "submitted": "2026-09-27 18:26 PDT",
+ "code_commit": "369e9f576f0e6935b1eaa6b47b1913d88817f84f",
+ "dirty": false,
+ "env": "ispatialgym-vectorized-envs",
+ "home": "/vision/u/minyeong/projects/isg_home",
+ "note": "dataset staging test: node-local copy of Behavior-1K/datasets",
+ "sbatch": {
+  "partition": "viscam",
+  "account": "viscam",
+  "gres": "gpu:l40s:1",
+  "cpus": 12,
+  "mem": "48G",
+  "exclude": "viscam-hgx-1,viscam-hgx-2,viscam1,viscam9,viscam10"
+ },
+ "runs": [
+  {
+   "alias": "mental_rotation-banana",
+   "subtask": "mental_rotation",
+   "run_id": "0927-182659-s00",
+   "out": "runlogs/pilot_20260915/first_demo/mental_rotation/0927-182659-s00",
+   "job_id": "17638614",
+   "max_attempts": 8,
+   "timeout": 9000,
+   "seed": 0,
+   "sample_only": false,
+   "collected": false
+  }
+ ],
+ "pack": 1
+}
