@@ -1013,6 +1013,9 @@ class SamplerV2(TaskSampler):
                     self.constraints_write_back(draft, self.instance_id(index))
                     self.instance_seeds.append(seed)
                     written.append(path)
+                    # run_isg loads an instance through the template meta; demos replay instances while the rest of the
+                    # template is still being sampled
+                    self.write_template_meta()
                     log.info("%s: instance %d written (attempt %d, %.1fs)", self.gp.alias, index, attempt, time.time() - t0)
                     ok = True
                     break
