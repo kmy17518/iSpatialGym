@@ -134,7 +134,9 @@ def restrict_openable_joints(obj, joint_names: Sequence[str]) -> None:
     is ``lower + 5 % of the range`` per joint, so a flap whose lower limit was extended below its closed position (the
     pressed non-target flap, ``apply_joint_brake`` with ``lower_limit_rad``) counts as *open* while shut and the BDDL
     ``(not (open carton))`` init fails (0919-041120). Patches ``open_state._get_relevant_joints`` once (a per-object
-    registry) and resets an already initialised state."""
+    registry) and resets an already initialised state: the per-object joints of the legacy state, or the joint tables the
+    tensorized state (BEHAVIOR-1K #2329) bakes in ``Open.initialize_view`` - rebuilt here, since the brake's USD edit that
+    precedes this call has just rebuilt them with every flap."""
     from omnigibson.object_states import open_state as OS
 
     if not getattr(OS, "_isg_openable_patched", False):
@@ -160,6 +162,13 @@ def restrict_openable_joints(obj, joint_names: Sequence[str]) -> None:
             st.relevant_joints_info = (False, [obj.joints[n] for n in names], [1] * len(names))
     except Exception:  # noqa: BLE001  (the registry alone covers a state initialised later)
         pass
+    from omnigibson.object_states import Open
+    from omnigibson.object_states.tensorized_state import TensorizedState
+
+    if (issubclass(Open, TensorizedState) and obj.relative_prim_path in (Open.OBJ_IDXS or {})
+            and og.sim.is_playing() and not og.sim.currently_stepping):
+        Open.initialize_view()
+        TensorizedState.caches_dirty = True
 
 
 def apply_hinge_drive(prim_path: str, friction: Optional[float], damping: Optional[float], stiffness: Optional[float] = None,
