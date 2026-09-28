@@ -106,3 +106,12 @@ def test_async_frames_hand_the_sinks_the_same_frames(tmp_path):
                 assert a[k] == b[k], k
     assert np.array_equal(rec0.last_rgb, rec1.last_rgb)
     assert p0["video"] and p1["video"] and os.path.getsize(p0["video"]) == os.path.getsize(p1["video"])
+
+
+def test_async_frames_without_frame_sinks_takes_the_synchronous_path(tmp_path):
+    """``--record hdf5`` (production): no video or LeRobot sink, so no frame is encoded; last_rgb as without the flag."""
+    r0, rec0, _ = _run(tmp_path / "sync", per_scene=False, async_frames=False)
+    r1, rec1, _ = _run(tmp_path / "async", per_scene=False, async_frames=True)
+    assert rec1._pipe is not None and rec1._step_frames({}) is None
+    assert r0["n_steps"] == r1["n_steps"] and r0["success"] == r1["success"]
+    assert np.array_equal(rec0.last_rgb, rec1.last_rgb)

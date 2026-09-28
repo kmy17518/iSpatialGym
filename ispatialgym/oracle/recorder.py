@@ -280,8 +280,11 @@ class Recorder:
         self._last_rgb = v
 
     def _step_frames(self, robs: Dict[str, Any]) -> Optional["_StepFrames"]:
-        """``async_frames``: the step's frames, one per camera key, shared by every sink; None otherwise."""
-        return _StepFrames(self._pipe, robs) if self._pipe is not None else None
+        """``async_frames``: the step's frames, one per camera key, shared by every sink; None otherwise, and when no
+        video or LeRobot sink takes frames (then only ``last_rgb`` is kept, as on the synchronous path)."""
+        if self._pipe is None or not (self.cfg.video or self.cfg.lerobot):
+            return None
+        return _StepFrames(self._pipe, robs)
 
     # ------------------------------------------------------------------ start
 
