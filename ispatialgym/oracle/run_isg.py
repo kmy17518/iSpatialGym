@@ -1071,9 +1071,12 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                 executor.protected_goal = []
         meta["protected_objects"] = {b: getattr(o, "name", b) for b, o in executor.protected_goal}
         log.info("protected during transits (goal objects placed by the task): %s", meta["protected_objects"] or "none")
+        # the scene file start() saves must hold every object's state (BEHAVIOR's playback loads the scene from it); in queue
+        # mode the previous instance left the per-step filter on
+        executor.enable_recording_filter(False)
+        recorder.start(obs, info, state0=executor._dump_state(full=True))
         if rec_cfg.hdf5:
             executor.enable_recording_filter(True)
-        recorder.start(obs, info, state0=executor._dump_state(full=True))
 
         # ---------------------------------------------------------------- run
         t0 = time.time()

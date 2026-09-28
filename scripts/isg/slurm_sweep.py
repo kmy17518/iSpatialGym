@@ -401,7 +401,7 @@ def cmd_provenance(args):
         for ln in open(p):
             if ln.strip():
                 a = json.loads(ln)
-                audit[(a["job_dir"], a["instance"])] = "disturbed" if a.get("disturbed") else "clean"
+                audit[(a["job_dir"], a["instance"])] = "no_hdf5" if a.get("hdf5_error") else ("disturbed" if a.get("disturbed") else "clean")
     n_rows = n_meta = 0
     index = []
     for j in m["jobs"]:
