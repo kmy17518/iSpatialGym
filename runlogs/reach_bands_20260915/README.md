@@ -393,7 +393,7 @@ job; A5000 / L40S nodes of the viscam partition), the six sampler bands by the s
 | band (key) | computed by | v2.0 cells | now | comparison with the committed v2.0 metadata |
 | --- | --- | --- | --- | --- |
 | `floor__…__shampoo_dispenser-zoyyia__ebf5e8a1` | worker | 145 | 145 | identical (stance, every trunk's counts); v2.0 `.json` kept |
-| `tabletop__…countertop_fjkase_0__shampoo_dispenser-zoyyia__ad9f7959` | worker | see below | | |
+| `tabletop__…countertop_fjkase_0__shampoo_dispenser-zoyyia__ad9f7959` | worker | 621 | 619 | ±1-2 on 8 trunks; the shoulder sits 1.4 mm higher on every trunk (as in the older `floor__…__c7e488d3`: v2.0's band likely predates the 250 kg chassis); new `.json` |
 | `handle__…__carton-cdmmwy__a2d384b5` | sampler | 311 | 311 | identical; v2.0 `.json` kept |
 | `handle__…__carton-cdmmwy__3ef569c1` (the push-close class v2.0 also computed in-process) | sampler | 235 | 235 | identical; v2.0 `.json` kept |
 | `tabletop__…__bar_soap-ofargb__b0cb991a` | sampler | 762 | 762 | identical; v2.0 `.json` kept |
