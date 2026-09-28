@@ -1,5 +1,5 @@
 {
- "generated": "2026-09-28T01:55",
+ "generated": "2026-09-28T08:41",
  "rule": "Symlink the head_rgb.mp4 of the latest successful first_demo demo per (task, object).\n\nRules\n  * task     = subtask directory under first_demo (alignment-world_horizontal excluded)\n  * success  = meta.json status == \"success\" and head_rgb.mp4 present,\n               minus runs the owner vetoed in the ledger (\"NOT a valid demo\")\n  * object   = alias minus subtask prefix / support suffix / model-id and placement-variant suffixes\n               (so dishwasher == dishwasher_wide, carton_cdmmwy == carton_cdmmwy_near/_lever, blender == blender_eyedvd)\n  * latest   = most recent meta.json mtime (demo completion) within the (task, object) group",
  "excluded_subtasks": [
   "alignment-world_horizontal"
@@ -13,18 +13,23 @@
  ],
  "entries": [
   {
-   "link": "alignment-axial__board_game__0927-212705.mp4",
-   "target": "../first_demo/alignment-axial/0927-212705/demo/alignment-axial-board_game-breakfast_table__house_single_floor__target-board_game-qgvsnb__0000/head_rgb.mp4",
+   "link": "alignment-axial__board_game__0928-042045.mp4",
+   "target": "../first_demo/alignment-axial/0928-042045/demo/alignment-axial-board_game-breakfast_table__house_single_floor__target-board_game-qgvsnb__0000/head_rgb.mp4",
    "subtask": "alignment-axial",
    "object": "board_game",
-   "run_id": "0927-212705",
+   "run_id": "0928-042045",
    "alias": "alignment-axial-board_game-breakfast_table",
    "instance": "alignment-axial-board_game-breakfast_table__house_single_floor__target-board_game-qgvsnb__0000",
-   "completed": "2026-09-27T21:39",
+   "completed": "2026-09-28T04:34",
    "n_steps": 518,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-212705",
+     "alias": "alignment-axial-board_game-breakfast_table",
+     "completed": "2026-09-27T21:39"
+    },
     {
      "run_id": "0927-212340",
      "alias": "alignment-axial-board_game-breakfast_table",
@@ -168,18 +173,23 @@
    ]
   },
   {
-   "link": "alignment-world_vertical__painting__0927-205922.mp4",
-   "target": "../first_demo/alignment-world_vertical/0927-205922/demo/alignment-world_vertical-painting_s070-walls__house_single_floor__target-painting-dacihj-s0.7__0000/head_rgb.mp4",
+   "link": "alignment-world_vertical__painting__0928-043205.mp4",
+   "target": "../first_demo/alignment-world_vertical/0928-043205/demo/alignment-world_vertical-painting_s070-walls__house_single_floor__target-painting-dacihj-s0.7__0000/head_rgb.mp4",
    "subtask": "alignment-world_vertical",
    "object": "painting",
-   "run_id": "0927-205922",
+   "run_id": "0928-043205",
    "alias": "alignment-world_vertical-painting_s070-walls",
    "instance": "alignment-world_vertical-painting_s070-walls__house_single_floor__target-painting-dacihj-s0.7__0000",
-   "completed": "2026-09-27T21:09",
+   "completed": "2026-09-28T04:46",
    "n_steps": 1149,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-205922",
+     "alias": "alignment-world_vertical-painting_s070-walls",
+     "completed": "2026-09-27T21:09"
+    },
     {
      "run_id": "0927-205225",
      "alias": "alignment-world_vertical-painting_s070-walls",
@@ -378,18 +388,23 @@
    ]
   },
   {
-   "link": "camera_relocalization-obstructed__footstool_1__0927-211957.mp4",
-   "target": "../first_demo/camera_relocalization-obstructed/0927-211957/demo/camera_relocalization-obstructed-footstool_1__house_single_floor__obstacles-footstool_1__0000/head_rgb.mp4",
+   "link": "camera_relocalization-obstructed__footstool_1__0928-044805.mp4",
+   "target": "../first_demo/camera_relocalization-obstructed/0928-044805/demo/camera_relocalization-obstructed-footstool_1__house_single_floor__obstacles-footstool_1__0000/head_rgb.mp4",
    "subtask": "camera_relocalization-obstructed",
    "object": "footstool_1",
-   "run_id": "0927-211957",
+   "run_id": "0928-044805",
    "alias": "camera_relocalization-obstructed-footstool_1",
    "instance": "camera_relocalization-obstructed-footstool_1__house_single_floor__obstacles-footstool_1__0000",
-   "completed": "2026-09-27T21:31",
-   "n_steps": 624,
+   "completed": "2026-09-28T05:01",
+   "n_steps": 999,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-211957",
+     "alias": "camera_relocalization-obstructed-footstool_1",
+     "completed": "2026-09-27T21:31"
+    },
     {
      "run_id": "0927-040237",
      "alias": "camera_relocalization-obstructed-footstool_1",
@@ -463,18 +478,23 @@
    ]
   },
   {
-   "link": "camera_relocalization-standard__0927-211908.mp4",
-   "target": "../first_demo/camera_relocalization-standard/0927-211908/demo/camera_relocalization-standard__house_single_floor__0000/head_rgb.mp4",
+   "link": "camera_relocalization-standard__0928-044905.mp4",
+   "target": "../first_demo/camera_relocalization-standard/0928-044905/demo/camera_relocalization-standard__house_single_floor__0000/head_rgb.mp4",
    "subtask": "camera_relocalization-standard",
    "object": "",
-   "run_id": "0927-211908",
+   "run_id": "0928-044905",
    "alias": "camera_relocalization-standard",
    "instance": "camera_relocalization-standard__house_single_floor__0000",
-   "completed": "2026-09-27T21:27",
-   "n_steps": 400,
+   "completed": "2026-09-28T04:59",
+   "n_steps": 563,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-211908",
+     "alias": "camera_relocalization-standard",
+     "completed": "2026-09-27T21:27"
+    },
     {
      "run_id": "0927-040239",
      "alias": "camera_relocalization-standard",
@@ -568,18 +588,23 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_close_large_scale__dishwasher__0927-210926.mp4",
-   "target": "../first_demo/configuration_matching-articulation_close_large_scale/0927-210926/demo/configuration_matching-articulation_close_large_scale-dishwasher__house_single_floor__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_close_large_scale__dishwasher__0928-043425.mp4",
+   "target": "../first_demo/configuration_matching-articulation_close_large_scale/0928-043425/demo/configuration_matching-articulation_close_large_scale-dishwasher__house_single_floor__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_close_large_scale",
    "object": "dishwasher",
-   "run_id": "0927-210926",
+   "run_id": "0928-043425",
    "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
    "instance": "configuration_matching-articulation_close_large_scale-dishwasher__house_single_floor__0000",
-   "completed": "2026-09-27T21:16",
+   "completed": "2026-09-28T04:45",
    "n_steps": 567,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-210926",
+     "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+     "completed": "2026-09-27T21:16"
+    },
     {
      "run_id": "0927-131003",
      "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
@@ -648,18 +673,23 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_close_large_scale__door__0927-202321.mp4",
-   "target": "../first_demo/configuration_matching-articulation_close_large_scale/0927-202321/demo/configuration_matching-articulation_close_large_scale-door__house_single_floor__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_close_large_scale__door__0928-040743.mp4",
+   "target": "../first_demo/configuration_matching-articulation_close_large_scale/0928-040743/demo/configuration_matching-articulation_close_large_scale-door__house_single_floor__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_close_large_scale",
    "object": "door",
-   "run_id": "0927-202321",
+   "run_id": "0928-040743",
    "alias": "configuration_matching-articulation_close_large_scale-door",
    "instance": "configuration_matching-articulation_close_large_scale-door__house_single_floor__0000",
-   "completed": "2026-09-27T21:15",
+   "completed": "2026-09-28T05:02",
    "n_steps": 3028,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-202321",
+     "alias": "configuration_matching-articulation_close_large_scale-door",
+     "completed": "2026-09-27T21:15"
+    },
     {
      "run_id": "0927-040233",
      "alias": "configuration_matching-articulation_close_large_scale-door",
@@ -718,18 +748,23 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_close_small_scale__blender__0927-210444.mp4",
-   "target": "../first_demo/configuration_matching-articulation_close_small_scale/0927-210444/demo/configuration_matching-articulation_close_small_scale-blender-breakfast_table__house_single_floor__target-blender-cwkvib__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_close_small_scale__blender__0928-043245.mp4",
+   "target": "../first_demo/configuration_matching-articulation_close_small_scale/0928-043245/demo/configuration_matching-articulation_close_small_scale-blender-breakfast_table__house_single_floor__target-blender-cwkvib__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_close_small_scale",
    "object": "blender",
-   "run_id": "0927-210444",
+   "run_id": "0928-043245",
    "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
    "instance": "configuration_matching-articulation_close_small_scale-blender-breakfast_table__house_single_floor__target-blender-cwkvib__0000",
-   "completed": "2026-09-27T21:33",
+   "completed": "2026-09-28T04:50",
    "n_steps": 885,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-210444",
+     "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
+     "completed": "2026-09-27T21:33"
+    },
     {
      "run_id": "0927-210241",
      "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
@@ -848,18 +883,53 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_close_small_scale__carton__0928-001817.mp4",
-   "target": "../first_demo/configuration_matching-articulation_close_small_scale/0928-001817/demo/configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table__house_single_floor__target-carton-cdmmwy__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_close_small_scale__carton__0928-070728.mp4",
+   "target": "../first_demo/configuration_matching-articulation_close_small_scale/0928-070728/demo/configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table__house_single_floor__target-carton-cdmmwy__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_close_small_scale",
    "object": "carton",
-   "run_id": "0928-001817",
+   "run_id": "0928-070728",
    "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
    "instance": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table__house_single_floor__target-carton-cdmmwy__0000",
-   "completed": "2026-09-28T00:39",
+   "completed": "2026-09-28T07:17",
    "n_steps": 1265,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-065208",
+     "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+     "completed": "2026-09-28T06:59"
+    },
+    {
+     "run_id": "0928-062528",
+     "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+     "completed": "2026-09-28T06:55"
+    },
+    {
+     "run_id": "0928-044201",
+     "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+     "completed": "2026-09-28T05:09"
+    },
+    {
+     "run_id": "0928-025253",
+     "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+     "completed": "2026-09-28T03:03"
+    },
+    {
+     "run_id": "0928-024656",
+     "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+     "completed": "2026-09-28T02:56"
+    },
+    {
+     "run_id": "0928-022104",
+     "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+     "completed": "2026-09-28T02:47"
+    },
+    {
+     "run_id": "0928-001817",
+     "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+     "completed": "2026-09-28T00:39"
+    },
     {
      "run_id": "0927-233221",
      "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
@@ -1073,18 +1143,23 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_open_large_scale__dishwasher__0927-211314.mp4",
-   "target": "../first_demo/configuration_matching-articulation_open_large_scale/0927-211314/demo/configuration_matching-articulation_open_large_scale-dishwasher__house_single_floor__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_open_large_scale__dishwasher__0928-043431.mp4",
+   "target": "../first_demo/configuration_matching-articulation_open_large_scale/0928-043431/demo/configuration_matching-articulation_open_large_scale-dishwasher__house_single_floor__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "object": "dishwasher",
-   "run_id": "0927-211314",
+   "run_id": "0928-043431",
    "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
    "instance": "configuration_matching-articulation_open_large_scale-dishwasher__house_single_floor__0000",
-   "completed": "2026-09-27T21:32",
+   "completed": "2026-09-28T04:57",
    "n_steps": 1557,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-211314",
+     "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
+     "completed": "2026-09-27T21:32"
+    },
     {
      "run_id": "0927-031305",
      "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
@@ -1243,18 +1318,23 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_open_large_scale__door__0927-222606.mp4",
-   "target": "../first_demo/configuration_matching-articulation_open_large_scale/0927-222606/demo/configuration_matching-articulation_open_large_scale-door__house_single_floor__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_open_large_scale__door__0928-042225.mp4",
+   "target": "../first_demo/configuration_matching-articulation_open_large_scale/0928-042225/demo/configuration_matching-articulation_open_large_scale-door__house_single_floor__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "object": "door",
-   "run_id": "0927-222606",
+   "run_id": "0928-042225",
    "alias": "configuration_matching-articulation_open_large_scale-door",
    "instance": "configuration_matching-articulation_open_large_scale-door__house_single_floor__0000",
-   "completed": "2026-09-27T22:59",
+   "completed": "2026-09-28T05:13",
    "n_steps": 2876,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-222606",
+     "alias": "configuration_matching-articulation_open_large_scale-door",
+     "completed": "2026-09-27T22:59"
+    },
     {
      "run_id": "0927-202323",
      "alias": "configuration_matching-articulation_open_large_scale-door",
@@ -1333,18 +1413,23 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_open_small_scale__blender__0927-213014.mp4",
-   "target": "../first_demo/configuration_matching-articulation_open_small_scale/0927-213014/demo/configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table__house_single_floor__target-blender-eyedvd__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_open_small_scale__blender__0928-043808.mp4",
+   "target": "../first_demo/configuration_matching-articulation_open_small_scale/0928-043808/demo/configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table__house_single_floor__target-blender-eyedvd__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_open_small_scale",
    "object": "blender",
-   "run_id": "0927-213014",
+   "run_id": "0928-043808",
    "alias": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
    "instance": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table__house_single_floor__target-blender-eyedvd__0000",
-   "completed": "2026-09-27T21:46",
+   "completed": "2026-09-28T04:50",
    "n_steps": 936,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0927-213014",
+     "alias": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
+     "completed": "2026-09-27T21:46"
+    },
     {
      "run_id": "0927-212718",
      "alias": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
@@ -1448,18 +1533,23 @@
    ]
   },
   {
-   "link": "configuration_matching-articulation_open_small_scale__carton__0927-202331.mp4",
-   "target": "../first_demo/configuration_matching-articulation_open_small_scale/0927-202331/demo/configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table__house_single_floor__target-carton-cdmmwy__0000/head_rgb.mp4",
+   "link": "configuration_matching-articulation_open_small_scale__carton__0928-043925.mp4",
+   "target": "../first_demo/configuration_matching-articulation_open_small_scale/0928-043925/demo/configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table__house_single_floor__target-carton-cdmmwy__0000/head_rgb.mp4",
    "subtask": "configuration_matching-articulation_open_small_scale",
    "object": "carton",
-   "run_id": "0927-202331",
+   "run_id": "0928-043925",
    "alias": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
    "instance": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table__house_single_floor__target-carton-cdmmwy__0000",
-   "completed": "2026-09-27T20:44",
+   "completed": "2026-09-28T05:05",
    "n_steps": 1604,
    "settled_success": true,
    "qa_verdicts": 1,
    "other_successful_runs": [
+    {
+     "run_id": "0927-202331",
+     "alias": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
+     "completed": "2026-09-27T20:44"
+    },
     {
      "run_id": "0927-202329",
      "alias": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
@@ -1638,18 +1728,28 @@
    ]
   },
   {
-   "link": "configuration_matching-attachment__cap-lemonade_bottle__0928-001825.mp4",
-   "target": "../first_demo/configuration_matching-attachment/0928-001825/demo/configuration_matching-attachment-cap-lemonade_bottle-breakfast_table__house_single_floor__partner-lemonade_bottle-yprkek__target-cap-xxqyrt__0000/head_rgb.mp4",
+   "link": "configuration_matching-attachment__cap-lemonade_bottle__0928-042845.mp4",
+   "target": "../first_demo/configuration_matching-attachment/0928-042845/demo/configuration_matching-attachment-cap-lemonade_bottle-breakfast_table__house_single_floor__partner-lemonade_bottle-yprkek__target-cap-xxqyrt__0000/head_rgb.mp4",
    "subtask": "configuration_matching-attachment",
    "object": "cap-lemonade_bottle",
-   "run_id": "0928-001825",
+   "run_id": "0928-042845",
    "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
    "instance": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table__house_single_floor__partner-lemonade_bottle-yprkek__target-cap-xxqyrt__0000",
-   "completed": "2026-09-28T00:34",
-   "n_steps": 910,
+   "completed": "2026-09-28T05:13",
+   "n_steps": 864,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-021604",
+     "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+     "completed": "2026-09-28T02:41"
+    },
+    {
+     "run_id": "0928-001825",
+     "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+     "completed": "2026-09-28T00:34"
+    },
     {
      "run_id": "0927-221832",
      "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
@@ -1858,18 +1958,23 @@
    ]
   },
   {
-   "link": "configuration_matching-attachment__cork-wine_bottle__0928-001829.mp4",
-   "target": "../first_demo/configuration_matching-attachment/0928-001829/demo/configuration_matching-attachment-cork-wine_bottle-breakfast_table__house_single_floor__partner-wine_bottle-inkqch__target-cork-ncxgpe__0000/head_rgb.mp4",
+   "link": "configuration_matching-attachment__cork-wine_bottle__0928-041525.mp4",
+   "target": "../first_demo/configuration_matching-attachment/0928-041525/demo/configuration_matching-attachment-cork-wine_bottle-breakfast_table__house_single_floor__partner-wine_bottle-inkqch__target-cork-ncxgpe__0000/head_rgb.mp4",
    "subtask": "configuration_matching-attachment",
    "object": "cork-wine_bottle",
-   "run_id": "0928-001829",
+   "run_id": "0928-041525",
    "alias": "configuration_matching-attachment-cork-wine_bottle-breakfast_table",
    "instance": "configuration_matching-attachment-cork-wine_bottle-breakfast_table__house_single_floor__partner-wine_bottle-inkqch__target-cork-ncxgpe__0000",
-   "completed": "2026-09-28T00:31",
-   "n_steps": 887,
+   "completed": "2026-09-28T04:52",
+   "n_steps": 950,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-001829",
+     "alias": "configuration_matching-attachment-cork-wine_bottle-breakfast_table",
+     "completed": "2026-09-28T00:31"
+    },
     {
      "run_id": "0927-205045",
      "alias": "configuration_matching-attachment-cork-wine_bottle-breakfast_table",
@@ -1968,18 +2073,23 @@
    ]
   },
   {
-   "link": "configuration_matching-attachment__lid-teapot__0928-001833.mp4",
-   "target": "../first_demo/configuration_matching-attachment/0928-001833/demo/configuration_matching-attachment-lid-teapot-breakfast_table__house_single_floor__partner-teapot-mvrhya__target-lid-tnwisp__0000/head_rgb.mp4",
+   "link": "configuration_matching-attachment__lid-teapot__0928-044025.mp4",
+   "target": "../first_demo/configuration_matching-attachment/0928-044025/demo/configuration_matching-attachment-lid-teapot-breakfast_table__house_single_floor__partner-teapot-mvrhya__target-lid-tnwisp__0000/head_rgb.mp4",
    "subtask": "configuration_matching-attachment",
    "object": "lid-teapot",
-   "run_id": "0928-001833",
+   "run_id": "0928-044025",
    "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
    "instance": "configuration_matching-attachment-lid-teapot-breakfast_table__house_single_floor__partner-teapot-mvrhya__target-lid-tnwisp__0000",
-   "completed": "2026-09-28T00:37",
-   "n_steps": 917,
+   "completed": "2026-09-28T04:54",
+   "n_steps": 950,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-001833",
+     "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+     "completed": "2026-09-28T00:37"
+    },
     {
      "run_id": "0927-204513",
      "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
@@ -2093,18 +2203,48 @@
    ]
   },
   {
-   "link": "configuration_matching-block_design__block_4__0927-233205.mp4",
-   "target": "../first_demo/configuration_matching-block_design/0927-233205/demo/configuration_matching-block_design-block_4-breakfast_table_board__house_single_floor__board-tray-isgboard__targets-toy_dice_4__0000/head_rgb.mp4",
+   "link": "configuration_matching-block_design__block_4__0928-063744.mp4",
+   "target": "../first_demo/configuration_matching-block_design/0928-063744/demo/configuration_matching-block_design-block_4-breakfast_table_board__house_single_floor__board-tray-isgboard__targets-toy_dice_4__0000/head_rgb.mp4",
    "subtask": "configuration_matching-block_design",
    "object": "block_4",
-   "run_id": "0927-233205",
+   "run_id": "0928-063744",
    "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
    "instance": "configuration_matching-block_design-block_4-breakfast_table_board__house_single_floor__board-tray-isgboard__targets-toy_dice_4__0000",
-   "completed": "2026-09-28T00:21",
-   "n_steps": 3563,
+   "completed": "2026-09-28T07:03",
+   "n_steps": 3646,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-062948",
+     "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+     "completed": "2026-09-28T06:55"
+    },
+    {
+     "run_id": "0928-044105",
+     "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+     "completed": "2026-09-28T05:21"
+    },
+    {
+     "run_id": "0928-023319",
+     "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+     "completed": "2026-09-28T03:08"
+    },
+    {
+     "run_id": "0928-022744",
+     "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+     "completed": "2026-09-28T03:08"
+    },
+    {
+     "run_id": "0928-022058",
+     "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+     "completed": "2026-09-28T02:44"
+    },
+    {
+     "run_id": "0927-233205",
+     "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+     "completed": "2026-09-28T00:21"
+    },
     {
      "run_id": "0927-233153",
      "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
@@ -2268,18 +2408,43 @@
    ]
   },
   {
-   "link": "disembedding__bar_soap-bar_soap_2_biscuit_1__0927-235146.mp4",
-   "target": "../first_demo/disembedding/0927-235146/demo/disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table__house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bar_soap-ofargb__distractors-bar_soap_2-biscuit_1__0000/head_rgb.mp4",
+   "link": "disembedding__bar_soap-bar_soap_2_biscuit_1__0928-045450.mp4",
+   "target": "../first_demo/disembedding/0928-045450/demo/disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table__house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bar_soap-ofargb__distractors-bar_soap_2-biscuit_1__0000/head_rgb.mp4",
    "subtask": "disembedding",
    "object": "bar_soap-bar_soap_2_biscuit_1",
-   "run_id": "0927-235146",
+   "run_id": "0928-045450",
    "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
    "instance": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table__house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bar_soap-ofargb__distractors-bar_soap_2-biscuit_1__0000",
-   "completed": "2026-09-28T00:06",
-   "n_steps": 876,
+   "completed": "2026-09-28T05:18",
+   "n_steps": 778,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-045013",
+     "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+     "completed": "2026-09-28T05:16"
+    },
+    {
+     "run_id": "0928-023004",
+     "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+     "completed": "2026-09-28T03:04"
+    },
+    {
+     "run_id": "0928-024856",
+     "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+     "completed": "2026-09-28T03:00"
+    },
+    {
+     "run_id": "0928-025426",
+     "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+     "completed": "2026-09-28T02:59"
+    },
+    {
+     "run_id": "0927-235146",
+     "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+     "completed": "2026-09-28T00:06"
+    },
     {
      "run_id": "0927-221154",
      "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
@@ -2433,18 +2598,58 @@
    ]
   },
   {
-   "link": "disembedding__bottle_of_milk-bottle_of_milk_1__0928-013557.mp4",
-   "target": "../first_demo/disembedding/0928-013557/demo/disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table__house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bottle_of_milk-mrejrs__distractors-bottle_of_milk_1__0000/head_rgb.mp4",
+   "link": "disembedding__bottle_of_milk-bottle_of_milk_1__0928-071838.mp4",
+   "target": "../first_demo/disembedding/0928-071838/demo/disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table__house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bottle_of_milk-mrejrs__distractors-bottle_of_milk_1__0000/head_rgb.mp4",
    "subtask": "disembedding",
    "object": "bottle_of_milk-bottle_of_milk_1",
-   "run_id": "0928-013557",
+   "run_id": "0928-071838",
    "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
    "instance": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table__house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bottle_of_milk-mrejrs__distractors-bottle_of_milk_1__0000",
-   "completed": "2026-09-28T01:49",
-   "n_steps": 890,
+   "completed": "2026-09-28T07:26",
+   "n_steps": 1018,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-065947",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T07:07"
+    },
+    {
+     "run_id": "0928-063408",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T06:48"
+    },
+    {
+     "run_id": "0928-045639",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T05:06"
+    },
+    {
+     "run_id": "0928-045513",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T05:05"
+    },
+    {
+     "run_id": "0928-030318",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T03:07"
+    },
+    {
+     "run_id": "0928-025916",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T03:06"
+    },
+    {
+     "run_id": "0928-023344",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T02:58"
+    },
+    {
+     "run_id": "0928-013557",
+     "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+     "completed": "2026-09-28T01:49"
+    },
     {
      "run_id": "0928-001821",
      "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
@@ -2567,18 +2772,43 @@
    "other_successful_runs": []
   },
   {
-   "link": "inter_object_relation_satisfaction-inside__brussels_sprouts-bowl__0927-210516.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-inside/0927-210516/demo/inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__house_single_floor__partner-bowl-belcml__target-brussels_sprouts-mbkrxe__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-inside__brussels_sprouts-bowl__0928-045918.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-inside/0928-045918/demo/inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__house_single_floor__partner-bowl-belcml__target-brussels_sprouts-mbkrxe__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-inside",
    "object": "brussels_sprouts-bowl",
-   "run_id": "0927-210516",
+   "run_id": "0928-045918",
    "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
    "instance": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__house_single_floor__partner-bowl-belcml__target-brussels_sprouts-mbkrxe__0000",
-   "completed": "2026-09-27T21:20",
-   "n_steps": 892,
+   "completed": "2026-09-28T05:17",
+   "n_steps": 934,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-050205",
+     "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+     "completed": "2026-09-28T05:16"
+    },
+    {
+     "run_id": "0928-030739",
+     "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+     "completed": "2026-09-28T03:14"
+    },
+    {
+     "run_id": "0928-030053",
+     "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+     "completed": "2026-09-28T03:10"
+    },
+    {
+     "run_id": "0928-024351",
+     "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+     "completed": "2026-09-28T03:00"
+    },
+    {
+     "run_id": "0927-210516",
+     "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+     "completed": "2026-09-27T21:20"
+    },
     {
      "run_id": "0927-210632",
      "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
@@ -2702,18 +2932,43 @@
    ]
   },
   {
-   "link": "inter_object_relation_satisfaction-nextto__marker-colored_pencil__0927-231100.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-nextto/0927-231100/demo/inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table__house_single_floor__partner-colored_pencil-acumgp__target-marker-xakoic__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-nextto__marker-colored_pencil__0928-050412.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-nextto/0928-050412/demo/inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table__house_single_floor__partner-colored_pencil-acumgp__target-marker-xakoic__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-nextto",
    "object": "marker-colored_pencil",
-   "run_id": "0927-231100",
+   "run_id": "0928-050412",
    "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
    "instance": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table__house_single_floor__partner-colored_pencil-acumgp__target-marker-xakoic__0000",
-   "completed": "2026-09-27T23:18",
-   "n_steps": 806,
+   "completed": "2026-09-28T05:22",
+   "n_steps": 740,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-050212",
+     "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+     "completed": "2026-09-28T05:15"
+    },
+    {
+     "run_id": "0928-031156",
+     "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+     "completed": "2026-09-28T03:20"
+    },
+    {
+     "run_id": "0928-030425",
+     "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+     "completed": "2026-09-28T03:11"
+    },
+    {
+     "run_id": "0928-024526",
+     "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+     "completed": "2026-09-28T02:55"
+    },
+    {
+     "run_id": "0927-231100",
+     "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+     "completed": "2026-09-27T23:18"
+    },
     {
      "run_id": "0927-211238",
      "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
@@ -2797,18 +3052,58 @@
    ]
   },
   {
-   "link": "inter_object_relation_satisfaction-ontop_large_scale__shampoo_dispenser-countertop-floor__0927-233757.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-ontop_large_scale/0927-233757/demo/inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor__house_single_floor__target-shampoo_dispenser-zoyyia__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-ontop_large_scale__shampoo_dispenser-countertop-floor__0928-070226.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-ontop_large_scale/0928-070226/demo/inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor__house_single_floor__target-shampoo_dispenser-zoyyia__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
    "object": "shampoo_dispenser-countertop-floor",
-   "run_id": "0927-233757",
+   "run_id": "0928-070226",
    "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
    "instance": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor__house_single_floor__target-shampoo_dispenser-zoyyia__0000",
-   "completed": "2026-09-28T01:11",
-   "n_steps": 1715,
+   "completed": "2026-09-28T07:14",
+   "n_steps": 1510,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-064921",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T06:58"
+    },
+    {
+     "run_id": "0928-062408",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T06:45"
+    },
+    {
+     "run_id": "0928-040739",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T04:38"
+    },
+    {
+     "run_id": "0928-040735",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T04:30"
+    },
+    {
+     "run_id": "0928-023441",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T02:48"
+    },
+    {
+     "run_id": "0928-022620",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T02:43"
+    },
+    {
+     "run_id": "0928-021600",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T02:40"
+    },
+    {
+     "run_id": "0927-233757",
+     "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+     "completed": "2026-09-28T01:11"
+    },
     {
      "run_id": "0927-233201",
      "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
@@ -2912,18 +3207,43 @@
    ]
   },
   {
-   "link": "inter_object_relation_satisfaction-ontop_small_scale__apple-plate__0927-233229.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-ontop_small_scale/0927-233229/demo/inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table__house_single_floor__partner-plate-kkjiko__target-apple-zlxfxt__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-ontop_small_scale__apple-plate__0928-050533.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-ontop_small_scale/0928-050533/demo/inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table__house_single_floor__partner-plate-kkjiko__target-apple-zlxfxt__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
    "object": "apple-plate",
-   "run_id": "0927-233229",
+   "run_id": "0928-050533",
    "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
    "instance": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table__house_single_floor__partner-plate-kkjiko__target-apple-zlxfxt__0000",
-   "completed": "2026-09-27T23:42",
-   "n_steps": 953,
+   "completed": "2026-09-28T05:25",
+   "n_steps": 879,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-050545",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+     "completed": "2026-09-28T05:16"
+    },
+    {
+     "run_id": "0928-031248",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+     "completed": "2026-09-28T03:16"
+    },
+    {
+     "run_id": "0928-031025",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+     "completed": "2026-09-28T03:16"
+    },
+    {
+     "run_id": "0928-025144",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+     "completed": "2026-09-28T03:04"
+    },
+    {
+     "run_id": "0927-233229",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+     "completed": "2026-09-27T23:42"
+    },
     {
      "run_id": "0927-232145",
      "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
@@ -3022,18 +3342,58 @@
    ]
   },
   {
-   "link": "inter_object_relation_satisfaction-ontop_small_scale__pack_of_kielbasa-platter__0928-013605.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-ontop_small_scale/0928-013605/demo/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table__house_single_floor__partner-platter-csanbr__target-pack_of_kielbasa-dgodnn__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-ontop_small_scale__pack_of_kielbasa-platter__0928-080032.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-ontop_small_scale/0928-080032/demo/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table__house_single_floor__partner-platter-csanbr__target-pack_of_kielbasa-dgodnn__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
    "object": "pack_of_kielbasa-platter",
-   "run_id": "0928-013605",
+   "run_id": "0928-080032",
    "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
    "instance": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table__house_single_floor__partner-platter-csanbr__target-pack_of_kielbasa-dgodnn__0000",
-   "completed": "2026-09-28T01:48",
-   "n_steps": 998,
+   "completed": "2026-09-28T08:35",
+   "n_steps": 942,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-080036",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T08:30"
+    },
+    {
+     "run_id": "0928-072203",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T07:36"
+    },
+    {
+     "run_id": "0928-065951",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T07:14"
+    },
+    {
+     "run_id": "0928-063748",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T07:10"
+    },
+    {
+     "run_id": "0928-054327",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T05:55"
+    },
+    {
+     "run_id": "0928-031851",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T03:26"
+    },
+    {
+     "run_id": "0928-031429",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T03:24"
+    },
+    {
+     "run_id": "0928-013605",
+     "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+     "completed": "2026-09-28T01:48"
+    },
     {
      "run_id": "0928-013601",
      "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
@@ -3237,18 +3597,28 @@
    ]
   },
   {
-   "link": "inter_object_relation_satisfaction-touching__box_of_sanitary_napkins-box_of_tissues__0927-233233.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-touching/0927-233233/demo/inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table__house_single_floor__partner-box_of_tissues-ntbrtz__target-box_of_sanitary_napkins-humkqw__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-touching__box_of_sanitary_napkins-box_of_tissues__0928-050931.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-touching/0928-050931/demo/inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table__house_single_floor__partner-box_of_tissues-ntbrtz__target-box_of_sanitary_napkins-humkqw__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-touching",
    "object": "box_of_sanitary_napkins-box_of_tissues",
-   "run_id": "0927-233233",
+   "run_id": "0928-050931",
    "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
    "instance": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table__house_single_floor__partner-box_of_tissues-ntbrtz__target-box_of_sanitary_napkins-humkqw__0000",
-   "completed": "2026-09-27T23:42",
+   "completed": "2026-09-28T05:19",
    "n_steps": 1638,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-030238",
+     "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+     "completed": "2026-09-28T03:18"
+    },
+    {
+     "run_id": "0927-233233",
+     "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+     "completed": "2026-09-27T23:42"
+    },
     {
      "run_id": "0927-205038",
      "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
@@ -3397,18 +3767,48 @@
    ]
   },
   {
-   "link": "inter_object_relation_satisfaction-under_large_scale__sandal-breakfast_table__0927-234037.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-under_large_scale/0927-234037/demo/inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table__house_single_floor__target-sandal-chgcrm__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-under_large_scale__sandal-breakfast_table__0928-061926.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-under_large_scale/0928-061926/demo/inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table__house_single_floor__target-sandal-chgcrm__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-under_large_scale",
    "object": "sandal-breakfast_table",
-   "run_id": "0927-234037",
+   "run_id": "0928-061926",
    "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
    "instance": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table__house_single_floor__target-sandal-chgcrm__0000",
-   "completed": "2026-09-28T01:32",
-   "n_steps": 2942,
+   "completed": "2026-09-28T07:58",
+   "n_steps": 2768,
    "settled_success": true,
-   "qa_verdicts": 1,
+   "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-070046",
+     "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+     "completed": "2026-09-28T07:29"
+    },
+    {
+     "run_id": "0928-063808",
+     "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+     "completed": "2026-09-28T07:06"
+    },
+    {
+     "run_id": "0928-040747",
+     "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+     "completed": "2026-09-28T05:31"
+    },
+    {
+     "run_id": "0928-040751",
+     "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+     "completed": "2026-09-28T05:02"
+    },
+    {
+     "run_id": "0928-023200",
+     "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+     "completed": "2026-09-28T02:55"
+    },
+    {
+     "run_id": "0927-234037",
+     "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+     "completed": "2026-09-28T01:32"
+    },
     {
      "run_id": "0927-233213",
      "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
@@ -3577,18 +3977,43 @@
    ]
   },
   {
-   "link": "inter_object_relation_satisfaction-under_small_scale__teacup-saucer__0927-234538.mp4",
-   "target": "../first_demo/inter_object_relation_satisfaction-under_small_scale/0927-234538/demo/inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table__house_single_floor__partner-saucer-mgbeah__target-teacup-wopjex__0000/head_rgb.mp4",
+   "link": "inter_object_relation_satisfaction-under_small_scale__teacup-saucer__0928-051100.mp4",
+   "target": "../first_demo/inter_object_relation_satisfaction-under_small_scale/0928-051100/demo/inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table__house_single_floor__partner-saucer-mgbeah__target-teacup-wopjex__0000/head_rgb.mp4",
    "subtask": "inter_object_relation_satisfaction-under_small_scale",
    "object": "teacup-saucer",
-   "run_id": "0927-234538",
+   "run_id": "0928-051100",
    "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
    "instance": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table__house_single_floor__partner-saucer-mgbeah__target-teacup-wopjex__0000",
-   "completed": "2026-09-27T23:55",
-   "n_steps": 891,
+   "completed": "2026-09-28T05:37",
+   "n_steps": 872,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-050940",
+     "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+     "completed": "2026-09-28T05:22"
+    },
+    {
+     "run_id": "0928-032055",
+     "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+     "completed": "2026-09-28T03:31"
+    },
+    {
+     "run_id": "0928-031521",
+     "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+     "completed": "2026-09-28T03:23"
+    },
+    {
+     "run_id": "0928-030829",
+     "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+     "completed": "2026-09-28T03:20"
+    },
+    {
+     "run_id": "0927-234538",
+     "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+     "completed": "2026-09-27T23:55"
+    },
     {
      "run_id": "0927-210941",
      "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
@@ -3707,18 +4132,43 @@
    ]
   },
   {
-   "link": "mental_rotation__banana__0927-210824.mp4",
-   "target": "../first_demo/mental_rotation/0927-210824/demo/mental_rotation-banana__house_single_floor__target-banana-znakxm__0000/head_rgb.mp4",
+   "link": "mental_rotation__banana__0928-051316.mp4",
+   "target": "../first_demo/mental_rotation/0928-051316/demo/mental_rotation-banana__house_single_floor__target-banana-znakxm__0000/head_rgb.mp4",
    "subtask": "mental_rotation",
    "object": "banana",
-   "run_id": "0927-210824",
+   "run_id": "0928-051316",
    "alias": "mental_rotation-banana",
    "instance": "mental_rotation-banana__house_single_floor__target-banana-znakxm__0000",
-   "completed": "2026-09-27T21:19",
+   "completed": "2026-09-28T05:34",
    "n_steps": 108,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-051734",
+     "alias": "mental_rotation-banana",
+     "completed": "2026-09-28T05:28"
+    },
+    {
+     "run_id": "0928-030837",
+     "alias": "mental_rotation-banana",
+     "completed": "2026-09-28T03:29"
+    },
+    {
+     "run_id": "0928-032428",
+     "alias": "mental_rotation-banana",
+     "completed": "2026-09-28T03:27"
+    },
+    {
+     "run_id": "0928-032051",
+     "alias": "mental_rotation-banana",
+     "completed": "2026-09-28T03:25"
+    },
+    {
+     "run_id": "0927-210824",
+     "alias": "mental_rotation-banana",
+     "completed": "2026-09-27T21:19"
+    },
     {
      "run_id": "0927-041741",
      "alias": "mental_rotation-banana",
@@ -3952,18 +4402,43 @@
    ]
   },
   {
-   "link": "object_scaling__canned_food__0928-013609.mp4",
-   "target": "../first_demo/object_scaling/0928-013609/demo/object_scaling-canned_food__house_single_floor__target-canned_food-ycbspm__0000/head_rgb.mp4",
+   "link": "object_scaling__canned_food__0928-051917.mp4",
+   "target": "../first_demo/object_scaling/0928-051917/demo/object_scaling-canned_food__house_single_floor__target-canned_food-ycbspm__0000/head_rgb.mp4",
    "subtask": "object_scaling",
    "object": "canned_food",
-   "run_id": "0928-013609",
+   "run_id": "0928-051917",
    "alias": "object_scaling-canned_food",
    "instance": "object_scaling-canned_food__house_single_floor__target-canned_food-ycbspm__0000",
-   "completed": "2026-09-28T01:47",
+   "completed": "2026-09-28T05:32",
    "n_steps": 123,
    "settled_success": true,
    "qa_verdicts": 0,
    "other_successful_runs": [
+    {
+     "run_id": "0928-051755",
+     "alias": "object_scaling-canned_food",
+     "completed": "2026-09-28T05:25"
+    },
+    {
+     "run_id": "0928-033024",
+     "alias": "object_scaling-canned_food",
+     "completed": "2026-09-28T03:34"
+    },
+    {
+     "run_id": "0928-032746",
+     "alias": "object_scaling-canned_food",
+     "completed": "2026-09-28T03:31"
+    },
+    {
+     "run_id": "0928-031235",
+     "alias": "object_scaling-canned_food",
+     "completed": "2026-09-28T03:21"
+    },
+    {
+     "run_id": "0928-013609",
+     "alias": "object_scaling-canned_food",
+     "completed": "2026-09-28T01:47"
+    },
     {
      "run_id": "0927-042025",
      "alias": "object_scaling-canned_food",
