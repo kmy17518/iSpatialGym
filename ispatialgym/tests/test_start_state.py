@@ -61,6 +61,19 @@ def test_quantized_quaternions_compare_by_rotation_angle():
     assert abs(S._quat_angle([0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 1.0, 0.0]) - math.pi) < 1e-9
 
 
+def test_sim_objects_serialize_by_name_not_address():
+    class Obj:
+        def __init__(self, name):
+            self.name = name
+
+    a, b = _loader(), _loader()
+    a.robot._ag_obj_constraint_params = {"right": {"target_obj": Obj("apple.n.01_1")}}
+    b.robot._ag_obj_constraint_params = {"right": {"target_obj": Obj("apple.n.01_1")}}
+    fa, fb = S.fingerprint(a, render=False), S.fingerprint(b, render=False)
+    assert fa["values"]["robot"]["assisted_grasp_params"]["right"]["target_obj"] == "<Obj apple.n.01_1>"
+    assert fa["sha256"] == fb["sha256"]
+
+
 def test_discrete_differences_fail():
     a = S.fingerprint(_loader(), render=False)
     rep = S.compare(a, S.fingerprint(_loader(ag=None), render=False))

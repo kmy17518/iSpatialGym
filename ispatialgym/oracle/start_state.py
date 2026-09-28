@@ -36,6 +36,9 @@ def _q(v: Any, quantum: float = QUANTUM) -> Any:
         return [_q(x, quantum) for x in v]
     if isinstance(v, (int, bool, str)) or v is None:
         return v
+    name = getattr(v, "name", None)
+    if isinstance(name, str):  # a sim object (e.g. the assisted grasp's target): its repr carries a per-process address
+        return f"<{type(v).__name__} {name}>"
     return str(v)
 
 
