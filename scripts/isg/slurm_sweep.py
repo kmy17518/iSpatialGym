@@ -193,10 +193,11 @@ exit $rc
 
 
 def cmd_produce(args):
-    """Submit ``--per-task`` instances + demos per alias as jobs of ``--slice`` instances each (see :func:`prod_job_script`)."""
+    """Submit ``--per-task`` instances + demos per alias as jobs of ``--slice`` instances each, or the jobs of ``--plan`` (see
+    :func:`prod_job_script`)."""
     aliases = list(V2_ALIASES) if args.all else list(args.aliases or [])
-    if not aliases:
-        raise SystemExit("slurm_sweep produce: --aliases or --all")
+    if not aliases and not args.plan:
+        raise SystemExit("slurm_sweep produce: --aliases, --all or --plan")
     sweep = args.sweep or time.strftime("prod_%m%d-%H%M%S")
     root = os.path.join(args.root, sweep)
     if os.path.exists(os.path.join(root, "manifest.json")):
@@ -211,31 +212,43 @@ def cmd_produce(args):
          "per_task": args.per_task, "slice": args.slice, "seed": args.seed, "demo_workers": args.demo_workers, "hours": args.hours,
          "sbatch": {"partition": args.partition, "account": args.account, "gres": args.gres, "cpus_per_proc": args.cpus_per_proc,
                     "mem_per_proc": args.mem_per_proc, "exclude": args.exclude}, "jobs": []}
-    nproc = 1 + int(args.demo_workers)
-    mem_gb = float(str(args.mem_per_proc).rstrip("Gg"))
-    for alias in aliases:
+    if args.plan:
+        # --plan: {"classes": {name: {gres, constraint, cpus_per_proc, mem_per_proc, demo_workers}}, "jobs": [{alias, start, count, class}]}
+        plan = json.load(open(args.plan))
+        m["plan"] = plan
+        jobs = [(j["alias"], int(j["start"]), int(j["count"]), plan["classes"][j["class"]], j["class"]) for j in plan["jobs"]]
+    else:
+        base = {"gres": args.gres, "constraint": args.constraint, "cpus_per_proc": args.cpus_per_proc, "mem_per_proc": args.mem_per_proc,
+                "demo_workers": args.demo_workers}
+        jobs = [(alias, start, min(args.slice, args.first_index + args.per_task - start), base, None)
+                for alias in aliases for start in range(args.first_index, args.first_index + args.per_task, args.slice)]
+    for alias, start, count, cls, cls_name in jobs:
         max_attempts = args.max_attempts or budget(alias)[0]
-        for start in range(args.first_index, args.first_index + args.per_task, args.slice):
-            count = min(args.slice, args.first_index + args.per_task - start)
-            job_dir = os.path.join(root, alias, f"i{start:04d}")
-            os.makedirs(job_dir, exist_ok=True)
-            script = os.path.join(job_dir, "job.sh")
-            with open(script, "w") as f:
-                f.write(prod_job_script(job_dir, alias, start, count, max_attempts, args))
-            name = "isgp_" + re.sub(r"[^A-Za-z0-9_.-]", "_", alias)[:36] + f"_{start}"
-            cmd = ["sbatch", "--parsable", "-p", args.partition, "-A", args.account, f"--gres={args.gres}", "-c", str(args.cpus_per_proc * nproc),
-                   f"--mem={int(mem_gb * nproc)}G", f"--time={int(args.hours * 60)}", "-J", name, "-o", os.path.join(job_dir, "slurm.log")]
-            if args.exclude:
-                cmd.append(f"--exclude={args.exclude}")
-            cmd.append(script)
-            r = subprocess.run(cmd, capture_output=True, text=True, env=slurm_env())
-            if r.returncode != 0:
-                raise SystemExit(f"sbatch failed for {alias} [{start}, {start + count}): {r.stderr.strip()}")
-            job_id = r.stdout.strip().split(";")[0]
-            m["jobs"].append({"alias": alias, "start": start, "count": count, "max_attempts": max_attempts, "dir": job_dir, "job_id": job_id})
-            print(f"{job_id}  {alias}  [{start}, {start + count})")
-            with open(os.path.join(root, "manifest.json"), "w") as f:
-                json.dump(m, f, indent=1)
+        jargs = argparse.Namespace(**{**vars(args), **{k: v for k, v in cls.items() if k != "constraint"}})
+        nproc = 1 + int(jargs.demo_workers)
+        mem_gb = float(str(jargs.mem_per_proc).rstrip("Gg"))
+        job_dir = os.path.join(root, alias, f"i{start:04d}")
+        os.makedirs(job_dir, exist_ok=True)
+        script = os.path.join(job_dir, "job.sh")
+        with open(script, "w") as f:
+            f.write(prod_job_script(job_dir, alias, start, count, max_attempts, jargs))
+        name = "isgp_" + re.sub(r"[^A-Za-z0-9_.-]", "_", alias)[:36] + f"_{start}"
+        cmd = ["sbatch", "--parsable", "-p", args.partition, "-A", args.account, f"--gres={jargs.gres}", "-c", str(jargs.cpus_per_proc * nproc),
+               f"--mem={int(mem_gb * nproc)}G", f"--time={int(args.hours * 60)}", "-J", name, "-o", os.path.join(job_dir, "slurm.log")]
+        if cls.get("constraint"):
+            cmd.append(f"--constraint={cls['constraint']}")
+        if args.exclude:
+            cmd.append(f"--exclude={args.exclude}")
+        cmd.append(script)
+        r = subprocess.run(cmd, capture_output=True, text=True, env=slurm_env())
+        if r.returncode != 0:
+            raise SystemExit(f"sbatch failed for {alias} [{start}, {start + count}): {r.stderr.strip()}")
+        job_id = r.stdout.strip().split(";")[0]
+        m["jobs"].append({"alias": alias, "start": start, "count": count, "max_attempts": max_attempts, "dir": job_dir, "job_id": job_id,
+                          "class": cls_name})
+        print(f"{job_id}  {alias}  [{start}, {start + count})  {cls_name or ''}")
+        with open(os.path.join(root, "manifest.json"), "w") as f:
+            json.dump(m, f, indent=1)
     print(f"produce {sweep}: {len(m['jobs'])} jobs -> {root}")
 
 
@@ -471,6 +484,10 @@ def main():
     s.add_argument("--min-scratch-gb", type=float, default=50.0)
     s.add_argument("--local-appdata", action="store_true")
     s.add_argument("--demo-mode", default="queue", choices=["queue", "fresh"], help="prod_worker --demo-mode")
+    s.add_argument("--constraint", default=None, help="sbatch --constraint (viscam node features: 24G / 48G, turing / ampere / ada)")
+    s.add_argument("--plan", default=None, help="JSON {classes: {name: {gres, constraint, cpus_per_proc, mem_per_proc, demo_workers}}, "
+                                                "jobs: [{alias, start, count, class}]}: the jobs to submit, in order (replaces "
+                                                "--aliases / --per-task / --slice)")
     s.add_argument("--code-root", default=None, help="iSpatialGym checkout the jobs run (default: this one); a frozen worktree keeps "
                                                      "edits made while the jobs run out of them")
     s.add_argument("--b1k-root", default=None, help="BEHAVIOR-1K checkout whose OmniGibson / bddl the jobs import (PYTHONPATH) instead "
