@@ -192,6 +192,11 @@ class ExecutorConfig:
     override_rot: float = 0.20
     #: record the serialized sim state every step (needed for the BEHAVIOR-replayable hdf5)
     record_state: bool = True
+    #: checkpoints, rollbacks and the recorded per-step states go through the env's own scene (``scene.dump_state`` /
+    #: ``load_state``) instead of the simulator: in a one-scene simulator the serialized state is the same tensor
+    #: (``og.sim.serialize`` concatenates the scenes'), and with several scenes in one simulator (ispatialgym.multienv) it is
+    #: the only state that belongs to this env. Default: ISPATIALGYM_PER_SCENE_STATE=1 (off when unset)
+    per_scene_state: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_PER_SCENE_STATE", "").lower() in ("1", "true", "yes"))
 
 
 class SupportLoad:
@@ -826,15 +831,22 @@ class Executor:
     def _active_filter(obj) -> bool:
         return bool(getattr(obj, "is_active", True) and getattr(obj, "initialized", True))
 
+    @property
+    def state_owner(self):
+        """What checkpoints and recorded states are dumped from and loaded into: the env's scene
+        (``ExecutorConfig.per_scene_state``) or the simulator."""
+        return self.env.scene if self.cfg.per_scene_state else self.sim
+
     def _dump_state(self, full: bool) -> th.Tensor:
+        owner = self.state_owner
         registry = getattr(getattr(self.env, "scene", None), "object_registry", None)
         if full and getattr(self, "_recording_filter", False) and registry is not None and hasattr(registry, "set_dump_filter"):
             registry.set_dump_filter(lambda obj: True)
             try:
-                return self.sim.dump_state(serialized=True)
+                return owner.dump_state(serialized=True)
             finally:
                 registry.set_dump_filter(self._active_filter)
-        return self.sim.dump_state(serialized=True)
+        return owner.dump_state(serialized=True)
 
     @property
     def isg(self) -> Dict[str, Any]:
@@ -926,7 +938,7 @@ class Executor:
         robot = self.robot
         report: Dict[str, Any] = {"action_index": cp.action_index, "ag_roundtrip_ok": True, "ag_fixed": [], "attached_fixed": []}
         stale = self.head_rgb_of(self.last_obs)  # what the camera showed last: the rolled-back attempt's final scene
-        self.sim.load_state(cp.sim_state, serialized=True)
+        self.state_owner.load_state(cp.sim_state, serialized=True)
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
         if ag is not None:

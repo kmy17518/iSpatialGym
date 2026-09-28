@@ -167,6 +167,23 @@ class _Frame:
         return self.data
 
 
+class _StepFrames(dict):
+    """``RecorderConfig.async_frames``: one pending frame per camera key of a step's robot observation, made on first use."""
+
+    def __init__(self, pipe, robs: Dict[str, Any]):
+        super().__init__()
+        self._pipe, self._robs = pipe, robs
+
+    def get(self, key, default=None):
+        if key not in self:
+            try:
+                self[key] = self._pipe.frame(self._robs[key]["rgb"])
+            except Exception:  # noqa: BLE001  (as the synchronous path: a camera without an rgb image has no frame)
+                self[key] = None
+        v = dict.get(self, key)
+        return default if v is None else v
+
+
 # ==========================================================================================
 # recorder
 # ==========================================================================================
@@ -188,6 +205,10 @@ class RecorderConfig:
     #: (run_isg --dev) name of an env external sensor (``obs["external"][name]["rgb"]``) written to ``external_rgb.mp4``
     #: next to the head video - the JoyLo replay viewpoint over the robot's shoulder
     external_camera: Optional[str] = None
+    #: frame conversion / encode off the stepping thread, once per step for all sinks, and the committed frames written
+    #: to the video / LeRobot sinks from a background thread (:mod:`ispatialgym.oracle.frame_pipeline`; same bytes, same
+    #: order). Default: ISPATIALGYM_ASYNC_FRAMES=1 (off when unset)
+    async_frames: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_ASYNC_FRAMES", "").lower() in ("1", "true", "yes"))
 
 
 class Recorder:
@@ -235,6 +256,25 @@ class Recorder:
         self.scene_file = None
         self.env_config = None
         self.hdf5_path = os.path.join(out_dir, "demo.hdf5") if self.cfg.hdf5 else None
+        self._pipe = None
+        if self.cfg.async_frames:
+            from ispatialgym.oracle.frame_pipeline import FramePipeline
+
+            self._pipe = FramePipeline(self.cfg.frame_buffer)
+
+    @property
+    def last_rgb(self) -> Optional[np.ndarray]:
+        v = self._last_rgb
+        rgb = getattr(v, "rgb", None)
+        return rgb() if callable(rgb) else v
+
+    @last_rgb.setter
+    def last_rgb(self, v) -> None:
+        self._last_rgb = v
+
+    def _step_frames(self, robs: Dict[str, Any]) -> Optional["_StepFrames"]:
+        """``async_frames``: the step's frames, one per camera key, shared by every sink; None otherwise."""
+        return _StepFrames(self._pipe, robs) if self._pipe is not None else None
 
     # ------------------------------------------------------------------ start
 
@@ -277,8 +317,9 @@ class Recorder:
             self.states = [th.as_tensor(state0).detach().cpu().float().clone()]
         robs = self._robot_obs(obs0)
         self._video_keys = self._rgb_keys(robs)
-        self._last_obs_lerobot = self._lerobot_obs(robs)
-        frame = self.head_frame(obs0)
+        frames = self._step_frames(robs)
+        self._last_obs_lerobot = self._lerobot_obs(robs, frames)
+        frame = self.head_frame(obs0) if frames is None else frames.get(self.cam_key)
         if frame is not None:
             self.last_rgb = frame
         if self.cfg.hdf5:
@@ -296,7 +337,13 @@ class Recorder:
             if task is not None and hasattr(task, "update_bddl_scope_metadata"):
                 task.update_bddl_scope_metadata(self.env)
             self.scene_file = self.env.scene.save()
-            self.env_config = copy.deepcopy(getattr(self.env, "config", None))
+            cfg = copy.deepcopy(getattr(self.env, "config", None))
+            # BEHAVIOR's playback builds its env from this config: a demo recorded in one of several scenes
+            # (ispatialgym.multienv) replays in a one-scene simulator
+            env_cfg = cfg.get("env") if isinstance(cfg, dict) else None
+            if isinstance(env_cfg, dict) and env_cfg.get("num_envs", 1) != 1:
+                env_cfg["num_envs"] = 1
+            self.env_config = cfg
         except Exception as e:  # noqa: BLE001
             log.warning("scene snapshot for the hdf5 header failed: %r", e)
 
@@ -349,10 +396,15 @@ class Recorder:
             self._obs_mapping["proprio"] = "observation.state"
         return features
 
-    def _lerobot_obs(self, robs: Dict[str, Any]) -> Dict[str, Any]:
+    def _lerobot_obs(self, robs: Dict[str, Any], frames: Optional[_StepFrames] = None) -> Dict[str, Any]:
         """The observation part of a LeRobot frame (frames buffered, proprio as float32)."""
         out: Dict[str, Any] = {}
         for key in self._video_keys:
+            if frames is not None:
+                fr = frames.get(key)
+                if fr is not None:
+                    out[key] = fr
+                continue
             try:
                 out[key] = _Frame(to_uint8_rgb(robs[key]["rgb"]), self.cfg.frame_buffer)
             except Exception:  # noqa: BLE001
@@ -440,11 +492,19 @@ class Recorder:
             r["proprio"].append(p)
         if state is not None:
             self._pending_states.append(th.as_tensor(state).detach().cpu().float().clone())
-        frame = self.head_frame(obs)
-        if frame is not None:
-            self.last_rgb = frame
-            if self._writer is not None:
-                self._pending_frames["video"].append(_Frame(frame, self.cfg.frame_buffer))
+        frames = self._step_frames(robs)
+        if frames is not None:
+            frame = frames.get(self.cam_key)
+            if frame is not None:
+                self.last_rgb = frame
+                if self._writer is not None:
+                    self._pending_frames["video"].append(frame)
+        else:
+            frame = self.head_frame(obs)
+            if frame is not None:
+                self.last_rgb = frame
+                if self._writer is not None:
+                    self._pending_frames["video"].append(_Frame(frame, self.cfg.frame_buffer))
         if self._ext_writer is not None:
             ext = self.external_frame(obs)
             if ext is not None:
@@ -452,7 +512,7 @@ class Recorder:
         if self.dataset is not None and self._last_obs_lerobot is not None:
             self._pending_lerobot.append(self._lerobot_frame(self._last_obs_lerobot, action, reward, terminated, truncated, action_index, self.current_task))
         if self.dataset is not None:
-            self._last_obs_lerobot = self._lerobot_obs(robs)
+            self._last_obs_lerobot = self._lerobot_obs(robs, frames)
 
     @property
     def n_pending(self) -> int:
@@ -472,15 +532,27 @@ class Recorder:
         for k, v in self._pending_rows.items():
             self.rows[k].extend(v)
         self.states.extend(self._pending_states)
-        if self._writer is not None:
-            for fr in self._pending_frames["video"]:
-                self._write_video_frame(fr.array())
-        if self._ext_writer is not None:
-            for fr in self._pending_frames["external"]:
-                self._write_video_frame(fr.array(), external=True)
-        if self.dataset is not None:
-            for frame in self._pending_lerobot:
-                self._add_lerobot_frame(frame)
+        if self._pipe is not None:
+            # the sink thread writes them in this order; close() drains it before closing the sinks
+            if self._writer is not None:
+                for fr in self._pending_frames["video"]:
+                    self._pipe.sink(self._sink_video_frame, fr, False)
+            if self._ext_writer is not None:
+                for fr in self._pending_frames["external"]:
+                    self._pipe.sink(self._sink_video_frame, fr, True)
+            if self.dataset is not None:
+                for frame in self._pending_lerobot:
+                    self._pipe.sink(self._sink_lerobot_frame, frame)
+        else:
+            if self._writer is not None:
+                for fr in self._pending_frames["video"]:
+                    self._write_video_frame(fr.array())
+            if self._ext_writer is not None:
+                for fr in self._pending_frames["external"]:
+                    self._write_video_frame(fr.array(), external=True)
+            if self.dataset is not None:
+                for frame in self._pending_lerobot:
+                    self._add_lerobot_frame(frame)
         self.n += n
         self._clear_pending()
         return n
@@ -519,8 +591,9 @@ class Recorder:
     def set_observation(self, obs) -> None:
         """The observation of the restored state (pairs with the first action after a rollback)."""
         robs = self._robot_obs(obs)
-        self._last_obs_lerobot = self._lerobot_obs(robs) if self.dataset is not None else None
-        frame = self.head_frame(obs)
+        frames = self._step_frames(robs)
+        self._last_obs_lerobot = self._lerobot_obs(robs, frames) if self.dataset is not None else None
+        frame = self.head_frame(obs) if frames is None else frames.get(self.cam_key)
         if frame is not None:
             self.last_rgb = frame
 
@@ -550,6 +623,15 @@ class Recorder:
             self.video_error = repr(e)
             log.warning("video frame dropped (%r); closing the writer", e)
             self._close_writer()
+
+    def _sink_video_frame(self, fr: _Frame, external: bool) -> None:
+        if (self._ext_writer if external else self._writer) is None:
+            return
+        self._write_video_frame(fr.array(), external=external)
+
+    def _sink_lerobot_frame(self, frame: Dict[str, Any]) -> None:
+        if self.dataset is not None:
+            self._add_lerobot_frame(frame)
 
     def _add_lerobot_frame(self, frame: Dict[str, Any]) -> None:
         try:
@@ -617,6 +699,8 @@ class Recorder:
     def close(self, meta: dict, qa: Optional[Dict[str, Any]] = None, success: bool = False) -> Dict[str, Any]:
         """Flush everything; returns the paths written (``None`` where a sink was off or failed)."""
         self.commit()
+        if self._pipe is not None:
+            self._pipe.drain()
         self._close_writer()
         out: Dict[str, Any] = {"video": None, "hdf5": None, "lerobot": None, "annotations": None}
         ann = self.annotations(qa)
@@ -648,6 +732,8 @@ class Recorder:
             except Exception as e:  # noqa: BLE001
                 self.lerobot_error = repr(e)
                 log.warning("LeRobot episode not saved: %r", e)
+        if self._pipe is not None:
+            self._pipe.close()
         out["video_error"] = self.video_error
         out["lerobot_error"] = self.lerobot_error
         return out
