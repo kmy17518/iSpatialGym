@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import glob
 import os
+import queue
 import shutil
+import threading
+from types import SimpleNamespace
 from typing import Any, Dict, Optional
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # the shards are local; lerobot must never fetch a dataset from the Hub
@@ -90,10 +93,64 @@ class FlatObsView(EnvironmentWrapper):
         return {k: f[k] for k in self._flat_keys}
 
 
-class ShardWriter(LeRobotDataWrapper):
-    """One LeRobot v3 dataset (``<root>/<repo_id>``) written episode by episode from the recorder's steps."""
+class _BackgroundFlush:
+    """``ShardWriter(async_flush=True)``: one worker thread that hands flushed trajectory segments to the LeRobot writer,
+    in submission order. Up to ``max_pending`` segments wait (each holds 32 steps of images); beyond that the stepping
+    thread waits, as it waits on the encoders' queues without it. A writer error is kept and raised on the stepping
+    thread at its next call."""
 
-    def __init__(self, env, root: str, repo_id: str, task_name: str):
+    def __init__(self, max_pending: int = 2):
+        self._jobs: "queue.Queue[Optional[tuple]]" = queue.Queue(maxsize=max_pending)
+        self.error: Optional[BaseException] = None
+        self._thread = threading.Thread(target=self._run, name="isg-shard-flush", daemon=True)
+        self._thread.start()
+
+    def submit(self, fn, *args) -> None:
+        self._jobs.put((fn, args))
+
+    def _run(self) -> None:
+        while True:
+            job = self._jobs.get()
+            try:
+                if job is None:
+                    return
+                if self.error is None:
+                    fn, args = job
+                    fn(*args)
+            except BaseException as e:  # noqa: BLE001
+                self.error = e
+            finally:
+                self._jobs.task_done()
+
+    def drain(self, cancel: bool = False) -> None:
+        """Wait until every submitted segment is written; ``cancel``: drop the ones not started yet."""
+        if cancel:
+            while True:
+                try:
+                    self._jobs.get_nowait()
+                except queue.Empty:
+                    break
+                self._jobs.task_done()
+        self._jobs.join()
+
+    def raise_error(self) -> None:
+        if self.error is not None:
+            e, self.error = self.error, None
+            raise e
+
+    def close(self) -> None:
+        self.drain()
+        self._jobs.put(None)
+        self._thread.join(timeout=60)
+
+
+class ShardWriter(LeRobotDataWrapper):
+    """One LeRobot v3 dataset (``<root>/<repo_id>``) written episode by episode from the recorder's steps.
+
+    ``async_flush``: every ``FLUSH_EVERY_N_STEPS`` steps the segment goes to :class:`_BackgroundFlush`, which runs the
+    playback wrapper's ``flush_partial_traj`` on it (the same frames, in the same order) while the demo steps on."""
+
+    def __init__(self, env, root: str, repo_id: str, task_name: str, async_flush: bool = False):
         warm_camera_params(env)
         view = FlatObsView(env)
         path = os.path.join(root, repo_id)
@@ -107,6 +164,7 @@ class ShardWriter(LeRobotDataWrapper):
         self.current_episode_step_count = 0
         self.aborted = False
         self.root, self.repo_id = root, repo_id
+        self._bg_flush = _BackgroundFlush() if async_flush else None
 
     @property
     def should_save_current_episode(self) -> bool:
@@ -123,14 +181,28 @@ class ShardWriter(LeRobotDataWrapper):
         """One recorded step: the action and the observation it led to (paired with the next action by the writer)."""
         if self.aborted or not self.current_traj_history:
             return
+        if self._bg_flush is not None:
+            self._bg_flush.raise_error()
         action = th.as_tensor(action, dtype=th.float32).detach().cpu()
         self._record_step_trajectory(action, self.env.flat(obs), float(reward), bool(terminated), bool(truncated), info or {})
         self.current_episode_step_count += 1
         if len(self.current_traj_history) > self.flush_every_n_steps:
-            LeRobotPlaybackWrapper.flush_partial_traj(self, step_idx=self.current_episode_step_count, total_steps=0, step_data=None)
+            if self._bg_flush is None:
+                LeRobotPlaybackWrapper.flush_partial_traj(self, step_idx=self.current_episode_step_count, total_steps=0, step_data=None)
+            else:
+                # flush_partial_traj on a view holding only this segment; the stepping thread keeps its last observation
+                # (paired with the next action), as flush_partial_traj leaves it
+                segment = SimpleNamespace(current_traj_history=self.current_traj_history, flush_every_n_steps=self.flush_every_n_steps,
+                                          current_episode_step_count=self.current_episode_step_count, task_name=self.task_name,
+                                          dataset=self.dataset)
+                self.current_traj_history = [{"obs": segment.current_traj_history[-1]["obs"]}]
+                self._bg_flush.submit(LeRobotPlaybackWrapper.flush_partial_traj, segment, segment.current_episode_step_count, 0, None)
 
     def abort(self) -> None:
         """Drop the episode being written (a rollback, or a failed demo)."""
+        if self._bg_flush is not None:
+            self._bg_flush.drain(cancel=True)
+            self._bg_flush.error = None
         if self.dataset is not None and self.dataset.has_pending_frames():
             self.dataset.clear_episode_buffer()
         self.current_traj_history = []
@@ -138,6 +210,15 @@ class ShardWriter(LeRobotDataWrapper):
 
     def end(self, save: bool) -> Optional[int]:
         """Save (``save``) or drop the episode; returns its episode index in the shard when saved."""
+        if self._bg_flush is not None:
+            self._bg_flush.drain(cancel=self.aborted or not save or self.current_episode_step_count == 0)
+            if self._bg_flush.error is not None:
+                # without async_flush this error would have come from the step that flushed, and the recorder would have
+                # dropped the episode and still closed the shard: do both here, then report it
+                err, self._bg_flush.error = self._bg_flush.error, None
+                self.abort()
+                self.close()
+                raise err
         if self.aborted or not save or self.current_episode_step_count == 0:
             self.abort()
             return None
@@ -146,6 +227,9 @@ class ShardWriter(LeRobotDataWrapper):
         return index
 
     def close(self) -> None:
+        if self._bg_flush is not None:
+            self._bg_flush.close()
+            self._bg_flush = None
         if self.dataset is not None:
             self.close_dataset()
             self.dataset = None

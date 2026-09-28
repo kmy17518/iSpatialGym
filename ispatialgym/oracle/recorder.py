@@ -210,6 +210,9 @@ class RecorderConfig:
     behavior_shard: Optional[str] = None
     #: task name of the shard's episodes (the alias)
     behavior_task: Optional[str] = None
+    #: the shard's segments handed to BEHAVIOR's LeRobot writer from a background thread (same frames, same order), so the
+    #: demo does not wait on the video encoders' queues. Default: ISPATIALGYM_ASYNC_SHARD=1 (off when unset)
+    async_shard: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_ASYNC_SHARD", "").lower() in ("1", "true", "yes"))
     #: frame conversion / encode off the stepping thread, once per step for all sinks, and the committed frames written
     #: to the video / LeRobot sinks from a background thread (:mod:`ispatialgym.oracle.frame_pipeline`; same bytes, same
     #: order). Default: ISPATIALGYM_ASYNC_FRAMES=1 (off when unset)
@@ -343,7 +346,7 @@ class Recorder:
                 from ispatialgym.oracle.behavior_lerobot import ShardWriter
 
                 root, repo_id = os.path.split(os.path.abspath(self.cfg.behavior_shard))
-                self.behavior = ShardWriter(self.env, root, repo_id, self.cfg.behavior_task or self.task_name or "")
+                self.behavior = ShardWriter(self.env, root, repo_id, self.cfg.behavior_task or self.task_name or "", async_flush=self.cfg.async_shard)
                 self.behavior.begin(obs0, info0)
                 self.behavior_status = "recording"
             except Exception as e:  # noqa: BLE001
