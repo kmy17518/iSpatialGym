@@ -299,6 +299,9 @@ class ExecuteConfig:
     #: the hand stopped on it and the arm pressed ~100 N into it for the whole closure, bending torso_joint1 by 7.6 mrad ...
     grasp_support_clearance_m: float = 0.004
     grasp_support_pad_margin_m: float = 0.005
+    #: ... unless the faces the lifted pads would close on slope more than this (|normal z|, sin 20 deg): a curved side above its widest
+    #: section - the milk bottle lying on its side, pinched 13 mm higher, rolled 14 deg under the closure (0927-210646)
+    grasp_support_face_slope_max: float = 0.34
     #: ... and a support place whose object hangs lower in the hand than the recorded ``eef_in_object`` by more than this is raised by
     #: the difference, so the object meets its support instead of being driven into it (the same pinch pressed the destination tray)
     place_inhand_raise_min_m: float = 0.002
@@ -1177,6 +1180,25 @@ def _ramped(start, waypoints: Sequence[Any], end, dz: float) -> List[Pose]:
     return [_raised(p, dz * (cum[i + 1] / total if total > 1e-9 else 1.0)) for i, p in enumerate(waypoints)]
 
 
+def _pinch_face_slope(obj, centre, closing, reach: float = 0.15) -> Optional[float]:
+    """The larger |normal z| of the two faces of ``obj`` a pinch centred at ``centre`` closes on along ``closing`` (a raycast toward
+    ``centre`` from each side, the first hit on the object); None when a side misses it."""
+    root = str(getattr(obj, "prim_path", "") or "")
+    c = C.as_tensor(centre).reshape(-1).float()
+    d = C.as_tensor(closing).reshape(-1).float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    if not root:
+        return None
+    slopes = []
+    for ray in _raycast_all([(c + reach * d).tolist(), (c - reach * d).tolist()], [c.tolist(), c.tolist()]):
+        hits = [h for h in (ray if isinstance(ray, list) else [ray]) if h.get("hit") and str(h.get("rigidBody") or "").startswith(root)]
+        if not hits:
+            return None
+        n = C.as_tensor(min(hits, key=lambda h: float(h.get("distance", reach)))["normal"]).reshape(-1).float()
+        slopes.append(abs(float(n[2])) / max(float(th.linalg.norm(n)), 1e-9))
+    return max(slopes)
+
+
 def _approach_tracks(motions: Optional[Motions], arm: str, q_hint, poses: Sequence[Any]) -> Optional[bool]:
     """Whether the differential IK tracks the straight legs through ``poses`` (the pre-grasp, its approach, the lifted grasp)
     from ``q_hint``'s arm joints - the pre-grasp witness the transit ends in and the approach leaves from (the current configuration
@@ -1244,6 +1266,18 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
         rec["reason"] = (f"the object's next place ({nxt}) does not follow its in-hand pose (a drop lands as the release throws it): the "
                          f"recorded grasp runs")
         return targets
+    try:
+        centre = pos + th.tensor([0.0, 0.0, need]) + 0.5 * (C.PAD_Z_RANGE[0] + C.PAD_Z_RANGE[1]) * C.approach_axis(quat)
+        slope = _pinch_face_slope(state.object(action.object), centre, C.closing_axis(quat))
+    except Exception as e:  # noqa: BLE001 - no scene queries (the test stubs): the faces are not judged
+        log.debug("pinch face probe of %s failed (%r)", action.object, e)
+        slope = None
+    if slope is not None:
+        rec["face_slope"] = round(slope, 3)
+        if slope > cfg.grasp_support_face_slope_max:
+            rec["reason"] = (f"the lifted pads would close on faces sloped {math.degrees(math.asin(min(slope, 1.0))):.0f} deg from vertical (a curved "
+                             f"side above its widest section rolls under the closure): the recorded grasp runs")
+            return targets
     index = (ctx.get("protect") or {}).get("index")
     if index is not None and index in getattr(motions, "support_lift_refused", ()):
         rec["reason"] = "the lifted grasp failed the previous attempt of this action: the recorded grasp runs"

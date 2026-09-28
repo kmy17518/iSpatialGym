@@ -107,6 +107,33 @@ def test_a3_grasp_kept_when_the_object_is_dropped_next(monkeypatch):
         assert not ctx["grasp_support_lift"]["applied"] and "next place" in ctx["grasp_support_lift"]["reason"]
 
 
+
+def test_a3_grasp_kept_when_the_lifted_pads_would_close_on_a_curved_side(monkeypatch):
+    """Milk 0927-210646 (v21_sweep_20260927-6): the bottle lies on its side; pinched 13 mm higher, the pads closed above its widest
+    section and it rolled 14 deg under the closure (v2.0's pinch: 0.2 deg). The faces the lifted pads meet decide: vertical (the bar
+    soap) - lifted; sloped past 20 deg - the recorded grasp."""
+    action, state, targets = _grasp_setup()
+    monkeypatch.setattr(EX, "_finger_low_z", lambda pos, quat, arm: 0.794)
+    monkeypatch.setattr(EX, "_approach_tracks", lambda motions, arm, q_hint, poses: True)
+    seen = {}
+
+    def probe(obj, centre, closing, reach=0.15):
+        seen["centre_z"] = float(C.as_tensor(centre)[2])
+        return seen["slope"]
+
+    monkeypatch.setattr(EX, "_pinch_face_slope", probe)
+    need = 0.80 + EX.ExecuteConfig().grasp_support_clearance_m - 0.794
+    for slope, lifted in ((0.57, False), (0.05, True), (None, True)):
+        seen["slope"] = slope
+        ctx = {"next_place_kind": "support"}
+        out = EX.lift_grasp_off_support(action, None, state, targets, ctx, EX.ExecuteConfig())
+        assert ctx["grasp_support_lift"]["applied"] is lifted and (out is targets) is (not lifted)
+        if slope == 0.57:
+            assert "sloped 35 deg" in ctx["grasp_support_lift"]["reason"]
+    # the probe sits at the lifted pads' centre
+    pad_mid = 0.5 * (C.PAD_Z_RANGE[0] + C.PAD_Z_RANGE[1]) * float(C.approach_axis(C.as_tensor(targets["grasp"].orientation))[2])
+    assert seen["centre_z"] == pytest.approx(targets["grasp"].position[2] + need + pad_mid, abs=1e-6)
+
 def test_executor_next_place_kind_follows_the_grasped_object():
     from ispatialgym.oracle.executor import Executor
 
