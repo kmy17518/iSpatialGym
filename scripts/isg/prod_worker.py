@@ -259,12 +259,17 @@ def run_queue_mode(args):
         if dead:
             release_orphan_claims(claims, results_path, {p.pid for p, _ in runners.values()})
         work_left = bool(unclaimed()) or sampler_rc is None
+        # once the sampler is done its GPU share takes one more runner (its memory ~ a runner's; on a job of two or more
+        # GPUs the sampler's card would otherwise idle while the runners drain the queue)
+        n_slots = args.demo_workers + (1 if sampler_rc is not None else 0)
         if not stopping["flag"] and work_left:
-            for slot in range(args.demo_workers):
+            for slot in range(n_slots):
                 if slot in runners:
                     continue
                 if sampler_rc is not None and len(unclaimed()) <= len(runners):
                     break  # the queue is drained by the runners already alive
+                if slot >= args.demo_workers and len(unclaimed()) < 3:
+                    break  # the extra runner loads its world first (~5 min): only for a queue worth it
                 n_started += 1
                 lp = os.path.join(logs, f"runner{slot}_{n_started:03d}.log")
                 cmd = [sys.executable, "-m", "ispatialgym.oracle.run_isg", "--queue", inst_glob, "--claims", claims, "--done-file", done_file,
@@ -272,8 +277,9 @@ def run_queue_mode(args):
                        "--poll-s", str(args.poll_s)]
                 if args.deadline:
                     cmd += ["--deadline", str(args.deadline)]
+                env = proc_env("sampler") if slot >= args.demo_workers else proc_env("demo", slot)
                 with open(lp, "w") as f:
-                    runners[slot] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=proc_env("demo", slot)), lp)
+                    runners[slot] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=env), lp)
         if sampler_rc is not None and not runners and (stopping["flag"] or not unclaimed()):
             break
         time.sleep(args.poll_s)

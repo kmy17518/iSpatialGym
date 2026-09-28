@@ -134,6 +134,7 @@ class SimWorld:
                     obs_modalities=["rgb", "seg_instance"] if cameras else ["proprio"],
                     sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}} if cameras else {},
                     position=PARK_POSITION.tolist(),
+                    **M.camera_overrides(),
                 )
             ],
         }

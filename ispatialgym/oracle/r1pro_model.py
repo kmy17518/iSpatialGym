@@ -187,6 +187,17 @@ ARM_READY_Q: Dict[str, List[float]] = {
 }
 
 
+def head_camera_only() -> bool:
+    """``ISPATIALGYM_HEAD_CAMERA_ONLY=1``: the robot carries its head camera only. The wrist RealSense cameras otherwise render
+    every step at the camera profile's resolution (1080 px), and nothing records them unless ``run_isg --all-cameras``."""
+    return os.environ.get("ISPATIALGYM_HEAD_CAMERA_ONLY", "").lower() in ("1", "true", "yes")
+
+
+def camera_overrides() -> dict:
+    """:func:`joylo_robot_config` overrides for :func:`head_camera_only`."""
+    return {"exclude_sensor_names": ["realsense"]} if head_camera_only() else {}
+
+
 def joylo_robot_config(name: str = "robot", **overrides) -> dict:
     """OmniGibson ``robots`` entry for an R1Pro driven in the JoyLo action space."""
     cfg = {

@@ -179,6 +179,7 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
                 obs_modalities=["rgb", "proprio"] if proprio else ["rgb"],
                 sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}},
                 **robot_kw,
+                **M.camera_overrides(),
             )
         ],
         "task": {
@@ -778,6 +779,8 @@ def parse_args(argv=None):
     args = p.parse_args(argv)
     if (args.instance is None) == (args.queue is None):
         p.error("exactly one of --instance and --queue")
+    if args.all_cameras and M.head_camera_only():
+        p.error("--all-cameras records the wrist cameras, which ISPATIALGYM_HEAD_CAMERA_ONLY removes")
     return args
 
 
