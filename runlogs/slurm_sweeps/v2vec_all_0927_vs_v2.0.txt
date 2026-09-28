@@ -31,7 +31,7 @@ success 24/28; same instance and step count as v2.0: 11/28; sum of run walls 20.
 
 notes (2026-09-27 20:00 PDT):
 - camera_relocalization-standard: the run stalled at Kit start (shared appdata on NFS); sweep v2vec_retry_0927 (--local-appdata): success, 400 steps, attempt 1, as v2.0.
-- carton_cdmmwy_lever: 8/8 init_false (tensorized Open kept the pressed flap) - fixed in b54d9669 (sweeps v2vec_leverfix_s0/s1_0927 sample on attempt 0/1); the demo then fails the flap pinch (assisted grasp never engages), also on v2.0's instance.
-- carton_cdmmwy close: push offenders matched by object name, #2329 prefixes the prim (articulated__<name>) - fixed in 2b447d12 (v2.0's instance: push in 147 steps, v2.0 151).
+- carton_cdmmwy_lever: 8/8 init_false (tensorized Open kept the pressed flap) - fixed in b54d9669 (sweeps v2vec_leverfix_s0/s1_0927 sample on attempt 0/1). The demo stays marginal: seed 0 and v2.0's instance fail the flap pinch twice (assisted grasp never engages: its raycast loses the flap), seed 1 grasps and reaches the goal (settled) but QA flags root_moved (box turned up to 0.043 rad).
+- carton_cdmmwy close: push offenders matched by object name, #2329 prefixes the prim (articulated__<name>) - fixed in 2b447d12 (v2.0's instance: success, 1457 steps vs v2.0's 1464).
 - sandal under: fails on this sweep's instance (grasp plan swings a joint 3.19 rad); v2.0's own instance succeeds on this branch.
 - shampoo: 5 rejections here; with the recomputed bands committed (v2vec_shampoo_bands_0927) attempt 0, success, 1538 steps.
