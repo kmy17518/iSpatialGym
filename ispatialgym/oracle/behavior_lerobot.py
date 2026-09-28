@@ -13,8 +13,12 @@ recording. An episode with a mid-episode retry (a rollback) is dropped here; its
 
 from __future__ import annotations
 
+import glob
 import os
+import shutil
 from typing import Any, Dict, Optional
+
+os.environ.setdefault("HF_HUB_OFFLINE", "1")  # the shards are local; lerobot must never fetch a dataset from the Hub
 
 import gymnasium as gym
 import torch as th
@@ -92,7 +96,12 @@ class ShardWriter(LeRobotDataWrapper):
     def __init__(self, env, root: str, repo_id: str, task_name: str):
         warm_camera_params(env)
         view = FlatObsView(env)
-        super().__init__(env=view, output_path=repo_id, root_dir=root, overwrite=not os.path.exists(os.path.join(root, repo_id)),
+        path = os.path.join(root, repo_id)
+        if os.path.exists(path) and not glob.glob(os.path.join(path, "meta", "episodes", "*", "*.parquet")):
+            # no episode saved yet (the runner's first one was dropped): lerobot cannot resume it from the local files and
+            # falls back to the Hub; start the shard over
+            shutil.rmtree(path)
+        super().__init__(env=view, output_path=repo_id, root_dir=root, overwrite=not os.path.exists(path),
                          only_successes=False, flush_every_n_traj=1, robot_type=ROBOT_TYPE, task_name=task_name)
         self.flush_every_n_steps = FLUSH_EVERY_N_STEPS
         self.current_episode_step_count = 0

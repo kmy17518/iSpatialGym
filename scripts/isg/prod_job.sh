@@ -32,6 +32,7 @@ export PYTHONPATH="$CODE:$B1K/OmniGibson:$B1K/bddl3${PYTHONPATH:+:$PYTHONPATH}"
 export OMNIGIBSON_DATA_PATH="$PROD_DATA_PATH" OMNIGIBSON_APPDATA_PATH="$APPDATA" OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES
 # demo.hdf5 is written on NFS, where HDF5's file lock intermittently fails with EIO and the demo is left without it
 export HDF5_USE_FILE_LOCKING=FALSE
+export HF_HUB_OFFLINE=1
 # OmniGibson's per-step change detection (gm.TRACK_STATE_UPDATES) stays on: the executor's per-step hdf5 dump filter reads
 # is_active, and with it off an object whose state changed while it slept is left out of that step's recorded state, which
 # BEHAVIOR's playback loads step by step. Off is ~half of an env step faster; PROD_TRACK_STATE_UPDATES=0 turns it off.
