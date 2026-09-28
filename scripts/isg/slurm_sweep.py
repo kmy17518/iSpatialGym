@@ -89,33 +89,44 @@ def chain(alias, max_attempts, seed, sample_only=False):
                   "--video --video-size 540; echo DEMO_EXIT $?; fi")
 
 
-def job_script(run_dir, args, timeout):
+def job_script(runs, args):
+    """One sbatch job for ``runs`` = ``[(run_dir, timeout), ...]``: they run concurrently on the job's GPU (``--pack``),
+    each with its own ``TMPDIR`` (and cold caches), ``local.log`` and ``slurm_result.json``."""
     q = shlex.quote
     min_kb = int(args.min_scratch_gb * 1024 * 1024)
-    # after the env's activation hooks (which may point these at a shared cache): the job starts cold, like a pool pod,
-    # and concurrent jobs never rewrite one held_hold.json; reach bands and the reach volume stay shared
+    # after the env's activation hooks (which may point these at a shared cache): each run starts cold, like a pool pod,
+    # and concurrent runs never rewrite one held_hold.json; reach bands and the reach volume stay shared
     cold = ('export ISPATIALGYM_CACHE_DIR="$TMPDIR/isg_cache" ISPATIALGYM_SAMPLING_CACHE="$TMPDIR/isg_cache/sampling" '
-            'ISPATIALGYM_HELD_HOLD_CACHE="$TMPDIR/isg_cache/held_hold.json"\n') if args.cold_caches else ""
+            'ISPATIALGYM_HELD_HOLD_CACHE="$TMPDIR/isg_cache/held_hold.json"; ') if args.cold_caches else ""
+    launches = "\n".join(f"run_one {q(d)} {int(t)} &" for d, t in runs)
     return f"""#!/bin/bash
 export HOME={q(args.home)}
 if [ -n "${{TMPDIR:-}}" ] && [ -d "$TMPDIR" ] && [ -w "$TMPDIR" ] && [ "$(df -Pk "$TMPDIR" | awk 'NR==2{{print $4}}')" -gt {min_kb} ]; then
-  export TMPDIR="$TMPDIR/isg_$SLURM_JOB_ID"
+  JOB_TMP="$TMPDIR/isg_$SLURM_JOB_ID"
 else
-  export TMPDIR={q(args.fallback_tmp)}/isg_$SLURM_JOB_ID
+  JOB_TMP={q(args.fallback_tmp)}/isg_$SLURM_JOB_ID
 fi
-mkdir -p "$TMPDIR"
 source {q(args.conda_sh)}
 conda activate {q(args.env)}
-{cold}cd {q(REPO)} || exit 2
-export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES SMOKE_OUT={q(run_dir)}
+cd {q(REPO)} || exit 2
+export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES
 gpu="$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | head -1)"
-t0=$(date +%s)
-timeout --kill-after=120 {int(timeout)} bash {q(os.path.join(run_dir, "chain.sh"))} > {q(os.path.join(run_dir, "local.log"))} 2>&1
-rc=$?
-printf '{{"job_id": "%s", "rc": %d, "wall_s": %d, "host": "%s", "gpu": "%s", "tmpdir": "%s"}}\\n' "$SLURM_JOB_ID" "$rc" "$(( $(date +%s) - t0 ))" \\
-  "$(hostname -s)" "$gpu" "$TMPDIR" > {q(os.path.join(run_dir, "slurm_result.json"))}
-rm -rf "$TMPDIR"
-exit $rc
+run_one() {{
+  local d="$1" t="$2"
+  (
+    export TMPDIR="$JOB_TMP/$(basename "$d")" SMOKE_OUT="$d"
+    mkdir -p "$TMPDIR"
+    {cold}t0=$(date +%s)
+    timeout --kill-after=120 "$t" bash "$d/chain.sh" > "$d/local.log" 2>&1
+    rc=$?
+    printf '{{"job_id": "%s", "rc": %d, "wall_s": %d, "host": "%s", "gpu": "%s", "tmpdir": "%s", "packed": %d}}\\n' "$SLURM_JOB_ID" "$rc" \\
+      "$(( $(date +%s) - t0 ))" "$(hostname -s)" "$gpu" "$TMPDIR" {len(runs)} > "$d/slurm_result.json"
+    rm -rf "$TMPDIR"
+  )
+}}
+{launches}
+wait
+rm -rf "$JOB_TMP"
 """
 
 
@@ -155,6 +166,7 @@ def cmd_submit(args):
          "sbatch": {"partition": args.partition, "account": args.account, "gres": args.gres, "cpus": args.cpus, "mem": args.mem, "exclude": args.exclude},
          "runs": []}
     stamp = time.strftime("%m%d-%H%M%S")
+    runs = []
     for k, alias in enumerate(a for a in aliases for _ in range(args.copies)):
         max_attempts, timeout = budget(alias)
         max_attempts = args.max_attempts or max_attempts
@@ -165,23 +177,33 @@ def cmd_submit(args):
         os.makedirs(run_dir, exist_ok=True)
         with open(os.path.join(run_dir, "chain.sh"), "w") as f:
             f.write(chain(alias, max_attempts, args.seed, args.sample_only) + "\n")
-        with open(os.path.join(run_dir, "job.sh"), "w") as f:
-            f.write(job_script(run_dir, args, timeout))
-        name = "isg_" + re.sub(r"[^A-Za-z0-9_.-]", "_", alias)[:40]
-        cmd = ["sbatch", "--parsable", "-p", args.partition, "-A", args.account, f"--gres={args.gres}", "-c", str(args.cpus), f"--mem={args.mem}",
-               f"--time={int(timeout / 60) + 30}", "-J", name, "-o", os.path.join(run_dir, "slurm.log")]
+        runs.append({"alias": alias, "subtask": st, "run_id": run_id, "out": os.path.relpath(run_dir, REPO), "job_id": None,
+                     "max_attempts": max_attempts, "timeout": timeout, "seed": args.seed, "sample_only": bool(args.sample_only), "collected": False})
+    pack = max(1, int(args.pack))
+    mem_gb = float(str(args.mem).rstrip("Gg"))
+    for i in range(0, len(runs), pack):
+        group = runs[i:i + pack]
+        dirs = [(os.path.join(REPO, r["out"]), r["timeout"]) for r in group]
+        script = os.path.join(dirs[0][0], "job.sh")
+        with open(script, "w") as f:
+            f.write(job_script(dirs, args))
+        name = "isg_" + re.sub(r"[^A-Za-z0-9_.-]", "_", group[0]["alias"])[:40] + (f"_x{len(group)}" if len(group) > 1 else "")
+        cmd = ["sbatch", "--parsable", "-p", args.partition, "-A", args.account, f"--gres={args.gres}", "-c", str(args.cpus * len(group)),
+               f"--mem={int(mem_gb * len(group))}G", f"--time={int(max(t for _, t in dirs) / 60) + 30}", "-J", name, "-o", os.path.join(dirs[0][0], "slurm.log")]
         if args.exclude:
             cmd.append(f"--exclude={args.exclude}")
-        cmd.append(os.path.join(run_dir, "job.sh"))
+        cmd.append(script)
         r = subprocess.run(cmd, capture_output=True, text=True, env=slurm_env())
         if r.returncode != 0:
-            raise SystemExit(f"sbatch failed for {alias}: {r.stderr.strip()}")
+            raise SystemExit(f"sbatch failed for {[g['alias'] for g in group]}: {r.stderr.strip()}")
         job_id = r.stdout.strip().split(";")[0]
-        m["runs"].append({"alias": alias, "subtask": st, "run_id": run_id, "out": os.path.relpath(run_dir, REPO), "job_id": job_id,
-                          "max_attempts": max_attempts, "timeout": timeout, "seed": args.seed, "sample_only": bool(args.sample_only), "collected": False})
-        print(f"{job_id}  {alias}  -> {os.path.relpath(run_dir, REPO)}")
+        for g in group:
+            g["job_id"] = job_id
+            print(f"{job_id}  {g['alias']}  -> {g['out']}")
+    m["runs"] = runs
+    m["pack"] = pack
     save_manifest(m)
-    print(f"sweep {sweep}: {len(m['runs'])} jobs ({manifest_path(sweep)})")
+    print(f"sweep {sweep}: {len(runs)} runs in {len({r['job_id'] for r in runs})} jobs ({manifest_path(sweep)})")
 
 
 def job_states(job_ids):
@@ -273,6 +295,8 @@ def main():
     s.add_argument("--home", default=os.environ.get("HOME", ""), help="HOME of the jobs (caches; default: the submitting shell's)")
     s.add_argument("--fallback-tmp", default=os.environ.get("TMPDIR", "/tmp"), help="TMPDIR when the node scratch is missing or short of space")
     s.add_argument("--min-scratch-gb", type=float, default=50.0)
+    s.add_argument("--pack", type=int, default=1, help="runs per job, concurrently on its one GPU (a run peaks at ~10 GB: 2 on 24 GB cards, "
+                                                        "3-4 on 46-48 GB); --cpus and --mem are per run")
     s.add_argument("--shared-caches", dest="cold_caches", action="store_false",
                    help="use the env's sampling / held-hold caches instead of a fresh per-job cache in the node scratch")
     s.set_defaults(fn=cmd_submit)
