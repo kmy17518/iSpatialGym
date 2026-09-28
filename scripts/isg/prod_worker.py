@@ -43,6 +43,21 @@ def result_record(log_path):
     return rec
 
 
+def job_provenance():
+    """The job's snapshot (PROD_SNAP from job.sh) with its commits and the change-detection setting of prod_job.sh."""
+    snap = os.environ.get("PROD_SNAP")
+
+    def git(root):
+        try:
+            return subprocess.run(["git", "-C", root, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=60).stdout.strip() or None
+        except Exception:  # noqa: BLE001
+            return None
+
+    return {"snapshot": snap, "isg_commit": git(os.path.join(snap, "ispatialgym")) if snap else None,
+            "b1k_commit": git(os.path.join(snap, "Behavior-1K")) if snap else None,
+            "track_state_updates_env": os.environ.get("OMNIGIBSON_TRACK_STATE_UPDATES")}
+
+
 def job_gpus():
     """The job's GPU indices (``CUDA_VISIBLE_DEVICES`` as Slurm set it), ``[]`` when unset."""
     return [g for g in os.environ.get("CUDA_VISIBLE_DEVICES", "").split(",") if g.strip()]
@@ -130,7 +145,8 @@ def main(argv=None):
             rec = result_record(lp) or {"status": "error", "reason": "no RUN_ISG_RESULT line"}
             row = {"instance": iid, "alias": args.alias, "rc": p.returncode, "status": rec.get("status"), "success": bool(rec.get("success")),
                    "reason": rec.get("reason"), "n_steps": rec.get("n_steps"), "wall_s": round(time.time() - t0, 1), "tro": tro,
-                   "out": rec.get("out"), "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                   "out": rec.get("out"), "reused_world": False, "provisional": False, "provenance": rec.get("provenance"),
+                   "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
             with open(results_path, "a") as f:
                 f.write(json.dumps(row) + "\n")
             done.add(iid)
@@ -151,7 +167,7 @@ def main(argv=None):
             break
         time.sleep(args.poll_s)
 
-    summary = {"alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
+    summary = {"provenance": job_provenance(), "alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
                "n_instances": len(ready_instances(inst_root)), "n_demos": len(done), "wall_s": round(time.time() - t_job, 1),
                "stopped": stopping["flag"]}
     with open(os.path.join(out, "worker_summary.json"), "w") as f:
@@ -285,7 +301,7 @@ def run_queue_mode(args):
         time.sleep(args.poll_s)
 
     n_demos = sum(1 for line in open(results_path) if line.strip()) if os.path.exists(results_path) else 0
-    summary = {"alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc, "demo_mode": "queue",
+    summary = {"provenance": job_provenance(), "alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc, "demo_mode": "queue",
                "sampler_restarts": sampler_restarts, "n_instances": len(ready_instances(inst_glob)), "n_demos": n_demos, "runner_processes": n_started,
                "wall_s": round(time.time() - t_job, 1), "stopped": stopping["flag"]}
     with open(os.path.join(out, "worker_summary.json"), "w") as f:

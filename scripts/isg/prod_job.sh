@@ -30,12 +30,10 @@ CODE="$PROD_SNAP/ispatialgym"; B1K="$PROD_SNAP/Behavior-1K"
 cd "$CODE" || exit 2
 export PYTHONPATH="$CODE:$B1K/OmniGibson:$B1K/bddl3${PYTHONPATH:+:$PYTHONPATH}"
 export OMNIGIBSON_DATA_PATH="$PROD_DATA_PATH" OMNIGIBSON_APPDATA_PATH="$APPDATA" OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES
-# the per-step change detection was ~half of an env step (mental_rotation queue demos: same step counts and verdicts with it
-# off, 56 / 33 s -> 26 / 25 s per demo). Its only reader in iSpatialGym is the executor's per-step hdf5 dump filter
-# (is_active): with it off, an object whose state changed while it slept is left out of that step's recorded state (its pose
-# is unchanged; mean state size 1264.3 -> 1263.7 floats per step on one demo, the same on the other). PROD_TRACK_STATE_UPDATES=1
-# restores it.
-export OMNIGIBSON_TRACK_STATE_UPDATES="${PROD_TRACK_STATE_UPDATES:-0}"
+# OmniGibson's per-step change detection (gm.TRACK_STATE_UPDATES) stays on: the executor's per-step hdf5 dump filter reads
+# is_active, and with it off an object whose state changed while it slept is left out of that step's recorded state, which
+# BEHAVIOR's playback loads step by step. Off is ~half of an env step faster; PROD_TRACK_STATE_UPDATES=0 turns it off.
+export OMNIGIBSON_TRACK_STATE_UPDATES="${PROD_TRACK_STATE_UPDATES:-1}"
 export TMPDIR="$JOB_TMP"
 # the samplers write feasible sets back into the band files they read, in place: a private copy per job (cp -p keeps the
 # mtimes the loader breaks ties with)
@@ -43,7 +41,7 @@ cp -p "$CODE"/runlogs/reach_bands_20260915/bands/* "$TMPDIR/reach_bands/" 2>/dev
 export ISPATIALGYM_REACH_BANDS="$TMPDIR/reach_bands" ISPATIALGYM_CACHE_DIR="$TMPDIR/isg_cache" ISPATIALGYM_SAMPLING_CACHE="$TMPDIR/isg_cache/sampling" \
   ISPATIALGYM_HELD_HOLD_CACHE="$TMPDIR/isg_cache/held_hold.json"
 export OMP_NUM_THREADS="$PROD_THREADS" MKL_NUM_THREADS="$PROD_THREADS" OPENBLAS_NUM_THREADS="$PROD_THREADS"
-echo "PROD_JOB $SLURM_JOB_ID host=$(hostname -s) gpu=\"$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)\" TMPDIR=$TMPDIR appdata=$APPDATA code=$CODE start=$(date -Is)"
+echo "PROD_JOB $SLURM_JOB_ID host=$(hostname -s) gpu=\"$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)\" TMPDIR=$TMPDIR appdata=$APPDATA code=$CODE isg_commit=$(git -C "$CODE" rev-parse HEAD) b1k_commit=$(git -C "$B1K" rev-parse HEAD) track_state_updates=$OMNIGIBSON_TRACK_STATE_UPDATES start=$(date -Is)"
 deadline=$(( $(date +%s) + ${PROD_HOURS%.*} * 3600 - ${PROD_GRACE_MIN%.*} * 60 ))
 python "$CODE/scripts/isg/prod_worker.py" --alias "$PROD_ALIAS" --start "$PROD_START" --count "$PROD_COUNT" --out "$PROD_OUT" --seed "$PROD_SEED" \
   --max-attempts "$PROD_MAX_ATTEMPTS" --demo-workers "$PROD_DEMO_WORKERS" --demo-mode "$PROD_DEMO_MODE" --deadline "$deadline"

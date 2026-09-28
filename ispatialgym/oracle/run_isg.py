@@ -49,6 +49,7 @@ import json
 import logging
 import math
 import os
+import subprocess
 import sys
 import time
 import traceback
@@ -232,6 +233,41 @@ def gripper_command_for(robot, arm: str, finger_q) -> float:
 
 def _copy_map(m):
     return m.clone() if hasattr(m, "clone") else m.copy()
+
+
+#: InstanceLoader.attach() loads the scene state taken after build_env before the next instance (queue mode)
+QUEUE_SCENE_RESTORE = True
+_PROVENANCE: Optional[Dict[str, Any]] = None
+
+
+def provenance() -> Dict[str, Any]:
+    """The code this process runs, for every results row and meta.json: the snapshot (``PROD_SNAP`` of a produce job, else
+    the checkout), the iSpatialGym and BEHAVIOR-1K commits and dirty flags of the packages actually imported, whether
+    OmniGibson's tensorized-state change detection is on (``gm.TRACK_STATE_UPDATES``; builds without the switch always
+    track) and whether queue mode restores the scene between instances."""
+    global _PROVENANCE
+    if _PROVENANCE is None:
+        import ispatialgym
+
+        isg_root = os.path.dirname(os.path.dirname(os.path.abspath(ispatialgym.__file__)))
+        b1k_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(og.__file__))))
+
+        def git(root, *a):
+            try:
+                return subprocess.run(["git", "-C", root, *a], capture_output=True, text=True, timeout=60).stdout.strip() or None
+            except Exception:  # noqa: BLE001
+                return None
+
+        _PROVENANCE = {
+            "snapshot": os.environ.get("PROD_SNAP") or os.path.dirname(isg_root),
+            "isg_root": isg_root, "isg_commit": git(isg_root, "rev-parse", "HEAD"),
+            "isg_dirty": bool(git(isg_root, "status", "--porcelain", "--", "ispatialgym", "scripts")),
+            "b1k_root": b1k_root, "b1k_commit": git(b1k_root, "rev-parse", "HEAD"),
+            "b1k_dirty": bool(git(b1k_root, "status", "--porcelain", "--", "OmniGibson/omnigibson", "bddl3")),
+            "track_state_updates": bool(getattr(gm, "TRACK_STATE_UPDATES", True)),
+            "queue_scene_restore": QUEUE_SCENE_RESTORE,
+        }
+    return dict(_PROVENANCE)
 
 
 def _first_key(d: Dict[str, Any], suffix: str) -> Optional[str]:
@@ -867,8 +903,9 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
     t_start = time.time()
     timings: Dict[str, float] = {}
     meta: Dict[str, Any] = {"status": "error", "mode": args.mode, "argv": sys.argv[1:], "hostname": os.uname().nodename,
-                            "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_start))}
-    result: Dict[str, Any] = {"status": "error", "mode": args.mode}
+                            "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_start)), "provenance": provenance(),
+                            "reused_world": bool(shared and shared.get("env") is not None)}
+    result: Dict[str, Any] = {"status": "error", "mode": args.mode, "provenance": meta["provenance"]}
     exit_code = EXIT_ERROR
     out_dir = None
     recorder: Optional[Recorder] = None
@@ -1201,8 +1238,10 @@ def run_queue(args) -> int:
         shared["signature"] = sig
         n += 1
         if args.results:
+            prov = provenance()
             row = {"instance": iid, "rc": code, "status": result.get("status"), "success": bool(result.get("success")), "reason": result.get("reason"),
                    "n_steps": result.get("n_steps"), "wall_s": round(time.time() - t0, 1), "tro": tro, "out": result.get("out"), "reused_world": n > 1,
+                   "provisional": bool(n > 1 and not prov["queue_scene_restore"]), "provenance": prov,
                    "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "pid": os.getpid(), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
             with open(args.results, "a") as f:
                 f.write(json.dumps(row, default=json_default) + "\n")

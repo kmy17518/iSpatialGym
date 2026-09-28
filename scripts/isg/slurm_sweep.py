@@ -318,6 +318,149 @@ def cmd_requeue(args):
     print(f"requeued {n} jobs of {args.sweep}")
 
 
+_SNAP_FACTS = {}
+
+
+def snapshot_facts(snap):
+    """Commits and behaviour of a produce snapshot: queue-mode scene restore in its run_isg, the change-detection switch in
+    its OmniGibson and the default its prod_job.sh gives it (None: no prod_job.sh)."""
+    if snap not in _SNAP_FACTS:
+        git = lambda root: subprocess.run(["git", "-C", root, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or None  # noqa: E731
+        read = lambda p: open(p).read() if os.path.exists(p) else ""  # noqa: E731
+        job_sh = read(os.path.join(snap, "ispatialgym", "scripts", "isg", "prod_job.sh"))
+        m = re.search(r"PROD_TRACK_STATE_UPDATES:-(\d)", job_sh)
+        _SNAP_FACTS[snap] = {
+            "isg_commit": git(os.path.join(snap, "ispatialgym")), "b1k_commit": git(os.path.join(snap, "Behavior-1K")),
+            "queue_scene_restore": "scene_state0" in read(os.path.join(snap, "ispatialgym", "ispatialgym", "oracle", "run_isg.py")),
+            "switch": "TRACK_STATE_UPDATES" in read(os.path.join(snap, "Behavior-1K", "OmniGibson", "omnigibson", "macros.py")),
+            "prod_job_default": None if m is None else m.group(1) == "1",
+        }
+    return _SNAP_FACTS[snap]
+
+
+def job_provenance(j):
+    """Snapshot, commits and settings a produce job ran with, from its slurm.log (the PROD_JOB line) or its job.sh."""
+    log = os.path.join(j["dir"], "slurm.log")
+    text = open(log, errors="replace").read(200000) if os.path.exists(log) else ""
+    line = next((ln for ln in text.splitlines() if ln.startswith("PROD_JOB ")), "")
+    code = re.search(r" code=(\S+)", line)
+    started = re.search(r" start=(\S+)", line)
+    if code:
+        snap, source = os.path.dirname(code.group(1)), "slurm.log"
+    else:
+        sh = open(os.path.join(j["dir"], "job.sh")).read() if os.path.exists(os.path.join(j["dir"], "job.sh")) else ""
+        hit = re.search(r"(/\S*/isg_prod/code_[0-9a-f]{8})", sh) if line else None  # a fat job.sh with the snapshot written in
+        if not hit:
+            return {"snapshot": None, "source": "not started" if not line else "unknown"}
+        snap, source = hit.group(1), "job.sh"
+    f = snapshot_facts(snap)
+    logged = re.search(r" track_state_updates=(\d)", line)
+    if logged:
+        track = logged.group(1) == "1"
+    elif not f["switch"]:
+        track = True  # an OmniGibson without the switch always tracks
+    elif source == "slurm.log" and "appdata=" in line and f["prod_job_default"] is not None:
+        track = f["prod_job_default"]  # thin job.sh: prod_job.sh's default (job.sh never sets PROD_TRACK_STATE_UPDATES)
+    else:
+        track = True  # a fat job.sh never set OMNIGIBSON_TRACK_STATE_UPDATES: the macro's default
+    return {"snapshot": os.path.basename(snap), "snapshot_path": snap, "isg_commit": f["isg_commit"], "b1k_commit": f["b1k_commit"],
+            "track_state_updates": track, "queue_scene_restore": f["queue_scene_restore"], "started": started.group(1) if started else None,
+            "source": source}
+
+
+def _rewrite_json(path, fn, jsonl=False, tries=5):
+    """Rewrite a (jsonl) file through ``fn`` atomically; retried when the file grows meanwhile (a runner appending a row)."""
+    for _ in range(tries):
+        size = os.path.getsize(path)
+        with open(path) as fh:
+            data = [json.loads(ln) for ln in fh if ln.strip()] if jsonl else json.load(fh)
+        new = fn(data)
+        if new is None:
+            return False
+        tmp = f"{path}.tmp{os.getpid()}"
+        with open(tmp, "w") as fh:
+            if jsonl:
+                fh.writelines(json.dumps(r) + "\n" for r in new)
+            else:
+                json.dump(new, fh, indent=1)
+        if os.path.getsize(path) == size:
+            os.replace(tmp, path)
+            return True
+        os.remove(tmp)
+    return False
+
+
+def cmd_provenance(args):
+    """Per-job provenance into the manifest, provenance + provisional into every results row and demo meta.json lacking them,
+    and <root>/<sweep>/demos_index.jsonl (one row per demo, with the scene audit of --audit files when given)."""
+    root = os.path.join(args.root, args.sweep)
+    mpath = os.path.join(root, "manifest.json")
+    m = json.load(open(mpath))
+    audit = {}
+    for p in sorted(glob.glob(args.audit)) if args.audit else []:
+        for ln in open(p):
+            if ln.strip():
+                a = json.loads(ln)
+                audit[(a["job_dir"], a["instance"])] = "disturbed" if a.get("disturbed") else "clean"
+    n_rows = n_meta = 0
+    index = []
+    for j in m["jobs"]:
+        prov = job_provenance(j)
+        j["provenance"] = prov
+        rp = os.path.join(j["dir"], "results.jsonl")
+        if not prov.get("snapshot") or not os.path.exists(rp):
+            continue
+        base = {k: prov[k] for k in ("snapshot", "isg_commit", "b1k_commit", "track_state_updates", "queue_scene_restore")}
+
+        def fill(rows):
+            changed = False
+            for r in rows:
+                if "provenance" not in r or r["provenance"] is None:
+                    r["provenance"] = dict(base, source="backfill:" + prov["source"])
+                    changed = True
+                if "provisional" not in r:
+                    r["provisional"] = bool(r.get("reused_world")) and not r["provenance"].get("queue_scene_restore", False)
+                    changed = True
+            return rows if changed else None
+
+        before = sum(1 for ln in open(rp) if ln.strip())
+        if _rewrite_json(rp, fill, jsonl=True):
+            n_rows += before
+        for r in (json.loads(ln) for ln in open(rp) if ln.strip()):
+            meta = os.path.join(r.get("out") or "", "meta.json")
+            if r.get("out") and os.path.exists(meta):
+                def fill_meta(mm, r=r):
+                    if "provenance" in mm:
+                        return None
+                    mm["provenance"] = r["provenance"]
+                    mm.setdefault("reused_world", bool(r.get("reused_world")))
+                    mm["provisional"] = bool(r.get("provisional"))
+                    return mm
+                if _rewrite_json(meta, fill_meta):
+                    n_meta += 1
+            pr = r.get("provenance") or {}
+            index.append({"alias": j["alias"], "job_id": j["job_id"], "job_dir": j["dir"], "instance": r["instance"], "success": bool(r.get("success")),
+                          "status": r.get("status"), "reason": r.get("reason"), "n_steps": r.get("n_steps"), "reused_world": bool(r.get("reused_world")),
+                          "provisional": bool(r.get("provisional")), "snapshot": pr.get("snapshot") and os.path.basename(str(pr.get("snapshot"))),
+                          "isg_commit": pr.get("isg_commit"), "b1k_commit": pr.get("b1k_commit"), "track_state_updates": pr.get("track_state_updates"),
+                          "queue_scene_restore": pr.get("queue_scene_restore"),
+                          "audit": audit.get((j["dir"], r["instance"]), "unchecked"), "out": r.get("out")})
+    m["code_commit_note"] = "code_commit is the checkout that submitted the first jobs; each job's code is jobs[].provenance"
+    with open(mpath + ".tmp", "w") as fh:
+        json.dump(m, fh, indent=1)
+    os.replace(mpath + ".tmp", mpath)
+    with open(os.path.join(root, "demos_index.jsonl.tmp"), "w") as fh:
+        fh.writelines(json.dumps(r) + "\n" for r in index)
+    os.replace(os.path.join(root, "demos_index.jsonl.tmp"), os.path.join(root, "demos_index.jsonl"))
+    by_snap = {}
+    for j in m["jobs"]:
+        s = (j.get("provenance") or {}).get("snapshot") or (j.get("provenance") or {}).get("source")
+        by_snap[s] = by_snap.get(s, 0) + 1
+    print(f"jobs per snapshot: {by_snap}")
+    print(f"results rows backfilled: {n_rows}; meta.json backfilled: {n_meta}; index: {len(index)} demos "
+          f"({sum(r['provisional'] for r in index)} provisional, {sum(not r['track_state_updates'] for r in index if r['track_state_updates'] is not None)} with change detection off)")
+
+
 def cmd_pstatus(args):
     """Per alias: instances sampled, demos finished / successful, jobs by state."""
     root = os.path.join(args.root, args.sweep)
@@ -570,6 +713,11 @@ def main():
     s.add_argument("--empty", action="store_true", help="also resubmit jobs that ended without writing an instance (e.g. a GPU crash at start)")
     s.add_argument("--demo-mode", default=None, choices=["queue", "fresh"], help="override the run's prod_worker --demo-mode")
     s.set_defaults(fn=cmd_requeue)
+    s = sub.add_parser("provenance", help="per-job code provenance into the manifest, results rows, meta.json and demos_index.jsonl")
+    s.add_argument("--sweep", required=True)
+    s.add_argument("--root", default=os.path.join(os.path.dirname(REPO), "isg_prod"))
+    s.add_argument("--audit", default=None, help="glob of check_provisional.py reports (job_dir, instance, disturbed)")
+    s.set_defaults(fn=cmd_provenance)
     s = sub.add_parser("pstatus", help="progress of a produce run")
     s.add_argument("--sweep", required=True)
     s.add_argument("--root", default=os.path.join(os.path.dirname(REPO), "isg_prod"))
