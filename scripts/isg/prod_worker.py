@@ -96,46 +96,42 @@ def main(argv=None):
     ap.add_argument("--demo-workers", type=int, default=2)
     ap.add_argument("--deadline", type=float, default=None, help="epoch seconds: no demo starts after it and the sampler is stopped")
     ap.add_argument("--poll-s", type=float, default=10.0)
-    ap.add_argument("--demo-mode", default="queue", choices=["queue", "fresh"],
+    ap.add_argument("--demo-mode", default="queue", choices=["queue", "fresh", "sample"],
                     help="queue: --demo-workers long-lived 'run_isg --queue' processes, each replaying instance after instance in one "
-                         "loaded world; fresh: one run_isg process (its own world) per demo, as first_demo")
+                         "loaded world; fresh: one run_isg process (its own world) per demo, as first_demo; sample: the sampler only")
     args = ap.parse_args(argv)
-    if args.demo_mode == "queue":
+    if args.demo_mode in ("queue", "sample"):
         return run_queue_mode(args)
 
     out = os.path.abspath(args.out)
-    inst_root = os.path.join(out, "inst")
+    inst_glob = os.path.join(out, "inst") + "*"
     logs = os.path.join(out, "demo_logs")
     os.makedirs(logs, exist_ok=True)
     results_path = os.path.join(out, "results.jsonl")
-    done = set()
-    if os.path.exists(results_path):  # a restarted job does not replay what it already recorded
-        with open(results_path) as f:
-            done = {json.loads(line)["instance"] for line in f if line.strip()}
-
-    sampler_cmd = [sys.executable, "-m", "ispatialgym.sampling.sample_isg", "--alias", args.alias, "--templates", "1",
-                   "--instances-per-template", str(args.count), "--start-index", str(args.start), "--seed", str(args.seed),
-                   "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", inst_root, "--log-level", "INFO"]
+    done = done_instances(results_path)  # a requeued slice replays what has no demo standing, sampling continues after its last index
+    resume = resume_sampler(out, args.start, args.count)
     t_job = time.time()
-    with open(os.path.join(out, "sample.log"), "a") as slog:
-        sampler = subprocess.Popen(sampler_cmd, stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
+    sampler = None
+    if resume is not None:
+        with open(os.path.join(out, "sample.log"), "a") as slog:
+            sampler = subprocess.Popen(sampler_command(args, *resume), stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
     running = {}  # iid -> (Popen, started, log path, tro)
     stopping = {"flag": False}
 
     def on_term(signum, _frame):
         stopping["flag"] = True
-        for p in [sampler] + [r[0] for r in running.values()]:
+        for p in ([sampler] if sampler is not None else []) + [r[0] for r in running.values()]:
             if p.poll() is None:
                 p.send_signal(signal.SIGTERM)
 
     signal.signal(signal.SIGTERM, on_term)
     signal.signal(signal.SIGINT, on_term)
 
-    sampler_rc = None
+    sampler_rc = None if sampler is not None else 0
     while True:
         if args.deadline and time.time() > args.deadline and not stopping["flag"]:
             stopping["flag"] = True
-            if sampler.poll() is None:
+            if sampler is not None and sampler.poll() is None:
                 sampler.send_signal(signal.SIGTERM)
         if sampler_rc is None and sampler.poll() is not None:
             sampler_rc = sampler.returncode
@@ -146,29 +142,31 @@ def main(argv=None):
             row = {"instance": iid, "alias": args.alias, "rc": p.returncode, "status": rec.get("status"), "success": bool(rec.get("success")),
                    "reason": rec.get("reason"), "n_steps": rec.get("n_steps"), "wall_s": round(time.time() - t0, 1), "tro": tro,
                    "out": rec.get("out"), "reused_world": False, "provisional": False, "provenance": rec.get("provenance"),
+                   "hdf5_ok": rec.get("hdf5_ok"), "behavior_lerobot": rec.get("behavior_lerobot"),
                    "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
             with open(results_path, "a") as f:
                 f.write(json.dumps(row) + "\n")
             done.add(iid)
             del running[iid]
         if not stopping["flag"]:
-            for iid, tro in sorted(ready_instances(inst_root).items()):
+            for iid, tro in sorted(ready_instances(inst_glob).items()):
                 if len(running) >= args.demo_workers:
                     break
                 if iid in done or iid in running:
                     continue
                 lp = os.path.join(logs, iid + ".log")
+                slot = len(running)
                 cmd = [sys.executable, "-m", "ispatialgym.oracle.run_isg", "--instance", tro, "--mode", "oracle", "--out", os.path.join(out, "demo"),
-                       "--video", "--video-size", "540"]
+                       *recording_args(out, slot)]
                 with open(lp, "w") as f:
-                    running[iid] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=proc_env("demo", len(running))), time.time(), lp, tro)
-        pending = [i for i in ready_instances(inst_root) if i not in done and i not in running]
+                    running[iid] = (subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=proc_env("demo", slot)), time.time(), lp, tro)
+        pending = [i for i in ready_instances(inst_glob) if i not in done and i not in running]
         if sampler_rc is not None and not running and (stopping["flag"] or not pending):
             break
         time.sleep(args.poll_s)
 
     summary = {"provenance": job_provenance(), "alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
-               "n_instances": len(ready_instances(inst_root)), "n_demos": len(done), "wall_s": round(time.time() - t_job, 1),
+               "n_instances": len(ready_instances(inst_glob)), "n_demos": len(done), "wall_s": round(time.time() - t_job, 1),
                "stopped": stopping["flag"]}
     with open(os.path.join(out, "worker_summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
@@ -187,12 +185,74 @@ def last_written_index(inst_root):
     return max(idx) if idx else None
 
 
-def release_orphan_claims(claims, results_path, live_pids):
-    """Claims of runners that died mid-instance (their pid is gone and no result row names the instance) go back to the queue."""
-    done = set()
+HDF5_SIGNATURE = b"\x89HDF\r\n\x1a\n"
+
+
+def hdf5_readable(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read(8) == HDF5_SIGNATURE
+    except OSError:
+        return False
+
+
+def slice_rows(results_path):
+    """``{instance: latest results row}`` of the job directory."""
+    rows = {}
     if os.path.exists(results_path):
         with open(results_path) as f:
-            done = {json.loads(line)["instance"] for line in f if line.strip()}
+            for line in f:
+                if line.strip():
+                    r = json.loads(line)
+                    rows[r["instance"]] = r
+    return rows
+
+
+def rerecord(row):
+    """A successful demo that does not count: recorded with OmniGibson's change detection off, or without a readable
+    demo.hdf5 (failed demos stay failed: their instance was attempted)."""
+    if not row.get("success"):
+        return False
+    if (row.get("provenance") or {}).get("track_state_updates") is False:
+        return True
+    return not hdf5_readable(os.path.join(row.get("out") or "", "demo.hdf5"))
+
+
+def done_instances(results_path):
+    """Instances whose demo stands: the latest row is a failure, or a success that counts (:func:`rerecord`)."""
+    return {iid for iid, r in slice_rows(results_path).items() if not rerecord(r)}
+
+
+def resume_sampler(out, start, count):
+    """Where a job continues the slice's sampling: ``(first index, number of instances, root)``, or None when every index
+    of ``[start, start + count)`` is written. A slice with instances continues after the last written index under a root of
+    its own (sample_isg skips a template directory that exists and excludes its model combination from the draw)."""
+    last = last_written_index(os.path.join(out, "inst") + "*")
+    nxt = start if last is None or last < start else last + 1
+    if nxt >= start + count:
+        return None
+    k = 0
+    while os.path.exists(os.path.join(out, "inst" if k == 0 else f"inst_r{k}")):
+        k += 1
+    return nxt, start + count - nxt, os.path.join(out, "inst" if k == 0 else f"inst_r{k}")
+
+
+def sampler_command(args, first, n, root):
+    return [sys.executable, "-m", "ispatialgym.sampling.sample_isg", "--alias", args.alias, "--templates", "1",
+            "--instances-per-template", str(n), "--start-index", str(first), "--seed", str(args.seed),
+            "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", root, "--log-level", "INFO"]
+
+
+def recording_args(out, slot):
+    """demo.hdf5 (change detection on: prod_job.sh) + one BEHAVIOR LeRobot v3 shard per runner slot (a replacement runner of
+    the slot resumes it)."""
+    return ["--record", "hdf5", "--behavior-shard", os.path.join(out, "lerobot", f"shard_{os.environ.get('SLURM_JOB_ID', 'local')}_{slot}")]
+
+
+def release_orphan_claims(claims, results_path, live_pids, rerun=()):
+    """Claims of runners that died mid-instance (their pid is gone and no result row names the instance) go back to the queue,
+    and so do the claims of ``rerun`` (successful demos to record again: :func:`rerecord`)."""
+    done = set(slice_rows(results_path)) - set(rerun)
     released = []
     for iid in os.listdir(claims):
         if iid in done:
@@ -219,19 +279,28 @@ def run_queue_mode(args):
     os.makedirs(claims, exist_ok=True)
     done_file = os.path.join(out, "sampler.done")
     results_path = os.path.join(out, "results.jsonl")
-    sampler_cmd = [sys.executable, "-m", "ispatialgym.sampling.sample_isg", "--alias", args.alias, "--templates", "1",
-                   "--instances-per-template", str(args.count), "--start-index", str(args.start), "--seed", str(args.seed),
-                   "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", inst_root, "--log-level", "INFO"]
     t_job = time.time()
+    # a requeued slice: its instances stay, sampling continues after the last written index, orphaned claims (runners of the
+    # previous job) and the claims of successful demos that do not count go back to the queue
+    rerun = sorted(iid for iid, r in slice_rows(results_path).items() if rerecord(r))
+    released = release_orphan_claims(claims, results_path, set(), rerun=rerun)
+    resume = resume_sampler(out, args.start, args.count)
+    sampler, sampler_cmd = None, None
     with open(os.path.join(out, "sample.log"), "a") as slog:
-        sampler = subprocess.Popen(sampler_cmd, stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
+        slog.write(f"\nPROD_WORKER start: {len(ready_instances(inst_glob))} instances, {len(released)} claims released "
+                   f"({len(rerun)} demos to record again), sampler {resume}\n")
+        if resume is not None:
+            sampler_cmd = sampler_command(args, *resume)
+            sampler = subprocess.Popen(sampler_cmd, stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
+        else:
+            open(done_file, "w").close()
     runners = {}  # slot -> (Popen, log path)
     n_started = 0
     stopping = {"flag": False}
 
     def on_term(signum, _frame):
         stopping["flag"] = True
-        for p in [sampler] + [r[0] for r in runners.values()]:
+        for p in ([sampler] if sampler is not None else []) + [r[0] for r in runners.values()]:
             if p.poll() is None:
                 p.send_signal(signal.SIGTERM)
 
@@ -241,32 +310,31 @@ def run_queue_mode(args):
     def unclaimed():
         return [iid for iid in ready_instances(inst_glob) if not os.path.exists(os.path.join(claims, iid))]
 
-    sampler_rc = None
+    sampler_rc = None if sampler is not None else 0
     sampler_restarts = 0
     while True:
         if args.deadline and time.time() > args.deadline and not stopping["flag"]:
             stopping["flag"] = True
-            if sampler.poll() is None:
+            if sampler is not None and sampler.poll() is None:
                 sampler.send_signal(signal.SIGTERM)
         if sampler_rc is None and sampler.poll() is not None:
             rc = sampler.returncode
-            last = last_written_index(inst_glob)
-            nxt = args.start if last is None else last + 1
-            if rc not in (0, 2) and not stopping["flag"] and sampler_restarts < SAMPLER_RESTARTS and nxt < args.start + args.count:
-                # a crashed sampler (GPU device lost, segfault) continues after the last instance it wrote, under a root of its
-                # own (sample_isg skips a template directory that exists and excludes its model combination from the draw)
+            resume = resume_sampler(out, args.start, args.count)
+            if rc not in (0, 2) and not stopping["flag"] and sampler_restarts < SAMPLER_RESTARTS and resume is not None:
+                # a crashed sampler (GPU device lost, segfault) continues after the last instance it wrote
                 sampler_restarts += 1
-                cmd = list(sampler_cmd)
-                cmd[cmd.index("--start-index") + 1] = str(nxt)
-                cmd[cmd.index("--instances-per-template") + 1] = str(args.start + args.count - nxt)
-                cmd[cmd.index("--out") + 1] = f"{inst_root}_r{sampler_restarts}"
                 with open(os.path.join(out, "sample.log"), "a") as slog:
-                    slog.write(f"\nPROD_WORKER sampler exited {rc}; restart {sampler_restarts} at index {nxt}\n")
+                    slog.write(f"\nPROD_WORKER sampler exited {rc}; restart {sampler_restarts}: {resume}\n")
                     slog.flush()
-                    sampler = subprocess.Popen(cmd, stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
+                    sampler = subprocess.Popen(sampler_command(args, *resume), stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
             else:
                 sampler_rc = rc
                 open(done_file, "w").close()
+        if args.demo_mode == "sample":
+            if sampler_rc is not None:
+                break
+            time.sleep(args.poll_s)
+            continue
         dead = False
         for slot, (p, lp) in list(runners.items()):
             if p.poll() is not None:
@@ -289,7 +357,7 @@ def run_queue_mode(args):
                 n_started += 1
                 lp = os.path.join(logs, f"runner{slot}_{n_started:03d}.log")
                 cmd = [sys.executable, "-m", "ispatialgym.oracle.run_isg", "--queue", inst_glob, "--claims", claims, "--done-file", done_file,
-                       "--results", results_path, "--mode", "oracle", "--out", os.path.join(out, "demo"), "--video", "--video-size", "540",
+                       "--results", results_path, "--mode", "oracle", "--out", os.path.join(out, "demo"), *recording_args(out, slot),
                        "--poll-s", str(args.poll_s)]
                 if args.deadline:
                     cmd += ["--deadline", str(args.deadline)]
@@ -301,8 +369,9 @@ def run_queue_mode(args):
         time.sleep(args.poll_s)
 
     n_demos = sum(1 for line in open(results_path) if line.strip()) if os.path.exists(results_path) else 0
-    summary = {"provenance": job_provenance(), "alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc, "demo_mode": "queue",
-               "sampler_restarts": sampler_restarts, "n_instances": len(ready_instances(inst_glob)), "n_demos": n_demos, "runner_processes": n_started,
+    summary = {"provenance": job_provenance(), "alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
+               "demo_mode": args.demo_mode, "sampler_restarts": sampler_restarts, "n_instances": len(ready_instances(inst_glob)), "n_demos": n_demos,
+               "runner_processes": n_started, "claims_released_at_start": len(released), "rerecorded": rerun,
                "wall_s": round(time.time() - t_job, 1), "stopped": stopping["flag"]}
     with open(os.path.join(out, "worker_summary.json"), "w") as f:
         json.dump(summary, f, indent=1)

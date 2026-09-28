@@ -159,14 +159,23 @@ def robot_name_from_tro(tro: TROFile, default: str = DEFAULT_ROBOT_NAME) -> str:
 EXTERNAL_CAMERA_NAME = "external_sensor0"  # --dev: the JoyLo replay over-the-shoulder viewpoint
 
 
-def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str, activity: str, did: int, robot_name: str, image_size: int, proprio: bool = True) -> dict:
+def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str, activity: str, did: int, robot_name: str, image_size: int, proprio: bool = True,
+                     behavior_output: bool = False) -> dict:
     """Evaluator configuration (mirrors ``validate_instances.py``) with the robot spawned at the TRO base pose so the
-    holonomic base's virtual joints stay near zero."""
+    holonomic base's virtual joints stay near zero. ``behavior_output``: the robot carries BEHAVIOR replay_obs.py's sensors,
+    modalities and proprioception (``behavior_lerobot.robot_overrides``) instead of the evaluation camera profile."""
     robot_kw = {}
     poses = {k.lower(): v for k, v in (tro.robot_poses or {}).items()}
     pose = (poses.get("robot") or poses.get("r1pro") or [None])[0]
     if pose is not None:
         robot_kw = {"position": [float(v) for v in pose["position"]], "orientation": [float(v) for v in pose["orientation"]]}
+    if behavior_output:
+        from ispatialgym.oracle.behavior_lerobot import robot_overrides
+
+        sensors = robot_overrides()
+    else:
+        sensors = {"obs_modalities": ["rgb", "proprio"] if proprio else ["rgb"],
+                   "sensor_config": {"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}}, **M.camera_overrides()}
     return {
         "env": {"action_frequency": 30, "physics_frequency": 120},
         "scene": {
@@ -175,15 +184,7 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
             "scene_file": os.path.join(template_dir, "template.json"),
             "load_room_instances": meta.get("load_room_instances") or None,
         },
-        "robots": [
-            M.joylo_robot_config(
-                robot_name,
-                obs_modalities=["rgb", "proprio"] if proprio else ["rgb"],
-                sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}},
-                **robot_kw,
-                **M.camera_overrides(),
-            )
-        ],
+        "robots": [M.joylo_robot_config(robot_name, **sensors, **robot_kw)],
         "task": {
             "type": "ISpatialGymTask",
             "activity_name": activity,
@@ -310,7 +311,8 @@ class InstanceLoader:
             if getattr(gm, name) != value:
                 with gm.unlocked():
                     setattr(gm, name, value)
-        self.cfg = build_env_config(self.template_dir, self.tmeta, self.tro, self.tro_path, self.activity, self.did, self.robot_name, self.image_size)
+        self.cfg = build_env_config(self.template_dir, self.tmeta, self.tro, self.tro_path, self.activity, self.did, self.robot_name, self.image_size,
+                                    behavior_output=getattr(self, "behavior_output", False))
         if getattr(self, "external_camera", False):
             # --dev (owner 2026-09-17 23:39): the BEHAVIOR / JoyLo replay external viewpoint - a camera on the robot's
             # base link over its shoulder, looking down-forward (render_instances.render_template) - recorded next to
@@ -345,6 +347,10 @@ class InstanceLoader:
             self.robot.sensors[self.cam_key].horizontal_aperture = self.head_aperture
         self.report["head_camera_key"] = self.cam_key
         self.report["head_camera_aperture_mm"] = float(self.robot.sensors[self.cam_key].horizontal_aperture)
+        if getattr(self, "behavior_output", False):
+            from ispatialgym.oracle.behavior_lerobot import warm_camera_params
+
+            warm_camera_params(self.env)
         self.report["evaluation_profile"] = (self.tro.meta.extras.get("evaluation_profile") or EVALUATION_PROFILE)
         # the whole scene as the template file loads it, for attach(): load_tro_instance rewrites only the task objects and
         # the robot, and restore()'s update_initial_file would carry whatever a demo moved into the next instance's start
@@ -820,12 +826,19 @@ def parse_args(argv=None):
     p.add_argument("--allow-sha-mismatch", action="store_true", help="run a sidecar whose tro_sha256 does not match the TRO (hand-built sidecars)")
     p.add_argument("--frame-buffer", default="jpeg", choices=["jpeg", "raw"], help="how pending rgb frames are buffered until an action commits")
     p.add_argument("--all-cameras", action="store_true", help="LeRobot: every rgb sensor (default: the head camera only)")
+    p.add_argument("--behavior-shard", default=None,
+                   help="<root>/<repo_id>: append each successful demo without a mid-episode retry to this LeRobot v3 dataset in BEHAVIOR's "
+                        "replay_obs.py format (robot with replay_obs's sensors: head 720 px, wrists 480 px, rgb + depth_linear + proprio)")
     p.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = p.parse_args(argv)
     if (args.instance is None) == (args.queue is None):
         p.error("exactly one of --instance and --queue")
     if args.all_cameras and M.head_camera_only():
         p.error("--all-cameras records the wrist cameras, which ISPATIALGYM_HEAD_CAMERA_ONLY removes")
+    if args.behavior_shard and M.head_camera_only():
+        p.error("--behavior-shard records the wrist cameras, which ISPATIALGYM_HEAD_CAMERA_ONLY removes")
+    if args.behavior_shard and args.record not in ("full", "hdf5"):
+        p.error("--behavior-shard needs demo.hdf5 (--record hdf5 or full): retried demos are replayed from it")
     return args
 
 
@@ -916,6 +929,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
     try:
         loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=args.image_size, head_aperture=args.head_aperture)
         loader.external_camera = bool(args.dev)
+        loader.behavior_output = bool(args.behavior_shard)
         meta["dev"] = bool(args.dev)
         iid, tro_path = loader.iid, loader.tro_path
         out_root = args.out or os.path.join(loader.template_dir, "runs")
@@ -1028,7 +1042,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         monitors = Monitors(env, robot, QAConfig(max_episode_steps=args.max_steps), cam_key=cam_key, cam_in_zed=cam_in_zed)
         rec_cfg = RecorderConfig(hdf5=args.record in ("full", "hdf5"), lerobot=args.record == "full", video=args.video, video_size=args.video_size,
                                  all_cameras=args.all_cameras, frame_buffer=args.frame_buffer,
-                                 external_camera=EXTERNAL_CAMERA_NAME if args.dev else None)
+                                 external_camera=EXTERNAL_CAMERA_NAME if args.dev else None,
+                                 behavior_shard=args.behavior_shard, behavior_task=meta.get("alias") or loader.activity)
         recorder = Recorder(out_dir, env, robot, cam_key, tracked, fps=int(loader.cfg["env"]["action_frequency"]), cfg=rec_cfg,
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
         if sidecar is not None:
@@ -1147,7 +1162,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                 qa = (executor.result.get("qa") or {}).get("stats") if executor is not None and executor.result else None
                 paths = recorder.close(meta, qa=qa, success=bool(result.get("success")))
                 meta.update({"hdf5": paths.get("hdf5"), "video": paths.get("video"), "lerobot": paths.get("lerobot"), "annotations": paths.get("annotations"),
-                             "video_error": paths.get("video_error"), "lerobot_error": paths.get("lerobot_error")})
+                             "video_error": paths.get("video_error"), "lerobot_error": paths.get("lerobot_error"),
+                             "behavior_lerobot": paths.get("behavior_lerobot")})
+                result["behavior_lerobot"] = paths.get("behavior_lerobot")
+                result["hdf5_ok"] = bool(paths.get("hdf5")) if rec_cfg.hdf5 else None
             except Exception as e:  # noqa: BLE001
                 meta["recorder_error"] = repr(e)
                 traceback.print_exc()
@@ -1245,6 +1263,7 @@ def run_queue(args) -> int:
             row = {"instance": iid, "rc": code, "status": result.get("status"), "success": bool(result.get("success")), "reason": result.get("reason"),
                    "n_steps": result.get("n_steps"), "wall_s": round(time.time() - t0, 1), "tro": tro, "out": result.get("out"), "reused_world": n > 1,
                    "provisional": bool(n > 1 and not prov["queue_scene_restore"]), "provenance": prov,
+                   "hdf5_ok": result.get("hdf5_ok"), "behavior_lerobot": result.get("behavior_lerobot"),
                    "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "pid": os.getpid(), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
             with open(args.results, "a") as f:
                 f.write(json.dumps(row, default=json_default) + "\n")
