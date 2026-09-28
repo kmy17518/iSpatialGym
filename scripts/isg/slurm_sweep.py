@@ -150,19 +150,25 @@ def prod_job_script(job_dir, alias, start, count, max_attempts, args):
     files they read, in place."""
     q = shlex.quote
     min_kb = int(args.min_scratch_gb * 1024 * 1024)
-    code = os.path.abspath(args.code_root or REPO)
-    bands = os.path.join(code, "runlogs", "reach_bands_20260915", "bands")
     appdata = 'export OMNIGIBSON_APPDATA_PATH="$TMPDIR/appdata"\n' if args.local_appdata else ""
-    snapshot = ""
-    if args.b1k_root:
-        # a frozen checkout of both repos: its packages shadow the env's editable installs (their finders come after sys.path)
-        b1k = os.path.abspath(args.b1k_root)
-        snapshot = (f'export PYTHONPATH={q(code)}:{q(os.path.join(b1k, "OmniGibson"))}:{q(os.path.join(b1k, "bddl3"))}${{PYTHONPATH:+:$PYTHONPATH}}\n'
-                    f'export OMNIGIBSON_DATA_PATH={q(os.path.realpath(args.data_path or os.path.join(REPO, "Behavior-1K", "datasets")))}\n')
+    data = q(os.path.realpath(args.data_path or os.path.join(REPO, "Behavior-1K", "datasets")))
+    if getattr(args, "snapshot_link", None):
+        # a symlink to a frozen checkout of both repos (<snap>/ispatialgym, <snap>/Behavior-1K), resolved once when the job
+        # starts: a job runs one snapshot throughout, jobs that start later pick up whatever the link points to by then
+        resolve = f"SNAP=$(readlink -f {q(args.snapshot_link)})\nCODE=\"$SNAP/ispatialgym\"; B1K=\"$SNAP/Behavior-1K\"\n"
+        snapshot = ('export PYTHONPATH="$CODE:$B1K/OmniGibson:$B1K/bddl3${PYTHONPATH:+:$PYTHONPATH}"\n'
+                    f'export OMNIGIBSON_DATA_PATH={data}\n')
+    else:
+        resolve = f"CODE={q(os.path.abspath(args.code_root or REPO))}\n"
+        snapshot = ""
+        if args.b1k_root:
+            # a frozen checkout of both repos: its packages shadow the env's editable installs (their finders come after sys.path)
+            b1k = q(os.path.abspath(args.b1k_root))
+            snapshot = (f'export PYTHONPATH="$CODE":{b1k}/OmniGibson:{b1k}/bddl3${{PYTHONPATH:+:$PYTHONPATH}}\n'
+                        f'export OMNIGIBSON_DATA_PATH={data}\n')
     threads = int(args.cpus_per_proc)
-    worker = ["python", os.path.join(code, "scripts", "isg", "prod_worker.py"), "--alias", alias, "--start", str(start), "--count", str(count),
-              "--out", job_dir, "--seed", str(args.seed), "--max-attempts", str(max_attempts), "--demo-workers", str(args.demo_workers),
-              "--demo-mode", args.demo_mode]
+    worker = ["--alias", alias, "--start", str(start), "--count", str(count), "--out", job_dir, "--seed", str(args.seed),
+              "--max-attempts", str(max_attempts), "--demo-workers", str(args.demo_workers), "--demo-mode", args.demo_mode]
     return f"""#!/bin/bash
 export HOME={q(args.home)}
 if [ -n "${{TMPDIR:-}}" ] && [ -d "$TMPDIR" ] && [ -w "$TMPDIR" ] && [ "$(df -Pk "$TMPDIR" | awk 'NR==2{{print $4}}')" -gt {min_kb} ]; then
@@ -174,17 +180,17 @@ else
 fi
 source {q(args.conda_sh)}
 conda activate {q(args.env)}
-cd {q(code)} || exit 2
+{resolve}cd "$CODE" || exit 2
 {snapshot}export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES
 export TMPDIR="$JOB_TMP"
 mkdir -p "$TMPDIR/reach_bands"
-cp -p {q(bands)}/* "$TMPDIR/reach_bands/"
+cp -p "$CODE"/runlogs/reach_bands_20260915/bands/* "$TMPDIR/reach_bands/" 2>/dev/null
 export ISPATIALGYM_REACH_BANDS="$TMPDIR/reach_bands" ISPATIALGYM_CACHE_DIR="$TMPDIR/isg_cache" ISPATIALGYM_SAMPLING_CACHE="$TMPDIR/isg_cache/sampling" \\
   ISPATIALGYM_HELD_HOLD_CACHE="$TMPDIR/isg_cache/held_hold.json"
 export OMP_NUM_THREADS={threads} MKL_NUM_THREADS={threads} OPENBLAS_NUM_THREADS={threads}
-{appdata}echo "PROD_JOB $SLURM_JOB_ID host=$(hostname -s) gpu=\\"$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)\\" TMPDIR=$TMPDIR start=$(date -Is)"
+{appdata}echo "PROD_JOB $SLURM_JOB_ID host=$(hostname -s) gpu=\\"$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)\\" TMPDIR=$TMPDIR code=$CODE start=$(date -Is)"
 deadline=$(( $(date +%s) + {int(args.hours * 3600) - int(args.grace_min * 60)} ))
-{' '.join(q(w) for w in worker)} --deadline $deadline
+python "$CODE/scripts/isg/prod_worker.py" {' '.join(q(w) for w in worker)} --deadline $deadline
 rc=$?
 echo "PROD_JOB_END $SLURM_JOB_ID rc=$rc end=$(date -Is)"
 case "$JOB_TMP" in /vision/*) ;; *) rm -rf "$JOB_TMP" ;; esac
@@ -212,6 +218,7 @@ def cmd_produce(args):
          "per_task": args.per_task, "slice": args.slice, "seed": args.seed, "demo_workers": args.demo_workers, "hours": args.hours,
          "sbatch": {"partition": args.partition, "account": args.account, "gres": args.gres, "cpus_per_proc": args.cpus_per_proc,
                     "mem_per_proc": args.mem_per_proc, "exclude": args.exclude}, "jobs": []}
+    m["args"] = {k: v for k, v in vars(args).items() if k != "fn"}
     if args.plan:
         # --plan: {"classes": {name: {gres, constraint, cpus_per_proc, mem_per_proc, demo_workers}}, "jobs": [{alias, start, count, class}]}
         plan = json.load(open(args.plan))
@@ -250,6 +257,51 @@ def cmd_produce(args):
         with open(os.path.join(root, "manifest.json"), "w") as f:
             json.dump(m, f, indent=1)
     print(f"produce {sweep}: {len(m['jobs'])} jobs -> {root}")
+
+
+def cmd_requeue(args):
+    """Cancel the produce run's jobs that have not started and submit them again with a regenerated ``job.sh`` (sbatch keeps the
+    script it was given, so a pending job would otherwise run the code it was submitted with): ``--snapshot-link`` makes the
+    new scripts resolve a snapshot symlink when they start. Running and ended jobs are left alone."""
+    root = os.path.join(args.root, args.sweep)
+    mpath = os.path.join(root, "manifest.json")
+    m = json.load(open(mpath))
+    pargs = argparse.Namespace(**{**m["args"], **({"snapshot_link": args.snapshot_link} if args.snapshot_link else {})})
+    classes = (m.get("plan") or {}).get("classes") or {}
+    states = job_states([j["job_id"] for j in m["jobs"]])
+    n = 0
+    for j in m["jobs"]:
+        if states.get(j["job_id"], ("?",))[0] != "PENDING":
+            continue
+        subprocess.run(["scancel", j["job_id"]], env=slurm_env())
+        cls = classes.get(j.get("class")) or {"gres": pargs.gres, "constraint": pargs.constraint, "cpus_per_proc": pargs.cpus_per_proc,
+                                               "mem_per_proc": pargs.mem_per_proc, "demo_workers": pargs.demo_workers}
+        jargs = argparse.Namespace(**{**vars(pargs), **{k: v for k, v in cls.items() if k != "constraint"}})
+        nproc = 1 + int(jargs.demo_workers)
+        script = os.path.join(j["dir"], "job.sh")
+        with open(script, "w") as f:
+            f.write(prod_job_script(j["dir"], j["alias"], j["start"], j["count"], j["max_attempts"], jargs))
+        name = "isgp_" + re.sub(r"[^A-Za-z0-9_.-]", "_", j["alias"])[:36] + f"_{j['start']}"
+        cmd = ["sbatch", "--parsable", "-p", pargs.partition, "-A", pargs.account, f"--gres={jargs.gres}", "-c", str(jargs.cpus_per_proc * nproc),
+               f"--mem={int(float(str(jargs.mem_per_proc).rstrip('Gg')) * nproc)}G", f"--time={int(pargs.hours * 60)}", "-J", name,
+               "-o", os.path.join(j["dir"], "slurm.log")]
+        if cls.get("constraint"):
+            cmd.append(f"--constraint={cls['constraint']}")
+        if pargs.exclude:
+            cmd.append(f"--exclude={pargs.exclude}")
+        cmd.append(script)
+        r = subprocess.run(cmd, capture_output=True, text=True, env=slurm_env())
+        if r.returncode != 0:
+            print(f"sbatch failed for {j['alias']} {j['start']}: {r.stderr.strip()}")
+            continue
+        j.setdefault("previous_job_ids", []).append(j["job_id"])
+        j["job_id"] = r.stdout.strip().split(";")[0]
+        n += 1
+    if args.snapshot_link:
+        m["args"]["snapshot_link"] = args.snapshot_link
+    with open(mpath, "w") as f:
+        json.dump(m, f, indent=1)
+    print(f"requeued {n} pending jobs of {args.sweep}")
 
 
 def cmd_pstatus(args):
@@ -493,7 +545,14 @@ def main():
     s.add_argument("--b1k-root", default=None, help="BEHAVIOR-1K checkout whose OmniGibson / bddl the jobs import (PYTHONPATH) instead "
                                                     "of the env's editable installs")
     s.add_argument("--data-path", default=None, help="OMNIGIBSON_DATA_PATH with --b1k-root (default: this checkout's Behavior-1K/datasets)")
+    s.add_argument("--snapshot-link", default=None, help="instead of --code-root / --b1k-root: a symlink to <snap>/{ispatialgym,Behavior-1K} "
+                                                         "that each job resolves when it starts (repoint it to roll out a new snapshot)")
     s.set_defaults(fn=cmd_produce)
+    s = sub.add_parser("requeue", help="resubmit the pending jobs of a produce run with regenerated job scripts")
+    s.add_argument("--sweep", required=True)
+    s.add_argument("--root", default=os.path.join(os.path.dirname(REPO), "isg_prod"))
+    s.add_argument("--snapshot-link", default=None, help="symlink to <snap>/{ispatialgym,Behavior-1K} the new job scripts resolve at start")
+    s.set_defaults(fn=cmd_requeue)
     s = sub.add_parser("pstatus", help="progress of a produce run")
     s.add_argument("--sweep", required=True)
     s.add_argument("--root", default=os.path.join(os.path.dirname(REPO), "isg_prod"))

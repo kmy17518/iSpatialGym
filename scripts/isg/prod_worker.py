@@ -17,6 +17,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -160,6 +161,35 @@ def main(argv=None):
 
 
 EXIT_QUEUE_RESTART = 75  # run_isg.EXIT_QUEUE_RESTART
+SAMPLER_RESTARTS = 3
+_INDEX_RE = re.compile(r"__(\d{4,})$")
+
+
+def last_written_index(inst_root):
+    """Highest instance index with a summary under the sampler's root, or None."""
+    idx = [int(m.group(1)) for iid in ready_instances(inst_root) for m in [_INDEX_RE.search(iid)] if m]
+    return max(idx) if idx else None
+
+
+def release_orphan_claims(claims, results_path, live_pids):
+    """Claims of runners that died mid-instance (their pid is gone and no result row names the instance) go back to the queue."""
+    done = set()
+    if os.path.exists(results_path):
+        with open(results_path) as f:
+            done = {json.loads(line)["instance"] for line in f if line.strip()}
+    released = []
+    for iid in os.listdir(claims):
+        if iid in done:
+            continue
+        try:
+            with open(os.path.join(claims, iid)) as f:
+                pid = int(f.read().split()[1])
+        except (OSError, ValueError, IndexError):
+            continue
+        if pid not in live_pids:
+            os.remove(os.path.join(claims, iid))
+            released.append(iid)
+    return released
 
 
 def run_queue_mode(args):
@@ -167,6 +197,7 @@ def run_queue_mode(args):
     that exits while instances are still coming or unclaimed (another template, an error) is replaced by a fresh one."""
     out = os.path.abspath(args.out)
     inst_root, claims = os.path.join(out, "inst"), os.path.join(out, "claims")
+    inst_glob = inst_root + "*"  # inst/ plus the inst_r<k>/ of restarted samplers
     logs = os.path.join(out, "demo_logs")
     os.makedirs(logs, exist_ok=True)
     os.makedirs(claims, exist_ok=True)
@@ -192,20 +223,41 @@ def run_queue_mode(args):
     signal.signal(signal.SIGINT, on_term)
 
     def unclaimed():
-        return [iid for iid in ready_instances(inst_root) if not os.path.exists(os.path.join(claims, iid))]
+        return [iid for iid in ready_instances(inst_glob) if not os.path.exists(os.path.join(claims, iid))]
 
     sampler_rc = None
+    sampler_restarts = 0
     while True:
         if args.deadline and time.time() > args.deadline and not stopping["flag"]:
             stopping["flag"] = True
             if sampler.poll() is None:
                 sampler.send_signal(signal.SIGTERM)
         if sampler_rc is None and sampler.poll() is not None:
-            sampler_rc = sampler.returncode
-            open(done_file, "w").close()
+            rc = sampler.returncode
+            last = last_written_index(inst_glob)
+            nxt = args.start if last is None else last + 1
+            if rc not in (0, 2) and not stopping["flag"] and sampler_restarts < SAMPLER_RESTARTS and nxt < args.start + args.count:
+                # a crashed sampler (GPU device lost, segfault) continues after the last instance it wrote, under a root of its
+                # own (sample_isg skips a template directory that exists and excludes its model combination from the draw)
+                sampler_restarts += 1
+                cmd = list(sampler_cmd)
+                cmd[cmd.index("--start-index") + 1] = str(nxt)
+                cmd[cmd.index("--instances-per-template") + 1] = str(args.start + args.count - nxt)
+                cmd[cmd.index("--out") + 1] = f"{inst_root}_r{sampler_restarts}"
+                with open(os.path.join(out, "sample.log"), "a") as slog:
+                    slog.write(f"\nPROD_WORKER sampler exited {rc}; restart {sampler_restarts} at index {nxt}\n")
+                    slog.flush()
+                    sampler = subprocess.Popen(cmd, stdout=slog, stderr=subprocess.STDOUT, env=proc_env("sampler"))
+            else:
+                sampler_rc = rc
+                open(done_file, "w").close()
+        dead = False
         for slot, (p, lp) in list(runners.items()):
             if p.poll() is not None:
                 del runners[slot]
+                dead = True
+        if dead:
+            release_orphan_claims(claims, results_path, {p.pid for p, _ in runners.values()})
         work_left = bool(unclaimed()) or sampler_rc is None
         if not stopping["flag"] and work_left:
             for slot in range(args.demo_workers):
@@ -215,7 +267,7 @@ def run_queue_mode(args):
                     break  # the queue is drained by the runners already alive
                 n_started += 1
                 lp = os.path.join(logs, f"runner{slot}_{n_started:03d}.log")
-                cmd = [sys.executable, "-m", "ispatialgym.oracle.run_isg", "--queue", inst_root, "--claims", claims, "--done-file", done_file,
+                cmd = [sys.executable, "-m", "ispatialgym.oracle.run_isg", "--queue", inst_glob, "--claims", claims, "--done-file", done_file,
                        "--results", results_path, "--mode", "oracle", "--out", os.path.join(out, "demo"), "--video", "--video-size", "540",
                        "--poll-s", str(args.poll_s)]
                 if args.deadline:
@@ -228,7 +280,7 @@ def run_queue_mode(args):
 
     n_demos = sum(1 for line in open(results_path) if line.strip()) if os.path.exists(results_path) else 0
     summary = {"alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc, "demo_mode": "queue",
-               "n_instances": len(ready_instances(inst_root)), "n_demos": n_demos, "runner_processes": n_started,
+               "sampler_restarts": sampler_restarts, "n_instances": len(ready_instances(inst_glob)), "n_demos": n_demos, "runner_processes": n_started,
                "wall_s": round(time.time() - t_job, 1), "stopped": stopping["flag"]}
     with open(os.path.join(out, "worker_summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
