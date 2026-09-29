@@ -38,6 +38,7 @@ classes) take no simulator and are unit-tested in ``tests/test_v2_large_scale.py
 from __future__ import annotations
 
 import contextlib
+import copy
 import logging
 import math
 from dataclasses import dataclass, field
@@ -655,12 +656,16 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
                         d_range: Tuple[float, float] = D_RANGE_DEFAULT, extra_visibility: Optional[Callable[[Pose], bool]] = None,
                         focus=None, cache_scope: Optional[Dict[str, Any]] = None, cache_contacts: bool = False,
                         translates: Sequence[float] = TRANSLATES, tilts: Sequence[float] = TILTS, stats: Optional[Dict[str, int]] = None,
-                        posture: Optional[str] = None, fingers: Optional[float] = None) -> List[Stance]:
+                        posture: Optional[str] = None, fingers: Optional[float] = None,
+                        step1_memo: Optional[Dict[str, Any]] = None) -> List[Stance]:
     """§5.2 Phase 2 steps 1–3: the survivors of the best angle class (each a grid-trunk stance with its tilt band and
     focus). ``arms`` = the working arms of the task (two arms → arms excluded from the stance collision check unless
     ``posture`` names the recorded arm posture of the stance, A6); ``focus`` defaults to the first contact's pad point.
     ``cache_scope`` caches step 1; with ``cache_contacts`` the steps 1–3 survivors are cached under the contact set too
-    (articulation: the contact set is fixed per (target, joint, q_init); alignment: per-instance δ → not cached)."""
+    (articulation: the contact set is fixed per (target, joint, q_init); alignment: per-instance δ → not cached).
+    ``step1_memo``: a dict shared by calls whose step 1 is the same (same face, ranges, lattice, arms, posture and
+    world, e.g. the bar offsets of one attempt): step 1 runs on the first call that needs it and the later calls screen
+    copies of its survivors (step 3 annotates the stances it screens)."""
     arms_excluded = len(set(arms)) > 1
     foc = _t(focus) if focus is not None else C.pad_center(contact_set[0].pose)
     key = None
@@ -684,7 +689,13 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
                 out.append(st)
             log.info("Phase 2 steps 1–3: %d survivors from the cache", len(out))
             return out
-    step1 = phase2_step1(s, face, d_range, lam_range, arms_excluded, cache_scope, translates, tilts, posture=posture, fingers=fingers)
+    if step1_memo is not None and "survivors" in step1_memo:
+        step1 = copy.deepcopy(step1_memo["survivors"])
+        log.info("Phase 2 step 1: %d survivors of this attempt's step 1 (same lattice and world)", len(step1))
+    else:
+        step1 = phase2_step1(s, face, d_range, lam_range, arms_excluded, cache_scope, translates, tilts, posture=posture, fingers=fingers)
+        if step1_memo is not None:
+            step1_memo["survivors"] = copy.deepcopy(step1)
     st_ = stats if stats is not None else {}
     st_["step1"] = len(step1)
     out = phase2_screen(s, step1, contact_set, foc, extra_visibility, stats=st_)

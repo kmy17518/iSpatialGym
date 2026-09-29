@@ -149,6 +149,29 @@ def world_key_str(key: Tuple[str, Tuple[str, ...], Tuple[str, ...]]) -> str:
     return f"{scene}|rooms={','.join(rooms)}|removed={','.join(removed)}"
 
 
+def kit_mesh_cache(world) -> Optional[int]:
+    """ISPATIALGYM_SAMPLER_MESH_CACHE (opt-in; unset: cuRobo's 8192): capacity of the kit's cuRobo mesh store, ``auto`` =
+    the world's collision meshes + ``reach_bands.MESH_CACHE_HEADROOM`` for the objects templates spawn (at least
+    ``MESH_CACHE_MIN``, a multiple of 64), as ``reach_bands --mesh-cache auto``, or a number. The capacity sizes every
+    collision kernel launch (batched IK 10.9 -> 6.0 s per call on block design, 8.7 -> 6.0 s on large-scale ontop). A
+    same-algorithm opt-in, like reach_bands': the thread layout changes the order of cuRobo's atomic float sums, and
+    large-scale ontop sampled different instances with it (dishwasher, blender and block design: identical TROs). The
+    store keeps the meshes of removed objects (disabled), so ``auto`` suits a process that samples one template
+    (production), not many aliases reusing one world."""
+    value = os.environ.get("ISPATIALGYM_SAMPLER_MESH_CACHE", "").strip().lower()
+    if not value:
+        return None
+    if value != "auto":
+        return int(value)
+    import math
+
+    from ispatialgym.sampling import reach_bands as RB
+    from ispatialgym.sampling.robot_utils import RobotKit
+
+    n = RobotKit.count_collision_meshes(world)
+    return max(RB.MESH_CACHE_MIN, 64 * math.ceil((n + RB.MESH_CACHE_HEADROOM) / 64))
+
+
 class WorldPool:
     """One live OmniGibson world at a time, re-created when the world key (scene, task rooms, removed chairs) changes;
     aliases with the same key reuse it (``last_action`` = ``"loaded"`` / ``"reused"`` after :meth:`get`)."""
@@ -189,7 +212,10 @@ class WorldPool:
             variant = {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed)}
             log.info("scene variant for %s: %d objects removed (%s)", scene, len(removed), removed)
         self.world = SimWorld(scene, rooms, scene_variant=variant)
-        self.kit = RobotKit(self.world, prebuild=("right_arm",))  # the left-arm planner is built on first use (brace tasks)
+        cache = kit_mesh_cache(self.world)
+        self.kit = RobotKit(self.world, prebuild=("right_arm",), mesh_cache_size=cache)  # the left-arm planner is built on first use (brace tasks)
+        if cache is not None:
+            log.info("cuRobo mesh store %d for %d collision meshes (ISPATIALGYM_SAMPLER_MESH_CACHE)", cache, RobotKit.count_collision_meshes(self.world))
         self.key = key
         self.last_action = "loaded"
         self.n_loads += 1

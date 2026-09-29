@@ -965,6 +965,9 @@ class ArticulationLarge(SamplerV2):
         h0_by: Dict[float, C.HandleWaypoint] = {}
         stats_by: Dict[float, Dict[str, Any]] = {}
         classes: Tuple[str, ...] = ()
+        # Phase 2 step 1 (base on free floor, body collision-free over the lattice) does not depend on the grasp offset:
+        # ISPATIALGYM_SAMPLER_STEP1_ONCE=1 runs it once per attempt for all offsets (default: once per offset)
+        step1_memo: Optional[Dict[str, Any]] = {} if os.environ.get("ISPATIALGYM_SAMPLER_STEP1_ONCE", "").lower() in ("1", "true", "yes") else None
         for off in offsets:
             self.bar_offset = off
             h0 = self.h([q_init])[0]
@@ -980,7 +983,7 @@ class ArticulationLarge(SamplerV2):
                      "sampler": "articulation_large", "class": self.door_class, "lam": [round(v, 2) for v in lam_range], "bar_offset": round(off, 3)}
             stats: Dict[str, Any] = {}
             survivors = P0.phase2_manipulation(self, self.face_manip, [contact], lam_range, [self.arm], d_range, extra_vis, focus=h0.contact,
-                                               cache_scope=scope, cache_contacts=True, stats=stats)
+                                               cache_scope=scope, cache_contacts=True, stats=stats, step1_memo=step1_memo)
             stats_by[off] = stats
             for st in survivors:
                 st.extras["bar_offset_m"] = off
