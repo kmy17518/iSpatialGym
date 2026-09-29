@@ -122,10 +122,10 @@ def main(argv=None) -> int:
     for d in demos:
         tro = json.load(open(os.path.join(d["demo"], "meta.json")))["tro_path"]
         groups.setdefault(os.path.dirname(os.path.dirname(tro)), []).append(d)
-    batches = [ds[i: i + args.group_size] for _, ds in sorted(groups.items()) for i in range(0, len(ds), args.group_size)]
-    batches = batches[args.part:: args.parts]
+    all_batches = [ds[i: i + args.group_size] for _, ds in sorted(groups.items()) for i in range(0, len(ds), args.group_size)]
+    batches = all_batches[args.part:: args.parts]
     print("REPLAY_PLAN " + json.dumps({"task": task, "replay": len(demos), "retried": sum(d["retried"] for d in demos), "by_reason": why,
-                                       "templates": len(groups), "this_part": sum(len(b) for b in batches)}), flush=True)
+                                       "templates": len(groups), "batches": len(all_batches), "this_part": sum(len(b) for b in batches)}), flush=True)
     if args.dry_run or not batches:
         return 0
     import subprocess
