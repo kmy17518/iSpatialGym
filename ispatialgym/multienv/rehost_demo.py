@@ -36,8 +36,9 @@ def main(argv=None):
     ap.add_argument("--out", required=True)
     ap.add_argument("--num-envs", type=int, default=2)
     ap.add_argument("--slot", type=int, default=1)
+    ap.add_argument("--slots", default=None, help="several slots from one simulator, comma-separated (needs --num-envs > max slot); "
+                    "slot k is written to <out>_slot<k>")
     args = ap.parse_args(argv)
-    import h5py
 
     for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", False), ("ENABLE_TRANSITION_RULES", False)):
         if getattr(gm, name) != value:
@@ -50,15 +51,27 @@ def main(argv=None):
     cfg["task"] = {"type": "DummyTask"}
     cfg["env"]["num_envs"] = int(args.num_envs)
     env = og.Environment(configs=cfg)
-    scene = env.scenes[args.slot]
+    if args.slots:
+        for k in [int(v) for v in args.slots.split(",")]:
+            rehost(env, k, args.demo, f"{args.out}_slot{k}", args.num_envs)
+    else:
+        rehost(env, args.slot, args.demo, args.out, args.num_envs)
+    sys.stdout.flush()
+    os._exit(0)
+
+
+def rehost(env, slot: int, demo_dir: str, out_dir: str, num_envs: int) -> None:
+    import h5py
+
+    scene = env.scenes[slot]
     reg = scene.object_registry
-    src = os.path.join(args.demo, "demo.hdf5")
-    os.makedirs(args.out, exist_ok=True)
-    dst = os.path.join(args.out, "demo.hdf5")
+    src = os.path.join(demo_dir, "demo.hdf5")
+    os.makedirs(out_dir, exist_ok=True)
+    dst = os.path.join(out_dir, "demo.hdf5")
     shutil.copyfile(src, dst)
     for extra in ("debug_full_states.pt", "meta.json", "annotations.json"):
-        if os.path.exists(os.path.join(args.demo, extra)):
-            shutil.copyfile(os.path.join(args.demo, extra), os.path.join(args.out, extra))
+        if os.path.exists(os.path.join(demo_dir, extra)):
+            shutil.copyfile(os.path.join(demo_dir, extra), os.path.join(out_dir, extra))
 
     with h5py.File(src, "r") as f:
         states = th.as_tensor(f["data/demo_0/state"][()], dtype=th.float32)
@@ -107,15 +120,13 @@ def main(argv=None):
         del demo["state"]
         demo.create_dataset("state", data=padded.numpy(), compression="gzip")
         f["data"].attrs["scene_file"] = json.dumps(new_scene_file, default=R.json_default)
-        f["data"].attrs["isg_rehosted"] = json.dumps({"from": src, "num_envs": args.num_envs, "slot": args.slot})
+        f["data"].attrs["isg_rehosted"] = json.dumps({"from": src, "num_envs": num_envs, "slot": slot})
     pos, ori = scene.get_position_orientation()
-    rec = {"out": dst, "slot": args.slot, "num_envs": args.num_envs, "slot_scene_pos": pos.tolist(), "slot_scene_ori": ori.tolist(),
+    rec = {"out": dst, "slot": slot, "num_envs": num_envs, "slot_scene_pos": pos.tolist(), "slot_scene_ori": ori.tolist(),
            "recorded_scene_pos": scene_file["state"].get("pos"), "n_states": len(out_states), "roundtrip_max_abs": max_rt,
            "scene_file_state_pos": [float(v) for v in new_scene_file["state"]["pos"]],
            "state0_pos_field": out_states[0][:3].tolist()}
     print("REHOST " + json.dumps(rec, default=R.json_default), flush=True)
-    sys.stdout.flush()
-    os._exit(0)
 
 
 if __name__ == "__main__":
