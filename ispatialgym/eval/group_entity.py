@@ -11,6 +11,7 @@ The entity exposes ``states`` keyed by the OmniGibson state classes so that the 
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
@@ -25,6 +26,9 @@ from ispatialgym.eval.geometry import (
     relation_error,
 )
 from ispatialgym.eval.targets import GroupTarget
+
+if os.environ.get("ISPATIALGYM_FAST_GEOMETRY") in ("1", "check"):
+    from ispatialgym.eval.geometry_fast import orientation_error, relation_error  # noqa: F811
 
 
 @dataclass
