@@ -197,6 +197,10 @@ class ExecutorConfig:
     #: (``og.sim.serialize`` concatenates the scenes'), and with several scenes in one simulator (ispatialgym.multienv) it is
     #: the only state that belongs to this env. Default: ISPATIALGYM_PER_SCENE_STATE=1 (off when unset)
     per_scene_state: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_PER_SCENE_STATE", "").lower() in ("1", "true", "yes"))
+    #: physics-only collection (:mod:`ispatialgym.oracle.physics_only`): the episode steps physics without rendering, with
+    #: Fabric's transforms synced after every step and after a rollback's load (camera poses read as in a rendered run),
+    #: and a rollback does not re-render. Default: ISPATIALGYM_PHYSICS_ONLY=1 (off when unset)
+    physics_only: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_PHYSICS_ONLY", "").lower() in ("1", "true", "yes"))
 
 
 class SupportLoad:
@@ -937,8 +941,13 @@ class Executor:
         """Roll the simulator and the executor back to ``cp``; returns the round-trip report."""
         robot = self.robot
         report: Dict[str, Any] = {"action_index": cp.action_index, "ag_roundtrip_ok": True, "ag_fixed": [], "attached_fixed": []}
-        stale = self.head_rgb_of(self.last_obs)  # what the camera showed last: the rolled-back attempt's final scene
+        # what the camera showed last: the rolled-back attempt's final scene (nothing to compare without renders)
+        stale = None if self.cfg.physics_only else self.head_rgb_of(self.last_obs)
         self.state_owner.load_state(cp.sim_state, serialized=True)
+        if self.cfg.physics_only:
+            from ispatialgym.oracle import physics_only as PO
+
+            PO.sync_transforms(self.sim)
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
         if ag is not None:
@@ -1051,6 +1060,10 @@ class Executor:
         previous new frame, freshness; ``checked`` False = no checkpoint observation / no readable camera: the fixed
         minimum was rendered. A frame within ``restore_frame_tol`` of the checkpoint observation is fresh whatever the
         rolled-back scene looked like (an attempt that barely moved leaves the two references alike)."""
+        if self.cfg.physics_only:
+            # no frames are recorded: nothing to wait for (the transforms were synced after the load)
+            return {"n": 0, "diff": None, "diff_stale": None, "change": None, "gain": None, "fresh": None, "converged": None,
+                    "checked": False, "physics_only": True}
         n_min, n_max = int(self.cfg.restore_renders), max(int(self.cfg.restore_renders), int(self.cfg.restore_renders_max))
         tol, gain_tol = float(self.cfg.restore_frame_tol), float(self.cfg.restore_frame_gain_tol)
         ref = self.head_rgb_of(cp.obs)
@@ -1355,6 +1368,14 @@ class Executor:
         return watched, skipped
 
     def run_program(self, actions: Sequence[Action]) -> Dict[str, Any]:
+        if self.cfg.physics_only:
+            from ispatialgym.oracle import physics_only as PO
+
+            with PO.episode(self.sim):
+                return self._run_program(actions)
+        return self._run_program(actions)
+
+    def _run_program(self, actions: Sequence[Action]) -> Dict[str, Any]:
         t0 = time.time()
         actions = list(actions)
         self.program_actions = actions

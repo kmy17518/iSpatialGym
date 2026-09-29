@@ -123,21 +123,6 @@ def _patch_behavior_shard():
     patch(LeRobotPlaybackWrapper, "flush_partial_traj", "LeRobotPlaybackWrapper.flush_partial_traj")
 
 
-def _patch_physics_only():
-    """ISPATIALGYM_PHYSICS_ONLY=1 (experiment): the episode steps physics without rendering (og.sim.render_on_step(False))
-    and a rollback does not wait for the camera to show the restored scene (restore_renders 0). For demo.hdf5-only
-    collection, whose observations come from a replay."""
-    _run_program = EX.Executor.run_program
-
-    def run_program(self, actions):
-        self.cfg.restore_renders = 0
-        self.cfg.restore_renders_max = 0
-        with self.sim.render_on_step(False):
-            return _run_program(self, actions)
-
-    EX.Executor.run_program = run_program
-
-
 def _patch_mesh_cache(value: str):
     """ISPATIALGYM_MESH_CACHE=auto|<n> (experiment): the cuRobo mesh store's capacity. cuRobo 0.8 launches its sphere-vs-mesh
     kernel over spheres x capacity threads, so the default 8192 is paid on every collision evaluation; ``auto`` sizes it to
@@ -166,8 +151,6 @@ if "--behavior-shard" in sys.argv:
     _patch_behavior_shard()
 if os.environ.get("ISPATIALGYM_MESH_CACHE"):
     _patch_mesh_cache(os.environ["ISPATIALGYM_MESH_CACHE"].lower())
-if os.environ.get("ISPATIALGYM_PHYSICS_ONLY", "").lower() in ("1", "true", "yes"):
-    _patch_physics_only()
 _build_env = run_isg.InstanceLoader.build_env
 
 

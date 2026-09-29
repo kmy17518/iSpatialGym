@@ -217,6 +217,34 @@ class RecorderConfig:
     #: to the video / LeRobot sinks from a background thread (:mod:`ispatialgym.oracle.frame_pipeline`; same bytes, same
     #: order). Default: ISPATIALGYM_ASYNC_FRAMES=1 (off when unset)
     async_frames: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_ASYNC_FRAMES", "").lower() in ("1", "true", "yes"))
+    #: physics-only collection (:mod:`ispatialgym.oracle.physics_only`): demo.hdf5 only, no frames kept (the images would
+    #: be stale). Default: ISPATIALGYM_PHYSICS_ONLY=1 (off when unset)
+    physics_only: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_PHYSICS_ONLY", "").lower() in ("1", "true", "yes"))
+    #: ``isg/behavior_proprio``: BEHAVIOR's proprioception of the state before each action (row i pairs with state[i] and
+    #: action[i]), for a replay that writes collection-time ``observation.state``. Default: physics-only collection or
+    #: ISPATIALGYM_RECORD_BEHAVIOR_PROPRIO=1
+    behavior_proprio: bool = field(default_factory=lambda: any(os.environ.get(k, "").lower() in ("1", "true", "yes")
+                                                               for k in ("ISPATIALGYM_PHYSICS_ONLY", "ISPATIALGYM_RECORD_BEHAVIOR_PROPRIO")))
+    #: keep the head camera's last frame as a device copy and convert it when read (``last_rgb``) instead of converting
+    #: every step, when no video sink takes the frames. Default: ISPATIALGYM_LAZY_FRAMES=1 (off when unset)
+    lazy_frames: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_LAZY_FRAMES", "").lower() in ("1", "true", "yes"))
+
+
+class _LazyRGB:
+    """``RecorderConfig.lazy_frames``: a frame kept as a copy of the camera buffer (on its device), converted to uint8 rgb
+    the first time it is read."""
+
+    __slots__ = ("_img", "_rgb")
+
+    def __init__(self, img):
+        self._img = img.detach().clone() if isinstance(img, th.Tensor) else np.array(img, copy=True)
+        self._rgb = None
+
+    def rgb(self) -> np.ndarray:
+        if self._rgb is None:
+            self._rgb = to_uint8_rgb(self._img)
+            self._img = None
+        return self._rgb
 
 
 class Recorder:
@@ -266,6 +294,15 @@ class Recorder:
         self.hdf5_path = os.path.join(out_dir, "demo.hdf5") if self.cfg.hdf5 else None
         self.behavior = None  # behavior_lerobot.ShardWriter of the episode
         self.behavior_status: Optional[str] = None
+        if self.cfg.physics_only:
+            from ispatialgym.oracle import physics_only as PO
+
+            PO.check_recording(self.cfg.video, self.cfg.lerobot, self.cfg.behavior_shard)
+        # behavior_proprio: the proprioception of the state the next recorded step starts from, the one of the last
+        # committed state (a rollback to an empty pending segment returns to it) and the one after each pending step
+        self._bproprio_last: Optional[np.ndarray] = None
+        self._bproprio_committed: Optional[np.ndarray] = None
+        self._pending_bproprio: List[np.ndarray] = []
         self._pipe = None
         if self.cfg.async_frames:
             from ispatialgym.oracle.frame_pipeline import FramePipeline
@@ -302,6 +339,26 @@ class Recorder:
         except Exception:  # noqa: BLE001
             return None
 
+    def _keep_head_frame(self, obs) -> None:
+        """``last_rgb`` from the synchronous path: nothing in physics-only collection (no render: the image is stale), a
+        lazily converted copy with ``lazy_frames`` when no video sink needs the frame now, else the converted frame."""
+        if self.cfg.physics_only:
+            return
+        if self.cfg.lazy_frames and self._writer is None:
+            try:
+                self.last_rgb = _LazyRGB(self._robot_obs(obs)[self.cam_key]["rgb"])
+            except Exception:  # noqa: BLE001  (as head_frame: a camera without an rgb image has no frame)
+                pass
+            return
+        frame = self.head_frame(obs)
+        if frame is not None:
+            self.last_rgb = frame
+
+    def _behavior_proprio_now(self) -> np.ndarray:
+        from ispatialgym.oracle import physics_only as PO
+
+        return PO.behavior_proprio(self.robot)
+
     def external_frame(self, obs) -> Optional[np.ndarray]:
         """The rgb of the configured external sensor (``obs["external"][name]``), None without one."""
         if not self.cfg.external_camera or not isinstance(obs, dict):
@@ -332,9 +389,15 @@ class Recorder:
         self._video_keys = self._rgb_keys(robs)
         frames = self._step_frames(robs)
         self._last_obs_lerobot = self._lerobot_obs(robs, frames)
-        frame = self.head_frame(obs0) if frames is None else frames.get(self.cam_key)
-        if frame is not None:
-            self.last_rgb = frame
+        if frames is None:
+            self._keep_head_frame(obs0)
+        else:
+            frame = frames.get(self.cam_key)
+            if frame is not None:
+                self.last_rgb = frame
+        if self.cfg.behavior_proprio:
+            self._bproprio_last = self._bproprio_committed = self._behavior_proprio_now()
+            self._pending_bproprio = []
         if self.cfg.hdf5:
             self._snapshot_scene()
         if self.cfg.video:
@@ -514,6 +577,10 @@ class Recorder:
         p = self._proprio(robs)
         if p is not None:
             r["proprio"].append(p)
+        if self.cfg.behavior_proprio and self._bproprio_last is not None:
+            r["behavior_proprio"].append(self._bproprio_last)
+            self._bproprio_last = self._behavior_proprio_now()
+            self._pending_bproprio.append(self._bproprio_last)
         if state is not None:
             self._pending_states.append(th.as_tensor(state).detach().cpu().float().clone())
         frames = self._step_frames(robs)
@@ -523,12 +590,13 @@ class Recorder:
                 self.last_rgb = frame
                 if self._writer is not None:
                     self._pending_frames["video"].append(frame)
-        else:
+        elif self._writer is not None:
             frame = self.head_frame(obs)
             if frame is not None:
                 self.last_rgb = frame
-                if self._writer is not None:
-                    self._pending_frames["video"].append(_Frame(frame, self.cfg.frame_buffer))
+                self._pending_frames["video"].append(_Frame(frame, self.cfg.frame_buffer))
+        else:
+            self._keep_head_frame(obs)
         if self._ext_writer is not None:
             ext = self.external_frame(obs)
             if ext is not None:
@@ -563,6 +631,8 @@ class Recorder:
         for k, v in self._pending_rows.items():
             self.rows[k].extend(v)
         self.states.extend(self._pending_states)
+        if self.cfg.behavior_proprio:
+            self._bproprio_committed = self._bproprio_last
         if self._pipe is not None:
             # the sink thread writes them in this order; close() drains it before closing the sinks
             if self._writer is not None:
@@ -611,12 +681,16 @@ class Recorder:
                 "action_index": int(action_index), "attempt": int(attempt), "verdict": verdict, "n_steps": n,
                 "rows": {k: list(v[mark:]) for k, v in self._pending_rows.items()}, "states": states,
             })
+        if self.cfg.behavior_proprio and self._bproprio_last is not None:
+            # the proprioception the kept steps end at, as the kept states: the step before the mark, or the committed state
+            self._bproprio_last = self._pending_bproprio[mark - 1] if mark > 0 else self._bproprio_committed
         if mark == 0:
             self._clear_pending()
         else:
             for k in list(self._pending_rows):
                 del self._pending_rows[k][mark:]
             del self._pending_states[mark:]
+            del self._pending_bproprio[mark:]
             for k in list(self._pending_frames):
                 del self._pending_frames[k][mark:]
             del self._pending_lerobot[mark:]
@@ -628,13 +702,17 @@ class Recorder:
         robs = self._robot_obs(obs)
         frames = self._step_frames(robs)
         self._last_obs_lerobot = self._lerobot_obs(robs, frames) if self.dataset is not None else None
-        frame = self.head_frame(obs) if frames is None else frames.get(self.cam_key)
-        if frame is not None:
-            self.last_rgb = frame
+        if frames is None:
+            self._keep_head_frame(obs)
+        else:
+            frame = frames.get(self.cam_key)
+            if frame is not None:
+                self.last_rgb = frame
 
     def _clear_pending(self) -> None:
         self._pending_rows = defaultdict(list)
         self._pending_states = []
+        self._pending_bproprio = []
         self._pending_frames = defaultdict(list)
         self._pending_lerobot = []
 
