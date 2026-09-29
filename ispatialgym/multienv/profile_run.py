@@ -28,6 +28,10 @@ from ispatialgym.oracle import recorder as REC
 
 TOTALS = defaultdict(lambda: [0.0, 0])
 _OUT = {"dir": None}
+#: timers whose calls are also logged one by one (name, start s since the first logged call, duration s), in order
+EVENT_NAMES = set()
+EVENTS = []
+_T0 = [None]
 
 
 def timed(name, fn):
@@ -37,9 +41,14 @@ def timed(name, fn):
         try:
             return fn(*a, **kw)
         finally:
+            dt = time.perf_counter() - t0
             rec = TOTALS[name]
-            rec[0] += time.perf_counter() - t0
+            rec[0] += dt
             rec[1] += 1
+            if name in EVENT_NAMES:
+                if _T0[0] is None:
+                    _T0[0] = t0
+                EVENTS.append((name, round(t0 - _T0[0], 3), round(dt, 4)))
 
     return wrapper
 
@@ -63,6 +72,25 @@ patch(REC.Recorder, "close")
 patch(QA.Monitors, "check")
 for _m in ("plan_pose", "plan_joint", "solve_ik", "solve_ik_batch", "solve_ik_path", "update_world", "check_collision", "attach_object"):
     patch(CP.R1ProCuRobo, _m)
+# inside cuRobo's planner: the trajectory optimizer, the PRM graph planner that seeds retries, and the IK solver
+CP.MotionPlanner.plan_cspace = timed("MotionPlanner.plan_cspace", CP.MotionPlanner.plan_cspace)
+CP.MotionPlanner.plan_pose = timed("MotionPlanner.plan_pose", CP.MotionPlanner.plan_pose)
+for _cls, _ms in ((CP.TrajOptSolver, ("solve_cspace", "solve_pose")), (CP.PRMGraphPlanner, ("find_path",)), (CP.IKSolver, ("solve_pose",))):
+    for _m in _ms:
+        if hasattr(_cls, _m):
+            patch(_cls, _m, f"{_cls.__name__}.{_m}")
+            EVENT_NAMES.add(f"{_cls.__name__}.{_m}")
+try:  # CUDA graph resets inside cuRobo's solvers (a reset means the next solve captures its graph again)
+    from curobo._src.solver.solver_core import SolverCore as _SolverCore
+
+    for _m in ("reset_shape", "reset_cuda_graph"):
+        patch(_SolverCore, _m, f"SolverCore.{_m}")
+        EVENT_NAMES.add(f"SolverCore.{_m}")
+except Exception as _e:  # noqa: BLE001
+    print("PROFILE_RUN solver_core timers unavailable:", repr(_e), flush=True)
+for _m in ("plan_pose", "plan_joint", "attach_object", "detach_object", "update_world"):
+    EVENT_NAMES.add(f"R1ProCuRobo.{_m}")
+patch(CP.R1ProCuRobo, "detach_object")
 
 
 def _patch_env_classes():
@@ -95,9 +123,51 @@ def _patch_behavior_shard():
     patch(LeRobotPlaybackWrapper, "flush_partial_traj", "LeRobotPlaybackWrapper.flush_partial_traj")
 
 
+def _patch_physics_only():
+    """ISPATIALGYM_PHYSICS_ONLY=1 (experiment): the episode steps physics without rendering (og.sim.render_on_step(False))
+    and a rollback does not wait for the camera to show the restored scene (restore_renders 0). For demo.hdf5-only
+    collection, whose observations come from a replay."""
+    _run_program = EX.Executor.run_program
+
+    def run_program(self, actions):
+        self.cfg.restore_renders = 0
+        self.cfg.restore_renders_max = 0
+        with self.sim.render_on_step(False):
+            return _run_program(self, actions)
+
+    EX.Executor.run_program = run_program
+
+
+def _patch_mesh_cache(value: str):
+    """ISPATIALGYM_MESH_CACHE=auto|<n> (experiment): the cuRobo mesh store's capacity. cuRobo 0.8 launches its sphere-vs-mesh
+    kernel over spheres x capacity threads, so the default 8192 is paid on every collision evaluation; ``auto`` sizes it to
+    the scene's collision meshes plus headroom, as ``reach_bands --mesh-cache auto`` does (same algorithm; the order of the
+    kernel's atomic float sums changes with the capacity, so results can differ marginally)."""
+    import math
+
+    _init = CP.R1ProCuRobo.__init__
+
+    def __init__(self, robot, *a, **kw):
+        n = None
+        if value == "auto":
+            n = sum(len(link.collision_meshes) for o in robot.scene.objects if o is not robot and not getattr(o, "visual_only", False)
+                    for link in o.links.values())
+            kw["mesh_cache_size"] = max(256, 64 * math.ceil((n + 256) / 64))
+        else:
+            kw["mesh_cache_size"] = int(value)
+        print(f"PROFILE_RUN mesh cache {kw['mesh_cache_size']} for {n} scene collision meshes", flush=True)
+        _init(self, robot, *a, **kw)
+
+    CP.R1ProCuRobo.__init__ = __init__
+
+
 _og = _patch_env_classes()
 if "--behavior-shard" in sys.argv:
     _patch_behavior_shard()
+if os.environ.get("ISPATIALGYM_MESH_CACHE"):
+    _patch_mesh_cache(os.environ["ISPATIALGYM_MESH_CACHE"].lower())
+if os.environ.get("ISPATIALGYM_PHYSICS_ONLY", "").lower() in ("1", "true", "yes"):
+    _patch_physics_only()
 _build_env = run_isg.InstanceLoader.build_env
 
 
@@ -120,7 +190,8 @@ def run_instance(args, tro_arg, shared=None):
     code, result = _run_instance(args, tro_arg, shared)
     out = {"wall_s": round(time.perf_counter() - t0, 2), "result": {k: result.get(k) for k in ("status", "n_steps", "wall_time_s", "out")},
            "track_state_updates": run_isg.provenance().get("track_state_updates"), "head_camera_only": os.environ.get("ISPATIALGYM_HEAD_CAMERA_ONLY", ""),
-           "timers": {k: {"s": round(v[0], 3), "n": v[1], "ms_per_call": round(1000 * v[0] / max(1, v[1]), 2)} for k, v in sorted(TOTALS.items(), key=lambda kv: -kv[1][0])}}
+           "timers": {k: {"s": round(v[0], 3), "n": v[1], "ms_per_call": round(1000 * v[0] / max(1, v[1]), 2)} for k, v in sorted(TOTALS.items(), key=lambda kv: -kv[1][0])},
+           "events": list(EVENTS)}
     print("PROFILE_RUN " + json.dumps(out), flush=True)
     if result.get("out"):
         try:
@@ -129,6 +200,8 @@ def run_instance(args, tro_arg, shared=None):
         except OSError:
             pass
     TOTALS.clear()
+    EVENTS.clear()
+    _T0[0] = None
     return code, result
 
 

@@ -91,6 +91,8 @@ def main(argv=None):
     ap.add_argument("--offset", type=int, default=50, help="env i starts this many demo steps after env i-1")
     ap.add_argument("--warmup", type=int, default=15)
     ap.add_argument("--image-size", type=int, default=R.DEFAULT_IMAGE_SIZE)
+    ap.add_argument("--behavior-sensors", action="store_true",
+                    help="the robot with BEHAVIOR replay_obs's sensors (head 720, wrists 480, rgb + depth_linear), as production's --behavior-shard")
     ap.add_argument("--track", default="1,0", help="change-detection settings to time, in order")
     ap.add_argument("--sync-dir", default=None)
     ap.add_argument("--sync-n", type=int, default=1)
@@ -107,7 +109,8 @@ def main(argv=None):
     tro_path = os.path.abspath(args.tro)
     iid, template_dir, tmeta, activity, did = R.resolve_instance(tro_path)
     tro = R.load_tro(tro_path)
-    cfg = R.build_env_config(template_dir, tmeta, tro, tro_path, activity, did, R.robot_name_from_tro(tro), args.image_size)
+    cfg = R.build_env_config(template_dir, tmeta, tro, tro_path, activity, did, R.robot_name_from_tro(tro), args.image_size,
+                             behavior_output=bool(args.behavior_sensors))
     cfg["task"] = {"type": "DummyTask"}
     cfg["env"]["num_envs"] = N
     with h5py.File(os.path.join(args.demo, "demo.hdf5"), "r") as f:
@@ -119,6 +122,7 @@ def main(argv=None):
     offsets = [(i * args.offset) % max(1, T - args.steps - args.warmup - 1) for i in range(N)]
     res = {"gpu": subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout.strip(),
            "host": os.uname().nodename, "num_envs": N, "tiled": bool(args.tiled), "image_size": args.image_size,
+           "behavior_sensors": bool(args.behavior_sensors),
            "head_camera_only": os.environ.get("ISPATIALGYM_HEAD_CAMERA_ONLY", ""), "tro": tro_path, "demo": args.demo, "offsets": offsets,
            "omp_threads": os.environ.get("OMP_NUM_THREADS"), "isg_thread_cap": os.environ.get("ISG_THREAD_CAP"),
            "cpus_allowed": len(os.sched_getaffinity(0)), "pid": os.getpid()}
