@@ -2,6 +2,104 @@
 
 Tagged states of this repository and what passed on them.
 
+## `first-demo-v3.0` — the owner's five findings on v2.2 fixed, each only in its own situation; 28/28 green, scoped under the owner's 23:05 rules (2026-09-30)
+
+- **Tag / commit:** `first-demo-v3.0` → `e4bc51ab` on `rush-20260917-2100` (`first-demo-v2.2` and its docs / manifest / TODO commits +
+  `35be7cba` F4, `91ebb50b` F2, `1178c510` F1, `123179c9` F5 - oracle - and `e4bc51ab` F3 - sampling; one commit per fix). After it:
+  `7ba60e3b` the reel builder (`scripts/isg/build_demo_reel.py`), the latest-success manifest (`fe9a6e69`), these docs and TODO.md.
+- **How the 28 demos were made** (owner rules 2026-09-27 23:05, as v2.2): each fix declares its situation predicate and its code paths and is
+  otherwise a strict no-op that adds a fired / not-fired note. Every predicate was evaluated in shadow over the 28 v2.2 release instances
+  (`runlogs/first-demo-v3.0/reports/scoping.md`): 9 aliases exposed - world vertical (F1); door open (F2, F5); carton lever (F3, a sampling
+  change: re-sampled); cork, cap, lid (F4); marker, dishwasher open, dishwasher close (F5). Phase A proved each fix on its v2.2 instance
+  (job markers `runlogs/jobs/v30_f*_20260930/`); the canaries `v30_canary_20260930` on `e4bc51ab` went 42/43 (the red is pre-existing,
+  below); the freeze `v30_sweep_20260930-1` on `e4bc51ab` re-ran the 9 exposed aliases ×2: 18/18 green (both copies step for step on
+  seven aliases; the cap 899 / 812 and the lid 938 / 909 drew differently on the two machines). The other 19 aliases keep their v2.2
+  release run (made on `e6c62b73` / kielbasa `bc78d77f`); `made_on`, the scoping evidence and the arm are in every manifest entry
+  (`runlogs/first-demo-v3.0/manifest.json`).
+- **The fixes** (each: the situation, the code path; Phase A = the fix on its v2.2 instance, a demo-only replay - F3 a fresh sample - with
+  head + overhead video):
+
+  | | finding (v2.2 run) | situation -> change (commit) | Phase A proof (v2.2 -> v3.0) |
+  |---|---|---|---|
+  | F1 | world vertical 0928-043205: the transition tucked both untucked arms (the wall stance's recorded posture), the brace and the push started from tucked | a WORKING arm the transition would put into the arriving stance's NAMED posture (`arm_posture`, no transition `arms_q`) whose next action there is a brace / push stays as it is when, the kept arms as they are: the sweep (trunk, drive-in) is collision-free with the protection distance, each kept arm's straight joint route to its contact's standoff / first witness is collision-free (the earlier arm at its contact) and the later arm as it is clears the earlier arm's contact witnesses; collision checks, FK and differential IK only (`execute.keep_contact_arms`, `Executor.stance_contact`; `1178c510`) | 0930-175423 (local): both arms kept; transition 226 -> 65 steps; before the brace (right) 10.35 -> 7.11 rad joint path, 2.32 -> 0.82 m hand path; before the push (left) 8.70 -> 5.54 rad, 2.26 -> 0.63 m; demo 1149 -> 1050 steps |
+  | F2 | door open 0928-042225: after the first release the ramp onto `arm_q_retreat` turned joint 1 by 3.4 rad (the hand rose ~0.65 m and came back), the re-grasp plan swung back | a release / move / re-grasp whose `arm_q_retreat` lies > 1.0 rad from the measured joints after the back-off (70 logged ramps of 38 runs: 0.012-0.595 rad; this instance 3.505) and whose drive holds the retreat posture keeps the arm where the back-off left it when the drive along `base_path` with it is collision-free (margin 0.01 m) and it keeps 0.02 m from the self-collision padding; either check failing ramps as before (`execute.keep_retreat_arm`; `91ebb50b`) | 0930-175755 (pod): kept at the first release (3.436 rad), the other two segments ramp as before (0.163 / 0.485 rad); largest joint excursion first release -> second grasp 3.505 -> 0.58 rad, hand rise 0.684 -> 0.005 m, base_follow 1882 -> 1316 steps; demo 2876 -> 2201 steps |
+  | F3 | carton lever 0928-043925: the grasp transit swung the hand ~56 cm right and 20 cm up (brace at joint 2's limit, pinch in the other shoulder solution; the oracle's detour needs the brace's solution to reach the pinch) | the two-flap lever brace is re-solved nearest the pinch's pre-grasp witness with a 0.05 rad joint-limit margin, the lever and the pinch re-checked beside it, when its solution does not reach the pinch the oracle's way (retreat, up-across-down detour, approach - differential IK) or stands within 0.05 rad of a joint limit (`articulation_small.brace_in_pinch_solution` / `lever_detour_reaches`; `e4bc51ab`) | 0930-182056 (fresh sample, pod): re-solved 3.03 rad away, margin 0.003 -> 0.099 rad; the transit takes the 'cartesian detour 6 cm above'; brace -> grasp excursion 3.167 -> 1.023 rad, hand lateral excursion 0.58 -> 0.001 m, grasp 425 -> 194 steps; demo 1604 -> 1316 steps. Control 0930-180217 (the detour check alone): the v2.2 instance again, identical to v2.2 |
+  | F4 | cork 0928-041525: seated within 0.7 mm / 0.4 deg, then two jam relaxes of the loaded wrist (after the descent, in the correction pass) moved it; attached 3.8 mm / 1.7 deg | an attach place with the part in hand: the holding arm joins `keep_hold_arms` from the descent until the attachment exists (`execute.attach_hold_kept`; `35be7cba`) | 0930-174300 (local): offset before the attach 3.57 mm / 1.66 deg -> 0.93 / 0.46, at the joint 3.81 / 1.66 -> 0.93 / 0.46, correction passes 1 -> 0, holding-arm relaxes from the descent to the attachment 2 -> 0 (in the whole place 3 -> 1: the one left ends the move to the re-aimed pre-place, before the descent); place 160 -> 112 steps |
+  | F5 | nextto marker 0928-050212: the grasp transit dropped the hand ~9 cm below the pre-grasp beside the robot, then rose to it: two descents | a plain grasp transit whose planned hand path (FK before it streams) dips > 7 cm below both ends (the 28 v2.2 transits: free-object pinches 0-5.6 cm, the marker 9.0, the handle grasps 13-25) runs as a Cartesian leg - straight, else up-over-down; tracked forward, else back from the plan's end after an in-place adjustment <= 0.6 rad moving the hand <= 2 cm - when it is collision- and protection-checked, ends in the plan's IK branch and the approach tracks from it; otherwise the plan runs as before (`Motions.transit_dip_gate`; `123179c9`) | 0930-181938 (local): the straight leg tracked back from the plan's end (in-place adjustment 0.32 rad / 1.9 mm first); hand dip 8.7 -> 0 cm, grasp 365 -> 253 steps; demo 740 -> 681 steps |
+
+- **Scoping in the freeze** (each fix fired exactly where the shadow said, in every replay, fresh sample and freeze copy): F1 on world
+  vertical (both arms kept); F2 on door open (the first release); F3 on the carton lever's fresh samples (its v2.2 instance's replays run
+  the recorded brace: 1604 steps, as v2.2); F4 on cork, cap and lid; F5 on the marker (backward straight leg), door open (forward,
+  13.2 cm planned dip) and dishwasher close (forward, 15.4 cm). Dishwasher open is exposed (its plan dips 24.5 cm) but no leg qualifies -
+  the four variants stall 13-15 mm short - so it runs v2.2's plan (1557 steps, as v2.2). Strict no-op evidence for the others: blender
+  close (F1's literal predicate matched it) replayed on `e4bc51ab` = v2.2 step for step (885); the canary replays of the non-exposed
+  fragile aliases repeat v2.2 (carton close 1265, milk 904, shampoo 1510; block design 3580 / 3567 vs 3562, run-to-run as before; the
+  sandal 2756 / 2756 vs 2754: every action up to the push-under step for step, then the push 290 vs 289 and the settle 460 vs 459 - no
+  v3.0 path wraps the push, F1 'no arm to re-pose', F5 evaluated 6.1 cm <= 7 cm).
+- **No-op replays** (evidence only, after the freeze, local RTX 4090; `runlogs/first-demo-v3.0/reports/noop_replays.md`): the 14
+  aliases neither exposed nor canaried, replayed from their v2.2 instances on `e4bc51ab` (`v30_noop_replay_20260930`): 14/14 green,
+  13/14 step for step as v2.2 (every action and the settle), no v3.0 note fired. Axial's push came out 341 steps vs 343 (515 vs 518 in
+  all, settle 86 vs 87). A/B `v30_noop_ab_20260930` on `bc78d77f`, local RTX 4090: the axial replays as 515 / [48, 341, 40] / 86 and
+  the sandal as 2756 / push 290 / 460 - equal per action to their `e4bc51ab` replays. Both differences from the v2.2 runs (fresh sample
+  + demo on a pod) are replay / machine variance at the base, not v3.0; every earlier axial run (three fresh runs, two commits, two
+  pods) gave 518.
+- **Results vs v2.2** (`runlogs/first-demo-v3.0/reports/measurements.md`):
+  - *F1 world vertical:* transition 226 -> 65 steps; the tuck skipped for both arms (the sweep, the route to the contact and the later
+    arm's hold clear); before the brace (right) 10.35 -> 7.11 rad / 2.317 -> 0.815 m hand path / 383 -> 282 steps; before the push (left)
+    8.70 -> 5.54 rad / 2.259 -> 0.629 m / 592 -> 511 steps.
+  - *F2 door open:* largest joint excursion first release -> second grasp 3.505 rad (joint 1) -> 0.58 rad (joint 7); hand rise 0.684 ->
+    0.005 m; base_follow 1882 -> 1316 steps.
+  - *F3 carton lever:* brace -> grasp excursion 3.167 rad (joint 1) -> 1.023 rad (joint 7); hand lateral excursion 0.58 -> 0.001 m;
+    pre_grasp_transit 'witness branch (the detour's branch does not reach the grasp)' -> 'cartesian detour 6 cm above'; grasp 425 -> 194
+    steps.
+  - *F4 attach places:* cork offset before the attach 3.57 mm / 1.66 deg -> 0.93 / 0.46, at the joint 3.81 / 1.66 -> 0.93 / 0.46,
+    holding-arm relaxes from the descent to the attachment 2 -> 0, correction passes 1 -> 0; lid 0.91 / 1.01 -> 0.27 / 0.28, relaxes
+    1 -> 0; cap (another draw) 0.69 / 0.32 -> 0.29 / 0.03, relaxes 0 -> 0. Jams in the whole place (the carry leg and the move to the
+    re-aimed pre-place included, before F4's window): cork 3 -> 1, lid 3 -> 2, cap 0 -> 1.
+  - *F5 grasp transits:* marker hand dip 8.7 -> 0 cm, grasp 365 -> 253 steps; door open 12.9 -> 0 cm (239 -> 243); dishwasher close
+    15.2 -> 0 cm (257 -> 233); dishwasher open 24.1 cm, unchanged (no leg qualifies).
+  - *Demo length:* 33441 demo steps in total (v2.2 34617). Shorter: door open 2876 -> 2201, carton lever 1604 -> 1316, world vertical
+    1149 -> 1050, marker 740 -> 681, cork 950 -> 893, dishwasher close 567 -> 546, lid 950 -> 938; cap 864 -> 899 (another draw,
+    attempt 2 -> 1); dishwasher open 1557 and the 19 kept aliases unchanged.
+  - *Attempts:* attempt 0 for 18/28 aliases (v2.2 18/28); cap 2 -> 1, the others unchanged.
+  - *Smoothness* (largest per-step arm-joint change / arm joint path, rad): the set's largest stays 0.048 (door close, kept). Re-runs:
+    door open 0.036 -> 0.038 / 53.8 -> 38.4, world vertical 0.020 / 24.1 -> 17.7, carton lever 0.030 -> 0.037 / 38.0 -> 34.1, cork
+    0.038 -> 0.030 / 16.1 -> 15.8; up on dishwasher close 0.036 -> 0.041 / 12.1 -> 14.3 and marker 0.027 -> 0.029 / 15.5 -> 16.2 (the
+    Cartesian legs), cap 15.5 -> 17.7 (another draw).
+  - *Wall time* (job, s): door open 3089 -> 1128, world vertical 855 -> 563, carton lever 1568 -> 1288, cork 2226 -> 1686, cap 2689 ->
+    2232, dishwasher open 1411 -> 557; up on marker 784 -> 1074, lid 883 -> 1538, dishwasher close 645 -> 675 (pod-to-pod demo walls
+    vary with the GPU).
+  - *Success:* 28/28 (v2.2 28/28).
+- **Canaries** (`v30_canary_20260930`, `e4bc51ab`): the 9 exposed aliases + the fragile sandal, shampoo, milk, block design and carton
+  close - replays of their v2.2 release instances on type-A pods (L40S / RTX 6000 Ada / L40) 14/14 and type-B (RTX 5090 / RTX 4090)
+  14/14, fresh samples 13/14, plus the blender close no-op replay. Determinism: the fresh samples of the exposed aliases draw their v2.2
+  instance (seed 0, sampling unchanged for them; the carton lever is re-sampled by F3) and the demos repeat across pod types (door open
+  2201 on three pods, cork 893, world vertical 1050 / 1049). Red: the sandal's fresh sample (0930-183356, local RTX 4090) - plan_failed at
+  its grasp (the protection's via-above and its finishing swing refused, -0.0228 / -0.0149 m, 3.05 / 3.03 rad), v2.1's / v2.2's known
+  pod-dependent signature, on another instance than v2.2's (the IORS-large sampler is time-budgeted, its draw depends on the machine); no
+  v3.0 path acted (F1 'no arm to re-pose', F5 5.9 cm <= 7 cm); the same instance on `bc78d77f` on the same GPU fails identically
+  (`v30_sandal_ab_20260930`, 0930-192835) -> pre-existing.
+- **Unit tests** on `e4bc51ab`: 1409 passed, 1 skipped; the same 4 known failures (identical on `bc78d77f`). New: `test_v30_fixes.py`
+  (15 tests: each fix's predicate, its code path and its not-fired note).
+- **Collected demos:** `runlogs/first-demo-v3.0/` (28 runs, `videos/` = head camera, `videos_overhead/` = the `--dev` overhead camera,
+  `manifest.json` with `arm` / `made_on` / `scoping` per entry, `reports/` with the decision log and the driver scripts). Reels
+  `runlogs/tmp/first-demo-v3.0_all_demos_with_overhead.mp4` (+ `.txt` index) and `runlogs/tmp/first-demo-v3.0_all_demos.mp4` (18:35, one
+  chapter per demo). The head videos are also linked from `runlogs/pilot_20260915/first_demo_latest_success_videos/manifest.json`.
+- **Known limits:**
+  - **Dishwasher open** still dips 24.5 cm in its grasp transit: the straight and up-over-down legs both stall 13-15 mm short, forward and
+    backward, so F5 keeps the plan (the owner's fallback).
+  - **F5's legs** trade joint path for the hand's height on two transits: dishwasher close +2.2 rad (largest step 0.041 rad), marker
+    +0.7 rad; the marker's backward leg starts with a 0.32 rad / 1.9 mm in-place adjustment at the idle arm's shoulder singularity.
+  - **F4's window** is the descent to the attachment only: the jam probe may still relax the holding arm at the end of the carry leg or
+    of the move to the re-aimed pre-place (cork 1, lid 2, cap 1 in the freeze runs; 0.007-0.02 rad of joint target each).
+  - **F1, F2 and F5 decide at run time:** the shadow bounds exposure from the recorded instances; their collision / tracking checks run
+    in the demo (deterministic: collision checks, FK, differential IK - no cuRobo random stream).
+  - **F3** covers the two-flap lever brace only (the `two_flap_v4` path); the other brace samplers keep their solutions.
+  - **Pre-existing:** the sandal's grasp via-above on some draws / pods (fails identically on `bc78d77f`); block design's run-to-run
+    step counts; a replay of a recorded instance can run a closed-loop push a step or two differently from its fresh run (axial, the
+    sandal; identical on `bc78d77f`).
+  - **Not in v3.0** (owner): camera relocalization's goal tilt, the sandal's via-above approach, D6 (the real left-arm bands).
+
 ## `first-demo-v2.2` — the left arm as one more dimension of the orientation chooser; mirrored left bands; 28/28 green, scoped under the owner's 23:05 rules (2026-09-28)
 
 - **Tag / commit:** `first-demo-v2.2` → `bc78d77f` on `rush-20260917-2100` (`first-demo-v2.1` `5d6a7ff5` + `2b6e0904` the left arm +
