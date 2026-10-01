@@ -811,8 +811,204 @@ def _keep_branches(motions: Motions, state, ctx: Dict[str, Any], move: Dict[str,
     return {arm: q for arm, q in move.items() if not kept[arm].get("keep")}
 
 
+def _q_at_stance(motions: Motions, targets, q: th.Tensor) -> th.Tensor:
+    """``q`` at a transition's arriving stance: the trunk at ``targets["trunk"]``, the base at ``targets["drive_in"]``."""
+    out = q.clone()
+    t, k = targets["trunk"]
+    out[motions.robot.trunk_control_idx] = C.as_tensor(C.torso_q(float(t), float(k), C.TORSO_JOINT_LIMITS)).reshape(-1).float()
+    return _q_at_base(motions, out, *as_pose2d(targets["drive_in"]))
+
+
+def _transition_sweep_from(motions: Motions, state, targets, q: th.Tensor) -> List[th.Tensor]:
+    """:func:`transition_sweep` from the configuration ``q`` (the arms as given) instead of the measured one."""
+    tidx = motions.robot.trunk_control_idx
+    t, k = targets["trunk"]
+    q_t = C.as_tensor(C.torso_q(float(t), float(k), C.TORSO_JOINT_LIMITS)).reshape(-1).float()
+    out = [q.clone()]
+    for s in range(1, 9):
+        qq = q.clone()
+        qq[tidx] = q[tidx] + (q_t - q[tidx]) * (s / 8)
+        out.append(qq)
+    return out + _base_legs(motions, out[-1], state.base_pose2d(), as_pose2d(targets["drive_in"]))
+
+
+def _joint_line(q_from: th.Tensor, q_to: th.Tensor, idx, step: float = 0.05) -> List[th.Tensor]:
+    """Configurations along the straight joint-space line ``q_from`` -> ``q_to`` of the joints ``idx`` (both ends included)."""
+    d = float(th.max(th.abs(q_to[idx] - q_from[idx]))) if len(idx) else 0.0
+    n = max(1, int(math.ceil(d / step)))
+    out = []
+    for s in range(n + 1):
+        q = q_from.clone()
+        q[idx] = q_from[idx] + (q_to[idx] - q_from[idx]) * (s / n)
+        out.append(q)
+    return out
+
+
+def contact_route_goal(motions: Motions, state, arm: str, contact: Dict[str, Any], q_ctx: th.Tensor, cfg: "ExecuteConfig") -> Tuple[th.Tensor, str]:
+    """Where a free arm's transit to its brace / push pre-pose ends (``reach_pre_pose``'s rule) with the robot at ``q_ctx``: the standoff
+    ``pre_pose_standoff_m`` off the supports in the branch of the contact's first witness when the pre-pose sits closer than
+    ``pre_pose_standoff_skip_m`` to them, else that witness. Differential IK only (deterministic); ``(28-D q, label)``."""
+    w = contact["witnesses"]
+    key = "pre" if "pre" in w else sorted(w)[0]
+    idx = motions.robot.arm_control_idx[arm]
+    q_w = q_ctx.clone()
+    q_w[idx] = C.as_tensor(w[key]).reshape(-1).float()[idx]
+    pre = (contact.get("targets") or {}).get("pre")
+    supports = contact_ignores(state, contact["object"]) if pre is not None else []
+    n = escape_direction(state, pre, supports) if supports else None
+    if n is None:
+        return q_w, f"the {contact['name']}'s {key} witness"
+    clearance = support_clearance(state, pre, supports)
+    if clearance is not None and clearance >= cfg.pre_pose_standoff_skip_m:
+        return q_w, f"the {contact['name']}'s {key} witness ({clearance:.3f} m clear of its supports)"
+    p, q = as_world_pose(pre)
+    dense = motions._densify((p, q), [(p + n * cfg.pre_pose_standoff_m, q)])
+    res = motions.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: wp} for wp in dense], q_start=q_w, pos_tol=motions.cfg.diff_ik_pos_tol,
+                                        rot_tol=motions.cfg.diff_ik_rot_tol, max_iters=motions.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False,
+                                        soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+        return q_w, f"the {contact['name']}'s {key} witness (its standoff does not track)"
+    return C.as_tensor(res.q_traj[-1]).reshape(-1).float(), f"the {contact['name']}'s standoff in the {key} witness's branch"
+
+
+def keep_contact_arms(motions: Motions, state, targets, ctx: Dict[str, Any], move: Dict[str, th.Tensor], record=None) -> Dict[str, th.Tensor]:
+    """Owner 2026-09-30 (first-demo v3.0 F1, world vertical 0928-043205: the transition tucked both untucked arms - the wall stance
+    records ``arm_posture: tucked`` - and the brace / push then started from tucked). A transition leaves a free arm as it is
+    instead of putting it into the arriving stance's recorded posture when it is one of that stance's working arms, the stance
+    ``record`` names that posture (``arm_posture``: tucked / ready / reset / untucked - a fixed default, not a configuration of the
+    arm's own motion), the transition record has no ``arms_q`` of its own, the arm's next action at the arriving stance is a brace /
+    push (``ctx["stance_contacts"]``, ``Executor.stance_contact``) and, the arms kept as they are and the others at their targets:
+    (1) the transition's sweep (trunk, then drive-in) is collision-free (whole body) and keeps the protected objects' distance;
+    (2) the arm's straight joint-space route from its joints to where its transit ends (:func:`contact_route_goal`) at the arriving
+    stance is collision-free and keeps that distance - with an arm that acts before it standing at that arm's contact;
+    (3) an arm that acts later stays collision-free as it is while the earlier arm stands at each of its contact's witnesses.
+    An arm failing (2) or (3) is re-posed and the rest re-checked; (1) failing re-poses every arm (the recorded sequence).
+    Collision checks, FK and differential IK only (no planner, no cuRobo random stream). ``ctx["contact_arms_kept"]`` records
+    fired / not fired and why; returns ``move`` without the kept arms."""
+    cfg = _cfg(ctx)
+    contacts = ctx.get("stance_contacts") or {}
+    rec: Dict[str, Any] = {"fired": False, "arms": {}}
+    ctx["contact_arms_kept"] = rec
+    posture = (getattr(record, "extra", None) or {}).get("arm_posture")
+    working = set(getattr(record, "working_arms", []) or [])
+    if not move:
+        rec["why"] = "no arm to re-pose"
+        return move
+    if targets.get("arms_q"):
+        rec["why"] = "the transition re-poses the arms to the joints its record was swept with, not to the stance's posture"
+        return move
+    if posture not in IDLE_POSTURES:
+        rec["why"] = "the arriving stance names no arm posture for its working arms"
+        return move
+    cand = []
+    for arm in sorted(move):
+        c = contacts.get(arm)
+        if arm not in working:
+            rec["arms"][arm] = {"kept": False, "why": f"not a working arm of the arriving stance (its idle arm goes to {posture})"}
+        elif not c:
+            rec["arms"][arm] = {"kept": False, "why": "its next action at the arriving stance is not a brace / push"}
+        elif not c.get("witnesses"):
+            rec["arms"][arm] = {"kept": False, "why": f"no recorded witness of its {c['name']}"}
+        else:
+            cand.append(arm)
+    if not cand:
+        rec["why"] = f"no working arm put into the stance's {posture} posture has a brace / push next at the arriving stance"
+        return move
+    rec["posture"] = posture
+    from ispatialgym.oracle import protection as PROT
+
+    backend = motions.backend
+    kept = sorted(cand, key=lambda a: contacts[a]["index"])
+    order = {a: contacts[a]["index"] for a in kept}
+
+    def protected(arms):
+        objs: List[Tuple[str, Any]] = []
+        for a in arms:
+            for n_, o in _protected_for(ctx, state, contacts[a]["object"]):
+                if not any(o is x for _, x in objs):
+                    objs.append((n_, o))
+        return objs
+
+    def collides(qs) -> Optional[int]:
+        hits = C.as_tensor(backend.check_collision(th.stack(qs), sync_world=True)).reshape(-1)
+        return int(th.nonzero(hits)[0]) if bool(hits.any()) else None
+
+    def too_close(arms, qs, objs) -> Optional[Dict[str, Any]]:
+        if not objs or len(qs) < 3 or not hasattr(motions, "_protect_violations"):
+            return None
+        viol = motions._protect_violations(list(arms), th.stack(qs), "whole_body", {"objects": objs, "inflation": PROT.INFLATION_M})
+        return viol[0] if viol else None
+
+    try:
+        for _ in range(len(cand)):
+            q_base = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+            for arm, qa in move.items():
+                if arm not in kept:
+                    q_base[motions.robot.arm_control_idx[arm]] = C.as_tensor(qa).reshape(-1).float()
+            sweep = _transition_sweep_from(motions, state, targets, q_base)
+            hit = collides(sweep)
+            viol = None if hit is not None else too_close(kept, sweep, protected(kept))
+            if hit is not None or viol is not None:
+                why = (f"the sweep with the arms as they are collides (configuration {hit} of {len(sweep)})" if hit is not None else
+                       f"the sweep with the arms as they are comes {viol.get('clearance_m')} m from {viol.get('object')}")
+                rec["why"] = why + ": every arm re-posed"
+                for arm in kept:
+                    rec["arms"][arm] = {"kept": False, "why": why}
+                return move
+            q_st = _q_at_stance(motions, targets, q_base)
+            failed: Dict[str, str] = {}
+            for arm in kept:
+                idx = motions.robot.arm_control_idx[arm]
+                earlier = [b for b in kept if b != arm and order[b] < order[arm]]
+                q_ctx = q_st.clone()
+                for b in earlier:  # the earlier arm stands at its contact (its last witness) while this arm moves
+                    wb = contacts[b]["witnesses"]
+                    q_ctx[motions.robot.arm_control_idx[b]] = C.as_tensor(wb[list(wb)[-1]]).reshape(-1).float()[motions.robot.arm_control_idx[b]]
+                goal, label = contact_route_goal(motions, state, arm, contacts[arm], q_ctx, cfg)
+                route = _joint_line(q_ctx, goal, idx)
+                hit = collides(route)
+                viol = None if hit is not None else too_close([arm], route, protected([arm]))
+                facts = {"route_to": label, "route_rad": round(float(th.max(th.abs(goal[idx] - q_ctx[idx]))), 3), "route_configurations": len(route)}
+                if hit is not None or viol is not None:
+                    failed[arm] = (f"its route to {label} collides (configuration {hit} of {len(route)})" if hit is not None else
+                                   f"its route to {label} comes {viol.get('clearance_m')} m from {viol.get('object')}")
+                    rec["arms"][arm] = {"kept": False, "why": failed[arm], **facts}
+                    continue
+                holds = []
+                for b in earlier:  # this arm, as it is, while the earlier arm goes through its contact
+                    ib = motions.robot.arm_control_idx[b]
+                    for q_b in contacts[b]["witnesses"].values():
+                        q_h = q_st.clone()
+                        q_h[ib] = C.as_tensor(q_b).reshape(-1).float()[ib]
+                        holds.append(q_h)
+                if holds and collides(holds) is not None:
+                    failed[arm] = f"as it is it collides with the {earlier[0]} arm's {contacts[earlier[0]]['name']}"
+                    rec["arms"][arm] = {"kept": False, "why": failed[arm], **facts}
+                    continue
+                rec["arms"][arm] = {"kept": True, "contact": f"{contacts[arm]['name']}[{contacts[arm]['index']}]", **facts,
+                                    **({"held_beside": f"{earlier[0]} {contacts[earlier[0]]['name']}", "hold_configurations": len(holds)} if holds else {})}
+            if not failed:
+                break
+            kept = [a for a in kept if a not in failed]
+            if not kept:
+                break
+    except Exception as e:  # noqa: BLE001 - a backend without the checks (the test stubs): the recorded sequence
+        rec["why"] = f"no collision check ({e!r}): every arm re-posed"[:200]
+        for arm in cand:
+            rec["arms"][arm] = {"kept": False, "why": rec["why"]}
+        return move
+    rec["fired"] = bool(kept)
+    rec["why"] = (f"{', '.join(kept)} kept as they are: the sweep, the route to the contact and the later arm's hold are clear" if kept else
+                  "every candidate arm failed its route / hold check: re-posed")
+    if kept:
+        log.info("transition: %s kept as they are (next: %s); the sweep, the routes to the contacts and the holds are collision-free", "/".join(kept),
+                 ", ".join(f"{a} {contacts[a]['name']}" for a in kept))
+    return {arm: q for arm, q in move.items() if arm not in kept}
+
+
 def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q: Optional[Dict[str, Sequence[float]]] = None,
-                   keep_sweep: Optional[Callable[[], List[th.Tensor]]] = None) -> Iterator[th.Tensor]:
+                   keep_sweep: Optional[Callable[[], List[th.Tensor]]] = None,
+                   keep_contacts: Optional[Callable[[Dict[str, th.Tensor]], Dict[str, th.Tensor]]] = None) -> Iterator[th.Tensor]:
     """Put the arms into the stance's recorded drive-in posture before the trunk motion / drive-in (A6 + owner
     decision 2026-09-16 10:47): the recorded finger opening (``fingers``: closed pads for the wall two-arm stance) and
     the recorded joints (``arms_q`` / ``arm_posture``) on **every arm that holds nothing** — working arms included —
@@ -824,7 +1020,8 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
     — the arm left where the previous motion ended it, ``program_check.choose_departure_arms``); they replace the stance's
     arm targets, so an arm already there does not move (the fingers still follow the stance record). ``keep_sweep`` (the leg's
     configurations with the arms as they are): an arm that holds the recorded hand pose in another IK branch may stay
-    (``keep_arm_branch``, first-demo v2.1 A2)."""
+    (``keep_arm_branch``, first-demo v2.1 A2). ``keep_contacts`` (a transition, first-demo v3.0 F1): an arm whose next action at
+    the arriving stance is a brace / push may stay as it is (:func:`keep_contact_arms`)."""
     holding = [arm for arm in M.ARMS if state.held_object(arm) is not None]
     fingers = stance_fingers(record)
     set_fingers = []
@@ -862,6 +1059,8 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
     move = {arm: qa for arm, qa in targets.items() if arm not in holding and float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
     if arms_q and keep_sweep is not None and move:
         move = _keep_branches(motions, state, ctx, move, keep_sweep)
+    if keep_contacts is not None:
+        move = keep_contacts(move)
     ctx["arms_posture"] = {"moved": sorted(move), "kept_holding": [a for a in holding if a in targets], "source": source}
     ctx["idle_arms_moved"] = sorted(a for a in move if a not in set(getattr(record, "working_arms", []) or []))
     if move:
@@ -934,7 +1133,9 @@ def execute_transition(action: Transition, motions: Motions, state, targets, ctx
     # record was swept with the arm where the previous motion left it (``arms_q``, owner 2026-09-24), to exactly that; an arm
     # holding that hand pose in another IK branch may stay (first-demo v2.1 A2)
     keep_sweep = (lambda: transition_sweep(motions, state, targets)) if ctx.get("next_contact") else None
-    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"), keep_sweep=keep_sweep)
+    # first-demo v3.0 F1: an arm whose next action at the arriving stance is a brace / push may go there from where it is
+    keep_contacts = (lambda move: keep_contact_arms(motions, state, targets, ctx, move, record=action.stance_to)) if "stance_contacts" in ctx else None
+    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"), keep_sweep=keep_sweep, keep_contacts=keep_contacts)
     t, k = targets["trunk"]
     yield from motions.trunk_to(float(t), float(k))
     yield from motions.track_path([targets["drive_in"]])

@@ -457,6 +457,8 @@ NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
 NOTE_KEYS = NOTE_KEYS + ("witness_posture",)
 #: first-demo v3.0 F4 (cork 0928-041525): an attach place kept the holding arm's hold from the descent until the attachment existed
 NOTE_KEYS = NOTE_KEYS + ("attach_hold",)
+#: first-demo v3.0 F1 (world vertical 0928-043205): a transition kept a free arm as it was for its brace / push at the arriving stance
+NOTE_KEYS = NOTE_KEYS + ("contact_arms_kept",)
 
 
 @dataclass
@@ -1154,6 +1156,27 @@ class Executor:
         return {"index": j, "name": acts[j].name, "object": (tuple(getattr(acts[j], "objects", ()) or ()) or (None,))[0], "chain": chain,
                 "stance": ([float(v) for v in chain[0]["base"]], chain[0]["q"][self.robot.trunk_control_idx]), "margin": min(margins) if margins else None}
 
+    def stance_contact(self, index: int, arm: str) -> Optional[Dict[str, Any]]:
+        """first-demo v3.0 F1: the first action of ``arm`` at the stance the travel legs after action ``index`` arrive at (up to the next
+        travel leg), when it is a brace or a push: ``{"index", "name", "object", "targets", "witnesses"}`` - its recorded targets and the
+        sampler's IK witnesses of it in order (``witnesses_for``). None when the arm's first action there is another one, or there is none."""
+        acts = list(self.program_actions)
+        j = index + 1
+        while j < len(acts) and isinstance(acts[j], (Transition, Navigate)):
+            j += 1
+        while j < len(acts) and not isinstance(acts[j], (Transition, Navigate)):
+            a = acts[j]
+            if arm in tuple(getattr(a, "arms", ()) or ()):
+                if not isinstance(a, (Brace, Push)):
+                    return None
+                try:
+                    targets = a.targets(self.sidecar, self.state)
+                except Exception:  # noqa: BLE001
+                    return None
+                return {"index": j, "name": a.name, "object": a.contact.object, "targets": targets, "witnesses": self.witnesses_for(j)}
+            j += 1
+        return None
+
     def next_place_kind(self, index: int, action: Grasp) -> Optional[str]:
         """The kind of the place that puts down what the grasp ``index`` picks (the first ``Place`` of its arm and object before that
         arm grasps again); None when none follows."""
@@ -1272,6 +1295,8 @@ class Executor:
             ctx["witnesses_rebranched"] = {"arm": ov["arm"], "keys": sorted(ov["witnesses"]), "leg": ov["leg"]}
         if isinstance(action, (Transition, Navigate)) and targets.get("arms_q"):
             ctx["next_contact"] = {arm: self.next_contact(index, arm) for arm in targets["arms_q"]}
+        if isinstance(action, Transition):
+            ctx["stance_contacts"] = {arm: self.stance_contact(index, arm) for arm in M.ARMS}
         if isinstance(action, Grasp):
             ctx["next_place_kind"] = self.next_place_kind(index, action)
         ctx["sidecar"] = self.sidecar  # attachment: the correction regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
