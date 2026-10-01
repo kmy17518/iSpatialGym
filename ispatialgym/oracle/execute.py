@@ -46,7 +46,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field, replace
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 import torch as th
@@ -1292,9 +1292,17 @@ def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: st
         # ``reach_pre_pose``: a low pre-pose is reached through a standoff away from the support, the support leaves the collision
         # world only for the last straight leg) - planned with the table ignored, trajopt swept the open hand 55 cm at table
         # height, the fingertips dragging the table for 94 steps at 135 N and knocking the partner bottle 4.7 cm (cap 0920-164504).
-        # The former plan (supports ignored throughout) is the fallback when no plan exists with them present
+        # The former plan (supports ignored throughout) is the fallback when no plan exists with them present.
+        # first-demo v3.0 F5 (nextto marker 0928-050212): a planned transit that dips below both of its ends runs as a Cartesian leg
+        # when one qualifies (``Motions.transit_dip_gate``); ``ctx["transit_dip"]`` records the last plan's verdict
+        gate = motions.transit_dip_gate(arm, targets.get("approach") or ()) if hasattr(motions, "transit_dip_gate") else nullcontext(None)
         try:
-            yield from reach_pre_pose(motions, state, arm, targets["pre_grasp"], supports, [], _witness(ctx, "pre_grasp"), ctx, _cfg(ctx))
+            with gate as dip:
+                try:
+                    yield from reach_pre_pose(motions, state, arm, targets["pre_grasp"], supports, [], _witness(ctx, "pre_grasp"), ctx, _cfg(ctx))
+                finally:
+                    if dip is not None:
+                        ctx["transit_dip"] = dict(dip)
             ctx["pre_grasp_transit"] = "supports present"
         except SkillError as e:
             if e.details.get("stage") == "protected":

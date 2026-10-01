@@ -115,6 +115,21 @@ class MotionsConfig:
     #: than ``protect_lift_m`` above both ends - takes the via-above too (kielbasa 0926-074242: the direct plan to the witness
     #: failed, the graph-seeded retry arched 1.27 m / 19 cm high for a 0.53 m move; the via-above on the same instance: 0.90 m / 12 cm)
     protect_detour_ratio: float = 1.4
+    #: owner 2026-09-30 (first-demo v3.0 F5, nextto marker 0928-050212: the plan to the pre-grasp lowered the hand from 1.013 to 0.837 m
+    #: beside the robot and rose to the pre-grasp at 0.926 m - 8.9 cm below its lower end - before the approach descended again): a
+    #: planned grasp transit (``transit_dip_gate``) whose hand path dips more than this below both of its ends runs as a Cartesian leg
+    #: instead - straight to its goal, else up ``transit_dip_lift_m`` above the higher end, across, down - when that leg tracks with
+    #: collisions and the protected objects checked, ends in the plan's IK branch and the approach tracks from it. The v2.2 grasp
+    #: transits dipped 0-5.6 cm (free-object pinches; milk 4.95, cork 5.6), the marker 9.0, the handle grasps of the door / dishwasher
+    #: 13-25 cm.
+    transit_dip_max_m: float = 0.07
+    transit_dip_lift_m: float = 0.06
+    #: a Cartesian leg tracked back from the plan's end reaches the hand's pose in other joints: an in-place adjustment of at most this
+    #: (rad, largest arm joint; the marker: 0.32 rad of joints 1 / 3 at the idle arm's shoulder singularity) moving the hand at most
+    #: ``transit_dip_adjust_hand_m`` precedes it, at ``transit_dip_adjust_rate`` (rad/s)
+    transit_dip_adjust_max_rad: float = 0.6
+    transit_dip_adjust_hand_m: float = 0.02
+    transit_dip_adjust_rate: float = 0.5
     #: a leg that starts with the eef link this far from the FK of the reported joints (the arm wound up under a
     #: contact load) first re-targets the joints onto the link's pose (``arm_along`` unwind)
     unwind_min_deflection: float = 0.005
@@ -428,6 +443,8 @@ class Motions:
         self.witness_branch_accepted_events: List[Dict[str, Any]] = []
         # every witness reached through an arm posture (``cfg.witness_via_postures``) instead of failing the attempt
         self.witness_via_posture_events: List[Dict[str, Any]] = []
+        # the dipping-transit gate of a grasp transit (first-demo v3.0 F5, ``transit_dip_gate``): the active context, None outside it
+        self._dip: Optional[Dict[str, Any]] = None
         self._joint_limits = (
             self.robot.joint_lower_limits[self.robot.trunk_control_idx],
             self.robot.joint_upper_limits[self.robot.trunk_control_idx],
@@ -1125,6 +1142,204 @@ class Motions:
             return None
         return {"object": "-", "path_m": round(path, 3), "straight_m": round(straight, 3), "via_above_m": round(via, 3), "rise_m": round(rise, 3)}
 
+    @contextmanager
+    def transit_dip_gate(self, arm: str, approach: Sequence[Any] = ()):
+        """The planned transits of ``arm`` inside this block (a grasp transit, first-demo v3.0 F5) pass :meth:`_dip_gate` before they
+        stream; ``approach`` (the grasp's approach waypoints) must track from where a Cartesian replacement ends. Yields the record:
+        ``{"fired", "why", "dip_m", ...}`` of the last plan checked (``{"fired": False, "why": "no planned transit"}`` when none)."""
+        prev = self._dip
+        rec: Dict[str, Any] = {"fired": False, "why": "no planned transit"}
+        self._dip = {"arm": arm, "approach": list(approach), "record": rec}
+        try:
+            yield rec
+        finally:
+            self._dip = prev
+
+    def _plan_dip(self, arm: str, q_traj: Any) -> Optional[Tuple[float, float, float, float]]:
+        """``(dip, z_start, z_end, z_min)`` of a planned trajectory's hand path - how far it runs below the lower of its ends (m); the
+        mirror of :meth:`_plan_detour`. None without a batched FK."""
+        fk_batch = getattr(self.backend, "fk_batch", None)
+        if fk_batch is None or q_traj is None:
+            return None
+        try:
+            q = C.as_tensor(q_traj)
+            if q.ndim != 2 or len(q) < 3:
+                return None
+            p = C.as_tensor(fk_batch(M.EEF_LINK[arm], q, f"{arm}_arm")[0]).float()
+        except Exception as e:  # noqa: BLE001 - advisory: without FK the plan runs as before
+            log.debug("transit dip check unavailable (%r)", e)
+            return None
+        z0, z1, zmin = float(p[0, 2]), float(p[-1, 2]), float(p[:, 2].min())
+        return min(z0, z1) - zmin, z0, z1, zmin
+
+    def _track_leg(self, arm: str, start: Pose, waypoints: Sequence[Any], q_start: th.Tensor) -> Tuple[Any, List[Pose]]:
+        """``solve_ik_path`` of the straight segments ``start`` -> ``waypoints`` from ``q_start`` with collisions checked (the current world),
+        at the free legs' tolerances, solved once more at half the spacing on a joint jump (as ``arm_along``). ``(result, poses)`` - the
+        poses aligned with ``result.q_traj`` (``start`` first)."""
+        frame = M.EEF_LINK[arm]
+        kw = dict(pos_tol=self.cfg.diff_ik_pos_tol, rot_tol=self.cfg.diff_ik_rot_tol, max_iters=self.cfg.diff_ik_max_iters, check_collisions=True, sync_world=False,
+                  soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free, soft_rot_tol=self.cfg.diff_ik_soft_rot_tol)
+        dense = self._densify(start, waypoints)
+        res = self.backend.solve_ik_path(f"{arm}_arm", [{frame: wp} for wp in dense], q_start=q_start, **kw)
+        if not res.success and str(res.status).startswith("joint jump"):
+            finer: List[Pose] = []
+            prev = start
+            for wp in dense:
+                finer.extend(C.line_waypoints(prev, wp, 2))
+                prev = wp
+            res2 = self.backend.solve_ik_path(f"{arm}_arm", [{frame: wp} for wp in finer], q_start=q_start, **kw)
+            if res2.success:
+                res, dense = res2, finer
+        return res, [start] + list(dense)
+
+    def _leg_steps(self, poses: Sequence[Pose], q_traj: th.Tensor) -> List[int]:
+        """Control steps per segment of a tracked leg, as ``arm_along`` times it (eef speed, eef rotation speed, joint speed bound)."""
+        steps = []
+        for i in range(len(poses) - 1):
+            seg = float(th.linalg.norm(as_world_pose(poses[i + 1])[0] - as_world_pose(poses[i])[0]))
+            ang = C.quat_angle(as_world_pose(poses[i])[1], as_world_pose(poses[i + 1])[1])
+            n = max(seg / (self.cfg.cartesian_speed * self.dt), ang / (self.cfg.cartesian_ang_speed * self.dt))
+            if i + 1 < len(q_traj):
+                n = max(n, float(th.max(th.abs(q_traj[i + 1] - q_traj[i]))) / (self.cfg.diff_ik_joint_speed * self.dt))
+            steps.append(max(1, int(round(n))))
+        return steps
+
+    def _cartesian_transit(self, arm: str, waypoints: Sequence[Any], q_plan_end: th.Tensor) -> Tuple[Optional[List[Tuple[th.Tensor, List[int]]]], str]:
+        """The joint path of a Cartesian leg replacing a dipping plan (:meth:`_dip_gate`): the hand along ``waypoints`` from where it is,
+        tracked with collisions checked, keeping the protected objects' distance, ending within ``witness_refine_max_jump`` of the plan's
+        last configuration (its IK branch: the chain after the transit runs as validated), the gate's approach tracking from its end.
+        Tracked forward from the current configuration, else backward from the plan's last configuration to the hand's pose (the marker
+        0928-050212: the idle arm stands at a shoulder singularity - joints 1 and 3 aligned - and the forward differential IK drifts into
+        the flipped-shoulder family and stalls short; tracked back from the plan's end the same line reaches the hand 0.32 rad of in-place
+        joint 1 / 3 motion from the idle joints): then an in-place adjustment of at most ``transit_dip_adjust_max_rad`` that moves the hand
+        at most ``transit_dip_adjust_hand_m`` comes first. Differential IK, FK and collision checks only; nothing moves. Returns the
+        segments ``[(q_traj, steps), ...]`` to stream in order, or None, and why."""
+        D = self._dip or {}
+        idx = self.robot.arm_control_idx[arm]
+        q_now = C.as_tensor(self.backend.q_full()).reshape(-1).float()
+        q_end_plan = C.as_tensor(q_plan_end).reshape(-1).float()
+        here = self.eef_pose(arm)
+        goal = as_world_pose(waypoints[-1])
+        whys = []
+        for direction in ("forward", "backward"):
+            adjust = None
+            if direction == "forward":
+                res, poses = self._track_leg(arm, here, waypoints, q_now)
+                if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+                    whys.append(f"forward: {res.status}"[:120])
+                    continue
+                q_traj = C.as_tensor(res.q_traj).float()
+                segments = [(q_traj, self._leg_steps(poses, q_traj))]
+            else:
+                q_pe = q_now.clone()
+                q_pe[idx] = q_end_plan[idx]
+                back = [as_world_pose(w) for w in list(waypoints)[:-1]][::-1] + [here]
+                res, poses = self._track_leg(arm, goal, back, q_pe)
+                if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+                    whys.append(f"backward: {res.status}"[:120])
+                    continue
+                q_traj, poses = C.as_tensor(res.q_traj).float().flip(0), poses[::-1]
+                gap0 = float(th.max(th.abs(q_traj[0][idx] - q_now[idx])))
+                if gap0 > self.cfg.transit_dip_adjust_max_rad:
+                    whys.append(f"backward: reaches the hand {gap0:.2f} rad from its joints (> {self.cfg.transit_dip_adjust_max_rad:.2f})")
+                    continue
+                q_adj = q_now.clone()
+                q_adj[idx] = q_traj[0][idx]
+                n_adj = max(2, int(math.ceil(gap0 / 0.05)))
+                ramp = th.stack([q_now + (q_adj - q_now) * (k / n_adj) for k in range(n_adj + 1)])
+                if bool(C.as_tensor(self.backend.check_collision(ramp, sync_world=False)).any()):
+                    whys.append("backward: the in-place adjustment collides")
+                    continue
+                fk_batch = getattr(self.backend, "fk_batch", None)
+                moved = 0.0
+                if fk_batch is not None:
+                    p_adj = C.as_tensor(fk_batch(M.EEF_LINK[arm], ramp, f"{arm}_arm")[0]).float()
+                    moved = float(th.linalg.norm(p_adj - here[0].float(), dim=1).max())
+                if moved > self.cfg.transit_dip_adjust_hand_m:
+                    whys.append(f"backward: the in-place adjustment moves the hand {moved * 1000:.0f} mm")
+                    continue
+                q_traj[0] = q_adj
+                segments = [(th.stack([q_now, q_adj]), [max(1, int(math.ceil(gap0 / (self.cfg.transit_dip_adjust_rate * self.dt))))]),
+                            (q_traj, self._leg_steps(poses, q_traj))]
+                adjust = {"rad": round(gap0, 3), "hand_mm": round(moved * 1000, 1)}
+            full = th.cat([seg[0] for seg in segments])
+            if self._protect is not None:
+                viol = self._protect_violations([arm], full, f"{arm}_arm", self._protect)
+                if viol:
+                    whys.append(f"{direction}: passes {viol[0].get('object')} at {viol[0].get('clearance_m')} m")
+                    continue
+            q_last = full[-1]
+            gap = float(th.max(th.abs(q_last[idx] - q_end_plan[idx])))
+            if gap > self.cfg.witness_refine_max_jump:
+                whys.append(f"{direction}: ends {gap:.2f} rad from the plan's last configuration (another IK branch)")
+                continue
+            approach = list(D.get("approach") or [])
+            if approach:
+                frame = M.EEF_LINK[arm]
+                dense_a = self._densify(goal, approach)
+                res_a = self.backend.solve_ik_path(f"{arm}_arm", [{frame: wp} for wp in dense_a], q_start=q_last, pos_tol=self.cfg.diff_ik_pos_tol,
+                                                   rot_tol=self.cfg.diff_ik_rot_tol, max_iters=self.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False,
+                                                   soft_pos_tol=self.cfg.diff_ik_soft_pos_tol, soft_rot_tol=self.cfg.diff_ik_soft_rot_tol)
+                if not res_a.success:
+                    whys.append(f"{direction}: the approach does not track from its end ({res_a.status})"[:160])
+                    continue
+            why = f"{direction}, ends {gap:.2f} rad from the plan's end" + (f", in-place adjustment {adjust['rad']} rad / {adjust['hand_mm']} mm first" if adjust else "")
+            return segments, why
+        return None, "; ".join(whys)
+
+    def _dip_gate(self, arms: Sequence[str], res: Any, goal_pose: Any, q_goal: Optional[th.Tensor]) -> Generator[th.Tensor, None, bool]:
+        """Owner 2026-09-30 (first-demo v3.0 F5): inside :meth:`transit_dip_gate`, a planned transit whose hand path dips more than
+        ``transit_dip_max_m`` below both of its ends (:meth:`_plan_dip`, FK of the plan before it streams) is replaced by a Cartesian
+        leg - straight to the goal, else up ``transit_dip_lift_m`` above the higher end, across, down - when :meth:`_cartesian_transit`
+        accepts it. Returns True when the leg ran (nothing of the plan streams); False = the plan runs as before. Outside the gate, or
+        for a plan that does not dip, nothing is computed beyond the FK."""
+        D = self._dip
+        if D is None or len(arms) != 1 or arms[0] != D["arm"] or res is None or getattr(res, "q_traj", None) is None:
+            return False
+        arm = arms[0]
+        rec: Dict[str, Any] = {"fired": False, "threshold_m": self.cfg.transit_dip_max_m}
+        D["record"].clear()
+        D["record"].update(rec)
+        rec = D["record"]
+        dip = self._plan_dip(arm, res.q_traj)
+        if dip is None:
+            rec["why"] = "no FK of the plan"
+            return False
+        rec.update({"dip_m": round(dip[0], 4), "z_start": round(dip[1], 3), "z_end": round(dip[2], 3), "z_min": round(dip[3], 3)})
+        if dip[0] <= self.cfg.transit_dip_max_m:
+            rec["why"] = f"the plan dips {dip[0] * 100:.1f} cm below its lower end (<= {self.cfg.transit_dip_max_m * 100:.0f} cm): planned as before"
+            return False
+        q_end = C.as_tensor(res.q_traj[-1]).reshape(-1).float() if q_goal is None else C.as_tensor(q_goal).reshape(-1).float()
+        if goal_pose is None:
+            try:
+                goal_pose = self.backend.fk([M.EEF_LINK[arm]], q_end)[M.EEF_LINK[arm]]
+            except Exception as e:  # noqa: BLE001
+                rec["why"] = f"no goal pose ({e!r})"[:160]
+                return False
+        gp, gq = (x.float() for x in as_world_pose(goal_pose))
+        here = self.eef_pose(arm)
+        z_top = max(float(here[0][2]), float(gp[2])) + float(self.cfg.transit_dip_lift_m)
+        legs = [("straight", [(gp, gq)]),
+                ("up-over-down", [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(gp[0]), float(gp[1]), z_top]), gq), (gp, gq)])]
+        tried = []
+        for name, wps in legs:
+            try:
+                segments, why = self._cartesian_transit(arm, wps, q_end)
+            except Exception as e:  # noqa: BLE001 - a backend without the checks: the plan runs as before
+                segments, why = None, f"no check ({e!r})"[:160]
+            tried.append(f"{name}: {why}")
+            if segments is None:
+                continue
+            for q_traj, steps in segments:
+                yield from self.execute_joint_trajectory(self._retime(q_traj, steps), arms=[arm])
+            rec.update({"fired": True, "leg": name, "tried": tried,
+                        "why": f"the plan dipped {dip[0] * 100:.1f} cm below its lower end: replaced by the {name} Cartesian leg"})
+            log.info("arm_to(%s): the planned transit dips %.1f cm below its lower end -> %s Cartesian leg instead (%s)", arm, dip[0] * 100, name, "; ".join(tried))
+            return True
+        rec.update({"tried": tried, "why": f"the plan dips {dip[0] * 100:.1f} cm but no Cartesian leg qualifies: planned as before"})
+        log.info("arm_to(%s): the planned transit dips %.1f cm below its lower end; no Cartesian leg qualifies (%s): the plan runs", arm, dip[0] * 100, "; ".join(tried))
+        return False
+
     def _protect_gate(self, arms: Sequence[str], emb: str, res: Any, goal_pose: Any, q_goal: Optional[th.Tensor],
                       replan: Callable[[], Any]) -> Generator[th.Tensor, None, Tuple[bool, Any]]:
         """Before ``arm_to`` streams ``res``: inside a protect context, check it; a plan that clears is kept (``(False, res)``).
@@ -1351,6 +1566,8 @@ class Motions:
                                      f"finishing motion): the sidecar's pre-pose and end-pose witnesses are in different IK branches", stage="trajopt", excursion=exc)
             log.info("arm_to(%s): %d waypoints to the recorded IK witness (%.1fs), planned in %.2fs", arm, len(res.q_traj), res.duration, res.plan_time)
             q_goal_w = q_goal
+            if (yield from self._dip_gate(arms, res, as_world_pose(pose), q_goal_w)):
+                return
             handled, res = yield from self._protect_gate(arms, emb, res, as_world_pose(pose), q_goal_w,
                                                          lambda: self.backend.plan_joint(emb, q_goal_w, q_start=self.backend.q_full(), max_attempts=self.cfg.plan_attempts, sync_world=False))
             if handled:
@@ -1414,6 +1631,9 @@ class Motions:
                 raise SkillError("plan_failed", f"arm_to({','.join(arms)}, {what}): the plan swings a joint by {exc:.2f} rad (> {max_excursion:.2f} allowed for a finishing motion; "
                                  f"cuRobo's IK branch differs from the current one, no IK witness in the sidecar)", stage="trajopt", excursion=exc)
         log.info("arm_to(%s): %d waypoints (%.1fs), planned in %.2fs", ",".join(arms), len(res.q_traj), res.duration, res.plan_time)
+        if self._dip is not None and len(arms) == 1:
+            if (yield from self._dip_gate(arms, res, targets[M.EEF_LINK[arms[0]]] if pose is not None else None, None if pose is not None else q_goal)):
+                return
         if self._protect is not None and len(arms) == 1:
             if pose is not None:
                 goal_g = targets[M.EEF_LINK[arms[0]]]

@@ -459,6 +459,8 @@ NOTE_KEYS = NOTE_KEYS + ("witness_posture",)
 NOTE_KEYS = NOTE_KEYS + ("attach_hold",)
 #: first-demo v3.0 F1 (world vertical 0928-043205): a transition kept a free arm as it was for its brace / push at the arriving stance
 NOTE_KEYS = NOTE_KEYS + ("contact_arms_kept",)
+#: first-demo v3.0 F5 (nextto marker 0928-050212): a grasp transit whose plan dipped below both ends ran as a Cartesian leg
+NOTE_KEYS = NOTE_KEYS + ("transit_dip",)
 
 
 @dataclass

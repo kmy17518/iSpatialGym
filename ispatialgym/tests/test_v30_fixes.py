@@ -205,6 +205,52 @@ def test_f2_near_witness_or_failed_checks_ramp_as_before():
     assert not f["fired"] and "idle posture" in f["why"] and swept == []
 
 
+# ------------------------------------------------------------------------------------------------ F5
+
+
+def _dip_run(tmp_path, dip, gate=True, fail_legs=0, collisions=False):
+    from ispatialgym.tests.test_v2_oracle import _arching, iors_world, make_executor
+
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc, tmp_path)
+    arm = "right"
+    p0, q0 = motions.eef_pose(arm)
+    target = (p0 + th.tensor([0.30, 0.0, -0.08]), q0)  # the pre-grasp: forward and lower than the hand (the marker: 0.55 m, 8.7 cm)
+    backend.solve_ik = None
+    n = _arching(backend, env.robot, arm, rise=-dip)  # the plan's hand path sags ``dip`` below the straight line
+    backend.fail_ik_paths = fail_legs
+    if collisions:
+        backend.check_collision = lambda q, sync_world=False, margin=0.0: th.zeros(len(q), dtype=th.bool)
+    zs = []
+    with (motions.transit_dip_gate(arm, approach=[(target[0] + th.tensor([0.0, 0.0, -0.05]), q0)]) if gate else EX.nullcontext({})) as rec:
+        for a in motions.arm_to(arm, pose=target):
+            env.step(a)
+            zs.append(float(motions.eef_pose(arm)[0][2]))
+    return rec, min(zs) - float(target[0][2]), float(th.linalg.norm(motions.eef_pose(arm)[0] - target[0])), n
+
+
+def test_f5_dipping_grasp_transit_runs_as_one_cartesian_descent(tmp_path):
+    rec, below_goal, gap, n = _dip_run(tmp_path, dip=0.15)
+    assert rec["fired"] and rec["leg"] == "straight" and rec["dip_m"] > 0.07 and n["calls"] == 1
+    assert below_goal > -2e-3 and gap < 5e-3  # never below the pre-grasp: one descent, ending there
+
+
+def test_f5_plan_runs_as_before_outside_the_gate_for_a_small_dip_or_without_a_leg(tmp_path):
+    rec, below_goal, gap, _ = _dip_run(tmp_path, dip=0.15, gate=False)
+    assert below_goal < -0.03 and gap < 5e-3  # the plan's sag executed (no gate: a carry, a contact transit)
+    rec, below_goal, gap, _ = _dip_run(tmp_path, dip=0.03)
+    assert not rec["fired"] and "planned as before" in rec["why"] and gap < 5e-3
+    rec, below_goal, gap, _ = _dip_run(tmp_path, dip=0.15, fail_legs=4, collisions=True)  # no leg tracks, forward or backward
+    assert not rec["fired"] and len(rec["tried"]) == 2 and "no Cartesian leg" in rec["why"] and below_goal < -0.03 and gap < 5e-3
+
+
+def test_f5_leg_tracked_back_from_the_plans_end_when_the_forward_tracking_stalls(tmp_path):
+    # the marker 0928-050212: from the idle arm's shoulder singularity the forward differential IK stalls; tracked back from the plan's
+    # end the straight line reaches the hand (here in the same joints: no in-place adjustment needed)
+    rec, below_goal, gap, _ = _dip_run(tmp_path, dip=0.15, fail_legs=1, collisions=True)
+    assert rec["fired"] and rec["leg"] == "straight" and "backward" in rec["tried"][0] and below_goal > -2e-3 and gap < 5e-3
+
+
 # ------------------------------------------------------------------------------------------------ F4
 
 
