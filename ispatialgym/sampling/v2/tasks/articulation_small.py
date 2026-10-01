@@ -80,6 +80,53 @@ def wide_stop_positions(a_pos: float, s_line: float, opening: float, ends: Seque
     return out
 
 
+def lever_detour_reaches(kit, arm: str, q_contact: th.Tensor, contact, retreat_m: float, pre_grasp, grasp) -> Tuple[bool, str]:
+    """Owner 2026-09-30 (first-demo v3.0 F3, carton lever 0928-043925): whether the brace hand gets from its brace to its pinch the way the
+    oracle moves it - the straight retreat ``retreat_m`` back along the brace's approach (the ``Retreat`` after a ``straight_retreat``
+    brace), then ``execute._grasp_transit``'s Cartesian detour (up ``grasp_transit_lift_m`` above the higher end, across, down onto the
+    pre-grasp) and the approach to the grasp - tracked from the brace contact configuration ``q_contact`` by differential IK at the
+    oracle's ``along_reaches`` settings (no collision check, densified as ``Motions._densify``). The oracle takes the detour only when
+    it tracks from the brace's IK solution; otherwise it plans to the pre-grasp witness, and from a brace in another solution that
+    plan swings the arm out (0928-043925: 56 cm to the robot's right). ``(ok, why)``."""
+    from ispatialgym.oracle import execute as E
+    from ispatialgym.oracle import motions as MO
+    from ispatialgym.oracle import r1pro_model as M
+
+    ecfg, mcfg = E.ExecuteConfig(), MO.MotionsConfig()
+    frame = M.EEF_LINK[arm]
+
+    def pose(p):
+        return th.as_tensor(p[0]).reshape(-1).float(), th.as_tensor(p[1]).reshape(-1).float()
+
+    def track(q0, start, wps, label):
+        dense, prev = [], start
+        for wp in wps:
+            n = max(1, int(math.ceil(max(float(th.linalg.norm(wp[0] - prev[0])) / mcfg.cartesian_step, float(C.quat_angle(prev[1], wp[1])) / mcfg.cartesian_rot_step))))
+            dense.extend(tuple(w) for w in C.line_waypoints(prev, wp, n))
+            prev = wp
+        res = kit.backend.solve_ik_path(f"{arm}_arm", [{frame: w} for w in dense], q_start=q0, pos_tol=mcfg.diff_ik_pos_tol, rot_tol=mcfg.diff_ik_rot_tol,
+                                        max_iters=mcfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=mcfg.diff_ik_soft_pos_tol,
+                                        soft_rot_tol=mcfg.diff_ik_soft_rot_tol)
+        if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+            return None, f"{label}: {res.status}"[:160]
+        return th.as_tensor(res.q_traj[-1]).reshape(-1).float(), ""
+
+    kit._ensure_synced()
+    c = pose(contact)
+    ret = pose(C.pre_pose(c, float(retreat_m)))
+    q_r, why = track(th.as_tensor(q_contact).reshape(-1).float(), c, [ret], "the brace's retreat")
+    if q_r is None:
+        return False, why
+    pre, gr = pose(pre_grasp), pose(grasp)
+    z_top = max(float(ret[0][2]), float(pre[0][2])) + float(ecfg.grasp_transit_lift_m)
+    up = (th.tensor([float(ret[0][0]), float(ret[0][1]), z_top]), ret[1])
+    over = (th.tensor([float(pre[0][0]), float(pre[0][1]), z_top]), pre[1])
+    q_g, why = track(q_r, ret, [up, over, pre, gr], "the detour to the pinch")
+    if q_g is None:
+        return False, why
+    return True, "the retreat, the detour and the approach track from the brace's solution"
+
+
 class _LinkSubset:
     """A few links of a spawned object as an ignorable 'object' for the collision checks (``ik._Ignoring`` walks ``.links``):
     the flap a fist presses / the flap a hand holds leaves the cuRobo world while the box body stays in it."""
@@ -2198,11 +2245,12 @@ class ArticulationSmall(SamplerV2):
 
         brace_on = bool(self.gen("v4_brace", True))
 
-        def find_lever_brace(st: Stance):
+        def find_lever_brace(st: Stance, q_seed=None):
             """Owner 2026-09-20 21:20: the main hand's OPEN gripper on the box's face on the target's hinge side (the box slid 3-4 cm
             that way during the slide + lift), pushing toward the seam, at ``v4_brace_height_frac`` of the box height, near the box's
             near end (``v4_brace_corner_inset_m`` from the corner). Returns ``(BraceRecord, q28 with the arm at the contact)`` or
-            ``(None, reason)``."""
+            ``(None, reason)``. ``q_seed`` (first-demo v3.0 F3): the brace's IK solved nearest that configuration (the pinch's
+            solution) instead of from the stance posture."""
             hull_w = C.transform_points(pose, self.hull)
             n_face = right_h  # the face's outward normal: away from the seam past the target's hinge
             proj = hull_w @ n_face
@@ -2258,7 +2306,7 @@ class ArticulationSmall(SamplerV2):
                 r, contact, pre, half, cls_used = None, None, None, half_pad, "pad_on"
                 for c_try, half_b, cls in cands:
                     pre_try = C.pre_pose(c_try, float(self.gen("v4_brace_pre_m", 0.08)))  # straight above
-                    r_try = self.ikc.exact([pre_try, c_try], st, main_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED)
+                    r_try = self.ikc.exact([pre_try, c_try], st, main_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED, q_seed=q_seed)
                     r, contact, pre, half, cls_used = r_try, c_try, pre_try, half_b, cls
                     if r_try.ok:
                         break
@@ -2288,7 +2336,7 @@ class ArticulationSmall(SamplerV2):
                           "note": "two-flap v4: the pinching hand, open, holds the box against the lever's shove (owner 2026-09-20 21:20)"}
                 bk = "opposite_face"
             set_flaps(self.q_init, q0o)
-            r = self.ikc.exact([pre, contact], st, main_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED)
+            r = self.ikc.exact([pre, contact], st, main_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED, q_seed=q_seed)
             if not r.ok:
                 b = st.world_to_base(pre[0][:2])
                 return None, f"brace ({main_arm}, {kind}, {'near' if near_i == 0 else 'far'} end of the hinge-side face, base depth {float(b[0]):.2f} lateral {float(b[1]):+.2f} z {float(pre[0][2]):.2f}): {str(r.reason)[:80]}"
@@ -2299,6 +2347,80 @@ class ArticulationSmall(SamplerV2):
             probe = (contact[0] - n_face * 0.012, contact[1])
             rp = self.ikc.exact([probe], st, main_arm, ignore_for_last=[support, target], q_seed=r.q, cache=False, fingers=C.FINGER_CLOSED)
             return rec, (r.q.clone(), rp.q.clone() if rp.ok else None)
+
+        def brace_in_pinch_solution(st: Stance, v, seed_posture, o, pinch, brace_rec, q_lock):
+            """Owner 2026-09-30 (first-demo v3.0 F3, carton lever 0928-043925: the brace recorded at [0.94, -3.14, -0.67, ...], joint 2 at
+            its limit, the pinch in the other shoulder solution [-2.0, 0.01, 1.73, ...] - the oracle's up-across-down detour runs only
+            when it tracks from the brace's solution, so it planned to the pinch's witness and swung the hand 56 cm out to the right):
+            the brace is kept when ``lever_detour_reaches`` from it to this pinch and its witnesses keep ``IKChecker.JOINT_LIMIT_MARGIN``
+            (0.05 rad; the alias runs margin 0) from every joint limit - a witness pinned at a limit tracks the detour in the sampler's
+            kinematics yet not from where the oracle's brace really stands (it stops on touch, holds against the lever, retreats from
+            there: the v2.2 instance's brace passes the kinematic check, the oracle refused the detour). Otherwise it is re-solved nearest
+            the pinch's pre-grasp witness with that margin (``find_lever_brace(q_seed=...)``), the lever re-checked with the brace arm
+            locked there and the pinch beside that lever, and both checks run again. Returns ``(brace_rec, q_lock, o, pinch)``
+            (``brace_rec.extras["grasp_solution"]`` records fired / not fired and why) or the reason (str); a failure leaves the IK
+            solutions as they were."""
+            from ispatialgym.sampling.v2.ik import IKChecker
+
+            idx = self.kit.robot.arm_control_idx[main_arm]
+            floor = float(IKChecker.JOINT_LIMIT_MARGIN)
+
+            def margin_of(rec, q_c):
+                qs = [q_c, self.ikc.solutions.get((main_arm, self.ikc._pose_key(rec.pre)))]
+                return min((self.ikc.joint_limit_margin(q, main_arm) for q in qs if q is not None), key=lambda t: t[0])
+
+            retreat_m = float((brace_rec.extras or {}).get("retreat_m") or 0.05)
+            wp_b = pinch[1]
+            m0, j0 = margin_of(brace_rec, q_lock)
+            ok, why = lever_detour_reaches(self.kit, main_arm, q_lock, brace_rec.contact, retreat_m, wp_b.pre_grasp, wp_b.eef)
+            if ok and m0 >= floor:
+                brace_rec.extras["grasp_solution"] = {"fired": False, "why": why, "margin_rad": round(m0, 4)}
+                return brace_rec, q_lock, o, pinch
+            if ok:
+                why = f"its witness stands {m0:.3f} rad from {j0}'s limit (< {floor:.2f})"
+            q_pre_b = self.ikc.solutions.get((main_arm, self.ikc._pose_key(wp_b.pre_grasp)))
+            if q_pre_b is None:
+                return f"the brace's solution does not reach the pinch ({why}) and the pinch has no pre-grasp witness"
+            snapshot = dict(self.ikc.solutions)
+
+            def fail(msg):
+                self.ikc.solutions.clear()
+                self.ikc.solutions.update(snapshot)
+                return f"the brace's solution does not reach the pinch ({why}); {msg}"
+
+            seed = q_lock.clone()
+            seed[idx] = th.as_tensor(q_pre_b).reshape(-1).float()[idx]
+            margin_before = self.ikc.JOINT_LIMIT_MARGIN
+            self.ikc.JOINT_LIMIT_MARGIN = max(float(margin_before), floor)
+            try:
+                b2, q2 = find_lever_brace(st, q_seed=seed)
+            finally:
+                self.ikc.JOINT_LIMIT_MARGIN = margin_before
+            if b2 is None:
+                return fail(f"no brace nearest the pinch's solution ({str(q2)[:120]})")
+            q2_lock = q2[0]
+            m2, j2 = margin_of(b2, q2_lock)
+            if m2 < floor:
+                return fail(f"the brace re-solved nearest the pinch stands {m2:.3f} rad from {j2}'s limit")
+            retreat2 = float((b2.extras or {}).get("retreat_m") or 0.05)
+            ok2, why2 = lever_detour_reaches(self.kit, main_arm, q2_lock, b2.contact, retreat2, wp_b.pre_grasp, wp_b.eef)
+            if not ok2:
+                return fail(f"the brace re-solved nearest the pinch does not reach it either ({why2})")
+            o2 = try_lever(st, v, seed_posture, q_lock=q2_lock)
+            if not isinstance(o2, dict):
+                return fail(f"the lever beside the re-solved brace fails ({str(o2)[:120]})")
+            pinch2 = pinch_with_lever(st, o2["q_lift_end"])
+            if pinch2 is None:
+                return fail("the pinch beside the lever re-checked with the re-solved brace fails")
+            ok3, why3 = lever_detour_reaches(self.kit, main_arm, q2_lock, b2.contact, retreat2, pinch2[1].pre_grasp, pinch2[1].eef)
+            if not ok3:
+                return fail(f"the re-solved brace does not reach the re-checked pinch ({why3})")
+            gap = float(th.max(th.abs(q2_lock[idx] - q_lock[idx])))
+            b2.extras["grasp_solution"] = {"fired": True, "why": f"the first brace's solution does not reach the pinch ({why}); re-solved nearest the pinch's solution: {why3}",
+                                           "first_brace_q": [round(float(x), 4) for x in q_lock[idx].tolist()], "first_margin_rad": round(m0, 4),
+                                           "margin_rad": round(m2, 4), "joint_gap_rad": round(gap, 3)}
+            log.info("%s: lever brace re-solved in the pinch's IK solution (%.2f rad from the first brace's; the first one does not reach the pinch: %s)", self.gp.alias, gap, why)
+            return b2, q2_lock, o2, pinch2
 
         def try_stance(st: Stance):
             lever_out, lever_v, whys, pinch = None, None, [], None
@@ -2393,6 +2515,13 @@ class ArticulationSmall(SamplerV2):
                     n_lever_ok += 1
                     last_lever = o["q_lift_end"]
                     pinch = pinch_with_lever(st, o["q_lift_end"])
+                    if pinch is not None and brace_rec is not None:
+                        tied = brace_in_pinch_solution(st, v, seed_posture, o, pinch, brace_rec, q_lock)
+                        if isinstance(tied, str):
+                            whys.append(f"{v['name']}{'' if seed_posture is None else ' (seed ' + seed_posture + ')'}: lever and pinch ok, {tied}"[:400])
+                            pinch = None
+                            continue
+                        brace_rec, q_lock, o, pinch = tied
                     if pinch is not None:
                         lever_out, lever_v = o, v
                         if whys:

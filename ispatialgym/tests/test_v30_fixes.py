@@ -251,6 +251,40 @@ def test_f5_leg_tracked_back_from_the_plans_end_when_the_forward_tracking_stalls
     assert rec["fired"] and rec["leg"] == "straight" and "backward" in rec["tried"][0] and below_goal > -2e-3 and gap < 5e-3
 
 
+# ------------------------------------------------------------------------------------------------ F3
+
+
+def test_f3_lever_detour_check_follows_the_oracle_from_the_brace_to_the_pinch():
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2.tasks.articulation_small import lever_detour_reaches
+
+    legs = []
+
+    def solve_ik_path(emb, waypoints, q_start=None, **kw):
+        pts = [th.as_tensor(next(iter(w.values()))[0]).float() for w in waypoints]
+        legs.append(pts)
+        if float(q_start[1]) <= -3.1:  # a brace solution with joint 2 at its limit: the leg stalls there
+            return SimpleNamespace(success=False, q_traj=None, status="did not converge (joint 2 at its limit)")
+        return SimpleNamespace(success=True, q_traj=th.stack([q_start.clone() for _ in pts]), status="ok")
+
+    kit = SimpleNamespace(backend=SimpleNamespace(solve_ik_path=solve_ik_path), _ensure_synced=lambda: None)
+    down = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([1.0, 0.0, 0.0]))  # a top-down blade: its approach is -z
+    contact = (th.tensor([0.60, -0.20, 0.90]), down)
+    pre = (th.tensor([0.65, 0.00, 1.05]), down)
+    grasp = (th.tensor([0.65, 0.00, 0.95]), down)
+    q = th.zeros(28)
+    ok, why = lever_detour_reaches(kit, "right", q, contact, 0.08, pre, grasp)
+    assert ok, why
+    retreat, detour = legs
+    assert float(retreat[-1][2]) == pytest.approx(0.98, abs=1e-4)  # 8 cm straight back along the blade's approach (up)
+    assert max(float(p[2]) for p in detour) == pytest.approx(1.05 + 0.06, abs=1e-4)  # up 6 cm above the higher end (the pre-grasp)
+    assert th.allclose(detour[-1], grasp[0])  # and on to the grasp: the approach tracks too
+    q_pinned = th.zeros(28)
+    q_pinned[1] = -3.14
+    ok, why = lever_detour_reaches(kit, "right", q_pinned, contact, 0.08, pre, grasp)
+    assert not ok and why.startswith("the brace's retreat")
+
+
 # ------------------------------------------------------------------------------------------------ F4
 
 
