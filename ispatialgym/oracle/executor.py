@@ -455,6 +455,8 @@ NOTE_KEYS = NOTE_KEYS + ("finger_clearance",)
 NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
 #: first-demo v2.1 (sandal on pods): the arm moved into the pre-grasp witness's posture before an approach that tracks only from there
 NOTE_KEYS = NOTE_KEYS + ("witness_posture",)
+#: first-demo v3.0 F4 (cork 0928-041525): an attach place kept the holding arm's hold from the descent until the attachment existed
+NOTE_KEYS = NOTE_KEYS + ("attach_hold",)
 
 
 @dataclass

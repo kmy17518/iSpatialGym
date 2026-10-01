@@ -1597,6 +1597,38 @@ def forbidden_contacts(action: Action) -> Tuple[str, ...]:
     return tuple(dict.fromkeys(out))
 
 
+@contextmanager
+def attach_hold_kept(action: Place, motions: Motions, state, ctx: Dict[str, Any]):
+    """Owner 2026-09-30 (first-demo v3.0 F4, cork 0928-041525: the descent seated the cork within 0.7 mm / 0.4 deg, then the jam
+    probe relaxed the hold twice - the loaded wrist reports 0.10-0.12 rad/s while moving < 1 mrad, its only contacts the fingers on
+    the cork - and joints 5-7 crept 8-21 mrad: 3.9 mm before the offset was measured, 3.3 mm after the correction pass). In an attach
+    place with the part in hand the holding arm joins ``keep_hold_arms`` from the descent until the attachment exists, so
+    ``Motions._relax_if_jammed`` leaves it alone there; every other place, and this one before the descent, is unchanged.
+    ``ctx["attach_hold"]`` records fired / not fired and why."""
+    arm = action.arm
+    kept = getattr(motions, "keep_hold_arms", None)
+    if action.kind != "attach" or not action.on:
+        why = "not an attach place"
+    elif kept is None:
+        why = "no jam probe to suspend"
+    elif state.held_object(arm) is None:
+        why = "the part is not in hand"
+    else:
+        why = None
+    if why is not None:
+        ctx["attach_hold"] = {"fired": False, "why": why}
+        yield
+        return
+    added = arm not in kept
+    kept.add(arm)
+    ctx["attach_hold"] = {"fired": True, "arm": arm, "why": "attach place with the part in hand: no jam relax of the holding arm until the attachment exists"}
+    try:
+        yield
+    finally:
+        if added:
+            kept.discard(arm)
+
+
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
@@ -1663,37 +1695,38 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             ctx["finger_clearance"]["reaim"] = ctx["inhand_reaim"]
             ctx["inhand_reaim"] = first
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
-    # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
-    # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
-    yield from motions.arm_along(arm, targets["descent"], finish=finish, soft_rot_tol=cfg.attach_leg_soft_rot_tol if action.kind == "attach" else None,
-                                 limit_margin=cfg.attach_leg_limit_margin_rad if action.kind == "attach" else 0.0)
-    if finish.used:
-        ctx["descent_finish"] = finish.info
-    # rush 2026-09-17: the hand ends the descent short of the recorded place pose by a systematic ~1-1.5 cm (the witness
-    # configuration's reach in the simulator is less than the sampler's model: no joint limit, no singularity, the DLS
-    # converges onto the reach sphere); the shortfall is closed with the BASE, arm locked, before the release - the
-    # recorded push (gap + tolerance + 5 mm) then covers the gap (touching 0917-223915: place 1.45 cm short, push
-    # extension at the reach boundary yawed the box 30 deg)
-    if cfg.place_base_nudge_max_m > 0:
-        short = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
-        short[2] = 0.0
-        dist = float(th.linalg.norm(short))
-        if cfg.place_base_nudge_min_m < dist <= cfg.place_base_nudge_max_m:
-            x, y, yaw = state.base_pose2d()
-            goal2d = [x + float(short[0]), y + float(short[1]), yaw]
-            log.info("place(%s): the hand is %.1f mm short of the recorded place pose -> nudging the base by that, arm locked", action.object, dist * 1000)
-            q = motions.robot.get_joint_positions()
-            motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
-            tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=cfg.place_base_nudge_tol_m)
-            try:
-                yield from motions.track_path([goal2d], tracker_cfg=tcfg)
-            except SkillError as e:
-                log.warning("place(%s): base nudge did not settle (%s); keeping what it achieved", action.object, e.message)
-            yield from motions.settle(max_steps=cfg.place_settle_steps // 2)
-            after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
-            ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
-    if action.kind == "attach" and action.on:
-        yield from _attach_at_place(action, motions, state, ctx)
+    with attach_hold_kept(action, motions, state, ctx):
+        # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
+        # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
+        yield from motions.arm_along(arm, targets["descent"], finish=finish, soft_rot_tol=cfg.attach_leg_soft_rot_tol if action.kind == "attach" else None,
+                                     limit_margin=cfg.attach_leg_limit_margin_rad if action.kind == "attach" else 0.0)
+        if finish.used:
+            ctx["descent_finish"] = finish.info
+        # rush 2026-09-17: the hand ends the descent short of the recorded place pose by a systematic ~1-1.5 cm (the witness
+        # configuration's reach in the simulator is less than the sampler's model: no joint limit, no singularity, the DLS
+        # converges onto the reach sphere); the shortfall is closed with the BASE, arm locked, before the release - the
+        # recorded push (gap + tolerance + 5 mm) then covers the gap (touching 0917-223915: place 1.45 cm short, push
+        # extension at the reach boundary yawed the box 30 deg)
+        if cfg.place_base_nudge_max_m > 0:
+            short = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
+            short[2] = 0.0
+            dist = float(th.linalg.norm(short))
+            if cfg.place_base_nudge_min_m < dist <= cfg.place_base_nudge_max_m:
+                x, y, yaw = state.base_pose2d()
+                goal2d = [x + float(short[0]), y + float(short[1]), yaw]
+                log.info("place(%s): the hand is %.1f mm short of the recorded place pose -> nudging the base by that, arm locked", action.object, dist * 1000)
+                q = motions.robot.get_joint_positions()
+                motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
+                tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=cfg.place_base_nudge_tol_m)
+                try:
+                    yield from motions.track_path([goal2d], tracker_cfg=tcfg)
+                except SkillError as e:
+                    log.warning("place(%s): base nudge did not settle (%s); keeping what it achieved", action.object, e.message)
+                yield from motions.settle(max_steps=cfg.place_settle_steps // 2)
+                after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
+                ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
+        if action.kind == "attach" and action.on:
+            yield from _attach_at_place(action, motions, state, ctx)
     # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
