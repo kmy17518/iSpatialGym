@@ -343,6 +343,15 @@ class ExecuteConfig:
     #: free-leg finish, both ends recorded in frame; ``"trajopt"`` = the former free trajopt transit (the regression
     #: reference: nextto 0916-152503 swung 40 cm back toward the robot and left the frame for 106 steps)
     carry_leg: str = "straight"
+    #: owner 2026-09-30 (first-demo v3.0 F2, door open 0928-042225): a ``release_move_regrasp`` ramps onto the recorded
+    #: ``arm_q_retreat`` only when it lies within this of the measured joints after the back-off (rad, largest arm joint). The ramp
+    #: absorbs the differential IK's null-space drift (0921-041230); 70 ramps of 38 door / dishwasher runs measured 0.012-0.595 rad,
+    #: the far IK solution of the v2.2 door instance 3.505 rad (4 runs). A farther witness keeps the arm where the back-off left it
+    #: when the drive with it is clear (whole body, ``follow_keep_drive_margin_m`` = the sampler's drive check) and it keeps
+    #: ``follow_keep_self_clearance_m`` from cuRobo's self-collision padding (the sampler's ``hybrid_follow.self_clearance_m``)
+    follow_retreat_ramp_max_rad: float = 1.0
+    follow_keep_drive_margin_m: float = 0.01
+    follow_keep_self_clearance_m: float = 0.02
 
 
 CONFIG = ExecuteConfig()
@@ -3418,6 +3427,39 @@ def _ramp_arm_to_q(motions: Motions, arm: str, q_arm: Sequence[float], speed: Op
     return d
 
 
+def keep_retreat_arm(motions: Motions, state, arm: str, seg: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
+    """Owner 2026-09-30 (first-demo v3.0 F2, door open 0928-042225: after the first release and the 10 cm back-off the ramp onto the
+    recorded ``arm_q_retreat`` turned joint 1 by 3.4 rad and raised the hand 1.04 -> 1.69 m and back, then the re-grasp plan swung it
+    back to the pre-grasp witness - the sampler's retreat IK had taken the largest-margin solution of the pose anywhere). Whether a
+    ``release_move_regrasp`` keeps the arm where the back-off left it instead of ramping onto ``arm_q_retreat``: only when the
+    recorded witness lies farther than ``follow_retreat_ramp_max_rad`` from the measured joints (another IK solution of the same hand
+    pose, not null-space drift), the configurations of the drive along ``seg["base_path"]`` with the arm as it is are collision-free
+    (whole body, ``follow_keep_drive_margin_m``) and the arm keeps ``follow_keep_self_clearance_m`` from cuRobo's self-collision
+    padding (a re-grasp plan may start from it). Reads only; ``fired`` False = ramp as before, with the reason."""
+    idx = motions.robot.arm_control_idx[arm]
+    q_now = C.as_tensor(motions.robot.get_joint_positions()).reshape(-1).float().clone()
+    gap = float(th.max(th.abs(q_now[idx] - C.as_tensor(seg["arm_q_retreat"]).reshape(-1).float())))
+    f: Dict[str, Any] = {"fired": False, "gap_rad": round(gap, 3), "threshold_rad": cfg.follow_retreat_ramp_max_rad}
+    if gap <= cfg.follow_retreat_ramp_max_rad:
+        return {**f, "why": "the recorded retreat witness is near the measured joints: ramped onto it"}
+    if seg.get("hold_posture") == "idle":
+        return {**f, "why": "the recorded drive holds the idle posture: ramped onto the recorded witness"}
+    backend = motions.backend
+    try:
+        qs = path_sweep(motions, state, seg.get("base_path") or [])
+        hits = C.as_tensor(backend.check_collision(th.stack(qs), sync_world=True, margin=cfg.follow_keep_drive_margin_m)).reshape(-1)
+        if bool(hits.any()):
+            return {**f, "why": f"the arm as it is collides on the drive (configuration {int(th.nonzero(hits)[0])} of {len(qs)}): ramped onto the recorded witness"}
+        pairs = backend.self_collision_pairs(q_now, f"{arm}_arm", margin=cfg.follow_keep_self_clearance_m)
+        if pairs:
+            return {**f, "why": f"the arm as it is lies within {cfg.follow_keep_self_clearance_m * 1000:.0f} mm of the self-collision padding "
+                                f"({'-'.join(pairs[0]['links'])}): ramped onto the recorded witness"}
+    except Exception as e:  # noqa: BLE001 - a backend without the checks (the test stubs): ramp as before
+        return {**f, "why": f"no drive / self-clearance check ({e!r}): ramped onto the recorded witness"[:200]}
+    return {**f, "fired": True, "drive_configurations": len(qs),
+            "why": "the recorded retreat witness is another IK solution; the drive and the self-clearance check out with the arm as it is: kept"}
+
+
 def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: List[Dict[str, Any]], ctx: Dict[str, Any], axis, note: Dict[str, Any]) -> Iterator[th.Tensor]:
     """Owner policy 2026-09-20 20:19, strictly one thing at a time: ``arm`` segments track the handle arc between the
     recorded poses (``arc_between`` about the joint axis, differential IK, no convergence wait); ``release_move_regrasp``
@@ -3521,9 +3563,16 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
             # and left link5 9 mm inside the trunk's self-collision padding, where no plan may start (0921-041230)
             yield from motions.arm_along(arm, [as_world_pose(seg["retreat_eef"])], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
             d_ret = 0.0
+            retreat_kept = None
             if seg.get("arm_q_retreat"):
-                d_ret = yield from _ramp_arm_to_q(motions, arm, seg["arm_q_retreat"])
-                log.info("base_follow: release at q = %.3f: retreat %.2f m, arm ramped onto the recorded retreat witness (%.3f rad)", float(seg.get("q") or 0.0), float(seg.get("retreat_m") or C.PRE_DIST), d_ret)
+                retreat_kept = keep_retreat_arm(motions, state, arm, seg, cfg)
+                if retreat_kept["fired"]:
+                    log.info("base_follow: release at q = %.3f: retreat %.2f m; the recorded retreat witness lies %.3f rad from the arm (> %.2f, another IK solution): "
+                             "the arm stays where the back-off left it", float(seg.get("q") or 0.0), float(seg.get("retreat_m") or C.PRE_DIST), retreat_kept["gap_rad"],
+                             cfg.follow_retreat_ramp_max_rad)
+                else:
+                    d_ret = yield from _ramp_arm_to_q(motions, arm, seg["arm_q_retreat"])
+                    log.info("base_follow: release at q = %.3f: retreat %.2f m, arm ramped onto the recorded retreat witness (%.3f rad)", float(seg.get("q") or 0.0), float(seg.get("retreat_m") or C.PRE_DIST), d_ret)
             if seg.get("hold_posture") == "idle" and seg.get("arm_q_hold"):
                 yield from motions.arm_to(arm, q={arm: C.as_tensor(seg["arm_q_hold"]).reshape(-1).float()})
             motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
@@ -3562,7 +3611,8 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
             motions.backend.attach_object(arm, obj)
             motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
             log_moves.append({"type": "release_move_regrasp", "q": seg.get("q"), "strides": len(seg["base_path"]), "hold_posture": seg.get("hold_posture"), "unwind_rad": round(total, 4),
-                              "m": round(math.hypot(seg["base_to"][0] - seg["base_from"][0], seg["base_to"][1] - seg["base_from"][1]), 3)})
+                              "m": round(math.hypot(seg["base_to"][0] - seg["base_from"][0], seg["base_to"][1] - seg["base_from"][1]), 3),
+                              **({"retreat_kept": retreat_kept} if retreat_kept is not None else {})})
         else:
             raise SkillError("plan_failed", f"base_follow: unknown follow segment type {kind!r}", stage="targets")
     yield from motions.hold(3)
