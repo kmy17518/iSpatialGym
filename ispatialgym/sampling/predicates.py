@@ -583,3 +583,11 @@ def support_geometry(lower: Any, upper: Any) -> Dict[str, Any]:
     tilt = math.degrees(math.acos(max(-1.0, min(1.0, up_z))))
     ok = abs(gap) <= BOTTOM_GAP_MAX_M and inside and tilt <= UP_AXIS_MAX_DEG
     return {"ok": ok, "bottom_gap_mm": round(gap * 1000, 1), "centre_inside_support": inside, "tilt_deg": round(tilt, 1)}
+
+
+if os.environ.get("ISPATIALGYM_FAST_SUPPORT") in ("1", "check"):
+    import sys as _sys
+
+    from ispatialgym.sampling import predicates_fast as _PF
+
+    _PF.install(_sys.modules[__name__], check=os.environ.get("ISPATIALGYM_FAST_SUPPORT") == "check")
