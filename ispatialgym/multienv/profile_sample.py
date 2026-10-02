@@ -141,6 +141,9 @@ def sample(self, rng):
         kit = self.kit.stats_delta(k0, self.kit.stats_snapshot()) if k0 else {}
         rec = {"alias": getattr(getattr(self, "gp", None), "alias", None), "class": type(self).__name__, "ok": ok, "wall_s": round(wall, 3),
                "python_s": round(py, 3), "buckets": _round(ACC), "regions": _round(REG), "kit": kit}
+        if ATTACH["fit_calls"]:  # cumulative; the sampler may exit before atexit runs
+            rec["attach_keys"] = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in ATTACH.items() if k != "keys"} | {
+                "distinct_keys": len(ATTACH["keys"])}
         print("PROFILE_SAMPLE " + json.dumps(rec), flush=True)
         IN["attempts"] += 1
         IN["wall"] += wall
@@ -156,12 +159,55 @@ def sample(self, rng):
 V2.SamplerV2.sample = sample
 _patch_classes()
 
+#: PROFILE_SAMPLE_ATTACH_KEYS=1: every attach sphere fit's exact input key (collision-mesh prim paths, scales and poses in the
+#: eef frame as float32 bytes, sphere count): how often a fit repeats an earlier input, and its seconds
+ATTACH = {"fit_calls": 0, "fit_s": 0.0, "repeats": 0, "repeat_fit_s": 0.0, "keys": {}}
+
+
+def _patch_attach_keys():
+    import hashlib
+
+    import numpy as np
+    from curobo._src.collision.attachment_manager import AttachmentManager
+
+    _fit = AttachmentManager.fit_spheres
+
+    def fit_spheres(self, obstacles, *a, **kw):
+        h = hashlib.sha1()
+        for ob in obstacles:
+            h.update(str(ob.name).encode())
+            h.update(np.asarray(ob.pose, dtype=np.float32).tobytes())
+            h.update(np.asarray(ob.scale, dtype=np.float32).tobytes())
+        h.update(repr(kw.get("num_spheres", a[0] if a else None)).encode())
+        key = h.hexdigest()
+        t0 = time.perf_counter()
+        try:
+            return _fit(self, obstacles, *a, **kw)
+        finally:
+            dt = time.perf_counter() - t0
+            n = ATTACH["keys"].get(key, 0)
+            ATTACH["keys"][key] = n + 1
+            ATTACH["fit_calls"] += 1
+            ATTACH["fit_s"] += dt
+            if n:
+                ATTACH["repeats"] += 1
+                ATTACH["repeat_fit_s"] += dt
+
+    AttachmentManager.fit_spheres = fit_spheres
+
+
+if os.environ.get("PROFILE_SAMPLE_ATTACH_KEYS") == "1":
+    _patch_attach_keys()
+
 
 @atexit.register
 def _total():
     if IN["attempts"]:
         print("PROFILE_SAMPLE_TOTAL " + json.dumps({"attempts": IN["attempts"], "wall_s": round(IN["wall"], 2), "python_s": round(IN["python"], 2),
                                                      "buckets": _round(TOTAL), "regions": _round(TOTAL_REG)}), flush=True)
+    if ATTACH["fit_calls"]:
+        print("PROFILE_SAMPLE_ATTACH " + json.dumps({k: (round(v, 2) if isinstance(v, float) else v) for k, v in ATTACH.items() if k != "keys"}
+                                                    | {"distinct_keys": len(ATTACH["keys"])}), flush=True)
 
 
 if __name__ == "__main__":

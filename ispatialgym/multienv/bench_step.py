@@ -73,6 +73,15 @@ def process_gpu_mib() -> int:
     return sum(int(l.split(",")[1]) for l in out.strip().splitlines() if l.split(",")[0].strip() == str(os.getpid()))
 
 
+def proc_status_mib(key: str) -> float:
+    """``VmRSS`` / ``VmHWM`` of this process from /proc/self/status, MiB."""
+    with open("/proc/self/status") as f:
+        for line in f:
+            if line.startswith(key + ":"):
+                return round(int(line.split()[1]) / 1024, 1)
+    return -1.0
+
+
 def stats(xs):
     xs = sorted(xs)
     if not xs:
@@ -96,6 +105,9 @@ def main(argv=None):
     ap.add_argument("--track", default="1,0", help="change-detection settings to time, in order")
     ap.add_argument("--sync-dir", default=None)
     ap.add_argument("--sync-n", type=int, default=1)
+    ap.add_argument("--physics-only", action="store_true",
+                    help="the record phase as physics-only collection steps (ispatialgym.oracle.physics_only.episode: no render)")
+    ap.add_argument("--no-parts", action="store_true", help="skip the parts phase")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
@@ -133,6 +145,8 @@ def main(argv=None):
     robots = [s.robots[0] for s in env.scenes]
     res["cameras_per_robot"] = sum(1 for k in robots[0].sensors if "Camera" in k)
     res["gpu_mib_after_load"] = process_gpu_mib()
+    res["rss_mib_after_load"] = proc_status_mib("VmRSS")
+    res["physics_only"] = bool(args.physics_only)
     print("BENCH " + json.dumps({"event": "loaded", **res}), flush=True)
 
     def reset_to_offsets():
@@ -171,17 +185,26 @@ def main(argv=None):
         reset_to_offsets()
         th.cuda.synchronize()
         step_t, dump_t = [], []
+        if args.physics_only:
+            from ispatialgym.oracle import physics_only as PO
+
+            mode = PO.episode(og.sim)
+        else:
+            import contextlib
+
+            mode = contextlib.nullcontext()
         r0, w0 = resource.getrusage(resource.RUSAGE_SELF), time.time()
-        for t in range(args.steps):
-            a = batch(args.warmup + t)
-            t1 = time.perf_counter()
-            env.step(a)
-            t2 = time.perf_counter()
-            for scene in env.scenes:
-                scene.dump_state(serialized=True)
-            t3 = time.perf_counter()
-            step_t.append(t2 - t1)
-            dump_t.append(t3 - t2)
+        with mode:
+            for t in range(args.steps):
+                a = batch(args.warmup + t)
+                t1 = time.perf_counter()
+                env.step(a)
+                t2 = time.perf_counter()
+                for scene in env.scenes:
+                    scene.dump_state(serialized=True)
+                t3 = time.perf_counter()
+                step_t.append(t2 - t1)
+                dump_t.append(t3 - t2)
         w1, r1 = time.time(), resource.getrusage(resource.RUSAGE_SELF)
         cpu = (r1.ru_utime - r0.ru_utime) + (r1.ru_stime - r0.ru_stime)
         ph = {"phase": "record", "track_state_updates": track == "1", "env_step": stats(step_t), "dump_all_scenes": stats(dump_t),
@@ -189,6 +212,8 @@ def main(argv=None):
               "ms_per_env_step": round(1000 * (sum(step_t) + sum(dump_t)) / (args.steps * N), 2)}
         phases.append(ph)
         print("BENCH " + json.dumps(ph), flush=True)
+        if args.no_parts:
+            continue
         # -- parts: where a step's time goes
         reset_to_offsets()
         th.cuda.synchronize()
@@ -235,6 +260,8 @@ def main(argv=None):
     res["phases"] = phases
     res["gpu_mib_end"] = process_gpu_mib()
     res["torch_max_reserved_gib"] = round(th.cuda.max_memory_reserved() / 2**30, 2)
+    res["vmhwm_mib"] = proc_status_mib("VmHWM")
+    res["rss_mib_end"] = proc_status_mib("VmRSS")
     gpu.stop()
     print("BENCH " + json.dumps({"event": "done", "load_s": res["load_s"], "gpu_mib_end": res["gpu_mib_end"]}), flush=True)
     if args.out:

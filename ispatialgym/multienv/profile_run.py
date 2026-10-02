@@ -13,6 +13,7 @@ writes it to ``<run out dir>/profile_run.json``. Behaviour is unchanged: the wra
 from __future__ import annotations
 
 import functools
+import gc
 import json
 import os
 import sys
@@ -28,6 +29,21 @@ from ispatialgym.oracle import recorder as REC
 
 TOTALS = defaultdict(lambda: [0.0, 0])
 _OUT = {"dir": None}
+_GC_T0 = [None]
+
+
+def _gc_timer(phase, info):
+    """``gc.callbacks``: the garbage collector's time per generation (timers ``gc.gen0`` .. ``gc.gen2``)."""
+    if phase == "start":
+        _GC_T0[0] = time.perf_counter()
+    elif _GC_T0[0] is not None:
+        tot = TOTALS[f"gc.gen{info.get('generation', 2)}"]
+        tot[0] += time.perf_counter() - _GC_T0[0]
+        tot[1] += 1
+        _GC_T0[0] = None
+
+
+gc.callbacks.append(_gc_timer)
 #: timers whose calls are also logged one by one (name, start s since the first logged call, duration s), in order
 EVENT_NAMES = set()
 EVENTS = []
@@ -167,6 +183,22 @@ def build_env(self, *a, **kw):
 run_isg.InstanceLoader.build_env = build_env
 _run_instance = run_isg.run_instance
 
+#: the opt-ins' counters (check modes: calls / mismatches; ISPATIALGYM_SHARED_GOAL_EVAL also counts reuses), cumulative
+#: over the process's instances
+_CHECK_COUNTERS = (("fast_support", "ispatialgym.sampling.predicates_fast", "_COUNTS"),
+                   ("fast_assign", "ispatialgym.eval.group_entity", "_ASSIGN_COUNTS"),
+                   ("shared_goal", "ispatialgym.tasks.ispatialgym_task", "_SHARED_COUNTS"),
+                   ("world_sync", "ispatialgym.oracle.curobo_planner", "_WS_COUNTS"))
+
+
+def _check_counts():
+    out = {}
+    for key, mod, attr in _CHECK_COUNTERS:
+        counts = getattr(sys.modules.get(mod), attr, None)
+        if counts:
+            out[key] = dict(counts)
+    return out
+
 
 def run_instance(args, tro_arg, shared=None):
     t0 = time.perf_counter()
@@ -174,7 +206,7 @@ def run_instance(args, tro_arg, shared=None):
     out = {"wall_s": round(time.perf_counter() - t0, 2), "result": {k: result.get(k) for k in ("status", "n_steps", "wall_time_s", "out")},
            "track_state_updates": run_isg.provenance().get("track_state_updates"), "head_camera_only": os.environ.get("ISPATIALGYM_HEAD_CAMERA_ONLY", ""),
            "timers": {k: {"s": round(v[0], 3), "n": v[1], "ms_per_call": round(1000 * v[0] / max(1, v[1]), 2)} for k, v in sorted(TOTALS.items(), key=lambda kv: -kv[1][0])},
-           "events": list(EVENTS)}
+           "events": list(EVENTS), "check_counts": _check_counts()}
     print("PROFILE_RUN " + json.dumps(out), flush=True)
     if result.get("out"):
         try:
