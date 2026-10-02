@@ -10,8 +10,10 @@ written while recording) and the replay shards (``<task dir>/replay/lerobot/*``:
 demos recorded before the BEHAVIOR output). Output ``<out>/isg/<task>`` (rebuilt) and ``<out>/isg/<task>.episodes.jsonl``
 (per episode index: the shard, its episode index there and the instance / demo it came from). ``--multitask``: every task
 with a per-task dataset listed in ``<out>/isg_multitask.tasks.json`` plus this run's tasks -> ``<out>/isg_multitask``, rebuilt
-from the per-task datasets so a task is never included twice. Only complete shards (``meta/info.json`` present, finalized)
-are read; verify_aggregate runs on every output with the expected episode count.
+from the per-task datasets so a task is never included twice, in BEHAVIOR's multi-task layout (2026-challenge-demos, read by
+omnigibson.eval.utils.score_utils): the k-th listed task has task index k and is chunk k of the data, the videos and the
+episode metadata. Only complete shards (``meta/info.json`` present, finalized) are read; every output is verified with the
+expected episode count.
 """
 
 from __future__ import annotations
@@ -30,7 +32,17 @@ import omnigibson as og  # noqa: F401  (resolves BEHAVIOR-1K for verify_aggregat
 from ispatialgym.oracle import lerobot_compat
 
 lerobot_compat.install()
-from lerobot.datasets.aggregate import aggregate_datasets  # noqa: E402
+from lerobot.datasets.aggregate import (  # noqa: E402
+    aggregate_data,
+    aggregate_datasets,
+    aggregate_metadata,
+    aggregate_videos,
+    finalize_aggregation,
+    merge_video_feature_info_for_aggregate,
+    validate_all_metadata,
+)
+from lerobot.datasets.dataset_metadata import LeRobotDatasetMetadata  # noqa: E402
+from lerobot.datasets.utils import DEFAULT_CHUNK_SIZE, DEFAULT_DATA_FILE_SIZE_IN_MB, DEFAULT_VIDEO_FILE_SIZE_IN_MB  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location(
     "aggregate_lerobot_task_shards",
@@ -116,6 +128,88 @@ def aggregate(inputs, repo_id: str, out_root: str, data_mb, video_mb) -> int:
     return expected
 
 
+def verify_one_chunk_per_task(root: str, expected: int, tasks) -> None:
+    """verify_aggregate's checks over every chunk (it reads the first episode-metadata file only) plus the layout: the
+    episodes of task k, their rows and their video files all in chunk k, and no data file holding another task's rows."""
+    import pandas as pd
+
+    info = json.load(open(os.path.join(root, "meta", "info.json")))
+    eps = pd.concat([pd.read_parquet(p) for p in sorted(glob.glob(os.path.join(root, "meta", "episodes", "chunk-*", "file-*.parquet")))],
+                    ignore_index=True)
+    if info["total_episodes"] != expected or sorted(eps["episode_index"]) != list(range(expected)):
+        raise RuntimeError(f"expected episodes 0..{expected - 1}: info.json has {info['total_episodes']}, the metadata {len(eps)}")
+    if int(eps["length"].sum()) != info["total_frames"]:
+        raise RuntimeError(f"episode lengths sum to {int(eps['length'].sum())}, info.json has {info['total_frames']} frames")
+    listed = pd.read_parquet(os.path.join(root, "meta", "tasks.parquet"))
+    if list(listed.index) != list(tasks) or list(listed["task_index"]) != list(range(len(tasks))):
+        raise RuntimeError(f"meta/tasks.parquet does not list the tasks in order: {list(listed.index)}")
+    chunk = eps["tasks"].map(lambda t: list(tasks).index(t[0]))
+    video_keys = [c[len("videos/"):-len("/chunk_index")] for c in eps.columns if c.startswith("videos/") and c.endswith("/chunk_index")]
+    for col in ["data/chunk_index", "meta/episodes/chunk_index"] + [f"videos/{v}/chunk_index" for v in video_keys]:
+        if (eps[col] != chunk).any():
+            raise RuntimeError(f"{int((eps[col] != chunk).sum())} episodes have {col} outside their task's chunk")
+    missing = []
+    for (c, f), g in eps.groupby(["data/chunk_index", "data/file_index"]):
+        p = os.path.join(root, info["data_path"].format(chunk_index=c, file_index=f))
+        if not os.path.exists(p):
+            missing.append(p)
+            continue
+        rows = pd.read_parquet(p, columns=["episode_index", "task_index"])
+        if set(rows["task_index"]) != {c} or len(rows) != int(g["length"].sum()) or set(rows["episode_index"]) != set(g["episode_index"]):
+            raise RuntimeError(f"{p}: its rows are not exactly the frames of the task-{c} episodes that point to it")
+    for v in video_keys:
+        for c, f in eps[[f"videos/{v}/chunk_index", f"videos/{v}/file_index"]].drop_duplicates().itertuples(index=False):
+            p = os.path.join(root, info["video_path"].format(video_key=v, chunk_index=c, file_index=f))
+            if not os.path.exists(p):
+                missing.append(p)
+    if missing:
+        raise RuntimeError(f"{len(missing)} referenced files missing, e.g. {missing[:3]}")
+
+
+def aggregate_one_chunk_per_task(inputs, repo_id: str, out_root: str, data_mb, video_mb) -> int:
+    """lerobot's aggregate_datasets with each input (a per-task dataset) starting a new chunk: input k becomes chunk k of the
+    data, the videos and the episode metadata, with task index k; within a chunk the files are packed by size as usual."""
+    import pandas as pd
+
+    tmp = out_root + ".building"
+    if os.path.exists(tmp):
+        shutil.rmtree(tmp)
+    metas = [LeRobotDatasetMetadata(os.path.relpath(r, os.path.dirname(r)), root=Path(r)) for r in inputs]
+    for r, m in zip(inputs, metas):
+        if len(m.tasks) != 1:
+            raise ValueError(f"{r}: a per-task dataset has one task, found {len(m.tasks)}")
+    tasks = [m.tasks.index[0] for m in metas]
+    if len(set(tasks)) != len(tasks):
+        raise ValueError(f"a task comes from two inputs: {tasks}")
+    fps, robot_type, _ = validate_all_metadata(metas)
+    features = merge_video_feature_info_for_aggregate(metas)
+    video_keys = [k for k in features if features[k]["dtype"] == "video"]
+    data_mb, video_mb = data_mb or DEFAULT_DATA_FILE_SIZE_IN_MB, video_mb or DEFAULT_VIDEO_FILE_SIZE_IN_MB
+    dst = LeRobotDatasetMetadata.create(repo_id=repo_id, fps=fps, robot_type=robot_type, features=features, root=Path(tmp),
+                                        use_videos=bool(video_keys), chunks_size=DEFAULT_CHUNK_SIZE,
+                                        data_files_size_in_mb=data_mb, video_files_size_in_mb=video_mb)
+    dst.tasks = pd.DataFrame({"task_index": range(len(tasks))}, index=pd.Index(tasks, name="task"))
+    dst.episodes = {}
+    videos_idx = {k: {"chunk": 0, "file": 0, "latest_duration": 0, "episode_duration": 0} for k in video_keys}
+    for k, src in enumerate(metas):
+        for v in videos_idx.values():
+            v.update(chunk=k, file=0)
+        videos_idx = aggregate_videos(src, dst, videos_idx, video_mb, DEFAULT_CHUNK_SIZE)
+        data_idx = aggregate_data(src, dst, {"chunk": k, "file": 0}, data_mb, DEFAULT_CHUNK_SIZE)
+        aggregate_metadata(src, dst, {"chunk": k, "file": 0}, data_idx, videos_idx)
+        dst.info.total_episodes += src.total_episodes
+        dst.info.total_frames += src.total_frames
+    finalize_aggregation(dst, metas)
+    fix_episode_meta_locations(tmp)
+    expected = sum(m.total_episodes for m in metas)
+    verify_one_chunk_per_task(tmp, expected, tasks)
+    readable_dataset(tmp)
+    if os.path.exists(out_root):
+        shutil.rmtree(out_root)
+    os.replace(tmp, out_root)
+    return expected
+
+
 def aggregate_task(args, task: str) -> dict:
     task_dir = os.path.join(args.sweep_root, task)
     shards = sorted(r for r in glob.glob(os.path.join(task_dir, "i*", "lerobot", "shard_*")) + glob.glob(os.path.join(task_dir, "replay", "lerobot", "*"))
@@ -144,7 +238,7 @@ def aggregate_multitask(args, tasks) -> dict:
             included.append(t)
     roots = [os.path.join(args.output_root, "isg", t) for t in included if complete(os.path.join(args.output_root, "isg", t))]
     out_root = os.path.join(args.output_root, "isg_multitask")
-    n = aggregate(roots, "isg_multitask", out_root, args.data_files_size_in_mb, args.video_files_size_in_mb)
+    n = aggregate_one_chunk_per_task(roots, "isg_multitask", out_root, args.data_files_size_in_mb, args.video_files_size_in_mb)
     with open(listed, "w") as f:
         json.dump(included, f, indent=1)
     rec = {"dataset": out_root, "episodes": n, "tasks": included}
