@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import gc
 import glob
 import importlib
 import json
@@ -91,6 +92,12 @@ DEFAULT_ROBOT_NAME = "robot_r1"
 EVALUATION_PROFILE = "isg-v1"
 
 EXIT_SUCCESS, EXIT_ORACLE_FAILED, EXIT_NO_ORACLE, EXIT_ERROR = 0, 2, 3, 4
+
+#: ISPATIALGYM_GC_FREEZE=1 (opt-in): gc.freeze() once the world is built and again after the first planner build, so the
+#: collector's later passes skip the long-lived scene / Kit / planner objects (torch runs a full gc.collect() before every
+#: CUDA graph capture: ~0.5 s each over the whole heap). Garbage cycles among the frozen objects are never collected; a
+#: process keeps one world (run_queue exits for another template).
+GC_FREEZE = os.environ.get("ISPATIALGYM_GC_FREEZE") == "1"
 
 #: largest ISG_HINGE_FRICTION_SCALE applied to a wall hinge record (2026-09-22, InstanceLoader._create_hinge): x8 saturated
 #: the push arm's drives (0918-000750); the damping scale is not applied at all
@@ -1006,6 +1013,9 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             env = loader.build_env()
             if shared is not None:
                 loader.share(shared)
+            if GC_FREEZE:
+                gc.collect()
+                gc.freeze()
         if shared is not None:
             shared["loader"] = loader
         try:
@@ -1046,6 +1056,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             backend = R1ProCuRobo(robot, prebuild=prebuild, **executor_mesh_cache_kw(robot, room_filter))
             if shared is not None:
                 shared["backend"] = backend
+            if GC_FREEZE:
+                gc.freeze()
         if os.environ.get("ISPATIALGYM_EXECUTOR_MESH_CACHE"):
             meta["executor_mesh_cache"] = int(backend.mesh_cache_size)
         bounds = task_bounds(env.scene, loader.rooms) if loader.rooms else None
