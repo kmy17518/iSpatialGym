@@ -12,6 +12,8 @@ The entity exposes ``states`` keyed by the OmniGibson state classes so that the 
 from __future__ import annotations
 
 import os
+import struct
+import time
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
@@ -29,6 +31,12 @@ from ispatialgym.eval.targets import GroupTarget
 
 if os.environ.get("ISPATIALGYM_FAST_GEOMETRY") in ("1", "check"):
     from ispatialgym.eval.geometry_fast import orientation_error, relation_error  # noqa: F811
+
+#: ISPATIALGYM_FAST_ASSIGN=1: one relation_error per (from member, to member, relation) within an evaluation, shared by
+#: the assignment's permutations and the final relation errors (their inputs are the same there); =check also recomputes
+#: every reused value and prints FAST_ASSIGN_CHECK counts
+FAST_ASSIGN = os.environ.get("ISPATIALGYM_FAST_ASSIGN", "")
+_ASSIGN_COUNTS = {"reused": 0, "mismatches": 0, "fresh_s": 0.0}
 
 
 @dataclass
@@ -196,12 +204,35 @@ class GroupEntity:
         self._cache_key, self._cache = key, ev
         return ev
 
+    @staticmethod
+    def _relation_error(memo, poses, m_from, m_to, i, rel, eqs, pos_tol, ori_tol):
+        if memo is None:
+            return relation_error(poses[m_from], poses[m_to], rel.pose, eqs, eqs, pos_tol, ori_tol)
+        key = (m_from, m_to, i)
+        hit = memo.get(key)
+        if hit is None:
+            hit = memo[key] = relation_error(poses[m_from], poses[m_to], rel.pose, eqs, eqs, pos_tol, ori_tol)
+            return hit
+        _ASSIGN_COUNTS["reused"] += 1
+        if FAST_ASSIGN == "check":
+            t0 = time.perf_counter()
+            fresh = relation_error(poses[m_from], poses[m_to], rel.pose, eqs, eqs, pos_tol, ori_tol)
+            _ASSIGN_COUNTS["fresh_s"] += time.perf_counter() - t0
+            if [struct.pack("<d", float(v)) for v in fresh] != [struct.pack("<d", float(v)) for v in hit]:
+                _ASSIGN_COUNTS["mismatches"] += 1
+                print(f"FAST_ASSIGN_CHECK mismatch {key}: memo {hit!r} fresh {fresh!r}", flush=True)
+            if _ASSIGN_COUNTS["reused"] % 1000 == 0:
+                print(f"FAST_ASSIGN_CHECK reused {_ASSIGN_COUNTS['reused']} mismatches {_ASSIGN_COUNTS['mismatches']}", flush=True)
+            return fresh
+        return hit
+
     def _evaluate(self, poses: Dict[str, tuple]) -> GroupEvaluation:
         target = self.target
         eqs = target.orientation_equivalences or None
         slots = target.target_slots
         relations = target.layout_relations
-        assignment = self._assign(poses)
+        memo = {} if FAST_ASSIGN in ("1", "check") else None
+        assignment = self._assign(poses, memo)
         ev = GroupEvaluation(assignment=assignment)
 
         # Absolute placement: every member at its assigned slot.
@@ -228,11 +259,9 @@ class GroupEntity:
             pos_tol, ori_tol = target.layout_tolerances if target.layout_tolerances else (None, None)
             slot_to_member = {s: m for m, s in assignment.items()}
             all_ok = True
-            for rel in relations:
+            for i, rel in enumerate(relations):
                 m_from, m_to = slot_to_member[rel.from_slot], slot_to_member[rel.to_slot]
-                pos_err, ori_err = relation_error(
-                    poses[m_from], poses[m_to], rel.pose, eqs, eqs, pos_tol, ori_tol
-                )
+                pos_err, ori_err = self._relation_error(memo, poses, m_from, m_to, i, rel, eqs, pos_tol, ori_tol)
                 ok = (pos_tol is None or pos_err <= pos_tol) and (ori_tol is None or ori_err <= ori_tol)
                 all_ok = all_ok and ok
                 ev.relation_errors.append(
@@ -249,7 +278,7 @@ class GroupEntity:
             ev.layout_reached = all_ok if target.layout_tolerances else None
         return ev
 
-    def _assign(self, poses: Dict[str, tuple]) -> Dict[str, str]:
+    def _assign(self, poses: Dict[str, tuple], memo: Optional[dict] = None) -> Dict[str, str]:
         target = self.target
         if target.assignment_mode == "fixed":
             return dict(target.member_to_slot)
@@ -266,9 +295,9 @@ class GroupEntity:
         def perm_cost(perm):
             slot_to_member = {slot_ids[j]: members[i] for i, j in enumerate(perm)}
             total_pos, total_ori = 0.0, 0.0
-            for rel in target.layout_relations:
-                pos_err, ori_err = relation_error(
-                    poses[slot_to_member[rel.from_slot]], poses[slot_to_member[rel.to_slot]], rel.pose, eqs, eqs, pos_tol, ori_tol
+            for k, rel in enumerate(target.layout_relations):
+                pos_err, ori_err = self._relation_error(
+                    memo, poses, slot_to_member[rel.from_slot], slot_to_member[rel.to_slot], k, rel, eqs, pos_tol, ori_tol
                 )
                 total_pos += pos_err
                 total_ori += ori_err
