@@ -196,6 +196,29 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
     }
 
 
+def executor_mesh_cache_kw(robot, make_obstacle_filter=None) -> Dict[str, int]:
+    """ISPATIALGYM_EXECUTOR_MESH_CACHE (opt-in; unset: cuRobo's 8192): capacity of the executor's cuRobo mesh store,
+    ``auto`` = the scene's collision meshes (objects other than the robot, not visual-only) + reach_bands'
+    MESH_CACHE_HEADROOM, at least MESH_CACHE_MIN, a multiple of 64 (as the sampler's ISPATIALGYM_SAMPLER_MESH_CACHE);
+    ``room`` = likewise over the objects the executor's obstacle filter keeps (``make_obstacle_filter()``: what
+    update_world loads; the headroom takes objects that enter the task rooms later); or a number. The capacity sizes every
+    collision kernel launch; the thread layout can change the order of cuRobo's atomic float sums. In queue mode the
+    store serves every instance of the loaded world (removed objects' meshes stay, disabled)."""
+    value = os.environ.get("ISPATIALGYM_EXECUTOR_MESH_CACHE", "").strip().lower()
+    if not value:
+        return {}
+    if value not in ("auto", "room"):
+        return {"mesh_cache_size": int(value)}
+    from ispatialgym.sampling import reach_bands as RB
+
+    keep = make_obstacle_filter() if value == "room" and make_obstacle_filter is not None else None
+    n = sum(len(link.collision_meshes) for o in robot.scene.objects
+            if o is not robot and not getattr(o, "visual_only", False) and (keep is None or keep(o)) for link in o.links.values())
+    cache = max(RB.MESH_CACHE_MIN, 64 * math.ceil((n + RB.MESH_CACHE_HEADROOM) / 64))
+    log.info("executor cuRobo mesh store %d for %d scene collision meshes (ISPATIALGYM_EXECUTOR_MESH_CACHE)", cache, n)
+    return {"mesh_cache_size": cache}
+
+
 def task_bounds(scene, rooms: Sequence[str], margin: float = 1.0):
     los, his = [], []
     for o in scene.objects:
@@ -1018,9 +1041,13 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         if shared is not None and shared.get("backend") is not None:
             backend = shared["backend"]
         else:
-            backend = R1ProCuRobo(robot, prebuild=prebuild)
+            room_filter = lambda: make_obstacle_filter(task_bounds(env.scene, loader.rooms) if loader.rooms else None, robot,  # noqa: E731
+                                                       [o.name for o in tracked.values()])
+            backend = R1ProCuRobo(robot, prebuild=prebuild, **executor_mesh_cache_kw(robot, room_filter))
             if shared is not None:
                 shared["backend"] = backend
+        if os.environ.get("ISPATIALGYM_EXECUTOR_MESH_CACHE"):
+            meta["executor_mesh_cache"] = int(backend.mesh_cache_size)
         bounds = task_bounds(env.scene, loader.rooms) if loader.rooms else None
         backend.obstacle_filter = make_obstacle_filter(bounds, robot, [o.name for o in tracked.values()])
         # load the collision world *before* attaching the held objects (their meshes must be known to be disabled)
