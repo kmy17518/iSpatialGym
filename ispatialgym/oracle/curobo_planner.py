@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib.metadata
 import logging
 import math
+import os
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -116,6 +117,47 @@ from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.poses import Pose, as_tensor, quat_wxyz_to_xyzw, quat_xyzw_to_wxyz
 
 log = logging.getLogger(__name__)
+
+#: ISPATIALGYM_BATCHED_WORLD_SYNC=1 (opt-in): ``update_world`` writes the poses of the meshes already in the store in one
+#: batched step at the end (one Pose inverse over all of them, one indexed assignment) instead of a one-mesh Pose,
+#: inverse, name lookup and write per mesh; the per-mesh pose reads and relative transforms are unchanged. =check also
+#: inverts every pose on its own and prints WORLD_SYNC_CHECK counts when a batched row differs.
+BATCHED_WORLD_SYNC = os.environ.get("ISPATIALGYM_BATCHED_WORLD_SYNC", "")
+_WS_COUNTS = {"calls": 0, "meshes": 0, "mismatches": 0}
+
+
+class _PoseBatch:
+    def __init__(self, planner):
+        self.planner = planner
+        self.names: List[str] = []
+        self.pos: List[th.Tensor] = []
+        self.quat: List[th.Tensor] = []
+
+    def add(self, name: str, pos: th.Tensor, quat_xyzw: th.Tensor) -> None:
+        self.names.append(name)
+        self.pos.append(pos)
+        self.quat.append(quat_xyzw_to_wxyz(quat_xyzw))
+
+    def write(self) -> None:
+        if not self.names:
+            return
+        dev = self.planner.device_cfg.device
+        meshes = self.planner.checker.data.meshes
+        first = {}
+        for i, n in enumerate(meshes.names[0]):
+            first.setdefault(n, i)
+        idx = th.tensor([first[n] for n in self.names], dtype=th.long, device=dev)
+        vec = CuPose(position=th.stack(self.pos).to(dev), quaternion=th.stack(self.quat).to(dev)).inverse().get_pose_vector()
+        _WS_COUNTS["calls"] += 1
+        _WS_COUNTS["meshes"] += len(self.names)
+        if BATCHED_WORLD_SYNC == "check":
+            for k in range(len(self.names)):
+                one = CuPose(position=self.pos[k].unsqueeze(0).to(dev), quaternion=self.quat[k].unsqueeze(0).to(dev)).inverse().get_pose_vector()
+                if not th.equal(one.reshape(-1), vec[k].reshape(-1)):
+                    _WS_COUNTS["mismatches"] += 1
+            if _WS_COUNTS["calls"] % 20 == 0 or _WS_COUNTS["mismatches"]:
+                print(f"WORLD_SYNC_CHECK {_WS_COUNTS}", flush=True)
+        meshes.inv_pose[0, idx, :7] = vec
 
 
 # --------------------------------------------------------------------------------------
@@ -513,11 +555,17 @@ class R1ProCuRobo:
         """
         t0 = time.time()
         if self._world_loaded and only_objects is not None:
+            batch = self._pose_batch() if BATCHED_WORLD_SYNC else None
             for obj, link, cm, (pos, quat) in self._iter_collision_meshes(ignore_objects, ignore_links, objects=list(only_objects)):
                 name = cm.prim_path
                 if name in self._world_mesh_names:
+                    if batch is not None:
+                        batch.add(name, pos, quat)
+                        continue
                     self._mesh_update_pose(name, CuPose(position=pos.unsqueeze(0).to(self.device_cfg.device),
                                                         quaternion=quat_xyzw_to_wxyz(quat).unsqueeze(0).to(self.device_cfg.device)))
+            if batch is not None:
+                batch.write()
             return
         if not self._world_loaded:
             meshes, names = [], set()
@@ -553,9 +601,16 @@ class R1ProCuRobo:
             return
 
         seen = set()
+        batch = self._pose_batch() if BATCHED_WORLD_SYNC else None
         for obj, link, cm, (pos, quat) in self._iter_collision_meshes(ignore_objects, ignore_links):
             name = cm.prim_path
             seen.add(name)
+            if batch is not None and name in self._world_mesh_names:
+                batch.add(name, pos, quat)
+                if name in self._disabled_obstacles and name not in self._attached_mesh_names():
+                    self._mesh_enable(name, True)
+                    self._disabled_obstacles.discard(name)
+                continue
             cu_pose = CuPose(
                 position=pos.unsqueeze(0).to(self.device_cfg.device),
                 quaternion=quat_xyzw_to_wxyz(quat).unsqueeze(0).to(self.device_cfg.device),
@@ -571,6 +626,8 @@ class R1ProCuRobo:
                     Mesh(name=name, pose=th.cat([pos, quat_xyzw_to_wxyz(quat)]).tolist(), vertices=verts, faces=faces, scale=scale)
                 )
                 self._world_mesh_names.add(name)
+        if batch is not None:
+            batch.write()
         for name in self._world_mesh_names - seen:
             if name not in self._disabled_obstacles:
                 self._mesh_enable(name, False)
@@ -704,6 +761,9 @@ class R1ProCuRobo:
     # are addressed through the mesh store directly.
     def _mesh_update_pose(self, name: str, pose: CuPose):
         self.checker.data.meshes.update_pose(name, w_obj_pose=pose)
+
+    def _pose_batch(self) -> "_PoseBatch":
+        return _PoseBatch(self)
 
     def _mesh_enable(self, name: str, enabled: bool):
         self.checker.data.meshes.set_enabled(name, enabled)
