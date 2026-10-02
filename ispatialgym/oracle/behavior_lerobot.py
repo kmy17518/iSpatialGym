@@ -23,6 +23,16 @@ from typing import Any, Dict, Optional
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # the shards are local; lerobot must never fetch a dataset from the Hub
 
+#: Opt-in shard format, changing recorded data. One setting per dataset: shards with and without depth cannot be
+#: aggregated (different features).
+#: ISPATIALGYM_SHARD_NO_DEPTH=1: the robot records proprio + rgb only (no depth annotators, readback or streams) and the
+#: datasets keep observation.robot2cam_pose.<camera> for every camera (BEHAVIOR's writer adds them only alongside depth).
+#: It is passed on to BEHAVIOR's writer, which both this module and scripts/isg/replay_obs_isg.py (it imports
+#: ROBOT_OBS_MODALITIES from here) build their datasets with.
+SHARD_NO_DEPTH = os.environ.get("ISPATIALGYM_SHARD_NO_DEPTH") == "1"
+if SHARD_NO_DEPTH:
+    os.environ["OMNIGIBSON_LEROBOT_ROBOT2CAM_WITH_RGB"] = "1"
+
 import gymnasium as gym
 import torch as th
 
@@ -40,7 +50,7 @@ ROBOT_SENSOR_CONFIG = {
     "VisionSensor": {"sensor_kwargs": {"image_height": 480, "image_width": 480}},
     "zed_link:Camera:0": {"sensor_kwargs": {"horizontal_aperture": 40.0, "image_height": 720, "image_width": 720}},
 }
-ROBOT_OBS_MODALITIES = ["proprio", "rgb", "depth_linear"]
+ROBOT_OBS_MODALITIES = ["proprio", "rgb"] if SHARD_NO_DEPTH else ["proprio", "rgb", "depth_linear"]
 ROBOT_PROPRIO_KEYS = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
 ROBOT_TYPE = "R1Pro"
 HEAD_IMAGE_SIZE = 720
