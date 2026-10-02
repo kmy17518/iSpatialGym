@@ -23,15 +23,18 @@ from typing import Any, Dict, Optional
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # the shards are local; lerobot must never fetch a dataset from the Hub
 
-#: Opt-in shard format, changing recorded data. One setting per dataset: shards with and without depth cannot be
-#: aggregated (different features).
+#: Opt-in shard formats, both changing recorded data. One setting per dataset: shards with and without depth cannot be
+#: aggregated (different features), and x265 / NVENC episodes must not be concatenated into one video by stream copy.
 #: ISPATIALGYM_SHARD_NO_DEPTH=1: the robot records proprio + rgb only (no depth annotators, readback or streams) and the
 #: datasets keep observation.robot2cam_pose.<camera> for every camera (BEHAVIOR's writer adds them only alongside depth).
-#: It is passed on to BEHAVIOR's writer, which both this module and scripts/isg/replay_obs_isg.py (it imports
+#: ISPATIALGYM_SHARD_RGB_ENCODER="hevc_nvenc,qp=<n>,preset=<p>": the rgb streams' encoder (GOP 8, yuv420p, no B-frames).
+#: Both are passed on to BEHAVIOR's writer, which both this module and scripts/isg/replay_obs_isg.py (it imports
 #: ROBOT_OBS_MODALITIES from here) build their datasets with.
 SHARD_NO_DEPTH = os.environ.get("ISPATIALGYM_SHARD_NO_DEPTH") == "1"
 if SHARD_NO_DEPTH:
     os.environ["OMNIGIBSON_LEROBOT_ROBOT2CAM_WITH_RGB"] = "1"
+if os.environ.get("ISPATIALGYM_SHARD_RGB_ENCODER"):
+    os.environ["OMNIGIBSON_LEROBOT_RGB_ENCODER"] = os.environ["ISPATIALGYM_SHARD_RGB_ENCODER"]
 
 import gymnasium as gym
 import torch as th
