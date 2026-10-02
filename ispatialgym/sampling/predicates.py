@@ -104,13 +104,29 @@ def branches() -> List[Dict[str, Any]]:
 
 
 MAX_LOG = 200  # the evaluator calls every step: keep the latest entries only
+#: tasks.ispatialgym_task's shared goal evaluation (ISPATIALGYM_SHARED_GOAL_EVAL): the entries _log appends while a list
+#: is set here, and the number of attachment joints the alignment branch has created
+_RECORD: Optional[List[Dict[str, Any]]] = None
+_JOINTS = [0]
 
 
 def _log(predicate: str, entities: Sequence[Any], branch: str, ok: bool, detail: Optional[Dict[str, Any]] = None) -> None:
-    _BRANCHES.append({"predicate": predicate, "entities": [getattr(e, "name", str(e)) for e in entities], "branch": branch, "ok": bool(ok),
-                      "detail": detail or {}})
+    entry = {"predicate": predicate, "entities": [getattr(e, "name", str(e)) for e in entities], "branch": branch, "ok": bool(ok),
+             "detail": detail or {}}
+    _BRANCHES.append(entry)
+    if _RECORD is not None:
+        _RECORD.append(entry)
     if len(_BRANCHES) > MAX_LOG:
         del _BRANCHES[: len(_BRANCHES) - MAX_LOG]
+
+
+def replay_log(entries: Sequence[Dict[str, Any]]) -> None:
+    """Append ``entries`` (recorded by an evaluation of the current state) again, as a second evaluation of the same state
+    would log them."""
+    for e in entries:
+        _BRANCHES.append({**e, "entities": list(e["entities"])})
+        if len(_BRANCHES) > MAX_LOG:
+            del _BRANCHES[: len(_BRANCHES) - MAX_LOG]
 
 
 def decided_by() -> Dict[str, str]:
@@ -386,6 +402,8 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
     else:
         a["attached"] = bool(child.states[AttachedTo].set_value(parent, True, bypass_alignment_checking=True))
         a["joint"] = "set_value"
+    if a["attached"]:
+        _JOINTS[0] += 1
     return a
 
 

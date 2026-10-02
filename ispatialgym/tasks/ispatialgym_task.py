@@ -16,7 +16,10 @@ Everything is surfaced in ``info["ispatialgym"]`` of ``env.step``; see :meth:`IS
 from __future__ import annotations
 
 import copy
+import json
 import logging
+import os
+import time
 from typing import Any, Dict, Optional
 
 import torch as th
@@ -67,6 +70,14 @@ log = logging.getLogger(__name__)
 #:   joints, with no measurable creep. A painting creeping 0.25 deg/s on its hinge (run 0922-180242) drifts 6.5 mrad over
 #:   the window and fails; an object rolling 3 mm/s drifts 4.5 mm and fails.
 DEFAULT_POSE_SETTLED_CONFIG: Dict[str, float] = {"n_steps": 45, "pos_tolerance": 0.002, "ori_tolerance": 0.005, "joint_tolerance": 0.005}
+
+#: ISPATIALGYM_SHARED_GOAL_EVAL=1: within one task step the potential reward reuses the termination's goal evaluation (the
+#: same goal heads on the same state) and appends that evaluation's branch-log entries again, as its own evaluation would;
+#: a step whose termination evaluation created an attachment joint evaluates again (the second evaluation then logs the
+#: atom as decided by OmniGibson). =check evaluates again on every step, compares the potential and the log entries and
+#: prints SHARED_GOAL_CHECK counts.
+SHARED_GOAL_EVAL = os.environ.get("ISPATIALGYM_SHARED_GOAL_EVAL", "")
+_SHARED_COUNTS = {"steps": 0, "reused": 0, "joint_steps": 0, "mismatches": 0, "potential_s": 0.0}
 
 
 def _compact(expr) -> str:
@@ -495,7 +506,57 @@ class ISpatialGymTask(BehaviorTask):
         terminations["predicate"] = PredicateGoal(check_goal_fn=self._check_goal)
         return terminations
 
+    def step(self, env, action):
+        if not SHARED_GOAL_EVAL:
+            return super().step(env, action)
+        self._shared_armed, self._shared_goal = True, None
+        try:
+            return super().step(env, action)
+        finally:
+            self._shared_armed, self._shared_goal = False, None
+
     def _check_goal(self, env_idx=0):
+        if not (SHARED_GOAL_EVAL and getattr(self, "_shared_armed", False) and getattr(self, "_shared_goal", None) is None):
+            return self._check_goal_impl(env_idx)
+        PRED._RECORD, joints0 = [], PRED._JOINTS[0]
+        try:
+            out = self._check_goal_impl(env_idx)
+        finally:
+            entries, PRED._RECORD = PRED._RECORD, None
+        self._shared_goal = {"status": out[1], "entries": entries, "joints": PRED._JOINTS[0] - joints0}
+        return out
+
+    def get_potential(self, env, env_idx):
+        shared = getattr(self, "_shared_goal", None) if SHARED_GOAL_EVAL and getattr(self, "_shared_armed", False) else None
+        if shared is None:
+            return super().get_potential(env, env_idx)
+        self._shared_goal = None
+        _SHARED_COUNTS["steps"] += 1
+        if shared["joints"]:
+            _SHARED_COUNTS["joint_steps"] += 1
+            return super().get_potential(env, env_idx)
+        n_sat, n_unsat = len(shared["status"]["satisfied"]), len(shared["status"]["unsatisfied"])
+        value = -(n_sat / (n_sat + n_unsat))
+        if SHARED_GOAL_EVAL == "check":
+            PRED._RECORD = []
+            t0 = time.perf_counter()
+            try:
+                ref = super().get_potential(env, env_idx)
+            finally:
+                real, PRED._RECORD = PRED._RECORD, None
+                _SHARED_COUNTS["potential_s"] += time.perf_counter() - t0
+            if ref != value or json.dumps(real, sort_keys=True, default=str) != json.dumps(shared["entries"], sort_keys=True, default=str):
+                _SHARED_COUNTS["mismatches"] += 1
+                if _SHARED_COUNTS["mismatches"] <= 20:
+                    print(f"SHARED_GOAL_CHECK mismatch: potential {ref!r} vs shared {value!r}; log {real!r} vs {shared['entries']!r}", flush=True)
+            if _SHARED_COUNTS["steps"] % 500 == 0:
+                print(f"SHARED_GOAL_CHECK {json.dumps(_SHARED_COUNTS)}", flush=True)
+            return ref
+        PRED.replay_log(shared["entries"])
+        _SHARED_COUNTS["reused"] += 1
+        return value
+
+    def _check_goal_impl(self, env_idx=0):
         """Evaluate all goal heads once; decide termination.
 
         Returns ``(done, goal_status)`` like ``CompiledTask.check_goal``. ``done`` is the first settled success
