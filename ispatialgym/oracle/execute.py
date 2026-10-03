@@ -305,6 +305,9 @@ class ExecuteConfig:
     #: this far (m; 0 = off) and then backs off ``brace_touch_backoff_m`` along its approach
     brace_touch_stop_m: float = 0.002
     brace_touch_backoff_m: float = 0.004
+    #: a following brace (``Brace.follow``) moves its recorded targets with the braced object once it has moved this far since the
+    #: program start (m): the recorded stop stands only ``stop_clearance_m`` (5 mm) off the face
+    brace_follow_min_m: float = 0.001
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
@@ -2571,6 +2574,46 @@ def brace_targets_at_goal(contact, state, cfg: ExecuteConfig, fraction: float = 
     }
 
 
+def _brace_follow_targets(action: Brace, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
+    """A following brace (``Brace.follow``) re-aimed at the braced object's LIVE pose: the recorded pre / contact / approach stand
+    ``stop_clearance_m`` off the face of the object at its init pose; when it has moved since the program start by more than
+    ``brace_follow_min_m`` (touching, release validation 2026-10-03: the gripper opening fully at the place pose shoved the
+    partner 5.5-6.5 mm toward the stop, the stop pressed into it and the push's start configuration was in collision), every
+    target moves with the object's planar rigid motion (translation + yaw about its position). ``ctx["brace_follow"]`` records
+    the facts; the same targets are returned when nothing moves."""
+    obj = action.contact.object
+    getter = getattr(state, "init_pose", None)
+    init = getter(obj) if getter is not None else None
+    if init is None:
+        return targets
+    try:
+        live = state.object_pose(obj)
+    except Exception:  # noqa: BLE001
+        return targets
+    p0, q0 = as_world_pose(init)
+    p1, q1 = as_world_pose(live)
+    p0, p1 = p0.float(), p1.float()
+    d = p1 - p0
+    dist = float(th.linalg.norm(d))
+    dyaw = float(C.wrap_angle(C.yaw_of(q1) - C.yaw_of(q0)))
+    rec: Dict[str, Any] = {"object": obj, "shift_m": round(dist, 4), "delta": [round(float(v), 4) for v in d.tolist()], "yaw_rad": round(dyaw, 4)}
+    ctx["brace_follow"] = rec
+    if dist < cfg.brace_follow_min_m and abs(dyaw) < 0.005:
+        rec["applied"] = False
+        return targets
+    qz = C.quat_from_yaw(dyaw)
+
+    def moved(pose):
+        p, q = as_world_pose(pose)
+        p_new = p1 + C.quat_rotate(qz, p.float() - p0)
+        return Pose(position=[float(v) for v in p_new.tolist()], orientation=[float(v) for v in C.qmul(qz, q.float()).tolist()])
+
+    out = {"pre": moved(targets["pre"]), "contact": moved(targets["contact"]), "approach": [moved(w) for w in targets["approach"]]}
+    rec["applied"] = True
+    log.info("brace(%s): moved %.1f mm / %.1f deg since the start -> the stop follows it", obj, dist * 1000, math.degrees(dyaw))
+    return out
+
+
 def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
@@ -2606,6 +2649,11 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
             ctx["brace_at_goal"]["probes"] = probes
         log.info("brace(%s): the fist stands where the braced edge will be at %.0f %% of the goal rotation (%.1f deg) + %.0f mm gap: contact moved %.1f cm",
                  action.contact.object, at_goal["fraction"] * 100, math.degrees(at_goal["goal_rotation_rad"]), at_goal["gap_m"] * 1000, at_goal["shift_m"] * 100)
+    elif getattr(action, "follow", False):
+        followed = _brace_follow_targets(action, state, targets, ctx, cfg)
+        if followed is not targets:
+            targets.update(followed)
+            q_hint_pre = None  # the recorded witness belongs to the recorded pre-pose; cuRobo plans the moved one
     opening = (getattr(action.contact, "extra", None) or {}).get("fingers_opening_m")
     if opening is not None:
         # a WIDE stop (owner 2026-09-19 00:49): the fingers pre-shaped to the recorded opening so both tips land on the braced

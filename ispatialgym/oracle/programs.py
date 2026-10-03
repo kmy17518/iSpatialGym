@@ -184,11 +184,12 @@ def _pack_stage_actions(sc: Sidecar, brace, pushes, base_yaw: float) -> List[Act
     return out
 
 
-def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float) -> List[Action]:
-    """Brace first (held), push with the other arm, retreat the push arm, release and retreat the brace arm."""
+def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float, follow_braced: bool = False) -> List[Action]:
+    """Brace first (held), push with the other arm, retreat the push arm, release and retreat the brace arm.
+    ``follow_braced``: the braced object is untouched by the program until the brace (``Brace.follow``)."""
     if brace.arm == push.arm:
         raise SidecarError(f"brace and push both use the {brace.arm} arm")
-    b = Brace(contact=brace, base_yaw=base_yaw)
+    b = Brace(contact=brace, base_yaw=base_yaw, follow=follow_braced)
     p = Push(contact=push, base_yaw=base_yaw)
     if os.environ.get("ISG_BRACE_RETREATS_FIRST", "0") == "1":
         # rush 2026-09-17: the brace pad leaves first while the push pad still holds the target - the brace caught the
@@ -910,7 +911,9 @@ def program_iors_touching(sc: Sidecar) -> List[Action]:
     if brace is None:
         p = Push(contact=push, base_yaw=base_yaw)
         return head + [p, Retreat(arm=push.arm, object=push.object, after=p)]
-    return head + _brace_push_retreat(sc, brace, push, base_yaw)
+    # the release opens the gripper fully beside the partner and shoves it 5-6 mm toward the stop (release validation
+    # 2026-10-03), more than the stop's 5 mm clearance: the brace follows the partner
+    return head + _brace_push_retreat(sc, brace, push, base_yaw, follow_braced=True)
 
 
 # ----------------------------------------------------------------------------------------------------------------

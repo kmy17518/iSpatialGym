@@ -1076,11 +1076,15 @@ class Brace(Action):
     command) until that arm's ``Retreat``. ``failed_grasp`` is not checked (``qa_exempt``).
 
     targets: ``{"pre": Pose, "contact": Pose, "approach": [Pose, ...]}`` (``line_waypoints`` pre → contact).
+
+    ``follow``: the program has not moved the braced object before the brace, so its init pose is the pose the stop was
+    recorded at; the executor moves the targets with the object when something shoved it since the program start.
     """
 
     name: str = "brace"
     contact: BraceContact
     base_yaw: Optional[float] = None
+    follow: bool = False
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
     TARGET_KEYS = ("pre", "contact", "approach")
 

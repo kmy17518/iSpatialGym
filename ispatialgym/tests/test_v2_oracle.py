@@ -2956,6 +2956,44 @@ def test_brace_of_a_hinged_target_stands_at_the_goal_edge_with_a_gap():
     assert EX.brace_targets_at_goal(brace.contact, state, replace(cfg, brace_at_goal_gap_m=-1.0)) is None
 
 
+def test_touching_brace_follows_a_shoved_partner():
+    """Touching (release validation 2026-10-03): the release opens the gripper fully beside the partner and shoves it 5-6 mm
+    toward the stop, more than the stop's 5 mm clearance. Its brace follows the partner (``Brace.follow``): the recorded pre /
+    contact / approach move with the partner's planar rigid motion since the program start, beyond ``brace_follow_min_m``;
+    a brace of another program (axial, block design) keeps the recorded targets."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
+    brace = [a for a in expand(sc.alias, sc) if isinstance(a, QA_Brace)][0]
+    assert brace.follow
+    for name in ("alignment-axial.json", "configuration_matching-block_design.json"):
+        other = Sidecar.load(os.path.join(SIDECARS, name))
+        assert not any(a.follow for a in expand(other.alias, other) if isinstance(a, QA_Brace))
+    targets = brace.targets(sc, None)
+    p0 = th.tensor([1.0, 2.0, 0.85])
+    q0 = C.quat_from_yaw(0.3)
+    cfg = EX.ExecuteConfig()
+
+    def at(dp, dyaw):
+        return SimpleNamespace(init_pose=lambda n: (p0.clone(), q0.clone()), object_pose=lambda n: (p0 + th.tensor(dp), C.quat_from_yaw(0.3 + dyaw)))
+
+    ctx = {}
+    assert EX._brace_follow_targets(brace, at([0.0005, 0.0, 0.0], 0.0), targets, ctx, cfg) is targets
+    assert ctx["brace_follow"]["applied"] is False
+    ctx = {}
+    dp = [-0.006, 0.001, 0.0]
+    out = EX._brace_follow_targets(brace, at(dp, 0.0), targets, ctx, cfg)
+    assert ctx["brace_follow"]["applied"] and abs(ctx["brace_follow"]["shift_m"] - float(th.linalg.norm(th.tensor(dp)))) < 1e-4
+    for key in ("pre", "contact"):
+        assert th.allclose(out[key].tensors()[0], targets[key].tensors()[0] + th.tensor(dp), atol=1e-6)
+        assert th.allclose(out[key].tensors()[1], targets[key].tensors()[1], atol=1e-6)
+    assert len(out["approach"]) == len(targets["approach"])
+    assert th.allclose(out["approach"][-1].tensors()[0], out["contact"].tensors()[0], atol=1e-6)
+    out = EX._brace_follow_targets(brace, at([0.0, 0.0, 0.0], 0.05), targets, {}, cfg)
+    c_rec, c_new = targets["contact"].tensors()[0], out["contact"].tensors()[0]
+    assert abs(float(th.linalg.norm(c_new - p0)) - float(th.linalg.norm(c_rec - p0))) < 1e-5  # rotated about the partner
+    q_want = C.qmul(C.quat_from_yaw(0.05), targets["contact"].tensors()[1])
+    assert abs(abs(float(th.dot(out["contact"].tensors()[1], q_want))) - 1.0) < 1e-5
+
+
 def _wall_push_retreat_world():
     sc = Sidecar.load(os.path.join(SIDECARS, "alignment-world_vertical.json"))
     actions = expand(sc.alias, sc)
