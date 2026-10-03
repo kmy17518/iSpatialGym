@@ -23,18 +23,20 @@ from typing import Any, Dict, Optional
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # the shards are local; lerobot must never fetch a dataset from the Hub
 
-#: Opt-in shard formats, both changing recorded data. One setting per dataset: shards with and without depth cannot be
-#: aggregated (different features), and x265 / NVENC episodes must not be concatenated into one video by stream copy.
-#: ISPATIALGYM_SHARD_NO_DEPTH=1: the robot records proprio + rgb only (no depth annotators, readback or streams) and the
-#: datasets keep observation.robot2cam_pose.<camera> for every camera (BEHAVIOR's writer adds them only alongside depth).
-#: ISPATIALGYM_SHARD_RGB_ENCODER="hevc_nvenc,qp=<n>,preset=<p>": the rgb streams' encoder (GOP 8, yuv420p, no B-frames).
-#: Both are passed on to BEHAVIOR's writer, which both this module and scripts/isg/replay_obs_isg.py (it imports
-#: ROBOT_OBS_MODALITIES from here) build their datasets with.
-SHARD_NO_DEPTH = os.environ.get("ISPATIALGYM_SHARD_NO_DEPTH") == "1"
+from ispatialgym.oracle import shard_format  # noqa: E402
+
+#: The shard format (ispatialgym.oracle.shard_format; changes recorded data): v2.0-multienv writes nodepth_nvenc by
+#: default (no depth streams, observation.robot2cam_pose.<camera> kept for every camera, rgb by hevc_nvenc QP 33 preset
+#: p7), ISPATIALGYM_SHARD_FORMAT=legacy writes production's (depth, x265 crf 30). It reaches BEHAVIOR's writer, whose own
+#: defaults stay BEHAVIOR's, through its opt-in variables; this module and scripts/isg/replay_obs_isg.py --one-world (it
+#: imports ROBOT_OBS_MODALITIES from here) build their datasets with that writer. Each shard written here gets the
+#: format marker <shard>.format.json, and ShardWriter only resumes a shard of the same format.
+SHARD_FORMAT = shard_format.effective()
+SHARD_NO_DEPTH = not SHARD_FORMAT["depth"]
 if SHARD_NO_DEPTH:
     os.environ["OMNIGIBSON_LEROBOT_ROBOT2CAM_WITH_RGB"] = "1"
-if os.environ.get("ISPATIALGYM_SHARD_RGB_ENCODER"):
-    os.environ["OMNIGIBSON_LEROBOT_RGB_ENCODER"] = os.environ["ISPATIALGYM_SHARD_RGB_ENCODER"]
+if SHARD_FORMAT["rgb_encoder"] != "x265":
+    os.environ["OMNIGIBSON_LEROBOT_RGB_ENCODER"] = SHARD_FORMAT["rgb_encoder"]
 
 import gymnasium as gym
 import torch as th
@@ -171,8 +173,13 @@ class ShardWriter(LeRobotDataWrapper):
             # no episode saved yet (the runner's first one was dropped): lerobot cannot resume it from the local files and
             # falls back to the Hub; start the shard over
             shutil.rmtree(path)
-        super().__init__(env=view, output_path=repo_id, root_dir=root, overwrite=not os.path.exists(path),
+        resume = os.path.exists(path)
+        if resume:
+            shard_format.check_resume(path, SHARD_FORMAT)
+        super().__init__(env=view, output_path=repo_id, root_dir=root, overwrite=not resume,
                          only_successes=False, flush_every_n_traj=1, robot_type=ROBOT_TYPE, task_name=task_name)
+        if not resume:
+            shard_format.write_marker(path, SHARD_FORMAT)
         self.flush_every_n_steps = FLUSH_EVERY_N_STEPS
         self.current_episode_step_count = 0
         self.aborted = False
