@@ -1016,6 +1016,9 @@ class Push(Action):
     touches: Tuple[str, ...] = ()
     #: instances the push must not touch (QA forbidden contacts): the partner of a ``push_under``
     avoid: Tuple[str, ...] = ()
+    #: the instance the pushed object's goal was sampled against (the touching partner): when it has moved since the program
+    #: start, the executor moves the goal with it
+    follow: Optional[str] = None
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
     TARGET_KEYS = ("pre", "waypoints", "direction", "distance_m")
 

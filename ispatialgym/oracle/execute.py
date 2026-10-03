@@ -308,6 +308,9 @@ class ExecuteConfig:
     #: a following brace (``Brace.follow``) moves its recorded targets with the braced object once it has moved this far since the
     #: program start (m): the recorded stop stands only ``stop_clearance_m`` (5 mm) off the face
     brace_follow_min_m: float = 0.001
+    #: a following push (``Push.follow``) moves the pushed object's goal with that instance once it has moved this far since the
+    #: program start (m): the touching goal is contact with it
+    push_goal_follow_min_m: float = 0.001
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
@@ -2205,6 +2208,43 @@ def _hold_until_still(motions: Motions, state, obj: str, cfg: ExecuteConfig) -> 
             return
 
 
+class _GoalShiftedState:
+    """``state`` whose world pose target of ``obj`` is moved by ``shift`` (a following push); everything else is ``state``'s."""
+
+    def __init__(self, state, obj: str, shift: th.Tensor):
+        self._state, self._obj, self._shift = state, obj, shift
+
+    def __getattr__(self, name):
+        return getattr(self._state, name)
+
+    def pose_target(self, name: str):
+        tgt = self._state.pose_target(name)
+        if name != self._obj or tgt is None or getattr(tgt, "position", None) is None or str(getattr(tgt, "frame", "world")) != "world":
+            return tgt
+        return replace(tgt, position=C.as_tensor(tgt.position).reshape(-1)[:3].float() + self._shift)
+
+
+def _push_goal_follow(action: Push, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Optional[th.Tensor]:
+    """The planar displacement of a following push's instance (``Push.follow``, the touching partner) since the program start,
+    or None below ``push_goal_follow_min_m`` / without a reference. The pushed object's goal was sampled against that instance
+    at its init pose (touching: contact with the partner); release validation 2026-10-03: the gripper opening fully at the
+    place pose shoved the partner 5.5-6.5 mm away from the target, the brace held it there, and the push to the recorded goal
+    ended 6 mm short of touching. ``ctx["push_goal_follow"]`` records the facts."""
+    getter = getattr(state, "init_pose", None)
+    init = getter(action.follow) if getter is not None else None
+    if init is None:
+        return None
+    try:
+        live = state.object_pose(action.follow)
+    except Exception:  # noqa: BLE001
+        return None
+    d = as_world_pose(live)[0].float() - as_world_pose(init)[0].float()
+    d[2] = 0.0
+    dist = float(th.linalg.norm(d))
+    ctx["push_goal_follow"] = {"follow": action.follow, "shift_m": round(dist, 4), "delta": [round(float(v), 4) for v in d.tolist()], "applied": dist >= cfg.push_goal_follow_min_m}
+    return d if dist >= cfg.push_goal_follow_min_m else None
+
+
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
@@ -2358,6 +2398,20 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             # owner 2026-09-26 (axial 0926-043254 / 051919): a push's legs are Cartesian and closed-loop from wherever the hand is -
             # a pre-contact witness trajopt cannot reach (another branch) is replaced by cuRobo's own branch instead of failing
             yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign, accept_other_branch=True)
+    shift = _push_goal_follow(action, state, ctx, cfg) if getattr(action, "follow", None) else None
+    if shift is not None:
+        # after the pad's start was placed against the object where it is: the goal (every stop, residual and re-push below
+        # reads it) moves with the partner, and a straight push line is extended by what the partner moved along it
+        state = _GoalShiftedState(state, obj, shift)
+        d0 = C.as_tensor(targets["direction"]).reshape(-1)[:3].float()
+        d0 = d0 / max(float(th.linalg.norm(d0)), 1e-9)
+        along = float(th.dot(shift, d0))
+        if action.contact.mid is None and along > 0:
+            p_end, q_end = as_world_pose(targets["waypoints"][-1])
+            targets = dict(targets)
+            targets["waypoints"] = list(targets["waypoints"]) + [Pose(position=[float(v) for v in (p_end + d0 * along).tolist()], orientation=[float(v) for v in q_end.tolist()])]
+            ctx["push_goal_follow"]["extended_m"] = round(along, 4)
+        log.info("push(%s): %s moved %.1f mm since the start -> the goal follows it (line extended %.1f mm)", obj, action.follow, float(th.linalg.norm(shift)) * 1000, max(along, 0.0) * 1000)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0

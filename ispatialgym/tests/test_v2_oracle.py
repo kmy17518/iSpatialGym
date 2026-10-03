@@ -2962,11 +2962,13 @@ def test_touching_brace_follows_a_shoved_partner():
     contact / approach move with the partner's planar rigid motion since the program start, beyond ``brace_follow_min_m``;
     a brace of another program (axial, block design) keeps the recorded targets."""
     sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
-    brace = [a for a in expand(sc.alias, sc) if isinstance(a, QA_Brace)][0]
-    assert brace.follow
+    actions = expand(sc.alias, sc)
+    brace = [a for a in actions if isinstance(a, QA_Brace)][0]
+    push = [a for a in actions if isinstance(a, Push)][0]
+    assert brace.follow and push.follow == brace.contact.object
     for name in ("alignment-axial.json", "configuration_matching-block_design.json"):
         other = Sidecar.load(os.path.join(SIDECARS, name))
-        assert not any(a.follow for a in expand(other.alias, other) if isinstance(a, QA_Brace))
+        assert not any(a.follow for a in expand(other.alias, other) if isinstance(a, (QA_Brace, Push)))
     targets = brace.targets(sc, None)
     p0 = th.tensor([1.0, 2.0, 0.85])
     q0 = C.quat_from_yaw(0.3)
@@ -2992,6 +2994,20 @@ def test_touching_brace_follows_a_shoved_partner():
     assert abs(float(th.linalg.norm(c_new - p0)) - float(th.linalg.norm(c_rec - p0))) < 1e-5  # rotated about the partner
     q_want = C.qmul(C.quat_from_yaw(0.05), targets["contact"].tensors()[1])
     assert abs(abs(float(th.dot(out["contact"].tensors()[1], q_want))) - 1.0) < 1e-5
+    # the push's goal follows the partner (planar), seen only through the pushed object's pose target
+    from ispatialgym.eval.targets import PoseTarget
+
+    goal = PoseTarget(instance=push.contact.object, link=None, frame="world", position=th.tensor([3.0, 1.0, 0.9]), orientation=None,
+                      position_metric="full", orientation_metric=None, position_tolerance=0.03, orientation_tolerance=None)
+    st = at([-0.006, 0.0005, 0.002], 0.0)
+    st.pose_target = lambda n: goal if n == push.contact.object else None
+    ctx = {}
+    shift = EX._push_goal_follow(push, st, ctx, cfg)
+    assert shift is not None and ctx["push_goal_follow"]["applied"] and abs(float(shift[2])) < 1e-9
+    moved = EX._GoalShiftedState(st, push.contact.object, shift)
+    assert th.allclose(moved.pose_target(push.contact.object).position, th.tensor([2.994, 1.0005, 0.9]), atol=1e-6)
+    assert moved.pose_target("other") is None and moved.init_pose("x")[0].allclose(p0)
+    assert EX._push_goal_follow(push, at([0.0004, 0.0, 0.0], 0.0), {}, cfg) is None
 
 
 def _wall_push_retreat_world():
