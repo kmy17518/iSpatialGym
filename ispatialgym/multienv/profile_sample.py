@@ -141,6 +141,8 @@ def sample(self, rng):
         kit = self.kit.stats_delta(k0, self.kit.stats_snapshot()) if k0 else {}
         rec = {"alias": getattr(getattr(self, "gp", None), "alias", None), "class": type(self).__name__, "ok": ok, "wall_s": round(wall, 3),
                "python_s": round(py, 3), "buckets": _round(ACC), "regions": _round(REG), "kit": kit}
+        if CP.SEEDED_SPHERE_FIT:  # cumulative: seeded fits and exact-cache hits
+            rec["sphere_fit"] = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in CP._FIT_COUNTS.items()}
         if ATTACH["fit_calls"]:  # cumulative; the sampler may exit before atexit runs
             rec["attach_keys"] = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in ATTACH.items() if k != "keys"} | {
                 "distinct_keys": len(ATTACH["keys"])}

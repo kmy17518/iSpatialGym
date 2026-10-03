@@ -185,10 +185,12 @@ _run_instance = run_isg.run_instance
 
 #: the opt-ins' counters (check modes: calls / mismatches; ISPATIALGYM_SHARED_GOAL_EVAL also counts reuses), cumulative
 #: over the process's instances
-_CHECK_COUNTERS = (("fast_support", "ispatialgym.sampling.predicates_fast", "_COUNTS"),
+_CHECK_COUNTERS = (("fast_geometry", "ispatialgym.eval.geometry_fast", "_COUNTS"),
+                   ("fast_support", "ispatialgym.sampling.predicates_fast", "_COUNTS"),
                    ("fast_assign", "ispatialgym.eval.group_entity", "_ASSIGN_COUNTS"),
                    ("shared_goal", "ispatialgym.tasks.ispatialgym_task", "_SHARED_COUNTS"),
-                   ("world_sync", "ispatialgym.oracle.curobo_planner", "_WS_COUNTS"))
+                   ("world_sync", "ispatialgym.oracle.curobo_planner", "_WS_COUNTS"),
+                   ("sphere_fit", "ispatialgym.oracle.curobo_planner", "_FIT_COUNTS"))
 
 
 def _check_counts():

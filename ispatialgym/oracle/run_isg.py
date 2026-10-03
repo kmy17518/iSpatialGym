@@ -1194,6 +1194,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         timings["total_s"] = time.time() - t_start
         meta["timings"] = timings
         meta["wall_time_s"] = timings["total_s"]
+        _backend = locals().get("backend")
+        if os.environ.get("ISPATIALGYM_EXECUTOR_MESH_CACHE") and _backend is not None:
+            # the store cannot grow: meshes held (loaded ones stay, disabled, once their object leaves) vs capacity
+            meta["executor_mesh_store"] = {"capacity": int(_backend.mesh_cache_size), "meshes": len(_backend._world_mesh_names),
+                                           "free": int(_backend.mesh_cache_size) - len(_backend._world_mesh_names)}
         result["wall_time_s"] = round(timings["total_s"], 1)
         result["exit_code"] = exit_code
         if recorder is not None:
