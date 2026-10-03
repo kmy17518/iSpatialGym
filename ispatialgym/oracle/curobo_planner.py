@@ -125,6 +125,59 @@ log = logging.getLogger(__name__)
 BATCHED_WORLD_SYNC = os.environ.get("ISPATIALGYM_BATCHED_WORLD_SYNC", "")
 _WS_COUNTS = {"calls": 0, "meshes": 0, "mismatches": 0}
 
+#: ISPATIALGYM_SEEDED_SPHERE_FIT (changes the fitted spheres, hence sampled instances and demos, once): =1 seeds each
+#: attach sphere fit (morphit: torch and numpy random draws) from a hash of its exact inputs - the collision meshes'
+#: prim paths, vertices, faces, scales and float32 poses in the eef frame, and the sphere count - with the global torch /
+#: numpy / random generators saved and restored around it, so a fit no longer shifts the process's other random draws
+#: and the same inputs always give the same spheres; =cache also keeps every fit by that key (an exact cache, since the
+#: fit is then a function of its key). Unset: the global generators, as before.
+SEEDED_SPHERE_FIT = os.environ.get("ISPATIALGYM_SEEDED_SPHERE_FIT", "")
+_FIT_CACHE: Dict[str, th.Tensor] = {}
+_FIT_COUNTS = {"fits": 0, "fit_s": 0.0, "hits": 0}
+
+
+def _sphere_fit_key(obstacles, num_spheres: int) -> str:
+    import hashlib
+
+    h = hashlib.sha256()
+    for ob in obstacles:
+        h.update(str(ob.name).encode())
+        h.update(np.ascontiguousarray(ob.vertices, dtype=np.float32).tobytes())
+        h.update(np.ascontiguousarray(ob.faces, dtype=np.int64).tobytes())
+        h.update(np.asarray(1.0 if ob.scale is None else ob.scale, dtype=np.float32).tobytes())
+        h.update(np.asarray(ob.pose, dtype=np.float32).tobytes())
+    h.update(str(int(num_spheres)).encode())
+    return h.hexdigest()
+
+
+def fit_attach_spheres(am, obstacles, num_spheres: int) -> th.Tensor:
+    """``am.fit_spheres(obstacles, num_spheres=num_spheres)``, seeded / cached per ISPATIALGYM_SEEDED_SPHERE_FIT."""
+    if not SEEDED_SPHERE_FIT:
+        return am.fit_spheres(obstacles, num_spheres=num_spheres)
+    import random
+
+    key = _sphere_fit_key(obstacles, num_spheres)
+    if SEEDED_SPHERE_FIT == "cache" and key in _FIT_CACHE:
+        _FIT_COUNTS["hits"] += 1
+        return _FIT_CACHE[key].clone()
+    seed = int(key[:16], 16)
+    t0 = time.perf_counter()
+    np_state, py_state = np.random.get_state(), random.getstate()
+    with th.random.fork_rng(devices=list(range(th.cuda.device_count()))):
+        th.manual_seed(seed)
+        np.random.seed(seed % 2**32)
+        random.seed(seed)
+        try:
+            out = am.fit_spheres(obstacles, num_spheres=num_spheres)
+        finally:
+            np.random.set_state(np_state)
+            random.setstate(py_state)
+    _FIT_COUNTS["fits"] += 1
+    _FIT_COUNTS["fit_s"] += time.perf_counter() - t0
+    if SEEDED_SPHERE_FIT == "cache":
+        _FIT_CACHE[key] = out.detach().clone()
+    return out
+
 
 class _PoseBatch:
     def __init__(self, planner):
@@ -836,7 +889,7 @@ class R1ProCuRobo:
             # operates on the KinematicsParams shared by all solvers of this planner
             am = AttachmentManager(kinematics=entry.fk, scene_collision=self.checker, device_cfg=self.device_cfg)
             if sphere_tensor is None:
-                sphere_tensor = am.fit_spheres(obstacles, num_spheres=num_spheres or M.ATTACHED_OBJECT_NUM_SPHERES)
+                sphere_tensor = fit_attach_spheres(am, obstacles, num_spheres or M.ATTACHED_OBJECT_NUM_SPHERES)
             am.update(sphere_tensor, self._active_js(entry, self.q_full()), link_name=link_name, world_objects_pose_offset=None)
         for n in mesh_names:
             if n in self._world_mesh_names:
