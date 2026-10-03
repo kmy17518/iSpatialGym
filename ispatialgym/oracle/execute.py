@@ -1098,10 +1098,19 @@ def post_reorient(action: Reorient, state, targets, ctx) -> Optional[str]:
     return _eef_reached(state, action.arm, targets["waypoints"][-1], _cfg(ctx), "reorient")
 
 
-def _release(motions: Motions, state, arm: str) -> None:
-    """Release whatever the arm holds (assisted grasp + planner attachment); idempotent."""
+RELEASE_WAIT_STEPS = 30
+
+
+def _release(motions: Motions, state, arm: str) -> Iterator[th.Tensor]:
+    """After the open command: hold until OmniGibson's assisted grasp has let go of what the arm held (its rule acts at the
+    open command, the in-hand registry clears after its release window), then drop the planner attachment. Nothing is
+    released directly - a demo must release the way a policy does; a grasp that does not let go fails the action."""
+    for _ in range(RELEASE_WAIT_STEPS):
+        if state.held_object(arm) is None:
+            break
+        yield from motions.hold(1)
     if state.held_object(arm) is not None:
-        state.robot.release_grasp_immediately(arm)
+        raise SkillError("execution", f"the assisted grasp of {arm} did not let go at the open command", arm=arm)
     motions.backend.detach_object(arm)
 
 
@@ -1277,7 +1286,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
-    _release(motions, state, arm)
+    yield from _release(motions, state, arm)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
     # release: a differential-IK stall is finished by arm_to like the Retreat action's leg (touching 0917-203045: the
@@ -1556,6 +1565,9 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     # drop the assisted grasp and attach in one step (no physics in between): the fixed joint is created at the current relative
     # pose of the meta links (predicates.attach_in_place), so the part does not move when it appears nor when the fingers open
     if state.held_object(arm) is not None:
+        # the attach placement's direct release stays (lid / cap / cork are outside the command-based release); the
+        # executor's release check exempts it by this event
+        motions.release_events.append({"arm": arm, "event": "attach_release", "object": action.object})
         state.robot.release_grasp_immediately(arm)
     motions.backend.detach_object(arm)
     ok = bool(state.attach(action.object, action.on))
@@ -1657,8 +1669,8 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             # pre-shape width, slides off the free edge (Retreat._edge_escape) and completes the opening once clear
             art = getattr(getattr(action, "after", None), "articulation", None)
             sheet = bool(art is not None and (getattr(art, "extra", None) or {}).get("handle_kind") == "edge_lid")
-            yield from motions.gripper(arm, close=False, staged=(not articulated) or sheet)
-            _release(motions, state, arm)
+            yield from motions.gripper(arm, close=False, staged=sheet)
+            yield from _release(motions, state, arm)
             if articulated and cfg.release_settle_steps > 0:
                 # let the constraint-removal transient die before the arm moves off the handle (the leaf keeps its angle
                 # through the counterbalance / friction; the torso rock of 0920-002330 happened while the leg started)
@@ -2931,7 +2943,7 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
                 total += motions.unwind(arm)
             yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
             yield from motions.gripper(arm, close=False, staged=False)
-            _release(motions, state, arm)
+            yield from _release(motions, state, arm)
             # the gripper-in-FOV span closes at the release and re-opens at the next pre-grasp (qa.py rule (b): "the
             # retreat legs and the transit to the next pre-grasp are unmonitored; every grasp -> release pair is its own
             # span") - door 0921-045829: the retreated hand, 0.32 m below the camera, tripped the monitor during the drive

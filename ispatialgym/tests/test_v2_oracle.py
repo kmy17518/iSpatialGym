@@ -1905,12 +1905,13 @@ def test_epilogue_reports_the_predicate_branch_of_the_final_binary_evaluation(tm
     assert result2["success"] and result2["binary_branch"] == {} and result2["binary_branch_fallback"] == [] and result2["binary_branch_log"] == []
 
 
-def test_release_is_rate_limited_and_staged_until_the_hand_clears():
-    """Owner 2026-09-16 21:18 (nextto 0916-201902 / 0916-201730): opening moves ramp at ``gripper_open_rate``; the release
-    of a held object is staged - first to the pre-shape width (pinch / 2 + margin, or the executor's capped value), the
-    full opening deferred until the hand has moved ``gripper_release_clearance_m`` from the release pose (completed by
-    the retreat leg through ``_emit``, ending on the exact open command); a gripper holding nothing opens fully in one
-    ramp; a new gripper command supersedes a pending deferred opening; the state round-trips through the checkpoints."""
+def test_release_ramps_to_open_and_only_an_articulated_part_stages():
+    """Owner 2026-10-03 (release semantics): opening moves ramp at ``gripper_open_rate`` to exactly the open command (+1);
+    a held free object is released by that command, with nothing staged or deferred. Only an articulated part pinched
+    across its thickness (a carton flap) stages: first to the pre-shape width (or the executor's value) with the assisted
+    grasp still holding it, the full opening deferred until the hand has moved ``gripper_release_clearance_m`` (or
+    ``gripper_release_deferred_max_steps`` passed) and ending on the +1 that releases it; a closing command supersedes a
+    pending deferral and the deferral round-trips through the checkpoints."""
     robot = FakeRobot()
     env = FakeEnv(robot, {})
     m = Motions(env, FakeBackend(robot), MotionsConfig(gripper_steps=30, settle_steps=5, cartesian_step=0.05, cartesian_rot_step=0.3))
@@ -1925,51 +1926,54 @@ def test_release_is_rate_limited_and_staged_until_the_hand_clears():
     ramp = [t for t in targets if t < 0.05 - 1e-9]
     assert len(ramp) == 22 and all(abs((ramp[i + 1] - ramp[i]) - 0.00225) < 1e-6 for i in range(len(ramp) - 1)), ramp
     assert cmds[len(ramp)] == 1.0 and cmds[-1] == 1.0 and not m.gripper_closed("right") and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
-    # (b) a held object with the grasp's pre-shape remembered: the release stops at the pre-shape width, the object is let
-    # go of (assisted grasp dropped, body woken) before the first opening step, the deferred opening is pending
+    # (b) a held free object, its grasp's pre-shape remembered: the same ramp to exactly +1, released by that command
     ep, _ = robot.eef_pose("right")
     marker = FakeObject("marker_xakoic_0", ep.tolist(), category="marker", extent=(0.1536, 0.0171, 0.0141))
     env.objects["marker.n.03_1"] = marker
     drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
-    assert m.preshape_opening["right"] == 0.017925 and not m.gripper_closed("right")
     drive(env, m.gripper("right", close=True, rate=0.00225))
     assert robot._ag_obj_in_hand["right"] is marker and m.gripper_closed("right")
     cmds.clear()
     drive(env, m.gripper("right", close=False))
-    stage = 0.017925
-    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and robot._ag_obj_in_hand["right"] is None and marker.woken >= 1
-    assert not m.gripper_closed("right") and "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == stage
     opened = [0.05 * (c + 1.0) / 2.0 for c in cmds]
-    assert max(opened) <= stage + 1e-6 and all(opened[i + 1] - opened[i] <= 0.00225 + 1e-6 for i in range(len(opened) - 1))
-    assert m.release_events[-1]["event"] == "staged" and m.release_events[-1]["source"] == "preshape" and m.release_events[-1]["stage_m"] == 0.0179
-    # the explicit release (execute_place) detaches; holding the hand still keeps the fingers at the stage (no clearance)
-    robot._ag_obj_in_hand["right"] = None
+    assert all(opened[i + 1] - opened[i] <= 0.00225 + 1e-6 for i in range(len(opened) - 1)) and cmds[-1] == 1.0
+    assert robot._ag_obj_in_hand["right"] is None and "right" not in m.deferred_open and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    assert not any(e["event"] == "staged" for e in m.release_events)
     m.backend.detach_object("right")
-    drive(env, m.hold(40))
-    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and "right" in m.deferred_open and m.deferred_open["right"]["steps"] >= 40  # + the release's own wait steps
-    # (c) the retreat leg lifts the hand: past 3 cm the deferred opening ramps to fully open at 2.25 mm/step, exactly +1 at the end
+    # (c) an articulated flap: staged at the pre-shape width with the assisted grasp still on it; the retreat leg's
+    # clearance completes the opening at 2.25 mm/step, exactly +1 at the end, which releases it
+    del env.objects["marker.n.03_1"]
+    ep, _ = robot.eef_pose("right")
+    flap = FakeObject("carton_flap_0", ep.tolist(), category="carton", extent=(0.1536, 0.0171, 0.0141), joints=["flap_joint"])
+    env.objects["carton.n.02_1"] = flap
+    drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    assert robot._ag_obj_in_hand["right"] is flap
+    drive(env, m.gripper("right", close=False))
+    stage = 0.017925
+    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and robot._ag_obj_in_hand["right"] is flap
+    assert "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == stage
+    assert m.release_events[-1]["event"] == "staged" and m.release_events[-1]["ag_released"] == "deferred_open"
     cmds.clear()
     p0, q0 = m.eef_pose("right")
     drive(env, m.arm_along("right", [(p0 + th.tensor([0.0, 0.0, 0.10]), q0)]))
-    assert "right" not in m.deferred_open and cmds[-1] == 1.0 and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    assert "right" not in m.deferred_open and cmds[-1] == 1.0 and robot._ag_obj_in_hand["right"] is None
     ev = m.release_events[-1]
     assert ev["event"] == "full_open" and ev["by"] == "clearance" and 0.03 <= ev["started_clearance_m"] < 0.04, ev
-    opened = [0.05 * (c + 1.0) / 2.0 for c in cmds]
-    first_move = next(i for i, t in enumerate(opened) if t > stage + 1e-9)
-    assert first_move > 0 and all(opened[i + 1] - opened[i] <= 0.00225 + 1e-6 for i in range(first_move, len(opened) - 1))
-    assert "right" not in m.preshape_opening
-    # (d) the executor's sidecar-derived first stage wins over the pre-shape; a closing command supersedes a pending deferral
-    robot.ag_fail_next = 0
+    # (d) the executor's value wins over the pre-shape; a closing command supersedes a pending deferral; checkpoints
+    m.backend.detach_object("right")
+    p1, q1 = m.eef_pose("right")
+    flap.pos = p1.clone()
     drive(env, m.gripper_opening("right", 0.030))
     drive(env, m.gripper("right", close=True, rate=0.00225))
-    assert robot._ag_obj_in_hand["right"] is marker
+    assert robot._ag_obj_in_hand["right"] is flap
     m.release_opening["right"] = 0.021
     drive(env, m.gripper("right", close=False))
     assert abs(float(robot.q[idx].max()) - 0.021) < 1e-6 and m.release_events[-1]["source"] == "release_opening"
     st = m.export_state()
     assert st["deferred_open"]["right"]["stage_m"] == 0.021 and st["gripper_intent_closed"]["right"] is False
     drive(env, m.gripper("right", close=True))
-    assert "right" not in m.deferred_open and m.gripper_closed("right") and float(robot.q[idx].max()) <= 0.021 + 1e-6
+    assert "right" not in m.deferred_open and m.gripper_closed("right")
     m.import_state(st)
     assert "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == 0.021 and not m.gripper_closed("right")
     # (e) the deferred opening completes at the latest after gripper_release_deferred_max_steps without any clearance
@@ -1977,16 +1981,13 @@ def test_release_is_rate_limited_and_staged_until_the_hand_clears():
     m.deferred_open["right"]["steps"] = 0
     drive(env, m.hold(60))
     assert "right" not in m.deferred_open and m.release_events[-1]["by"] == "max_steps" and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
-    # (f) a pre-shape narrower than the current fingers stages nothing (the pads already clear the object)
-    drive(env, m.gripper("right", close=False))
     env.after_step = None
 
 
-def test_place_releases_in_two_stages_and_the_retreat_completes_the_opening(tmp_path):
-    """The executor derives the first stage from the sidecar (library pinch 73.4 mm / 2 + 10 mm = 46.7 mm; capped by the
-    sampler's ``release_sweep.release_opening_max_m`` / 2 when recorded), ``execute_place`` needs no edit: its
-    ``gripper(open)`` stops at the stage and its retreat leg (10 cm along -a) completes the full opening once the hand
-    is 3 cm away; both events are in the place's notes; the object is released (the explicit release) and the demo passes."""
+def test_place_releases_with_the_open_command_at_the_place_pose(tmp_path):
+    """Owner 2026-10-03: the place opens the gripper to exactly +1 at the place pose and the assisted grasp lets go at
+    that command, before the retreat; no staged opening, no deferred one; the opening never jumps (2.25 mm per step from
+    the closure's contact hold on); the release check counts one commanded release and no violation; the demo passes."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     robot = env.robot
@@ -1996,26 +1997,17 @@ def test_place_releases_in_two_stages_and_the_retreat_completes_the_opening(tmp_
     result = ex.run_program(expand(sc.alias, sc))
     assert result["success"], result["verdict"]
     place = result["actions"][3]
-    assert place["name"] == "place" and abs(place["notes"]["release_stage_m"] - (0.5 * 0.0734 + 0.010)) < 1e-6
-    events = place["notes"]["release"]
-    assert [e["event"] for e in events] == ["staged", "full_open"], events
-    assert events[0]["source"] == "release_opening" and abs(events[0]["stage_m"] - round(0.5 * 0.0734 + 0.010, 4)) < 1e-6
-    assert events[1]["by"] == "clearance" and events[1]["started_clearance_m"] >= 0.03 and events[1]["clearance_m"] <= 0.10 + 1e-6
+    assert place["name"] == "place" and not [e for e in place["notes"].get("release") or [] if e["event"] in ("staged", "full_open")]
     assert robot._ag_obj_in_hand["right"] is None and float(robot.q[robot.gripper_control_idx["right"]].max()) > 0.049
-    # the opening never jumps: every command step opens the fingers by at most 2.25 mm (from the closure's contact hold on)
     i0 = min(range(len(cmds)), key=lambda i: cmds[i])
     assert -1.0 < cmds[i0] < 0.9  # the symmetric closure holds at the apple's contact width, never at -1
     steps = [0.05 * (b - a) / 2.0 for a, b in zip(cmds[i0:-1], cmds[i0 + 1:]) if b > a]
-    assert steps and max(steps) <= 0.00225 + 1e-6, max(steps)
-    # the sampler's release sweep caps the first stage (core 385de1e: the largest symmetric opening clearing the partner)
+    assert steps and max(steps) <= 0.00225 + 1e-6 and 1.0 in cmds[i0:], max(steps)
+    assert not result["release_check"]["violations"]
+    # the executor's first-stage value (still used by an articulated part) is unchanged: sidecar pinch, sweep cap
     sc2, env2 = iors_world()
-    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
     sc2.grasps[0].extra["release_sweep"] = {"release_opening_max_m": 0.086, "pinch_width_m": 0.0734, "clearance_at_place_m": -0.004}
     ex2, motions2, *_ = make_executor(env2, sc2, tmp_path / "b")
-    result2 = ex2.run_program(expand(sc2.alias, sc2))
-    assert result2["success"], result2["verdict"]
-    ev2 = result2["actions"][3]["notes"]["release"]
-    assert abs(result2["actions"][3]["notes"]["release_stage_m"] - 0.043) < 1e-6 and ev2[0]["stage_m"] == 0.043 and ev2[1]["event"] == "full_open"
     # a cap below pinch / 2 + 5 mm is not honoured (never less than 5 mm of clearance per pad)
     assert abs(ex2.release_stage_opening(SimpleNamespace(object="apple.n.01_1", arm="right")) - 0.043) < 1e-6
     sc2.grasps[0].extra["release_sweep"]["release_opening_max_m"] = 0.075
@@ -3916,27 +3908,30 @@ def _held_marker(joints=None):
     return robot, env, m, marker
 
 
-def test_a6_free_object_is_let_go_before_the_first_opening_step():
-    """First-demo v2 A6 (inside 0926-075013: the sprouts hung 1.3 s above the bowl): a free object leaves the hand as the
-    fingers start to open - the assisted grasp is gone from the first opening step on and the body is woken once."""
+def test_free_object_is_released_by_the_open_command():
+    """Release semantics (owner 2026-10-03): a held free object leaves the hand only through OmniGibson's rule - the
+    command ramps to exactly +1 with the hand still, the assisted grasp holds it while the command is below +1 and lets
+    go at the first +1 step; nothing is released directly and no opening is deferred."""
     robot, env, m, marker = _held_marker()
     seen = []
-    env.after_step = lambda a: seen.append(robot._ag_obj_in_hand["right"])
-    woken0 = marker.woken
+    cmd_idx = robot.controller_action_idx["gripper_right"]
+    env.after_step = lambda a: seen.append((float(a[cmd_idx]), robot._ag_obj_in_hand["right"]))
+    robot.release_grasp_immediately = lambda arm: (_ for _ in ()).throw(AssertionError("direct release"))
     drive(env, m.gripper("right", close=False))
     env.after_step = None
-    assert seen and all(s is None for s in seen), "the assisted grasp must be gone from the first opening step on"
-    assert marker.woken == woken0 + 1 and "right" not in m.pending_wake
-    ev = m.release_events[-1]
-    assert ev["event"] == "staged" and ev["ag_released"] == "first_increment"
-    assert "right" in m.deferred_open  # the staged finger opening itself is unchanged: the full opening stays deferred
+    first_free = next(i for i, (_, held) in enumerate(seen) if held is None)
+    assert all(held is marker and cmd < 1.0 for cmd, held in seen[:first_free]), "held while the command is below +1"
+    assert seen[first_free][0] == 1.0, "let go at the step whose command is exactly +1"
+    assert "right" not in m.deferred_open and not any(e.get("event") == "staged" for e in m.release_events)
 
 
-def test_a6_articulated_link_keeps_the_callers_release():
+def test_articulated_sheet_keeps_its_staged_opening():
+    """A flap (an articulated part) pinched across its thickness still opens in two stages: the assisted grasp keeps it
+    until the deferred full opening, which is the same +1 command."""
     robot, env, m, marker = _held_marker(joints=["flap_joint"])
     drive(env, m.gripper("right", close=False))
-    assert robot._ag_obj_in_hand["right"] is marker and m.pending_wake.get("right") is marker
-    assert m.release_events[-1]["ag_released"] == "caller"
+    assert robot._ag_obj_in_hand["right"] is marker and "right" in m.deferred_open
+    assert m.release_events[-1]["event"] == "staged" and m.release_events[-1]["ag_released"] == "deferred_open"
 
 
 def _arching(backend, robot, arm, rise):
