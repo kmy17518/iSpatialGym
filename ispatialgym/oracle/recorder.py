@@ -83,6 +83,14 @@ def pose7(pos, quat) -> np.ndarray:
     return np.concatenate([np.asarray(th.as_tensor(pos).detach().cpu(), dtype=np.float32), np.asarray(th.as_tensor(quat).detach().cpu(), dtype=np.float32)])
 
 
+#: ISPATIALGYM_RECORD_LINK_POSES=1 (opt-in, adds a dataset): ``isg/link_poses`` (T, L, 7) - every step's world pose (pos
+#: xyz, quat xyzw) of each link of the scene's movable objects (the robot, articulated or free objects; fixed-base
+#: objects without joints never move), read from the physics state like the other poses here, so it works without
+#: rendering; the link prim paths in the data group's ``isg_link_pose_paths`` attribute. What a Fabric-direct replayer
+#: writes per tick instead of loading the recorded state.
+RECORD_LINK_POSES = os.environ.get("ISPATIALGYM_RECORD_LINK_POSES") == "1"
+
+
 def sensor_name(key: str) -> str:
     """LeRobot observation name of a sensor key, as ``LeRobotDataWrapper.get_lerobot_obs_mapping``:
     ``robot_r1:zed_link:Camera:0`` -> ``zed_link_camera_0``."""
@@ -328,6 +336,14 @@ class Recorder:
 
     # ------------------------------------------------------------------ start
 
+    def _pose_links(self) -> list:
+        links = getattr(self, "_pose_links_cache", None)
+        if links is None:
+            objs = [o for o in self.robot.scene.objects if not (getattr(o, "fixed_base", False) and not getattr(o, "joints", None))]
+            links = sorted((link for o in objs for link in o.links.values()), key=lambda link: link.prim_path)
+            self._pose_links_cache = links
+        return links
+
     def _robot_obs(self, obs) -> Dict[str, Any]:
         if obs is None:
             return {}
@@ -566,6 +582,8 @@ class Recorder:
             r["head_camera_pose"].append(pose7(*self.robot.sensors[self.cam_key].get_position_orientation()))
         for inst, obj in self.objects.items():
             r[f"object_pose/{inst}"].append(pose7(*obj.get_position_orientation()))
+        if RECORD_LINK_POSES:
+            r["link_poses"].append(np.stack([pose7(*link.get_position_orientation()) for link in self._pose_links()]))
         isg = (info or {}).get("done", {}).get("ispatialgym") or (info or {}).get("ispatialgym") or {}
         r["eval/binary_success"].append(bool(isg.get("binary_success", False)))
         r["eval/settled"].append(bool(isg.get("settled", False)))
@@ -894,6 +912,8 @@ class Recorder:
             data.attrs["controller_dims"] = json.dumps(M.CONTROLLER_DIMS)
             data.attrs["joint_names"] = json.dumps(list(getattr(self.robot, "joints", {}).keys()))
             data.attrs["pose_layout"] = "pos xyz, quat xyzw"
+            if RECORD_LINK_POSES:
+                data.attrs["isg_link_pose_paths"] = json.dumps([link.prim_path for link in self._pose_links()])
             data.attrs["fps"] = self.fps
             data.attrs["robot_name"] = self.robot.name
             data.attrs["head_camera_key"] = self.cam_key
