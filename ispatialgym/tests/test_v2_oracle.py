@@ -4136,3 +4136,19 @@ def test_lever_grasp_transit_takes_the_witness_branch_when_the_detour_branch_sto
             assert m.calls == [("probe", 4), ("along", 4)] and ctx["pre_grasp_transit"].startswith("cartesian detour")
         else:
             assert m.calls == [("probe", 4), ("arm_to", True)] and ctx["pre_grasp_transit"].startswith("witness branch")
+
+
+def test_ag_joint_rule_is_the_tasks_not_the_oracles():
+    """The assisted-grasp joint of a link behind a movable joint is a rule of the environment, not of the oracle:
+    ``ISpatialGymTask`` sets our Behavior-1K fork's ``Robot.ag_moving_link_joint_type`` (fixed) on every robot, so a recorded
+    demo and an evaluated policy (``run_isg --mode replay / policy``) meet the same joint. No oracle module overrides
+    OmniGibson's joint choice or the setting (the 2026-10 evaluation found the oracle-only fixed joint: replays of the
+    blender demos under the stock spherical joint never opened the lid)."""
+    pkg = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    task = open(os.path.join(pkg, "tasks", "ispatialgym_task.py")).read()
+    assert 'AG_MOVING_LINK_JOINT_TYPE = "FixedJoint"' in task
+    assert "robot.ag_moving_link_joint_type = AG_MOVING_LINK_JOINT_TYPE" in task
+    for path in glob.glob(os.path.join(pkg, "oracle", "*.py")):
+        src = open(path).read()
+        assert "_get_assisted_grasp_joint_type =" not in src, path
+        assert "ag_moving_link_joint_type" not in src, path

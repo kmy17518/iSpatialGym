@@ -178,9 +178,6 @@ class ExecuteConfig:
     #: goal tolerance (arcs / lines) instead of driving the pad to the recorded end
     push_stop_at_goal: bool = True
     push_stop_frac_arc: float = 0.15
-    #: handle grasps (articulation) attach the assisted grasp with a FixedJoint instead of OmniGibson's SphericalJoint for
-    #: links behind a movable joint (2026-09-18: the lid did not turn with the hand, ghost_hand 29 deg on a 4 cm lever)
-    handle_grasp_fixed_ag: bool = True
     push_stop_frac_line: float = 0.0
     #: (2026-09-22, alignment-world_vertical 0918-000750) pad speed along a push ARC about a hinge (m/s; the approach to the
     #: first contact keeps ``cartesian_speed``). The hinge torque is friction + damping * omega, so at the former 0.10 m/s
@@ -534,26 +531,6 @@ def _hook(ctx: Dict[str, Any], name: str):
     """An executor hook (``ctx["hooks"][name]``; a no-op without an executor): ``fov(enabled)`` enables / disables
     the gripper-in-FOV monitor around the checked segment of the action (``qa.Monitors`` arming rule)."""
     return (ctx.get("hooks") or {}).get(name) or (lambda *a, **k: None)
-
-
-def _patch_ag_joint_type(robot, joint_type: Optional[str]) -> None:
-    """Force the assisted-grasp joint type OmniGibson picks for the next attachment (``robot._get_assisted_grasp_joint_type``:
-    FixedJoint for rigid bodies, SphericalJoint for a link behind a movable joint). ``joint_type`` = ``"FixedJoint"`` installs
-    the override (objects the stock rule refuses - too heavy - stay refused), ``None`` restores the stock method."""
-    if joint_type is None:
-        orig = getattr(robot, "_isg_ag_joint_type_orig", None)
-        if orig is not None:
-            robot._get_assisted_grasp_joint_type = orig
-            del robot._isg_ag_joint_type_orig
-        return
-    if getattr(robot, "_isg_ag_joint_type_orig", None) is None:
-        robot._isg_ag_joint_type_orig = robot._get_assisted_grasp_joint_type
-
-    def forced(target_obj, target_link_name, _orig=robot._isg_ag_joint_type_orig, _kind=joint_type):
-        stock = _orig(target_obj, target_link_name)
-        return None if stock is None else _kind
-
-    robot._get_assisted_grasp_joint_type = forced
 
 
 def _witness(ctx: Dict[str, Any], key: str):
@@ -1033,22 +1010,12 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     yield from motions.arm_along(arm, targets["approach"], finish=finish)
     if finish.used:
         ctx["approach_finish"] = finish.info
-    # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step
-    # 2026-09-18 (blender cwkvib 0918-225935, ghost_hand "drifted 2 cm / 29 deg" at the follow): OmniGibson attaches an assisted
-    # grasp on a link behind a movable joint (a lid, a door leaf) with a SPHERICAL joint at the contact point - the hand can
-    # turn without turning the link, and the arm's arc-tracking slack (1 cm) is tens of degrees on a 4 cm handle lever. A
-    # handle pinched across a 13 mm tab transmits torque in reality: handle grasps attach with a FIXED joint (the only
-    # kind the follow was designed for; the dishwasher survived the spherical one only through its 30 cm lever)
-    fixed_ag = cfg.handle_grasp_fixed_ag and action.kind == "handle"
-    if fixed_ag:
-        _patch_ag_joint_type(motions.robot, "FixedJoint")
-    try:
-        yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
-    finally:
-        if fixed_ag:
-            _patch_ag_joint_type(motions.robot, None)
+    # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step. A handle's
+    # link is attached with a FIXED joint by the task's rule (ISpatialGymTask: AG_MOVING_LINK_JOINT_TYPE), the only kind the
+    # follow was designed for - the same rule an evaluated policy's grasp meets
+    yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
     ctx["closure_rate_m_per_step"] = motions.cfg.gripper_close_rate
-    if fixed_ag:
+    if action.kind == "handle":
         params = (getattr(motions.robot, "_ag_obj_constraint_params", None) or {}).get(arm) or {}
         ctx["ag_joint_type"] = params.get("joint_type")
     held = state.held_object(arm)
@@ -3101,14 +3068,7 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
                 fov_hook(True)  # the pre-grasp is reached: the next grasp -> release span opens
             finish = ApproachFinish(grasp, q_hint=_witness(ctx, f"regrasp[{j}]"), ignore_objects=[obj], max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
             yield from motions.arm_along(arm, [grasp], finish=finish)
-            fixed_ag = cfg.handle_grasp_fixed_ag
-            if fixed_ag:
-                _patch_ag_joint_type(robot, "FixedJoint")
-            try:
-                yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
-            finally:
-                if fixed_ag:
-                    _patch_ag_joint_type(robot, None)
+            yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
             if state.held_object(arm) is not obj:
                 raise SkillError("failed_grasp", f"{art.object} not in the {arm} hand after the re-grasp of segment {j}", stage="regrasp")
             motions.backend.attach_object(arm, obj)
