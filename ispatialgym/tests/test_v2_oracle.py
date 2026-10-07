@@ -3979,6 +3979,34 @@ def test_free_object_is_released_by_the_open_command():
     assert "right" not in m.deferred_open and not any(e.get("event") == "staged" for e in m.release_events)
 
 
+def test_attach_rule_acts_at_the_release(monkeypatch):
+    """Attach tasks (owner 2026-10-06): the part leaves the hand by the open command like any place, and at the instant the
+    assisted grasp lets go the release hook joins a registered attachment child to its parent through the task's attach
+    rule (``released``: the in-hand registry still names it until the release window ends); any other released object is
+    left alone."""
+    from ispatialgym.sampling import predicates as PRED
+
+    calls = []
+
+    def fake_attach(child, parent, equivalences=None, in_place=True, released=False):
+        calls.append((child.name, parent.name, released))
+        return {"ok": True, "attached": True, "joint": "in_place", "fix": "T"}
+
+    monkeypatch.setattr(PRED, "attach_if_aligned", fake_attach)
+    reg = {n: SimpleNamespace(name=n) for n in ("cork_0", "wine_bottle_0", "apple_0")}
+    scene = SimpleNamespace(object_registry=lambda key, name: reg.get(name))
+    for o in reg.values():
+        o.scene = scene
+    PRED.set_attachment_context([{"child": "cork_0", "parent": "wine_bottle_0", "equivalences": []}])
+    try:
+        rec = PRED.attach_on_release(None, "right", reg["cork_0"])
+        assert calls == [("cork_0", "wine_bottle_0", True)] and rec["hook"] == "release" and rec["parent"] == "wine_bottle_0"
+        assert PRED.LAST_RELEASE_ATTACH["attached"] and "fix" not in PRED.LAST_RELEASE_ATTACH
+        assert PRED.attach_on_release(None, "right", reg["apple_0"]) is None and len(calls) == 1
+    finally:
+        PRED.set_attachment_context([])
+
+
 def test_articulated_sheet_keeps_its_staged_opening():
     """A flap (an articulated part) pinched across its thickness still opens in two stages: the assisted grasp keeps it
     until the deferred full opening, which is the same +1 command."""

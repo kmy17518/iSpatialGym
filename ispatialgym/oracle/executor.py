@@ -788,8 +788,8 @@ class Executor:
         self.last_info: Dict[str, Any] = {}
         self.phase_steps: Dict[int, int] = {PHASE_ORACLE: 0, PHASE_SETTLE: 0, PHASE_GOAL: 0}
         #: every assisted-grasp release of the episode: it must come from OmniGibson's rule at a recorded gripper command of
-        #: exactly +1 (what an evaluated policy can do); a release between steps (a direct call) is a violation, except the
-        #: attach placement's (``attach_release`` event) - rollbacks reset the tracking
+        #: exactly +1 (what an evaluated policy can do); a release between steps (a direct call) is a violation - rollbacks
+        #: reset the tracking
         self.release_check: Dict[str, Any] = {"releases": [], "violations": []}
         self._ag_last: Optional[Dict[str, Optional[str]]] = None
         self.stats: QAStats = monitors.stats if monitors is not None else QAStats()
@@ -856,13 +856,8 @@ class Executor:
 
     def _check_releases(self, before: Dict[str, Optional[str]], after: Dict[str, Optional[str]], action: th.Tensor) -> None:
         if self._ag_last is not None:
-            events = list(getattr(self.motions, "release_events", None) or []) if self.motions is not None else []
             for arm, obj in self._ag_last.items():
                 if obj is not None and before.get(arm) is None:
-                    attach = next((e for e in events if e.get("event") == "attach_release" and e.get("arm") == arm and not e.get("_seen")), None)
-                    if attach is not None:
-                        attach["_seen"] = True
-                        continue
                     self.release_check["violations"].append({"step": self.n + 1, "arm": arm, "object": obj, "kind": "released_between_steps"})
         for arm, obj in before.items():
             if obj is not None and after.get(arm) is None:

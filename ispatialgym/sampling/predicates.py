@@ -356,14 +356,16 @@ def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, 
     return True
 
 
-def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None, in_place: bool = True) -> Dict[str, Any]:
+def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None, in_place: bool = True,
+                      released: bool = False) -> Dict[str, Any]:
     """The BEHAVIOR attachment of ``child`` to ``parent`` when :func:`attachment_alignment` passes (its thresholds met modulo
     the symmetry): the fixed joint is created at the current relative pose (:func:`attach_in_place`; ``in_place`` False =
     the stock ``AttachedTo.set_value(True, bypass_alignment_checking=True)``, which snaps the child onto the raw female
     frame first). Never while a robot holds the child (0919-174551: the evaluator's per-step check joined the lid to the
     teapot halfway down the place descent, still in the hand, and snapped it 4 cm out of the grasp path — the part must be
-    released first, as the goal's ``(not (grasped ...))`` atoms say; the oracle drops the assisted grasp before its own
-    attach). Returns the alignment record with ``attached`` and ``joint`` (``in_place`` / ``set_value``)."""
+    released first, as the goal's ``(not (grasped ...))`` atoms say). ``released``: called at the instant a robot's
+    assisted grasp let go of ``child`` (:func:`attach_on_release`), while its in-hand registry still names it until the
+    release window ends. Returns the alignment record with ``attached`` and ``joint`` (``in_place`` / ``set_value``)."""
     from omnigibson.object_states import AttachedTo
 
     a = attachment_alignment(child, parent, equivalences)
@@ -373,7 +375,7 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
     if not a.get("ok"):
         a["attached"] = False
         return a
-    if held_by_robot(child):
+    if held_by_robot(child) and not released:
         a.update({"attached": False, "reason": "held by a robot"})
         return a
     pair = (a["child_link"], a["parent_link"])
@@ -387,6 +389,32 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
         a["attached"] = bool(child.states[AttachedTo].set_value(parent, True, bypass_alignment_checking=True))
         a["joint"] = "set_value"
     return a
+
+
+#: the record of the latest attach at a release (attach_on_release), for the oracle's audit
+LAST_RELEASE_ATTACH: Dict[str, Any] = {}
+
+
+def attach_on_release(robot: Any, arm: str, obj: Any) -> Optional[Dict[str, Any]]:
+    """The release hook (a robot's ``release_callbacks``, called by our Behavior-1K fork's ``_release_grasp``): a registered
+    attachment child let go aligned with its parent (modulo its symmetry) is joined in that instant, before the step's
+    physics. The per-step check of the ``attached`` atom would join it only at the end of the step, after it fell a few
+    millimetres through the collision-filtered partner. The same rule acts for an evaluated policy's release. Returns the
+    alignment record (also kept in ``LAST_RELEASE_ATTACH``), or None when ``obj`` is not an attachment child."""
+    name = getattr(obj, "name", None)
+    scene = getattr(obj, "scene", None)
+    for child_name, parent_name in list(_ATTACHMENTS):
+        if child_name != name or scene is None:
+            continue
+        parent = scene.object_registry("name", parent_name)
+        if parent is None:
+            continue
+        rec = attach_if_aligned(obj, parent, released=True)
+        rec.update(hook="release", arm=arm, parent=parent_name)
+        LAST_RELEASE_ATTACH.clear()
+        LAST_RELEASE_ATTACH.update({k: v for k, v in rec.items() if k != "fix"})
+        return rec
+    return None
 
 
 def evaluate_predicate(predicate_cls, *entities) -> bool:

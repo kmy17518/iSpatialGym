@@ -24,9 +24,9 @@ Behaviour per action (§3.6 / §6.1):
 * ``Grasp``      ``gripper(open)`` → ``arm_to(pre_grasp)`` → ``arm_along(approach)`` → ``gripper(close)``; the
   assisted grasp must hold the object (``failed_grasp``), then backend ``attach_object``.
 * ``Lift`` / ``Reorient``  ``arm_along`` over the recorded segment; post: still held, eef at the segment end.
-* ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (+ ``release_grasp_immediately``,
-  backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest (``not_settled``) or
-  ``attached`` for ``kind="attach"``.
+* ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (the command ramps to +1, OmniGibson's
+  assisted grasp lets go; backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest
+  (``not_settled``) or ``attached`` for ``kind="attach"`` (the task's attach rule joins the part at its release).
 * ``Push``       ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(init → mid → goal)``; post: eef at the goal
   contact, the pushed object moved (``no_motion``).
 * ``Brace``      ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(pre → contact)``; held (no further command).
@@ -1293,6 +1293,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
     yield from _release(motions, state, arm)
+    if action.kind == "attach" and action.on:
+        _attach_after_release(action, state, ctx)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
     # release: a differential-IK stall is finished by arm_to like the Retreat action's leg (touching 0917-203045: the
@@ -1486,10 +1488,12 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     The male / female meta-link offset is read from the live world (the recorded pose does not know the in-hand slip of
     the closure or the descent's shortfall). Above ``attach_correct_min_*`` the hand is moved by the male -> female
     transform — the part is rigid in the hand, so ``T_eef' = T_female @ inv(T_male) @ T_eef`` — as a short Cartesian leg
-    (closed-loop correction on the object, not a fallback). Then the assisted grasp is dropped and, in the same step,
-    ``AttachedTo.set_value(True)`` snaps the millimetre residual and creates the fixed joint, so the part never
-    free-falls; the fingers open afterwards. A residual beyond OmniGibson's 5 cm / 15 deg does not attach and the
-    postcondition fails as before (``ctx["attach"]`` records the offsets for the audit)."""
+    (closed-loop correction on the object, not a fallback). The part is still held when this returns: the place then
+    opens the gripper by the command (ramp to +1) like every other place, OmniGibson's assisted grasp lets go, and the
+    task's attach rule joins the part in that instant (``predicates.attach_on_release``, the release hook of our
+    Behavior-1K fork: the fixed joint at the current relative pose, so the part neither moves nor falls through the
+    collision-filtered partner) - the same rule an evaluated policy's release meets. A residual beyond the misalignment
+    bound is refused here and the postcondition fails as before (``ctx["attach"]`` records the offsets for the audit)."""
     cfg = _cfg(ctx)
     arm = action.arm
     getter = getattr(state, "attachment_offset", None)
@@ -1568,22 +1572,26 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
                                                     f"({cfg.attach_snap_max_m * 1000:.0f} mm / {math.degrees(cfg.attach_snap_max_rad):.0f} deg)"})
         log.warning("place(%s): %s - not attached", action.object, rec["refused"])
         raise SkillError("execution", f"attach refused: {rec['refused']}")  # still held: the checkpoint rollback + retry re-aim the place
-    # drop the assisted grasp and attach in one step (no physics in between): the fixed joint is created at the current relative
-    # pose of the meta links (predicates.attach_in_place), so the part does not move when it appears nor when the fingers open
-    if state.held_object(arm) is not None:
-        # the attach placement's direct release stays (lid / cap / cork are outside the command-based release); the
-        # executor's release check exempts it by this event
-        motions.release_events.append({"arm": arm, "event": "attach_release", "object": action.object})
-        state.robot.release_grasp_immediately(arm)
-    motions.backend.detach_object(arm)
-    ok = bool(state.attach(action.object, action.on))
-    rec["attached"] = ok
-    rec["alignment"] = getattr(state, "last_attach", None)  # the evaluator's alignment record (modulo the part's symmetry)
-    if ok:
-        log.info("place(%s): attached to %s (fixed attachment joint at the current relative pose, %s)", action.object, action.on,
-                 (rec["alignment"] or {}).get("joint", "?"))
+    from ispatialgym.sampling import predicates as PRED
+
+    PRED.LAST_RELEASE_ATTACH.clear()  # the release that follows records its attach there
+
+
+def _attach_after_release(action: Place, state, ctx) -> None:
+    """After the attach placement's release by the command: whether the task's attach rule joined the part, and how
+    (``ctx["attach"]``: ``attached``, the release hook's alignment record)."""
+    from ispatialgym.sampling import predicates as PRED
+
+    rec = ctx.setdefault("attach", {})
+    rec["release"] = "gripper command +1"
+    rec["attached"] = bool(state.attached(action.object, action.on))
+    rec["alignment"] = dict(PRED.LAST_RELEASE_ATTACH) or None
+    if rec["attached"]:
+        log.info("place(%s): released at the open command and joined to %s (%s)", action.object, action.on,
+                 "at the release" if (rec["alignment"] or {}).get("attached") else "by the per-step check")
     else:
-        log.warning("place(%s): AttachedTo.set_value(True) refused at the place pose (meta links beyond 5 cm / 15 deg?)", action.object)
+        log.warning("place(%s): released at the open command but not attached to %s (%s)", action.object, action.on,
+                    (rec["alignment"] or {}).get("reason", "no attach at the release"))
 
 
 def post_place(action: Place, state, targets, ctx) -> Optional[str]:
