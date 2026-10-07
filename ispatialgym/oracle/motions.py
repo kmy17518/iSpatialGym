@@ -618,6 +618,29 @@ class Motions:
         for _ in range(int(self.cfg.gripper_preshape_steps if steps is None else steps)):
             yield self._emit()
 
+    def gripper_open_short(self, arm: str) -> Iterator[th.Tensor]:
+        """Open the fingers at ``cfg.gripper_open_rate`` to one ramp increment short of the open limit and wait until they
+        stop: the command stays below +1, so OmniGibson's assisted grasp keeps what the hand holds (it lets go only at the
+        open command, which the following ``gripper(close=False)`` reaches in one increment). The attach placement opens
+        this far before its last alignment, with the fingertips off the partner (cap/xxqyrt 0005: the fingertips reach
+        ~1 cm below the rim and, opening against the neck, pushed the hand 7 mm before the release)."""
+        self.state.stop_base()
+        idx = self.robot.gripper_control_idx[arm]
+        lo, hi = self._gripper_limits(arm)
+        rate = float(self.cfg.gripper_open_rate or 0.002)
+        target = max(lo, hi - rate)
+        q = float(self.robot.get_joint_positions()[idx].float().mean())
+        while q < target - 1e-6:
+            q = min(target, q + rate)
+            self.state.gripper_cmd[arm] = self.gripper_command(arm, q)
+            yield self._emit()
+        self.state.gripper_cmd[arm] = self.gripper_command(arm, target)
+        for i in range(self.cfg.gripper_steps):
+            yield self._emit()
+            if i > 10 and float(self.robot.get_joint_velocities()[idx].abs().max()) < 1e-3:
+                break
+        yield from self.hold(5)
+
     def release_stage_opening(self, arm: str) -> Optional[float]:
         """The first-stage opening (m per finger) of a release with ``arm``: the executor's sidecar-derived value
         (``release_opening``: pinch / 2 + margin capped by the sampler's ``release_sweep.release_opening_max_m`` / 2),

@@ -1289,6 +1289,12 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
     if action.kind == "attach" and action.on:
         yield from _attach_at_place(action, motions, state, ctx)
+        # the fingers open to just short of the release (the assisted grasp still holds the part) and the alignment is
+        # measured and corrected again with the fingertips off the partner; the open command's last increment releases it
+        yield from motions.gripper_open_short(arm)
+        closed = ctx.get("attach")
+        yield from _attach_at_place(action, motions, state, ctx)
+        ctx["attach"]["fingers_closed"] = closed
     # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
@@ -1488,8 +1494,9 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     The male / female meta-link offset is read from the live world (the recorded pose does not know the in-hand slip of
     the closure or the descent's shortfall). Above ``attach_correct_min_*`` the hand is moved by the male -> female
     transform — the part is rigid in the hand, so ``T_eef' = T_female @ inv(T_male) @ T_eef`` — as a short Cartesian leg
-    (closed-loop correction on the object, not a fallback). The part is still held when this returns: the place then
-    opens the gripper by the command (ramp to +1) like every other place, OmniGibson's assisted grasp lets go, and the
+    (closed-loop correction on the object, not a fallback). The part is still held when this returns; the place runs it
+    once with the fingers closed and once more with them open to just short of the release (``gripper_open_short``),
+    then opens the gripper by the command (ramp to +1) like every other place, OmniGibson's assisted grasp lets go, and the
     task's attach rule joins the part in that instant (``predicates.attach_on_release``, the release hook of our
     Behavior-1K fork: the fixed joint at the current relative pose, so the part neither moves nor falls through the
     collision-filtered partner) - the same rule an evaluated policy's release meets. A residual beyond the misalignment

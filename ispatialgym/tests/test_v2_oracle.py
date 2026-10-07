@@ -3979,6 +3979,22 @@ def test_free_object_is_released_by_the_open_command():
     assert "right" not in m.deferred_open and not any(e.get("event") == "staged" for e in m.release_events)
 
 
+def test_attach_opens_short_of_the_release_before_the_last_alignment():
+    """The attach placement first opens the fingers to one increment short of the open limit (cap 0005: the fingertips
+    opening against the neck pushed the hand 7 mm before the release): the command stays below +1, the assisted grasp still
+    holds the part for the last alignment, and the open command that follows releases it at exactly +1."""
+    robot, env, m, marker = _held_marker()
+    cmd_idx = robot.controller_action_idx["gripper_right"]
+    drive(env, m.gripper_open_short("right"))
+    assert robot._ag_obj_in_hand["right"] is marker and float(env.last_action[cmd_idx]) < 1.0
+    seen = []
+    env.after_step = lambda a: seen.append((float(a[cmd_idx]), robot._ag_obj_in_hand["right"]))
+    drive(env, m.gripper("right", close=False))
+    env.after_step = None
+    first_free = next(i for i, (_, held) in enumerate(seen) if held is None)
+    assert first_free <= 2 and seen[first_free][0] == 1.0
+
+
 def test_attach_rule_acts_at_the_release(monkeypatch):
     """Attach tasks (owner 2026-10-06): the part leaves the hand by the open command like any place, and at the instant the
     assisted grasp lets go the release hook joins a registered attachment child to its parent through the task's attach
