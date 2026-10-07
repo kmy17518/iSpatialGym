@@ -417,6 +417,24 @@ def attach_on_release(robot: Any, arm: str, obj: Any) -> Optional[Dict[str, Any]
     return None
 
 
+def install_release_hook(robots: Any) -> int:
+    """Registers :func:`attach_on_release` in the ``release_callbacks`` of every robot in ``robots`` (``env.robots``: one
+    list per scene), once each; returns the number of robots that carry it."""
+    n, stack = 0, list(robots or [])
+    while stack:
+        robot = stack.pop()
+        if isinstance(robot, (list, tuple)):
+            stack.extend(robot)
+            continue
+        callbacks = getattr(robot, "release_callbacks", None)
+        if callbacks is None:
+            robot.release_callbacks = callbacks = []
+        if attach_on_release not in callbacks:
+            callbacks.append(attach_on_release)
+        n += 1
+    return n
+
+
 def evaluate_predicate(predicate_cls, *entities) -> bool:
     """Drop-in for ``evaluate_bddl_predicate`` with the robust ``under`` / ``ontop`` / ``touching`` re-checks (module docstring)."""
     from omnigibson.utils.bddl_utils import evaluate_bddl_predicate

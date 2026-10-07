@@ -259,12 +259,7 @@ class ISpatialGymTask(BehaviorTask):
         self.object_scope[AGENT_INSTANCE] = self.get_agent(env)
         # the attach rule also acts at the instant a robot's assisted grasp lets go (our Behavior-1K fork's release hook): a
         # part released aligned with its partner is joined before it can fall through the collision-filtered partner
-        for robot in getattr(env, "robots", None) or []:
-            callbacks = getattr(robot, "release_callbacks", None)
-            if callbacks is None:
-                robot.release_callbacks = callbacks = []
-            if PRED.attach_on_release not in callbacks:
-                callbacks.append(PRED.attach_on_release)
+        PRED.install_release_hook(getattr(env, "robots", None))
         if self._tro is not None:
             self.configure_targets(self._tro.meta)
         return True, None

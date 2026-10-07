@@ -4005,6 +4005,10 @@ def test_attach_rule_acts_at_the_release(monkeypatch):
         assert PRED.attach_on_release(None, "right", reg["apple_0"]) is None and len(calls) == 1
     finally:
         PRED.set_attachment_context([])
+    # the task installs the hook on every robot of env.robots (one list per scene), once
+    robots = [SimpleNamespace(), SimpleNamespace(release_callbacks=[print])]
+    assert PRED.install_release_hook([[robots[0]], [robots[1]]]) == 2 and PRED.install_release_hook([robots]) == 2
+    assert robots[0].release_callbacks == [PRED.attach_on_release] and robots[1].release_callbacks == [print, PRED.attach_on_release]
 
 
 def test_articulated_sheet_keeps_its_staged_opening():
