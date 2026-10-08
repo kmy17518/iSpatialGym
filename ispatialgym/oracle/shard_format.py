@@ -6,10 +6,10 @@ so nothing in LeRobot refuses a mixed aggregate. Every shard therefore gets a ma
 ``<shard dir>.format.json``, and a shard is only resumed by a process writing the same format.
 
 Formats (``ISPATIALGYM_SHARD_FORMAT``):
-  nodepth_nvenc  v2.0-multienv's default: the robot records proprio + rgb only (no depth annotators, readback or
+  legacy         the default, production's format: depth_linear streams, rgb by x265 crf 30.
+  nodepth_nvenc  opt-in (v2.0-multienv's default): the robot records proprio + rgb only (no depth annotators, readback or
                  streams), the datasets keep observation.robot2cam_pose.<camera> for every camera, and the rgb streams
                  are encoded by hevc_nvenc (QP 33, preset p7, GOP 8, yuv420p, no B-frames).
-  legacy         production's format: depth_linear streams, rgb by x265 crf 30.
 For experiments ``ISPATIALGYM_SHARD_NO_DEPTH=0|1`` and ``ISPATIALGYM_SHARD_RGB_ENCODER=<spec>|x265`` override one part.
 No omnigibson import here: scripts can check markers without loading the simulator.
 """
@@ -24,7 +24,7 @@ FORMATS: Dict[str, Dict[str, Any]] = {
     "nodepth_nvenc": {"depth": False, "rgb_encoder": "hevc_nvenc,qp=33,preset=p7"},
     "legacy": {"depth": True, "rgb_encoder": "x265"},
 }
-DEFAULT = "nodepth_nvenc"
+DEFAULT = "legacy"
 MARKER_SUFFIX = ".format.json"
 #: the parts that decide whether two shards may meet in one dataset
 KEYS = ("depth", "rgb_encoder")

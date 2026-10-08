@@ -7,6 +7,8 @@ import pytest
 
 from ispatialgym.oracle import shard_format as SF
 
+NVENC = {"ISPATIALGYM_SHARD_FORMAT": "nodepth_nvenc"}
+
 
 def _shard(tmp_path, name, depth):
     d = tmp_path / name
@@ -19,27 +21,27 @@ def _shard(tmp_path, name, depth):
 
 
 def test_effective():
-    assert SF.effective({}) == {"name": "nodepth_nvenc", "depth": False, "rgb_encoder": "hevc_nvenc,qp=33,preset=p7"}
-    assert SF.effective({"ISPATIALGYM_SHARD_FORMAT": "legacy"}) == {"name": "legacy", "depth": True, "rgb_encoder": "x265"}
+    assert SF.effective({}) == {"name": "legacy", "depth": True, "rgb_encoder": "x265"}
+    assert SF.effective(NVENC) == {"name": "nodepth_nvenc", "depth": False, "rgb_encoder": "hevc_nvenc,qp=33,preset=p7"}
     assert SF.effective({"ISPATIALGYM_SHARD_FORMAT": "legacy", "ISPATIALGYM_SHARD_NO_DEPTH": "1"})["name"] == "custom"
-    assert SF.effective({"ISPATIALGYM_SHARD_RGB_ENCODER": "x265"}) == {"name": "custom", "depth": False, "rgb_encoder": "x265"}
+    assert SF.effective({**NVENC, "ISPATIALGYM_SHARD_RGB_ENCODER": "x265"}) == {"name": "custom", "depth": False, "rgb_encoder": "x265"}
     with pytest.raises(ValueError):
         SF.effective({"ISPATIALGYM_SHARD_FORMAT": "nope"})
 
 
 def test_resume_same_and_different(tmp_path):
-    new, legacy = SF.effective({}), SF.effective({"ISPATIALGYM_SHARD_FORMAT": "legacy"})
+    new, legacy = SF.effective(NVENC), SF.effective({})
     s = _shard(tmp_path, "shard_a", depth=False)
     SF.write_marker(s, new)
     SF.check_resume(s, new)
     with pytest.raises(RuntimeError):
         SF.check_resume(s, legacy)
     with pytest.raises(RuntimeError):
-        SF.check_resume(s, SF.effective({"ISPATIALGYM_SHARD_RGB_ENCODER": "x265"}))
+        SF.check_resume(s, SF.effective({**NVENC, "ISPATIALGYM_SHARD_RGB_ENCODER": "x265"}))
 
 
 def test_resume_without_marker(tmp_path):
-    new, legacy = SF.effective({}), SF.effective({"ISPATIALGYM_SHARD_FORMAT": "legacy"})
+    new, legacy = SF.effective(NVENC), SF.effective({})
     prod = _shard(tmp_path, "shard_prod", depth=True)
     with pytest.raises(RuntimeError):
         SF.check_resume(prod, new)

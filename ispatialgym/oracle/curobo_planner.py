@@ -130,8 +130,8 @@ _WS_COUNTS = {"calls": 0, "meshes": 0, "mismatches": 0}
 #: prim paths, vertices, faces, scales and float32 poses in the eef frame, and the sphere count - with the global torch /
 #: numpy / random generators saved and restored around it, so a fit no longer shifts the process's other random draws
 #: and the same inputs always give the same spheres; =cache also keeps every fit by that key (an exact cache, since the
-#: fit is then a function of its key). v2.0-multienv default: cache; =off: the global generators, as production.
-SEEDED_SPHERE_FIT = os.environ.get("ISPATIALGYM_SEEDED_SPHERE_FIT", "cache")
+#: fit is then a function of its key). Default off: the global generators, as production (v2.0-multienv's default was cache).
+SEEDED_SPHERE_FIT = os.environ.get("ISPATIALGYM_SEEDED_SPHERE_FIT", "off")
 if SEEDED_SPHERE_FIT in ("off", "0"):
     SEEDED_SPHERE_FIT = ""
 _FIT_CACHE: Dict[str, th.Tensor] = {}
