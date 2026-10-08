@@ -26,7 +26,7 @@ import torch as th
 from ispatialgym.eval import goal_occlusion as GO
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import run_isg as RI
-from ispatialgym.oracle.executor import depth_modality, settled_depth
+from ispatialgym.oracle.head_depth import settled_depth
 from ispatialgym.oracle.qa import CameraModel
 
 
@@ -91,15 +91,14 @@ def predict(loader, summary, raw_tro):
     sensor = robot.sensors[loader.cam_key]
     judged = [o for o in dict.fromkeys(loader.tracked.values()) if GO.role(getattr(o, "name", ""))]
     without = None
-    with depth_modality(sensor):
-        depth = settled_depth(sensor, og.sim.render)
-        cp, cq = sensor.get_position_orientation()
-        if any(GO.role(o.name) == "fixture" for o in judged):
-            robot.visible = False
-            try:
-                without = settled_depth(sensor, og.sim.render)
-            finally:
-                robot.visible = True
+    depth = settled_depth(sensor, og.sim.render)
+    cp, cq = sensor.get_position_orientation()
+    if any(GO.role(o.name) == "fixture" for o in judged):
+        robot.visible = False
+        try:
+            without = settled_depth(sensor, og.sim.render)
+        finally:
+            robot.visible = True
     objects = GO.screen_scene(depth, (cp.float().tolist(), cq.float().tolist()), GO.intrinsics_of(CameraModel.from_sensor(sensor)), judged,
                               depth_without_robot=without, revolute=JointType.JOINT_REVOLUTE)
     return GO.report(objects, method="predicted from the instance summary (goal_occlusion_check.py), head-camera depth", robot=source)
