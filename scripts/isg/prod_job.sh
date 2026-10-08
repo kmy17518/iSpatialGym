@@ -4,7 +4,7 @@
 #
 # PROD_SNAP (snapshot root: ispatialgym/ + Behavior-1K/), PROD_ALIAS, PROD_START, PROD_COUNT, PROD_OUT, PROD_SEED,
 # PROD_MAX_ATTEMPTS, PROD_DEMO_WORKERS, PROD_DEMO_MODE, PROD_HOURS, PROD_GRACE_MIN, PROD_THREADS, PROD_HOME, PROD_CONDA_SH,
-# PROD_ENV, PROD_DATA_PATH, PROD_FALLBACK_TMP, PROD_MIN_SCRATCH_KB
+# PROD_ENV, PROD_DATA_PATH, PROD_FALLBACK_TMP, PROD_MIN_SCRATCH_KB, PROD_SPEEDUPS (default 1)
 export HOME="$PROD_HOME"
 free_kb() { df -Pk "$1" 2>/dev/null | awk 'NR==2{print $4}'; }
 if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ] && [ -w "$TMPDIR" ] && [ "$(free_kb "$TMPDIR")" -gt "$PROD_MIN_SCRATCH_KB" ]; then
@@ -44,7 +44,13 @@ cp -p "$CODE"/runlogs/reach_bands_20260915/bands/* "$TMPDIR/reach_bands/" 2>/dev
 export ISPATIALGYM_REACH_BANDS="$TMPDIR/reach_bands" ISPATIALGYM_CACHE_DIR="$TMPDIR/isg_cache" ISPATIALGYM_SAMPLING_CACHE="$TMPDIR/isg_cache/sampling" \
   ISPATIALGYM_HELD_HOLD_CACHE="$TMPDIR/isg_cache/held_hold.json"
 export OMP_NUM_THREADS="$PROD_THREADS" MKL_NUM_THREADS="$PROD_THREADS" OPENBLAS_NUM_THREADS="$PROD_THREADS"
-echo "PROD_JOB $SLURM_JOB_ID host=$(hostname -s) gpu=\"$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)\" TMPDIR=$TMPDIR appdata=$APPDATA code=$CODE isg_commit=$(git -C "$CODE" rev-parse HEAD) b1k_commit=$(git -C "$B1K" rev-parse HEAD) track_state_updates=$OMNIGIBSON_TRACK_STATE_UPDATES start=$(date -Is)"
+# the adopted speedups (isg_home/multienv/SUMMARY.md: output-identical in every check): one OpenMP thread per process, numpy
+# change detection and the six exact opt-ins; MKL / OpenBLAS keep PROD_THREADS as measured. PROD_SPEEDUPS=0 runs without them
+if [ "${PROD_SPEEDUPS:-1}" = 1 ]; then
+  export OMP_NUM_THREADS=1 OMNIGIBSON_CHANGE_DETECTION_NUMPY=1 ISPATIALGYM_FAST_GEOMETRY=1 ISPATIALGYM_FAST_SUPPORT=1 ISPATIALGYM_FAST_ASSIGN=1 \
+    ISPATIALGYM_SHARED_GOAL_EVAL=1 ISPATIALGYM_GC_FREEZE=1 ISPATIALGYM_BATCHED_WORLD_SYNC=1
+fi
+echo "PROD_JOB $SLURM_JOB_ID host=$(hostname -s) gpu=\"$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)\" TMPDIR=$TMPDIR appdata=$APPDATA code=$CODE isg_commit=$(git -C "$CODE" rev-parse HEAD) b1k_commit=$(git -C "$B1K" rev-parse HEAD) track_state_updates=$OMNIGIBSON_TRACK_STATE_UPDATES speedups=${PROD_SPEEDUPS:-1} start=$(date -Is)"
 deadline=$(( $(date +%s) + ${PROD_HOURS%.*} * 3600 - ${PROD_GRACE_MIN%.*} * 60 ))
 python "$CODE/scripts/isg/prod_worker.py" --alias "$PROD_ALIAS" --start "$PROD_START" --count "$PROD_COUNT" --out "$PROD_OUT" --seed "$PROD_SEED" \
   --max-attempts "$PROD_MAX_ATTEMPTS" --demo-workers "$PROD_DEMO_WORKERS" --demo-mode "$PROD_DEMO_MODE" --deadline "$deadline"

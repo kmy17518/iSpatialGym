@@ -43,8 +43,13 @@ def result_record(log_path):
     return rec
 
 
+#: the speed settings prod_job.sh exports (PROD_SPEEDUPS), recorded with the job's provenance
+SPEEDUP_ENV = ("OMP_NUM_THREADS", "OMNIGIBSON_CHANGE_DETECTION_NUMPY", "ISPATIALGYM_FAST_GEOMETRY", "ISPATIALGYM_FAST_SUPPORT", "ISPATIALGYM_FAST_ASSIGN",
+               "ISPATIALGYM_SHARED_GOAL_EVAL", "ISPATIALGYM_GC_FREEZE", "ISPATIALGYM_BATCHED_WORLD_SYNC", "ISPATIALGYM_GOAL_OCCLUSION")
+
+
 def job_provenance():
-    """The job's snapshot (PROD_SNAP from job.sh) with its commits and the change-detection setting of prod_job.sh."""
+    """The job's snapshot (PROD_SNAP from job.sh) with its commits and the change-detection / speed settings of prod_job.sh."""
     snap = os.environ.get("PROD_SNAP")
 
     def git(root):
@@ -55,7 +60,8 @@ def job_provenance():
 
     return {"snapshot": snap, "isg_commit": git(os.path.join(snap, "ispatialgym")) if snap else None,
             "b1k_commit": git(os.path.join(snap, "Behavior-1K")) if snap else None,
-            "track_state_updates_env": os.environ.get("OMNIGIBSON_TRACK_STATE_UPDATES")}
+            "track_state_updates_env": os.environ.get("OMNIGIBSON_TRACK_STATE_UPDATES"),
+            "speedups_env": {k: os.environ.get(k) for k in SPEEDUP_ENV if os.environ.get(k) is not None}}
 
 
 def job_gpus():
