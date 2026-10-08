@@ -46,6 +46,7 @@ import os
 import time
 import traceback
 from collections import Counter
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
@@ -65,6 +66,39 @@ from ispatialgym.robot import conventions as C
 log = logging.getLogger(__name__)
 
 AGENT_INSTANCE = "agent.n.01_1"
+
+
+@contextmanager
+def depth_modality(sensor):
+    """The sensor with a ``depth_linear`` modality for the block: added when it has none, removed afterwards - an extra
+    modality changes the observations ``Environment.reset`` checks against the observation space (the next instance of a
+    --queue world)."""
+    added = "depth_linear" not in sensor.modalities
+    if added:
+        sensor.add_modality("depth_linear")
+    try:
+        yield sensor
+    finally:
+        if added:
+            sensor.remove_modality("depth_linear")
+
+
+def settled_depth(sensor, render, min_renders: int = 4, max_renders: int = 24) -> np.ndarray:
+    """The sensor's linear depth ``(H, W)``, rendered until two consecutive reads of a non-empty buffer agree: annotator
+    data lags the scene by one to two frames (``SimWorld.seg_instance``), and one attached on first use delivers nothing
+    for its first frames."""
+    prev = None
+    for n in range(1, int(max_renders) + 1):
+        render()
+        obs, _info = sensor.get_obs()
+        cur = th.as_tensor(obs["depth_linear"]).float().cpu()
+        if n >= min_renders and cur.numel() > 0 and prev is not None and cur.shape == prev.shape and th.equal(cur, prev):
+            return cur.numpy()
+        prev = cur
+    if prev is None or prev.numel() == 0:
+        raise RuntimeError(f"no depth from {getattr(sensor, 'name', sensor)} after {max_renders} frames")
+    log.warning("depth of %s still changing after %d frames; using the latest", getattr(sensor, "name", sensor), max_renders)
+    return prev.numpy()
 
 #: cylinder tags of the placed-orientation demo gate (owner 2026-09-16 17:10 item 4 fallback): ``{"<category>/<model>":
 #: {"axis": "x"|"y"|"z", "tags": [...], ...}}`` built by ``scripts/symmetry/revolution_axes.py`` from the ICL symmetry
@@ -2217,39 +2251,32 @@ class Executor:
             "step": self.n,
         }
 
-    def _head_depth(self, sensor) -> np.ndarray:
-        for _ in range(int(self.cfg.goal_image_renders)):
-            self.sim.render()
-        obs, _info = sensor.get_obs()
-        return th.as_tensor(obs["depth_linear"]).float().cpu().numpy()
-
     def goal_occlusion_report(self) -> Dict[str, Any]:
         """The demo gate ``goal_occlusion`` (``ispatialgym.eval.goal_occlusion``) on the settled last frame: the head camera's
         depth, the box screen of every tracked target / partner and the panel screen of a tracked fixture (a second depth
         render with the robot hidden; the panel = the links its revolute joints move, at the final joint state). Runs after
-        the last recorded frame; the depth annotator it may add and the hidden robot touch no recorded data."""
+        the last recorded frame and leaves the camera's modalities and the robot's visibility as it found them."""
         from omnigibson.utils.constants import JointType
 
         from ispatialgym.eval import goal_occlusion as GO
 
         sensor = self.robot.sensors[self.cam_key]
-        if "depth_linear" not in sensor.modalities:
-            sensor.add_modality("depth_linear")
         cm = CameraModel.from_sensor(sensor)
         intr = GO.intrinsics_of(cm)
-        depth = self._head_depth(sensor)
-        cp, cq = sensor.get_position_orientation()
-        cam = (cp.float().tolist(), cq.float().tolist())
         judged = [o for o in self.tracked.values() if GO.role(getattr(o, "name", ""))]
         depth_without = None
-        if any(GO.role(o.name) == "fixture" for o in judged):
-            self.robot.visible = False
-            try:
-                depth_without = self._head_depth(sensor)
-            finally:
-                self.robot.visible = True
-                for _ in range(int(self.cfg.goal_image_renders)):
-                    self.sim.render()
+        with depth_modality(sensor):
+            depth = settled_depth(sensor, self.sim.render)
+            cp, cq = sensor.get_position_orientation()
+            if any(GO.role(o.name) == "fixture" for o in judged):
+                self.robot.visible = False
+                try:
+                    depth_without = settled_depth(sensor, self.sim.render)
+                finally:
+                    self.robot.visible = True
+                    for _ in range(int(self.cfg.goal_image_renders)):
+                        self.sim.render()
+        cam = (cp.float().tolist(), cq.float().tolist())
         objects = GO.screen_scene(depth, cam, intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE)
         return GO.report(objects, method="live head-camera depth", step=self.n, camera_key=self.cam_key, resolution=[intr[0], intr[1]])
 

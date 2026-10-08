@@ -636,29 +636,35 @@ class SimWorld:
 
     def depth_linear(self, n_renders: int = 3) -> th.Tensor:
         """The head camera's linear depth ``(H, W)`` in m (distance along the optical axis), read the way :meth:`seg_instance`
-        reads its buffer: the ``depth_linear`` annotator is attached on first use, then frames are rendered until two
-        consecutive fetches of a non-empty buffer are identical (the scene is static during a measurement), up to
-        :data:`DEPTH_MAX_RENDERS`."""
+        reads its buffer: frames are rendered until two consecutive fetches of a non-empty buffer are identical (the scene
+        is static during a measurement), up to :data:`DEPTH_MAX_RENDERS`. A ``depth_linear`` modality the camera lacks is
+        attached for the read and removed after it: an extra modality changes the observations ``Environment.reset``
+        checks against the observation space."""
         self._require_camera()
-        if "depth_linear" not in self.cam.modalities:
+        added = "depth_linear" not in self.cam.modalities
+        if added:
             self.cam.add_modality("depth_linear")
-        n_min = max(int(n_renders), self.SEG_MIN_RENDERS)
-        self.render(n_min - 2)
-        prev = self._raw_depth()
-        n = n_min - 2
-        while True:
-            self.render(1)
-            n += 1
-            cur = self._raw_depth()
-            if n >= n_min and cur.numel() > 0 and cur.shape == prev.shape and th.equal(cur, prev):
-                break
-            if n >= self.DEPTH_MAX_RENDERS:
-                if cur.numel() == 0:
-                    raise RuntimeError(f"depth_linear: no data from the head camera after {n} frames")
-                log.warning("depth_linear: buffer still changing after %d frames; using the latest", n)
-                break
-            prev = cur
-        return cur.reshape(self.camera_model.height, self.camera_model.width).cpu()
+        try:
+            n_min = max(int(n_renders), self.SEG_MIN_RENDERS)
+            self.render(n_min - 2)
+            prev = self._raw_depth()
+            n = n_min - 2
+            while True:
+                self.render(1)
+                n += 1
+                cur = self._raw_depth()
+                if n >= n_min and cur.numel() > 0 and cur.shape == prev.shape and th.equal(cur, prev):
+                    break
+                if n >= self.DEPTH_MAX_RENDERS:
+                    if cur.numel() == 0:
+                        raise RuntimeError(f"depth_linear: no data from the head camera after {n} frames")
+                    log.warning("depth_linear: buffer still changing after %d frames; using the latest", n)
+                    break
+                prev = cur
+            return cur.reshape(self.camera_model.height, self.camera_model.width).cpu()
+        finally:
+            if added:
+                self.cam.remove_modality("depth_linear")
 
     def visible_pixels(self, n_renders: int = 3, exclude_structure: bool = True) -> Dict[str, int]:
         seg, mapping = self.seg_instance(n_renders)

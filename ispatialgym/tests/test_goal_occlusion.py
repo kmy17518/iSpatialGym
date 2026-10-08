@@ -163,3 +163,42 @@ def test_screen_scene_and_report():
     rep = GO.report(objs, "test")
     assert rep["worst"] in ("target_box_0", "door_crtrpa_0") and rep["occluded"] == (rep["max_occluded"] >= 0.5)
     assert GO.report({"target_a": {"status": "out_of_frame"}}, "test")["occluded"] is False
+
+
+class _Sensor:
+    name = "fake:Camera:0"
+
+    def __init__(self, modalities=("rgb",), first_frame=6):
+        self.modalities, self.frames, self.first_frame, self.removed = set(modalities), 0, first_frame, []
+
+    def add_modality(self, m):
+        self.modalities.add(m)
+
+    def remove_modality(self, m):
+        self.modalities.discard(m)
+        self.removed.append(m)
+
+    def render(self):
+        self.frames += 1
+
+    def get_obs(self):
+        if self.frames < self.first_frame:
+            return {"depth_linear": np.zeros((0,))}, {}
+        return {"depth_linear": np.full((2, 3), 1.5)}, {}
+
+
+def test_depth_modality_and_settled_depth():
+    from ispatialgym.oracle.executor import depth_modality, settled_depth
+
+    s = _Sensor()
+    with depth_modality(s):
+        assert "depth_linear" in s.modalities
+        d = settled_depth(s, s.render)
+    assert d.shape == (2, 3) and float(d[0, 0]) == 1.5 and s.frames >= 7
+    assert s.removed == ["depth_linear"] and "depth_linear" not in s.modalities
+    kept = _Sensor(modalities=("rgb", "depth_linear"))
+    with depth_modality(kept):
+        pass
+    assert "depth_linear" in kept.modalities and not kept.removed
+    with pytest.raises(RuntimeError):
+        settled_depth(_Sensor(first_frame=10**6), lambda: None, max_renders=5)
