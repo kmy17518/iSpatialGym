@@ -1029,7 +1029,14 @@ class SamplerV2(TaskSampler):
                 obj.set_joint_positions(G.t(qj))
                 obj.set_joint_velocities(th.zeros_like(G.t(qj)))
             self.kit.apply(q, base_pose2d)
-            self.world.step_physics(1, still=[self.robot] + list(self.objects.values()))
+            # a body teleported while asleep keeps its old render transform until it is awake in a rendering step
+            # (SimWorld.ensure_segmented): wake, one rendering step, everything held still
+            task_objects = list(dict.fromkeys(self.objects.values()))
+            self.world.wake(task_objects)
+            self.robot.keep_still()
+            self.world.full_step(render=True)
+            self.world.keep_still(task_objects)
+            self.robot.keep_still()
             cam = self.world.cam
             if "depth_linear" not in cam.modalities:
                 cam.add_modality("depth_linear")
