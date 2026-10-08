@@ -1093,7 +1093,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         meta["camera_in_zed"] = {"position": cam_in_zed[0].tolist(), "orientation": cam_in_zed[1].tolist(),
                                  "constant_dev_mm": 1000.0 * float(th.linalg.norm(cam_in_zed[0] - C.CAMERA_IN_ZED[0]))}
         state = SimState(env, task, robot, cam_key, cam_in_zed=cam_in_zed)
-        monitors = Monitors(env, robot, QAConfig(max_episode_steps=args.max_steps), cam_key=cam_key, cam_in_zed=cam_in_zed)
+        qa_cfg = QAConfig(max_episode_steps=args.max_steps)
+        if args.mode != "oracle":
+            # a replay / policy run is a single stream action: the per-action cap would otherwise cut every episode at 3000 steps
+            qa_cfg.max_action_steps = args.max_steps
+        monitors = Monitors(env, robot, qa_cfg, cam_key=cam_key, cam_in_zed=cam_in_zed)
         rec_cfg = RecorderConfig(hdf5=args.record in ("full", "hdf5"), lerobot=args.record == "full", video=args.video, video_size=args.video_size,
                                  all_cameras=args.all_cameras, frame_buffer=args.frame_buffer,
                                  external_camera=EXTERNAL_CAMERA_NAME if args.dev else None,
