@@ -181,6 +181,10 @@ class ExecutorConfig:
     #: axis now and at the recorded goal (nearest equivalence) against the same tolerance; every other object keeps the
     #: full error. ``demo_revolution_axes`` switches that equivalence off (full error for everything).
     demo_gating: Tuple[str, ...] = ()
+    #: replay / policy streams: ``stop`` = a QA monitor verdict (collision, ghost hand, ...) ends the episode as it does an
+    #: oracle action; ``log`` = it is recorded (``result.stream_qa``) and the stream goes on, so the episode is judged by its
+    #: goal as an evaluator judges a policy (a stream has no program, so its grasps and pushes have no intended contacts)
+    stream_qa: str = "stop"
     demo_orientation_tolerance_default: float = 0.2
     demo_revolution_axes: bool = True
     #: ``placed_tilt`` (retracted as the default, owner 2026-09-16 17:10 item 4; the code path stays unused): the tilt of
@@ -855,6 +859,8 @@ class Executor:
         self.last_ctx: Dict[str, Any] = {}
         self._defer_commit = False
         self.brace_retries: List[Dict[str, Any]] = []
+        self.stream_qa: List[Dict[str, Any]] = []
+        self._qa_log = False
         # oracle.protection (owner 2026-09-26): the goal objects protected during transits ([(bddl name, scene object)], set by
         # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
         self.protected_goal: List[Tuple[str, Any]] = []
@@ -976,10 +982,26 @@ class Executor:
         """Step every action a generator yields; returns the first monitor verdict (the generator is then closed)."""
         for a in gen:
             v = self.step(a, phase, action_index, attempt, monitor=monitor)
+            if v is not None and self._log_stream_verdict(v):
+                continue
             if v is not None:
                 gen.close()
                 return v
         return None
+
+    def _log_stream_verdict(self, verdict: Verdict) -> bool:
+        """``stream_qa="log"`` during a replay / policy stream and its epilogue: record a QA monitor verdict (consecutive
+        repeats of one category / link / object merged) and return True to go on; a timeout still ends the episode."""
+        if not self._qa_log or verdict.category == "timeout":
+            return False
+        det = verdict.details or {}
+        key = [verdict.category, det.get("link"), det.get("object")]
+        last = self.stream_qa[-1] if self.stream_qa else None
+        if last is not None and last["key"] == key and last["last_step"] + 1 >= int(verdict.step or 0):
+            last["last_step"], last["n"] = int(verdict.step or 0), last["n"] + 1
+        else:
+            self.stream_qa.append({"key": key, "message": verdict.message, "first_step": int(verdict.step or 0), "last_step": int(verdict.step or 0), "n": 1})
+        return True
 
     # ------------------------------------------------------------------ checkpoints
 
@@ -1770,6 +1792,7 @@ class Executor:
         are not updated by a stream; holding them would drive the robot back to its initial configuration)."""
         t0 = time.time()
         verdict: Optional[Verdict] = None
+        self._qa_log = self.cfg.stream_qa == "log"
         if self.monitors is not None:
             self.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=self.state.held_objects(), manipulation=False)
         try:
@@ -1777,6 +1800,9 @@ class Executor:
                 a = th.as_tensor(a, dtype=th.float32).reshape(-1)
                 self._last_stream_action = a.clone()
                 verdict = self.step(a, phase, 0, 0)
+                if verdict is not None and self._log_stream_verdict(verdict):
+                    verdict = None
+                    continue
                 if verdict is not None:
                     break
         finally:
@@ -2220,6 +2246,7 @@ class Executor:
             "brace_retry": _jsonable(self.brace_retries),
             "goal_observation": goal_obs,
             "goal_occlusion": goal_occlusion,
+            "stream_qa": _jsonable(self.stream_qa) if self._qa_log else None,
             "timings": dict(self.timings),
             "release_check": _jsonable(self.release_check),
         }

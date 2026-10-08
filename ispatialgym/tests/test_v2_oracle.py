@@ -2523,6 +2523,45 @@ def test_replay_stream_holds_the_last_streamed_configuration(tmp_path):
     assert result2["qa"]["stats"]["by_category"] == {}
 
 
+def test_replay_stream_qa_log_records_monitor_verdicts_and_judges_the_goal(tmp_path):
+    """--stream-qa log: a QA monitor verdict during a replay stream is recorded (consecutive repeats merged) and the stream
+    goes on, so the goal decides; the default (stop) still ends the episode at the verdict."""
+    from ispatialgym.oracle.qa import Verdict
+
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"]
+    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_action_steps"]]]
+
+    def with_contact(ex_):
+        real = ex_.monitors.check
+
+        def check(n):
+            v = real(n)
+            if v is None and 5 <= n <= 8:
+                return Verdict("collision", f"left_gripper_finger_link1 in contact with target_apple_0 for {n - 4} steps", step=n,
+                               details={"link": "left_gripper_finger_link1", "object": "target_apple_0"})
+            return v
+
+        ex_.monitors.check = check
+
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    ex2, *_ = make_executor(env2, sc2, tmp_path / "stop")
+    with_contact(ex2)
+    r2 = ex2.run_stream(th.as_tensor(a) for a in actions)
+    assert not r2["success"] and r2["reason"] == "collision" and r2["stream_qa"] is None
+    sc3, env3 = iors_world()
+    env3.evaluate = success_eval("apple.n.01_1", _place_goal(sc3), tol=0.08)
+    ex3, *_ = make_executor(env3, sc3, tmp_path / "log", exec_cfg=ExecutorConfig(stream_qa="log"))
+    with_contact(ex3)
+    r3 = ex3.run_stream(th.as_tensor(a) for a in actions)
+    assert r3["success"], r3["verdict"]
+    assert [(e["key"], e["first_step"], e["last_step"], e["n"]) for e in r3["stream_qa"]] == [(["collision", "left_gripper_finger_link1", "target_apple_0"], 5, 8, 4)]
+
+
 def test_checkpoint_restore_fixes_a_broken_ag_roundtrip(tmp_path):
     sc, env = iors_world(ag_roundtrip=False)
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
