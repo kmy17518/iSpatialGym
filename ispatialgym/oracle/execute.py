@@ -2448,14 +2448,14 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         held = state.held_object(arm)
         if held is not None:
             articulated = bool(getattr(held, "n_joints", 0) or len(getattr(held, "joints", {}) or {}))
-            # a handle of an articulated object is released with the full opening at once (no staged release: the assisted
-            # grasp would re-grasp the handle during the retreat and the door cannot follow the hand) - except a SHEET pinched
-            # across its thickness (handle_kind edge_lid, a carton flap 2026-09-19): the full 10 cm opening swept a finger
-            # against the 0.8 mm flap and pressed it down 0.25 rad in lockstep with the fingers (0919-070252); it opens to the
-            # pre-shape width, slides off the free edge (Retreat._edge_escape) and completes the opening once clear
-            art = getattr(getattr(action, "after", None), "articulation", None)
-            sheet = bool(art is not None and (getattr(art, "extra", None) or {}).get("handle_kind") == "edge_lid")
-            yield from motions.gripper(arm, close=False, staged=sheet)
+            # a handle of an articulated object is released with the full opening at once, by the open command (no staged
+            # release: the assisted grasp would re-grasp the handle during the retreat and the door cannot follow the hand). A
+            # SHEET pinched across its thickness (handle_kind edge_lid, a carton flap) as well: its staged release (2026-09-19:
+            # the full opening of a released flap swept a finger against it, 0919-070252) deferred the +1 to the edge escape,
+            # but the assisted grasp holds the flap with a fixed joint (the task's rule) until that +1 and the hinge stops the
+            # radial escape, so the grasp never let go (v3.0-reconciled, cdmmwy lever: "did not let go at the open command" in
+            # both attempts). The flap is let go here; the open pads then slide off its free edge (Retreat._edge_escape)
+            yield from motions.gripper(arm, close=False, staged=False)
             yield from _release(motions, state, arm)
             if articulated and cfg.release_settle_steps > 0:
                 # let the constraint-removal transient die before the arm moves off the handle (the leaf keeps its angle
