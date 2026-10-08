@@ -47,10 +47,10 @@ from ispatialgym.tasks import VecISpatialGymTask  # noqa: F401  (registers the t
 log = logging.getLogger(__name__)
 
 
-def world_signature(template_dir: str) -> str:
-    """What makes two templates the same world for the batch: the scene model, the room filter, the problem, and the set of
-    scene objects with their categories / models and their non-robot state. The robot's own entry (pose, virtual base joints,
-    AABB) is excluded: the TRO restore overwrites it. (The relocalization templates differ only there.)"""
+def world_payload(template_dir: str) -> Dict[str, Any]:
+    """What makes two templates the same world for the batch: the scene model, the room filter, the problem, the set of scene
+    objects with their categories / models, and their resting poses / joint positions. The robot's own entry (pose, virtual base
+    joints, AABB) is excluded: the TRO restore overwrites it; AABBs, sleep flags and residual velocities are settle noise."""
     with open(os.path.join(template_dir, "template.json")) as f:
         t = json.load(f)
     with open(os.path.join(template_dir, "template_meta.json")) as f:
@@ -59,12 +59,63 @@ def world_signature(template_dir: str) -> str:
     objs = {k: {"class": v.get("class_name"), "args": {a: v.get("args", {}).get(a) for a in ("category", "model", "name", "scale", "fixed_base")}}
             for k, v in init.items() if not str(k).startswith("robot")}
     reg = ((t.get("state") or {}).get("registry") or {}).get("object_registry") or {}
-    state = {k: v for k, v in reg.items() if not str(k).startswith("robot")}
-    for v in state.values():
-        if isinstance(v, dict):
-            v.pop("non_kin", None)  # AABBs carry float noise between runs
-    payload = {"scene": meta.get("scene"), "rooms": meta.get("load_room_instances"), "problem": meta.get("problem"), "objects": objs, "state": state}
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+    def strip(x):
+        if isinstance(x, dict):
+            return {k: strip(v) for k, v in x.items() if k not in ("non_kin", "is_asleep") and not str(k).endswith("_vel")}
+        if isinstance(x, list):
+            return [strip(v) for v in x]
+        return x
+
+    state = {k: strip(v) for k, v in reg.items() if not str(k).startswith("robot")}
+    return {"scene": meta.get("scene"), "rooms": meta.get("load_room_instances"), "problem": meta.get("problem"), "objects": objs, "state": state}
+
+
+def _leaves(x, prefix=""):
+    if isinstance(x, dict):
+        for k, v in x.items():
+            yield from _leaves(v, f"{prefix}/{k}")
+    elif isinstance(x, list) and x and all(isinstance(v, (int, float)) for v in x):
+        yield prefix, x
+    elif isinstance(x, list):
+        for i, v in enumerate(x):
+            yield from _leaves(v, f"{prefix}[{i}]")
+    else:
+        yield prefix, x
+
+
+def worlds_compatible(a: Dict[str, Any], b: Dict[str, Any], tol: float = 5e-3) -> Tuple[bool, List[str]]:
+    """Same scene / rooms / problem / objects, and every numeric state leaf within ``tol`` (m, rad, quaternion components):
+    the same template settled on another machine differs by ~1e-7 (the single-env worker reused such worlds)."""
+    bad = []
+    for k in ("scene", "rooms", "problem"):
+        if a.get(k) != b.get(k):
+            bad.append(f"{k}: {a.get(k)} vs {b.get(k)}")
+    if a.get("objects") != b.get("objects"):
+        bad.append("objects differ")
+    la, lb = dict(_leaves(a.get("state") or {})), dict(_leaves(b.get("state") or {}))
+    if set(la) != set(lb):
+        bad.append(f"state keys differ ({len(set(la) ^ set(lb))})")
+    for k in sorted(set(la) & set(lb)):
+        va, vb = la[k], lb[k]
+        if isinstance(va, list) and isinstance(vb, list):
+            if len(va) != len(vb) or any(abs(float(x) - float(y)) > tol for x, y in zip(va, vb)):
+                bad.append(f"{k}: {va} vs {vb}")
+        elif isinstance(va, (int, float)) and isinstance(vb, (int, float)):
+            if abs(float(va) - float(vb)) > tol:
+                bad.append(f"{k}: {va} vs {vb}")
+        elif va != vb:
+            bad.append(f"{k}: {va} vs {vb}")
+        if len(bad) > 10:
+            break
+    return (not bad), bad
+
+
+def world_signature(template_dir: str) -> str:
+    """A label of the world (scene, rooms, problem, object set: the parts compared exactly); the state is compared with a tolerance
+    by :func:`worlds_compatible`, so two templates with equal signatures may still be rejected."""
+    p = world_payload(template_dir)
+    return hashlib.sha256(json.dumps({k: p[k] for k in ("scene", "rooms", "problem", "objects")}, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
 class SceneView:
@@ -184,6 +235,7 @@ class VecInstanceLoader:
         iid, template_dir, tmeta, activity, did = resolve_instance(os.path.abspath(first_tro_path))
         tro = load_tro(os.path.abspath(first_tro_path))
         self.template_dir = template_dir
+        self.payload = world_payload(template_dir)
         self.signature = world_signature(template_dir)
         self.tmeta, self.activity, self.did = tmeta, activity, did
         self.robot_name = self.robot_name_arg or robot_name_from_tro(tro)
@@ -272,9 +324,11 @@ class VecInstanceLoader:
 
     def check_template(self, tro_path: str) -> str:
         _, template_dir, _, _, _ = resolve_instance(os.path.abspath(tro_path))
-        sig = world_signature(template_dir)
-        if sig != self.signature:
-            raise RuntimeError(f"{tro_path}: template {template_dir} is another world ({sig} != {self.signature} of {self.template_dir})")
+        if os.path.abspath(template_dir) == os.path.abspath(self.template_dir):
+            return template_dir
+        ok, bad = worlds_compatible(self.payload, world_payload(template_dir))
+        if not ok:
+            raise RuntimeError(f"{tro_path}: template {template_dir} is another world than {self.template_dir}: {bad[:3]}")
         return template_dir
 
     def restore_batch(self, tro_paths: Sequence[Optional[str]]) -> Tuple[Dict[int, Any], Dict[int, Any]]:
@@ -408,4 +462,4 @@ class VecInstanceLoader:
         return st.action()
 
 
-__all__ = ["VecInstanceLoader", "SlotLoader", "SceneView", "TaskView", "world_signature"]
+__all__ = ["VecInstanceLoader", "SlotLoader", "SceneView", "TaskView", "world_signature", "world_payload", "worlds_compatible"]
