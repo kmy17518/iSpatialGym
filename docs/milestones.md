@@ -85,6 +85,18 @@ Tagged states of this repository and what passed on them.
   `manifest.json` with `arm` / `made_on` / `scoping` per entry, `reports/` with the decision log and the driver scripts). Reels
   `runlogs/tmp/first-demo-v3.0_all_demos_with_overhead.mp4` (+ `.txt` index) and `runlogs/tmp/first-demo-v3.0_all_demos.mp4` (18:35, one
   chapter per demo). The head videos are also linked from `runlogs/pilot_20260915/first_demo_latest_success_videos/manifest.json`.
+- **Pinned for reproduction** (pushed to GitHub):
+  - code: tag `first-demo-v3.0`;
+  - reach bands the runs read: commit `452082a8` on this branch, the tag plus the 8 `.npz` it lacks (shampoo floor and countertop,
+    the blender cwkvib / eyedvd and carton cdmmwy handles, bar soap, milk, sandal: only their `.json` were committed, the pods got
+    the `.npz` with remote_run's working-tree sync). Check out the tag, then
+    `git checkout 452082a8 -- runlogs/reach_bands_20260915/bands/`;
+  - simulator: unchanged, tag `ispatialgym-first-demo-v2.0` of `kmy17518/BEHAVIOR-1K` (`14e06b710`; `setup.sh` clones the
+    branch, `ISPATIALGYM_B1K_BRANCH=ispatialgym-first-demo-v2.0` pins the tag). Assets, robot-asset checksums and package
+    versions as at `first-demo-v2.0`;
+  - demos: branch `first-demo-v3.0-artifacts` / tag `first-demo-v3.0-demos`, an orphan branch with no code history. It holds
+    the collection and `runlogs/first-demo-v3.0/pins/PIN.json`: package versions, the sampling budgets, robot-asset checksums,
+    the local sampler cache, the ledger rows and job markers; its README has the rebuild commands.
 - **Known limits:**
   - **Dishwasher open** still dips 24.5 cm in its grasp transit: the straight and up-over-down legs both stall 13-15 mm short, forward and
     backward, so F5 keeps the plan (the owner's fallback).
