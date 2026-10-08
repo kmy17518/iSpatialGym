@@ -139,8 +139,13 @@ class VecInstanceLoader:
     """N clones of one template; see the module docstring."""
 
     def __init__(self, num_envs: int, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM,
-                 behavior_output: bool = True, tiled_rendering: bool = True, settle_physics_steps: int = 25):
+                 behavior_output: bool = True, tiled_rendering: bool = False, settle_physics_steps: int = 25, warm_renders: int = 100):
+        """``tiled_rendering``: one tiled render product for all clones' cameras (off by default: the tiles share one exposure, so
+        a clone's frames stay 15-20 % off its own per-camera render). ``warm_renders``: renders after the batch's reset before
+        the first observation is taken - the real-time renderer adapts to a camera's new view over ~20-60 frames (a robot moved
+        to its instance pose renders ~6 % darker at first), and a single-scene world got that warm-up for free during the build."""
         self.num_envs = int(num_envs)
+        self.warm_renders = int(warm_renders)
         self.robot_name_arg = robot_name
         self.image_size = int(image_size)
         self.head_aperture = float(head_aperture)
@@ -320,8 +325,14 @@ class VecInstanceLoader:
         task._reset_tracking(loaded)
         idx = th.tensor(loaded, dtype=th.long)
         obs_list, info = env.reset(env_indices=idx)  # the loaded scenes back to their snapshots, pose_settled tracking on, a render
+        info_list = info.get("obs_info") or [None] * len(loaded)
+        if self.warm_renders > 0:
+            # the renderer's adaptation to every clone's new view (see __init__); physics untouched, the observation re-read
+            for _ in range(self.warm_renders):
+                og.sim.render()
+            obs_list, info_list = env.get_obs(env_indices=idx)
         obs = {i: obs_list[k] for k, i in enumerate(loaded)}
-        infos = {i: {"obs_info": (info.get("obs_info") or [None] * len(loaded))[k]} for k, i in enumerate(loaded)}
+        infos = {i: {"obs_info": info_list[k]} for k, i in enumerate(loaded)}
         for k, i in enumerate(loaded):
             sl = self.slots[i]
             try:
@@ -342,6 +353,7 @@ class VecInstanceLoader:
             self.slot_reports[i]["robot_base_init_scene"] = {"position": [float(v) for v in rp], "orientation": [float(v) for v in rq]}
         self.batches += 1
         self.report["last_restore_s"] = round(time.time() - t0, 1)
+        self.report["warm_renders"] = self.warm_renders
         return obs, infos
 
     def _hold_entities(self, loaded: Sequence[int]) -> None:
