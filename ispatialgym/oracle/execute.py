@@ -24,9 +24,9 @@ Behaviour per action (§3.6 / §6.1):
 * ``Grasp``      ``gripper(open)`` → ``arm_to(pre_grasp)`` → ``arm_along(approach)`` → ``gripper(close)``; the
   assisted grasp must hold the object (``failed_grasp``), then backend ``attach_object``.
 * ``Lift`` / ``Reorient``  ``arm_along`` over the recorded segment; post: still held, eef at the segment end.
-* ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (+ ``release_grasp_immediately``,
-  backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest (``not_settled``) or
-  ``attached`` for ``kind="attach"``.
+* ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (the command ramps to +1, OmniGibson's
+  assisted grasp lets go; backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest
+  (``not_settled``) or ``attached`` for ``kind="attach"`` (the task's attach rule joins the part at its release).
 * ``Push``       ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(init → mid → goal)``; post: eef at the goal
   contact, the pushed object moved (``no_motion``).
 * ``Brace``      ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(pre → contact)``; held (no further command).
@@ -178,9 +178,6 @@ class ExecuteConfig:
     #: goal tolerance (arcs / lines) instead of driving the pad to the recorded end
     push_stop_at_goal: bool = True
     push_stop_frac_arc: float = 0.15
-    #: handle grasps (articulation) attach the assisted grasp with a FixedJoint instead of OmniGibson's SphericalJoint for
-    #: links behind a movable joint (2026-09-18: the lid did not turn with the hand, ghost_hand 29 deg on a 4 cm lever)
-    handle_grasp_fixed_ag: bool = True
     push_stop_frac_line: float = 0.0
     #: (2026-09-22, alignment-world_vertical 0918-000750) pad speed along a push ARC about a hinge (m/s; the approach to the
     #: first contact keeps ``cartesian_speed``). The hinge torque is friction + damping * omega, so at the former 0.10 m/s
@@ -305,6 +302,12 @@ class ExecuteConfig:
     #: this far (m; 0 = off) and then backs off ``brace_touch_backoff_m`` along its approach
     brace_touch_stop_m: float = 0.002
     brace_touch_backoff_m: float = 0.004
+    #: a following brace (``Brace.follow``) moves its recorded targets with the braced object once it has moved this far since the
+    #: program start (m): the recorded stop stands only ``stop_clearance_m`` (5 mm) off the face
+    brace_follow_min_m: float = 0.001
+    #: a following push (``Push.follow``) moves the pushed object's goal with that instance once it has moved this far since the
+    #: program start (m): the touching goal is contact with it
+    push_goal_follow_min_m: float = 0.001
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
@@ -528,26 +531,6 @@ def _hook(ctx: Dict[str, Any], name: str):
     """An executor hook (``ctx["hooks"][name]``; a no-op without an executor): ``fov(enabled)`` enables / disables
     the gripper-in-FOV monitor around the checked segment of the action (``qa.Monitors`` arming rule)."""
     return (ctx.get("hooks") or {}).get(name) or (lambda *a, **k: None)
-
-
-def _patch_ag_joint_type(robot, joint_type: Optional[str]) -> None:
-    """Force the assisted-grasp joint type OmniGibson picks for the next attachment (``robot._get_assisted_grasp_joint_type``:
-    FixedJoint for rigid bodies, SphericalJoint for a link behind a movable joint). ``joint_type`` = ``"FixedJoint"`` installs
-    the override (objects the stock rule refuses - too heavy - stay refused), ``None`` restores the stock method."""
-    if joint_type is None:
-        orig = getattr(robot, "_isg_ag_joint_type_orig", None)
-        if orig is not None:
-            robot._get_assisted_grasp_joint_type = orig
-            del robot._isg_ag_joint_type_orig
-        return
-    if getattr(robot, "_isg_ag_joint_type_orig", None) is None:
-        robot._isg_ag_joint_type_orig = robot._get_assisted_grasp_joint_type
-
-    def forced(target_obj, target_link_name, _orig=robot._isg_ag_joint_type_orig, _kind=joint_type):
-        stock = _orig(target_obj, target_link_name)
-        return None if stock is None else _kind
-
-    robot._get_assisted_grasp_joint_type = forced
 
 
 def _witness(ctx: Dict[str, Any], key: str):
@@ -1027,22 +1010,12 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     yield from motions.arm_along(arm, targets["approach"], finish=finish)
     if finish.used:
         ctx["approach_finish"] = finish.info
-    # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step
-    # 2026-09-18 (blender cwkvib 0918-225935, ghost_hand "drifted 2 cm / 29 deg" at the follow): OmniGibson attaches an assisted
-    # grasp on a link behind a movable joint (a lid, a door leaf) with a SPHERICAL joint at the contact point - the hand can
-    # turn without turning the link, and the arm's arc-tracking slack (1 cm) is tens of degrees on a 4 cm handle lever. A
-    # handle pinched across a 13 mm tab transmits torque in reality: handle grasps attach with a FIXED joint (the only
-    # kind the follow was designed for; the dishwasher survived the spherical one only through its 30 cm lever)
-    fixed_ag = cfg.handle_grasp_fixed_ag and action.kind == "handle"
-    if fixed_ag:
-        _patch_ag_joint_type(motions.robot, "FixedJoint")
-    try:
-        yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
-    finally:
-        if fixed_ag:
-            _patch_ag_joint_type(motions.robot, None)
+    # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step. A handle's
+    # link is attached with a FIXED joint by the task's rule (ISpatialGymTask: AG_MOVING_LINK_JOINT_TYPE), the only kind the
+    # follow was designed for - the same rule an evaluated policy's grasp meets
+    yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
     ctx["closure_rate_m_per_step"] = motions.cfg.gripper_close_rate
-    if fixed_ag:
+    if action.kind == "handle":
         params = (getattr(motions.robot, "_ag_obj_constraint_params", None) or {}).get(arm) or {}
         ctx["ag_joint_type"] = params.get("joint_type")
     held = state.held_object(arm)
@@ -1098,10 +1071,19 @@ def post_reorient(action: Reorient, state, targets, ctx) -> Optional[str]:
     return _eef_reached(state, action.arm, targets["waypoints"][-1], _cfg(ctx), "reorient")
 
 
-def _release(motions: Motions, state, arm: str) -> None:
-    """Release whatever the arm holds (assisted grasp + planner attachment); idempotent."""
+RELEASE_WAIT_STEPS = 30
+
+
+def _release(motions: Motions, state, arm: str) -> Iterator[th.Tensor]:
+    """After the open command: hold until OmniGibson's assisted grasp has let go of what the arm held (its rule acts at the
+    open command, the in-hand registry clears after its release window), then drop the planner attachment. Nothing is
+    released directly - a demo must release the way a policy does; a grasp that does not let go fails the action."""
+    for _ in range(RELEASE_WAIT_STEPS):
+        if state.held_object(arm) is None:
+            break
+        yield from motions.hold(1)
     if state.held_object(arm) is not None:
-        state.robot.release_grasp_immediately(arm)
+        raise SkillError("execution", f"the assisted grasp of {arm} did not let go at the open command", arm=arm)
     motions.backend.detach_object(arm)
 
 
@@ -1274,10 +1256,18 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
     if action.kind == "attach" and action.on:
         yield from _attach_at_place(action, motions, state, ctx)
+        # the fingers open to just short of the release (the assisted grasp still holds the part) and the alignment is
+        # measured and corrected again with the fingertips off the partner; the open command's last increment releases it
+        yield from motions.gripper_open_short(arm)
+        closed = ctx.get("attach")
+        yield from _attach_at_place(action, motions, state, ctx)
+        ctx["attach"]["fingers_closed"] = closed
     # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
-    _release(motions, state, arm)
+    yield from _release(motions, state, arm)
+    if action.kind == "attach" and action.on:
+        _attach_after_release(action, state, ctx)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
     # release: a differential-IK stall is finished by arm_to like the Retreat action's leg (touching 0917-203045: the
@@ -1471,10 +1461,13 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     The male / female meta-link offset is read from the live world (the recorded pose does not know the in-hand slip of
     the closure or the descent's shortfall). Above ``attach_correct_min_*`` the hand is moved by the male -> female
     transform — the part is rigid in the hand, so ``T_eef' = T_female @ inv(T_male) @ T_eef`` — as a short Cartesian leg
-    (closed-loop correction on the object, not a fallback). Then the assisted grasp is dropped and, in the same step,
-    ``AttachedTo.set_value(True)`` snaps the millimetre residual and creates the fixed joint, so the part never
-    free-falls; the fingers open afterwards. A residual beyond OmniGibson's 5 cm / 15 deg does not attach and the
-    postcondition fails as before (``ctx["attach"]`` records the offsets for the audit)."""
+    (closed-loop correction on the object, not a fallback). The part is still held when this returns; the place runs it
+    once with the fingers closed and once more with them open to just short of the release (``gripper_open_short``),
+    then opens the gripper by the command (ramp to +1) like every other place, OmniGibson's assisted grasp lets go, and the
+    task's attach rule joins the part in that instant (``predicates.attach_on_release``, the release hook of our
+    Behavior-1K fork: the fixed joint at the current relative pose, so the part neither moves nor falls through the
+    collision-filtered partner) - the same rule an evaluated policy's release meets. A residual beyond the misalignment
+    bound is refused here and the postcondition fails as before (``ctx["attach"]`` records the offsets for the audit)."""
     cfg = _cfg(ctx)
     arm = action.arm
     getter = getattr(state, "attachment_offset", None)
@@ -1553,19 +1546,26 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
                                                     f"({cfg.attach_snap_max_m * 1000:.0f} mm / {math.degrees(cfg.attach_snap_max_rad):.0f} deg)"})
         log.warning("place(%s): %s - not attached", action.object, rec["refused"])
         raise SkillError("execution", f"attach refused: {rec['refused']}")  # still held: the checkpoint rollback + retry re-aim the place
-    # drop the assisted grasp and attach in one step (no physics in between): the fixed joint is created at the current relative
-    # pose of the meta links (predicates.attach_in_place), so the part does not move when it appears nor when the fingers open
-    if state.held_object(arm) is not None:
-        state.robot.release_grasp_immediately(arm)
-    motions.backend.detach_object(arm)
-    ok = bool(state.attach(action.object, action.on))
-    rec["attached"] = ok
-    rec["alignment"] = getattr(state, "last_attach", None)  # the evaluator's alignment record (modulo the part's symmetry)
-    if ok:
-        log.info("place(%s): attached to %s (fixed attachment joint at the current relative pose, %s)", action.object, action.on,
-                 (rec["alignment"] or {}).get("joint", "?"))
+    from ispatialgym.sampling import predicates as PRED
+
+    PRED.LAST_RELEASE_ATTACH.clear()  # the release that follows records its attach there
+
+
+def _attach_after_release(action: Place, state, ctx) -> None:
+    """After the attach placement's release by the command: whether the task's attach rule joined the part, and how
+    (``ctx["attach"]``: ``attached``, the release hook's alignment record)."""
+    from ispatialgym.sampling import predicates as PRED
+
+    rec = ctx.setdefault("attach", {})
+    rec["release"] = "gripper command +1"
+    rec["attached"] = bool(state.attached(action.object, action.on))
+    rec["alignment"] = dict(PRED.LAST_RELEASE_ATTACH) or None
+    if rec["attached"]:
+        log.info("place(%s): released at the open command and joined to %s (%s)", action.object, action.on,
+                 "at the release" if (rec["alignment"] or {}).get("attached") else "by the per-step check")
     else:
-        log.warning("place(%s): AttachedTo.set_value(True) refused at the place pose (meta links beyond 5 cm / 15 deg?)", action.object)
+        log.warning("place(%s): released at the open command but not attached to %s (%s)", action.object, action.on,
+                    (rec["alignment"] or {}).get("reason", "no attach at the release"))
 
 
 def post_place(action: Place, state, targets, ctx) -> Optional[str]:
@@ -1657,8 +1657,8 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             # pre-shape width, slides off the free edge (Retreat._edge_escape) and completes the opening once clear
             art = getattr(getattr(action, "after", None), "articulation", None)
             sheet = bool(art is not None and (getattr(art, "extra", None) or {}).get("handle_kind") == "edge_lid")
-            yield from motions.gripper(arm, close=False, staged=(not articulated) or sheet)
-            _release(motions, state, arm)
+            yield from motions.gripper(arm, close=False, staged=sheet)
+            yield from _release(motions, state, arm)
             if articulated and cfg.release_settle_steps > 0:
                 # let the constraint-removal transient die before the arm moves off the handle (the leaf keeps its angle
                 # through the counterbalance / friction; the torso rock of 0920-002330 happened while the leg started)
@@ -2190,6 +2190,43 @@ def _hold_until_still(motions: Motions, state, obj: str, cfg: ExecuteConfig) -> 
             return
 
 
+class _GoalShiftedState:
+    """``state`` whose world pose target of ``obj`` is moved by ``shift`` (a following push); everything else is ``state``'s."""
+
+    def __init__(self, state, obj: str, shift: th.Tensor):
+        self._state, self._obj, self._shift = state, obj, shift
+
+    def __getattr__(self, name):
+        return getattr(self._state, name)
+
+    def pose_target(self, name: str):
+        tgt = self._state.pose_target(name)
+        if name != self._obj or tgt is None or getattr(tgt, "position", None) is None or str(getattr(tgt, "frame", "world")) != "world":
+            return tgt
+        return replace(tgt, position=C.as_tensor(tgt.position).reshape(-1)[:3].float() + self._shift)
+
+
+def _push_goal_follow(action: Push, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Optional[th.Tensor]:
+    """The planar displacement of a following push's instance (``Push.follow``, the touching partner) since the program start,
+    or None below ``push_goal_follow_min_m`` / without a reference. The pushed object's goal was sampled against that instance
+    at its init pose (touching: contact with the partner); release validation 2026-10-03: the gripper opening fully at the
+    place pose shoved the partner 5.5-6.5 mm away from the target, the brace held it there, and the push to the recorded goal
+    ended 6 mm short of touching. ``ctx["push_goal_follow"]`` records the facts."""
+    getter = getattr(state, "init_pose", None)
+    init = getter(action.follow) if getter is not None else None
+    if init is None:
+        return None
+    try:
+        live = state.object_pose(action.follow)
+    except Exception:  # noqa: BLE001
+        return None
+    d = as_world_pose(live)[0].float() - as_world_pose(init)[0].float()
+    d[2] = 0.0
+    dist = float(th.linalg.norm(d))
+    ctx["push_goal_follow"] = {"follow": action.follow, "shift_m": round(dist, 4), "delta": [round(float(v), 4) for v in d.tolist()], "applied": dist >= cfg.push_goal_follow_min_m}
+    return d if dist >= cfg.push_goal_follow_min_m else None
+
+
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
@@ -2343,6 +2380,20 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             # owner 2026-09-26 (axial 0926-043254 / 051919): a push's legs are Cartesian and closed-loop from wherever the hand is -
             # a pre-contact witness trajopt cannot reach (another branch) is replaced by cuRobo's own branch instead of failing
             yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign, accept_other_branch=True)
+    shift = _push_goal_follow(action, state, ctx, cfg) if getattr(action, "follow", None) else None
+    if shift is not None:
+        # after the pad's start was placed against the object where it is: the goal (every stop, residual and re-push below
+        # reads it) moves with the partner, and a straight push line is extended by what the partner moved along it
+        state = _GoalShiftedState(state, obj, shift)
+        d0 = C.as_tensor(targets["direction"]).reshape(-1)[:3].float()
+        d0 = d0 / max(float(th.linalg.norm(d0)), 1e-9)
+        along = float(th.dot(shift, d0))
+        if action.contact.mid is None and along > 0:
+            p_end, q_end = as_world_pose(targets["waypoints"][-1])
+            targets = dict(targets)
+            targets["waypoints"] = list(targets["waypoints"]) + [Pose(position=[float(v) for v in (p_end + d0 * along).tolist()], orientation=[float(v) for v in q_end.tolist()])]
+            ctx["push_goal_follow"]["extended_m"] = round(along, 4)
+        log.info("push(%s): %s moved %.1f mm since the start -> the goal follows it (line extended %.1f mm)", obj, action.follow, float(th.linalg.norm(shift)) * 1000, max(along, 0.0) * 1000)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
@@ -2559,6 +2610,46 @@ def brace_targets_at_goal(contact, state, cfg: ExecuteConfig, fraction: float = 
     }
 
 
+def _brace_follow_targets(action: Brace, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
+    """A following brace (``Brace.follow``) re-aimed at the braced object's LIVE pose: the recorded pre / contact / approach stand
+    ``stop_clearance_m`` off the face of the object at its init pose; when it has moved since the program start by more than
+    ``brace_follow_min_m`` (touching, release validation 2026-10-03: the gripper opening fully at the place pose shoved the
+    partner 5.5-6.5 mm toward the stop, the stop pressed into it and the push's start configuration was in collision), every
+    target moves with the object's planar rigid motion (translation + yaw about its position). ``ctx["brace_follow"]`` records
+    the facts; the same targets are returned when nothing moves."""
+    obj = action.contact.object
+    getter = getattr(state, "init_pose", None)
+    init = getter(obj) if getter is not None else None
+    if init is None:
+        return targets
+    try:
+        live = state.object_pose(obj)
+    except Exception:  # noqa: BLE001
+        return targets
+    p0, q0 = as_world_pose(init)
+    p1, q1 = as_world_pose(live)
+    p0, p1 = p0.float(), p1.float()
+    d = p1 - p0
+    dist = float(th.linalg.norm(d))
+    dyaw = float(C.wrap_angle(C.yaw_of(q1) - C.yaw_of(q0)))
+    rec: Dict[str, Any] = {"object": obj, "shift_m": round(dist, 4), "delta": [round(float(v), 4) for v in d.tolist()], "yaw_rad": round(dyaw, 4)}
+    ctx["brace_follow"] = rec
+    if dist < cfg.brace_follow_min_m and abs(dyaw) < 0.005:
+        rec["applied"] = False
+        return targets
+    qz = C.quat_from_yaw(dyaw)
+
+    def moved(pose):
+        p, q = as_world_pose(pose)
+        p_new = p1 + C.quat_rotate(qz, p.float() - p0)
+        return Pose(position=[float(v) for v in p_new.tolist()], orientation=[float(v) for v in C.qmul(qz, q.float()).tolist()])
+
+    out = {"pre": moved(targets["pre"]), "contact": moved(targets["contact"]), "approach": [moved(w) for w in targets["approach"]]}
+    rec["applied"] = True
+    log.info("brace(%s): moved %.1f mm / %.1f deg since the start -> the stop follows it", obj, dist * 1000, math.degrees(dyaw))
+    return out
+
+
 def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
@@ -2594,6 +2685,11 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
             ctx["brace_at_goal"]["probes"] = probes
         log.info("brace(%s): the fist stands where the braced edge will be at %.0f %% of the goal rotation (%.1f deg) + %.0f mm gap: contact moved %.1f cm",
                  action.contact.object, at_goal["fraction"] * 100, math.degrees(at_goal["goal_rotation_rad"]), at_goal["gap_m"] * 1000, at_goal["shift_m"] * 100)
+    elif getattr(action, "follow", False):
+        followed = _brace_follow_targets(action, state, targets, ctx, cfg)
+        if followed is not targets:
+            targets.update(followed)
+            q_hint_pre = None  # the recorded witness belongs to the recorded pre-pose; cuRobo plans the moved one
     opening = (getattr(action.contact, "extra", None) or {}).get("fingers_opening_m")
     if opening is not None:
         # a WIDE stop (owner 2026-09-19 00:49): the fingers pre-shaped to the recorded opening so both tips land on the braced
@@ -2931,7 +3027,7 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
                 total += motions.unwind(arm)
             yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
             yield from motions.gripper(arm, close=False, staged=False)
-            _release(motions, state, arm)
+            yield from _release(motions, state, arm)
             # the gripper-in-FOV span closes at the release and re-opens at the next pre-grasp (qa.py rule (b): "the
             # retreat legs and the transit to the next pre-grasp are unmonitored; every grasp -> release pair is its own
             # span") - door 0921-045829: the retreated hand, 0.32 m below the camera, tripped the monitor during the drive
@@ -2972,14 +3068,7 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
                 fov_hook(True)  # the pre-grasp is reached: the next grasp -> release span opens
             finish = ApproachFinish(grasp, q_hint=_witness(ctx, f"regrasp[{j}]"), ignore_objects=[obj], max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
             yield from motions.arm_along(arm, [grasp], finish=finish)
-            fixed_ag = cfg.handle_grasp_fixed_ag
-            if fixed_ag:
-                _patch_ag_joint_type(robot, "FixedJoint")
-            try:
-                yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
-            finally:
-                if fixed_ag:
-                    _patch_ag_joint_type(robot, None)
+            yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
             if state.held_object(arm) is not obj:
                 raise SkillError("failed_grasp", f"{art.object} not in the {arm} hand after the re-grasp of segment {j}", stage="regrasp")
             motions.backend.attach_object(arm, obj)

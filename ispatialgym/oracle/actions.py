@@ -1016,6 +1016,9 @@ class Push(Action):
     touches: Tuple[str, ...] = ()
     #: instances the push must not touch (QA forbidden contacts): the partner of a ``push_under``
     avoid: Tuple[str, ...] = ()
+    #: the instance the pushed object's goal was sampled against (the touching partner): when it has moved since the program
+    #: start, the executor moves the goal with it
+    follow: Optional[str] = None
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
     TARGET_KEYS = ("pre", "waypoints", "direction", "distance_m")
 
@@ -1076,11 +1079,15 @@ class Brace(Action):
     command) until that arm's ``Retreat``. ``failed_grasp`` is not checked (``qa_exempt``).
 
     targets: ``{"pre": Pose, "contact": Pose, "approach": [Pose, ...]}`` (``line_waypoints`` pre → contact).
+
+    ``follow``: the program has not moved the braced object before the brace, so its init pose is the pose the stop was
+    recorded at; the executor moves the targets with the object when something shoved it since the program start.
     """
 
     name: str = "brace"
     contact: BraceContact
     base_yaw: Optional[float] = None
+    follow: bool = False
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
     TARGET_KEYS = ("pre", "contact", "approach")
 

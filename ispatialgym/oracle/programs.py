@@ -184,12 +184,14 @@ def _pack_stage_actions(sc: Sidecar, brace, pushes, base_yaw: float) -> List[Act
     return out
 
 
-def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float) -> List[Action]:
-    """Brace first (held), push with the other arm, retreat the push arm, release and retreat the brace arm."""
+def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float, follow_braced: bool = False) -> List[Action]:
+    """Brace first (held), push with the other arm, retreat the push arm, release and retreat the brace arm.
+    ``follow_braced``: the braced object is untouched by the program until the brace (``Brace.follow``), and the push's goal
+    was sampled against it (``Push.follow``)."""
     if brace.arm == push.arm:
         raise SidecarError(f"brace and push both use the {brace.arm} arm")
-    b = Brace(contact=brace, base_yaw=base_yaw)
-    p = Push(contact=push, base_yaw=base_yaw)
+    b = Brace(contact=brace, base_yaw=base_yaw, follow=follow_braced)
+    p = Push(contact=push, base_yaw=base_yaw, follow=brace.object if follow_braced else None)
     if os.environ.get("ISG_BRACE_RETREATS_FIRST", "0") == "1":
         # rush 2026-09-17: the brace pad leaves first while the push pad still holds the target - the brace caught the
         # painting with ~1 cm of penetration and its departure let the painting relax +0.05 rad toward the short side
@@ -907,10 +909,12 @@ def program_iors_touching(sc: Sidecar) -> List[Action]:
     else:
         head = program_iors_small(sc, "nextto")
     base_yaw = sc.stance(push_stance).base_pose2d[2]
+    # the release opens the gripper fully beside the partner and shoves it 5-6 mm away from the target (release validation
+    # 2026-10-03): the push's goal follows the partner, and so does the brace (the shove exceeds the stop's 5 mm clearance)
     if brace is None:
-        p = Push(contact=push, base_yaw=base_yaw)
+        p = Push(contact=push, base_yaw=base_yaw, follow=g.place_on)
         return head + [p, Retreat(arm=push.arm, object=push.object, after=p)]
-    return head + _brace_push_retreat(sc, brace, push, base_yaw)
+    return head + _brace_push_retreat(sc, brace, push, base_yaw, follow_braced=True)
 
 
 # ----------------------------------------------------------------------------------------------------------------

@@ -456,6 +456,7 @@ NOTE_KEYS = NOTE_KEYS + ("inhand_reaim",)
 NOTE_KEYS = NOTE_KEYS + ("push_close",)
 NOTE_KEYS = NOTE_KEYS + ("protection",)  # oracle.protection (owner 2026-09-26): the transits of the action and their protected objects
 NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial 0926-061151): a failed retreat leg replaced by a planned transit
+NOTE_KEYS = NOTE_KEYS + ("ag_joint_type",)  # the assisted-grasp joint a handle grasp got (the task's rule for links behind a movable joint)
 NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, carton lever): the lever fist slides out before it lifts
 
 
@@ -796,6 +797,11 @@ class Executor:
         self.last_obs = None
         self.last_info: Dict[str, Any] = {}
         self.phase_steps: Dict[int, int] = {PHASE_ORACLE: 0, PHASE_SETTLE: 0, PHASE_GOAL: 0}
+        #: every assisted-grasp release of the episode: it must come from OmniGibson's rule at a recorded gripper command of
+        #: exactly +1 (what an evaluated policy can do); a release between steps (a direct call) is a violation - rollbacks
+        #: reset the tracking
+        self.release_check: Dict[str, Any] = {"releases": [], "violations": []}
+        self._ag_last: Optional[Dict[str, Optional[str]]] = None
         self.stats: QAStats = monitors.stats if monitors is not None else QAStats()
         self.action_records: List[ActionRecord] = []
         self.last_ctx: Dict[str, Any] = {}
@@ -859,9 +865,32 @@ class Executor:
 
     # ------------------------------------------------------------------ stepping (the only env.step)
 
+    def _ag_held(self) -> Dict[str, Optional[str]]:
+        """arm -> name of the object the assisted-grasp joint holds (None: no joint)."""
+        cons = getattr(self.robot, "_ag_obj_constraints", None) or {}
+        held = getattr(self.robot, "_ag_obj_in_hand", None) or {}
+        return {arm: (getattr(held.get(arm), "name", "?") if c is not None else None) for arm, c in cons.items()}
+
+    def _check_releases(self, before: Dict[str, Optional[str]], after: Dict[str, Optional[str]], action: th.Tensor) -> None:
+        if self._ag_last is not None:
+            for arm, obj in self._ag_last.items():
+                if obj is not None and before.get(arm) is None:
+                    self.release_check["violations"].append({"step": self.n + 1, "arm": arm, "object": obj, "kind": "released_between_steps"})
+        for arm, obj in before.items():
+            if obj is not None and after.get(arm) is None:
+                cmd = float(action[self.robot.controller_action_idx[f"gripper_{arm}"]].flatten()[0])
+                self.release_check["releases"].append({"step": self.n, "arm": arm, "object": obj, "gripper_command": round(cmd, 4)})
+                if cmd < 1.0 - 1e-6:
+                    self.release_check["violations"].append({"step": self.n, "arm": arm, "object": obj, "kind": "gripper_command_below_open",
+                                                             "gripper_command": round(cmd, 4)})
+
     def step(self, action: th.Tensor, phase: int = PHASE_ORACLE, action_index: int = -1, attempt: int = 0, monitor: bool = True) -> Optional[Verdict]:
+        ag_before = self._ag_held()
         obs, reward, terminated, truncated, info = SE.step(self.env, action, n_render_iterations=self.cfg.n_render_iterations)
         self.n += 1
+        ag_after = self._ag_held()
+        self._check_releases(ag_before, ag_after, action)
+        self._ag_last = ag_after
         self.phase_steps[phase] = self.phase_steps.get(phase, 0) + 1
         self.last_obs, self.last_info = obs, info
         if self.support_load is not None:
@@ -948,6 +977,9 @@ class Executor:
             from ispatialgym.oracle import physics_only as PO
 
             PO.sync_transforms(self.sim)
+        self._ag_last = None  # the restore re-establishes / drops grasps itself (not a release of the demo)
+        for k in ("releases", "violations"):  # the rolled-back attempt's steps leave the recording, and its releases with them
+            self.release_check[k] = [r for r in self.release_check[k] if r["step"] <= cp.step]
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
         if ag is not None:
@@ -1946,6 +1978,12 @@ class Executor:
                 verdict = Verdict("root_moved", "articulated object's root moved while its joint was worked: " + msg, step=self.n,
                                   details={"targets": sorted(failed_roots), "report": {o: root_report["objects"][o] for o in failed_roots}})
                 self.stats.record(verdict)
+        bad = self.release_check["violations"]
+        if verdict is None and bad:
+            msg = "; ".join(f"step {v['step']} {v['arm']} {v['object']}: {v['kind']}" + (f" ({v['gripper_command']})" if "gripper_command" in v else "") for v in bad)
+            verdict = Verdict("release_not_commanded", "an assisted-grasp release did not come from a gripper command of +1: " + msg, step=self.n,
+                              details={"violations": bad})
+            self.stats.record(verdict)
         self.timings["settle_s"] = time.time() - t0
         goal_obs = None
         if verdict is None and self.cfg.goal_image:
@@ -2005,6 +2043,7 @@ class Executor:
             "brace_retry": _jsonable(self.brace_retries),
             "goal_observation": goal_obs,
             "timings": dict(self.timings),
+            "release_check": _jsonable(self.release_check),
         }
         return self.result
 

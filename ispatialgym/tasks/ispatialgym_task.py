@@ -79,9 +79,26 @@ DEFAULT_POSE_SETTLED_CONFIG: Dict[str, float] = {"n_steps": 45, "pos_tolerance":
 SHARED_GOAL_EVAL = os.environ.get("ISPATIALGYM_SHARED_GOAL_EVAL", "")
 _SHARED_COUNTS = {"steps": 0, "reused": 0, "joint_steps": 0, "mismatches": 0, "potential_s": 0.0}
 
+#: The assisted-grasp joint of a link behind a movable joint (a lid, a door leaf, a flap), set on every robot of the env
+#: (our Behavior-1K fork's ``Robot.ag_moving_link_joint_type``): fixed instead of OmniGibson's spherical one, which couples
+#: position only - a handle pinched across a 13 mm tab could not turn a blender lid on its 4 cm lever (2026-09-18). The
+#: demos are recorded under this rule, and an evaluated policy meets the same one.
+AG_MOVING_LINK_JOINT_TYPE = "FixedJoint"
+
 
 def _compact(expr) -> str:
     return " ".join(to_bddl(expr).split())
+
+
+def _robots(robots):
+    """The robots of ``env.robots`` (one list per scene in the vectorized environment)."""
+    stack = list(robots or [])
+    while stack:
+        robot = stack.pop()
+        if isinstance(robot, (list, tuple)):
+            stack.extend(robot)
+        else:
+            yield robot
 
 
 class ISpatialGymTask(BehaviorTask):
@@ -268,6 +285,11 @@ class ISpatialGymTask(BehaviorTask):
         if missing:
             return False, f"No object binding for instances {missing}"
         self.object_scope[AGENT_INSTANCE] = self.get_agent(env)
+        # the attach rule also acts at the instant a robot's assisted grasp lets go (our Behavior-1K fork's release hook): a
+        # part released aligned with its partner is joined before it can fall through the collision-filtered partner
+        PRED.install_release_hook(getattr(env, "robots", None))
+        for robot in _robots(getattr(env, "robots", None)):
+            robot.ag_moving_link_joint_type = AG_MOVING_LINK_JOINT_TYPE
         if self._tro is not None:
             self.configure_targets(self._tro.meta)
         return True, None
