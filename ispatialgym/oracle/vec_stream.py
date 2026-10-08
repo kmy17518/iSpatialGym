@@ -107,11 +107,15 @@ class VecStreamExecutor:
     ``env.step(actions, n_render_iterations)`` must return per-env lists (``obs_list, rewards, terminateds, truncateds,
     infos``); ``sim`` provides ``current_time`` for the recorders (None: not recorded)."""
 
-    def __init__(self, env, slots: List[Slot], sim=None, n_render_iterations: int = 1):
+    def __init__(self, env, slots: List[Slot], sim=None, n_render_iterations: int = 1, num_envs: Optional[int] = None, idle_actions: Optional[Dict[int, th.Tensor]] = None):
+        """``num_envs`` / ``idle_actions``: the batch may have environments without an episode (a partial last batch); their
+        rows of every step's action are ``idle_actions[env_idx]`` (a hold of that robot's joints)."""
         self.env = env
         self.slots = list(slots)
         self.sim = sim
         self.n_render_iterations = int(n_render_iterations)
+        self.num_envs = int(num_envs) if num_envs is not None else (max(s.idx for s in self.slots) + 1 if self.slots else 1)
+        self.idle_actions = dict(idle_actions or {})
         for s in self.slots:
             if s.monitors is not None:
                 s.stats = s.monitors.stats
@@ -145,7 +149,9 @@ class VecStreamExecutor:
             if s.monitors is not None:
                 s.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=s.held(), manipulation=False)
         while any(not s.done for s in self.slots):
-            actions = th.zeros((len(self.slots), self.action_dim), dtype=th.float32)
+            actions = th.zeros((self.num_envs, self.action_dim), dtype=th.float32)
+            for i, a in self.idle_actions.items():
+                actions[i] = th.as_tensor(a, dtype=th.float32).reshape(-1)
             phases: Dict[int, int] = {}
             for s in self.slots:
                 if s.stage == "stream":

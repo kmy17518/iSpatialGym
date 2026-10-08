@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import copy
 import math
+import types
 from typing import Any, Dict, List, Optional
 
 import pytest
@@ -272,3 +273,74 @@ def test_result_dict_has_the_single_env_keys():
     single = run_single("reach_then_stop")
     missing = set(single) - set(r) - {"_pose", "_steps"}
     assert not missing, missing
+
+
+# ---------------------------------------------------------------------------------------------------------------- clone frames
+
+
+class _Scene:
+    def __init__(self, pose, idx=1):
+        self.pose, self.idx = th.as_tensor(pose, dtype=th.float32), idx
+
+
+def _translated(x, y=0.0, z=0.0):
+    p = th.eye(4)
+    p[:3, 3] = th.tensor([x, y, z])
+    return p
+
+
+def test_clone_frames_translate_targets_objects_and_robot_but_not_the_base_scene():
+    from ispatialgym.eval.clone_frames import offset_object_state, offset_targets_meta, scene_translation, to_base, to_clone
+    from ispatialgym.eval.targets import PoseTarget
+
+    base, clone = _Scene(th.eye(4), idx=0), _Scene(_translated(40.0), idx=1)
+    assert scene_translation(None) is None and scene_translation(base) is None
+    assert th.equal(scene_translation(clone), th.tensor([40.0, 0.0, 0.0]))
+    # a world-frame pose target: translated, the orientation untouched; an object-relative frame: untouched
+    world = PoseTarget("agent.n.01_1", "zed_link:Camera:0", "world", th.tensor([15.4, 1.94, 1.15]), th.tensor([0.1, 0.2, 0.3, 0.927]), "full", "full", 0.05, 0.1)
+    rel = PoseTarget("cup.n.01_1", None, "table.n.01_1", th.tensor([0.1, 0.0, 0.0]), None, "full", None, 0.01, None)
+    meta = types.SimpleNamespace(pose_targets={"agent.n.01_1": world, "cup.n.01_1": rel})
+    out = offset_targets_meta(meta, clone)
+    assert out is not meta and th.allclose(out.pose_targets["agent.n.01_1"].position, th.tensor([55.4, 1.94, 1.15]))
+    assert th.equal(out.pose_targets["agent.n.01_1"].orientation, world.orientation)
+    assert th.equal(out.pose_targets["cup.n.01_1"].position, rel.position)
+    assert offset_targets_meta(meta, base) is meta  # bit-identical path for the base scene
+    assert th.equal(world.position, th.tensor([15.4, 1.94, 1.15]))  # the TRO meta itself is untouched
+    # an object state: root position translated, orientation / joints untouched
+    st = {"root_link": {"pos": th.tensor([1.0, 2.0, 0.5]), "ori": th.tensor([0.0, 0.0, 0.0, 1.0])}, "joint_pos": th.tensor([0.3])}
+    out = offset_object_state(st, clone)
+    assert th.equal(out["root_link"]["pos"], th.tensor([41.0, 2.0, 0.5])) and th.equal(out["root_link"]["ori"], th.tensor([0.0, 0.0, 0.0, 1.0]))
+    # round trip
+    assert th.equal(to_base(clone, to_clone(clone, th.tensor([3.0, 4.0, 5.0]))), th.tensor([3.0, 4.0, 5.0]))
+    assert th.equal(to_clone(base, th.tensor([3.0, 4.0, 5.0])), th.tensor([3.0, 4.0, 5.0]))
+
+
+def test_clone_frames_reject_a_rotated_placement():
+    from ispatialgym.eval.clone_frames import scene_translation
+
+    p = th.eye(4)
+    p[0, 0], p[0, 1], p[1, 0], p[1, 1] = 0.0, -1.0, 1.0, 0.0
+    p[:3, 3] = th.tensor([40.0, 0.0, 0.0])
+    with pytest.raises(AssertionError):
+        scene_translation(_Scene(p))
+
+
+def test_attachment_context_is_per_scene():
+    from ispatialgym.sampling import predicates as PRED
+
+    class Ent:
+        def __init__(self, name, idx):
+            self.name, self.scene = name, types.SimpleNamespace(idx=idx)
+
+    PRED.set_attachment_context([{"child": "bolt", "parent": "nut", "equivalences": [[0, 0, 1, 0]]}], scene_idx=0)
+    PRED.set_attachment_context([{"child": "bolt", "parent": "nut", "equivalences": [[0, 0, 0, 1], [0, 1, 0, 0]]}], scene_idx=1)
+    assert len(PRED.attachment_context(Ent("bolt", 0), Ent("nut", 0))["equivalences"]) == 1
+    assert len(PRED.attachment_context(Ent("bolt", 1), Ent("nut", 1))["equivalences"]) == 2
+    assert PRED.attachment_context(Ent("bolt", 2), Ent("nut", 2)) is None  # no registration for scene 2, no single-env fallback
+    PRED.set_attachment_context([{"child": "bolt", "parent": "nut", "equivalences": []}])  # the single-env task (scene None)
+    assert PRED.attachment_context(Ent("bolt", 2), Ent("nut", 2))["equivalences"] == []
+    assert len(PRED.attachment_context(Ent("bolt", 1), Ent("nut", 1))["equivalences"]) == 2  # scene 1's entry kept
+    PRED.set_attachment_context([], scene_idx=1)
+    assert PRED.attachment_context(Ent("bolt", 1), Ent("nut", 1))["equivalences"] == []  # falls back to the single-env entry
+    PRED.set_attachment_context([])
+    PRED.set_attachment_context([], scene_idx=0)

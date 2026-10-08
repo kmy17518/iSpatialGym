@@ -92,7 +92,9 @@ DRIFT_SETTLED_ENTITIES = frozenset(s.strip() for s in os.environ.get("ISG_DRIFT_
 _BRANCHES: List[Dict[str, Any]] = []
 #: (child object name, parent object name) -> {"child_link", "parent_link", "equivalences": [[x, y, z, w], ...]} — the task's
 #: ``attachment_targets`` with the child part's recorded symmetry (``set_attachment_context``)
-_ATTACHMENTS: Dict[Tuple[str, str], Dict[str, Any]] = {}
+#: keyed by (scene index or None, child name, parent name): a vectorized task registers every clone's pairs under its scene index,
+#: a single-env task under None; the lookup tries the entity's own scene first (``attachment_context``)
+_ATTACHMENTS: Dict[Tuple[Optional[int], str, str], Dict[str, Any]] = {}
 
 
 def reset_branches() -> None:
@@ -128,19 +130,27 @@ def decided_by() -> Dict[str, str]:
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def set_attachment_context(pairs: Sequence[Dict[str, Any]]) -> None:
+def set_attachment_context(pairs: Sequence[Dict[str, Any]], scene_idx: Optional[int] = None) -> None:
     """Register the task's attachment pairs: ``{"child": <object name>, "parent": <object name>, "child_link", "parent_link",
     "equivalences": [[x, y, z, w], ...]}`` (object-frame rotations of the child that leave its shape unchanged; the identity
-    is implied). Called by the task when the TRO targets are configured; ``[]`` clears."""
-    _ATTACHMENTS.clear()
+    is implied). Called by the task when the TRO targets are configured; ``[]`` clears. ``scene_idx``: the clone the pairs
+    belong to (a vectorized environment registers each clone's pairs separately; only that clone's entries are replaced)."""
+    for key in [k for k in _ATTACHMENTS if k[0] == scene_idx]:
+        del _ATTACHMENTS[key]
     for p in pairs or []:
         if p.get("child") and p.get("parent"):
-            _ATTACHMENTS[(str(p["child"]), str(p["parent"]))] = {"child_link": p.get("child_link"), "parent_link": p.get("parent_link"),
-                                                                 "equivalences": [[float(v) for v in q] for q in (p.get("equivalences") or [])]}
+            _ATTACHMENTS[(scene_idx, str(p["child"]), str(p["parent"]))] = {"child_link": p.get("child_link"), "parent_link": p.get("parent_link"),
+                                                                            "equivalences": [[float(v) for v in q] for q in (p.get("equivalences") or [])]}
 
 
 def attachment_context(child: Any, parent: Any) -> Optional[Dict[str, Any]]:
-    return _ATTACHMENTS.get((getattr(child, "name", str(child)), getattr(parent, "name", str(parent))))
+    """The pair's record: the one registered for the child's own scene (``child.scene.idx``) when there is one, else the
+    single-env registration (scene None)."""
+    names = (getattr(child, "name", str(child)), getattr(parent, "name", str(parent)))
+    idx = getattr(getattr(child, "scene", None), "idx", None)
+    if idx is not None and (idx, *names) in _ATTACHMENTS:
+        return _ATTACHMENTS[(idx, *names)]
+    return _ATTACHMENTS.get((None, *names))
 
 
 def _qmul(a, b):

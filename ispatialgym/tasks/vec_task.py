@@ -28,6 +28,7 @@ from omnigibson.tasks.task_base import BaseTask
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 
 from ispatialgym.activity.problem import AGENT_INSTANCE, is_agent_instance
+from ispatialgym.eval.clone_frames import offset_object_state, offset_targets_meta, scene_translation
 from ispatialgym.eval.group_entity import GroupEntity
 from ispatialgym.eval.tro import apply_targets_to_scope, load_tro, physical_instances, validate_tro_against_problem
 from ispatialgym.sampling import predicates as PRED
@@ -36,40 +37,23 @@ from ispatialgym.tasks.ispatialgym_task import ISpatialGymTask
 log = logging.getLogger(__name__)
 
 
-def _offset_targets_meta(meta, scene):
-    """A shallow copy of the TRO meta whose world-frame pose targets are expressed in ``scene``'s world placement (the TRO's
-    poses are env 0's = scene-relative). Object-relative frames need no change (they move with the object)."""
-    if scene is None:
-        return meta
-    pose = scene.pose
-    if pose is None or bool(th.allclose(pose, th.eye(4))):
-        return meta
-    new = copy.copy(meta)
-    new.pose_targets = {}
-    for inst, tgt in meta.pose_targets.items():
-        t = copy.copy(tgt)
-        if (t.frame in (None, "world")) and t.position is not None:
-            pos = th.as_tensor(t.position, dtype=th.float32).reshape(3)
-            ori = th.as_tensor(t.orientation if t.orientation is not None else [0.0, 0.0, 0.0, 1.0], dtype=th.float32).reshape(4)
-            wpos, wori = scene.convert_scene_relative_pose_to_world(pos, ori)
-            t.position = wpos
-            if t.orientation is not None:
-                t.orientation = wori
-        new.pose_targets[inst] = t
-    return new
-
-
 class VecISpatialGymTask(ISpatialGymTask):
     """Per-environment iSpatialGym task (see the module docstring)."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, activity_name, activity_definition_id=0, activity_instance_id=0, activity_definitions_root=None, tro_path=None, object_bindings=None,
+                 require_pose_settled=False, terminate_on_binary_success=False, pose_settled_config=None, highlight_task_relevant_objects=False, termination_config=None,
+                 reward_config=None, include_obs=False):
+        # the explicit signature: OmniGibson's registry picks the config keys from it
         self._n = 1
         self._scopes: Optional[List[Dict[str, Any]]] = None
         self._first_success_steps: List[int] = [-1]
         self._first_settled_success_steps: List[int] = [-1]
         self._errors_at_first_success_envs: List[Optional[dict]] = [None]
         self._last_goal_evals: List[Any] = [None]
-        super().__init__(*args, **kwargs)
+        super().__init__(activity_name, activity_definition_id=activity_definition_id, activity_instance_id=activity_instance_id, activity_definitions_root=activity_definitions_root,
+                         tro_path=tro_path, object_bindings=object_bindings, require_pose_settled=require_pose_settled, terminate_on_binary_success=terminate_on_binary_success,
+                         pose_settled_config=pose_settled_config, highlight_task_relevant_objects=highlight_task_relevant_objects, termination_config=termination_config,
+                         reward_config=reward_config, include_obs=include_obs)
 
     # ------------------------------------------------------------------ scopes (per env)
 
@@ -156,6 +140,13 @@ class VecISpatialGymTask(ISpatialGymTask):
         if missing:
             return False, f"No object binding for instances {missing}"
         scope[AGENT_INSTANCE] = self.get_agent(env, env_idx)
+        if env_idx > 0:
+            # the clones are copies of env 0's scene file: every bound instance must carry the same scene object name (the
+            # TRO's object_bindings, the attachment context and the recorder's names are shared by name)
+            for inst, entity in scope.items():
+                e0 = self._scopes[0].get(inst)
+                if entity is not None and e0 is not None and not isinstance(entity, GroupEntity) and getattr(entity, "name", None) != getattr(e0, "name", None):
+                    return False, f"env {env_idx}: {inst!r} is bound to {entity.name!r}, env 0 to {e0.name!r}"
         if self._tro is not None:
             self.configure_targets(self._tro.meta, env_idx=env_idx, scene=scene)
         return True, None
@@ -173,18 +164,21 @@ class VecISpatialGymTask(ISpatialGymTask):
     def configure_targets(self, meta, env_idx: int = 0, scene=None):
         """TRO targets into env ``env_idx``'s scope, the world-frame pose targets placed in that clone's world frame."""
         scope = self._scopes[env_idx]
-        apply_targets_to_scope(_offset_targets_meta(meta, scene), scope)
+        apply_targets_to_scope(offset_targets_meta(meta, scene), scope)
         self._targets_configured = True
         for entity in scope.values():
             if isinstance(entity, GroupEntity):
                 entity.invalidate()
-        if env_idx == 0:
-            PRED.set_attachment_context(self._attachment_pairs(meta))
+        # the attachment pairs (scene object names, links, the child's symmetry) registered for this clone's scene: the names
+        # are the clone's own (initialize_activity binds every env's scope and asserts the names match env 0's, so the
+        # base class's env-0 pairs are this env's pairs); the predicate wrapper looks them up by the entity's scene index
+        PRED.set_attachment_context(self._attachment_pairs(meta), scene_idx=getattr(scene, "idx", None) if scene is not None else None)
 
-    def load_tro_instance(self, env, tro=None, settle_steps=25, apply_object_states=True, env_idx: int = 0, finalize: bool = True):
+    def load_tro_instance(self, env, tro=None, settle_steps=25, apply_object_states=True, env_idx: int = 0):
         """The TRO into clone ``env_idx``: object states with their root poses moved into the clone's frame, the robot pose set
-        scene-relative, the robot joints, the targets. ``finalize`` (single-env behaviour): settle, snapshot the scene's initial
-        state and reset it; the vectorized loader passes ``finalize=False`` and settles every freshly loaded env together."""
+        scene-relative, the robot joints, the targets; then exactly the single-env sequence - ``settle_steps`` physics steps with
+        the scope's entities kept still, the scene's initial file updated, the scene reset, the tracking of that env reset. The
+        vectorized loader calls it with ``settle_steps=0`` (as ``run_isg.InstanceLoader.restore`` does) and settles the batch."""
         if tro is None:
             tro = self._tro if self._tro is not None else self._tro_path
         if tro is None:
@@ -199,14 +193,12 @@ class VecISpatialGymTask(ISpatialGymTask):
         self._verify_object_bindings_env(tro, scope)
         robot = self.get_agent(env, env_idx)
         if apply_object_states:
-            offset = scene.pose[:3, 3] if scene.pose is not None else None
+            offset = scene_translation(scene)
             for inst, state in tro.object_states.items():
                 entity = scope.get(inst)
                 if entity is None or isinstance(entity, GroupEntity):
                     raise ValueError(f"TRO stores a state for {inst!r}, which is not a bound physical instance")
-                st = recursively_convert_to_torch(copy.deepcopy(state))
-                if offset is not None and isinstance(st, dict) and "root_link" in st and float(th.norm(offset)) > 0:
-                    st["root_link"]["pos"] = th.as_tensor(st["root_link"]["pos"]) + offset
+                st = offset_object_state(recursively_convert_to_torch(copy.deepcopy(state)), scene)
                 entity.load_state(st, serialized=False)
             if tro.robot_poses:
                 poses = {k.lower(): v for k, v in tro.robot_poses.items()}
@@ -217,23 +209,25 @@ class VecISpatialGymTask(ISpatialGymTask):
                 else:
                     raise KeyError(f"No generic or model-specific presampled robot pose for {robot.model}")
                 pose = available[0]
-                robot.set_position_orientation(th.tensor(pose["position"]), th.tensor(pose["orientation"]), frame="scene")
+                # the base scene: the single-env call bit for bit; a clone: the position translated, the orientation untouched (the
+                # scene-frame setter's matrix round trip would perturb the quaternion)
+                position = th.tensor(pose["position"]) if offset is None else th.tensor(pose["position"], dtype=th.float32) + offset
+                robot.set_position_orientation(position, th.tensor(pose["orientation"]))
                 scene.write_task_metadata(key="robot_poses", data=tro.robot_poses)
             self._restore_robot_state(robot, tro.meta.robot_state)
             for key in ("grasps", "attachment_targets", "constraints"):
                 if tro.meta.extras.get(key):
-                    raise NotImplementedError(f"VecISpatialGymTask: TRO '{key}' records are not supported in the vectorized loader")
+                    log.warning(f"TRO '{key}' records are not restored by VecISpatialGymTask.load_tro_instance (the loader restores them per env)")
         self.configure_targets(tro.meta, env_idx=env_idx, scene=scene)
         og.sim.update_handles()
-        if finalize:
-            for _ in range(settle_steps):
-                og.sim.step_physics()
-                for entity in scope.values():
-                    if entity is not None and not isinstance(entity, GroupEntity):
-                        entity.keep_still()
-            scene.update_initial_file()
-            scene.reset()
-            self._reset_tracking([env_idx])
+        for _ in range(settle_steps):
+            og.sim.step_physics()
+            for entity in scope.values():
+                if entity is not None and not isinstance(entity, GroupEntity):
+                    entity.keep_still()
+        scene.update_initial_file()
+        scene.reset()
+        self._reset_tracking([env_idx])
 
     def _verify_object_bindings_env(self, tro, scope):
         for inst, binding in tro.meta.object_bindings.items():
