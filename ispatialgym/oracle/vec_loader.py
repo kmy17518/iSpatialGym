@@ -190,7 +190,8 @@ class VecInstanceLoader:
     """N clones of one template; see the module docstring."""
 
     def __init__(self, num_envs: int, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM,
-                 behavior_output: bool = True, tiled_rendering: bool = False, settle_physics_steps: int = 25, warm_renders: int = 100, enhanced_determinism: Optional[bool] = None):
+                 behavior_output: bool = True, tiled_rendering: bool = False, settle_physics_steps: int = 25, warm_renders: int = 100, enhanced_determinism: Optional[bool] = None,
+                 fixed_handle_ag: bool = True):
         """``tiled_rendering``: one tiled render product for all clones' cameras (off by default: the tiles share one exposure, so
         a clone's frames stay 15-20 % off its own per-camera render). ``warm_renders``: renders after the batch's reset before
         the first observation is taken - the real-time renderer adapts to a camera's new view over ~20-60 frames (a robot moved
@@ -201,6 +202,12 @@ class VecInstanceLoader:
         # are grouped into islands / threads, i.e. on how many scenes share the simulation. Default: on for a multi-scene world, off
         # for num_envs = 1 (the single-env evaluator runs without it; bit-identity with it is kept).
         self.enhanced_determinism = bool(self.num_envs > 1) if enhanced_determinism is None else bool(enhanced_determinism)
+        # the demo collector's assisted-grasp semantics (run_isg --mode oracle, ExecutorConfig.handle_grasp_fixed_ag): a handle grasp -
+        # a link behind a movable joint (a lid, a leaf) - attaches with a FixedJoint, where OmniGibson's stock rule picks a
+        # SphericalJoint under which the hand turns without turning the link. A stream has no action boundaries to install the
+        # oracle's per-closure override, so it holds for the whole episode (rigid bodies keep the stock FixedJoint). Without it the
+        # blender demos replay to the lid turning in the hand (item 1b, 2026-10-08); with it all four replay to the demo's success step.
+        self.fixed_handle_ag = bool(fixed_handle_ag)
         self.robot_name_arg = robot_name
         self.image_size = int(image_size)
         self.head_aperture = float(head_aperture)
@@ -283,6 +290,12 @@ class VecInstanceLoader:
         self.report["head_camera_aperture_mm"] = [float(r.sensors[self.cam_key].horizontal_aperture) for r in self.robots]
         if self.behavior_output:
             self._warm_camera_params()
+        if self.fixed_handle_ag:
+            from ispatialgym.oracle.execute import _patch_ag_joint_type
+
+            for r in self.robots:
+                _patch_ag_joint_type(r, "FixedJoint")
+        self.report["fixed_handle_ag"] = self.fixed_handle_ag
         self.report["tiled_rendering"] = bool(getattr(self.env, "_tiled_sensor", None) is not None)
         self.report["num_envs"] = self.num_envs
         self.report["scene_offsets"] = [[float(v) for v in scene.pose[:3, 3]] for scene in self.env.scenes]
