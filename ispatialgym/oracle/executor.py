@@ -55,7 +55,7 @@ import torch as th
 from ispatialgym import ASSETS_ROOT
 from ispatialgym import single_env as SE
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.actions import Action, Brace, Place, Push
+from ispatialgym.oracle.actions import Action, Brace, Grasp, Navigate, Place, Push, Transition
 from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
@@ -458,6 +458,20 @@ NOTE_KEYS = NOTE_KEYS + ("protection",)  # oracle.protection (owner 2026-09-26):
 NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial 0926-061151): a failed retreat leg replaced by a planned transit
 NOTE_KEYS = NOTE_KEYS + ("ag_joint_type",)  # the assisted-grasp joint a handle grasp got (the task's rule for links behind a movable joint)
 NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, carton lever): the lever fist slides out before it lifts
+#: first-demo v2.1 A3 (bar soap 0927-034001): a library pinch lifted off the support under it, a support place raised for the in-hand pose
+NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
+#: first-demo v2.1 A1 (cap 0927-040231): an attach place opened the fingers that would meet the partner before the part seats
+NOTE_KEYS = NOTE_KEYS + ("finger_clearance",)
+#: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
+NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
+#: first-demo v2.1 (sandal on pods): the arm moved into the pre-grasp witness's posture before an approach that tracks only from there
+NOTE_KEYS = NOTE_KEYS + ("witness_posture",)
+#: first-demo v3.0 F4 (cork 0928-041525): an attach place kept the holding arm's hold from the descent until the attachment existed
+NOTE_KEYS = NOTE_KEYS + ("attach_hold",)
+#: first-demo v3.0 F1 (world vertical 0928-043205): a transition kept a free arm as it was for its brace / push at the arriving stance
+NOTE_KEYS = NOTE_KEYS + ("contact_arms_kept",)
+#: first-demo v3.0 F5 (nextto marker 0928-050212): a grasp transit whose plan dipped below both ends ran as a Cartesian leg
+NOTE_KEYS = NOTE_KEYS + ("transit_dip",)
 
 
 @dataclass
@@ -811,6 +825,9 @@ class Executor:
         # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
         self.protected_goal: List[Tuple[str, Any]] = []
         self._protect_force: set = set()
+        # first-demo v2.1 A2: the witnesses of a kept arm's next contact, tracked from the branch a travel leg kept it in
+        # ({action index: {"arm", "witnesses", "leg"}}, execute.keep_arm_branch)
+        self._witness_overrides: Dict[int, Dict[str, Any]] = {}
         self.program_actions: List[Action] = []
         self.checkpoint_reports: List[Dict[str, Any]] = []
         self.timings: Dict[str, float] = {}
@@ -934,6 +951,15 @@ class Executor:
 
     def _backend(self):
         return getattr(self.motions, "backend", None)
+
+    def _arm_offer_note(self, action) -> Optional[Dict[str, Any]]:
+        """The sampler's arm offer of the segment an action belongs to (first-demo v2.2; fired / not fired): ``grasps[].arm_offer`` of
+        the grasp record of the action's object made by the action's arm; None for any other action."""
+        obj, arms = getattr(action, "object", None), tuple(getattr(action, "arms", ()) or ())
+        g = next((g for g in (getattr(self.sidecar, "grasps", None) or []) if g.object == obj and g.arm in arms), None) if obj and arms else None
+        ex = getattr(g, "extra", None) if g is not None else None
+        offer = ex.get("arm_offer") if isinstance(ex, dict) else None
+        return dict(offer) if isinstance(offer, dict) else None
 
     def checkpoint(self, action_index: int) -> Checkpoint:
         robot = self.robot
@@ -1153,6 +1179,86 @@ class Executor:
                     out[key] = th.tensor([float(v) for v in q], dtype=th.float32)
         return out
 
+    def next_contact(self, index: int, arm: str) -> Optional[Dict[str, Any]]:
+        """The next contact of ``arm`` after the travel legs that follow action ``index`` (``execute.keep_arm_branch``, first-demo v2.1
+        A2): the first action past the transitions / navigates, when it moves ``arm``, with its chain - the actions of ``arm`` up to the
+        next travel leg - as the sampler's witnesses in order (``[{action, key, pose, q, margin, base}]``), the contact's stance (the base
+        pose and the trunk joints of its first witness) and the chain's smallest recorded joint-limit margin. None when another action
+        comes first or no witness with a stance is recorded."""
+        acts = list(self.program_actions)
+        entries = (getattr(self.sidecar, "extra", None) or {}).get("ik_witnesses") or []
+        j = index + 1
+        while j < len(acts) and isinstance(acts[j], (Transition, Navigate)):
+            j += 1
+        if j >= len(acts) or arm not in tuple(getattr(acts[j], "arms", ()) or ()):
+            return None
+        if not isinstance(acts[j], Grasp):
+            # a push / brace acts through the arm's posture around its obstacles (sandal 0927-030120 replayed with the arm kept: the push
+            # under the table from the other branch turned the sandal 49 deg): its recorded arm posture stays
+            return {"index": j, "name": acts[j].name, "object": None, "chain": [], "why": f"the arm's next contact is a {acts[j].name}, not a grasp"}
+        chain: List[Dict[str, Any]] = []
+        k = j
+        while k < len(acts) and not isinstance(acts[k], (Transition, Navigate)):
+            if arm in tuple(getattr(acts[k], "arms", ()) or ()):
+                for e in entries:
+                    if not isinstance(e, dict) or e.get("action") != k or (e.get("arm") or arm) != arm:
+                        continue
+                    for key, w in (e.get("targets") or {}).items():
+                        if not isinstance(w, dict) or w.get("q") is None or len(w["q"]) != 28 or not isinstance(w.get("pose"), dict):
+                            continue
+                        p = w["pose"]
+                        chain.append({"action": k, "key": key, "q": th.tensor([float(v) for v in w["q"]], dtype=th.float32), "margin": w.get("joint_limit_margin_rad"),
+                                      "pose": (th.tensor([float(v) for v in p["position"]]), th.tensor([float(v) for v in p["orientation"]])), "base": w.get("base_pose2d")})
+            k += 1
+        if not chain or chain[0]["base"] is None:
+            return None
+        margins = [c["margin"] for c in chain if c["margin"] is not None]
+        return {"index": j, "name": acts[j].name, "object": (tuple(getattr(acts[j], "objects", ()) or ()) or (None,))[0], "chain": chain,
+                "stance": ([float(v) for v in chain[0]["base"]], chain[0]["q"][self.robot.trunk_control_idx]), "margin": min(margins) if margins else None}
+
+    def stance_contact(self, index: int, arm: str) -> Optional[Dict[str, Any]]:
+        """first-demo v3.0 F1: the first action of ``arm`` at the stance the travel legs after action ``index`` arrive at (up to the next
+        travel leg), when it is a brace or a push: ``{"index", "name", "object", "targets", "witnesses"}`` - its recorded targets and the
+        sampler's IK witnesses of it in order (``witnesses_for``). None when the arm's first action there is another one, or there is none."""
+        acts = list(self.program_actions)
+        j = index + 1
+        while j < len(acts) and isinstance(acts[j], (Transition, Navigate)):
+            j += 1
+        while j < len(acts) and not isinstance(acts[j], (Transition, Navigate)):
+            a = acts[j]
+            if arm in tuple(getattr(a, "arms", ()) or ()):
+                if not isinstance(a, (Brace, Push)):
+                    return None
+                try:
+                    targets = a.targets(self.sidecar, self.state)
+                except Exception:  # noqa: BLE001
+                    return None
+                return {"index": j, "name": a.name, "object": a.contact.object, "targets": targets, "witnesses": self.witnesses_for(j)}
+            j += 1
+        return None
+
+    def next_place_kind(self, index: int, action: Grasp) -> Optional[str]:
+        """The kind of the place that puts down what the grasp ``index`` picks (the first ``Place`` of its arm and object before that
+        arm grasps again); None when none follows."""
+        acts = list(self.program_actions)
+        for a in acts[index + 1:]:
+            if isinstance(a, Grasp) and a.arm == action.arm:
+                return None
+            if isinstance(a, Place) and a.arm == action.arm and a.object == action.object:
+                return a.kind
+        return None
+
+    def _absorb_branch_decisions(self, index: int, ctx: Dict[str, Any]) -> None:
+        """After a travel leg passed: a kept arm's next contact runs on the configurations tracked from it (``_witness_overrides``); an
+        arm the leg re-posed to the recorded joints drops them (its next contact runs on the sampler's witnesses)."""
+        reposed = set((ctx.get("arms_posture") or {}).get("moved") or []) | set(ctx.get("navigate_arms_reposed") or [])
+        reposed |= {arm for arm, f in (ctx.get("branch_kept") or {}).items() if not f.get("keep")}
+        if reposed:
+            self._witness_overrides = {i: o for i, o in self._witness_overrides.items() if o["arm"] not in reposed}
+        for arm, per_action in (ctx.get("witness_overrides") or {}).items():
+            for i, ws in per_action.items():
+                self._witness_overrides[int(i)] = {"arm": arm, "witnesses": ws, "leg": index}
+
     def release_stage_opening(self, action: Place) -> Optional[float]:
         """The first-stage opening (m per finger) of the staged release of ``action.object`` (owner 2026-09-16 21:18):
         the library pinch width / 2 + ``MotionsConfig.gripper_preshape_margin`` (the pre-shape width, ~1 cm past the
@@ -1243,6 +1349,16 @@ class Executor:
             return v, ctx
         ctx["targets_keys"] = sorted(targets.keys())
         ctx["witnesses"] = self.witnesses_for(index)
+        ov = self._witness_overrides.get(index)
+        if ov:
+            ctx["witnesses"].update(ov["witnesses"])
+            ctx["witnesses_rebranched"] = {"arm": ov["arm"], "keys": sorted(ov["witnesses"]), "leg": ov["leg"]}
+        if isinstance(action, (Transition, Navigate)) and targets.get("arms_q"):
+            ctx["next_contact"] = {arm: self.next_contact(index, arm) for arm in targets["arms_q"]}
+        if isinstance(action, Transition):
+            ctx["stance_contacts"] = {arm: self.stance_contact(index, arm) for arm in M.ARMS}
+        if isinstance(action, Grasp):
+            ctx["next_place_kind"] = self.next_place_kind(index, action)
         ctx["sidecar"] = self.sidecar  # attachment: the correction regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
             # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep
@@ -1315,6 +1431,9 @@ class Executor:
             self.last_ctx = ctx
             rec.targets_keys = ctx.get("targets_keys", [])
             rec.notes = {key: val for key, val in ctx.items() if key in NOTE_KEYS}
+            offer = self._arm_offer_note(action)
+            if offer is not None:
+                rec.notes["arm_offer"] = offer
             left = getattr(self.motions, "last_witness_residual", None) if self.motions is not None else None
             if left is not None:  # an arm_to left a small witness residual unclosed (a witness on a joint limit)
                 rec.notes["witness_residual_left"] = {"pos_m": round(float(left[0]), 4), "rot_rad": round(float(left[1]), 4)}
@@ -1323,14 +1442,24 @@ class Executor:
             if events:  # staged release: the first stage of this release and / or the deferred full opening a retreat completed
                 rec.notes["release"] = events
                 self.motions.release_events.clear()
+            via = list(getattr(self.motions, "witness_via_posture_events", None) or []) if self.motions is not None else []
+            seen = getattr(self, "_via_seen", 0)
+            rec.notes["witness_via_posture"] = via[seen:] if len(via) > seen else "not fired"
+            self._via_seen = len(via)
             rec.attempts.append(None if verdict is None else verdict.to_dict())
             if verdict is None:
+                self._absorb_branch_decisions(index, ctx)
                 self._commit()
                 log.info("action %d %s ok in %d steps (%.1fs)", index, action.summary() if hasattr(action, "summary") else action.name, self.n - rec.step_start, time.time() - t0)
                 break
             log.warning("action %d %s attempt %d failed: %s", index, action.name, k, verdict)
             if verdict.category in ("protected_contact", "protected_moved"):
                 self._protect_force.add(index)  # the retry re-plans the transit via the point above its goal (oracle.protection)
+            if (ctx.get("grasp_support_lift") or {}).get("applied") and self.motions is not None:
+                # first-demo v2.1 A3: a grasp lifted off its support failed - the retry runs the recorded grasp
+                if not hasattr(self.motions, "support_lift_refused"):
+                    self.motions.support_lift_refused = set()
+                self.motions.support_lift_refused.add(index)
             if k < self.cfg.retries:
                 # roll back: the failed attempt leaves no trace in the demo (kept under rollbacks), retry from the checkpoint
                 if self.recorder is not None:
@@ -2033,6 +2162,7 @@ class Executor:
             "kept_hold_arms": sorted(getattr(self.motions, "keep_hold_arms", ()) or ()),
             "jams": _jsonable(list(getattr(self.motions, "jams", []) or [])),
             "witness_branch_accepted": _jsonable(list(getattr(self.motions, "witness_branch_accepted_events", []) or [])),
+            "witness_via_posture": _jsonable(list(getattr(self.motions, "witness_via_posture_events", []) or [])),
             "protection": _jsonable({"protected": [getattr(o, "name", n) for n, o in self.protected_goal], "plan_checks": int(getattr(self.motions, "protect_checks", 0) or 0),
                                      "fired": list(getattr(self.motions, "protect_events", []) or []) + list(getattr(self.monitors, "protect_events", []) or [])}),
             "demo_gating": demo_gating,

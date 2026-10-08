@@ -48,11 +48,11 @@
   "owner": "-"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "demos of record 0922-115754-dishwasher_wide_reanchored_local / 0922-120634-door_seq_reanchored_local (250 kg, follow_arm_tracking reanchored; code ~ 4bb48aa3, work committed in e43b3935); 0924-194634 dishwasher_wide re-run on d1b61e77 success. Experiment aliases live in runlogs/smoke_inputs/artic_large_exp/customs.json",
+  "blocking": "fresh first_demo runs (sample + demo) on the shipped customs, job large_articulation_integration_20260925 (merged f6da0b31): door 0925-180053 (sequential follow, 3 release / re-grasp moves, re-anchored arm tracking, settled) and dishwasher 0925-193818 (the former dishwasher_wide settings, 1 base move, settled); 250 kg base, no ISG_PROGRAM_HOOK",
   "owner": "-"
  },
  "configuration_matching-articulation_close_large_scale": {
-  "blocking": "demos 0920-014713-dishwasher_close (inverse of the shallow open) and 0921-003144-door_pushclose_seq3 (ISG_PROGRAM_HOOK door_pull_push.py, 5 push chunks) - experiment customs + hook, not first_demo.py runs; code e43b3935 (the pod trees of 09-20 / 09-21 carried it uncommitted)",
+  "blocking": "fresh first_demo runs (sample + demo) on the shipped customs, job large_articulation_integration_20260925 (merged f6da0b31): door 0925-155115 (the registry's push_close program, 5 chunks 49.2 -> 0 deg, settled) and dishwasher 0925-191616 (inverse follow, settled); 250 kg base, no ISG_PROGRAM_HOOK",
   "owner": "-"
  },
  "alignment-world_vertical": {

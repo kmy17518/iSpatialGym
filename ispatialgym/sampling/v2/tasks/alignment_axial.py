@@ -38,6 +38,7 @@ from ispatialgym.sampling.constraints import Hinge, create_hinge, remove_hinge
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import pose_target
+from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance
@@ -358,7 +359,7 @@ class AlignmentAxial(SamplerV2):
         # push contact at an end inside the band: the closed right gripper beside the end, pushing tangentially toward the goal yaw
         d_goal = C.wrap_angle(yaw_goal - yaw0)  # signed rotation to the goal
         spin = 1.0 if d_goal > 0 else -1.0
-        push = brace_found = None
+        push = brace_found = push_orient = None
         push_fails, brace_fails = [], []
         n_push_ok = 0
         # with the long axis parallel to the edge at the goal, exactly one end moves toward the robot there: its stop face
@@ -382,7 +383,7 @@ class AlignmentAxial(SamplerV2):
             side_c = C.unit(th.cross(z_axis, d, dim=0))  # the finger's side pushes when the pad-face wrist yaw is infeasible
             for pitch in TT.approach_pitch_order(jp.get("classes")):
                 a_vec = TT.pitched_approach(pitch, manip.forward)
-                for c_axis, c_sign in ((d, 1.0), (d, -1.0), (side_c, 1.0), (side_c, -1.0)):
+                for c_axis in (d, side_c):
                     # the closed fingers' half thickness beside the pushed face at this pitch: the pad face (closing axis
                     # along the push) or the finger's side (closing axis across it), from the measured finger profile
                     geo = self._blade_geometry(pitch, 0.0, side=c_axis is side_c)
@@ -390,15 +391,38 @@ class AlignmentAxial(SamplerV2):
                         push_fails.append(f"{pitch:.0f}°: face reaches the palm section")
                         continue
                     push_half_p = geo[1]
-                    quat = C.eef_quat(a_vec, c_sign * c_axis)
-                    p_init = (side_pt - d * push_half_p, quat)
-                    arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), z_axis, d_goal, n=2)
-                    p_mid, p_goal = arc[0], arc[1]
-                    p_pre = C.pre_pose(p_init)
-                    res = self.ikc.waypoints_ok([p_pre, p_init, p_mid, p_goal], manip, "right", ignore_all=[support, target])
-                    if not res.ok:
-                        push_fails.append(f"{pitch:.0f}°: {res.reason}")
+                    props = []
+                    for rank, c_sign in enumerate((1.0, -1.0)):
+                        quat = C.eef_quat(a_vec, c_sign * c_axis)
+                        p_init = (side_pt - d * push_half_p, quat)
+                        arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), z_axis, d_goal, n=2)
+                        props.append(O.Proposal(f"{pitch:.0f}{'' if c_sign > 0 else '-'}{'_side' if c_axis is side_c else ''}", rank, c_sign,
+                                                [C.pre_pose(p_init), p_init, arc[0], arc[1]]))
+
+                    def evaluate(p):
+                        res = self.ikc.waypoints_ok(list(p.chain), manip, "right", ignore_all=[support, target], q_first=p.q_first)
+                        if not res.ok:
+                            return False, res, None, str(res.reason)
+                        q_pre = self.ikc.solutions.get(("right", self.ikc._pose_key(p.chain[0])))
+                        q_goal = self.ikc.solutions.get(("right", self.ikc._pose_key(p.chain[-1])))
+                        if q_pre is None or q_goal is None:
+                            return True, res, None, ""
+                        # the contact configuration (the screening does not keep one), where the camera is checked: tracked from the pre
+                        # witness as the oracle's straight leg runs; when that misses the tracker's joint-limit margin, the plain IK from the
+                        # pre witness - scored, not a rejection (the push passed as before; the margin ranks it)
+                        r_c = self.ikc.exact(list(p.chain[:2]), manip, "right", ignore_for_last=[support, target], cache=False, q_first=q_pre)
+                        q_c = r_c.q if r_c.ok else None
+                        if q_c is None:
+                            with self.ikc.ignoring([support, target]):
+                                q_c = self.kit.ik(p.chain[1], q_pre, arm="right")
+                        return True, res, ([q_pre, q_c, q_goal] if q_c is not None else [q_pre]), ""
+
+                    # the two wrist turns of the class by the orientation rule (owner 2026-09-27)
+                    chosen, dec_push = O.choose(self.ikc, "right", props, evaluate, self.ikc.q_locked(manip), camera_idx=[1], stage=f"axial push {pitch:.0f}")
+                    if chosen is None:
+                        push_fails.extend(f"{pitch:.0f}°: {o.get('why', '')}" for o in dec_push["options"] if not o.get("ok"))
                         continue
+                    p_pre, p_init, p_mid, p_goal = chosen.proposal.chain
                     n_push_ok += 1
                     # the stop brace is optional (owner decision 2026-09-16 08:10: axial = push-only, the oracle's push closure
                     # is the stop): tried only when the joint two-arm placement exists for this end (work point in the right
@@ -410,13 +434,20 @@ class AlignmentAxial(SamplerV2):
                         target.keep_still()
                         self.kit.sync_world()
                         try:
-                            for brace_pre, brace, kind, extras in self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal):
-                                res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
-                                                            ignore_brace_last=[support], brace_only_check=([support], TT.BRACE_TARGET_MARGIN))
-                                if res_b.ok:
-                                    brace_found = (brace_pre, brace, kind, {**extras, "push_half_thickness_m": push_half_p, "target_checked_at": "goal"})
-                                    break
-                                brace_fails.append(f"{kind}: {res_b.reason}")
+                            def eval_brace(p):
+                                res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", list(p.chain), ignore_work_last=[support, target],
+                                                            ignore_brace_last=[support], brace_only_check=([support], TT.BRACE_TARGET_MARGIN), q_first_brace=p.q_first)
+                                if not res_b.ok:
+                                    brace_fails.append(f"{p.label}: {res_b.reason}")
+                                return bool(res_b.ok), res_b, None, str(res_b.reason)
+
+                            b_chosen, dec_brace, _b_fails = O.choose_first(self.ikc, "left", self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal),
+                                                                          key=lambda c: c[1], label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=eval_brace,
+                                                                          q_start=self.ikc.q_locked(manip), stage="axial brace")
+                            if b_chosen is not None:
+                                brace_pre, brace, kind, extras = b_chosen.proposal.payload
+                                brace_found = (brace_pre, brace, kind, {**extras, "push_half_thickness_m": push_half_p, "target_checked_at": "goal",
+                                                                        **({"orient": dec_brace} if len([o for o in dec_brace["options"] if o["source"] == "ik"]) > 1 else {})})
                         finally:
                             target.set_position_orientation(*pose)
                             target.keep_still()
@@ -426,6 +457,7 @@ class AlignmentAxial(SamplerV2):
                         brace_reason = "no_joint_cell" if not jp["brace_ok"] else "brace_class_failed"
                     dist = abs(d_goal) * float(th.linalg.norm(r_xy))
                     push = (p_pre, p_init, p_mid, p_goal, d, dist, e, goal_pose, stop_pts, d_stop, pitch)
+                    push_orient = dec_push
                     break
                 if push is not None:
                     break
@@ -444,7 +476,10 @@ class AlignmentAxial(SamplerV2):
         # record: the push always, the brace only when the joint placement produced one (push-only otherwise: the
         # manipulation stance works with the right arm, the left arm idle)
         self.sidecar.add_stance(manip)
-        annotate_height_extra(self.sidecar.add_contact(ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname)), self)
+        push_rec = ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname)
+        if push_orient is not None and len([o for o in push_orient["options"] if o["source"] == "ik"]) > 1:
+            push_rec.extras["orient"] = push_orient
+        annotate_height_extra(self.sidecar.add_contact(push_rec), self)
         if brace_found is not None:
             brace_pre, brace, brace_kind, brace_extras = brace_found
             annotate_height_extra(self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname,

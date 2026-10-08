@@ -853,6 +853,39 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
     return report
 
 
+#: witness keys of the chain a library pinch decides the arm configuration of (``tabletop.held_turns``): the pick and the held chain
+#: this check tracks from the grasp witness - lift, in-hand reorient, carry, pre-place, descent, place. The place's release retreat is
+#: not one of them: the oracle's retreat keeps its own joint-limit box (``execute.retreat_limit_margin_rad``, never past its start).
+TURN_KEYS = {"grasp": ("pre_grasp", "approach", "grasp"), "lift": ("lift",), "reorient": ("waypoints",), "place": ("carry", "pre_place", "descent", "place")}
+
+
+def turn_chain(report: Optional[Dict[str, Any]], obj: str) -> Dict[str, Any]:
+    """The pick and held chain of ``obj`` in a :func:`run` report: ``margin`` (the smallest ``joint_limit_margin_rad`` of its
+    :data:`TURN_KEYS` witnesses from its grasp to its place; None without them), ``joint`` / ``where`` (``<action>.<key>``) of that
+    witness, ``q_pre`` (the pre-grasp witness, 28 values) and ``actions`` (the actions while ``obj`` is held)."""
+    out: Dict[str, Any] = {"margin": None, "joint": None, "where": None, "q_pre": None, "actions": []}
+    holding = False
+    for e in (report or {}).get("actions") or []:
+        name = e.get("name")
+        if name == "grasp" and obj in (e.get("objects") or []):
+            holding = True
+        elif not holding:
+            continue
+        elif e.get("carried") != obj:
+            break
+        else:
+            out["actions"].append(name)
+        wit = e.get("witnesses") or {}
+        if name == "grasp" and isinstance(wit.get("pre_grasp"), dict):
+            out["q_pre"] = wit["pre_grasp"].get("q")
+        for key in TURN_KEYS.get(name, ()):
+            w = wit.get(key)
+            m = w.get("joint_limit_margin_rad") if isinstance(w, dict) else None
+            if m is not None and (out["margin"] is None or float(m) < out["margin"]):
+                out.update(margin=float(m), joint=w.get("joint_limit_nearest"), where=f"{name}.{key}")
+    return out
+
+
 class _Tracker:
     """Where the robot is and what it holds while the program runs: ``Navigate`` -> ``path.to``, ``Transition`` ->
     ``transition.to``; ``Grasp`` picks up ``object`` (held until ``Place``); ``Brace`` parks its arm at the contact

@@ -42,6 +42,7 @@ from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
 from ispatialgym.sampling.v2.navigation import attached
@@ -128,6 +129,13 @@ HAND_SPHERES_EEF: Tuple[Tuple[Tuple[float, float, float], float], ...] = (
 ) + tuple(((0.0, sy * 0.02, _L - dz), r) for sy in (-1.0, 1.0) for dz, r in ((0.010, 0.010), (0.030, 0.008), (0.045, 0.007), (0.060, 0.005)))
 _HAND_SPHERE_C = th.tensor([c for c, _ in HAND_SPHERES_EEF], dtype=th.float32)
 _HAND_SPHERE_R = th.tensor([r for _, r in HAND_SPHERES_EEF], dtype=th.float32)
+
+
+def _orient_extra(decision: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """``{"orient": decision}`` when the contact class had two wrist turns (``orient.choose``), else nothing."""
+    if decision is None or len([o for o in decision.get("options", []) if o.get("source") == "ik"]) < 2:
+        return {}
+    return {"orient": decision}
 
 
 def hand_table_clearance(eef: TT.Pose, top_z: float) -> float:
@@ -1254,6 +1262,35 @@ class BlockDesign(SamplerV2):
         out.sort(key=lambda t: (t[0], t[1]))
         return out
 
+    def _pick_turns(self, screened: List[Tuple[Any, ...]], manip: Stance, support, block, d_pick: float):
+        """``screened`` (cube-pick classes, the module's order) with a class and its twin - the same pick turned pi about the
+        approach (a straight-down pick at yaw k and k + 2) - next to each other where the first of them stands, the pair in the
+        order of the orientation rule (``orient.choose`` on the pick [pre-grasp, grasp], owner 2026-09-27: joint-limit safe,
+        then easier to reach from the stance, the module's order within the tolerance); a class whose wrist camera comes within
+        5 mm of the world at the pick is dropped. Lazy: a pair is solved when the chain search reaches it (the search's own
+        pick IK, cached); the search takes the first class whose whole chain passes, the other turn next."""
+        rest = list(screened)
+        q0 = self.ikc.q_locked(manip)
+
+        def evaluate(p):
+            res = self._exact2(list(p.chain), manip, ignore_for_last=[support, block], approached=[block])
+            return bool(res.ok), res, None, str(res.reason)
+
+        while rest:
+            c = rest.pop(0)
+            j = next((k for k, o in enumerate(rest) if O.is_twin(c[2].eef, o[2].eef)), None)
+            if j is None:
+                yield c
+                continue
+            grp = [c, rest.pop(j)]
+            props = [O.Proposal(g[0], r, g, [IK.pre_pose(g[2].eef, d_pick), g[2].eef]) for r, g in enumerate(grp)]
+            chosen, dec = O.choose(self.ikc, "right", props, evaluate, q0, stage="cube pick", map_twins=False)
+            camera = {o["label"] for o in dec["options"] if not o.get("ok") and str(o.get("why", "")).startswith("wrist camera")}
+            first = [] if chosen is None else [chosen.proposal.payload]
+            for g in first + [g for g in grp if not first or g is not first[0]]:
+                if g[0] not in camera:
+                    yield g
+
     def _exact2(self, poses: List[TT.Pose], stance: Stance, **kw):
         """``IKChecker.exact`` with one retry from FRESH seeds when the seeded solve ends in an untrackable branch or a miss:
         the checker seeds every solve from the nearest remembered witness (hundreds accumulate over the blocks of an
@@ -1487,7 +1524,7 @@ class BlockDesign(SamplerV2):
             if -d_left > float(self.gen("flip_direct_max_slot_left_m", 0.04)):
                 diag.append(f"direct flip skipped: the slot lies {-d_left * 100:.0f} cm left of the cell")
                 screened = []
-        for label, pair, g_pick, place_eef, clearance, lam in screened:
+        for label, pair, g_pick, place_eef, clearance, lam in self._pick_turns(screened, manip, support, block, d_pick):
             pre_pick = IK.pre_pose(g_pick.eef, d_pick)
             lift = (g_pick.eef[0] + th.tensor([0.0, 0.0, self._carry_height()]), g_pick.eef[1])
             pivot = self._centre(pick_pose)[0] + th.tensor([0.0, 0.0, self._carry_height()])
@@ -1865,7 +1902,7 @@ class BlockDesign(SamplerV2):
                     if i_ < len(lst):
                         ordered.append(lst[i_])
             tag = "re-grasp" if st2 is manip else f"re-grasp@{st2.translate:.2f}/{st2.tilt:+.2f}/sh{float(st2.extras.get('block_stance_shift_m', 0.0)):+.2f}"
-            for label2, pair2, g2, place2, clr2 in ordered[: int(self.gen("max_regrasp_classes", 12))]:
+            for label2, pair2, g2, place2, clr2 in self._pick_turns(ordered[: int(self.gen("max_regrasp_classes", 12))], st2, support, block, d_pick):
                 pre_pick2 = IK.pre_pose(g2.eef, d_pick)
                 lift2 = (g2.eef[0] + th.tensor([0.0, 0.0, carry]), g2.eef[1])
                 place2m = (place2[0] + _xy3(right) * self._place_margin() + _xy3(toward) * self._place_margin(), place2[1])
@@ -2615,26 +2652,40 @@ class BlockDesign(SamplerV2):
         brace_fails: List[str] = []
         push_fails: List[str] = []
         idx_b = self.kit.robot.arm_control_idx[brace_arm]
-        for b_pose, b_a, b_name, b_half in self._blade_poses_at(mid, -b_dxy, manip, "pack_brace", modes=("side",)):
-            b_pre = C.pre_pose(b_pose)
-            r_b = self.ikc.exact([b_pre, b_pose], manip, brace_arm, ignore_for_last=[support] + braced_objs, cache=False, fingers=q_open)
+        pushes_of: Dict[int, List[Dict[str, Any]]] = {}
+
+        def eval_brace(p):
+            r_b = self.ikc.exact(list(p.chain), manip, brace_arm, ignore_for_last=[support] + braced_objs, cache=False, fingers=q_open, q_first=p.q_first)
             if not r_b.ok:
-                brace_fails.append(f"{b_name}: {r_b.reason}")
-                continue
-            q_b = r_b.q
+                brace_fails.append(f"{p.label}: {r_b.reason}")
+            return bool(r_b.ok), r_b, None, str(r_b.reason)
+
+        def pushes_with(sc):
             # the pushes, one per cube, each checked with the brace arm locked at its contact
             q_seed = self.ikc.q_locked(manip, fingers=0.0).clone()
-            q_seed[idx_b] = q_b[idx_b]
-            push_recs, why_p = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, q_seed, braced_objs, b_name)
+            q_seed[idx_b] = sc.result.q[idx_b]
+            push_recs, why_p = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, q_seed, braced_objs, sc.proposal.label)
             if push_recs is None:
                 push_fails.append(why_p)
-                continue
+                return False, why_p
+            pushes_of[id(sc)] = push_recs
+            return True, ""
+
+        # a blade class's two wrist turns by the orientation rule (owner 2026-09-27); the other turn when the pushes fail with the first
+        chosen_b, dec_b, _fails_b = O.choose_first(self.ikc, brace_arm, self._blade_poses_at(mid, -b_dxy, manip, "pack_brace", modes=("side",)), key=lambda c: c[0],
+                                                   label=lambda c: c[2], chain=lambda c: [C.pre_pose(c[0]), c[0]], evaluate=eval_brace,
+                                                   q_start=self.ikc.q_locked(manip, fingers=0.0), stage="pack brace", downstream=pushes_with)
+        if chosen_b is not None:
+            b_pose, b_a, b_name, b_half = chosen_b.proposal.payload
+            b_pre = chosen_b.proposal.chain[0]
+            push_recs = pushes_of[id(chosen_b)]
             brace_rec = annotate_height_extra(TT.BraceRecord("brace", brace_arm, b_pre, b_pose, direction=b_a, brace_kind=f"pack_{tag}", object=braced[0],
                                                              extras={"pose_class": b_name, "blade_half_thickness_m": None if b_half is None else float(b_half), "stop_clearance_m": 0.0,
                                                                      "fingers_opening_m": round(float(q_open), 4), "stop_width_m": round(float(spread), 4),
                                                                      "braced": list(braced),
                                                                      # the program check removes BOTH braced cubes at the contact (a finger side on each), the support throughout
-                                                                     "ignore_last": list(braced), "ignore_every": ["supports"]}), self).to_sidecar()
+                                                                     "ignore_last": list(braced), "ignore_every": ["supports"],
+                                                                     **_orient_extra(dec_b)}), self).to_sidecar()
             return {"tag": tag, "brace": brace_rec, "pushes": push_recs}, ""
         why = (sorted(set(push_fails)) or sorted(set(brace_fails)))[:3]
         return None, f"no brace + pushes pass ({len(brace_fails)} brace, {len(push_fails)} push failures; e.g. {why})"
@@ -2671,20 +2722,24 @@ class BlockDesign(SamplerV2):
             t_pt, t_a = self._face_contact(world[nm], push_dir, into=False)
             c_axis_t = th.tensor([float(-push_dir[1]), float(push_dir[0]), 0.0])  # pads close across the push direction
             cands.append((C.contact_eef(t_pt, t_a, c_axis_t), t_a, "pack_push_tilted", None))
-            for p_face, p_a, p_name, p_half in cands:
+
+            def evaluate(p, nm=nm, dist=dist, driven=driven, driven_objs=driven_objs):
+                p_face, p_a, p_name, p_half = p.payload
                 # the blade starts ``pack_push_standoff_m`` short of the face (a cube placed a few mm toward the blade is met, not
                 # landed on) and travels that plus the gap; the neighbour stops the cube at the packed position
                 p_init = (p_face[0] - d3 * standoff, p_face[1])
                 p_goal = (p_face[0] + d3 * float(dist), p_face[1])
                 p_pre = C.pre_pose(p_init)
-                r_i = self.ikc.exact([p_pre, p_init], manip, push_arm, ignore_for_last=[support, self.objects[nm]], q_seed=q_seed, cache=False, fingers=0.0)
+                r_i = self.ikc.exact([p_pre, p_init], manip, push_arm, ignore_for_last=[support, self.objects[nm]], q_seed=q_seed, cache=False, fingers=0.0,
+                                     q_first=p.q_first)
                 if not r_i.ok:
                     fails.append(f"{b_name}/{nm}/{p_name}: init {r_i.reason}")
-                    continue
+                    return False, None, None, f"init {r_i.reason}"
+                qs = O.chain_qs(self.ikc, push_arm, [p_pre, p_init])
                 r_g = self.ikc.exact([p_pre, p_goal], manip, push_arm, ignore_for_last=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=q_seed, cache=False, fingers=0.0)
                 if not r_g.ok:
                     fails.append(f"{b_name}/{nm}/{p_name}: goal {r_g.reason}")
-                    continue
+                    return False, None, None, f"goal {r_g.reason}"
                 # the program check's own verdict on the push (``check_action_targets``: waypoints pre -> init -> goal with the pushed
                 # cube and the support removed throughout, closed pads): run it here so the sampler never records a push the check
                 # rejects (0920-055948: 'push: waypoints: exact IK failed at pose 1 of 3' on a board push the two exact checks passed)
@@ -2695,7 +2750,7 @@ class BlockDesign(SamplerV2):
                                             cache=False, fingers=0.0, approached=[self.objects[nm]])
                 if not r_w.ok:
                     fails.append(f"{b_name}/{nm}/{p_name}: chain {r_w.reason}")
-                    continue
+                    return False, None, None, f"chain {r_w.reason}"
                 # the oracle's retreat from a push (``execute_retreat``, contact_retreat_escape_m 0.05): the pad leaves RADIALLY -
                 # opposite the push - by ``Retreat.escape_far`` (5 cm for the pack retreats; the default 10 cm left the arm 14 mm
                 # short after the board's rightward wall push, 0920-192950 action 33) and up by the same, reached by ``arm_to`` at
@@ -2705,12 +2760,12 @@ class BlockDesign(SamplerV2):
                 r_r = self.ikc.exact([r_end], manip, push_arm, ignore_for_last=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=r_w.q, cache=False, fingers=0.0)
                 if not r_r.ok or r_r.q is None:
                     fails.append(f"{b_name}/{nm}/{p_name}: retreat end {r_r.reason}")
-                    continue
+                    return False, None, None, f"retreat end {r_r.reason}"
                 with self.ikc.ignoring([support, self.objects[nm]] + braced_objs + driven_objs):
                     _q_pol, res_r = self.ikc.polish_witness(r_r.q, r_end, push_arm, ignore=[])
                 if res_r > 0.005:
                     fails.append(f"{b_name}/{nm}/{p_name}: retreat end {res_r * 1000:.1f} mm beyond the arm's reach")
-                    continue
+                    return False, None, None, f"retreat end {res_r * 1000:.1f} mm beyond the arm's reach"
                 q_both = r_g.q.clone()
                 q_both[idx_other] = q_seed[idx_other]
                 # with a brace the two contact configurations are checked together at 5 mm; a single-handed push only needs its own
@@ -2719,7 +2774,7 @@ class BlockDesign(SamplerV2):
                     free = bool(self.kit.collision_free(q_both, margin=0.005 if braced_objs else 0.0)[0])
                 if not free:
                     fails.append(f"{b_name}/{nm}/{p_name}: the two arms collide at the contacts")
-                    continue
+                    return False, None, None, "the two arms collide at the contacts"
                 rec = annotate_height_extra(ContactRecord("push", push_arm, p_pre, p_init, None, p_goal, d3, float(dist) + standoff, object=nm), self).to_sidecar()
                 rec["pose_class"] = p_name
                 rec["standoff_m"] = standoff
@@ -2732,8 +2787,14 @@ class BlockDesign(SamplerV2):
                     rec["q_hint"] = [round(float(v), 5) for v in q_hint.tolist()]
                 if p_half is not None:
                     rec["blade_half_thickness_m"] = float(p_half)
-                found = rec
-                break
+                return True, rec, (qs or []) + [r_w.q, r_r.q], ""
+
+            # a class's two wrist turns by the orientation rule (owner 2026-09-27); the classes in their order
+            chosen_p, dec_p, _fails_p = O.choose_first(self.ikc, push_arm, cands, key=lambda c: c[0], label=lambda c: c[2],
+                                                       chain=lambda c: [C.pre_pose((c[0][0] - d3 * standoff, c[0][1])), (c[0][0] - d3 * standoff, c[0][1])],
+                                                       evaluate=evaluate, q_start=q_seed, camera_idx=[1], stage="pack push")
+            if chosen_p is not None:
+                found = dict(chosen_p.result, **_orient_extra(dec_p))
             if found is None:
                 return None, f"{nm}: no push class passes ({len(fails)} failures; e.g. {sorted(set(fails))[:3]})"
             recs.append(found)
@@ -2775,34 +2836,54 @@ class BlockDesign(SamplerV2):
             brace_cands.append((C.contact_eef(b_pt, a_vec, c_vec), a_vec, name, None))
         push_fails, brace_fails = [], []
         chosen = None
-        for push_init, push_a, p_name, p_half in push_cands:
-            push_goal = (push_init[0] + d3 * dist, push_init[1])
-            push_pre = C.pre_pose(push_init)
+        brace_of: Dict[int, Any] = {}
+
+        def eval_push(p):
             # the push init / goal touch the block: init is exact-IK-checked with the block ignored, then pre + goal with the brace arm
-            r_init = self.ikc.exact([push_pre, push_init], manip, "right", ignore_for_last=[support, self.objects[pushed]], cache=False)
+            r_init = self.ikc.exact(list(p.chain), manip, "right", ignore_for_last=[support, self.objects[pushed]], cache=False, q_first=p.q_first)
             if not r_init.ok:
-                push_fails.append(f"{p_name}: {r_init.reason}")
-                continue
-            for b, b_a_vec, b_name, b_half in brace_cands:
-                b_pre = C.pre_pose(b)
-                res = TT.brace_second_arm(self, manip, "right", [push_pre, push_goal], "left", [b_pre, b], ignore_work_last=[support, self.objects[pushed]],
-                                          ignore_brace_last=[support, self.objects[braced]])
-                if res.ok:
-                    chosen = (push_pre, push_init, push_goal, b_pre, b, b_a_vec, f"{p_name}+{b_name}", p_half, b_half)
-                    break
-                brace_fails.append(f"{p_name}+{b_name}: {res.reason}")
-            if chosen is not None:
-                break
+                push_fails.append(f"{p.label}: {r_init.reason}")
+            return bool(r_init.ok), r_init, None, str(r_init.reason)
+
+        def brace_with(sc):
+            push_pre, push_init = sc.proposal.chain
+            push_goal = (push_init[0] + d3 * dist, push_init[1])
+
+            def eval_brace(p):
+                res = TT.brace_second_arm(self, manip, "right", [push_pre, push_goal], "left", list(p.chain), ignore_work_last=[support, self.objects[pushed]],
+                                          ignore_brace_last=[support, self.objects[braced]], q_first_brace=p.q_first)
+                if not res.ok:
+                    brace_fails.append(f"{sc.proposal.label}+{p.label}: {res.reason}")
+                return bool(res.ok), res, None, str(res.reason)
+
+            b_chosen, b_dec, _b_fails = O.choose_first(self.ikc, "left", brace_cands, key=lambda c: c[0], label=lambda c: c[2], chain=lambda c: [C.pre_pose(c[0]), c[0]],
+                                                       evaluate=eval_brace, q_start=self.ikc.q_locked(manip), stage=f"{kind} brace")
+            if b_chosen is None:
+                return False, "no brace joins it"
+            brace_of[id(sc)] = (b_chosen, b_dec, push_goal)
+            return True, ""
+
+        # a class's two wrist turns by the orientation rule (owner 2026-09-27), for the push and for the brace joining it; the push's
+        # other turn when no brace joins the first
+        p_chosen, p_dec, _p_fails = O.choose_first(self.ikc, "right", push_cands, key=lambda c: c[0], label=lambda c: c[2], chain=lambda c: [C.pre_pose(c[0]), c[0]],
+                                                   evaluate=eval_push, q_start=self.ikc.q_locked(manip), camera_idx=[1], stage=f"{kind} push", downstream=brace_with)
+        if p_chosen is not None:
+            b_chosen, b_dec, push_goal = brace_of[id(p_chosen)]
+            push_init, _push_a, p_name, p_half = p_chosen.proposal.payload
+            b, b_a_vec, b_name, b_half = b_chosen.proposal.payload
+            chosen = (p_chosen.proposal.chain[0], push_init, push_goal, b_chosen.proposal.chain[0], b, b_a_vec, f"{p_name}+{b_name}", p_half, b_half)
+            p_orient, b_orient = _orient_extra(p_dec), _orient_extra(b_dec)
         if chosen is None:
             log.info("%s: %s brace / push of %s skipped: %s", self.gp.alias, kind, pushed, (sorted(set(brace_fails)) or sorted(set(push_fails)))[:2])
             return "brace_ik_failed" if brace_fails else "push_ik_failed"
         push_pre, push_init, push_goal, brace_pre, brace, brace_a, used, p_half, b_half = chosen
         rec[f"push_{kind}"] = annotate_height_extra(ContactRecord("push", "right", push_pre, push_init, None, push_goal, d3, dist, object=pushed), self).to_sidecar()
+        rec[f"push_{kind}"].update(p_orient)
         if p_half is not None:
             rec[f"push_{kind}"]["blade_half_thickness_m"] = float(p_half)
         rec[f"brace_{kind}"] = annotate_height_extra(TT.BraceRecord("brace", "left", brace_pre, brace, direction=brace_a, brace_kind="row_left" if kind == "row" else "column_top",
                                               object=braced, extras={"pose_class": used, "blade_half_thickness_m": None if b_half is None else float(b_half),
-                                                                     "stop_clearance_m": 0.0}), self).to_sidecar()
+                                                                     "stop_clearance_m": 0.0, **b_orient}), self).to_sidecar()
         return "present"
 
     # ------------------------------------------------------------------ program check (blocks without a brace / push tail)

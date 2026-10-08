@@ -289,6 +289,14 @@ class SamplerV2(TaskSampler):
     def after_goal_check(self, draft: Draft):  # hook
         """Checks that need the settled goal pose (place IK from the manipulation stance, partner unmoved, ...)."""
 
+    def turn_recheck(self, draft: Draft, grasp: Any, q_first: Optional[th.Tensor] = None) -> Optional[str]:  # hook
+        """``tabletop.held_turns``: the module's checks that depend on the wrist turn of a library pinch, run for ``grasp`` just recorded
+        as its other finger assignment (``q_first``: the recorded pre-grasp witness wrist-flipped, a start for the pick). None when they
+        pass, else the first failure; ``tabletop.TurnNotOffered`` when the module cannot re-check that held chain. Default: not offered."""
+        from ispatialgym.sampling.v2 import tabletop as TT
+
+        raise TT.TurnNotOffered("no turn re-check in this task module")
+
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:  # hook
         """Typed, scoped constraint records (§2.3) learned from this successful instance (``source`` added by core)."""
         return []
@@ -656,6 +664,64 @@ class SamplerV2(TaskSampler):
                 log.info("%s -> %s: transition stand-off %.2f -> %.2f with the objects placed", tr.frm, tr.to, tr.stand_off, new.stand_off)
             self.sidecar.transitions[i] = new
 
+    def recheck_carried_travel(self, carried: str, arm_q: Optional[Dict[str, th.Tensor]] = None, stances: bool = True) -> Optional[str]:
+        """The recorded sweeps that carry ``carried``, checked again as recorded and read-only with the object posed in the hand per its
+        CURRENT grasp record (``tabletop.held_turns``: after ``tabletop.flip_grasp`` the other finger assignment rides there): with
+        ``stances`` its carried stances, and its transitions at their recorded stand-off, as :meth:`check_stances_with_objects` sweeps
+        them; its paths at their recorded strides as ``NAV.plan_path`` / ``NAV.plan_edge_slide`` swept them (yaw-lag envelope, edge
+        slide), at ``generation.carry_path_margin_m``. ``arm_q`` (per arm): the arms a task drove its carried path with (touching: this
+        assignment's lift configuration); default as :meth:`record_path` (``carry_arm_q``, else the departing stance's arms). Returns why
+        a sweep fails, None when every one passes."""
+        from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+        obj, arm, eef_in_object = self.carried_attachment(carried)
+        if obj is None:
+            return None
+        q_carry = self.carry_arm_q.get(carried)
+        for st in (self.sidecar.stances.values() if stances else ()):
+            if st.name == "goal" or st.carried != carried:
+                continue
+            kw = {f"{arm}_arm": q_carry} if q_carry is not None else {}
+            with self.object_joints_of(st), NAV.attached(self.kit, arm, obj, eef_in_object=eef_in_object), self.ikc.ignoring([obj]):
+                if not self.ikc.stance_collision_free(st, **kw):
+                    return f"stance {st.name} collides with {carried} in the hand"
+        for tr in self.sidecar.transitions:
+            frm, to = self.sidecar.stances.get(tr.frm), self.sidecar.stances.get(tr.to)
+            if frm is None or to is None or (tr.holding or (frm.carried if tr.departure else to.carried)) != carried:
+                continue
+            override = {arm: q_carry} if q_carry is not None else None
+            with self.object_joints_of(to), self.ikc.ignoring([obj]):
+                if tr.departure:
+                    new = NAV.departure_transition(self.kit, frm, to, tr.trunk_to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
+                                                   min_standoff=tr.stand_off, arm_q_override=override)
+                else:
+                    dep = self.departure_of(tr.frm, tr.to)
+                    s_to = float(to.stand_off if to.stand_off is not None else 0.0)
+                    new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, min_standoff=tr.stand_off,
+                                         path_end_standoff=self.path_end_standoff(frm, to), arm_q_override=override, trunk_from=dep.trunk_to if dep is not None else None,
+                                         extra_max=max(NAV.TRANSITION_EXTRA_MAX, float(tr.stand_off) - s_to + NAV.TRANSITION_EXTRA_MAX))
+            if new is None or abs(new.stand_off - tr.stand_off) > 1e-6:
+                return f"transition {tr.frm} -> {tr.to} is not swept free at its recorded s_T {tr.stand_off:.2f} with {carried} in the hand"
+        margin = float(self.gp.gen("carry_path_margin_m", 0.01))
+        for p in self.sidecar.paths:
+            frm = self.sidecar.stances.get(p.frm)
+            if p.carried != carried or frm is None or len(p.waypoints) < 2:
+                continue
+            if p.mode == NAV.EDGE_SLIDE_MODE:
+                poses = NAV.stride_poses(p.waypoints, p.stride_m)
+            else:
+                poses = NAV.stride_poses(p.waypoints, p.stride_m, yaw_envelope=True)
+            q_arms = arm_q
+            if q_arms is None:
+                r, l, _ = stance_arm_vectors(self.kit, frm, p.posture if p.posture != "untucked" else None)
+                q_arms = {"right": r, "left": l, **({arm: q_carry} if q_carry is not None else {})}
+            trunk = (float(p.trunk[0]), float(p.trunk[1])) if p.trunk is not None else (frm.translate, frm.tilt)
+            with NAV.attached(self.kit, arm, obj, eef_in_object=eef_in_object):
+                ok, bad = NAV.path_collision_free(self.kit, poses, trunk, p.posture, margin=margin, q_arms=q_arms)
+            if not ok:
+                return f"path {p.frm} -> {p.to} collides at swept pose {bad}/{len(poses)} with {carried} in the hand"
+        return None
+
     @contextlib.contextmanager
     def object_joints_of(self, st: Optional[Stance]):
         """The articulated objects' joints as the task recorded them for a stance (``stance.extras["object_joints"] =
@@ -845,7 +911,13 @@ class SamplerV2(TaskSampler):
     # ------------------------------------------------------------------ program check (§3.5)
 
     def program_check(self, draft: Draft) -> Dict[str, Any]:
+        from ispatialgym.sampling.v2 import tabletop as TT
+
         report = PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask)
+        # the wrist turn of a library pinch ranked on its whole held chain (owner 2026-09-27; ranking only, never a rejection)
+        report = TT.held_turns(self, draft, report, lambda: PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask))
+        # the arm of the segment ranked on its whole held chain (owner 2026-09-27, first-demo v2.2; ranking only, never a rejection)
+        report = TT.held_arms(self, draft, report, lambda: PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask))
         self.last_program_check = report
         draft.summary["program_check"] = report
         return report

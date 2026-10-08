@@ -289,6 +289,9 @@ class Disembedding(SamplerV2):
         self.dst_floor: Optional[TrayFloor] = None
         self.band_spec: Optional[TT.BandSpec] = None
         self.bands = None
+        self.segment_arms: List[str] = ["right"]  # the arms offered for the target's segment (sample_template)
+        self.arm_offer_why = ""  # why the other arm is not offered for the template (``tabletop.arm_offer``)
+        self.arm_bands: Dict[str, Any] = {}
         self.placed_key: Optional[str] = None  # band key of the stance-relative source tray (item 9)
         self.release_surface_z: Optional[float] = None  # raycast surface under the destination goal (owner item 3)
 
@@ -480,8 +483,13 @@ class Disembedding(SamplerV2):
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
+                # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm's
+                # band is its own or this band mirrored
+                self.segment_arms, self.arm_offer_why = TT.arm_offer(self)
+                self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=bands) if len(self.segment_arms) > 1 else {}
                 cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT), target_height=self.height[self.src_role],
-                                                      in_frame_fn=self._source_tray_in_frame, bands=bands, top=self.top, focus_z=self.top.z + self.src_floor.z_local)
+                                                      in_frame_fn=self._source_tray_in_frame, bands=bands, top=self.top, focus_z=self.top.z + self.src_floor.z_local,
+                                                      arm_bands=self.arm_bands)
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the source tray in frame")
                 self.edge, self.init_stance, self.manip_candidates = edge, init, cands
@@ -495,7 +503,7 @@ class Disembedding(SamplerV2):
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "band": getattr(self.bands, "path", None), "placed_key": self.placed_key, "source_tray_scale": src_scale,
                                     "src_floor_cells": self.src_floor.n_cells, "dst_floor_cells": self.dst_floor.n_cells,
-                                    "H_max": H_max, "distractors": [b.name for b in self.bindings.many("distractors")]})
+                                    "H_max": H_max, "distractors": [b.name for b in self.bindings.many("distractors")], "segment_arms": list(self.segment_arms)})
 
     def _tray_yaw(self, key: str, stance: Stance) -> float:
         """Yaw putting the tray's longer footprint axis along the front edge (stance tangent)."""
@@ -529,7 +537,7 @@ class Disembedding(SamplerV2):
         for k in rng.permutation(len(self.manip_candidates))[:6]:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
-            manip.focus, manip.arms = cand.focus, ["right"]
+            manip.focus, manip.arms = cand.focus, [self.segment_arms[0]]
             self.sidecar.reset_instance()
             self.sidecar.add_stance(init)
             for o in self.world.spawned.values():
@@ -545,7 +553,7 @@ class Disembedding(SamplerV2):
     def _sample_with(self, rng, init: Stance, manip: Stance, tname: str, sname: str, dname: str, dnames: List[str], k: int) -> Draft:
         d = Draft()
         support = self.obj("support")
-        src, dst, tgt = self.obj(self.src_role), self.obj(self.dst_role), self.obj("target")
+        src, tgt = self.obj(self.src_role), self.obj("target")
         # §4.5 step 5: transition init -> manipulation
         self.record_transition(init, manip)
         # source tray at the focus, aligned with the edge (§4.6 step 1, disembedding)
@@ -556,9 +564,46 @@ class Disembedding(SamplerV2):
         src.keep_still()
         self.kit.sync_world()
         src_w = self.src_floor.at(s_pose)
-        # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray ignored for the grasp
+        # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray ignored for the grasp; the other
+        # arm is tried only where its band covers the focus (owner 2026-09-27)
+        default = self.segment_arms[0]
+        arms_here = [a for a in self.segment_arms if a == default or a in (manip.extras.get("focus_arms") or [])]
         t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], [support, src], top=src_w, support_z=src_w.z,
-                                         margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale, bands=self.bands)
+                                         margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale, bands=self.bands,
+                                         arms=arms_here, arm_bands=self.arm_bands or None)
+        if grasp.arm != default:
+            self.sidecar.transitions.clear()
+            self.record_transition(init, manip)  # the other arm idles now
+        # the segment's later contacts; when they fail with the chosen arm, the whole segment is retried with the other arm if its grasp
+        # passed too (owner 2026-09-27: the fallback spans the segment)
+        tried: List[str] = []
+        while True:
+            try:
+                return self._segment_rest(rng, d, init, manip, t_pose, grasp, s_pose, src_w, tname, sname, dname, dnames, k, arms_here)
+            except Reject as e:
+                tried.append(grasp.arm)
+                others = [a for a in TT.fallback_arms(grasp) if a not in tried]
+                if not others:
+                    raise
+                g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.grasps, others[0], ignore_for_grasp=[support, src],
+                                               scale_key=self.choice.models["target"].scale, support_z=src_w.z, why=f"[{e.reason}] {e}")
+                if g2 is None:
+                    raise
+                grasp = g2
+                d = Draft()
+                self.sidecar.transitions.clear()
+                self.sidecar.paths.clear()
+                self.record_transition(init, manip)
+                for o in self.world.spawned.values():
+                    if o.name not in (src.name, tgt.name):
+                        self.world.park(o, list(self.world.spawned).index(o.name))
+
+    def _segment_rest(self, rng, d: Draft, init: Stance, manip: Stance, t_pose, grasp, s_pose, src_w, tname: str, sname: str, dname: str, dnames: List[str], k: int,
+                      arms_here: List[str]) -> Draft:
+        """The segment after its grasp, with the grasp's arm: destination, distractors, frame and whole-body checks, the placement
+        stance and its place, the carried path, the records."""
+        support = self.obj("support")
+        dst, tgt = self.obj(self.dst_role), self.obj("target")
         grasp.place_on = dname
         # destination tray: random side, exactly 4 cm inside the init image, >= 4 cm from the source tray, footprint on the top
         cam_init = self.camera_pose_at(init)
@@ -588,9 +633,9 @@ class Disembedding(SamplerV2):
         TT.whole_body_check_at(self, [place_st], {}, require=True, reason="no_placement_stance")
         place = IK.grasp_pose(goal, grasp.eef_in_object)
         pre_place = IK.pre_pose(place)
-        with TT.posed_in_hand(self, "right", tgt, grasp.eef_in_object):
-            with attached(self.kit, "right", tgt):
-                res = self.ikc.exact([pre_place, place], place_st, "right", ignore_for_last=[support, dst], scale_key=self.choice.models["target"].scale)
+        with TT.posed_in_hand(self, grasp.arm, tgt, grasp.eef_in_object):
+            with attached(self.kit, grasp.arm, tgt):
+                res = self.ikc.exact([pre_place, place], place_st, grasp.arm, ignore_for_last=[support, dst], scale_key=self.choice.models["target"].scale)
             if not res.ok:
                 raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the placement stance: {res.reason}")
             grasp.pre_place, grasp.place = pre_place, place
@@ -602,7 +647,7 @@ class Disembedding(SamplerV2):
             # §3.7 path manipulation -> placement with the object attached: the edge slide (owner 2026-09-24, ``generation.
             # carry_edge_slide``) - the body keeps facing the table and slides along the edge (drive back / slide / drive in when
             # the stand-offs differ), the grid path with its turn-drive-turn only when the strip collides
-            self.record_path(manip, place_st, carried=tname, arm="right", edge_slide=bool(self.g("carry_edge_slide")),
+            self.record_path(manip, place_st, carried=tname, arm=grasp.arm, edge_slide=bool(self.g("carry_edge_slide")),
                              edge_slide_back_m=float(self.g("carry_edge_slide_back_m") or 0.0))
         cam_manip = self.camera_pose_at(manip)
         if not self.ikc.eef_in_frame(grasp.grasp, cam_manip):
@@ -629,7 +674,8 @@ class Disembedding(SamplerV2):
             d.extras["constraints"] = masses
         d.summary.update({"manipulation_candidate": k, "grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "pinch_width": width},
                           "dest_side": "left" if side > 0 else "right", "destination": dest_diag, "distractor_spacing_m": spacing, "occlusion": occ,
-                          "carry_height": grasp.carry_height, "placement_stance": place_st.to_meta()})
+                          "carry_height": grasp.carry_height, "placement_stance": place_st.to_meta(), "arm": TT.segment_arm_summary(grasp, arms_here)})
+        grasp.extras["arm_offer"] = TT.arm_offer_record(self.segment_arms, arms_here, grasp, self.arm_offer_why)
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), self._descriptor(tname, objects, cam_init))
         self.sidecar.describe(sname, "source tray", "the tray in front of the robot")
         self.sidecar.describe(dname, "destination tray", f"the tray on the {'left' if side > 0 else 'right'}")
@@ -878,13 +924,60 @@ class Disembedding(SamplerV2):
         place = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
         pre_place = IK.pre_pose(place)
         tgt = self.obj("target")
-        with TT.posed_in_hand(self, "right", tgt, grasp.eef_in_object):
-            with attached(self.kit, "right", tgt):
-                res = self.ikc.exact([pre_place, place], place_st, "right", ignore_for_last=[self.obj("support"), self.obj(self.dst_role)],
+        with TT.posed_in_hand(self, grasp.arm, tgt, grasp.eef_in_object):
+            with attached(self.kit, grasp.arm, tgt):
+                res = self.ikc.exact([pre_place, place], place_st, grasp.arm, ignore_for_last=[self.obj("support"), self.obj(self.dst_role)],
                                      scale_key=self.choice.models["target"].scale)
         if not res.ok:
             raise Reject("place_unreachable", f"settled goal: pre-place / place fail the exact IK from the placement stance: {res.reason}")
         grasp.pre_place, grasp.place = pre_place, place
+
+    def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
+        """``tabletop.held_turns``: this module's checks that depend on the wrist turn, for ``grasp`` just recorded as its other finger
+        assignment - the pick from the manipulation stance as the draw solved it (support and source tray ignored at the grasp; from
+        ``q_first``, the recorded pre-grasp witness wrist-flipped, else afresh) with the wrist camera clear of the source tray's floor
+        and of the world, the carried path to the placement stance swept again with this turn in the hand, and the pre-place -> place
+        from the placement stance as ``after_goal_check`` solves it. None when every check passes, else the first failure."""
+        from ispatialgym.sampling.v2 import orient as O
+
+        tgt, support, src, dst = self.obj("target"), self.obj("support"), self.obj(self.src_role), self.obj(self.dst_role)
+        manip, place_st = self.sidecar.stance("manipulation"), self.sidecar.stance("placement")
+        scale = self.choice.models["target"].scale
+        kw = {"ignore_for_last": [support, src], "scale_key": scale, "cache": False}
+        res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
+        if not res.ok and q_first is not None:
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)
+        if not res.ok:
+            return f"pick: {res.reason}"
+        floor_z = float(self.src_floor.at(draft.object_poses[self.bindings.one(self.src_role).name]).z)
+        if TT.wrist_camera_clearance(grasp.grasp, floor_z) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, grasp.arm):
+            return "pick: the wrist camera on the tray floor / within 5 mm of the world"
+        why = self.recheck_carried_travel(self.tname)
+        if why:
+            return f"carried path: {why}"
+        with TT.posed_in_hand(self, grasp.arm, tgt, grasp.eef_in_object):
+            with attached(self.kit, grasp.arm, tgt):
+                r = self.ikc.exact([grasp.pre_place, grasp.place], place_st, grasp.arm, ignore_for_last=[support, dst], scale_key=scale, cache=False)
+        return None if r.ok else f"place: {r.reason}"
+
+    def arm_switch(self, draft: Draft, grasp, arm: str) -> Optional[str]:
+        """``tabletop.held_arms``: the segment switched to ``arm`` in place - the manipulation and placement stances with ``arm`` working
+        and the other arm in its first collision-free idle posture, the init -> manipulation transition and the carried path to the
+        placement stance recorded again with ``arm`` holding the target (the objects at their settled poses). None when the switch is
+        made, else why not."""
+        manip, place_st, init = self.sidecar.stance("manipulation"), self.sidecar.stance("placement"), self.sidecar.stance("init")
+        st_m, st_p = TT.stance_for_arm(self, manip, arm), TT.stance_for_arm(self, place_st, arm)
+        if st_m is None or st_p is None:
+            return f"no collision-free idle posture of the {TT.RB.other_arm(arm)} arm with the {arm} arm working at the {'manipulation' if st_m is None else 'placement'} stance"
+        TT.adopt_arm(manip, st_m)
+        TT.adopt_arm(place_st, st_p)
+        self.sidecar.transitions[:] = [t for t in self.sidecar.transitions if not (t.frm == init.name and t.to == manip.name)]
+        self.record_transition(init, manip)
+        self.sidecar.paths[:] = [p for p in self.sidecar.paths if not (p.frm == manip.name and p.to == place_st.name)]
+        with TT.posed_in_hand(self, arm, self.obj("target"), grasp.eef_in_object):
+            self.record_path(manip, place_st, carried=self.tname, arm=arm, edge_slide=bool(self.g("carry_edge_slide")),
+                             edge_slide_back_m=float(self.g("carry_edge_slide_back_m") or 0.0))
+        return None
 
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         g = self.sidecar.grasp_of(self.tname)

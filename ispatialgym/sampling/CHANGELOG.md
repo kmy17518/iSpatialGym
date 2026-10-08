@@ -108,6 +108,89 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   `eef_in_object` (the oracle executes it unchanged; `conventions.grasp_entry` resolves the alias), `grasps[].wrist_flip` /
   `twin_choice`, and the instance summary's `kit` counts the choices and the joint-limit re-solves. `generation.grasp_twins`
   (default on; off = the previous behaviour exactly).
+- **The wrist turn of every contact by one rule** (owner 2026-09-27, first-demo v2.1; replaces B2's capped-margin rule). The
+  hand is C2-symmetric about its approach axis except for the wrist camera, so wherever a generator yields a contact in both
+  wrist turns - a library pinch of a free object and its twin (`tabletop.pick_twin`), the tabletop / block-design pushes, the
+  braces and blades (touching, attachment, axial, wall, block-design pack / row / column, the small-articulation base-link
+  braces), the push-under blade, the handle pinches (small and large articulation), the push-close fist (the tip handle and
+  its twin ranked on the first contact from the Phase-2 stance, the whole push-close flow as the downstream check, the other
+  turn when it rejects), the block-design cube picks and the flip-in-place re-grasp (a pick and its twin grouped, ordered on
+  the pick IK the chain search runs first) - `orient.choose` decides between them.
+  Each turn is evaluated with the generator's own checks; each solution (and the witnesses a failed chain left - B2's rescue
+  path) also offers the other turn in its shoulder / elbow branch (`IKChecker.twin_q`, verified when it is the one to try).
+  Order: joint-limit safe (every configuration of the action's chain at least `JOINT_LIMIT_MARGIN` 0.05 rad from every arm
+  limit) before unsafe, neither safe: more clearance first; then the smaller largest joint change from where the arm starts,
+  the generator's own order within `REACH_TOL` 0.30 rad (its first turn: camera away / camera up, the library row). The first
+  option that passes wins; a `downstream` check (the pushes with the brace arm locked at it) failing moves on to the next
+  option. Where two turns compete the wrist camera (`<arm>_realsense_link`) must keep `CAMERA_MARGIN` 5 mm from the world
+  with the contacted objects present; a generator's single turn (the camera-up lever fist, the camera-up flip) is its hard
+  rule and is not re-checked. B2's 5 mm camera-above-support test applies to the library row as well. The large articulation
+  orders its two pinch signs by their step-5a solutions without a flipped branch (the follow solves the grasp again from the
+  stance). The axial push scores its contact configuration from the pre witness (tracked, else the plain IK) - no new
+  rejection. Records: `orient` in the contact extras (every option's margin, nearest joint, reach, verdict; `against_default`
+  when the chosen turn is not the generator's first), grasps `twin_choice.orient`, the summary `kit` counters
+  `orient_choices`, `orient_reason.*`, `orient_source.map`, `orient_against_default`. Every proposal and record carries the
+  `arm` making the contact (default: the arm of the call; scoring, the camera check and the wrist-twin pairing / mapping use
+  each proposal's own arm; no arm choice yet). Tests: `test_orient.py`, `test_grasp_twins.py`.
+- **A library pinch's wrist turn is ranked on its whole held chain** (owner 2026-09-27 ~14:46, first-demo v2.1: "count the carry /
+  pre-place / place configurations in the joint-limit safety ranking"; sprouts 0927-130119: carry / pre-place 17.7 mrad from
+  `right_arm_joint7`'s limit with the row `pick_twin` scored on [pre-grasp, grasp] alone). The configurations the grasp decides
+  besides its pick exist only in the program check, tracked from the grasp witness: `program_check.turn_chain` takes the smallest
+  `joint_limit_margin_rad` over the pick and the held chain (lift, in-hand reorient, carry, pre-place, descent, place; the place's
+  release retreat keeps the oracle's own 0.05 rad box and is left out). `tabletop.held_turns` runs in `SamplerV2.program_check`
+  after the check of the recorded assignment: a record with `twin_choice` whose chain is below `JOINT_LIMIT_MARGIN` is flipped to
+  its other finger assignment (`flip_grasp`: every eef pose, `~r180` name, `finger_q`), which must pass the task module's
+  `turn_recheck` (the pick at the settled pose from the recorded pre-grasp witness wrist-flipped, camera, pads, descent, lift, and
+  the module's turn-dependent sweeps), `verify_carry_legs` and the program check again; `orient.prefer` orders the two on the
+  whole chain (safe, more clearance, reach of the recorded pre-grasp witness, the row first within `REACH_TOL`). Ranking only:
+  otherwise the grasp record, witnesses, travel records (`arms_q`), waypoint policy, summary, carry configurations and IK memory
+  are put back exactly, never a rejection (a fault of the step keeps the record too). Hooks: IORS small (all relations; touching
+  re-sweeps its carried drive at the other turn's lift configuration, `SamplerV2.recheck_carried_travel`), disembedding (carried
+  path, place at the placement stance), attachment (standoff, lift + SLERP, attach, brace re-solved on the new attach, fingers
+  in the partner, a second base pose's sweeps); IORS large-scale records `not offered` (its carry pose, B -> C carried travel and
+  `carry_end_q` belong to the recorded turn). Records `grasps[].twin_choice.held` (status switched / kept / not offered + why,
+  reason, both chains' margins, nearest joint, where, reach, `against_default`), log `orient [held chain, <arm> arm] ...`, kit
+  `held_turn_checks` / `held_turn_switched` / `held_turn_kept` / `held_turn_not_offered` / `held_turn_errors`. Tests:
+  `test_grasp_twins.py`.
+- **The arm of a single-arm segment by the same rule** (owner 2026-09-27, first-demo v2.2). Per arm-bound segment (grasp ->
+  carry -> place -> release, + the push-under blade of under-large; a held object's hold -> reorient / present), not per
+  contact: the other arm is offered (`tabletop.offered_arms`) when it has no role besides the segment (no brace, push or hold
+  planned) and the object is free (not articulated, not attached at the goal); `generation.other_arm` false switches it off.
+  Candidates are arm x wrist turn x configuration (`orient.with_arms`: every proposal of the default arm - `generation.arm`,
+  right - ranked before the other arm's, so within `REACH_TOL` the default arm, then the generator's turn), each solved with
+  its arm's IK at the stance with that arm working (`tabletop.stance_for_arm`: the other arm idles in its first A6 posture) and
+  checked against its own wrist camera; each arm's reach is measured from its own starting posture (`q_start` per arm).
+  Decisions record `arm_choice` (offered, chosen, reason, `against_default`, viable arms), instance summaries `arm`, the kit
+  counters `orient_arm.*` / `orient_arm_reason.*`. Stance first: Phase 2 (`arm_bands`) takes its foci from every offered arm's
+  band (survivors tagged `focus_arms`), the reach order ranks by whichever arm reaches better (`best_reach_margin`; IORS large's
+  B order too), and the other arm is tried only where its band covers the focus. The fallback spans the segment: when the
+  chosen arm's grasp passed but a later contact of its segment fails at the draw (IORS small: partner / frame / place
+  screening; disembedding: destination, placement stance, place, carried path; IORS large: the C coupling; held objects: the
+  goal search), the segment is retried once with the other arm if its grasp passed (`segment_fallback_grasp`, extras
+  `segment_fallback`). Left bands: the right band mirrored in memory (`ReachBands.mirrored` / `load_arm`: cells (x, λ) ->
+  (x, -λ), yaw -> -yaw, extent, shoulders and idle postures to the other side; meta `mirrored_from` / `mirror_source`; never
+  written - `store_feasible_set` keeps its sets in memory - never computed in-process; a band of the arm's own always wins;
+  tabletop and floor bands only). Counters `arm_band_mirrored.foci / empty_F / ik_tried / ik_failed` measure the mirrors' cost.
+  IORS large mirrors its right-side laterals for the left arm (floor-B offsets, carry poses, frontal push lane, side push
+  stance). Held objects: the left hold is the right hold's mirror image (approach base -y, roll -roll), its own hold-cache key,
+  no B7 prior (rendered with the right hand). `IKChecker` reads a recorded stance's finger opening from its working arm's
+  gripper. The arm is also ranked on the whole held chain (`tabletop.held_arms`, after `held_turns`): when another arm stayed
+  viable at the grasp and the chosen arm's held chain (`program_check.turn_chain`) is below `JOINT_LIMIT_MARGIN`, the segment
+  is solved again with the other arm (the module's `arm_switch` + `turn_recheck`: IORS small, disembedding; IORS large and held
+  objects record "not offered") and `orient.prefer` keeps the better chain; the loser is restored exactly; records
+  `twin_choice.held_arm`, kit `held_arm_*`. Every grasp record carries `extras.arm_offer` (fired / not fired and why, template
+  and offered arms, the arm, `against_default`, the mirrored band), copied by the executor into the grasp action's notes.
+  Tests: `test_left_arm.py`, `test_left_arm_held.py`, `test_left_arm_large.py`.
+- **Oracle: a witness no direct plan reaches is planned to through an arm posture** (first-demo v2.2; kielbasa 0928-050633 /
+  050708 / 025936, one instance: every joint-space round to the pre-grasp witness failed and the pose-goal fallback ended
+  3.02 rad away, in another IK branch; cap 0927-221834 the same). Only where `arm_to(q_hint)` raised `plan_failed` - every
+  joint-space round failed and the pose-goal fallback failed or ended past `witness_branch_max_jump` without
+  `accept_other_branch` - start -> posture -> witness is planned as two joint-space plans through `witness_via_postures`
+  (ready, then untucked); the first that plans is streamed like the direct plan (protection gate, residual close), else
+  `plan_failed` as before. Recorded per action (`notes.witness_via_posture`: the events, or "not fired") and per episode.
+  Exposure over the v2.1 / v2.2 sweeps and canaries: 4 runs, all failed before (the kielbasa instance ×3, cap
+  0927-221834); the kielbasa instance succeeds with it (local replay 0928-054327: via the ready posture). Tests:
+  `test_v2_oracle.py::test_arm_to_witness_retries_the_joint_plan_and_refuses_another_branch`.
 - **Oracle: a retreat leg that fails is replaced by a planned transit to its end pose** (owner 2026-09-26; axial 0926-061151 /
   061806, wave 15: after a successful push the escape leg reached `right_arm_joint4`'s lower limit at waypoint 3/11 from the
   push's end configuration, both attempts). Only where the leg fails `plan_failed` short of both the partial acceptance and

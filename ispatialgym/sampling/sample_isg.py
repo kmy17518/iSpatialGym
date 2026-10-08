@@ -316,7 +316,7 @@ def load_problem_from_args(args) -> GroundedProblem:
     return GroundedProblem.load(args.alias, args.customs, args.bddl_root)
 
 
-def main(argv=None):
+def main(argv=None, shutdown: bool = True):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--alias", action="append", required=True, help="customs alias; repeatable")
     parser.add_argument("--customs", default=os.environ.get("ISG_CUSTOMS") or DEFAULT_CUSTOMS,
@@ -384,9 +384,13 @@ def main(argv=None):
         with open(os.path.join(args.out, "summary.json"), "w") as f:
             json.dump(report, f, indent=2, default=str)
         print("SAMPLING_REPORT " + json.dumps(_compact(report), default=str), flush=True)
-        og.shutdown()
+        if shutdown:
+            og.shutdown()
     # exit code: 0 when at least one instance was written, 2 when every template failed (chains / job runners stop)
-    sys.exit(0 if report["n_written"] > 0 else 2)
+    code = 0 if report["n_written"] > 0 else 2
+    if not shutdown:  # in-process use (one warm Isaac process for the sampler and the demo): the app and the world stay up
+        return code, report, pool
+    sys.exit(code)
 
 
 def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs_copy: str, customs_sha: Optional[str]) -> None:

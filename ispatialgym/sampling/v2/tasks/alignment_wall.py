@@ -44,6 +44,7 @@ from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import pose_target
+from ispatialgym.sampling.v2 import orient as ORI
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.sampling.v2.stances import ContactRecord, FaceFrame, Stance
@@ -206,6 +207,25 @@ def wall_fist_axes(normal, closing, tilt: float = 0.0) -> Tuple[th.Tensor, th.Te
     k = C.unit(th.cross(c, n, dim=0))
     a = C.unit(-n * math.cos(tilt) + k * math.sin(tilt))
     return a, c
+
+
+def wall_brace_turns(tilts: Sequence[float]) -> List[Tuple[float, str, float]]:
+    """The brace's wrist turns ``(tilt, label, turn)`` in wrist-twin pairs (``orient``): turn + at tilt t and turn - at -t are the
+    same fist turned pi about its approach. Each pair keeps the generator's own order (tilts 0, +t, -t, turn + before -: (+t, +)
+    before (-t, -), (+t, -) before (-t, +)), so its first member is the tie-breaker default; the set is the tilts x turns."""
+    out: List[Tuple[float, str, float]] = []
+    for tilt in sorted({abs(float(t)) for t in tilts}):
+        for t_sign in ((1.0,) if tilt == 0.0 else (1.0, -1.0)):
+            for label, sgn in ((("+", 1.0), ("-", -1.0)) if t_sign > 0 else (("-", -1.0), ("+", 1.0))):
+                out.append((tilt * t_sign * sgn + 0.0, label, sgn))  # + 0.0: no -0.0 (the wrist label stays "s+0/-")
+    return out
+
+
+def _orient_extra(decision: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """``{"orient": decision}`` when the contact had two wrist turns (``orient.choose``), else nothing."""
+    if decision is None or len([o for o in decision.get("options", []) if o.get("source") == "ik"]) < 2:
+        return {}
+    return {"orient": decision}
 
 
 def wall_contact_pose(point, normal, direction, face: float, gap: float = 0.0, tilt: float = 0.0, turn: float = 1.0) -> Tuple[th.Tensor, th.Tensor]:
@@ -473,12 +493,11 @@ class AlignmentWall(SamplerV2):
             B = on_plane(B, mid_plane, n)
             # the stop: a finger's outer side ``brace_offset_m`` before B along a (toward the target), reached along a in the
             # wall plane from PRE_DIST out (spec §5.5: "the approach slides along the wall from outside the hull")
-            for tilt in tilts:
-                for label, sgn in (("+", 1.0), ("-", -1.0)):
-                    eef_w = wall_contact_pose(B, n, a, face, gap=gap_b, tilt=tilt, turn=sgn)
-                    pre = (eef_w[0] - C.PRE_DIST * a, eef_w[1])
-                    braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": f"s{math.degrees(tilt):+.0f}/{label}",
-                                   "tilt_deg": math.degrees(tilt), "face_m": face})
+            for tilt_b, label, sgn in wall_brace_turns(tilts):
+                eef_w = wall_contact_pose(B, n, a, face, gap=gap_b, tilt=tilt_b, turn=sgn)
+                pre = (eef_w[0] - C.PRE_DIST * a, eef_w[1])
+                braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": f"s{math.degrees(tilt_b):+.0f}/{label}",
+                               "tilt_deg": math.degrees(tilt_b), "face_m": face})
         push_arm = push_arm_of(E_push, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))  # the arm on the pushed end's side
         return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "normal": n, "E_low": E_low, "E_high": E_high, "E_push": E_push,
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,
@@ -908,70 +927,94 @@ class AlignmentWall(SamplerV2):
         # next brace candidate is tried before the caller moves to the next survivor
         why: List[str] = []
         solved = None
-        for b, sp in braces:  # the target is *not* ignored for the brace (§5.5: ≥ 2 cm clear of the tilted hull)
+        arm_b = self.kit.robot.arm_control_idx[brace_arm]
+        arm_p = self.kit.robot.arm_control_idx[push_arm]
+        push_of: Dict[int, Any] = {}
+
+        def eval_brace(p):  # the target is *not* ignored for the brace (§5.5: ≥ 2 cm clear of the tilted hull)
+            b = p.payload[0]
             tag = f"{b['kind']}/{b.get('wrist', 'n+')}"
             if not tips_in_frame([b["pre"], b["pose"]]):
                 why.append(f"{tag}: brace fingertips out of the head camera frame at the pre-contact / contact")
-                continue
-            r_pre_b = self.ikc.exact([b["pre"]], manip, brace_arm, ignore_for_last=wall, q_seed=q0, cache=False)
+                return False, None, None, "fingertips out of the head camera frame"
+            r_pre_b = self.ikc.exact([b["pre"]], manip, brace_arm, ignore_for_last=wall, q_seed=q0, cache=False, q_first=p.q_first)
             if not r_pre_b.ok:
                 why.append(f"{tag}: brace pre-contact")
-                continue
+                return False, None, None, "brace pre-contact"
             # the oracle's Brace approaches along the straight segment pre → contact (``line_waypoints``, 3 poses) and the
             # program check re-solves those poses (§3.9: screening at the intermediate ones, exact at the ends); the same
             # chain is solved here exactly, pose by pose, so every pose has a remembered witness solution
-            chain = [tuple(p) for p in C.line_waypoints(b["pre"], b["pose"], 3)]
             with self.ikc.ignoring(wall):
-                res = self.ikc.exact(chain, manip, brace_arm, q_seed=q0, cache=False)
+                res = self.ikc.exact(list(p.chain), manip, brace_arm, q_seed=q0, cache=False, q_first=r_pre_b.q if p.q_first is not None else None)
             if not res.ok:
                 why.append(f"{tag}: brace contact / approach ({res.reason})")
-                continue
+                return False, res, None, f"brace contact / approach ({res.reason})"
             if not wall_ok(res.q) or not wall_ok(r_pre_b.q):
                 why.append(f"{tag}: brace arm inside the wall (wrist / camera) at the contact or pre-contact")
-                continue
-            arm_b = self.kit.robot.arm_control_idx[brace_arm]
+                return False, res, None, "brace arm inside the wall at the contact or pre-contact"
+            return True, res, None, ""
+
+        def push_with(sb):
+            b = sb.proposal.payload[0]
+            tag = f"{b['kind']}/{b.get('wrist', 'n+')}"
             q_seed = q0.clone()
-            q_seed[arm_b] = res.q[arm_b]
-            arm_p = self.kit.robot.arm_control_idx[push_arm]
-            for push in geo["push"].get("variants") or [geo["push"]]:
+            q_seed[arm_b] = sb.result.q[arm_b]
+
+            def eval_push(p):
+                push = p.payload
                 ptag = f"{tag}/push-{push.get('wrist', 'n+')}"
                 if not tips_in_frame([push["pre"], push["init"], push["mid"], push["goal"]]):
                     why.append(f"{ptag}: push fingertips out of the head camera frame along pre / arc")
-                    continue
+                    return False, None, None, "push fingertips out of the head camera frame"
                 # the push pre-contact lies 10 cm back along the corner's tangent, in the target's plane beside the hull: the
                 # target is removed for it as for the contact poses (the approach pre -> init runs along the tangent and the
                 # finger meets the target at init; documented relaxation of §3.6 for the wall push)
-                r_pre = self.ikc.exact([push["pre"]], manip, push_arm, ignore_for_last=[target] + wall, q_seed=q_seed, cache=False)
+                r_pre = self.ikc.exact([push["pre"]], manip, push_arm, ignore_for_last=[target] + wall, q_seed=q_seed, cache=False, q_first=p.q_first)
                 if not r_pre.ok:
                     alone = self.ikc.exact([push["pre"]], manip, push_arm, ignore_for_last=[target] + wall, q_seed=q0, cache=False)
                     why.append(f"{ptag}: push pre-contact with the brace locked" + ("" if alone.ok else " (and alone: the push arm cannot reach its pre-contact)"))
-                    continue
+                    return False, None, None, "push pre-contact with the brace locked"
                 r_init = self.ikc.exact([push["init"]], manip, push_arm, ignore_for_last=[target] + wall, q_seed=q_seed, cache=False)
                 if not r_init.ok:
                     why.append(f"{ptag}: push init contact")
-                    continue
+                    return False, None, None, "push init contact"
                 ok_mid = self.ikc.screen([push["mid"]], manip, push_arm, ignore=[target] + wall, q_seed=q_seed)
                 if not bool(ok_mid.all()):
                     why.append(f"{ptag}: push arc waypoint δ/2 (screening)")
-                    continue
+                    return False, None, None, "push arc waypoint (screening)"
                 r_goal = self.ikc.exact([push["goal"]], manip, push_arm, ignore_for_last=[target] + wall, q_seed=q_seed, cache=False)
                 if not r_goal.ok:
                     why.append(f"{ptag}: push goal contact")
-                    continue
+                    return False, None, None, "push goal contact"
                 if not all(wall_ok(r.q, [target]) for r in (r_pre, r_init, r_goal)):
                     why.append(f"{ptag}: push arm inside the wall (wrist / camera) along the arc")
-                    continue
+                    return False, None, None, "push arm inside the wall along the arc"
                 q_comb = q_seed.clone()
                 q_comb[arm_p] = r_pre.q[arm_p]
                 # brace contact + push pre-contact together: the target removed (the push hand hovers 2 cm off its side), the
                 # wall present at margin 0, the arms against each other and the scene checked
                 if not wall_ok(q_comb, [target]):
                     why.append(f"{ptag}: combined configuration (brace contact + push pre-contact) collides")
-                    continue
-                solved = (b, push)
-                break
-            if solved is not None:
-                break
+                    return False, None, None, "combined configuration collides"
+                return True, r_pre, [r_pre.q, r_init.q, r_goal.q], ""
+
+            chosen_p, dec_p, _fails_p = ORI.choose_first(self.ikc, push_arm, geo["push"].get("variants") or [geo["push"]], key=lambda v: v["init"],
+                                                         label=lambda v: v.get("wrist", "n+"), chain=lambda v: [v["pre"], v["init"], v["goal"]], evaluate=eval_push,
+                                                         q_start=q_seed, camera_idx=[1], stage="wall push")
+            if chosen_p is None:
+                return False, "no push with this brace"
+            push_of[id(sb)] = (chosen_p, dec_p)
+            return True, ""
+
+        # brace candidates in order (kind order, a contact's two wrist turns by the orientation rule, owner 2026-09-27), then the push
+        # arm (its two wrist turns likewise) with the brace arm locked at its solution; when the push chain fails with that brace, the
+        # other turn and then the next brace candidate are tried before the caller moves to the next survivor
+        chosen_b, dec_b, _fails_b = ORI.choose_first(self.ikc, brace_arm, braces, key=lambda c: c[0]["pose"], label=lambda c: f"{c[0]['kind']}/{c[0].get('wrist', 'n+')}",
+                                                     chain=lambda c: [tuple(x) for x in C.line_waypoints(c[0]["pre"], c[0]["pose"], 3)], evaluate=eval_brace,
+                                                     q_start=q0, stage="wall brace", downstream=push_with)
+        if chosen_b is not None:
+            chosen_p, dec_p = push_of[id(chosen_b)]
+            solved = (chosen_b.proposal.payload[0], chosen_p.proposal.payload)
         if solved is None:
             raise Reject("push_unreachable" if any("push" in w for w in why) else "brace_unreachable",
                          f"no (brace, push) chain passes the exact IK from the manipulation stance: {'; '.join(why) or 'no brace candidate'}")
@@ -982,10 +1025,10 @@ class AlignmentWall(SamplerV2):
         P0.connect(self, init, manip, float(self.param("path_max_m", P0.PATH_MAX_M)))
         tname = self.tname
         self.sidecar.add_contact(ContactRecord("push", push_arm, push["pre"], push["init"], push["mid"], push["goal"], geo["push"]["direction"], geo["push"]["distance"],
-                                               object=tname, extras={"contact_face": "finger_side", "wrist": push.get("wrist")}))
+                                               object=tname, extras={"contact_face": "finger_side", "wrist": push.get("wrist"), **_orient_extra(dec_p)}))
         # the stop stands at the GOAL edge already (brace_point on the level pose): the oracle keeps it where it is recorded
         self.sidecar.add_contact(ContactRecord("brace", brace_arm, b["pre"], b["pose"], direction=b["a"], brace_kind=b["kind"], object=tname,
-                                               extras={"contact_face": "finger_side", "placed_at": "goal", "wrist": b.get("wrist")}))
+                                               extras={"contact_face": "finger_side", "placed_at": "goal", "wrist": b.get("wrist"), **_orient_extra(dec_b)}))
         self.sidecar.waypoint_policy = "push arc: screening at δ/2, exact at init and goal; brace: exact pre / approach / contact; wall-present margin-0 re-check of every contact configuration"
 
     # ------------------------------------------------------------------ pipeline hooks (§5.5 Phase 3)

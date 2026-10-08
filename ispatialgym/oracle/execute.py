@@ -46,7 +46,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field, replace
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 import torch as th
@@ -276,6 +276,32 @@ class ExecuteConfig:
     #: partner's displacement since the program start when it exceeds this (0920-164504: the bottle knocked 4.7 cm during the grasp
     #: phase, the descent came down 4 cm beside the neck)
     partner_shift_min_m: float = 0.005
+    #: (owner 2026-09-27, first-demo v2.1 A1) an attach place whose fingers would meet the partner before the part seats (the cap's
+    #: 51 mm rim pinched on its axis, the lemonade bottle's collar 54 mm across: the fingertips landed on the collar 5 mm before the
+    #: cap seated, tipped the bottle 1.2 deg and the attach locked the offset, 0927-040231) opens the fingers by up to this per finger
+    #: before the descent - the assisted grasp keeps holding the part (it releases on the full open command only) ...
+    attach_finger_clear_max_m: float = 0.004
+    #: ... in steps of this: the least opening whose fingers stay ``attach_finger_clear_margin_m`` from the partner down to the seat,
+    #: else the one that meets it latest
+    attach_finger_clear_step_m: float = 0.0005
+    attach_finger_clear_margin_m: float = 0.001
+    #: the finger surface is swept along the descent from its lowest this-many metres (the part of the finger that can reach the
+    #: partner first), sampled every ``attach_finger_clear_spacing_m``
+    attach_finger_clear_band_m: float = 0.010
+    attach_finger_clear_spacing_m: float = 0.003
+    #: (owner 2026-09-27, first-demo v2.1 A3, bar soap 0927-034001: "the robot wobbles at the grasp and the release") a library pinch
+    #: whose finger envelope (both finger meshes, closed..open) at the grasp pose reaches below the grasped object's lowest point + this
+    #: is lifted by the deficit along world z, the pads' fingertip-side end kept ``grasp_support_pad_margin_m`` below the object's top
+    #: (the attachment rule's FINGER_SUPPORT_CLEARANCE_M): the recorded bar-soap pinch aimed the fingertips 1 cm into the tray floor,
+    #: the hand stopped on it and the arm pressed ~100 N into it for the whole closure, bending torso_joint1 by 7.6 mrad ...
+    grasp_support_clearance_m: float = 0.004
+    grasp_support_pad_margin_m: float = 0.005
+    #: ... unless the faces at the lifted pads' fingertip-side end slope more than this (|normal z|, sin 20 deg): a curved side above
+    #: its widest section - the milk bottle lying on its side, pinched 13 mm higher, rolled 14 deg under the closure (0927-210646)
+    grasp_support_face_slope_max: float = 0.34
+    #: ... and a support place whose object hangs lower in the hand than the recorded ``eef_in_object`` by more than this is raised by
+    #: the difference, so the object meets its support instead of being driven into it (the same pinch pressed the destination tray)
+    place_inhand_raise_min_m: float = 0.002
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -320,6 +346,15 @@ class ExecuteConfig:
     #: free-leg finish, both ends recorded in frame; ``"trajopt"`` = the former free trajopt transit (the regression
     #: reference: nextto 0916-152503 swung 40 cm back toward the robot and left the frame for 106 steps)
     carry_leg: str = "straight"
+    #: owner 2026-09-30 (first-demo v3.0 F2, door open 0928-042225): a ``release_move_regrasp`` ramps onto the recorded
+    #: ``arm_q_retreat`` only when it lies within this of the measured joints after the back-off (rad, largest arm joint). The ramp
+    #: absorbs the differential IK's null-space drift (0921-041230); 70 ramps of 38 door / dishwasher runs measured 0.012-0.595 rad,
+    #: the far IK solution of the v2.2 door instance 3.505 rad (4 runs). A farther witness keeps the arm where the back-off left it
+    #: when the drive with it is clear (whole body, ``follow_keep_drive_margin_m`` = the sampler's drive check) and it keeps
+    #: ``follow_keep_self_clearance_m`` from cuRobo's self-collision padding (the sampler's ``hybrid_follow.self_clearance_m``)
+    follow_retreat_ramp_max_rad: float = 1.0
+    follow_keep_drive_margin_m: float = 0.01
+    follow_keep_self_clearance_m: float = 0.02
 
 
 CONFIG = ExecuteConfig()
@@ -619,7 +654,344 @@ def stance_fingers(record) -> Optional[float]:
     return None if f is None else float(f)
 
 
-def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q: Optional[Dict[str, Sequence[float]]] = None) -> Iterator[th.Tensor]:
+#: rad: a kept branch's chain may come this close to a joint limit where the recorded chain came closer (the sampler's
+#: ``IKChecker.JOINT_LIMIT_MARGIN``); clearances within ``orient.CLEARANCE_EQ`` of each other count as equal
+KEEP_BRANCH_LIMIT_MARGIN = 0.05
+
+
+def _arm_limit_margin(robot, q28, arm: str) -> float:
+    """Smallest distance (rad) of ``arm``'s joints in ``q28`` to their limits."""
+    idx = robot.arm_control_idx[arm]
+    q = C.as_tensor(q28).reshape(-1).float()[idx]
+    lo, hi = C.as_tensor(robot.joint_lower_limits).float()[idx], C.as_tensor(robot.joint_upper_limits).float()[idx]
+    return float(th.min(th.minimum(q - lo, hi - q)))
+
+
+def keep_arm_branch(motions: Motions, state, arm: str, q_rec, sweep: Sequence[th.Tensor], nxt: Optional[Dict[str, Any]], ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Owner 2026-09-27 (first-demo v2.1 A2, block design 0927-040243: before the third grasp the base stood still while the transition
+    swung the hand 41 cm out to the right and back, 382 steps): a travel leg brings an empty arm to the joints the sampler swept it
+    with (``arms_q``, "the arm as the previous motion left it") - but the arm can hold that hand pose in another IK branch (grasp 2's
+    via-above planned the pose goal in cuRobo's own branch and the Cartesian actions after it stayed there). The arm then stays where it
+    is when (1) its hand is at the recorded one (``witness_residual_accept_pos`` or the retreat's own acceptance ``retreat_partial_accept_m``
+    / ``witness_residual_accept_rot``), (2) the leg's configurations ``sweep`` with the arm as it is are collision-free and keep the
+    protected objects' distance (``oracle.protection``), and (3) the arm's next contact ``nxt`` (``Executor.next_contact``) is reached
+    from here: the IK of its first pose seeded at the arm on the contact's stance lands nearer than the recorded witness, and the
+    contact's chain up to the arm's next travel leg tracks from there no closer to a joint limit than the recorded chain (or
+    ``KEEP_BRANCH_LIMIT_MARGIN``). Returns the facts; ``keep`` True carries ``witnesses`` ({action index: {key: 28-D q}}): the chain's
+    configurations from here, which replace the sampler's witnesses of those actions so the next contact goes straight to its pre-pose."""
+    from ispatialgym.sampling.v2.orient import CLEARANCE_EQ
+
+    backend, cfg = motions.backend, motions.cfg
+    idx, eef = state.robot.arm_control_idx[arm], M.EEF_LINK[arm]
+    q_now = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+    q_r = q_now.clone()
+    q_r[idx] = C.as_tensor(q_rec).reshape(-1).float()
+    dp, da = _pose_error(backend.fk([eef], q_now)[eef], backend.fk([eef], q_r)[eef])
+    f: Dict[str, Any] = {"keep": False, "joint_gap_rad": round(float(th.max(th.abs(q_now[idx] - q_r[idx]))), 3), "hand_gap_m": round(dp, 4), "hand_gap_rad": round(da, 4)}
+    # the recorded joints are where the sampler's previous motion ended (``choose_departure_arms``); the executor accepts that motion's end
+    # within ``retreat_partial_accept_m`` (0927-040243 leg 16: the recorded retreat stalled at right_arm_joint2's limit, the kept branch
+    # retreated the full 10 cm - the hands 22 mm apart)
+    if dp > max(cfg.witness_residual_accept_pos, _cfg(ctx).retreat_partial_accept_m) or da > cfg.witness_residual_accept_rot:
+        return {**f, "why": "the hand is not at the recorded pose"}
+    if not nxt or not nxt.get("chain"):
+        return {**f, "why": (nxt or {}).get("why") or "no grasp of the arm follows the travel legs"}
+    f["next"] = nxt["index"]
+    qs = th.stack([C.as_tensor(q).reshape(-1).float() for q in sweep]) if sweep else q_now.unsqueeze(0)
+    if bool(C.as_tensor(backend.check_collision(qs, sync_world=True)).any()):
+        return {**f, "why": "the arm as it is collides during the leg"}
+    objs = _protected_for(ctx, state, nxt.get("object"))
+    if objs and len(qs) >= 3 and hasattr(motions, "_protect_violations"):
+        from ispatialgym.oracle import protection as PROT
+
+        viol = motions._protect_violations([arm], qs, "whole_body", {"objects": objs, "inflation": PROT.INFLATION_M})
+        if viol:
+            return {**f, "why": f"the arm as it is comes within the protection distance of {viol[0].get('object')} during the leg"}
+    base, trunk = nxt["stance"]
+    q0 = _q_at_base(motions, q_now, *base)
+    q0[state.robot.trunk_control_idx] = C.as_tensor(trunk).reshape(-1).float()
+    first = nxt["chain"][0]
+    q_first = backend.solve_ik(f"{arm}_arm", {eef: as_world_pose(first["pose"])}, q_seed=q0, sync_world=False)
+    if q_first is None:
+        return {**f, "why": f"no IK of the next {nxt['name']}'s {first['key']} from the arm as it is"}
+    q_first = C.as_tensor(q_first).reshape(-1).float()
+    reach = float(th.max(th.abs(q_first[idx] - q0[idx])))
+    reach_rec = float(th.max(th.abs(C.as_tensor(first["q"]).reshape(-1).float()[idx] - q0[idx])))
+    f.update({"reach_rad": round(reach, 3), "recorded_reach_rad": round(reach_rec, 3)})
+    if reach >= reach_rec:
+        return {**f, "why": "the IK from here is no nearer than the recorded witness"}
+    out: Dict[int, Dict[str, th.Tensor]] = {first["action"]: {first["key"]: q_first}}
+    q, prev = q_first, first["pose"]
+    for w in nxt["chain"][1:]:
+        dense = motions._densify(as_world_pose(prev), [w["pose"]])
+        res = backend.solve_ik_path(f"{arm}_arm", [{eef: p} for p in dense], q_start=q, pos_tol=cfg.diff_ik_pos_tol, rot_tol=cfg.diff_ik_rot_tol,
+                                    max_iters=cfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=cfg.diff_ik_soft_pos_tol_free)
+        if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+            return {**f, "why": f"the next chain does not track from here at {w['action']}:{w['key']} ({res.status})"[:200]}
+        q = C.as_tensor(res.q_traj[-1]).reshape(-1).float()
+        out.setdefault(w["action"], {})[w["key"]] = q
+        prev = w["pose"]
+    margin = min(_arm_limit_margin(state.robot, qq, arm) for d in out.values() for qq in d.values())
+    floor = min(nxt["margin"], KEEP_BRANCH_LIMIT_MARGIN) if nxt.get("margin") is not None else KEEP_BRANCH_LIMIT_MARGIN
+    f.update({"chain_margin_rad": round(margin, 4), "recorded_margin_rad": nxt.get("margin")})
+    if margin < floor - CLEARANCE_EQ:
+        return {**f, "why": f"the chain from here comes {margin:.4f} rad from a joint limit (recorded {nxt.get('margin')})"}
+    return {**f, "keep": True, "chain": [f"{a}:{k}" for a, d in sorted(out.items()) for k in d], "witnesses": out}
+
+
+def _base_legs(motions: Motions, q: th.Tensor, start, goal, step_m: float = 0.05, step_rad: float = 0.1) -> List[th.Tensor]:
+    """Configurations along a straight base leg ``start`` -> ``goal`` ([x, y, yaw] world) with the joints of ``q`` otherwise."""
+    (x0, y0, a0), (x1, y1, a1) = (float(v) for v in start), (float(v) for v in goal)
+    da = C.wrap_angle(a1 - a0)
+    n = max(1, int(math.ceil(max(math.hypot(x1 - x0, y1 - y0) / step_m, abs(da) / step_rad))))
+    return [_q_at_base(motions, q, x0 + (x1 - x0) * s / n, y0 + (y1 - y0) * s / n, a0 + da * s / n) for s in range(1, n + 1)]
+
+
+def transition_sweep(motions: Motions, state, targets) -> List[th.Tensor]:
+    """A transition's configurations after the drive-back with the arms as they are: the trunk swept to its target, then the drive-in."""
+    q = C.as_tensor(motions.backend.q_full()).reshape(-1).float().clone()
+    tidx = state.robot.trunk_control_idx
+    t, k = targets["trunk"]
+    q_t = C.as_tensor(C.torso_q(float(t), float(k), C.TORSO_JOINT_LIMITS)).reshape(-1).float()
+    out = [q]
+    for s in range(1, 9):
+        qq = q.clone()
+        qq[tidx] = q[tidx] + (q_t - q[tidx]) * (s / 8)
+        out.append(qq)
+    return out + _base_legs(motions, out[-1], state.base_pose2d(), as_pose2d(targets["drive_in"]))
+
+
+def path_sweep(motions: Motions, state, waypoints) -> List[th.Tensor]:
+    """A recorded base path's configurations with the arms and the trunk as they are."""
+    q = C.as_tensor(motions.backend.q_full()).reshape(-1).float().clone()
+    out, prev = [q], state.base_pose2d()
+    for w in waypoints:
+        w = as_pose2d(w)
+        out += _base_legs(motions, q, prev, w)
+        prev = w
+    return out
+
+
+def _keep_branches(motions: Motions, state, ctx: Dict[str, Any], move: Dict[str, th.Tensor], sweep_fn: Callable[[], List[th.Tensor]]) -> Dict[str, th.Tensor]:
+    """``keep_arm_branch`` for every arm a travel leg would re-pose to its recorded joints: the kept arms leave ``move``; the facts go to
+    ``ctx["branch_kept"]`` and the kept arms' chain configurations to ``ctx["witness_overrides"]`` (the executor applies them to the next
+    contact's actions once the leg passes)."""
+    nxt = ctx.get("next_contact") or {}
+    kept: Dict[str, Any] = {}
+    sweep: Optional[List[th.Tensor]] = None
+    for arm in sorted(move):
+        try:
+            if sweep is None:
+                sweep = sweep_fn()
+            facts = keep_arm_branch(motions, state, arm, move[arm], sweep, nxt.get(arm), ctx)
+        except Exception as e:  # noqa: BLE001 - a backend without FK / IK / frames (the test stubs): the recorded joints
+            facts = {"keep": False, "why": f"no branch check ({e!r})"[:160]}
+        kept[arm] = {k: v for k, v in facts.items() if k != "witnesses"}
+        if facts.get("keep"):
+            ctx.setdefault("witness_overrides", {})[arm] = facts["witnesses"]
+            log.info("travel leg: the %s arm holds the recorded hand pose %.1f mm off in another IK branch (%.2f rad): kept, the next %s runs from here",
+                     arm, facts["hand_gap_m"] * 1000, facts["joint_gap_rad"], (nxt.get(arm) or {}).get("name"))
+    ctx["branch_kept"] = kept
+    return {arm: q for arm, q in move.items() if not kept[arm].get("keep")}
+
+
+def _q_at_stance(motions: Motions, targets, q: th.Tensor) -> th.Tensor:
+    """``q`` at a transition's arriving stance: the trunk at ``targets["trunk"]``, the base at ``targets["drive_in"]``."""
+    out = q.clone()
+    t, k = targets["trunk"]
+    out[motions.robot.trunk_control_idx] = C.as_tensor(C.torso_q(float(t), float(k), C.TORSO_JOINT_LIMITS)).reshape(-1).float()
+    return _q_at_base(motions, out, *as_pose2d(targets["drive_in"]))
+
+
+def _transition_sweep_from(motions: Motions, state, targets, q: th.Tensor) -> List[th.Tensor]:
+    """:func:`transition_sweep` from the configuration ``q`` (the arms as given) instead of the measured one."""
+    tidx = motions.robot.trunk_control_idx
+    t, k = targets["trunk"]
+    q_t = C.as_tensor(C.torso_q(float(t), float(k), C.TORSO_JOINT_LIMITS)).reshape(-1).float()
+    out = [q.clone()]
+    for s in range(1, 9):
+        qq = q.clone()
+        qq[tidx] = q[tidx] + (q_t - q[tidx]) * (s / 8)
+        out.append(qq)
+    return out + _base_legs(motions, out[-1], state.base_pose2d(), as_pose2d(targets["drive_in"]))
+
+
+def _joint_line(q_from: th.Tensor, q_to: th.Tensor, idx, step: float = 0.05) -> List[th.Tensor]:
+    """Configurations along the straight joint-space line ``q_from`` -> ``q_to`` of the joints ``idx`` (both ends included)."""
+    d = float(th.max(th.abs(q_to[idx] - q_from[idx]))) if len(idx) else 0.0
+    n = max(1, int(math.ceil(d / step)))
+    out = []
+    for s in range(n + 1):
+        q = q_from.clone()
+        q[idx] = q_from[idx] + (q_to[idx] - q_from[idx]) * (s / n)
+        out.append(q)
+    return out
+
+
+def contact_route_goal(motions: Motions, state, arm: str, contact: Dict[str, Any], q_ctx: th.Tensor, cfg: "ExecuteConfig") -> Tuple[th.Tensor, str]:
+    """Where a free arm's transit to its brace / push pre-pose ends (``reach_pre_pose``'s rule) with the robot at ``q_ctx``: the standoff
+    ``pre_pose_standoff_m`` off the supports in the branch of the contact's first witness when the pre-pose sits closer than
+    ``pre_pose_standoff_skip_m`` to them, else that witness. Differential IK only (deterministic); ``(28-D q, label)``."""
+    w = contact["witnesses"]
+    key = "pre" if "pre" in w else sorted(w)[0]
+    idx = motions.robot.arm_control_idx[arm]
+    q_w = q_ctx.clone()
+    q_w[idx] = C.as_tensor(w[key]).reshape(-1).float()[idx]
+    pre = (contact.get("targets") or {}).get("pre")
+    supports = contact_ignores(state, contact["object"]) if pre is not None else []
+    n = escape_direction(state, pre, supports) if supports else None
+    if n is None:
+        return q_w, f"the {contact['name']}'s {key} witness"
+    clearance = support_clearance(state, pre, supports)
+    if clearance is not None and clearance >= cfg.pre_pose_standoff_skip_m:
+        return q_w, f"the {contact['name']}'s {key} witness ({clearance:.3f} m clear of its supports)"
+    p, q = as_world_pose(pre)
+    dense = motions._densify((p, q), [(p + n * cfg.pre_pose_standoff_m, q)])
+    res = motions.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: wp} for wp in dense], q_start=q_w, pos_tol=motions.cfg.diff_ik_pos_tol,
+                                        rot_tol=motions.cfg.diff_ik_rot_tol, max_iters=motions.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False,
+                                        soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+        return q_w, f"the {contact['name']}'s {key} witness (its standoff does not track)"
+    return C.as_tensor(res.q_traj[-1]).reshape(-1).float(), f"the {contact['name']}'s standoff in the {key} witness's branch"
+
+
+def keep_contact_arms(motions: Motions, state, targets, ctx: Dict[str, Any], move: Dict[str, th.Tensor], record=None) -> Dict[str, th.Tensor]:
+    """Owner 2026-09-30 (first-demo v3.0 F1, world vertical 0928-043205: the transition tucked both untucked arms - the wall stance
+    records ``arm_posture: tucked`` - and the brace / push then started from tucked). A transition leaves a free arm as it is
+    instead of putting it into the arriving stance's recorded posture when it is one of that stance's working arms, the stance
+    ``record`` names that posture (``arm_posture``: tucked / ready / reset / untucked - a fixed default, not a configuration of the
+    arm's own motion), the transition record has no ``arms_q`` of its own, the arm's next action at the arriving stance is a brace /
+    push (``ctx["stance_contacts"]``, ``Executor.stance_contact``) and, the arms kept as they are and the others at their targets:
+    (1) the transition's sweep (trunk, then drive-in) is collision-free (whole body) and keeps the protected objects' distance;
+    (2) the arm's straight joint-space route from its joints to where its transit ends (:func:`contact_route_goal`) at the arriving
+    stance is collision-free and keeps that distance - with an arm that acts before it standing at that arm's contact;
+    (3) an arm that acts later stays collision-free as it is while the earlier arm stands at each of its contact's witnesses.
+    An arm failing (2) or (3) is re-posed and the rest re-checked; (1) failing re-poses every arm (the recorded sequence).
+    Collision checks, FK and differential IK only (no planner, no cuRobo random stream). ``ctx["contact_arms_kept"]`` records
+    fired / not fired and why; returns ``move`` without the kept arms."""
+    cfg = _cfg(ctx)
+    contacts = ctx.get("stance_contacts") or {}
+    rec: Dict[str, Any] = {"fired": False, "arms": {}}
+    ctx["contact_arms_kept"] = rec
+    posture = (getattr(record, "extra", None) or {}).get("arm_posture")
+    working = set(getattr(record, "working_arms", []) or [])
+    if not move:
+        rec["why"] = "no arm to re-pose"
+        return move
+    if targets.get("arms_q"):
+        rec["why"] = "the transition re-poses the arms to the joints its record was swept with, not to the stance's posture"
+        return move
+    if posture not in IDLE_POSTURES:
+        rec["why"] = "the arriving stance names no arm posture for its working arms"
+        return move
+    cand = []
+    for arm in sorted(move):
+        c = contacts.get(arm)
+        if arm not in working:
+            rec["arms"][arm] = {"kept": False, "why": f"not a working arm of the arriving stance (its idle arm goes to {posture})"}
+        elif not c:
+            rec["arms"][arm] = {"kept": False, "why": "its next action at the arriving stance is not a brace / push"}
+        elif not c.get("witnesses"):
+            rec["arms"][arm] = {"kept": False, "why": f"no recorded witness of its {c['name']}"}
+        else:
+            cand.append(arm)
+    if not cand:
+        rec["why"] = f"no working arm put into the stance's {posture} posture has a brace / push next at the arriving stance"
+        return move
+    rec["posture"] = posture
+    from ispatialgym.oracle import protection as PROT
+
+    backend = motions.backend
+    kept = sorted(cand, key=lambda a: contacts[a]["index"])
+    order = {a: contacts[a]["index"] for a in kept}
+
+    def protected(arms):
+        objs: List[Tuple[str, Any]] = []
+        for a in arms:
+            for n_, o in _protected_for(ctx, state, contacts[a]["object"]):
+                if not any(o is x for _, x in objs):
+                    objs.append((n_, o))
+        return objs
+
+    def collides(qs) -> Optional[int]:
+        hits = C.as_tensor(backend.check_collision(th.stack(qs), sync_world=True)).reshape(-1)
+        return int(th.nonzero(hits)[0]) if bool(hits.any()) else None
+
+    def too_close(arms, qs, objs) -> Optional[Dict[str, Any]]:
+        if not objs or len(qs) < 3 or not hasattr(motions, "_protect_violations"):
+            return None
+        viol = motions._protect_violations(list(arms), th.stack(qs), "whole_body", {"objects": objs, "inflation": PROT.INFLATION_M})
+        return viol[0] if viol else None
+
+    try:
+        for _ in range(len(cand)):
+            q_base = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+            for arm, qa in move.items():
+                if arm not in kept:
+                    q_base[motions.robot.arm_control_idx[arm]] = C.as_tensor(qa).reshape(-1).float()
+            sweep = _transition_sweep_from(motions, state, targets, q_base)
+            hit = collides(sweep)
+            viol = None if hit is not None else too_close(kept, sweep, protected(kept))
+            if hit is not None or viol is not None:
+                why = (f"the sweep with the arms as they are collides (configuration {hit} of {len(sweep)})" if hit is not None else
+                       f"the sweep with the arms as they are comes {viol.get('clearance_m')} m from {viol.get('object')}")
+                rec["why"] = why + ": every arm re-posed"
+                for arm in kept:
+                    rec["arms"][arm] = {"kept": False, "why": why}
+                return move
+            q_st = _q_at_stance(motions, targets, q_base)
+            failed: Dict[str, str] = {}
+            for arm in kept:
+                idx = motions.robot.arm_control_idx[arm]
+                earlier = [b for b in kept if b != arm and order[b] < order[arm]]
+                q_ctx = q_st.clone()
+                for b in earlier:  # the earlier arm stands at its contact (its last witness) while this arm moves
+                    wb = contacts[b]["witnesses"]
+                    q_ctx[motions.robot.arm_control_idx[b]] = C.as_tensor(wb[list(wb)[-1]]).reshape(-1).float()[motions.robot.arm_control_idx[b]]
+                goal, label = contact_route_goal(motions, state, arm, contacts[arm], q_ctx, cfg)
+                route = _joint_line(q_ctx, goal, idx)
+                hit = collides(route)
+                viol = None if hit is not None else too_close([arm], route, protected([arm]))
+                facts = {"route_to": label, "route_rad": round(float(th.max(th.abs(goal[idx] - q_ctx[idx]))), 3), "route_configurations": len(route)}
+                if hit is not None or viol is not None:
+                    failed[arm] = (f"its route to {label} collides (configuration {hit} of {len(route)})" if hit is not None else
+                                   f"its route to {label} comes {viol.get('clearance_m')} m from {viol.get('object')}")
+                    rec["arms"][arm] = {"kept": False, "why": failed[arm], **facts}
+                    continue
+                holds = []
+                for b in earlier:  # this arm, as it is, while the earlier arm goes through its contact
+                    ib = motions.robot.arm_control_idx[b]
+                    for q_b in contacts[b]["witnesses"].values():
+                        q_h = q_st.clone()
+                        q_h[ib] = C.as_tensor(q_b).reshape(-1).float()[ib]
+                        holds.append(q_h)
+                if holds and collides(holds) is not None:
+                    failed[arm] = f"as it is it collides with the {earlier[0]} arm's {contacts[earlier[0]]['name']}"
+                    rec["arms"][arm] = {"kept": False, "why": failed[arm], **facts}
+                    continue
+                rec["arms"][arm] = {"kept": True, "contact": f"{contacts[arm]['name']}[{contacts[arm]['index']}]", **facts,
+                                    **({"held_beside": f"{earlier[0]} {contacts[earlier[0]]['name']}", "hold_configurations": len(holds)} if holds else {})}
+            if not failed:
+                break
+            kept = [a for a in kept if a not in failed]
+            if not kept:
+                break
+    except Exception as e:  # noqa: BLE001 - a backend without the checks (the test stubs): the recorded sequence
+        rec["why"] = f"no collision check ({e!r}): every arm re-posed"[:200]
+        for arm in cand:
+            rec["arms"][arm] = {"kept": False, "why": rec["why"]}
+        return move
+    rec["fired"] = bool(kept)
+    rec["why"] = (f"{', '.join(kept)} kept as they are: the sweep, the route to the contact and the later arm's hold are clear" if kept else
+                  "every candidate arm failed its route / hold check: re-posed")
+    if kept:
+        log.info("transition: %s kept as they are (next: %s); the sweep, the routes to the contacts and the holds are collision-free", "/".join(kept),
+                 ", ".join(f"{a} {contacts[a]['name']}" for a in kept))
+    return {arm: q for arm, q in move.items() if arm not in kept}
+
+
+def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q: Optional[Dict[str, Sequence[float]]] = None,
+                   keep_sweep: Optional[Callable[[], List[th.Tensor]]] = None,
+                   keep_contacts: Optional[Callable[[Dict[str, th.Tensor]], Dict[str, th.Tensor]]] = None) -> Iterator[th.Tensor]:
     """Put the arms into the stance's recorded drive-in posture before the trunk motion / drive-in (A6 + owner
     decision 2026-09-16 10:47): the recorded finger opening (``fingers``: closed pads for the wall two-arm stance) and
     the recorded joints (``arms_q`` / ``arm_posture``) on **every arm that holds nothing** — working arms included —
@@ -629,7 +1001,10 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
 
     ``arms_q`` (owner 2026-09-24): the arm joints the *transition record* itself was swept with (``transitions[].arms_q``
     — the arm left where the previous motion ended it, ``program_check.choose_departure_arms``); they replace the stance's
-    arm targets, so an arm already there does not move (the fingers still follow the stance record)."""
+    arm targets, so an arm already there does not move (the fingers still follow the stance record). ``keep_sweep`` (the leg's
+    configurations with the arms as they are): an arm that holds the recorded hand pose in another IK branch may stay
+    (``keep_arm_branch``, first-demo v2.1 A2). ``keep_contacts`` (a transition, first-demo v3.0 F1): an arm whose next action at
+    the arriving stance is a brace / push may stay as it is (:func:`keep_contact_arms`)."""
     holding = [arm for arm in M.ARMS if state.held_object(arm) is not None]
     fingers = stance_fingers(record)
     set_fingers = []
@@ -665,6 +1040,10 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
         source = "arms_q" if extra.get("arms_q") else (extra.get("arm_posture") or extra.get("idle_posture") or None)
     q = state.robot.get_joint_positions()
     move = {arm: qa for arm, qa in targets.items() if arm not in holding and float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
+    if arms_q and keep_sweep is not None and move:
+        move = _keep_branches(motions, state, ctx, move, keep_sweep)
+    if keep_contacts is not None:
+        move = keep_contacts(move)
     ctx["arms_posture"] = {"moved": sorted(move), "kept_holding": [a for a in holding if a in targets], "source": source}
     ctx["idle_arms_moved"] = sorted(a for a in move if a not in set(getattr(record, "working_arms", []) or []))
     if move:
@@ -702,6 +1081,9 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
             qa = C.as_tensor(list(arms_q[arm])).reshape(-1).float()
             if float(th.max(th.abs(q_now[idx].float() - qa))) > IDLE_ARM_TOL:
                 move[arm] = qa
+        if move and ctx.get("next_contact"):
+            # first-demo v2.1 A2: an arm holding the recorded hand pose in another IK branch drives as it is when the path clears it
+            move = _keep_branches(motions, state, ctx, move, lambda: path_sweep(motions, state, targets["waypoints"]))
         ctx["navigate_arms_reposed"] = sorted(move)
         ctx["navigate_arms_source"] = "record arms_q"
         if move:
@@ -731,8 +1113,12 @@ def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:
 def execute_transition(action: Transition, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     yield from motions.track_path([targets["drive_back"]])
     # A6: the arriving stance's idle arm(s) to their recorded posture before the trunk moves (at the stand-off) - or, when the
-    # record was swept with the arm where the previous motion left it (``arms_q``, owner 2026-09-24), to exactly that
-    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"))
+    # record was swept with the arm where the previous motion left it (``arms_q``, owner 2026-09-24), to exactly that; an arm
+    # holding that hand pose in another IK branch may stay (first-demo v2.1 A2)
+    keep_sweep = (lambda: transition_sweep(motions, state, targets)) if ctx.get("next_contact") else None
+    # first-demo v3.0 F1: an arm whose next action at the arriving stance is a brace / push may go there from where it is
+    keep_contacts = (lambda move: keep_contact_arms(motions, state, targets, ctx, move, record=action.stance_to)) if "stance_contacts" in ctx else None
+    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"), keep_sweep=keep_sweep, keep_contacts=keep_contacts)
     t, k = targets["trunk"]
     yield from motions.trunk_to(float(t), float(k))
     yield from motions.track_path([targets["drive_in"]])
@@ -889,9 +1275,17 @@ def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: st
         # ``reach_pre_pose``: a low pre-pose is reached through a standoff away from the support, the support leaves the collision
         # world only for the last straight leg) - planned with the table ignored, trajopt swept the open hand 55 cm at table
         # height, the fingertips dragging the table for 94 steps at 135 N and knocking the partner bottle 4.7 cm (cap 0920-164504).
-        # The former plan (supports ignored throughout) is the fallback when no plan exists with them present
+        # The former plan (supports ignored throughout) is the fallback when no plan exists with them present.
+        # first-demo v3.0 F5 (nextto marker 0928-050212): a planned transit that dips below both of its ends runs as a Cartesian leg
+        # when one qualifies (``Motions.transit_dip_gate``); ``ctx["transit_dip"]`` records the last plan's verdict
+        gate = motions.transit_dip_gate(arm, targets.get("approach") or ()) if hasattr(motions, "transit_dip_gate") else nullcontext(None)
         try:
-            yield from reach_pre_pose(motions, state, arm, targets["pre_grasp"], supports, [], _witness(ctx, "pre_grasp"), ctx, _cfg(ctx))
+            with gate as dip:
+                try:
+                    yield from reach_pre_pose(motions, state, arm, targets["pre_grasp"], supports, [], _witness(ctx, "pre_grasp"), ctx, _cfg(ctx))
+                finally:
+                    if dip is not None:
+                        ctx["transit_dip"] = dict(dip)
             ctx["pre_grasp_transit"] = "supports present"
         except SkillError as e:
             if e.details.get("stage") == "protected":
@@ -959,8 +1353,241 @@ def _transit(ctx, motions: Motions, state, action, leg: str, target: Optional[st
             pass
 
 
+def _finger_low_z(pos: th.Tensor, quat: th.Tensor, arm: str) -> Optional[float]:
+    """Lowest world z of the finger meshes at the eef pose (pos, quat) over the closure (closed and open), None without the assets."""
+    R = C.quat_to_mat(quat.float()).numpy()
+    p = pos.float().numpy()
+    lows = []
+    for q in (C.FINGER_CLOSED, C.FINGER_OPEN):
+        pts = M.finger_points_eef(q, arm)
+        if pts is None:
+            return None
+        lows.append(float((pts @ R.T + p)[:, 2].min()))
+    return min(lows)
+
+
+def _raised(pose, dz: float) -> Pose:
+    p, q = as_world_pose(pose)
+    return Pose(position=[float(p[0]), float(p[1]), float(p[2]) + float(dz)], orientation=[float(v) for v in q.tolist()])
+
+
+def _ramped(start, waypoints: Sequence[Any], end, dz: float) -> List[Pose]:
+    """``waypoints`` between ``start`` (kept) and ``end`` (raised by ``dz``) raised by ``dz`` x their path fraction from ``start``."""
+    pts = [as_world_pose(p)[0] for p in [start] + list(waypoints) + [end]]
+    cum = [0.0]
+    for a, b in zip(pts[:-1], pts[1:]):
+        cum.append(cum[-1] + float(th.linalg.norm(b.float() - a.float())))
+    total = cum[-1]
+    return [_raised(p, dz * (cum[i + 1] / total if total > 1e-9 else 1.0)) for i, p in enumerate(waypoints)]
+
+
+def _pinch_face_slope(obj, centre, closing, reach: float = 0.15) -> Optional[float]:
+    """The larger |normal z| of the two faces of ``obj`` a pinch centred at ``centre`` closes on along ``closing`` (a raycast toward
+    ``centre`` from each side, the first hit on the object); None when a side misses it."""
+    root = str(getattr(obj, "prim_path", "") or "")
+    c = C.as_tensor(centre).reshape(-1).float()
+    d = C.as_tensor(closing).reshape(-1).float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    if not root:
+        return None
+    slopes = []
+    for ray in _raycast_all([(c + reach * d).tolist(), (c - reach * d).tolist()], [c.tolist(), c.tolist()]):
+        hits = [h for h in (ray if isinstance(ray, list) else [ray]) if h.get("hit") and str(h.get("rigidBody") or "").startswith(root)]
+        if not hits:
+            return None
+        n = C.as_tensor(min(hits, key=lambda h: float(h.get("distance", reach)))["normal"]).reshape(-1).float()
+        slopes.append(abs(float(n[2])) / max(float(th.linalg.norm(n)), 1e-9))
+    return max(slopes)
+
+
+def _approach_tracks(motions: Optional[Motions], arm: str, q_hint, poses: Sequence[Any]) -> Optional[bool]:
+    """Whether the differential IK tracks the straight legs through ``poses`` (the pre-grasp, its approach, the lifted grasp)
+    from ``q_hint``'s arm joints - the pre-grasp witness the transit ends in and the approach leaves from (the current configuration
+    without a hint), as ``Motions.arm_along`` will; None without a backend (the test stubs)."""
+    backend = getattr(motions, "backend", None)
+    solve = getattr(backend, "solve_ik_path", None)
+    robot = getattr(motions, "robot", None)
+    if solve is None or robot is None or not poses:
+        return None
+    cfg = motions.cfg
+    try:
+        q0 = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+        idx = robot.arm_control_idx[arm]
+        if q_hint is not None:
+            q0[idx] = C.as_tensor(q_hint).reshape(-1).float()[idx]
+        start = backend.fk([M.EEF_LINK[arm]], q0)[M.EEF_LINK[arm]]
+        dense = motions._densify(as_world_pose(start), [as_world_pose(p) for p in poses])
+        res = solve(f"{arm}_arm", [{M.EEF_LINK[arm]: p} for p in dense], q_start=q0, pos_tol=cfg.diff_ik_pos_tol, rot_tol=cfg.diff_ik_rot_tol,
+                    max_iters=cfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=cfg.diff_ik_soft_pos_tol_free)
+    except Exception as e:  # noqa: BLE001
+        log.debug("approach probe of %s failed (%r)", arm, e)
+        return None
+    return bool(res.success)
+
+
+def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Dict[str, Any]:
+    """Owner 2026-09-27 (first-demo v2.1 A3, bar soap 0927-034001: "the wrist camera contacts the table during grasp & release and
+    pushes against it, causing robot to wobble" - a replay's contact dump showed only the two finger links, pressing 91-154 N into the
+    tray floor while the hand stood still, and torso_joint1 bent 7.6 mrad; the camera never touched): a library pinch of an object
+    resting on a support must not put a finger below the object's lowest point - nothing of the hand fits there. When the finger
+    envelope at the grasp pose reaches below the object's bottom + ``grasp_support_clearance_m``, the grasp is lifted by the deficit
+    along world z and the approach ramps up to it from the recorded pre-grasp, provided the pads' fingertip-side end stays
+    ``grasp_support_pad_margin_m`` below the object's top and that approach tracks from the pre-grasp witness (``_approach_tracks``) -
+    else the recorded grasp runs; a lifted grasp whose attempt failed is not lifted on the retry (``Executor.run_action`` keeps
+    ``support_lift_refused``). The pre-grasp stays where it was recorded, and with it the transit there: the sandal 0927-030120 with
+    its pre-grasp lifted too took the transit's via-above into a posture its approach stalled from (13 mm short 4.7 cm before the grasp,
+    the finish toward the grasp witness 3.06 rad away refused - 8b572a12 on a pod and locally, both attempts). A vertical approach (the
+    bar soap's) is the same line either way. Only an object set down or attached next is lifted (``ctx["next_place_kind"]``): those
+    places follow the in-hand pose (``raise_place_for_inhand_pose``, the attach re-aim); a drop does not - the sandal lifted 14 mm
+    landed 9.6 deg / 7 mm off its recorded drop and the push under the table then turned it 78 deg (503be065, local 0927-163758;
+    v2.0: 2 deg). ``ctx["grasp_support_lift"]`` records the facts."""
+    if action.kind != "library" or targets.get("grasp") is None:
+        return targets
+    try:
+        lo, hi = state.object(action.object).aabb
+        bottom, top = float(lo[2]), float(hi[2])
+        pos, quat = (C.as_tensor(x).float() for x in as_world_pose(targets["grasp"]))
+        low = _finger_low_z(pos, quat, action.arm)
+    except Exception as e:  # noqa: BLE001 - no aabb / no finger meshes: the recorded grasp
+        ctx["grasp_support_lift"] = {"applied": False, "reason": f"{e!r}"[:120]}
+        return targets
+    if low is None:
+        return targets
+    need = bottom + cfg.grasp_support_clearance_m - low
+    pad_end = float((pos + C.PAD_Z_RANGE[1] * C.approach_axis(quat))[2])
+    rec: Dict[str, Any] = {"applied": False, "finger_low_z": round(low, 4), "object_bottom_z": round(bottom, 4), "deficit_m": round(need, 4), "object_top_z": round(top, 4)}
+    ctx["grasp_support_lift"] = rec
+    if need <= 0.0:
+        return targets
+    if pad_end + need > top - cfg.grasp_support_pad_margin_m:
+        rec["reason"] = f"a {need * 1000:.1f} mm lift leaves the pads {(top - pad_end - need) * 1000:.1f} mm below the object's top"
+        return targets
+    nxt = ctx.get("next_place_kind")
+    if nxt not in ("support", "attach"):
+        rec["reason"] = (f"the object's next place ({nxt}) does not follow its in-hand pose (a drop lands as the release throws it): the "
+                         f"recorded grasp runs")
+        return targets
+    try:
+        # the lifted pads' fingertip-side end: what grips an object the pads overhang (the milk: the lifted pads reached down only to
+        # 12 mm above the bottle's widest section; v2.0's pinch had them there)
+        centre = pos + th.tensor([0.0, 0.0, need]) + (C.PAD_Z_RANGE[1] - 0.001) * C.approach_axis(quat)
+        slope = _pinch_face_slope(state.object(action.object), centre, C.closing_axis(quat))
+    except Exception as e:  # noqa: BLE001 - no scene queries (the test stubs): the faces are not judged
+        log.debug("pinch face probe of %s failed (%r)", action.object, e)
+        slope = None
+    if slope is not None:
+        rec["face_slope"] = round(slope, 3)
+        if slope > cfg.grasp_support_face_slope_max:
+            rec["reason"] = (f"the lifted pads would close on faces sloped {math.degrees(math.asin(min(slope, 1.0))):.0f} deg from vertical (a curved "
+                             f"side above its widest section rolls under the closure): the recorded grasp runs")
+            return targets
+    index = (ctx.get("protect") or {}).get("index")
+    if index is not None and index in getattr(motions, "support_lift_refused", ()):
+        rec["reason"] = "the lifted grasp failed the previous attempt of this action: the recorded grasp runs"
+        return targets
+    out = dict(targets)
+    out["grasp"] = _raised(targets["grasp"], need)
+    out["approach"] = _ramped(targets["pre_grasp"], list(targets["approach"]), targets["grasp"], need)
+    if _approach_tracks(motions, action.arm, _witness(ctx, "pre_grasp"), [out["pre_grasp"]] + list(out["approach"]) + [out["grasp"]]) is False:
+        rec["reason"] = f"the approach to the {need * 1000:.1f} mm lifted grasp does not track from the pre-grasp witness: the recorded grasp runs"
+        return targets
+    rec.update({"applied": True, "lift_m": round(need, 4)})
+    log.info("grasp(%s): the finger envelope reaches %.1f mm below the object's bottom + %.0f mm: the grasp is lifted by that", action.object,
+             need * 1000, cfg.grasp_support_clearance_m * 1000)
+    return out
+
+
+def raise_place_for_inhand_pose(action: Place, state, sidecar, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Dict[str, Any]:
+    """Owner 2026-09-27 (first-demo v2.1 A3): the recorded place pose sets the object down only with the recorded in-hand transform
+    (``grasps[].eef_in_object``); an object that hangs LOWER in the hand (a grasp that ended higher on it - stopped short on the
+    support, 1 cm on the bar soap's tray floor, or lifted by ``lift_grasp_off_support``) was driven into its support by that much, the
+    fingertips pressing ~100 N into the destination tray through the release. The pre-place, place, descent and retreat are raised by
+    the difference (z only, never lowered) and the carry ramps up to the raised pre-place. ``ctx["place_inhand_raise"]`` records it."""
+    if action.kind != "support" or targets.get("place") is None:
+        return targets
+    try:
+        obj = state.object(action.object)
+        if state.held_object(action.arm) is not obj:
+            return targets
+        g = next((g for g in (getattr(sidecar, "grasps", None) or []) if g.object == action.object and getattr(g, "arm", None) in (None, action.arm)), None)
+        eio = (getattr(g, "extra", None) or {}).get("eef_in_object") if g is not None else None
+        if not isinstance(eio, dict) or eio.get("position") is None or eio.get("orientation") is None:
+            return targets
+        eio_rec = (th.tensor([float(v) for v in eio["position"]]), th.tensor([float(v) for v in eio["orientation"]]))
+        eio_live = C.relative(tuple(C.as_tensor(x).float() for x in state.eef_pose(action.arm)), tuple(C.as_tensor(x).float() for x in state.object_pose(action.object)))
+        place = tuple(C.as_tensor(x).float() for x in as_world_pose(targets["place"]))
+        live = C.compose(C.compose(place, C.invert(eio_rec)), eio_live)  # the hand pose that sets the object where the recorded place does
+        dz = float(live[0][2] - place[0][2])
+    except Exception as e:  # noqa: BLE001
+        ctx["place_inhand_raise"] = {"applied": False, "reason": f"{e!r}"[:120]}
+        return targets
+    rec: Dict[str, Any] = {"applied": False, "dz_m": round(dz, 4)}
+    ctx["place_inhand_raise"] = rec
+    if dz <= cfg.place_inhand_raise_min_m:
+        return targets
+    out = dict(targets)
+    for k in ("pre_place", "place"):
+        out[k] = _raised(targets[k], dz)
+    out["descent"] = [_raised(p, dz) for p in targets["descent"]]
+    out["retreat"] = [_raised(p, dz) for p in targets["retreat"]]
+    carry = list(targets.get("carry") or ())
+    if carry:
+        out["carry"] = [_raised(p, dz * (i + 1) / len(carry)) for i, p in enumerate(carry)]
+    rec.update({"applied": True, "raised_m": round(dz, 4)})
+    log.info("place(%s): the object hangs %.1f mm lower in the hand than recorded: the place is raised by that", action.object, dz * 1000)
+    return out
+
+
+def _into_witness_posture(motions: Motions, targets, ctx, arm: str) -> Iterator[th.Tensor]:
+    """The transit to the pre-grasp may leave the arm in another IK branch than the pre-grasp witness: the via-above's pose-goal point
+    above descends in its own branch (sandal on pods, 0927-154128 / 0927-165511: at the pre-grasp the arm stood 2.91 rad from the
+    witness, shoulder and elbow flipped - v2.0 0927-030120 and the local replays 0.91 rad, the same branch - and the approach stalled
+    56 mm short of the grasp in both attempts). When the approach does not track from where the arm is but does from the pre-grasp
+    witness, where the sampler checked it, the arm first moves into the witness's posture: a joint-space plan to the witness refined
+    for the pre-grasp pose, checked against the protected objects of the enclosing transit; with no such plan nothing moves.
+    ``ctx["witness_posture"]`` records it."""
+    w = _witness(ctx, "pre_grasp")
+    backend = getattr(motions, "backend", None)
+    if w is None or backend is None or not hasattr(motions, "along_reaches"):
+        return
+    try:
+        if motions.along_reaches(arm, targets["approach"]):
+            return
+        if _approach_tracks(motions, arm, w, [targets["pre_grasp"]] + list(targets["approach"])) is not True:
+            return
+        emb = f"{arm}_arm"
+        idx = motions.robot.arm_control_idx[arm]
+        q_now = C.as_tensor(backend.q_full()).reshape(-1).float()
+        q_w = q_now.clone()
+        q_w[idx] = C.as_tensor(w).reshape(-1).float()[idx]
+        q_ik = backend.solve_ik(emb, {M.EEF_LINK[arm]: as_world_pose(targets["pre_grasp"])}, q_seed=q_w, sync_world=False)
+        if q_ik is not None:
+            q_ik = C.as_tensor(q_ik).reshape(-1).float()
+            if float(th.max(th.abs(q_ik[idx] - q_w[idx]))) <= motions.cfg.witness_refine_max_jump:
+                q_w[idx] = q_ik[idx]
+        rec: Dict[str, Any] = {"gap_rad": round(float(th.max(th.abs(q_w[idx] - q_now[idx]))), 3)}
+        ctx["witness_posture"] = rec
+        backend.update_world()  # the supports the transit left out of the world are obstacles again
+        res = backend.plan_joint(emb, q_w, q_start=q_now, max_attempts=motions.cfg.plan_attempts, sync_world=False)
+    except Exception as e:  # noqa: BLE001 - the approach from where the arm is, as before
+        log.debug("witness posture check of %s failed (%r)", arm, e)
+        return
+    if not getattr(res, "success", False) or res.q_traj is None:
+        rec["result"] = f"no plan ({getattr(res, 'status', '?')})"
+        return
+    viol = motions._protect_violations([arm], res.q_traj, emb)
+    if viol:
+        rec["result"] = f"the plan passes {viol[0]['object']} at {viol[0]['clearance_m']} m"
+        return
+    log.info("grasp(%s): the approach does not track from where the transit left the arm (%.2f rad from the pre-grasp witness) but "
+             "does from the witness: the arm moves into its posture first", arm, rec["gap_rad"])
+    yield from motions.execute_joint_trajectory(res.q_traj, arms=[arm])
+    rec["result"] = "moved into the witness posture"
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
+    targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
     _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
     yield from motions.gripper(arm, close=False)
     # the container / support the object rests in (the source tray of disembedding, the table; ``grasps[].grasp_from``
@@ -989,6 +1616,7 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     # (owner 2026-09-26, oracle.protection: teacup 0925-222212 / 235559 - the hand passed low over the saucer and shoved it 20 cm)
     with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
         yield from _grasp_transit(action, motions, state, targets, ctx, arm, supports, ignore_links)
+        yield from _into_witness_posture(motions, targets, ctx, arm)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
@@ -1169,6 +1797,40 @@ def forbidden_contacts(action: Action) -> Tuple[str, ...]:
     return tuple(dict.fromkeys(out))
 
 
+@contextmanager
+def attach_hold_kept(action: Place, motions: Motions, state, ctx: Dict[str, Any]):
+    """Owner 2026-09-30 (first-demo v3.0 F4, cork 0928-041525: the descent seated the cork within 0.7 mm / 0.4 deg, then the jam
+    probe relaxed the hold twice - the loaded wrist reports 0.10-0.12 rad/s while moving < 1 mrad, its only contacts the fingers on
+    the cork - and joints 5-7 crept 8-21 mrad: 3.9 mm before the offset was measured, 3.3 mm after the correction pass). In an attach
+    place with the part in hand the holding arm joins ``keep_hold_arms`` from the descent until the attachment exists, so
+    ``Motions._relax_if_jammed`` leaves it alone there; every other place, and this one before the descent, is unchanged. The
+    attachment exists once the open command's last increment has released the part (the task's release hook joins it), so
+    the window spans the alignment passes, the fingers' opening and the release. ``ctx["attach_hold"]`` records fired / not
+    fired and why."""
+    arm = action.arm
+    kept = getattr(motions, "keep_hold_arms", None)
+    if action.kind != "attach" or not action.on:
+        why = "not an attach place"
+    elif kept is None:
+        why = "no jam probe to suspend"
+    elif state.held_object(arm) is None:
+        why = "the part is not in hand"
+    else:
+        why = None
+    if why is not None:
+        ctx["attach_hold"] = {"fired": False, "why": why}
+        yield
+        return
+    added = arm not in kept
+    kept.add(arm)
+    ctx["attach_hold"] = {"fired": True, "arm": arm, "why": "attach place with the part in hand: no jam relax of the holding arm until the attachment exists"}
+    try:
+        yield
+    finally:
+        if added:
+            kept.discard(arm)
+
+
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
@@ -1190,6 +1852,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
     if action.kind == "attach" and action.on:
         targets = _reaim_attach_targets(action, state, targets, ctx, cfg)
+    elif action.kind == "support":
+        targets = raise_place_for_inhand_pose(action, state, ctx.get("sidecar"), targets, ctx, cfg)
     carry = list(targets.get("carry") or ())
     if cfg.carry_leg == "straight" and carry:
         # the carry leg: a straight Cartesian leg from where the hand is (the lift end) to the recorded pre-place, through
@@ -1224,48 +1888,57 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     if action.kind == "attach" and action.on:
         # the part is in the air above the partner: re-aim the descent for its live in-hand pose (and the carry's residual)
         targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
+        yield from clear_fingers_over_partner(action, motions, state, targets, ctx, cfg)
+        if ctx["finger_clearance"].get("applied"):
+            # the opened pads let the part settle in the assisted grasp (cap 0927-040231: 1.25 mm / 1.4 deg in the hand, which then
+            # stood as the offset before the snap and cost a correction pass): the descent is aimed again for that in-hand pose
+            first = ctx["inhand_reaim"]
+            targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
+            ctx["finger_clearance"]["reaim"] = ctx["inhand_reaim"]
+            ctx["inhand_reaim"] = first
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
-    # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
-    # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
-    yield from motions.arm_along(arm, targets["descent"], finish=finish, soft_rot_tol=cfg.attach_leg_soft_rot_tol if action.kind == "attach" else None,
-                                 limit_margin=cfg.attach_leg_limit_margin_rad if action.kind == "attach" else 0.0)
-    if finish.used:
-        ctx["descent_finish"] = finish.info
-    # rush 2026-09-17: the hand ends the descent short of the recorded place pose by a systematic ~1-1.5 cm (the witness
-    # configuration's reach in the simulator is less than the sampler's model: no joint limit, no singularity, the DLS
-    # converges onto the reach sphere); the shortfall is closed with the BASE, arm locked, before the release - the
-    # recorded push (gap + tolerance + 5 mm) then covers the gap (touching 0917-223915: place 1.45 cm short, push
-    # extension at the reach boundary yawed the box 30 deg)
-    if cfg.place_base_nudge_max_m > 0:
-        short = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
-        short[2] = 0.0
-        dist = float(th.linalg.norm(short))
-        if cfg.place_base_nudge_min_m < dist <= cfg.place_base_nudge_max_m:
-            x, y, yaw = state.base_pose2d()
-            goal2d = [x + float(short[0]), y + float(short[1]), yaw]
-            log.info("place(%s): the hand is %.1f mm short of the recorded place pose -> nudging the base by that, arm locked", action.object, dist * 1000)
-            q = motions.robot.get_joint_positions()
-            motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
-            tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=cfg.place_base_nudge_tol_m)
-            try:
-                yield from motions.track_path([goal2d], tracker_cfg=tcfg)
-            except SkillError as e:
-                log.warning("place(%s): base nudge did not settle (%s); keeping what it achieved", action.object, e.message)
-            yield from motions.settle(max_steps=cfg.place_settle_steps // 2)
-            after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
-            ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
-    if action.kind == "attach" and action.on:
-        yield from _attach_at_place(action, motions, state, ctx)
-        # the fingers open to just short of the release (the assisted grasp still holds the part) and the alignment is
-        # measured and corrected again with the fingertips off the partner; the open command's last increment releases it
-        yield from motions.gripper_open_short(arm)
-        closed = ctx.get("attach")
-        yield from _attach_at_place(action, motions, state, ctx)
-        ctx["attach"]["fingers_closed"] = closed
-    # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
-    # support place sets the object down
-    yield from motions.gripper(arm, close=False)
-    yield from _release(motions, state, arm)
+    with attach_hold_kept(action, motions, state, ctx):
+        # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
+        # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
+        yield from motions.arm_along(arm, targets["descent"], finish=finish, soft_rot_tol=cfg.attach_leg_soft_rot_tol if action.kind == "attach" else None,
+                                     limit_margin=cfg.attach_leg_limit_margin_rad if action.kind == "attach" else 0.0)
+        if finish.used:
+            ctx["descent_finish"] = finish.info
+        # rush 2026-09-17: the hand ends the descent short of the recorded place pose by a systematic ~1-1.5 cm (the witness
+        # configuration's reach in the simulator is less than the sampler's model: no joint limit, no singularity, the DLS
+        # converges onto the reach sphere); the shortfall is closed with the BASE, arm locked, before the release - the
+        # recorded push (gap + tolerance + 5 mm) then covers the gap (touching 0917-223915: place 1.45 cm short, push
+        # extension at the reach boundary yawed the box 30 deg)
+        if cfg.place_base_nudge_max_m > 0:
+            short = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
+            short[2] = 0.0
+            dist = float(th.linalg.norm(short))
+            if cfg.place_base_nudge_min_m < dist <= cfg.place_base_nudge_max_m:
+                x, y, yaw = state.base_pose2d()
+                goal2d = [x + float(short[0]), y + float(short[1]), yaw]
+                log.info("place(%s): the hand is %.1f mm short of the recorded place pose -> nudging the base by that, arm locked", action.object, dist * 1000)
+                q = motions.robot.get_joint_positions()
+                motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
+                tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=cfg.place_base_nudge_tol_m)
+                try:
+                    yield from motions.track_path([goal2d], tracker_cfg=tcfg)
+                except SkillError as e:
+                    log.warning("place(%s): base nudge did not settle (%s); keeping what it achieved", action.object, e.message)
+                yield from motions.settle(max_steps=cfg.place_settle_steps // 2)
+                after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
+                ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
+        if action.kind == "attach" and action.on:
+            yield from _attach_at_place(action, motions, state, ctx)
+            # the fingers open to just short of the release (the assisted grasp still holds the part) and the alignment is
+            # measured and corrected again with the fingertips off the partner; the open command's last increment releases it
+            yield from motions.gripper_open_short(arm)
+            closed = ctx.get("attach")
+            yield from _attach_at_place(action, motions, state, ctx)
+            ctx["attach"]["fingers_closed"] = closed
+        # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
+        # support place sets the object down
+        yield from motions.gripper(arm, close=False)
+        yield from _release(motions, state, arm)
     if action.kind == "attach" and action.on:
         _attach_after_release(action, state, ctx)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
@@ -1392,6 +2065,131 @@ def _reaim_for_inhand_pose(action: Place, motions: Motions, state, targets: Dict
         log.warning("place(%s): the move to the re-aimed pre-place did not complete (%s); descending from where the hand is", action.object, e.message)
     rec["applied"] = True
     return out
+
+
+_FINGER_SURFACE: Dict[Tuple[str, float], Optional[List[Tuple[Any, Any]]]] = {}
+
+
+def finger_surface_points(arm: str, spacing: float) -> Optional[List[Tuple[Any, Any]]]:
+    """Points on the two finger meshes' convex hulls, at most ``spacing`` apart, in the eef frame at finger joint 0, with each finger's
+    slide axis (``r1pro_model.finger_hulls_eef`` gives the hull vertices only: a rim edge under a finger's flat underside passes
+    between rays cast from its corners). ``[(points (N, 3) ndarray, axis (3,) ndarray), ...]``; None without the assets."""
+    key = (arm, round(float(spacing), 5))
+    if key in _FINGER_SURFACE:
+        return _FINGER_SURFACE[key]
+    hulls = M.finger_hulls_eef(arm)
+    out = None
+    if hulls:
+        import numpy as np
+        from scipy.spatial import ConvexHull
+
+        out = []
+        for pts, axis in hulls:
+            samples = [pts]
+            for tri in ConvexHull(pts).simplices:
+                a, b, c = pts[tri]
+                n = max(1, int(math.ceil(max(np.linalg.norm(b - a), np.linalg.norm(c - a), np.linalg.norm(c - b)) / spacing)))
+                ij = np.array([(i, j) for i in range(n + 1) for j in range(n + 1 - i)], dtype=float) / n
+                samples.append(a + ij[:, :1] * (b - a) + ij[:, 1:] * (c - a))
+            out.append((np.unique(np.vstack(samples).round(5), axis=0), axis))
+    _FINGER_SURFACE[key] = out
+    return out
+
+
+def _raycast_all(starts, ends):
+    """Every hit along each ray (OmniGibson ``raytest_batch``, PhysX scene queries): a list per ray of hit dicts."""
+    from omnigibson.utils.sampling_utils import raytest_batch
+
+    return raytest_batch(starts, ends, only_closest=False)
+
+
+def _finger_meets_partner(arm: str, finger_q: Sequence[float], pre, place, partner, cfg: ExecuteConfig) -> Tuple[Optional[float], int, List[str]]:
+    """Where the fingers (joint values ``finger_q``) meet ``partner`` when the hand descends straight from ``pre`` to ``place`` (same
+    orientation): rays from the finger surface's lowest ``attach_finger_clear_band_m`` along the descent, down to
+    ``attach_finger_clear_margin_m`` past the seat, against the partner's collision geometry. ``(metres before the seat at the first
+    contact - negative within the margin past it, None when clear -, rays cast, partner bodies hit)``."""
+    import numpy as np
+
+    surf = finger_surface_points(arm, cfg.attach_finger_clear_spacing_m)
+    if not surf:
+        return None, 0, []
+    pts = np.vstack([p + float(q) * ax for (p, ax), q in zip(surf, finger_q)])
+    (p0, q0), (p1, _) = as_world_pose(pre), as_world_pose(place)
+    R = C.quat_to_mat(C.as_tensor(q0).float()).numpy()
+    rise = (C.as_tensor(p0) - C.as_tensor(p1)).float().numpy()
+    length = float(np.linalg.norm(rise))
+    if length < 1e-4:
+        return None, 0, []
+    down = -rise / length
+    seat = pts @ R.T + C.as_tensor(p1).float().numpy()
+    low = seat @ down
+    seat = seat[low >= float(low.max()) - cfg.attach_finger_clear_band_m]
+    starts, ends = seat + rise, seat + cfg.attach_finger_clear_margin_m * down
+    root = str(getattr(partner, "prim_path", "") or "")
+    worst, bodies = None, set()
+    for ray in _raycast_all(starts.tolist(), ends.tolist()):
+        for h in (ray if isinstance(ray, list) else [ray]):
+            body = str(h.get("rigidBody") or "")
+            if not h.get("hit") or not root or not body.startswith(root):
+                continue
+            before = length - float(h.get("distance", length))
+            worst = before if worst is None else max(worst, before)
+            bodies.add(body[len(root):] or body)
+    return worst, len(starts), sorted(bodies)
+
+
+def clear_fingers_over_partner(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
+    """Owner 2026-09-27 (first-demo v2.1 A1, cap 0927-040231 "the cap seems slightly off when attached"; the owner's stable attach
+    0920-235831): a part pinched by its rim can hold the fingers inside the outline of the partner's top it goes onto - the cap's 51 mm
+    rim pinched on its axis (the sampler's re-centred fingertip pinch), the lemonade bottle's collar 54 mm across - and the fingertips
+    land on the collar before the part seats: 5 mm short, the bottle tipped 1.2 deg, the attach locked that offset and the correction
+    pass (measured on the tipped bottle) did not help. At the pre-place, after the re-aim, the finger surface is swept along the descent
+    against the partner (``_finger_meets_partner``); when the fingers would meet it before the seat they open by the least
+    ``attach_finger_clear_step_m`` multiple (<= ``attach_finger_clear_max_m`` per finger) that keeps ``attach_finger_clear_margin_m``
+    down to the seat - else the one that meets it latest - and the assisted grasp keeps holding the part (OmniGibson releases it on the
+    full open command only), so the part seats before a finger touches the partner. ``ctx["finger_clearance"]`` records the facts."""
+    arm = action.arm
+    rec: Dict[str, Any] = {"applied": False}
+    ctx["finger_clearance"] = rec
+    if targets.get("place") is None or targets.get("pre_place") is None or not action.on:
+        rec["reason"] = "no place targets"
+        return
+    try:
+        partner = state.object(action.on)
+        q_now = [float(v) for v in motions.robot.get_joint_positions()[motions.robot.gripper_control_idx[arm]].tolist()]
+        before, n_rays, bodies = _finger_meets_partner(arm, q_now, targets["pre_place"], targets["place"], partner, cfg)
+    except Exception as e:  # noqa: BLE001 - no raycasts / finger meshes: the place runs as before
+        rec["reason"] = f"no finger sweep ({e!r})"[:160]
+        return
+    rec.update({"before_seat_m": None if before is None else round(before, 4), "rays": n_rays, "partner_bodies": bodies, "finger_q_m": [round(v, 4) for v in q_now]})
+    if before is None:
+        return
+    best = None  # (metres before the seat or None, opening) of the opening that meets the partner latest
+    k = 1
+    while k * cfg.attach_finger_clear_step_m <= cfg.attach_finger_clear_max_m + 1e-9:
+        dq = k * cfg.attach_finger_clear_step_m
+        after, _, _ = _finger_meets_partner(arm, [v + dq for v in q_now], targets["pre_place"], targets["place"], partner, cfg)
+        if after is None:
+            best = (None, dq)
+            break
+        if after < before and (best is None or after < best[0]):
+            best = (after, dq)
+        k += 1
+    if best is None:
+        rec["reason"] = f"no opening up to {cfg.attach_finger_clear_max_m * 1000:.1f} mm per finger meets the partner later"
+        log.warning("place(%s): the fingers meet %s %.1f mm before the seat and no bounded opening helps", action.object, action.on, before * 1000)
+        return
+    after, dq = best
+    lo, hi = motions._gripper_limits(arm)
+    opening = min(hi - 1e-4, sum(q_now) / len(q_now) + dq)  # below the full open command: the assisted grasp holds
+    motions.state.gripper_cmd[arm] = motions.gripper_command(arm, opening)
+    motions.state.stop_base()
+    for _ in range(int(motions.cfg.gripper_preshape_steps)):
+        yield motions._emit()
+    rec.update({"applied": True, "opened_m": round(dq, 4), "before_seat_after_m": None if after is None else round(after, 4), "opening_cmd_m": round(opening, 4),
+                "held": state.held_object(arm) is state.object(action.object)})
+    log.info("place(%s): the fingers would meet %s %.1f mm before the seat; opened %.1f mm per finger (%s)", action.object, action.on, before * 1000, dq * 1000,
+             "clear of it down to the seat" if after is None else f"{after * 1000:.1f} mm before the seat after")
 
 
 @dataclass
@@ -2937,6 +3735,39 @@ def _ramp_arm_to_q(motions: Motions, arm: str, q_arm: Sequence[float], speed: Op
     return d
 
 
+def keep_retreat_arm(motions: Motions, state, arm: str, seg: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
+    """Owner 2026-09-30 (first-demo v3.0 F2, door open 0928-042225: after the first release and the 10 cm back-off the ramp onto the
+    recorded ``arm_q_retreat`` turned joint 1 by 3.4 rad and raised the hand 1.04 -> 1.69 m and back, then the re-grasp plan swung it
+    back to the pre-grasp witness - the sampler's retreat IK had taken the largest-margin solution of the pose anywhere). Whether a
+    ``release_move_regrasp`` keeps the arm where the back-off left it instead of ramping onto ``arm_q_retreat``: only when the
+    recorded witness lies farther than ``follow_retreat_ramp_max_rad`` from the measured joints (another IK solution of the same hand
+    pose, not null-space drift), the configurations of the drive along ``seg["base_path"]`` with the arm as it is are collision-free
+    (whole body, ``follow_keep_drive_margin_m``) and the arm keeps ``follow_keep_self_clearance_m`` from cuRobo's self-collision
+    padding (a re-grasp plan may start from it). Reads only; ``fired`` False = ramp as before, with the reason."""
+    idx = motions.robot.arm_control_idx[arm]
+    q_now = C.as_tensor(motions.robot.get_joint_positions()).reshape(-1).float().clone()
+    gap = float(th.max(th.abs(q_now[idx] - C.as_tensor(seg["arm_q_retreat"]).reshape(-1).float())))
+    f: Dict[str, Any] = {"fired": False, "gap_rad": round(gap, 3), "threshold_rad": cfg.follow_retreat_ramp_max_rad}
+    if gap <= cfg.follow_retreat_ramp_max_rad:
+        return {**f, "why": "the recorded retreat witness is near the measured joints: ramped onto it"}
+    if seg.get("hold_posture") == "idle":
+        return {**f, "why": "the recorded drive holds the idle posture: ramped onto the recorded witness"}
+    backend = motions.backend
+    try:
+        qs = path_sweep(motions, state, seg.get("base_path") or [])
+        hits = C.as_tensor(backend.check_collision(th.stack(qs), sync_world=True, margin=cfg.follow_keep_drive_margin_m)).reshape(-1)
+        if bool(hits.any()):
+            return {**f, "why": f"the arm as it is collides on the drive (configuration {int(th.nonzero(hits)[0])} of {len(qs)}): ramped onto the recorded witness"}
+        pairs = backend.self_collision_pairs(q_now, f"{arm}_arm", margin=cfg.follow_keep_self_clearance_m)
+        if pairs:
+            return {**f, "why": f"the arm as it is lies within {cfg.follow_keep_self_clearance_m * 1000:.0f} mm of the self-collision padding "
+                                f"({'-'.join(pairs[0]['links'])}): ramped onto the recorded witness"}
+    except Exception as e:  # noqa: BLE001 - a backend without the checks (the test stubs): ramp as before
+        return {**f, "why": f"no drive / self-clearance check ({e!r}): ramped onto the recorded witness"[:200]}
+    return {**f, "fired": True, "drive_configurations": len(qs),
+            "why": "the recorded retreat witness is another IK solution; the drive and the self-clearance check out with the arm as it is: kept"}
+
+
 def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: List[Dict[str, Any]], ctx: Dict[str, Any], axis, note: Dict[str, Any]) -> Iterator[th.Tensor]:
     """Owner policy 2026-09-20 20:19, strictly one thing at a time: ``arm`` segments track the handle arc between the
     recorded poses (``arc_between`` about the joint axis, differential IK, no convergence wait); ``release_move_regrasp``
@@ -3040,9 +3871,16 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
             # and left link5 9 mm inside the trunk's self-collision padding, where no plan may start (0921-041230)
             yield from motions.arm_along(arm, [as_world_pose(seg["retreat_eef"])], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
             d_ret = 0.0
+            retreat_kept = None
             if seg.get("arm_q_retreat"):
-                d_ret = yield from _ramp_arm_to_q(motions, arm, seg["arm_q_retreat"])
-                log.info("base_follow: release at q = %.3f: retreat %.2f m, arm ramped onto the recorded retreat witness (%.3f rad)", float(seg.get("q") or 0.0), float(seg.get("retreat_m") or C.PRE_DIST), d_ret)
+                retreat_kept = keep_retreat_arm(motions, state, arm, seg, cfg)
+                if retreat_kept["fired"]:
+                    log.info("base_follow: release at q = %.3f: retreat %.2f m; the recorded retreat witness lies %.3f rad from the arm (> %.2f, another IK solution): "
+                             "the arm stays where the back-off left it", float(seg.get("q") or 0.0), float(seg.get("retreat_m") or C.PRE_DIST), retreat_kept["gap_rad"],
+                             cfg.follow_retreat_ramp_max_rad)
+                else:
+                    d_ret = yield from _ramp_arm_to_q(motions, arm, seg["arm_q_retreat"])
+                    log.info("base_follow: release at q = %.3f: retreat %.2f m, arm ramped onto the recorded retreat witness (%.3f rad)", float(seg.get("q") or 0.0), float(seg.get("retreat_m") or C.PRE_DIST), d_ret)
             if seg.get("hold_posture") == "idle" and seg.get("arm_q_hold"):
                 yield from motions.arm_to(arm, q={arm: C.as_tensor(seg["arm_q_hold"]).reshape(-1).float()})
             motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
@@ -3074,7 +3912,8 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
             motions.backend.attach_object(arm, obj)
             motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
             log_moves.append({"type": "release_move_regrasp", "q": seg.get("q"), "strides": len(seg["base_path"]), "hold_posture": seg.get("hold_posture"), "unwind_rad": round(total, 4),
-                              "m": round(math.hypot(seg["base_to"][0] - seg["base_from"][0], seg["base_to"][1] - seg["base_from"][1]), 3)})
+                              "m": round(math.hypot(seg["base_to"][0] - seg["base_from"][0], seg["base_to"][1] - seg["base_from"][1]), 3),
+                              **({"retreat_kept": retreat_kept} if retreat_kept is not None else {})})
         else:
             raise SkillError("plan_failed", f"base_follow: unknown follow segment type {kind!r}", stage="targets")
     yield from motions.hold(3)

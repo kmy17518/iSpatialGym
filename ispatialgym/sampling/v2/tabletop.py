@@ -739,6 +739,128 @@ class _BandGrasp:
         return self.position, self.quat
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# the arm of a single-arm segment (owner 2026-09-27, first-demo v2.2)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def default_arm(s) -> str:
+    """The task's working arm (``generation.arm``, core's ``IKChecker.default_working_arms``; ``right`` by default)."""
+    arms = list(getattr(getattr(s, "ikc", None), "default_working_arms", None) or ["right"])
+    return arms[0] if len(arms) == 1 else "right"
+
+
+def object_free(s, role: str = "target") -> bool:
+    """Whether the object of ``role`` is free: not articulated (the problem gives the role no joint) and not attached at the
+    goal (no ``attached`` atom in the grounded BDDL's goal)."""
+    gp = getattr(s, "gp", None)
+    r = (getattr(gp, "roles", None) or {}).get(role)
+    if r is not None and getattr(r, "joint", None):
+        return False
+    text = str(getattr(gp, "bddl_text", "") or "")
+    return "attached" not in (text.split(":goal", 1)[1] if ":goal" in text else "")
+
+
+def arm_offer(s, *, other_arm_roles: Sequence[str] = (), role: str = "target", free: Optional[bool] = None) -> Tuple[List[str], str]:
+    """The situation predicate of the other arm (owner 2026-09-27, first-demo v2.2; side-effect free: it reads the plan, the problem
+    and ``generation``): the arms offered for a single-arm segment (grasp -> carry -> place -> release, or a held object's hold ->
+    reorient), the default arm first - the other arm too when it has no role besides the segment (``other_arm_roles`` empty: no
+    brace, push or hold planned) and the object is free (:func:`object_free`); ``generation.other_arm`` false switches it off.
+    Returns ``(arms, why the other arm is not offered or "")``. Which offered arm makes the segment is the orientation rule's choice
+    at the segment's first contact."""
+    arms = [default_arm(s)]
+    gen = getattr(s, "gen", None)
+    on = gen("other_arm", True) if callable(gen) else True
+    if on is False or str(on).strip().lower() in ("off", "false", "0", "no"):
+        return arms, "generation.other_arm is off"
+    if other_arm_roles:
+        return arms, f"the other arm has a role besides the segment: {', '.join(other_arm_roles)}"
+    if not (object_free(s, role) if free is None else free):
+        return arms, "the object is not free (articulated or attached at the goal)"
+    return arms + [RB.other_arm(arms[0])], ""
+
+
+def offered_arms(s, *, other_arm_roles: Sequence[str] = (), role: str = "target", free: Optional[bool] = None) -> List[str]:
+    """The arms of :func:`arm_offer`."""
+    return arm_offer(s, other_arm_roles=other_arm_roles, role=role, free=free)[0]
+
+
+def arm_offer_record(template_arms: Sequence[str], arms_here: Sequence[str], rec: GraspRecord, not_offered: str = "") -> Dict[str, Any]:
+    """``grasps[].arm_offer`` (fired / not fired, the oracle copies it into the notes of the segment's actions): ``fired`` when the
+    segment's first contact was offered to more than one arm; the arms offered for the template and at this segment's focus, the arm
+    that makes it and why (:func:`segment_arm_summary`), else why the other arm was not offered (the template's predicate, or its band
+    does not cover the focus)."""
+    s_arm = segment_arm_summary(rec, arms_here)
+    fired = len(arms_here) > 1
+    out = {"fired": fired, "template_arms": list(template_arms), "arms": list(arms_here), "arm": rec.arm, "reason": s_arm["reason"],
+           "against_default": s_arm["against_default"], "mirrored_band": s_arm["mirrored_band"]}
+    if not fired:
+        out["not_fired"] = not_offered or ("the other arm's band does not cover the focus" if len(template_arms) > 1 else "one arm offered")
+    return out
+
+
+def band_facts(bands: Optional[RB.ReachBands]) -> Optional[Dict[str, Any]]:
+    """What a record says about the band a choice used: its arm, file, and for a mirror its source."""
+    if bands is None:
+        return None
+    d: Dict[str, Any] = {"arm": bands.meta.get("arm", "right"), "path": bands.path}
+    if bands.meta.get("mirrored_from"):
+        d.update({"mirrored_from": bands.meta["mirrored_from"], "mirror_source": bands.meta.get("mirror_source")})
+    return d
+
+
+def arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None, edge: Optional[EdgeFrame] = None, bands: Optional[RB.ReachBands] = None) -> RB.ReachBands:
+    """``arm``'s reach band for the sampler's support and object (cached on ``s.bands_by_arm``): ``bands`` (default
+    :func:`ensure_bands`) when it is that arm's; else the arm's own band from the cache directories, else ``bands`` mirrored in
+    memory (``ReachBands.mirrored``: never written, never computed in-process - a missing default-arm band is computed as
+    before and then mirrored). The choice goes to ``template_facts["arm_bands"]``."""
+    base = bands if bands is not None else ensure_bands(s, spec, top=top, edge=edge)
+    if base.arm == arm:
+        return base
+    cache = s.__dict__.setdefault("bands_by_arm", {})
+    key = (arm, id(base))
+    if key in cache:
+        return cache[key]
+    m = base.meta
+    try:
+        own = RB.ReachBands.load(m.get("scene"), m.get("support"), m.get("object"), "generic" if m.get("generic_pinch") else m.get("grasp_key"),
+                                 placed=RB.canonical_placed(m), under=m.get("under_partner"), scale=m.get("scale"), arm=arm,
+                                 under_edge=None if m.get("mode") != "floor" else bool(m.get("under_edge")))
+        log.info("%s-arm reach band: %s", arm, own.path)
+    except FileNotFoundError:
+        own = base.mirrored()
+        log.info("%s-arm reach band: the %s band mirrored (%s)", arm, base.arm, base.path)
+    cache[key] = own
+    tf = getattr(s, "template_facts", None)
+    if isinstance(tf, dict):
+        tf.setdefault("arm_bands", {})[arm] = band_facts(own)
+    return own
+
+
+def arm_bands_for(s, arms: Sequence[str], **kw) -> Dict[str, RB.ReachBands]:
+    """``{arm: band}`` for ``arms`` (:func:`arm_band`), in their order."""
+    return {a: arm_band(s, a, **kw) for a in arms}
+
+
+def stance_for_arm(s, stance: Stance, arm: str) -> Optional[Stance]:
+    """``stance`` with ``arm`` as its one working arm: the stance itself when it already is, else a copy whose other arm idles in
+    the first recorded collision-free posture (A6: untucked, ready, tucked - the two arms' postures follow the joint sign map);
+    None when every idle posture collides."""
+    if stance.working_arms == [arm]:
+        return stance
+    st = stance.with_trunk(stance.translate, stance.tilt, stance.name)
+    st.arms, st.idle_posture = [arm], None
+    st.extras = dict(stance.extras)
+    if not bool(s.ikc.stances_collision_free([st])[0]):
+        return None
+    return st
+
+
+def adopt_arm(stance: Stance, arm_stance: Stance) -> None:
+    """Make ``stance`` (the caller's record) the stance of ``arm_stance``'s working arm and idle posture, in place."""
+    stance.arms, stance.idle_posture = list(arm_stance.arms), arm_stance.idle_posture
+
+
 def band_cells_world(bands: RB.ReachBands, stance: Stance, translate: Optional[float] = None, tilt: Optional[float] = None) -> th.Tensor:
     """The band cells of the grid trunk (same translate, nearest tilt) in the world at ``stance`` (robot-relative cells,
     §4.5 step 2 "band shifted with the stand-off")."""
@@ -1443,7 +1565,8 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
                                stand_offs: Sequence[float] = STAND_OFFS, translates: Sequence[float] = TRANSLATES, n_tilts: int = N_TILT_SAMPLES,
                                angle_classes_deg: Sequence[float] = ANGLE_CLASSES_DEG, margin: float = IN_FRAME_MARGIN, bands: Optional[RB.ReachBands] = None,
                                class1_when_deep_m: Optional[float] = None,
-                               top=None, erosion_extra: float = 0.02, focus_z: Optional[float] = None, order: Optional[str] = None) -> List[Stance]:
+                               top=None, erosion_extra: float = 0.02, focus_z: Optional[float] = None, order: Optional[str] = None,
+                               arm_bands: Optional[Dict[str, RB.ReachBands]] = None) -> List[Stance]:
     """§4.5: scan stand-off {0.35, 0.45, 0.55} x translate {0, …, 0.95} x tilt (0 → torso_joint3 limit, ``n_tilts`` samples)
     at the init edge and lateral; (1) whole-body collision check without objects; (2) band = the grid trunk with the
     same translate and nearest tilt, focus candidates = its cells inside the top eroded by ``target_half_extent`` +
@@ -1456,9 +1579,17 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     (W2, owner 2026-09-20 22:15; opt-in through the task's ``generation`` so the valid small-scale demos keep their uniform
     draw) returns the survivors sorted by the right arm's reach margin to their focus (stretched arm length minus the
     shoulder -> focus distance, 5 cm buckets, deepest margin first): the tallest torso bowing forward (translate 0,
-    tilt -0.6: the grasp 0.88 m out) comes last."""
+    tilt -0.6: the grasp 0.88 m out) comes last.
+
+    ``arm_bands`` (owner 2026-09-27, first-demo v2.2: ``{arm: band}`` of every arm offered for the segment, the default arm first):
+    the focus candidates are the cells of every offered arm's band (the other arm's band a mirror when it has no band of its
+    own), each survivor records in ``extras["focus_arms"]`` the arms whose band covers its focus, and ``order="reach"`` ranks by
+    whichever of those arms reaches better - so stances that suit the other arm reach the orientation chooser."""
     top = _top(s, top)
     bands = bands or ensure_bands(s, top=top, edge=init.edge)
+    arm_bands = {a: b for a, b in (arm_bands or {}).items() if b is not None}
+    if len(arm_bands) < 2:
+        arm_bands = {}
     fk = camera_fk(s)
     height = float(target_height) if target_height is not None else 2.0 * float(target_half_extent)
     cands: List[Stance] = []
@@ -1483,7 +1614,19 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     n_cells = 0
     diag: List[str] = []  # per trunk candidate: cells on the top, min axis angle, nearest focus (base frame) — for the cone question
     for st, cam in zip(cands, cams):
-        cells = band_cells_world(bands, st)
+        cell_arms: Dict[Tuple[float, float], List[str]] = {}
+        if arm_bands:
+            cells_l = []
+            for a, b in arm_bands.items():
+                for c in band_cells_world(b, st):
+                    k = (round(float(c[0]), 3), round(float(c[1]), 3))
+                    if k not in cell_arms:
+                        cell_arms[k] = []
+                        cells_l.append(c)
+                    cell_arms[k].append(a)
+            cells = th.stack(cells_l) if cells_l else th.zeros(0, 2)
+        else:
+            cells = band_cells_world(bands, st)
         if len(cells) == 0:
             continue
         keep = [c for c in cells if top.contains(c, erosion)]
@@ -1507,6 +1650,8 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
             c = st.with_trunk(st.translate, st.tilt, "manipulation")
             c.focus = focus
             c.extras.update({"axis_angle": ang, "angle_class": 0 if ang <= math.radians(angle_classes_deg[0]) else 1, "focus_info": info})
+            if arm_bands:
+                c.extras["focus_arms"] = list(cell_arms.get((round(float(focus_xy[0]), 3), round(float(focus_xy[1]), 3)), [next(iter(arm_bands))]))
             classes[c.extras["angle_class"]].append(c)
         if angs:
             a_min, f_min = min(angs, key=lambda t: t[0])
@@ -1522,8 +1667,9 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
         if min(depth0) > float(class1_when_deep_m):
             out = classes[0] + classes[1]
             which = f"0+1 (class-0 foci {min(depth0):.2f}–{max(depth0):.2f} m base-forward, all deeper than {float(class1_when_deep_m):.2f})"
-    log.info("phase 2: %d trunk candidates collision-free, %d (stance, focus) pairs within %.0f°, %d survivors in class %s", len(cands), n_cells,
-             float(angle_classes_deg[1]), len(out), which)
+    log.info("phase 2: %d trunk candidates collision-free, %d (stance, focus) pairs within %.0f°, %d survivors in class %s%s", len(cands), n_cells,
+             float(angle_classes_deg[1]), len(out), which,
+             "" if not arm_bands else " (focus in the band of " + ", ".join(f"{a}: {sum(1 for c in out if a in c.extras.get('focus_arms', []))}" for a in arm_bands) + ")")
     if diag and (not out or os.environ.get("ISG_PHASE2_DEBUG")):
         # ISG_PHASE2_DEBUG=1: the per-trunk view even with survivors (which trunks the cone / in-frame rule excludes)
         log.info("phase 2: per trunk candidate: %s", " | ".join(diag[:40]))
@@ -1531,41 +1677,46 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
             trunks = sorted({(round(float(c.stand_off or 0), 2), round(float(c.translate), 2), round(float(c.tilt), 2)) for c in out})
             log.info("phase 2: surviving (stand-off, translate, tilt): %s", trunks)
     if order == "reach" and out:
-        out = sorted(out, key=lambda c: -min(round(reach_margin(s, c, c.focus) / 0.05) * 0.05, 0.30))
+        out = sorted(out, key=lambda c: -min(round(best_reach_margin(s, c, c.focus, c.extras.get("focus_arms") or ("right",))[0] / 0.05) * 0.05, 0.30))
     return out
 
 
-def reach_margin(s, stance: Stance, point_world) -> float:
-    """Right arm's stretched length (kit FK, arm joints at zero; cached on the sampler) minus the shoulder -> ``point_world``
+def reach_margin(s, stance: Stance, point_world, arm: str = "right") -> float:
+    """``arm``'s stretched length (kit FK, arm joints at zero; cached on the sampler) minus the shoulder -> ``point_world``
     distance at the stance's URDF-clamped trunk (``conventions.torso_fk`` / ``torso_q`` with ``TORSO_JOINT_LIMITS``)."""
     from ispatialgym.oracle import r1pro_model as M
     from ispatialgym.sampling import geometry as G
-    if not hasattr(s, "_arm_len_right"):
+    lens = s.__dict__.setdefault("_arm_len", {}) if hasattr(s, "__dict__") else {}
+    if arm not in lens:
         q = s.kit.q_config(arms="untucked", translate=0.5, tilt=0.0)
-        q[s.kit.robot.arm_control_idx["right"]] = 0.0
-        fk = s.kit.fk(["torso_link4", M.EEF_LINK["right"]], q)
-        sh = G.compose(fk["torso_link4"], (th.as_tensor(C._SHOULDER_IN_TORSO4["right"], dtype=th.float32), G.IDENTITY_QUAT))[0]
-        s._arm_len_right = float(th.linalg.norm(fk[M.EEF_LINK["right"]][0] - sh))
-    sh_b = C.torso_fk(C.torso_q(float(stance.translate), float(stance.tilt), C.TORSO_JOINT_LIMITS))["right_shoulder"][0]
+        q[s.kit.robot.arm_control_idx[arm]] = 0.0
+        fk = s.kit.fk(["torso_link4", M.EEF_LINK[arm]], q)
+        sh = G.compose(fk["torso_link4"], (th.as_tensor(C._SHOULDER_IN_TORSO4[arm], dtype=th.float32), G.IDENTITY_QUAT))[0]
+        lens[arm] = float(th.linalg.norm(fk[M.EEF_LINK[arm]][0] - sh))
+    sh_b = C.torso_fk(C.torso_q(float(stance.translate), float(stance.tilt), C.TORSO_JOINT_LIMITS))[f"{arm}_shoulder"][0]
     x, y, yaw = (float(v) for v in stance.base_pose2d)
     cs, sn = math.cos(yaw), math.sin(yaw)
     sh_w = th.tensor([x + cs * float(sh_b[0]) - sn * float(sh_b[1]), y + sn * float(sh_b[0]) + cs * float(sh_b[1]), float(s.kit.floor_z) + C.NOMINAL_BASE_Z + float(sh_b[2])])
     p = th.as_tensor([float(v) for v in point_world], dtype=th.float32)
-    return s._arm_len_right - float(th.linalg.norm(p - sh_w))
+    return lens[arm] - float(th.linalg.norm(p - sh_w))
+
+
+def best_reach_margin(s, stance: Stance, point_world, arms: Sequence[str] = ("right",)) -> Tuple[float, str]:
+    """The largest :func:`reach_margin` to ``point_world`` over ``arms`` and its arm (the first arm on a tie): a stance ranked by
+    whichever arm reaches better (owner 2026-09-27)."""
+    best: Optional[Tuple[float, str]] = None
+    for a in arms:
+        m = reach_margin(s, stance, point_world, a)
+        if best is None or m > best[0] + 1e-9:
+            best = (m, a)
+    return best if best is not None else (reach_margin(s, stance, point_world), "right")
 
 
 # ----------------------------------------------------------------------------------------------------------------
 # Gripper symmetry: a library pinch or its twin (the eef turned π about the approach axis, the fingers swapped)
 # ----------------------------------------------------------------------------------------------------------------
 
-#: joint-limit margins (rad) above this compare equal: the twin wins on margin only when a chain comes close to a limit
-TWIN_MARGIN_CAP = 0.30
-#: hysteresis (rad): one capped margin decides only when it exceeds the other by more than this
-TWIN_MARGIN_GAIN = 0.10
-#: on equal margins the twin is recorded when its pre-grasp witness lies this much closer (rad, L-inf over the arm joints)
-#: to the configuration the arm starts from
-TWIN_SWING_TOL = 0.30
-#: the twin of a support-ignored grasp pose must keep the wrist camera's spheres this far above the support top (m)
+#: a support-ignored grasp pose (the row or its twin) must keep the wrist camera's spheres this far above the support top (m)
 TWIN_CAMERA_CLEARANCE_M = 0.005
 #: the wrist camera (``<arm>_realsense_link``), the one part of the hand that is not C2-symmetric about the approach axis: its
 #: cuRobo spheres in the eef frame (as ``iors_small.HAND_SPHERES_EEF["wrist camera"]``) and their radius (m)
@@ -1588,25 +1739,6 @@ def wrist_camera_clearance(eef: Pose, plane_z: float) -> float:
     return float(pts[:, 2].min()) - WRIST_CAMERA_SPHERE_R - float(plane_z)
 
 
-def twin_rule(row: Optional[Tuple[float, float]], twin: Optional[Tuple[float, float]]) -> Tuple[bool, str]:
-    """``(record the twin instead of the library row, why)``. ``row`` / ``twin`` = ``(joint-limit margin, swing)`` in rad of a
-    chain that passed every check, None for one that did not. Lexicographic: feasibility; the margin capped at
-    ``TWIN_MARGIN_CAP``, deciding only beyond ``TWIN_MARGIN_GAIN``; the twin's swing smaller by more than ``TWIN_SWING_TOL``;
-    otherwise the row."""
-    if twin is None:
-        return False, ("twin infeasible" if row is not None else "neither feasible")
-    if row is None:
-        return True, "row infeasible"
-    m, mt = min(float(row[0]), TWIN_MARGIN_CAP), min(float(twin[0]), TWIN_MARGIN_CAP)
-    if mt > m + TWIN_MARGIN_GAIN:
-        return True, "margin"
-    if m > mt + TWIN_MARGIN_GAIN:
-        return False, "margin"
-    if float(twin[1]) < float(row[1]) - TWIN_SWING_TOL:
-        return True, "continuity"
-    return False, "tie"
-
-
 @dataclass
 class TwinPick:
     """What :func:`pick_twin` chose. ``twin``: the recorded eef is the row's twin; ``grasp``: the library row or
@@ -1624,6 +1756,9 @@ class TwinPick:
     passed: bool
     other: Optional[Tuple[Any, Pose, Pose, Pose]]
     facts: Dict[str, Any]
+    #: the arm that makes the grasp and the stance it was solved at (its working arm; the other arm idles there)
+    arm: str = "right"
+    stance: Optional[Stance] = None
 
 
 def _count(s, key: str) -> None:
@@ -1635,102 +1770,469 @@ def _count(s, key: str) -> None:
 def _twin_side(d: Dict[str, Any]) -> str:
     src = f"{d['source']} " if d.get("source") else ""
     if d.get("margin_rad") is None:
-        return f"{src}fail: {str(d.get('reason', ''))[:120]}"
-    cam = "" if d.get("camera_clearance_m") is None else f" camera {d['camera_clearance_m'] * 1000:+.0f} mm"
-    verdict = "ok" if d.get("ok") else f"rejected ({d.get('reason', '')})"
-    return f"{src}{verdict} margin {d['margin_rad']:.3f} ({d.get('nearest_joint')}) swing {d['swing_rad']:.2f}{cam}"
+        return f"{src}fail: {str(d.get('why', d.get('reason', '')))[:120]}"
+    verdict = "ok" if d.get("ok") else f"rejected ({d.get('why', d.get('reason', ''))})"
+    return f"{src}{verdict} margin {d['margin_rad']:.3f} ({d.get('nearest_joint')}) reach {d.get('reach_rad')}"
 
 
 def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pre: Pose, res, exact_kw: Dict[str, Any], *,
-              support_z: Optional[float] = None, accept: Optional[Callable[[th.Tensor], bool]] = None, where: str = "") -> TwinPick:
+              support_z: Optional[float] = None, accept: Optional[Callable[[th.Tensor], bool]] = None, where: str = "",
+              row_allowed: bool = True, arms: Optional[Sequence[str]] = None, stances: Optional[Dict[str, Stance]] = None,
+              twins: bool = True) -> TwinPick:
     """The library pinch ``g`` drawn for a free object, or its twin (``conventions.twin_pose``: the same pinch with the fingers
-    swapped), by :func:`twin_rule`. ``eef_in_object`` is the row's ``T_obj→eef``, ``eef`` / ``pre`` its grasp / pre-grasp
-    poses and ``res`` their exact IK (``s.ikc.exact([pre, eef], stance, arm, **exact_kw)``; it may have failed).
+    swapped), by the orientation rule of :mod:`ispatialgym.sampling.v2.orient` (owner 2026-09-27: success, then joint-limit
+    safe, then easier to reach; the library row wins within ``orient.REACH_TOL``). ``eef_in_object`` is the row's
+    ``T_obj→eef``, ``eef`` / ``pre`` its grasp / pre-grasp poses and ``res`` their exact IK (``s.ikc.exact([pre, eef], stance,
+    arm, **exact_kw)``; it may have failed).
 
-    The twin's chain is solved with the same ``exact_kw``, from the row's pre-grasp witness mapped by ``IKChecker.twin_q``
-    when that is collision-free (source ``map``), else from scratch (``ik``). A solved row whose mapped chain could not win
-    keeps the row without a solve (``predicted``); a row rejected at the reach boundary (``ik_reach``) is final - the twin
-    has the same wrist centre (``skipped``). A chain passes when it solved, ``accept`` holds at its grasp configuration and,
-    given ``support_z`` (the support top ignored at the grasp pose), the wrist camera clears that top by
-    ``TWIN_CAMERA_CLEARANCE_M``. Only a passing twin is taken; otherwise the row stands with its own verdict. Margins are the
-    smallest arm joint-limit margin over the two witnesses, swings the L-inf distance of the pre-grasp witness from the
-    stance configuration (``IKChecker.q_locked``), where the pre-grasp transit starts."""
+    The twin's chain is solved with the same ``exact_kw``; each passing chain also offers the other finger assignment in its own
+    shoulder / elbow branch (``IKChecker.twin_q``, checked when it is the one to try). A row rejected at the reach boundary
+    (``ik_reach``) is final - the twin has the same wrist centre. A chain passes when it solved, ``accept`` holds at its grasp
+    configuration, given ``support_z`` (the support top ignored at the grasp pose) the wrist camera clears that top by
+    ``TWIN_CAMERA_CLEARANCE_M``, and the camera clears the world (``orient.camera_clear``). Margins are the smallest arm
+    joint-limit margin over the two witnesses, reach the largest joint change of the pre-grasp witness from the stance
+    configuration (``IKChecker.q_locked``), where the pre-grasp transit starts. ``row_allowed`` False (the caller bars the row by
+    name): the row is offered in no branch.
+
+    ``arms`` (owner 2026-09-27, first-demo v2.2; default ``[arm]``): the arms offered for the grasp's segment, the default arm
+    first; ``stances[a]`` is the stance with ``a`` working (default :func:`stance_for_arm`; an arm without a collision-free stance
+    is not offered). Both turns of every offered arm are proposals (``orient.with_arms``: within ``REACH_TOL`` the default arm,
+    then the row), each solved with its arm's IK at its arm's stance, each arm's reach from its own starting posture; ``res`` is
+    ``arm``'s row. The pick carries the chosen ``arm`` and its ``stance``; ``other`` is the chosen arm's other finger assignment."""
     from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.sampling.v2 import orient as O
 
     IK = _ik()
     ikc = s.ikc
-    idx = s.kit.robot.arm_control_idx[arm]
-    q_start = _t(ikc.q_locked(stance))[idx]
+    arms = list(arms) if arms else [arm]
+    st_of: Dict[str, Any] = {}
+    for a in arms:
+        if a == arm:
+            st_of[a] = (stances or {}).get(a, stance)
+            continue
+        st_a = (stances or {}).get(a) or stance_for_arm(s, stance, a)
+        if st_a is not None:
+            st_of[a] = st_a
+    arms = [a for a in arms if a in st_of]
+    multi = len(arms) > 1
+    q_start = {a: _t(ikc.q_locked(st_of[a])) for a in arms} if multi else _t(ikc.q_locked(st_of[arms[0]] if arms else stance))
     gt = GL.twin(g)
     eio_t = C.twin_pose((_t(eef_in_object[0]), _t(eef_in_object[1])))
     eef_t = C.twin_pose((_t(eef[0]), _t(eef[1])))
     pre_t = IK.pre_pose(eef_t)
+    row_name, twin_name = getattr(g, "name", None), gt.name
+    reach_limited = res is not None and (not res.ok) and str(res.reason).startswith("ik_reach")
 
-    def witness(p):
-        return ikc.solutions.get((arm, ikc._pose_key(p)))
-
-    def accepted(q_end) -> bool:
-        return accept is None or bool(accept(_t(q_end)))
-
-    def judge(solved: bool, q_pre, q_end, e: Pose, why: str, acc: bool) -> Tuple[Dict[str, Any], Optional[Tuple[float, float]]]:
-        cam = None if support_z is None else wrist_camera_clearance(e, float(support_z))
-        d: Dict[str, Any] = {"ok": False, "camera_clearance_m": None if cam is None else round(cam, 4)}
-        if not solved or q_end is None:
-            d["reason"] = str(why)[:160]
-            return d, None
-        m, jn = min((ikc.joint_limit_margin(_t(q), arm) for q in (q_pre, q_end) if q is not None), key=lambda mj: mj[0])
-        swing = float(th.max(th.abs(_t(q_pre if q_pre is not None else q_end)[idx] - q_start)))
-        d.update({"margin_rad": round(float(m), 4), "nearest_joint": jn, "swing_rad": round(swing, 3)})
+    def evaluate(p) -> Tuple[bool, Any, Optional[List[th.Tensor]], str]:
+        side, a = p.payload[0], p.arm
+        if side == "row" and p.q_first is None and a == arm and res is not None:
+            if not row_allowed and res.ok:
+                return False, None, None, "the row is barred by the caller"
+            r = res
+        elif side == "row" and not row_allowed:
+            return False, None, None, "the row is barred by the caller"
+        elif reach_limited and a == arm and side == "twin":
+            return False, None, None, "the row failed at the arm's reach boundary; the twin has the same wrist centre"
+        else:
+            kw = dict(exact_kw)
+            if p.q_first is not None:
+                kw.update({"q_first": p.q_first, "cache": False})
+            _count(s, "twin_solves")
+            r = ikc.exact(p.chain, st_of[a], a, **kw)
+        if not r.ok or r.q is None:
+            return False, r, None, str(r.reason)
+        cam = None if support_z is None else wrist_camera_clearance(p.chain[-1], float(support_z))
         if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M:
-            d["reason"] = f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
-            return d, None
-        if not acc:
-            d["reason"] = "fails the caller's check"
-            return d, None
-        d["ok"] = True
-        return d, (float(m), swing)
+            return False, r, None, f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
+        if accept is not None and not bool(accept(_t(r.q))):
+            return False, r, None, "fails the caller's check"
+        return True, r, None, ""
 
     _count(s, "twin_picks")
-    q_pre_row = witness(pre)
-    row_acc = bool(res.ok and res.q is not None and accepted(res.q))
-    row_f, row_s = judge(res.ok, q_pre_row, res.q, eef, res.reason, row_acc)
-    q_pre_map = ikc.twin_q(q_pre_row, arm)
-    twin_s, res_t = None, None
-    if not res.ok and str(res.reason).startswith("ik_reach"):
-        twin_f = {"ok": False, "source": "skipped", "reason": "the row failed at the arm's reach boundary; the twin has the same wrist centre"}
-        take, why = False, "twin skipped"
-    else:
-        twin_f = None
-        q_end_map = ikc.twin_q(res.q, arm) if res.ok else None
-        if res.ok and q_pre_map is not None and q_end_map is not None:
-            pf, ps = judge(True, q_pre_map, q_end_map, eef_t, "", accepted(q_end_map))
-            take, why = twin_rule(row_s, ps)
-            if not take:
-                twin_f = dict(pf, source="predicted")
-        if twin_f is None:
-            seed = q_pre_map if q_pre_map is not None and ikc._witness_ok(q_pre_map, pre_t, arm) else None
-            kw = dict(exact_kw)
-            if seed is not None:
-                kw.update({"q_first": seed, "cache": False})
-            _count(s, "twin_solves")
-            res_t = ikc.exact([pre_t, eef_t], stance, arm, **kw)
-            twin_f, twin_s = judge(res_t.ok, witness(pre_t), res_t.q, eef_t, res_t.reason,
-                                   bool(res_t.ok and res_t.q is not None and accepted(res_t.q)))
-            twin_f["source"] = "map" if seed is not None else "ik"
-            take, why = twin_rule(row_s, twin_s)
-    facts = {"stage": where, "chosen": "twin" if take else "row", "reason": why, "row": dict(row_f, name=getattr(g, "name", None)),
-             "twin": dict(twin_f, name=gt.name)}
-    _count(s, f"twin_source.{twin_f.get('source')}")
+    turns = lambda: [O.Proposal(str(row_name), 0, ("row", g, eef_in_object, eef, pre), [pre, eef])] + (  # noqa: E731
+        [O.Proposal(str(twin_name), 1, ("twin", gt, eio_t, eef_t, pre_t), [pre_t, eef_t])] if twins else [])
+    props = O.with_arms([(a, turns()) for a in arms]) if arms else []
+    chosen, decision = O.choose(ikc, arm, props, evaluate, q_start, stage=f"grasp {where}".strip())
+    opts = decision["options"]
+    c_arm = chosen.proposal.arm if chosen is not None else (arms[0] if arms else arm)
+    lab = (lambda name: f"{c_arm}:{name}") if multi else (lambda name: str(name))  # noqa: E731
+
+    def side(label: str) -> Dict[str, Any]:
+        """The chosen configuration for the chosen assignment, the caller's / fresh solve for the other."""
+        if chosen is not None and chosen.proposal.label == label:
+            return chosen.facts()
+        return next((dict(o) for o in opts if o["label"] == label and o["source"] == "ik"), {"ok": False})
+
+    take = chosen is not None and chosen.proposal.payload[0] == "twin"
+    why = decision["reason"] if chosen is not None else "neither feasible"
+    facts = {"stage": where, "arm": c_arm, "chosen": "twin" if take else "row", "reason": why, "source": decision["source"],
+             "row": dict(side(lab(row_name)), name=row_name), "twin": dict(side(lab(twin_name)), name=twin_name), "orient": decision}
+    if multi:
+        facts["arm_choice"] = decision.get("arm_choice")
     if take:
         _count(s, "twin_taken")
         _count(s, f"twin_taken.{why.replace(' ', '_')}")
-    log.info("grasp twin [%s] %s (%s, %s) | row %s: %s | twin %s: %s", where, gt.name if take else getattr(g, "name", None), facts["chosen"], why,
-             getattr(g, "name", None), _twin_side(row_f), gt.name, _twin_side(twin_f))
+    log.info("grasp twin [%s] %s (%s, %s%s) | row %s: %s | twin %s: %s%s", where, twin_name if take else row_name, facts["chosen"], why,
+             ", wrist-flipped branch" if decision["source"] == "map" else "", row_name, _twin_side(facts["row"]), twin_name, _twin_side(facts["twin"]),
+             f" | {c_arm} arm of {arms} ({(decision.get('arm_choice') or {}).get('reason')})" if multi else "")
+    ok_labels = {o["label"] for o in opts if o.get("ok") and not o.get("predicted")}
+    st_c = st_of.get(c_arm, stance)
+    if chosen is None:
+        # the row's own verdict: its IK failure, or the check it failed after solving (camera, the caller's check)
+        failed = res if (res is not None and not res.ok) else IK.IKResult(False, None, str(facts["row"].get("why") or "the row fails the camera / caller's check"), 2)
+        return TwinPick(False, g, eef_in_object, eef, pre, failed, False, None, facts, c_arm, st_c)
     if take:
-        other = (g, eef_in_object, eef, pre) if row_acc else None
-        return TwinPick(True, gt, eio_t, eef_t, pre_t, res_t, True, other, facts)
-    other = (gt, eio_t, eef_t, pre_t) if twin_s is not None else None
-    return TwinPick(False, g, eef_in_object, eef, pre, res, row_acc, other, facts)
+        other = (g, eef_in_object, eef, pre) if lab(row_name) in ok_labels else None
+        return TwinPick(True, gt, eio_t, eef_t, pre_t, chosen.result, True, other, facts, c_arm, st_c)
+    other = (gt, eio_t, eef_t, pre_t) if lab(twin_name) in ok_labels else None
+    return TwinPick(False, g, eef_in_object, eef, pre, chosen.result, True, other, facts, c_arm, st_c)
+
+
+class TurnNotOffered(Exception):
+    """Raised by a task module's ``turn_recheck`` when it cannot re-check the other finger assignment of a recorded pinch; the
+    message is recorded as the reason (:func:`held_turns`: not offered)."""
+
+
+#: the fields of a ``GraspRecord`` its finger assignment decides (:func:`flip_grasp`)
+_TURN_FIELDS = ("grasp_name", "finger_q", "eef_in_object", "pre_grasp", "grasp", "pre_place", "place", "carry", "waypoints", "extras")
+#: a row the draw itself barred (``pick_twin(row_allowed=False)`` / the caller's name rule): never offered back by :func:`held_turns`
+_BARRED = ("excluded by name", "the row is barred by the caller")
+
+
+def flip_grasp(g) -> Dict[str, Any]:
+    """Record ``g`` as the other finger assignment of its pinch: every eef pose it holds turned pi about its approach axis
+    (``conventions.twin_pose`` - the carry and in-hand waypoints too: the SLERP of two twins is the twin of the SLERP),
+    ``conventions.twin_name``, ``finger_q`` reversed, ``wrist_flip`` toggled. Returns the fields as they were
+    (:func:`unflip_grasp`; flipping twice negates the quaternions, which the IK memory's pose keys tell apart)."""
+    was = {k: getattr(g, k) for k in _TURN_FIELDS}
+
+    def tw(p):
+        return None if p is None else C.twin_pose((_t(p[0]), _t(p[1])))
+
+    g.grasp_name = C.twin_name(str(g.grasp_name))
+    g.finger_q = None if g.finger_q is None else list(reversed(list(g.finger_q)))
+    for k in ("eef_in_object", "pre_grasp", "grasp", "pre_place", "place"):
+        setattr(g, k, tw(getattr(g, k)))
+    for k in ("carry", "waypoints"):
+        setattr(g, k, None if getattr(g, k) is None else [tw(p) for p in getattr(g, k)])
+    g.extras = dict(g.extras, wrist_flip=not bool(g.extras.get("wrist_flip")))
+    return was
+
+
+def unflip_grasp(g, was: Dict[str, Any]) -> None:
+    """Put back the fields :func:`flip_grasp` returned (the very objects)."""
+    for k, v in was.items():
+        setattr(g, k, v)
+
+
+def _held_snapshot(s, draft) -> Dict[str, Any]:
+    """Everything :func:`held_turns`' re-check of the other assignment may write besides the grasp record: the program check's
+    witnesses and the travel records' ``arms_q`` (``program_check.choose_departure_arms``), the waypoint policy and the carry facts
+    (``verify_carry_legs``), the summary, the carry configurations and the IK memory."""
+    sc = s.sidecar
+    recs = list(getattr(sc, "paths", []) or []) + list(getattr(sc, "transitions", []) or [])
+    return {"ik_witnesses": list(sc.ik_witnesses or []), "waypoint_policy": sc.waypoint_policy, "paths": list(getattr(sc, "paths", []) or []),
+            "transitions": list(getattr(sc, "transitions", []) or []), "records": [(r, {k: (dict(v) if isinstance(v, dict) else v) for k, v in vars(r).items()}) for r in recs],
+            "summary": dict(draft.summary), "solutions": dict(s.ikc.solutions),
+            "carry": {k: dict(getattr(s, k)) for k in ("carry_arm_q", "carry_end_q") if isinstance(getattr(s, k, None), dict)}}
+
+
+def _held_restore(s, draft, snap: Dict[str, Any]) -> None:
+    sc = s.sidecar
+    sc.ik_witnesses, sc.waypoint_policy = snap["ik_witnesses"], snap["waypoint_policy"]
+    if hasattr(sc, "paths"):
+        sc.paths[:] = snap["paths"]
+    if hasattr(sc, "transitions"):
+        sc.transitions[:] = snap["transitions"]
+    for r, d in snap["records"]:
+        vars(r).update(d)
+    draft.summary.clear()
+    draft.summary.update(snap["summary"])
+    s.ikc.solutions.clear()
+    s.ikc.solutions.update(snap["solutions"])
+    for k, d in snap["carry"].items():
+        getattr(s, k).clear()
+        getattr(s, k).update(d)
+
+
+def _turn_scored(O, ikc, label: str, chain: Optional[Dict[str, Any]], q_start: Optional[th.Tensor], arm: str, source: str, why: str = ""):
+    """``orient.Scored`` of one finger assignment from its ``program_check.turn_chain``: margin = the smallest over its pick and
+    held chain, reach = the largest arm-joint change of its recorded pre-grasp witness from the stance configuration."""
+    ok = chain is not None and chain.get("margin") is not None
+    q_pre = chain.get("q_pre") if chain else None
+    reach = O.reach(ikc, th.as_tensor(q_pre, dtype=th.float32), q_start, arm) if (q_pre is not None and q_start is not None) else None
+    return O.Scored(O.Proposal(label, 1 if C.split_twin(label)[1] else 0, None, [], source=source, arm=arm), ok, margin=chain.get("margin") if ok else None,
+                    nearest=chain.get("joint") if ok else None, reach=reach, why=why)
+
+
+def held_turns(s, draft, report: Dict[str, Any], rerun: Callable[[], Dict[str, Any]]) -> Dict[str, Any]:
+    """The orientation rule of :mod:`ispatialgym.sampling.v2.orient` over the whole chain a library pinch decides (owner 2026-09-27:
+    count the carry / pre-place / place configurations in the joint-limit ranking; ranking only). :func:`pick_twin` scored the pick
+    alone, but the grasp also decides the configurations the program check tracks from its witness: the lift, an in-hand reorient,
+    the carry, the pre-place, the descent and the place (``program_check.turn_chain``; the place's release retreat keeps the oracle's
+    own 0.05 rad joint-limit box, never past its start, and is left out). ``report`` = the program check of the recorded assignment.
+    A record whose chain there is joint-limit safe (every configuration >= ``IKChecker.JOINT_LIMIT_MARGIN``) is left alone - the
+    rule ranks it first anyway. Otherwise the record is flipped to its other finger assignment (:func:`flip_grasp`), which must pass
+    the task module's turn checks (``s.turn_recheck(draft, grasp, q_first)``, started from the recorded pre-grasp witness
+    wrist-flipped), the carry legs (``s.verify_carry_legs``) and the program check again (``rerun``); the two are ordered by
+    ``orient.prefer`` on the whole chain - safe first, neither safe: more clearance (``orient.CLEARANCE_EQ``), then the smaller reach
+    of the recorded pre-grasp witness from the stance configuration, the generator's order (the library row first) within
+    ``orient.REACH_TOL``. When the other assignment fails a check or is not preferred, the grasp record, the witnesses, the travel
+    records, the waypoint policy, the summary, the carry configurations and the IK memory are put back exactly: a draw is never
+    rejected here. Not offered (recorded with the reason): a row the draw barred, a task module without ``turn_recheck``, one that
+    raises :class:`TurnNotOffered`. The decision is ``twin_choice.held`` on the grasp record plus an ``orient [held chain, <arm> arm]``
+    log line in the format of ``orient.choose``; kit counters ``held_turn_checks`` / ``held_turn_switched`` / ``held_turn_kept`` /
+    ``held_turn_not_offered`` (``held_turn_errors``: a fault of this step, which then keeps the recorded assignment too). Returns the
+    program-check report the sidecar keeps."""
+    for g in list(s.sidecar.grasps):
+        flipped: Dict[str, Any] = {}
+        try:
+            report = _held_turn(s, draft, g, report, rerun, flipped)
+        except Exception as e:  # noqa: BLE001 - the rule only ranks: a fault here keeps the recorded assignment and the instance
+            if flipped:
+                unflip_grasp(g, flipped["was"])
+                _held_restore(s, draft, flipped["snap"])
+            _count(s, "held_turn_errors")
+            log.warning("held chain [%s]: %r - the recorded assignment %s stays", g.object, e, g.grasp_name)
+    return report
+
+
+def _held_turn(s, draft, g, report: Dict[str, Any], rerun: Callable[[], Dict[str, Any]], flipped: Dict[str, Any]) -> Dict[str, Any]:
+    """:func:`held_turns` for one grasp record; ``flipped`` holds ``was`` / ``snap`` while the record stands flipped and uncommitted."""
+    import functools
+
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import orient as O
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    tc = g.extras.get("twin_choice")
+    if not isinstance(tc, dict) or not g.grasp_name:
+        return report
+    safe = float(s.ikc.JOINT_LIMIT_MARGIN)
+    mine = PC.turn_chain(report, g.object)
+    if mine["margin"] is None or mine["margin"] >= safe:
+        return report
+    _count(s, "held_turn_checks")
+    stance = s.sidecar.stances.get(g.stance)
+    q_start = _t(s.ikc.q_locked(stance)) if stance is not None else None
+    label0, label1 = str(g.grasp_name), C.twin_name(str(g.grasp_name))
+    a = _turn_scored(O, s.ikc, label0, mine, q_start, g.arm, "recorded")
+    base = {"stage": "held chain", "arm": g.arm, "recorded": label0, "safe_margin_rad": round(safe, 4), "actions": list(mine["actions"])}
+    barred = str((tc.get("row") or {}).get("why") or "") if C.split_twin(label0)[1] else ""  # only a row is ever barred
+    recheck = getattr(s, "turn_recheck", None)
+    why_not = f"the draw barred it ({barred})" if barred in _BARRED else (None if recheck is not None else "no turn re-check in this task module")
+    b, rep2, why, theirs = None, None, "", None
+    if why_not is None:
+        q_first = None
+        if mine["q_pre"] is not None and q_start is not None:
+            q_rec = q_start.clone()
+            idx = s.kit.robot.arm_control_idx[g.arm]
+            q_rec[idx] = th.as_tensor(mine["q_pre"], dtype=th.float32)[idx]
+            q_first = s.ikc.twin_q(q_rec, g.arm)
+        flipped["snap"] = _held_snapshot(s, draft)
+        flipped["was"] = flip_grasp(g)
+        try:
+            why = recheck(draft, g, q_first=q_first) or ""
+            if not why:
+                g.carry = None  # this assignment's carry leg is screened afresh
+                s.verify_carry_legs(draft)
+                rep2 = rerun()
+        except TurnNotOffered as e:
+            why_not = str(e) or "the task module cannot re-check it"
+        except Reject as e:
+            why = str(e)[:200]  # "[<reason>] <message>"
+        except Exception as e:  # noqa: BLE001 - the recorded assignment stays; a failed re-check never costs the instance
+            why = f"re-check raised {e!r}"[:200]
+        theirs = PC.turn_chain(rep2, g.object) if rep2 is not None else None
+        if rep2 is not None and theirs["margin"] is None:
+            why = "the program check left no witnesses of its chain"
+        source = "ik"
+        if q_first is not None and theirs is not None and theirs["q_pre"] is not None:
+            idx = s.kit.robot.arm_control_idx[g.arm]
+            if float((th.as_tensor(theirs["q_pre"], dtype=th.float32)[idx] - q_first[idx]).abs().max()) < 1e-2:
+                source = "map"  # the chain left from the recorded pre-grasp witness wrist-flipped
+        b = _turn_scored(O, s.ikc, label1, theirs if not why else None, q_start, g.arm, source, why=why)
+    if why_not is not None:
+        if flipped:
+            unflip_grasp(g, flipped.pop("was"))
+            _held_restore(s, draft, flipped.pop("snap"))
+        opts = [dict(a.facts(), where=mine["where"]), {"label": label1, "arm": g.arm, "ok": False, "why": f"not offered: {why_not}"[:200]}]
+        tc["held"] = dict(base, status="not offered", chosen=label0, reason=None, why=why_not, against_default=a.proposal.rank > 0, options=opts)
+        _count(s, "held_turn_not_offered")
+        log.info("orient [held chain, %s arm] %s (not offered) | %s | %s not offered: %s", g.arm, label0, O._side(opts[0]), label1, why_not[:120])
+        return report
+    pool = sorted([x for x in (a, b) if x.ok], key=functools.cmp_to_key(O.prefer))
+    chosen = pool[0]
+    reason = O.reason(chosen, pool[1:])
+    switched = chosen is b
+    opts = [dict(a.facts(), where=mine["where"]), dict(b.facts(), **({"where": theirs["where"]} if b.ok else {}))]
+    held = dict(base, status="switched" if switched else "kept", chosen=chosen.proposal.label, reason=reason, against_default=chosen.proposal.rank > 0,
+                options=opts, **({"why": why} if why else {}))
+    log.info("orient [held chain, %s arm] %s (%s%s)%s | %s", g.arm, chosen.proposal.label, reason, ", wrist-flipped branch" if chosen.proposal.source == "map" else "",
+             " AGAINST the generator's order" if chosen.proposal.rank > 0 else "", " | ".join(O._side(o) for o in opts))
+    if not switched:
+        unflip_grasp(g, flipped.pop("was"))
+        _held_restore(s, draft, flipped.pop("snap"))
+        tc["held"] = held
+        _count(s, "held_turn_kept")
+        return report
+    flipped.clear()  # committed: the other assignment is the record now
+    tc["held"] = held
+    tc["chosen"] = "twin" if C.split_twin(label1)[1] else "row"
+    if isinstance(draft.summary.get("grasp"), dict):
+        draft.summary["grasp"] = dict(draft.summary["grasp"], name=label1)
+    _count(s, "held_turn_switched")
+    return rep2
+
+
+def held_arms(s, draft, report: Dict[str, Any], rerun: Callable[[], Dict[str, Any]]) -> Dict[str, Any]:
+    """The arm of a segment ranked on its whole held chain (owner 2026-09-27, first-demo v2.2: the arm is ordered "as for the wrist
+    turn", joint-limit safe over every configuration of the segment's chains; ranking only, after :func:`held_turns`).
+
+    Predicate (side-effect free: it reads the grasp record and the program-check report): a grasp record whose arm choice left
+    another viable arm (:func:`fallback_arms`) and whose held chain (``program_check.turn_chain``) is below
+    ``IKChecker.JOINT_LIMIT_MARGIN``. When it does not fire nothing changes (``arm_offer.held_chain`` says why). When it fires the
+    segment is switched to the other arm (the module's ``arm_switch(draft, grasp, arm)``: its stances take that arm as their working
+    arm and their travel is recorded again), the grasp is re-checked with that arm (``turn_recheck``; the recorded finger assignment,
+    then the other one when that fails), the carry legs and the program check run again, and ``orient.prefer`` orders the two
+    segments on the whole chain (safe, more clearance, the reach of each arm's recorded pre-grasp witness from that arm's own
+    stance posture; the default arm within ``orient.REACH_TOL``). The loser is put back exactly - grasp record, stances, travel
+    records, witnesses, summary, carry configurations, IK memory - and a draw is never rejected here. Not offered (recorded): a
+    module without ``arm_switch`` / ``turn_recheck``, or one that raises :class:`TurnNotOffered`. Records ``twin_choice.held_arm``,
+    ``arm_offer.held_chain``, the log ``orient [held chain, arms] ...``, kit ``held_arm_checks`` / ``_switched`` / ``_kept`` /
+    ``_not_offered`` / ``_errors``."""
+    for g in list(s.sidecar.grasps):
+        state: Dict[str, Any] = {}
+        try:
+            report = _held_arm(s, draft, g, report, rerun, state)
+        except Exception as e:  # noqa: BLE001 - the rule only ranks: a fault here keeps the recorded segment and the instance
+            if state:
+                _held_arm_restore(s, draft, g, state)
+            _count(s, "held_arm_errors")
+            log.warning("held chain [%s]: %r - the recorded %s arm stays", g.object, e, g.arm)
+    return report
+
+
+def _held_arm_snapshot(s, draft, g) -> Dict[str, Any]:
+    return {"snap": _held_snapshot(s, draft), "grasp": {k: getattr(g, k) for k in _TURN_FIELDS + ("arm",)},
+            "stances": {n: (st.arms, st.idle_posture) for n, st in s.sidecar.stances.items()}}
+
+
+def _held_arm_restore(s, draft, g, state: Dict[str, Any]) -> None:
+    for k, v in state["grasp"].items():
+        setattr(g, k, v)
+    for n, (arms, idle) in state["stances"].items():
+        st = s.sidecar.stances.get(n)
+        if st is not None:
+            st.arms, st.idle_posture = arms, idle
+    _held_restore(s, draft, state["snap"])
+    state.clear()
+
+
+def _held_arm(s, draft, g, report: Dict[str, Any], rerun: Callable[[], Dict[str, Any]], state: Dict[str, Any]) -> Dict[str, Any]:
+    """:func:`held_arms` for one grasp record; ``state`` holds the snapshot while the segment stands switched and uncommitted."""
+    import functools
+
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import orient as O
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    offer = g.extras.get("arm_offer") if isinstance(g.extras.get("arm_offer"), dict) else None
+    others = fallback_arms(g)
+    if not others:
+        if offer is not None:
+            offer["held_chain"] = {"fired": False, "why": "no other viable arm recorded at the grasp"}
+        return report
+    safe = float(s.ikc.JOINT_LIMIT_MARGIN)
+    mine = PC.turn_chain(report, g.object)
+    if mine["margin"] is None or mine["margin"] >= safe:
+        if offer is not None:
+            offer["held_chain"] = {"fired": False, "why": "the held chain is joint-limit safe" if mine["margin"] is not None else "no held chain witnesses"}
+        return report
+    _count(s, "held_arm_checks")
+    default = default_arm(s)
+    arm0, arm1 = g.arm, others[0]
+    stance = s.sidecar.stances.get(g.stance)
+    q_start0 = _t(s.ikc.q_locked(stance)) if stance is not None else None
+
+    def scored(arm: str, chain: Optional[Dict[str, Any]], q_start, source: str, why: str = ""):
+        ok = chain is not None and chain.get("margin") is not None
+        q_pre = chain.get("q_pre") if chain else None
+        reach = O.reach(s.ikc, th.as_tensor(q_pre, dtype=th.float32), q_start, arm) if (q_pre is not None and q_start is not None) else None
+        return O.Scored(O.Proposal(f"{arm}:{g.grasp_name}", 0 if arm == default else 1, None, [], source=source, arm=arm), ok,
+                        margin=chain.get("margin") if ok else None, nearest=chain.get("joint") if ok else None, reach=reach, why=why)
+
+    a = scored(arm0, mine, q_start0, "recorded")
+    base = {"stage": "held chain", "recorded": arm0, "other": arm1, "safe_margin_rad": round(safe, 4), "actions": list(mine["actions"])}
+    switch, recheck = getattr(s, "arm_switch", None), getattr(s, "turn_recheck", None)
+    why_not = None if (switch is not None and recheck is not None) else "no arm switch / turn re-check in this task module"
+    b, rep2, why, theirs, q_start1 = None, None, "", None, None
+    if why_not is None:
+        state.update(_held_arm_snapshot(s, draft, g))
+        g.extras = dict(g.extras)  # the re-checks write into the record's extras: the snapshot keeps the recorded dict
+        try:
+            why = switch(draft, g, arm1) or ""
+            if not why:
+                g.arm = arm1
+                why = recheck(draft, g, q_first=None) or ""
+                if why:
+                    was = flip_grasp(g)
+                    why2 = recheck(draft, g, q_first=None) or ""
+                    if why2:
+                        unflip_grasp(g, was)
+                        why = f"{why}; the other finger assignment: {why2}"
+                    else:
+                        why = ""
+            if not why:
+                g.carry = None  # this segment's carry leg is screened afresh
+                s.verify_carry_legs(draft)
+                rep2 = rerun()
+        except TurnNotOffered as e:
+            why_not = str(e) or "the task module cannot switch the arm"
+        except Reject as e:
+            why = str(e)[:200]
+        except Exception as e:  # noqa: BLE001 - the recorded segment stays; a failed re-check never costs the instance
+            why = f"re-check raised {e!r}"[:200]
+        st1 = s.sidecar.stances.get(g.stance)
+        q_start1 = _t(s.ikc.q_locked(st1)) if (st1 is not None and why_not is None) else None
+        theirs = PC.turn_chain(rep2, g.object) if rep2 is not None else None
+        if rep2 is not None and theirs["margin"] is None:
+            why = "the program check left no witnesses of its chain"
+        b = scored(arm1, theirs if not why else None, q_start1, "ik", why=why)
+    if why_not is not None:
+        if state:
+            _held_arm_restore(s, draft, g, state)
+        opts = [dict(a.facts(), where=mine["where"]), {"label": f"{arm1}:{g.grasp_name}", "arm": arm1, "ok": False, "why": f"not offered: {why_not}"[:200]}]
+        rec = dict(base, status="not offered", chosen=arm0, reason=None, why=why_not, options=opts)
+        _count(s, "held_arm_not_offered")
+        log.info("orient [held chain, arms] %s arm (not offered) | %s | %s arm not offered: %s", arm0, O._side(opts[0]), arm1, why_not[:120])
+    else:
+        pool = sorted([x for x in (a, b) if x.ok], key=functools.cmp_to_key(O.prefer))
+        chosen = pool[0]
+        reason = O.reason(chosen, pool[1:])
+        switched = chosen is b
+        opts = [dict(a.facts(), where=mine["where"]), dict(b.facts(), **({"where": theirs["where"]} if b.ok else {}))]
+        rec = dict(base, status="switched" if switched else "kept", chosen=chosen.proposal.arm, reason=reason, against_default=chosen.proposal.arm != default,
+                   options=opts, **({"why": why} if why else {}))
+        log.info("orient [held chain, arms] %s arm (%s)%s | %s", chosen.proposal.arm, reason, " AGAINST the default arm" if chosen.proposal.arm != default else "",
+                 " | ".join(O._side(o) for o in opts))
+        if not switched:
+            _held_arm_restore(s, draft, g, state)
+            _count(s, "held_arm_kept")
+        else:
+            state.clear()  # committed: the other arm makes the segment now
+            _count(s, "held_arm_switched")
+            report = rep2
+    tc = g.extras.setdefault("twin_choice", {})
+    tc["held_arm"] = rec
+    offer = g.extras.get("arm_offer") if isinstance(g.extras.get("arm_offer"), dict) else None
+    if offer is not None:
+        offer["held_chain"] = {"fired": True, "status": rec["status"], "why": rec.get("why") or rec.get("reason")}
+        if rec["status"] == "switched":
+            offer.update({"arm": g.arm, "reason": "held chain", "against_default": g.arm != offer.get("template_arms", [default])[0]})
+    if rec["status"] == "switched" and isinstance(draft.summary.get("arm"), dict):
+        draft.summary["arm"] = dict(draft.summary["arm"], arm=g.arm, reason="held chain", against_default=g.arm != default)
+    return report
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1741,7 +2243,8 @@ def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pr
 def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor, rest_quat, ignore_for_grasp: Sequence[Any], *, top=None,
                   support_z: Optional[float] = None, margin: float = SUPPORT_MARGIN, focus_radius: float = FOCUS_RADIUS, yaws: Sequence[float] = YAWS,
                   arm: str = "right", object_name: Optional[str] = None, scale_key: Any = None, eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
-                  bands: Optional[RB.ReachBands] = None, jitter: float = YAW_JITTER, n_positions: int = 5) -> Tuple[Pose, GraspRecord]:
+                  bands: Optional[RB.ReachBands] = None, jitter: float = YAW_JITTER, n_positions: int = 5, arms: Optional[Sequence[str]] = None,
+                  arm_bands: Optional[Dict[str, RB.ReachBands]] = None) -> Tuple[Pose, GraspRecord]:
     """§4.6 step 1: screen the 8 fixed yaws x ``grasps`` at the focus cell (12-seed IK from ``manip``, support ignored for
     the grasp pose only) -> feasible set F (stored in the band cache under (trunk, cell); empty F removes the cell);
     draw (yaw, grasp) uniformly from F, jitter ±22.5°, place the object within 5 cm of the focus with its footprint on
@@ -1749,7 +2252,13 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     object pose ∘ T_obj→eef and pre-grasp 10 cm back, confirm both with the exact IK; next element of F without
     replacement on failure; ``Reject("grasp_unreachable")`` when F is exhausted. With ``generation.grasp_twins`` each drawn
     pinch may be recorded as its twin (:func:`pick_twin`; extras ``wrist_flip`` / ``twin_choice``). Returns the object pose
-    and the ``GraspRecord`` (``yaw``, ``grasp_key``, ``grasp_name``, both eef poses, ``eef_in_object``)."""
+    and the ``GraspRecord`` (``yaw``, ``grasp_key``, ``grasp_name``, both eef poses, ``eef_in_object``).
+
+    ``arms`` (owner 2026-09-27, first-demo v2.2; default ``[arm]``): the arms offered for the target's segment, the default arm
+    first (the caller offers the other arm only where its band covers the focus). F is screened per arm at the arm's stance
+    (:func:`stance_for_arm`) and stored in that arm's band (``arm_bands``; a mirrored band keeps it in memory); the draw is
+    uniform over the union, and at the drawn pose the arms whose F holds the pair compete with both turns (:func:`pick_twin`).
+    The record carries the chosen arm; ``manip`` is switched to that arm's working arm and idle posture in place."""
     IK = _ik()
     top = _top(s, top)
     z = float(support_z) if support_z is not None else float(top.z)
@@ -1760,20 +2269,52 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     eef_of = eef_of_grasp or (lambda g: g.pose)
     grasps = list(grasps)
     twins = grasp_twins_on(s)
+    offered = list(arms) if arms else [arm]
+    st_of: Dict[str, Any] = {}
+    if offered == [arm]:
+        st_of[arm] = manip
+    for a in (offered if not st_of else []):
+        st_a = manip if (a == offered[0] and (not manip.working_arms or manip.working_arms == [a])) else stance_for_arm(s, manip, a)
+        if st_a is not None:
+            st_of[a] = st_a
+        else:
+            log.info("phase3_target: no collision-free idle posture for the %s arm with the %s arm working; not offered", RB.other_arm(a), a)
+    offered = [a for a in offered if a in st_of]
+    if not offered:
+        _reject("stance_collision", f"no offered arm has a collision-free stance at the focus ({arms or [arm]})")
+    band_of = {a: (arm_bands or {}).get(a) for a in offered}
+    if band_of.get(offered[0]) is None:
+        band_of[offered[0]] = bands or getattr(s, "bands", None)
 
     def pose_at(cell, yaw):
         return object_pose_on(s, hull, rest_quat, cell, yaw, z)
 
-    F = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, manip, arm, list(ignore_for_grasp), eef_of).get(0, [])
-    store_feasible_set(bands or getattr(s, "bands", None), manip, F, yaws)
+    F_of: Dict[str, List[Tuple[float, Any]]] = {}
+    for a in offered:
+        F_of[a] = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of).get(0, [])
+        store_feasible_set(band_of.get(a), st_of[a], F_of[a], yaws)
+        if (band_of.get(a) is not None) and band_of[a].meta.get("mirrored_from"):
+            _count(s, "arm_band_mirrored.foci")
+            if not F_of[a]:
+                _count(s, "arm_band_mirrored.empty_F")
+    pool: Dict[Tuple[float, str], Tuple[float, Any, List[str]]] = {}
+    for a in offered:
+        for yaw0, g in F_of[a]:
+            k = (round(float(yaw0), 4), str(getattr(g, "name", id(g))))
+            if k not in pool:
+                pool[k] = (float(yaw0), g, [])
+            pool[k][2].append(a)
+    F = list(pool.values())
     if not F:
         _reject("grasp_unreachable", f"empty feasible set F at the focus {[round(float(v), 3) for v in fx.tolist()]} (trunk {manip.translate:.2f}/{manip.tilt:+.2f}, "
-                                     f"{len(yaws)} yaws x {len(grasps)} grasps)")
+                                     f"{len(yaws)} yaws x {len(grasps)} grasps{', arms ' + str(offered) if len(offered) > 1 else ''})")
     name = object_name or s.bindings.one("target").name
     fails = {"support": 0, "ik": 0}
     last_reason = ""
+    exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
     for i in rng.permutation(len(F)):
-        yaw0, g = F[int(i)]
+        yaw0, g, arms_i = F[int(i)]
+        a0 = arms_i[0]
         yaw = float(yaw0) + float(rng.uniform(-jitter, jitter))
         for _ in range(int(n_positions)):
             r, a = float(rng.uniform(0.0, focus_radius)), float(rng.uniform(0.0, 2 * math.pi))
@@ -1784,23 +2325,91 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                 continue
             eef = IK.grasp_pose(pose, eef_of(g))
             pre = IK.pre_pose(eef)
-            res = s.ikc.exact([pre, eef], manip, arm, ignore_for_last=list(ignore_for_grasp), scale_key=scale_key)
-            g_rec, eef_in_object, pick = g, eef_of(g), None
-            if twins and getattr(g, "name", None):
-                pick = pick_twin(s, manip, arm, g, eef_in_object, eef, pre, res, {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key},
-                                 support_z=z, where="phase3_target")
-                g_rec, eef_in_object, eef, pre, res = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res
+            res = s.ikc.exact([pre, eef], st_of[a0], a0, **exact_kw)
+            g_rec, eef_in_object, pick, arm_c = g, eef_of(g), None, a0
+            if (twins or len(arms_i) > 1) and getattr(g, "name", None):
+                pick = pick_twin(s, st_of[a0], a0, g, eef_in_object, eef, pre, res, exact_kw, support_z=z, where="phase3_target", arms=arms_i, stances=st_of,
+                                 twins=twins)
+                g_rec, eef_in_object, eef, pre, res, arm_c = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res, pick.arm
+                for o in pick.facts["orient"]["options"]:
+                    if o.get("source") == "ik" and band_of.get(o.get("arm")) is not None and band_of[o["arm"]].meta.get("mirrored_from"):
+                        _count(s, "arm_band_mirrored.ik_tried")
+                        if not o.get("ok"):
+                            _count(s, "arm_band_mirrored.ik_failed")
             if not res.ok:
                 fails["ik"] += 1
                 last_reason = res.reason
                 continue
             finger_q = list(getattr(g_rec, "finger_q", []) or []) or None
-            rec = GraspRecord(name, arm, getattr(g_rec, "key", None), getattr(g_rec, "name", None), yaw, pre, eef, finger_q=finger_q, eef_in_object=eef_in_object)
+            rec = GraspRecord(name, arm_c, getattr(g_rec, "key", None), getattr(g_rec, "name", None), yaw, pre, eef, finger_q=finger_q, eef_in_object=eef_in_object)
             if pick is not None:
                 rec.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts})
+            if len(offered) > 1 or arm_c != arm:
+                rec.extras["arm_bands"] = {a: band_facts(band_of.get(a)) for a in offered}
+            if st_of[arm_c] is not manip:
+                adopt_arm(manip, st_of[arm_c])
             rec.stance = manip.name
             return pose, rec
     _reject("grasp_unreachable", f"F ({len(F)} pairs) exhausted without an exact-IK confirmation ({fails}; last: {last_reason[:160]})")
+
+
+def fallback_arms(rec: GraspRecord) -> List[str]:
+    """The other arms whose grasp passed when ``rec``'s arm was chosen for the segment (``orient.viable_arms`` of its choice),
+    in the chooser's order: where the segment is retried when one of its later contacts fails."""
+    from ispatialgym.sampling.v2 import orient as O
+
+    dec = ((rec.extras or {}).get("twin_choice") or {}).get("orient") or {}
+    return [a for a in O.viable_arms(dec) if a != rec.arm]
+
+
+def segment_arm_summary(rec: GraspRecord, offered: Sequence[str]) -> Dict[str, Any]:
+    """The instance summary's ``arm``: the arm of the segment, the arms offered, why (the chooser's ``arm_choice`` reason, the
+    segment fallback, or a single arm), whether it is not the default arm and whether its band was a mirror."""
+    ex = rec.extras or {}
+    tc = ex.get("twin_choice") or {}
+    ac = tc.get("arm_choice") or (tc.get("orient") or {}).get("arm_choice") or {}
+    fb = ex.get("segment_fallback")
+    bf = (ex.get("arm_bands") or {}).get(rec.arm) or {}
+    why = "segment fallback" if fb else (ac.get("reason") or ("only arm offered" if len(offered) < 2 else "only arm feasible at the draw"))
+    return {"arm": rec.arm, "offered": list(offered), "reason": why, "against_default": bool(offered) and rec.arm != offered[0],
+            "fallback": fb, "mirrored_band": bool(bf.get("mirrored_from"))}
+
+
+def segment_fallback_grasp(s, manip: Stance, obj_pose: Pose, rec: GraspRecord, grasps: Sequence[Any], arm: str, *, ignore_for_grasp: Sequence[Any],
+                           scale_key: Any = None, support_z: Optional[float] = None, eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
+                           why: str = "") -> Optional[GraspRecord]:
+    """The segment's fallback (owner 2026-09-27, first-demo v2.2): the preferred arm's grasp passed but a later contact of its
+    segment failed (``why``), so the whole segment is retried with ``arm``: the same object pose and library pinch, both turns of
+    ``arm`` by the orientation rule at ``arm``'s stance. Returns the new record (``manip`` switched to ``arm`` in place), None
+    when ``arm`` cannot take the pinch there."""
+    IK = _ik()
+    row = C.split_twin(str(rec.grasp_name))[0]
+    g = next((x for x in grasps if getattr(x, "name", None) == row), None)
+    st = stance_for_arm(s, manip, arm) if g is not None else None
+    if st is None:
+        return None
+    eef_of = eef_of_grasp or (lambda x: x.pose)
+    eio = eef_of(g)
+    eef = IK.grasp_pose(obj_pose, eio)
+    pre = IK.pre_pose(eef)
+    kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
+    res = s.ikc.exact([pre, eef], st, arm, **kw)
+    pick = pick_twin(s, st, arm, g, eio, eef, pre, res, kw, support_z=support_z, where="segment fallback", twins=grasp_twins_on(s))
+    _count(s, "segment_fallbacks")
+    if not pick.passed:
+        log.info("segment fallback: the %s arm cannot take %s at the same pose (%s)", arm, row, str(pick.res.reason)[:120])
+        return None
+    _count(s, f"segment_fallback_taken.{arm}")
+    finger_q = list(getattr(pick.grasp, "finger_q", []) or []) or None
+    new = GraspRecord(rec.object, arm, getattr(pick.grasp, "key", None), getattr(pick.grasp, "name", None), rec.yaw, pick.pre, pick.eef, finger_q=finger_q,
+                      eef_in_object=pick.eef_in_object)
+    new.extras.update({k: v for k, v in (rec.extras or {}).items() if k not in ("wrist_flip", "twin_choice", "height_extra_m", "height_extra_effective_m",
+                                                                                 "height_extra_clip_reason")})
+    new.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts, "segment_fallback": {"from_arm": rec.arm, "from_grasp": rec.grasp_name, "why": str(why)[:300]}})
+    new.stance = rec.stance
+    adopt_arm(manip, st)
+    log.info("segment fallback: the %s arm takes %s after the %s arm's segment failed (%s)", arm, new.grasp_name, rec.arm, str(why)[:160])
+    return new
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1941,7 +2550,8 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
                      ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None,
-                     brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None):
+                     brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None,
+                     q_first_brace: Optional[th.Tensor] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
     arm locked at its solution, combined whole-body check of the final configuration. Same steps as
     ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
@@ -1950,7 +2560,8 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     ``brace_only_check = (ignored objects, margin)``: an extra check of the brace arm's final configuration with the
     working arm back at the stance posture against everything but the ignored objects at ``margin`` — the way to test
     a stop blade against the target at its goal pose (teleported there by the caller) while the push hand, which
-    touches the target, is not in the picture. Returns the ``IKResult``."""
+    touches the target, is not in the picture. ``q_first_brace``: the brace chain starts from this arm configuration (``exact``'s
+    ``q_first``; a wrist-flipped solution, ``orient``). Returns the ``IKResult``."""
     IK = _ik()
     ikc = s.ikc
     r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
@@ -1962,8 +2573,14 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     # the locked arm touches (``ignore_while_locked``, default = the working pose's ignore set; a caller may pass just the touched
     # link) leave the world for the whole brace chain; the final pose ignores ``ignore_brace_last`` on top, as before.
     locked_ign = list(ignore_work_last) if ignore_while_locked is None else list(ignore_while_locked)
+    q_f = None
+    if q_first_brace is not None:
+        q_f = r1.q.clone()
+        idx_b = s.kit.robot.arm_control_idx[brace_arm]
+        q_f[idx_b] = _t(q_first_brace)[idx_b]
     with ikc.ignoring(locked_ign):
-        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers)
+        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers,
+                       q_first=q_f)
     if not r2.ok:
         return IK.IKResult(False, None, f"{brace_arm} (brace): {r2.reason}")
     touched = list(ignore_work_last) + [o for o in ignore_brace_last if all(o is not w for w in ignore_work_last)]

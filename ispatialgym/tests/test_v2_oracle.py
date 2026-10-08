@@ -2121,7 +2121,8 @@ def test_grasp_plans_to_the_recorded_ik_witness_and_closes_the_residual(tmp_path
     n_after_transition = len(backend.calls)
     assert ex.run_action(1, grasp) is None
     calls = backend.calls[n_after_transition:]
-    assert calls[0] == "plan_joint" and "plan_pose" not in calls and calls.count("solve_ik_path") == 2  # residual + approach
+    # residual + the approach check from where the transit left the arm (execute._into_witness_posture) + approach
+    assert calls[0] == "plan_joint" and "plan_pose" not in calls and calls.count("solve_ik_path") == 3
     assert env.robot._ag_obj_in_hand["right"] is env.objects["apple.n.01_1"]
     # without a witness the pose goal is planned as before
     sc.extra["ik_witnesses"] = []
@@ -3703,13 +3704,33 @@ def test_arm_to_witness_retries_the_joint_plan_and_refuses_another_branch(tmp_pa
     backend.calls.clear()
     drive(env, motions.arm_to("right", pose=pose, q_hint=q_hint))
     assert backend.calls.count("plan_joint") == 3 and "plan_pose" not in backend.calls
-    # every joint-space round fails and the pose-goal plan ends 2 rad from the witness: plan_failed with the excursion recorded
+    # every joint-space round fails, the pose-goal plan ends 2 rad from the witness and no arm posture carries the transit:
+    # plan_failed with the excursion recorded
+    n_via = len(motions.cfg.witness_via_postures)
+    orig_pose = backend.plan_pose
+
+    def pose_then_block(*a, **k):
+        r = orig_pose(*a, **k)
+        backend.fail_plans = n_via  # the first leg to every posture fails
+        return r
+
+    backend.plan_pose = pose_then_block
     backend.fail_plans = rounds
     backend.calls.clear()
     with pytest.raises(SkillError) as ei:
         drive(env, motions.arm_to("right", pose=pose, q_hint=q_hint))
     assert ei.value.reason == "plan_failed" and ei.value.details.get("excursion") is not None and ei.value.details["excursion"] > 0.6
-    assert backend.calls.count("plan_joint") == rounds and backend.calls.count("plan_pose") == 1
+    assert backend.calls.count("plan_joint") == rounds + n_via and backend.calls.count("plan_pose") == 1
+    backend.plan_pose = orig_pose
+    # first-demo v2.2 (kielbasa 0928-050633): when a posture carries it (start -> posture -> witness, two joint-space plans), the
+    # witness is reached through it instead - recorded; nothing else changes
+    backend.fail_plans = rounds
+    backend.calls.clear()
+    n_ev = len(motions.witness_via_posture_events)
+    drive(env, motions.arm_to("right", pose=pose, q_hint=q_hint))
+    ev = motions.witness_via_posture_events[-1]
+    assert len(motions.witness_via_posture_events) == n_ev + 1 and ev["posture"] == motions.cfg.witness_via_postures[0] and "rad from it" in ev["why"]
+    assert backend.calls.count("plan_joint") == rounds + 2 and backend.calls.count("plan_pose") == 1
     # owner 2026-09-26 (axial 0926-043254 / 051919): a caller whose legs start from wherever the hand is (a push's pre-contact) keeps
     # the other-branch pose-goal plan instead - recorded; the arm ends where the pose plan ends, not at the witness
     backend.fail_plans = rounds
