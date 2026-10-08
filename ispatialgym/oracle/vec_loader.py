@@ -139,13 +139,17 @@ class VecInstanceLoader:
     """N clones of one template; see the module docstring."""
 
     def __init__(self, num_envs: int, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM,
-                 behavior_output: bool = True, tiled_rendering: bool = False, settle_physics_steps: int = 25, warm_renders: int = 100):
+                 behavior_output: bool = True, tiled_rendering: bool = False, settle_physics_steps: int = 25, warm_renders: int = 100, enhanced_determinism: Optional[bool] = None):
         """``tiled_rendering``: one tiled render product for all clones' cameras (off by default: the tiles share one exposure, so
         a clone's frames stay 15-20 % off its own per-camera render). ``warm_renders``: renders after the batch's reset before
         the first observation is taken - the real-time renderer adapts to a camera's new view over ~20-60 frames (a robot moved
         to its instance pose renders ~6 % darker at first), and a single-scene world got that warm-up for free during the build."""
         self.num_envs = int(num_envs)
         self.warm_renders = int(warm_renders)
+        # PhysX enhanced determinism (physxScene:enableEnhancedDeterminism): the solver's results no longer depend on how the actors
+        # are grouped into islands / threads, i.e. on how many scenes share the simulation. Default: on for a multi-scene world, off
+        # for num_envs = 1 (the single-env evaluator runs without it; bit-identity with it is kept).
+        self.enhanced_determinism = bool(self.num_envs > 1) if enhanced_determinism is None else bool(enhanced_determinism)
         self.robot_name_arg = robot_name
         self.image_size = int(image_size)
         self.head_aperture = float(head_aperture)
@@ -200,11 +204,15 @@ class VecInstanceLoader:
         masses = []
         mass_kg = float(os.environ.get("ISG_BASE_MASS_KG", M.EVAL_BASE_LINK_MASS_KG))
         links = [(r.base_footprint_link if hasattr(r, "base_footprint_link") else r.links[M.BASE_LINK]) for r in self.robots]
-        if mass_kg > 0 and any(abs(float(l.mass) - mass_kg) > 1e-6 for l in links):
+        need_mass = mass_kg > 0 and any(abs(float(l.mass) - mass_kg) > 1e-6 for l in links)
+        if need_mass or self.enhanced_determinism:
             og.sim.stop()
-            for l in links:
-                masses.append({"before": float(l.mass)})
-                l.mass = mass_kg
+            if need_mass:
+                for l in links:
+                    masses.append({"before": float(l.mass)})
+                    l.mass = mass_kg
+            if self.enhanced_determinism:
+                self.report["enhanced_determinism"] = self._set_enhanced_determinism(True)
             og.sim.play()
             if hasattr(og.sim, "update_handles"):
                 og.sim.update_handles()
@@ -230,6 +238,23 @@ class VecInstanceLoader:
         self.scene_state0 = [copy.deepcopy(scene.dump_state(serialized=False)) for scene in self.env.scenes]
         self._fresh = True
         return self.env
+
+    @staticmethod
+    def _set_enhanced_determinism(value: bool) -> Dict[str, Any]:
+        """``physxScene:enableEnhancedDeterminism`` on the simulator's physics scene prim (while stopped)."""
+        import omnigibson.lazy as lazy
+
+        ctx = og.sim._physics_context
+        path = getattr(ctx, "prim_path", None) or "/physicsScene"
+        prim = og.sim.stage.GetPrimAtPath(path)
+        if not prim or not prim.IsValid():
+            return {"error": f"no physics scene prim at {path}"}
+        api_cls = lazy.pxr.PhysxSchema.PhysxSceneAPI
+        with og.sim.editing_usd():
+            api = api_cls(prim) if prim.HasAPI(api_cls) else api_cls.Apply(prim)
+            attr = api.GetEnableEnhancedDeterminismAttr() or api.CreateEnableEnhancedDeterminismAttr()
+            attr.Set(bool(value))
+        return {"prim": path, "enableEnhancedDeterminism": bool(attr.Get())}
 
     def _warm_camera_params(self, max_renders: int = 20) -> None:
         from omnigibson.sensors.vision_sensor import VisionSensor
