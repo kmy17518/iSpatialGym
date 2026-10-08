@@ -2,5 +2,6 @@
 that ``{"task": {"type": "ISpatialGymTask", ...}}`` works in an environment config."""
 
 from ispatialgym.tasks.ispatialgym_task import ISpatialGymTask
+from ispatialgym.tasks.vec_task import VecISpatialGymTask
 
-__all__ = ["ISpatialGymTask"]
+__all__ = ["ISpatialGymTask", "VecISpatialGymTask"]
