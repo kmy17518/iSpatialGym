@@ -1037,23 +1037,14 @@ class SamplerV2(TaskSampler):
             self.world.full_step(render=True)
             self.world.keep_still(task_objects)
             self.robot.keep_still()
-            cam = self.world.cam
-            if "depth_linear" not in cam.modalities:
-                cam.add_modality("depth_linear")
             intr = GO.intrinsics_of(self.world.camera_model)
-
-            def depth_now():
-                self.world.render(3)
-                obs, _ = cam.get_obs()
-                return th.as_tensor(obs["depth_linear"]).float().cpu().numpy()
-
-            depth = depth_now()
+            depth = self.world.depth_linear().float().numpy()
             cp, cq = self.world.camera_pose()
             depth_without = None
             if any(GO.role(o.name) == "fixture" for o in judged):
                 self.robot.visible = False
                 try:
-                    depth_without = depth_now()
+                    depth_without = self.world.depth_linear().float().numpy()
                 finally:
                     self.robot.visible = True
             objects = GO.screen_scene(depth, (cp.tolist(), cq.tolist()), intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE)

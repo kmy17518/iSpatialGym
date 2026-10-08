@@ -625,6 +625,41 @@ class SimWorld:
         mapping = {int(k): v for k, v in info[self.cam_key]["seg_instance"].items()}
         return seg.cpu(), mapping
 
+    #: frames rendered at most for one depth read (a depth annotator attached on first use delivers nothing for its first frames)
+    DEPTH_MAX_RENDERS = 24
+
+    def _raw_depth(self) -> th.Tensor:
+        raw = self.cam._annotators["depth_linear"].get_data(device=og.sim.device)
+        data = raw["data"] if isinstance(raw, dict) else raw
+        d = self.cam._preprocess_cpu_obs(data, "depth_linear") if og.sim.device == "cpu" else self.cam._preprocess_gpu_obs(data, "depth_linear")
+        return th.as_tensor(d).clone()
+
+    def depth_linear(self, n_renders: int = 3) -> th.Tensor:
+        """The head camera's linear depth ``(H, W)`` in m (distance along the optical axis), read the way :meth:`seg_instance`
+        reads its buffer: the ``depth_linear`` annotator is attached on first use, then frames are rendered until two
+        consecutive fetches of a non-empty buffer are identical (the scene is static during a measurement), up to
+        :data:`DEPTH_MAX_RENDERS`."""
+        self._require_camera()
+        if "depth_linear" not in self.cam.modalities:
+            self.cam.add_modality("depth_linear")
+        n_min = max(int(n_renders), self.SEG_MIN_RENDERS)
+        self.render(n_min - 2)
+        prev = self._raw_depth()
+        n = n_min - 2
+        while True:
+            self.render(1)
+            n += 1
+            cur = self._raw_depth()
+            if n >= n_min and cur.numel() > 0 and cur.shape == prev.shape and th.equal(cur, prev):
+                break
+            if n >= self.DEPTH_MAX_RENDERS:
+                if cur.numel() == 0:
+                    raise RuntimeError(f"depth_linear: no data from the head camera after {n} frames")
+                log.warning("depth_linear: buffer still changing after %d frames; using the latest", n)
+                break
+            prev = cur
+        return cur.reshape(self.camera_model.height, self.camera_model.width).cpu()
+
     def visible_pixels(self, n_renders: int = 3, exclude_structure: bool = True) -> Dict[str, int]:
         seg, mapping = self.seg_instance(n_renders)
         ids, counts = th.unique(seg, return_counts=True)
