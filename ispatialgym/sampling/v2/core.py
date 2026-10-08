@@ -976,6 +976,109 @@ class SamplerV2(TaskSampler):
             self.template_meta["stances"] = {k: v.to_meta() for k, v in self.sidecar.stances.items()}
         return path
 
+    def final_configuration(self) -> Optional[Tuple[th.Tensor, Tuple[float, float, float], Dict[str, Any]]]:
+        """Where the program check leaves the robot: ``(q, base_pose2d, source)`` - the last action's last witness (its
+        retreat / end pose) at that action's stance, or that stance's own posture when the last action records no
+        witness (a closed-loop push-close). None without a checked program."""
+        acts = (self.last_program_check or {}).get("actions") or []
+        if not acts:
+            return None
+        last = acts[-1]
+        stance = self.sidecar.stances.get(last.get("stance") or "")
+        if stance is None:
+            return None
+        wit = last.get("witnesses") or {}
+        key = "retreat" if "retreat" in wit else (list(wit)[-1] if wit else None)
+        if key is not None and wit[key].get("q") is not None:
+            q = th.tensor(wit[key]["q"], dtype=th.float32)
+            source = {"action": last.get("name"), "index": last.get("index"), "witness": key, "stance": last.get("stance")}
+        else:
+            q = self.stance_q(stance)
+            source = {"action": last.get("name"), "index": last.get("index"), "witness": None, "stance": last.get("stance")}
+        return q, tuple(float(v) for v in stance.base_pose2d), source
+
+    def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
+        """Pre-generation goal-image occlusion (``ispatialgym.eval.goal_occlusion``): the goal state as the goal check
+        settled it (its settled poses, the goal joints) with the robot where the program check ends
+        (:meth:`final_configuration`), screened as the oracle screens a demo's last frame - the head camera's depth, the box
+        screen per target / partner, the panel screen per fixture (a second depth render with the robot hidden). It runs
+        after the instance is written, so the TRO is the one an unchecked run writes; a target / partner at least half
+        hidden removes the instance's files and rejects the attempt (``goal_occluded``) before any demo is recorded."""
+        from omnigibson.utils.constants import JointType
+
+        from ispatialgym.eval import goal_occlusion as GO
+
+        if not GO.enabled() or GO.exempt(self.subtask):
+            return
+        judged = [o for o in dict.fromkeys(self.objects.values()) if GO.role(o.name)]
+        final = self.final_configuration()
+        if not judged or final is None or self.world.cam is None:
+            draft.summary["goal_occlusion"] = {"skipped": "no judged object" if not judged else ("no checked program" if final is None else "no camera")}
+            return
+        q, base_pose2d, source = final
+        settled = (draft.summary.get("goal_check") or {}).get("settled_poses") or {}
+        t0 = time.time()
+        state = self.world.snapshot()
+        try:
+            for name, pose in draft.goal_poses.items():
+                obj = self.objects[name]
+                p = settled.get(obj.name, pose)
+                obj.set_position_orientation(G.t(p[0]), G.t(p[1]))
+            for name, qj in draft.goal_joints.items():
+                obj = self.objects[name]
+                obj.set_joint_positions(G.t(qj))
+                obj.set_joint_velocities(th.zeros_like(G.t(qj)))
+            self.kit.apply(q, base_pose2d)
+            self.world.step_physics(1, still=[self.robot] + list(self.objects.values()))
+            cam = self.world.cam
+            if "depth_linear" not in cam.modalities:
+                cam.add_modality("depth_linear")
+            intr = GO.intrinsics_of(self.world.camera_model)
+
+            def depth_now():
+                self.world.render(3)
+                obs, _ = cam.get_obs()
+                return th.as_tensor(obs["depth_linear"]).float().cpu().numpy()
+
+            depth = depth_now()
+            cp, cq = self.world.camera_pose()
+            depth_without = None
+            if any(GO.role(o.name) == "fixture" for o in judged):
+                self.robot.visible = False
+                try:
+                    depth_without = depth_now()
+                finally:
+                    self.robot.visible = True
+            objects = GO.screen_scene(depth, (cp.tolist(), cq.tolist()), intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE)
+            rep = GO.report(objects, method="predicted: settled goal poses, robot at the program check's end, head-camera depth", robot=source,
+                            seconds=round(time.time() - t0, 2))
+        except Exception as e:  # noqa: BLE001 - a failed prediction keeps the instance; the oracle's gate still judges its last frame
+            log.warning("%s: goal occlusion not predicted: %r", self.gp.alias, e)
+            rep = {"error": repr(e), "occluded": False, "robot": source}
+        finally:
+            self.world.restore(state)
+            self.world.keep_still(self.objects.values())
+            self.robot.keep_still()
+            self.kit.sync_world()
+            self.configure_targets(draft)
+        draft.summary["goal_occlusion"] = rep
+        summary_path = tro_path.replace("-tro_state.json", ".summary.json")
+        sidecar_path = tro_path.replace("-tro_state.json", ".oracle.json")
+        if rep["occluded"]:
+            for p in (tro_path, sidecar_path, summary_path):
+                if os.path.exists(p):
+                    os.remove(p)
+            if not self.instance_seeds:
+                self.template_meta.pop("stances", None)
+            self.counters["goal_occluded"] = self.counters.get("goal_occluded", 0) + 1
+            raise Reject("goal_occluded", f"{rep['worst']} predicted {rep['max_occluded']:.0%} hidden in the goal image (>= {rep['threshold']:.0%})",
+                         objects={k: v.get("occluded") for k, v in rep["objects"].items()})
+        with open(summary_path) as f:
+            summary = json.load(f)
+        summary["goal_occlusion"] = _jsonable(rep)
+        with open(summary_path, "w") as f:
+            json.dump(summary, f, indent=2)
+
     def annotate_stance_arms(self) -> None:
         """A6: every recorded stance carries the arm joint values the checks used (``arms_q = {"right": [7], "left": [7]}``,
         ``fingers`` when not the open default) next to ``idle_posture`` in the sidecar, so the oracle can move the idle
@@ -1082,6 +1185,8 @@ class SamplerV2(TaskSampler):
                     draft.summary["kit"] = self.kit.stats_delta(k0, self.kit.stats_snapshot())
                     draft.summary["attempt"] = attempt
                     path = self.write_instance(draft, index, seed)
+                    phase = "goal_occlusion"
+                    self.check_goal_occlusion(draft, path)
                     self.constraints_write_back(draft, self.instance_id(index))
                     self.instance_seeds.append(seed)
                     written.append(path)

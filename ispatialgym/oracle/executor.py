@@ -2123,6 +2123,19 @@ class Executor:
                 log.warning("goal image not captured: %r", e)
                 goal_obs = {"error": repr(e)}
             self.timings["goal_image_s"] = time.time() - t1
+        goal_occlusion = None
+        if verdict is None and "goal_occlusion" in self.cfg.demo_gating:
+            t1 = time.time()
+            try:
+                goal_occlusion = self.goal_occlusion_report()
+            except Exception as e:  # noqa: BLE001
+                log.warning("goal occlusion not measured: %r", e)
+                goal_occlusion = {"error": repr(e)}
+            self.timings["goal_occlusion_s"] = time.time() - t1
+            if goal_occlusion.get("occluded"):
+                verdict = Verdict("goal_occluded", f"{goal_occlusion['worst']} is {goal_occlusion['max_occluded']:.0%} hidden in the goal image "
+                                                   f"(>= {goal_occlusion['threshold']:.0%})", step=self.n, details={"goal_occlusion": goal_occlusion})
+                self.stats.record(verdict)
         self.verdict = verdict
         success = verdict is None
         errors = isg.get("final_errors") or isg.get("errors") or {}
@@ -2172,6 +2185,7 @@ class Executor:
             "checkpoint_reports": list(self.checkpoint_reports),
             "brace_retry": _jsonable(self.brace_retries),
             "goal_observation": goal_obs,
+            "goal_occlusion": goal_occlusion,
             "timings": dict(self.timings),
             "release_check": _jsonable(self.release_check),
         }
@@ -2202,6 +2216,42 @@ class Executor:
             "n_renders": int(self.cfg.goal_image_renders),
             "step": self.n,
         }
+
+    def _head_depth(self, sensor) -> np.ndarray:
+        for _ in range(int(self.cfg.goal_image_renders)):
+            self.sim.render()
+        obs, _info = sensor.get_obs()
+        return th.as_tensor(obs["depth_linear"]).float().cpu().numpy()
+
+    def goal_occlusion_report(self) -> Dict[str, Any]:
+        """The demo gate ``goal_occlusion`` (``ispatialgym.eval.goal_occlusion``) on the settled last frame: the head camera's
+        depth, the box screen of every tracked target / partner and the panel screen of a tracked fixture (a second depth
+        render with the robot hidden; the panel = the links its revolute joints move, at the final joint state). Runs after
+        the last recorded frame; the depth annotator it may add and the hidden robot touch no recorded data."""
+        from omnigibson.utils.constants import JointType
+
+        from ispatialgym.eval import goal_occlusion as GO
+
+        sensor = self.robot.sensors[self.cam_key]
+        if "depth_linear" not in sensor.modalities:
+            sensor.add_modality("depth_linear")
+        cm = CameraModel.from_sensor(sensor)
+        intr = GO.intrinsics_of(cm)
+        depth = self._head_depth(sensor)
+        cp, cq = sensor.get_position_orientation()
+        cam = (cp.float().tolist(), cq.float().tolist())
+        judged = [o for o in self.tracked.values() if GO.role(getattr(o, "name", ""))]
+        depth_without = None
+        if any(GO.role(o.name) == "fixture" for o in judged):
+            self.robot.visible = False
+            try:
+                depth_without = self._head_depth(sensor)
+            finally:
+                self.robot.visible = True
+                for _ in range(int(self.cfg.goal_image_renders)):
+                    self.sim.render()
+        objects = GO.screen_scene(depth, cam, intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE)
+        return GO.report(objects, method="live head-camera depth", step=self.n, camera_key=self.cam_key, resolution=[intr[0], intr[1]])
 
     # ------------------------------------------------------------------ TRO goal override (§3.8, spec §8)
 
