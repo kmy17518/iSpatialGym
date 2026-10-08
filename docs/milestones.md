@@ -2,6 +2,105 @@
 
 Tagged states of this repository and what passed on them.
 
+## `v3.0-reconciled` — production (`v2.0-vectorized`), the multienv speedups (`v2.0-multienv`) and `first-demo-v3.0` on one branch; the goal-occlusion screen before generation; the 28 v3.0 aliases sampled, demonstrated and replayed through the evaluator on one commit (2026-10-08)
+
+- **Branch / commits** (untagged, local): iSpatialGym `v3.0-reconciled` from `v2.0-multienv` (`33072fca`): `aac50a6e` merges `v2.0-vectorized`
+  (release by the gripper command `998cd55b`, Brace.follow `7140a215`, Push.follow `f6385a89`, the attach release `7c48588d` /
+  `75d2cd72` / `8292f12e`, the FixedJoint task rule `5913aa30`); `e39ffd35` merges `rush-20260917-2100` (`first-demo-v3.0` `e4bc51ab`,
+  the pinned reach bands `452082a8`, docs); then `3882cb49` defaults, `3917264c` `4af874f2` `037e9853` `7a24b174` `0e3c1d82` `ab47a362`
+  goal occlusion, `c2a0c5d0` prod_job speedups, `0fdc2259` `--stream-qa log`, `75bc1728` carton flap release, `fc3e410d` replay stream
+  budget. Behavior-1K `v3.0-reconciled`: `a4e7724fe` merges `v2.0-vectorized` (release wake `a0e81fb68`, release callbacks `4eee45a42`,
+  `ag_moving_link_joint_type` `2d26311f5`) into `v2.0-multienv` (numpy change detection `0fb7df693`) without conflicts; `ddbd8ff24`.
+- **Conflicts** (both sides kept): `Executor.restore` (production's stale head image and physics-only transform sync; v3.0's
+  release-check trim to the checkpoint step); `ispatialgym_task.py` (multienv's shared goal evaluation; production's
+  `AG_MOVING_LINK_JOINT_TYPE = "FixedJoint"`); `execute_place` (v3.0 F4's `attach_hold_kept` window now spans production's release by
+  command - the alignment passes, `gripper_open_short`, the second `_attach_at_place`, the open command and `_release` -, then
+  `_attach_after_release`; `_attach_at_place`, `Motions.gripper` and `gripper_open_short` byte-identical to production's); `run_isg.py`
+  (v3.0's `--load-only` with production's checks, its exit returns `(exit_code, result)`; production's meta keys). The reach bands are the
+  v3.0 pin exactly: production's extra carton `3ef569c1` and milk `e964cb25` bands share the pinned ones' lookup factors
+  (`ReachBands.find` picks by mtime) and are removed.
+- **Grasp release, demo collection = evaluation:** the three Behavior-1K release commits are in; the FixedJoint rule is the task's
+  (oracle, replay and policy meet it); `_patch_ag_joint_type` / `handle_grasp_fixed_ag` stay removed; the v3.0 oracle diff adds no
+  privileged release or attach; `release_grasp_immediately` is left only in rollback restores, the loader's grasp setup and `run_isg_v1`.
+- **Defaults:** production's (`3882cb49`): shard format `legacy`, unseeded attach sphere fit; multienv's `nodepth_nvenc` and seeded fit
+  stay opt-ins.
+- **Speedups** (every run below): `OMP_NUM_THREADS=1`, `OMNIGIBSON_CHANGE_DETECTION_NUMPY=1` and `ISPATIALGYM_FAST_GEOMETRY` /
+  `FAST_SUPPORT` / `FAST_ASSIGN` / `SHARED_GOAL_EVAL` / `GC_FREEZE` / `BATCHED_WORLD_SYNC` = 1; `EXECUTOR_MESH_CACHE=room` off (not
+  bitwise). `scripts/isg/prod_job.sh` sets them by default (`PROD_SPEEDUPS=0` opts out) and records them in the job provenance.
+- **Goal occlusion before generation.** The rule is unchanged: a `target_*` / `partner_*` / `targets_*` entity at least 50% hidden in the
+  settled last head-camera frame invalidates the demo (box screen, 2 cm depth tolerance; the with / without-robot panel screen for
+  `dishwasher_*` / `door_*`; camera relocalization exempt), now in `ispatialgym.eval.goal_occlusion` (simulator-free, parity-tested
+  against `occ.py`).
+  - *Sampler* (`core.check_goal_occlusion`, right after an instance is written, before its demo): the goal entities at the program
+    check's settled poses, the goal joints, the robot at the program's final configuration (the last action's retreat witness at its
+    stance), one rendering step, the settled head-camera depth (`SimWorld.depth_linear` -> `ispatialgym.oracle.head_depth`: a kept extra
+    annotator read until two consecutive reads agree; the camera's modalities never change), the screen. Occluded: the instance's files
+    are removed and the attempt is rejected (`goal_occluded`). 2-3.5 s per instance; fail-open; `ISPATIALGYM_GOAL_OCCLUSION=off` disables.
+  - *Oracle* (`demo_gating` `goal_occlusion`, default in oracle mode): the same screen on the demo's settled last frame (verdict
+    `goal_occluded`, `meta.goal_occlusion`), so a miss of the prediction never becomes a demo. *Offline:* `scripts/isg/goal_occlusion_check.py`.
+  - *Validation* against production's post-hoc screen (`prod_0927`, 61 instances of 5 aliases): TP 11 / FN 1 / FP 0 / TN 47, 2 not
+    predicted (no end witness; target outside the predicted frame); median |predicted - measured| 0.011. The miss (milk 1409, 0.478 vs
+    0.575) and the largest gaps (brussels sprouts, up to 0.34) are where the demo's end departs from the plan's. On the 28 below the
+    prediction is within 0.01 for most (kielbasa 0.221 / 0.219, teacup 0.263 / 0.266) and off where the demo ends elsewhere than the
+    program check (canned food 0.429 / 0.0: the reorient witness leaves the camera 0.67 m from the can, the demo 0.42 m). A wrong
+    prediction costs a resample (false reject) or reaches the oracle's gate (miss).
+- **Found and fixed on the way:**
+  - *Carton lever* (`75bc1728`): the staged release of a pinched sheet (`edge_lid`) cannot let go by command under the FixedJoint grasp -
+    the hinge blocks the radial escape the deferred second stage waits for (latent since `998cd55b`: "AG did not let go at the open
+    command"). The retreat now opens fully at the hand's pose: flap error 0.0028 rad, 1 release / 0 violations.
+  - *Replay through the evaluator:* strict replay stops at the first QA verdict, and nothing is intended in a stream, so contact-rich
+    demos end at a "collision" on every branch - `--stream-qa log` (`0fdc2259`) records the monitor verdicts and lets the goal decide.
+    The stream's QA action budget was an oracle action's 3000 steps whatever `--max-steps` said, so no demo longer than that could be
+    replayed (block design 3676 / 3707, v3.0's door close 3028); it is now the episode budget (`fc3e410d`; oracle actions keep 3000).
+  - *Behavior-1K `ddbd8ff24`:* `og.cleanup()` aborted on `OSError` ("Directory not empty") when Kit's temp directory is on NFS (a node
+    with a full `/tmp`): a finished sample exited 139.
+- **Results** (viscam via Slurm, frozen snapshots, private HOME / caches per job; sample = `sample_isg` seed 0 with v3.0's budgets; demo
+  = `run_isg --mode oracle --video --video-size 540 --dev`; replay = `run_isg --mode replay --stream-qa log --no-goal-override` on a copy
+  of the post-demo instance, judged by the goal). Round r4, all on `ab47a362` + Behavior-1K `ddbd8ff24` (block design's replay on
+  `fc3e410d`, which changes only the replay / policy budget): **28/28 sampled, demonstrated and replayed**. The sandal row is
+  `r4sandal_s0`: r4's own sandal draw failed at its grasp (plan_failed: the sidecar's pre-pose and end-pose witnesses 3.04 rad apart in
+  different IK branches - the signature of v3.0's canary red), and viscam's nodes run the IORS-large search ~2.5x slower than v3.0's pods
+  (107 vs 43 s per exhausted C try), so the sandal ran with its attempt budget 2400 -> 6000 s through a customs copy (`ISG_CUSTOMS`; the
+  oracle reads the shipped list): seeds 0 / 1 / 2 all green (2753 / 2686 / 2848 steps, replays 3304 / 3224 / 3418), and v3.0's own sandal
+  instance on the same code gave 2754 / 3305. Round r3 (`4af874f2`, replays on `0fdc2259` / `fc3e410d`) went 26/28 before the carton fix
+  (carton lever red; its sandal sampler spent three 2400 s attempts).
+
+  | alias | v3.0 | r4 demo | r4 replay | occlusion predicted / measured | r3 demo / replay |
+  |---|---|---|---|---|---|
+  | block design | 3562 | 3676 | 4412 | 0.087 / 0.108 | 3707 / 4449 |
+  | door close | 3028 | 2477 | 2973 | 0.0 / 0.0 | 2556 / 3068 |
+  | sandal (`r4sandal_s0`) | 2754 | 2753 | 3304 | 0.075 / 0.081 | no instance |
+  | door open | 2201 | 2222 | 2667 | 0.102 / 0.0 | 2222 / 2667 |
+  | touching | 1638 | 1624 | 1949 | 0.029 / 0.035 | 1624 / 1949 |
+  | dishwasher open | 1557 | 1557 | 1869 | 0.0 / 0.0 | 1557 / 1869 |
+  | shampoo | 1510 | 1571 | 1886 | 0.0 / 0.0 | 1571 / 1886 |
+  | carton lever | 1316 | 1341 | 1610 | 0.099 / 0.091 | failed (1077) |
+  | carton close | 1265 | 1262 | 1515 | 0.008 / 0.010 | 1262 / 1515 |
+  | world vertical | 1050 | 1050 | 1260 | 0.0 / 0.0 | 1050 / 1260 |
+  | camera relocalization, obstructed | 999 | 624 | 749 | exempt | 624 / 749 |
+  | kielbasa | 942 | 946 | 1136 | 0.221 / 0.219 | 946 / 1136 |
+  | bar soap | 940 | 756 | 908 | 0.0 / 0.0 | 789 / 947 |
+  | lid | 938 | 1018 | 1222 | 0.0 / 0.011 | 1018 / 1222 |
+  | blender open | 936 | 938 | 1126 | 0.055 / 0.024 | 938 / 1126 |
+  | brussels sprouts | 934 | 945 | 1134 | 0.006 / 0.003 | 945 / 1134 |
+  | milk | 904 | 987 | 1185 | 0.080 / 0.008 | 987 / 1185 |
+  | cap | 899 | 783 | 940 | 0.0 / 0.0 | 899 / 1079 |
+  | cork | 893 | 914 | 1097 | 0.0 / 0.0 | 914 / 1097 |
+  | blender close | 885 | 881 | 1058 | 0.042 / 0.043 | 881 / 1058 |
+  | apple | 879 | 884 | 1061 | 0.056 / 0.056 | 884 / 1061 |
+  | teacup | 872 | 874 | 1049 | 0.263 / 0.266 | 874 / 1049 |
+  | marker | 681 | 698 | 838 | 0.014 / 0.004 | 698 / 838 |
+  | camera relocalization, standard | 563 | 400 | 480 | exempt | 400 / 480 |
+  | dishwasher close | 546 | 546 | 656 | 0.162 / 0.0 | 546 / 656 |
+  | axial | 518 | 518 | 622 | 0.0 / 0.0 | 518 / 622 |
+  | canned food | 123 | 123 | 173 | 0.429 / 0.0 | 123 / 173 |
+  | banana | 108 | 108 | 158 | 0.149 / 0.193 | 108 / 158 |
+
+- **Tests** (`fc3e410d`, GPU node): 1465 passed, 2 skipped, 4 failed - the same 4 fail on both parents' tips
+  (`test_v2_core` stance sidecar / transition standoff, `test_v2_large_scale` push-under constants / attempt budget).
+- **Not done:** nothing pushed; production not switched (`isg_prod`, its snapshots and `isg_home/tmp` untouched). Each sandbox job
+  starts Kit cold (~5 min before the first frame, up to 7 min of scene import); production's warm worker homes do not pay that.
+
 ## `first-demo-v3.0` — the owner's five findings on v2.2 fixed, each only in its own situation; 28/28 green, scoped under the owner's 23:05 rules (2026-09-30)
 
 - **Tag / commit:** `first-demo-v3.0` → `e4bc51ab` on `rush-20260917-2100` (`first-demo-v2.2` and its docs / manifest / TODO commits +
