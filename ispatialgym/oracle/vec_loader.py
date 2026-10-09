@@ -191,7 +191,8 @@ class VecInstanceLoader:
 
     def __init__(self, num_envs: int, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM,
                  behavior_output: bool = True, tiled_rendering: bool = False, settle_physics_steps: int = 25, warm_renders: int = 100, enhanced_determinism: Optional[bool] = None,
-                 fixed_handle_ag: bool = True):
+                 fixed_handle_ag: bool = True, physics_overrides: Optional[Dict[str, Any]] = None, dummy_bodies: int = 0, dummy_bodies_x: float = 63.0,
+                 render_overrides: Optional[Dict[str, Any]] = None, scene_margin: Optional[float] = None):
         """``tiled_rendering``: one tiled render product for all clones' cameras (off by default: the tiles share one exposure, so
         a clone's frames stay 15-20 % off its own per-camera render). ``warm_renders``: renders after the batch's reset before
         the first observation is taken - the real-time renderer adapts to a camera's new view over ~20-60 frames (a robot moved
@@ -208,6 +209,17 @@ class VecInstanceLoader:
         # oracle's per-closure override, so it holds for the whole episode (rigid bodies keep the stock FixedJoint). Without it the
         # blender demos replay to the lid turning in the hand (item 1b, 2026-10-08); with it all four replay to the demo's success step.
         self.fixed_handle_ag = bool(fixed_handle_ag)
+        # item 2 experiments (2026-10-08): physics settings applied while the simulator is stopped after the world build
+        # ({"broadphase": "SAP"|"MBP"|"GPU", "solver": "TGS"|"PGS", "gpu_dynamics": bool, "num_threads": int, "enhanced_determinism": bool}) and
+        # dummy rigid bodies (static cubes) added to scene 0 at x = dummy_bodies_x: does the base scene's physics depend on the world's composition?
+        self.physics_overrides = dict(physics_overrides or {})
+        # item 1c experiments: carb render settings applied right after the simulator launch, before the world (e.g. {"/rtx/post/aa/op": 0})
+        self.render_overrides = dict(render_overrides or {})
+        # the gap between cloned scenes along +x (omnigibson.simulator.m.SCENE_MARGIN, default 10 m; the spacing is this margin plus the
+        # scene's AABB width, ~53 m for house_single_floor); None = OmniGibson's default
+        self.scene_margin = None if scene_margin is None else float(scene_margin)
+        self.dummy_bodies = int(dummy_bodies)
+        self.dummy_bodies_x = float(dummy_bodies_x)
         self.robot_name_arg = robot_name
         self.image_size = int(image_size)
         self.head_aperture = float(head_aperture)
@@ -250,6 +262,30 @@ class VecInstanceLoader:
         self.cfg["task"]["type"] = "VecISpatialGymTask"
         self.cfg["env"]["num_envs"] = self.num_envs
         t0 = time.time()
+        if self.scene_margin is not None:
+            import omnigibson.simulator as _S
+
+            with _S.m.unlocked():
+                _S.m.SCENE_MARGIN = self.scene_margin
+            self.report["scene_margin"] = float(_S.m.SCENE_MARGIN)
+        if self.render_overrides and og.sim is None:
+            import omnigibson.lazy as lazy
+
+            env_cfg = self.cfg["env"]
+            og.launch(physics_dt=1.0 / env_cfg["physics_frequency"], rendering_dt=1.0 / env_cfg.get("rendering_frequency", 30), sim_step_dt=1.0 / env_cfg["action_frequency"])
+            settings = lazy.carb.settings.get_settings()
+            applied = {}
+            for key, value in self.render_overrides.items():
+                if isinstance(value, bool):
+                    settings.set_bool(key, value)
+                elif isinstance(value, int):
+                    settings.set_int(key, value)
+                elif isinstance(value, float):
+                    settings.set_float(key, value)
+                else:
+                    settings.set_string(key, str(value))
+                applied[key] = settings.get(key)
+            self.report["render_overrides"] = applied
         self.env = og.Environment(configs=self.cfg)
         self.scene_loads += 1
         from ispatialgym.sampling.scene_variants import patch_trav_map_from_meta
@@ -264,14 +300,18 @@ class VecInstanceLoader:
         mass_kg = float(os.environ.get("ISG_BASE_MASS_KG", M.EVAL_BASE_LINK_MASS_KG))
         links = [(r.base_footprint_link if hasattr(r, "base_footprint_link") else r.links[M.BASE_LINK]) for r in self.robots]
         need_mass = mass_kg > 0 and any(abs(float(l.mass) - mass_kg) > 1e-6 for l in links)
-        if need_mass or self.enhanced_determinism:
+        if need_mass or self.enhanced_determinism or self.physics_overrides or self.dummy_bodies:
             og.sim.stop()
             if need_mass:
                 for l in links:
                     masses.append({"before": float(l.mass)})
                     l.mass = mass_kg
-            if self.enhanced_determinism:
-                self.report["enhanced_determinism"] = self._set_enhanced_determinism(True)
+            if self.enhanced_determinism or "enhanced_determinism" in self.physics_overrides:
+                self.report["enhanced_determinism"] = self._set_enhanced_determinism(bool(self.physics_overrides.get("enhanced_determinism", self.enhanced_determinism)))
+            if self.physics_overrides:
+                self.report["physics_overrides"] = self._apply_physics_overrides(self.physics_overrides)
+            if self.dummy_bodies:
+                self.report["dummy_bodies"] = self._add_dummy_bodies(self.dummy_bodies, self.dummy_bodies_x)
             og.sim.play()
             if hasattr(og.sim, "update_handles"):
                 og.sim.update_handles()
@@ -303,6 +343,43 @@ class VecInstanceLoader:
         self.scene_state0 = [copy.deepcopy(scene.dump_state(serialized=False)) for scene in self.env.scenes]
         self._fresh = True
         return self.env
+
+    @staticmethod
+    def _apply_physics_overrides(ov: Dict[str, Any]) -> Dict[str, Any]:
+        """Physics-engine settings for the item-2 experiments (simulator stopped)."""
+        import omnigibson.lazy as lazy
+
+        ctx = og.sim._physics_context
+        out: Dict[str, Any] = {}
+        with og.sim.editing_usd():  # the physics scene attributes are USD edits
+            if "broadphase" in ov:
+                ctx.set_broadphase_type(str(ov["broadphase"]))
+                out["broadphase"] = ctx.get_broadphase_type()
+            if "solver" in ov:
+                ctx.set_solver_type(str(ov["solver"]))
+                out["solver"] = str(ov["solver"])
+            if "gpu_dynamics" in ov:
+                ctx.enable_gpu_dynamics(bool(ov["gpu_dynamics"]))
+                out["gpu_dynamics"] = bool(ov["gpu_dynamics"])
+        if "num_threads" in ov:
+            settings = lazy.carb.settings.get_settings()
+            settings.set_int("/persistent/physics/numThreads", int(ov["num_threads"]))
+            settings.set_int("/physics/numThreads", int(ov["num_threads"]))
+            out["num_threads"] = int(ov["num_threads"])
+        return out
+
+    def _add_dummy_bodies(self, n: int, x: float) -> Dict[str, Any]:
+        """``n`` static 10 cm cubes in scene 0 at (x + i, 0, 1): actors that never touch anything of the task (item 2)."""
+        from omnigibson.objects.primitive_object import PrimitiveObject
+
+        scene = self.env.scenes[0]
+        names = []
+        for i in range(n):
+            obj = PrimitiveObject(name=f"isg_dummy_{i}", primitive_type="Cube", size=0.1, fixed_base=True, visual_only=False)
+            scene.add_object(obj)
+            obj.set_position_orientation(th.tensor([x + float(i), 0.0, 1.0 + 0.2 * i]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+            names.append(obj.name)
+        return {"n": n, "x": x, "names": names}
 
     @staticmethod
     def _set_enhanced_determinism(value: bool) -> Dict[str, Any]:
