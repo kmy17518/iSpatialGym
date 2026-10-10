@@ -754,6 +754,11 @@ class Motions:
         else:
             stage = None
             articulated = held_before is not None and bool(getattr(held_before, "n_joints", 0) or len(getattr(held_before, "joints", {}) or {}))
+            if articulated and bool(getattr(held_before, "fixed_base", False)):
+                # a handle of a door / appliance: the drives stop pressing before the fingers open (dishwasher close 1008: the
+                # torso bent 0.24 deg against the closed door sprang back at the release). A free-standing body (a blender,
+                # a carton) is left as it is: re-reading the loaded arm turns it (execute_base_follow's unwind)
+                yield from self.unload([arm])
             if articulated and staged:
                 # (staged=False: a handle of an articulated object - OmniGibson's assisted grasp treats any command short
                 # of fully open as "applying grasp" and re-grasps the handle during the retreat, then the door cannot

@@ -3923,8 +3923,7 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
                 note["unwind_stopped"] = {"after_steps": k_u, "root_step_m": round(dp_u, 5), "root_step_rad": round(da_u, 5)}
                 break
             total += motions.unwind(action.arm)
-            if trunk_total > 0.0:
-                trunk_total += _unwind_trunk(motions, threshold=False)
+            trunk_total += _unwind_trunk(motions, threshold=trunk_total == 0.0)  # the unwound arm hands its load to the torso
         note["unwind_rad"] = total
         if trunk_total > 0.0:
             note["unwind_trunk_rad"] = round(trunk_total, 5)
@@ -4085,8 +4084,7 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
             for _ in range(max(0, int(cfg.follow_unwind_steps) - 1)):
                 yield from motions.hold(1)
                 total += motions.unwind(arm)
-                if trunk_total > 0.0:
-                    trunk_total += _unwind_trunk(motions, threshold=False)
+                trunk_total += _unwind_trunk(motions, threshold=trunk_total == 0.0)
             yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
             late = _unwind_trunk(motions)  # the leaf's swing went on loading the torso while the joint came to rest (door open)
             if late > 0.0:
