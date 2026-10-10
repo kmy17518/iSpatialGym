@@ -106,6 +106,18 @@ def apply_ag_joint_rule(robot) -> None:
     robot.ag_moving_link_joint_type = AG_MOVING_LINK_JOINT_TYPE
 
 
+def apply_environment_rules(robots) -> int:
+    """The rules ``initialize_activity`` applies to the env's robots - the attach rule's release hook and the assisted-grasp
+    joint rule - for a task that re-implements it (``VecISpatialGymTask``). ``robots``: ``env.robots`` (one list per scene
+    in the vectorized environment). Returns the number of robots."""
+    PRED.install_release_hook(robots)
+    n = 0
+    for robot in _robots(robots):
+        apply_ag_joint_rule(robot)
+        n += 1
+    return n
+
+
 class ISpatialGymTask(BehaviorTask):
     """
     Args:

@@ -32,7 +32,7 @@ from ispatialgym.eval.clone_frames import offset_object_state, offset_targets_me
 from ispatialgym.eval.group_entity import GroupEntity
 from ispatialgym.eval.tro import apply_targets_to_scope, load_tro, physical_instances, validate_tro_against_problem
 from ispatialgym.sampling import predicates as PRED
-from ispatialgym.tasks.ispatialgym_task import ISpatialGymTask
+from ispatialgym.tasks.ispatialgym_task import ISpatialGymTask, apply_environment_rules
 
 log = logging.getLogger(__name__)
 
@@ -147,6 +147,7 @@ class VecISpatialGymTask(ISpatialGymTask):
                 e0 = self._scopes[0].get(inst)
                 if entity is not None and e0 is not None and not isinstance(entity, GroupEntity) and getattr(entity, "name", None) != getattr(e0, "name", None):
                     return False, f"env {env_idx}: {inst!r} is bound to {entity.name!r}, env 0 to {e0.name!r}"
+        apply_environment_rules(getattr(env, "robots", None))
         if self._tro is not None:
             self.configure_targets(self._tro.meta, env_idx=env_idx, scene=scene)
         return True, None

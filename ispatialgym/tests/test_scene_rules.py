@@ -85,3 +85,23 @@ def test_ag_joint_shim_only_reapplies_the_tasks_rule():
     assert vars(robot) == {"ag_moving_link_joint_type": AG_MOVING_LINK_JOINT_TYPE} and AG_MOVING_LINK_JOINT_TYPE == "FixedJoint"
     with pytest.raises(ValueError):
         EX._patch_ag_joint_type(robot, "SphericalJoint")
+
+
+def test_vec_task_gives_every_scenes_robot_both_rules(monkeypatch):
+    """``VecISpatialGymTask.initialize_activity`` re-implements the parent's: per scene, the robots of every scene get the
+    release hook (once) and the assisted-grasp joint rule, as ``ISpatialGymTask.initialize_activity`` gives a single env."""
+    from ispatialgym.tasks import vec_task as VT
+    from ispatialgym.tasks.ispatialgym_task import AG_MOVING_LINK_JOINT_TYPE, apply_environment_rules
+
+    robots = [[SimpleNamespace()], [SimpleNamespace(release_callbacks=[print])], [SimpleNamespace()]]
+    env = SimpleNamespace(robots=robots, scenes=[SimpleNamespace(idx=i) for i in range(3)])
+    task = SimpleNamespace(_object_bindings_source=lambda env: {}, _scopes=[{}, {}, {}], compiled_task=None,
+                           get_agent=lambda env, i: env.robots[i][0], _tro=None)
+    monkeypatch.setattr(VT, "physical_instances", lambda compiled_task: [])
+    for i in range(3):
+        assert VT.VecISpatialGymTask.initialize_activity(task, env, i) == (True, None)
+    for (robot,) in robots:
+        assert robot.release_callbacks.count(PRED.attach_on_release) == 1
+        assert robot.ag_moving_link_joint_type == AG_MOVING_LINK_JOINT_TYPE
+    assert robots[1][0].release_callbacks == [print, PRED.attach_on_release]
+    assert apply_environment_rules(robots) == 3 and robots[0][0].release_callbacks == [PRED.attach_on_release]
