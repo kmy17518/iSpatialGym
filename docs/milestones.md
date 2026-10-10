@@ -9,7 +9,8 @@ Tagged states of this repository and what passed on them.
   handle is released unloaded; the follow's unwinds watch the torso every step), `e39c30bc` (notes reach `meta.json`; its ramp exception for
   the sandal was reverted by `9b422a29`), `9b422a29` (drops come down before the release), `855546a1` (a free-standing body's handle
   follow turns rigidly about the start hinge; the opened fingers bound a drop's descent), `f704954b` (a descent whose plan jumps is tried
-  shorter), `56cb2e8e` (customs: the sandal drops from 0.15 m, the (0.95, -1.2) trunk first). Behavior-1K unchanged (`ddbd8ff24`): the assisted grasp's release-by-command rule - what demo collection and evaluation share -
+  shorter), `56cb2e8e` (customs: the sandal drops from 0.15 m, the (0.95, -1.2) trunk first), `c9522ff8` (the same as the default of
+  every under_large_scale alias, and for the sibling breakfast-table sandal). Behavior-1K unchanged (`ddbd8ff24`): the assisted grasp's release-by-command rule - what demo collection and evaluation share -
   is untouched; every change is in how the oracle commands the robot.
 - **The owner's audit** (r4 demos, `ab47a362`) - cause, fix, before -> after on the same instance (largest |torso command - measured|,
   deg; torso speed while its command and the base are still, deg/s; head-camera motion within 10 still steps, mm; finger force on the
@@ -44,9 +45,14 @@ Tagged states of this repository and what passed on them.
     yaw 0.7 rad off (tolerance 0.8) - marginal. With the alias drawn at `drop_height_m` 0.15 and the deeper drop trunk (0.95, -1.2) first
     (a customs copy) it comes the full 11.7 cm: released 1.7 cm above its rest, landed 1.2 mm aside, push yaw 0.075 rad off - success
     (sampler: instance 0 at attempt 0 in 1420 s). The goal-judged replay passed too
-    (3172 steps). Still sampling when written: seed 3 at 0.15 and seeds 0 / 3 at `drop_height_m` 0.10 (`runs/r11sandal_drop*`). The
-    shipped customs entry now has `drop_height_m` 0.15 with the (0.95, -1.2) trunk first (`56cb2e8e`); the sibling alias
-    `...sandal-breakfast_table-floor` keeps 0.25 (not among the 28, not validated).
+    (3172 steps). Seed 3 at 0.15 likewise (11.7 cm down, landed 1.0 mm aside, yaw 0.073 rad off; replay passed); seed 0 at
+    `drop_height_m` 0.10 comes 6.8 cm down to the same 1.7 cm release (1.2 mm, 0.024 rad; replay passed) (`runs/r11sandal_drop*`).
+    The shipped customs entry has `drop_height_m` 0.15 with the (0.95, -1.2) trunk first (`56cb2e8e`). `c9522ff8` (owner 2026-10-10)
+    makes both the default of every under_large_scale alias (`PUSH_UNDER_DROP_HEIGHT_M` 0.15, was 0.10; `PUSH_UNDER_DROP_TRUNKS`,
+    (0.95, -1.2) before (0.5, -0.6)) and gives the sibling `...sandal-breakfast_table-floor` (was 0.25) the same entry. Of the 28 only
+    the breakfast-table sandal is an under alias, and it already had both. The ten aliases without an override (apple / marker under
+    the desk, pencil under the sofa, sandal under the bed) have no push-under tuning and no demo yet; first draws on the new default:
+    `runs/r13default_*`.
 - **The gate**: `executor.TorsoLoad` (`meta.torso_load`); `robot_wobble` (on with `--demo-gating auto` in oracle mode) discards a demo
   above 1 deg. After the fixes the largest over the 28 is 0.16 deg (the apple's and the sandal's grasps).
 - **Found on the way**: `goal_occluded` was not a registered QA category (the in-run occlusion gate would have raised); the sandal's
