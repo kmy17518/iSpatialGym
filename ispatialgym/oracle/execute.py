@@ -3908,7 +3908,7 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
         total = motions.unwind(action.arm)
         # the torso the hand's load bent goes with the arm (owner 2026-10-09: dishwasher close 0.24 deg, door open 0.38 deg kept bent
         # through the arm's unwind - the unwound arm is a rigid link - and sprung back when the gripper opened)
-        trunk_total = motions.unwind_trunk(motions.cfg.unload_min_trunk_rad)
+        trunk_total = _unwind_trunk(motions)
         prev = state.object_pose(art.object)
         for k_u in range(1, max(0, int(cfg.follow_unwind_steps) - 1) + 1):
             yield from motions.hold(1)
@@ -3924,13 +3924,22 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
                 break
             total += motions.unwind(action.arm)
             if trunk_total > 0.0:
-                trunk_total += motions.unwind_trunk()
+                trunk_total += _unwind_trunk(motions, threshold=False)
         note["unwind_rad"] = total
         if trunk_total > 0.0:
             note["unwind_trunk_rad"] = round(trunk_total, 5)
     hold_steps, q_end = yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
     note.update({"hold_steps": hold_steps, "q_end": q_end, "shortfall_rad": sign * (art.q_goal - q_end)})
     ctx["follow"] = note
+
+
+def _unwind_trunk(motions, threshold: bool = True) -> float:
+    """``Motions.unwind_trunk``: from ``cfg.unload_min_trunk_rad`` on for the first re-target of an unwind (``threshold``), every re-read
+    after it; 0 for a motions object without a trunk."""
+    fn = getattr(motions, "unwind_trunk", None)
+    if fn is None:
+        return 0.0
+    return fn(float(getattr(getattr(motions, "cfg", None), "unload_min_trunk_rad", 0.0)) if threshold else 0.0)
 
 
 def _ramp_arm_to_q(motions: Motions, arm: str, q_arm: Sequence[float], speed: Optional[float] = None, loaded: bool = False) -> Generator[th.Tensor, None, float]:
@@ -4072,16 +4081,16 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
         elif kind == "release_move_regrasp":
             # 1. unwind gradually (the arm and the torso it bent), hold until the joint is still, release (full opening for a handle), settle
             total = motions.unwind(arm)
-            trunk_total = motions.unwind_trunk(motions.cfg.unload_min_trunk_rad)
+            trunk_total = _unwind_trunk(motions)
             for _ in range(max(0, int(cfg.follow_unwind_steps) - 1)):
                 yield from motions.hold(1)
                 total += motions.unwind(arm)
                 if trunk_total > 0.0:
-                    trunk_total += motions.unwind_trunk()
+                    trunk_total += _unwind_trunk(motions, threshold=False)
             yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
-            if motions.state.trunk_error() > motions.cfg.unload_min_trunk_rad:
-                # the leaf's swing went on loading the torso while the joint came to rest (door open: the pull's momentum)
-                trunk_total += motions.unwind_trunk()
+            late = _unwind_trunk(motions)  # the leaf's swing went on loading the torso while the joint came to rest (door open)
+            if late > 0.0:
+                trunk_total += late
                 yield from motions.hold(int(cfg.follow_still_steps))
             yield from motions.gripper(arm, close=False, staged=False)
             yield from _release(motions, state, arm)
