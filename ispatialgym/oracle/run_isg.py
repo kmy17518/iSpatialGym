@@ -816,6 +816,24 @@ def policy_actions(policy, executor: Executor, obs0, info0, max_steps: int) -> I
 # ==========================================================================================
 
 
+def demo_gating_for(mode: str, demo_gating: str) -> Tuple[str, ...]:
+    """The executor's ``demo_gating`` for ``--mode`` / ``--demo-gating``. ``auto``: the full placed_orientation gate (owner
+    2026-09-16 17:10 item 4: placed_tilt retracted; cylinders are compared modulo rotation about their long axis inside the
+    gate, ExecutorConfig.demo_revolution_axes), the operated articulated roots (owner 2026-09-27: the body of an object whose
+    lid / flap / door the robot works stays put), the torso a load bent visibly off its command (owner 2026-10-09: "if
+    unpreventable discard"), a target / partner at least half hidden in the goal image (ispatialgym.eval.goal_occlusion,
+    ISPATIALGYM_GOAL_OCCLUSION=off drops it) for the oracle; the release by the gripper command for the oracle and for replays
+    of its demos; nothing for an evaluated policy."""
+    if demo_gating != "auto":
+        return () if demo_gating == "none" else (demo_gating,)
+    gating: Tuple[str, ...] = ("placed_orientation", "root_moved", "robot_wobble") if mode == "oracle" else ()
+    if mode == "oracle" and goal_occlusion.enabled():
+        gating += ("goal_occlusion",)
+    if mode in ("oracle", "replay"):
+        gating += ("release_commanded",)
+    return gating
+
+
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--instance", default=None, help="path to <iid>-tro_state.json of a sampled instance")
@@ -845,13 +863,16 @@ def parse_args(argv=None):
                    help="replay / policy: stop = a QA monitor verdict (collision, ghost hand, ...) ends the episode; log = it is recorded in "
                         "meta.stream_qa and the stream goes on, the episode judged by its goal (a stream has no program: its grasps and "
                         "pushes have no intended contacts)")
-    p.add_argument("--demo-gating", default="auto", choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "robot_wobble", "none"],
+    p.add_argument("--demo-gating", default="auto",
+                   choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "robot_wobble", "release_commanded", "none"],
                    help="demo-collection gate after the epilogue: placed_orientation = every placed object within its recorded orientation tolerance (full error; "
                         "an object with a continuous symmetry about its long axis per the ICL survey - marker, pencil, bottles - modulo rotation about that axis); "
                         "root_moved = the root of a free-standing articulated object whose joint the program works stays within 5 mm / 0.02 rad at the end and "
                         "10 mm / 0.04 rad of tilt throughout; goal_occlusion = no target / partner >= 50%% hidden in the settled goal image; robot_wobble = no "
-                        "load the hands bear bends the torso more than 1 deg off its command (auto = the four on for --mode oracle, off for replay / policy); "
-                        "placed_tilt = the retracted principal-axis tilt variant (unused by default); none")
+                        "load the hands bear bends the torso more than 1 deg off its command; release_commanded = every assisted-grasp release comes from a "
+                        "gripper command of +1 (meta.release_check records the releases in every case) (auto = the five on for --mode oracle, "
+                        "release_commanded alone for --mode replay, none for --mode policy); placed_tilt = the retracted principal-axis tilt variant "
+                        "(unused by default); none")
     p.add_argument("--carry-leg", default="straight", choices=["straight", "trajopt"],
                    help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
     p.add_argument("--max-steps", type=int, default=6000, help="episode step budget (30 Hz control steps)")
@@ -1106,17 +1127,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
         if sidecar is not None:
             recorder.episode = episode_annotations(sidecar)
-        if args.demo_gating == "auto":
-            # the full placed_orientation gate (owner 2026-09-16 17:10 item 4: placed_tilt retracted; cylinders are compared
-            # modulo rotation about their long axis inside the gate, ExecutorConfig.demo_revolution_axes) and the operated
-            # articulated roots (owner 2026-09-27: the body of an object whose lid / flap / door the robot works stays put), the torso a
-            # load bent visibly off its command (owner 2026-10-09: "if unpreventable discard"); a target / partner at least half hidden in
-            # the goal image (ispatialgym.eval.goal_occlusion, ISPATIALGYM_GOAL_OCCLUSION=off drops it)
-            gating = ("placed_orientation", "root_moved", "robot_wobble") if args.mode == "oracle" else ()
-            if args.mode == "oracle" and goal_occlusion.enabled():
-                gating += ("goal_occlusion",)
-        else:
-            gating = () if args.demo_gating == "none" else (args.demo_gating,)
+        gating = demo_gating_for(args.mode, args.demo_gating)
         ex_cfg = ExecutorConfig(max_steps=args.max_steps, retries=args.retries, settle_min_steps=args.settle_steps, goal_image=args.goal_image,
                                 record_state=rec_cfg.hdf5, demo_gating=gating, stream_qa=args.stream_qa)
         meta["demo_gating_enabled"] = list(gating)

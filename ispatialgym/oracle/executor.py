@@ -146,6 +146,8 @@ class ExecutorConfig:
     #: marker, pencil, bottles, cans ...) is compared **modulo rotation about that axis** — the angle between its long
     #: axis now and at the recorded goal (nearest equivalence) against the same tolerance; every other object keeps the
     #: full error. ``demo_revolution_axes`` switches that equivalence off (full error for everything).
+    #: ``release_commanded``: an assisted-grasp release that did not come from a gripper command of exactly +1 fails the
+    #: episode (``release_not_commanded``); ``result.release_check`` records the releases whether the gate is on or not.
     demo_gating: Tuple[str, ...] = ()
     #: replay / policy streams: ``stop`` = a QA monitor verdict (collision, ghost hand, ...) ends the episode as it does an
     #: oracle action; ``log`` = it is recorded (``result.stream_qa``) and the stream goes on, so the episode is judged by its
@@ -2208,7 +2210,7 @@ class Executor:
                               details={"torso_load": torso_report})
             self.stats.record(verdict)
         bad = self.release_check["violations"]
-        if verdict is None and bad:
+        if verdict is None and bad and "release_commanded" in self.cfg.demo_gating:
             msg = "; ".join(f"step {v['step']} {v['arm']} {v['object']}: {v['kind']}" + (f" ({v['gripper_command']})" if "gripper_command" in v else "") for v in bad)
             verdict = Verdict("release_not_commanded", "an assisted-grasp release did not come from a gripper command of +1: " + msg, step=self.n,
                               details={"violations": bad})

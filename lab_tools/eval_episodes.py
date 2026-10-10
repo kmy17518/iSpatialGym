@@ -453,7 +453,7 @@ def run_job(args, shared=None, shutdown=True) -> int:
                 "raw_dir": os.path.relpath(out_dir, WT) if out_dir else None,
                 "server_metadata": {k2: v for k2, v in (ctx.get("server_metadata") or {}).items() if k2 in ("policy", "action_horizon", "chunk_size", "execution_mode", "checkpoint_step", "goal_fusion", "goal_views", "task_map")},
                 "goal_views_sent": ctx.get("goal_views_sent"),
-                "timings": meta.get("timings"),
+                "timings": meta.get("timings"), "release_check": meta.get("release_check"),
             })
             if result.get("status") == "error" or rc == R.EXIT_ERROR:
                 record["error"] = result.get("error") or "evaluator error"

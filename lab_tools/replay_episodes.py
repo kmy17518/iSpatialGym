@@ -368,7 +368,7 @@ def run_replay_job(args, shared=None, shutdown=True) -> int:
                 "n_action_steps": result.get("n_action_steps"), "first_success_step": meta.get("first_success_step"), "binary_success_ever": meta.get("binary_success_ever"),
                 "binary_success_final": meta.get("binary_success_final"), "settled_success": meta.get("settled_success"), "settle_windows": meta.get("settle_windows"),
                 "video": os.path.relpath(meta["video"], WT) if meta.get("video") else None, "raw_dir": os.path.relpath(out_dir, WT) if out_dir else None,
-                "timings": meta.get("timings"),
+                "timings": meta.get("timings"), "release_check": meta.get("release_check"),
             })
             if result.get("status") == "error" or rc == R.EXIT_ERROR:
                 record["error"] = result.get("error") or "evaluator error"

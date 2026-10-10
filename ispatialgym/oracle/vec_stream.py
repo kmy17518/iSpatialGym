@@ -91,6 +91,9 @@ class Slot:
     t_settle0: float = 0.0
     rules: Any = None
     _hold_iter: Any = None
+    #: ``Executor.release_check`` of this environment (facts only: the vectorized evaluator has no release verdict)
+    release_check: Dict[str, Any] = field(default_factory=lambda: {"releases": [], "violations": []})
+    _ag_last: Optional[Dict[str, Optional[str]]] = None
 
     @property
     def isg(self) -> Dict[str, Any]:
@@ -171,6 +174,7 @@ class VecStreamExecutor:
                     actions[s.idx] = self._noop(s)
             if all(s.done for s in self.slots):
                 break
+            ag_before = {s.idx: Executor._ag_held(s) for s in self.slots if s.idx in phases}
             obs_list, rewards, terminateds, truncateds, infos = self.env.step(actions, n_render_iterations=self.n_render_iterations)
             self.steps += 1
             sim_time = None
@@ -184,6 +188,9 @@ class VecStreamExecutor:
                     continue  # finished: its no-op was stepped, nothing recorded
                 phase = phases[s.idx]
                 s.n += 1
+                ag_after = Executor._ag_held(s)
+                Executor._check_releases(s, ag_before[s.idx], ag_after, actions[s.idx])
+                s._ag_last = ag_after
                 s.phase_steps[phase] = s.phase_steps.get(phase, 0) + 1
                 s.last_obs, s.last_info = obs_list[s.idx], infos[s.idx]
                 if s.recorder is not None:
@@ -348,6 +355,11 @@ class VecStreamExecutor:
             "checkpoint_reports": [],
             "brace_retry": _jsonable([]),
             "goal_observation": None,
+            "goal_occlusion": None,
+            "torso_load": None,
+            "witness_via_posture": [],
+            "stream_qa": None,
+            "release_check": _jsonable(s.release_check),
             "timings": dict(s.timings),
             "env_idx": s.idx,
             "batch_steps": self.steps,

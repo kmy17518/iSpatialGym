@@ -593,7 +593,7 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
                         "n_action_steps": episode.get("n_action_steps"), "first_success_step": episode.get("first_success_step"), "binary_success_ever": episode.get("binary_success_ever"),
                         "binary_success_final": episode.get("binary_success_final"), "settled_success": episode.get("settled_success"), "settle_windows": episode.get("settle_windows"),
                         "video": os.path.relpath(meta["video"], WT) if meta.get("video") else None, "raw_dir": os.path.relpath(out_dir, WT), "timings": meta.get("timings"),
-                        "batch_steps": episode.get("batch_steps"),
+                        "batch_steps": episode.get("batch_steps"), "release_check": episode.get("release_check"),
                     })
                     if args.mode == "policy":
                         record["server_metadata"] = {k2: v for k2, v in (ctx.get("server_metadata") or {}).items()

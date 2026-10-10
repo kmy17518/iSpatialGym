@@ -20,6 +20,8 @@ Verdict categories (the executor's verdict / ``SkillError.reason``; this module 
                             ``ispatialgym.eval.goal_occlusion``)
 ``robot_wobble``            a load the hands bore bent the torso visibly off its command (epilogue demo gate,
                             ``executor.TorsoLoad``)
+``release_not_commanded``   an assisted-grasp release did not come from a gripper command of +1 (epilogue demo gate
+                            ``release_commanded``, ``Executor.release_check``)
 ``failed_grasp``            the assisted grasp did not attach (grasp actions; push / brace exempt)
 ``no_motion``               a push / articulation moved nothing
 ``plan_failed``             trajopt (or the differential IK along recorded waypoints) found no trajectory
@@ -104,6 +106,7 @@ CATEGORIES: Tuple[str, ...] = (
     "root_moved",
     "goal_occluded",
     "robot_wobble",
+    "release_not_commanded",
 )
 #: categories the per-step monitors can raise (``protected_*``: the transit span of oracle.protection, owner 2026-09-26)
 STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "gripper_out_of_fov", "timeout", "protected_contact", "protected_moved")
@@ -112,7 +115,7 @@ STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "grippe
 #: of an articulated object whose joint the program works; ``goal_occluded`` / ``robot_wobble`` = the demo gates on the goal
 #: image and on the torso a load bent; policy evaluation is unchanged)
 EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation", "placed_tilt", "root_moved", "goal_occluded",
-                                        "robot_wobble")
+                                        "robot_wobble", "release_not_commanded")
 
 #: contacts with these object categories never count (the robot stands / drives on them)
 GROUND_CATEGORIES = frozenset({"floors", "carpet", "rug", "mat", "gym_mat", "yoga_mat", "lawn", "driveway", "ceramic_tile"})
