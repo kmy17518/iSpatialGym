@@ -6,7 +6,7 @@ Tagged states of this repository and what passed on them.
 
 - **Commits** (untagged, local, branch `v3.0-attach-contact` off `5d54b735`): `a4895689` (the rule, the join modes, the filter at the
   join, the `AttachedTo` overrides, the oracle's hover / alignment / instant release), `d9937bce` (the hover settles on arrival before
-  the first measurement), `ebdb93f0` (`snap` is the default join), then the touchdown before the release. Behavior-1K unchanged
+  the first measurement), `ebdb93f0` (`snap` is the default join), `8947f32b` (the touchdown before the release). Behavior-1K unchanged
   (`ddbd8ff24`). The gripper A/B test's decision (owner): keep the contact-hold closure everywhere (closing to -1 slides the part
   1-2 cm before the assisted grasp attaches); the instant opening stays; never a partial opening.
 - **Why** (owner): the oracle carried the part with partly opened fingers while the assisted grasp held it (+0.125 for the whole
@@ -65,9 +65,15 @@ Tagged states of this repository and what passed on them.
   joined in the release step (the release hook deferred to the step's check), <= 1.4 mm aside, tilt 0.2 deg; *both* likewise. All
   six in one attempt (no rollback); every replay passed, identical to its demo. The owner chose the touchdown, a failed one falling
   back to a plain drop - never a partial opening (the unload is one).
-- **Tests**: `d9937bce` 1487 passed, 1 skipped, the 4 pre-existing failures (`test_v2_core` x2, `test_v2_large_scale` x2) - the
-  baseline's 1477 + 13 new tests in `test_attach_contact.py` - 3 removed with the old attach place. On svl nodes one more test skips
-  (`a4895689` on svl10: 1486 passed, 2 skipped; `c9522ff8` on svl7: 1476 / 2).
+- **Demos with the touchdown** (`8947f32b`, snap, r5 instances, `runs_touchdown`): all three pass in one attempt - cap 0.18 mm /
+  0.000 rad, cork 0.93 mm / 0.002 rad, lid 0.13 mm / 0.001 rad. The hand came down 3.2 / 3.6 / 4.6 mm in 11 / 12 / 18 steps to
+  contact (the lid's rim sits inside the teapot's opening), no fallback; each part was joined in the release step by that step's own
+  check (the release hook deferred: touching), in contact; lateral offset at the release -> at the join 1.0 -> 0.4 / 2.0 -> 2.1 /
+  1.0 -> 1.1 mm; snap 10.2 / 18.1 / 4.9 mm. The replays pass, bit-identical to the demos (the lid's first replay process segfaulted
+  in Kit's start-up, in the viewport wait, before any replay step; the re-run passed).
+- **Tests**: `8947f32b` 1489 passed, 1 skipped, the 4 pre-existing failures (`test_v2_core` x2, `test_v2_large_scale` x2) - the
+  baseline's 1477 + 15 new tests in `test_attach_contact.py` - 3 removed with the old attach place (`d9937bce`: 1487). On svl nodes
+  one more test skips (`a4895689` on svl10: 1486 passed, 2 skipped; `c9522ff8` on svl7: 1476 / 2).
 
 ## `v3.0-reconciled` audit fixes — no stored force is let go of at once, drops come down before an instant release, a free-standing lid follows its arc; a visibly wobbling demo is discarded (2026-10-09/10)
 
