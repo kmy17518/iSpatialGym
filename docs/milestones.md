@@ -2,6 +2,60 @@
 
 Tagged states of this repository and what passed on them.
 
+## `v3.0-reconciled` audit fixes — no stored force is let go of at once, drops come down before an instant release, a free-standing lid follows its arc; a visibly wobbling demo is discarded (2026-10-09/10)
+
+- **Commits** (untagged, local, on `v3.0-reconciled`): `06abb98a` (unload, push-close / grasp stops, the instant drop release, the
+  partner clearance, `TorsoLoad` + the `robot_wobble` gate, QA categories), `157775e5` (the follow tests' stubs), `bdb9ec76` (a fixed-base
+  handle is released unloaded; the follow's unwinds watch the torso every step), `e39c30bc` (notes reach `meta.json`; its ramp exception for
+  the sandal was reverted by `9b422a29`), `9b422a29` (drops come down before the release), `855546a1` (a free-standing body's handle
+  follow turns rigidly about the start hinge; the opened fingers bound a drop's descent), `f704954b` (a descent whose plan jumps is tried
+  shorter). Behavior-1K unchanged (`ddbd8ff24`): the assisted grasp's release-by-command rule - what demo collection and evaluation share -
+  is untouched; every change is in how the oracle commands the robot.
+- **The owner's audit** (r4 demos, `ab47a362`) - cause, fix, before -> after on the same instance (largest |torso command - measured|,
+  deg; torso speed while its command and the base are still, deg/s; head-camera motion within 10 still steps, mm; finger force on the
+  support, N):
+  - *door close* ("unacceptable"): the push-close's base drag drove the fist 6.7 cm on into the closed leaf; torso_joint1 sat 4.2 deg
+    behind its target and sprang forward at the back-off. The arc and the drag stop at the closed leaf (within 0.004 rad) or once the
+    trunk is pressed 0.3 deg; arm + torso are unloaded before the fist backs off: 4.24 -> 0.05 deg, 9.7 -> 0.6 deg/s, 58 -> 0.1 mm.
+  - *dishwasher close*: the arm's unwind left it a rigid link and the closed door's load went into the torso (0.24 deg), released at the
+    retreat. The unwinds take the torso along; a fixed-base handle is released only after unloading: 0.24 -> 0.07 deg, 3.2 -> 0.8 mm.
+  - *door open*: the swinging leaf pulled the torso 0.38 deg past its target, released by the gripper: same fixes, 0.38 -> 0.09 deg,
+    7.3 -> 2.6 deg/s, 9.2 -> 1.9 mm.
+  - *blender open* (owner 2026-10-09 night): the arm-mode follow streamed the chords between the five recorded handle poses (0.4 rad
+    apart), pulling the lid off its circle - torso 0.41 deg, the free-standing body tipped 0.95 deg. Re-aiming the poses for the body's
+    live pose made it run away (4.6 deg, 13.9 mm: `root_moved`, the hand followed the body it tipped); an arc snapped onto each recorded
+    pose jerked the hand by the grasp offset. The hand now turns rigidly about the hinge where it stood when the follow began, through the
+    recorded joint values (`_follow_handle_poses`): 0.41 -> 0.025 deg, 5.4 -> 0.8 deg/s, 6.8 -> 0.26 mm, body tilt 0.95 -> 0.34 deg, slide
+    2.3 -> 1.1 mm (old vs new code on r6's instance). Carton lever (the other arm-mode follow) unchanged in outcome (1341 steps, tilt
+    0.67 -> 0.54 deg); blender close and carton close close with pushes and run byte-identically.
+  - *brussels sprouts*: (1) not a wake issue - the assisted grasp lets go on the full open command only and the opening ramp left the
+    sprout hanging between open fingers for 13 steps: every free drop now opens at once (1 step). (2) The pinch aims the fingertips 24 mm
+    below the sphere; the hand pressed the table up to 196 N. The approach stops once a finger presses the support (trunk 0.1 deg off)
+    and is unloaded before the closure: 0.81 -> 0.14 deg, 18 -> 3.6 mm, 196 -> 50 N (apple: 113 -> 85 N). (3) The drop comes down 4.6 cm
+    (bounded by the opened fingers over the bowl's rim, 1.5 cm clear) and falls from 5.8 cm instead of 10.5.
+  - *touching*: the opening pad on the partner's side swept 15 mm toward the box of tissues and shoved it 5.3 mm. A next-to / touching
+    place moves away from the partner until the fully opened fingers keep 5 mm (raycasts along the finger slide axes, at most 3 cm) and
+    the push keeps its recorded end: the partner does not move at the release.
+  - *sandal* (instant release for every drop, owner 2026-10-09 night): released 24 cm above its rest at once it tumbled 7 deg, bounced
+    14.6 deg and landed 14 mm aside; the push then turned it 60 deg (`placed_orientation`). A drop now first comes straight down from the
+    recorded drop pose (`lower_drop`: until its bottom is 2 cm above the surface under it, at most 20 cm, collision-checked with only the
+    held object left out, the opened fingers 1.5 cm clear; a leg whose plan jumps is tried shorter). On the instances drawn with
+    `drop_height_m` 0.25 the wrist flips 5-9 cm down, so it comes 6.8 cm: released 16.7 cm up, landed 10 mm aside, success with the
+    yaw 0.7 rad off (tolerance 0.8) - marginal. With the alias drawn at `drop_height_m` 0.15 and the deeper drop trunk (0.95, -1.2) first
+    (a customs copy) it comes the full 11.7 cm: released 1.7 cm above its rest, landed 1.2 mm aside, push yaw 0.075 rad off - success
+    (sampler: instance 0 at attempt 0 in 1420 s). The goal-judged replay passed too
+    (3172 steps). Still sampling when written: seed 3 at 0.15 and seeds 0 / 3 at `drop_height_m` 0.10 (`runs/r11sandal_drop*`). The
+    shipped customs entry still says 0.25: a new sandal drawn with it falls from 17 cm after the descent.
+- **The gate**: `executor.TorsoLoad` (`meta.torso_load`); `robot_wobble` (on with `--demo-gating auto` in oracle mode) discards a demo
+  above 1 deg. After the fixes the largest over the 28 is 0.16 deg (the apple's and the sandal's grasps).
+- **Found on the way**: `goal_occluded` was not a registered QA category (the in-run occlusion gate would have raised); the sandal's
+  grasp fails its finishing swing (3.02-3.07 rad, both attempts) on Turing GPUs - Titan RTX on viscam2 and svl - with the original code
+  `ab47a362` as with the new, and passes on Ampere / Ada (A5000, A6000, 3090, L40S): the GPU, not the code or the rewritten instance.
+- **Validation** (viscam, overflow to svl's Titan RTX nodes; sample -> demo -> goal-judged replay): A/B demos on the r4/r5/r6 instances
+  (`ab5`-`ab11`); r5 (`06abb98a`, all 28) 27/28 and r6 (`bdb9ec76`, the 8 articulation aliases) 8/8 for the earlier fixes; tests
+  (`f704954b`, GPU node): 1476 passed, the 4 pre-existing failures. On svl: r5 lid / blender open / world vertical's replay as on viscam.
+  Two r5 replays on viscam12 hit a cffi version clash in numba's cache load (Kit's bundled cffi) before any action; re-run, both passed.
+
 ## `v3.0-reconciled` — production (`v2.0-vectorized`), the multienv speedups (`v2.0-multienv`) and `first-demo-v3.0` on one branch; the goal-occlusion screen before generation; the 28 v3.0 aliases sampled, demonstrated and replayed through the evaluator on one commit (2026-10-08)
 
 - **Branch / commits** (untagged, local): iSpatialGym `v3.0-reconciled` from `v2.0-multienv` (`33072fca`): `aac50a6e` merges `v2.0-vectorized`
