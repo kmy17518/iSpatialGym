@@ -27,8 +27,8 @@ Behaviour per action (§3.6 / §6.1):
 * ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (the command ramps to +1, OmniGibson's
   assisted grasp lets go; backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest
   (``not_settled``) or ``attached`` for ``kind="attach"``: the descent ends at a hover pose above the seat, the hand aligns
-  the part laterally and in yaw there, opens in one step, and the task's attach rule joins the part once it lands on its
-  partner.
+  the part laterally and in yaw there, touches it down on its partner, opens in one step, and the task's attach rule joins the
+  part where it rests on its partner.
 * ``Push``       ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(init → mid → goal)``; post: eef at the goal
   contact, the pushed object moved (``no_motion``).
 * ``Brace``      ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(pre → contact)``; held (no further command).
@@ -271,8 +271,16 @@ class ExecuteConfig:
     attach_hover_footprint_margin_m: float = 0.01
     #: ... aligns the male link there with the female one - laterally (across the seat axis) and in yaw about it modulo the part's
     #: symmetry, the height and the tilt kept - in the closed-loop passes of the task's correction regime (``AttachCorrection``),
-    #: opens in one step to +1 and holds still until the task's attach rule has joined the part (it lands on the partner in
-    #: contact), at most this many steps, before the retreat
+    #: then TOUCHES DOWN (owner 2026-10-10: released at the hover, the contact hold's squeeze let go at once kicked the cap 8 mm
+    #: aside): the hand lowered along the seat axis at ``attach_touchdown_speed_m_s`` until PhysX reports the part in contact with
+    #: its partner, at most the hover's part clearance + ``attach_touchdown_extra_m``, then ``attach_touchdown_hold_steps`` still;
+    #: a touchdown that fails releases where the hand is (a plain drop) - never a partial opening ...
+    attach_touchdown_speed_m_s: float = 0.01
+    attach_touchdown_extra_m: float = 0.004
+    attach_touchdown_hold_steps: int = 3
+    attach_touchdown_soft_pos_tol_m: float = 0.0005
+    #: ... opens in one step to +1 and holds still until the task's attach rule has joined the part (in contact), at most this many
+    #: steps, before the retreat
     attach_join_wait_steps: int = 45
     #: (owner 2026-09-27, first-demo v2.1 A3, bar soap 0927-034001: "the robot wobbles at the grasp and the release") a library pinch
     #: whose finger envelope (both finger meshes, closed..open) at the grasp pose reaches below the grasped object's lowest point + this
@@ -1988,9 +1996,10 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
                 after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
                 ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
         if action.kind == "attach" and action.on:
-            # aligned laterally and in yaw at the hover pose, released in one step; the part lands on the partner and the task's
-            # attach rule joins it there
+            # aligned laterally and in yaw at the hover pose, touched down on the partner, released in one step; the task's
+            # attach rule joins the part there
             yield from _align_at_hover(action, motions, state, ctx, cfg)
+            yield from _touch_down(action, motions, state, ctx, cfg)
             ctx["release_instant"] = True
             yield from _release_into_join(action, motions, state, ctx, cfg)
         else:
@@ -2620,10 +2629,68 @@ def _align_at_hover(action: Place, motions: Motions, state, ctx: Dict[str, Any],
     rec["after"] = _hover_note(off)
 
 
+def _touch_down(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
+    """The attach touchdown (owner 2026-10-10): after the hover alignment the hand comes straight down the seat axis at
+    ``attach_touchdown_speed_m_s`` until PhysX reports the part in contact with its partner (at most the hover's part clearance +
+    ``attach_touchdown_extra_m``), then holds still, so the part rests on its partner when the fingers open in one step and the
+    attach rule joins it in that step (the release hook leaves a touching part to the step's own check). Released at the hover,
+    the contact hold's squeeze let go at once shot the cap 8 mm aside - never joined, the place rolled back and its replay
+    failed; touched down it moved < 1.5 mm. A touchdown that fails - its leg raises, or no contact within the depth - releases
+    where the hand is: a plain drop. The gripper keeps the contact hold throughout (never a partial opening).
+    ``ctx["attach"]["touchdown"]`` records it."""
+    from ispatialgym.sampling import predicates as PRED
+
+    arm = action.arm
+    child, partner = state.object(action.object), state.object(action.on)
+    rec: Dict[str, Any] = {"touched": False, "steps": 0, "fallback": None}
+    ctx.setdefault("attach", {})["touchdown"] = rec
+
+    def touching() -> bool:
+        try:
+            return bool(PRED.pair_in_contact(child, partner))
+        except Exception:  # noqa: BLE001 - no contact matrix (the test stubs)
+            return False
+
+    axis = _seat_axis(state, action)
+    hover = ctx["attach"].get("hover") or {}
+    depth = float(hover.get("part_clearance_m") or cfg.attach_hover_clear_m) + float(cfg.attach_touchdown_extra_m)
+    p0, q0 = (x.float() for x in state.eef_pose(arm))
+    rec["depth_max_m"] = round(depth, 4)
+    if touching():
+        rec["touched"] = True
+    elif axis is None:
+        rec["fallback"] = "no seat axis: released at the hover"
+    else:
+        leg = motions.arm_along(arm, [(p0 - depth * axis, q0)], speed=cfg.attach_touchdown_speed_m_s, converge=False,
+                                soft_pos_tol=cfg.attach_touchdown_soft_pos_tol_m, limit_margin=cfg.attach_leg_limit_margin_rad)
+        try:
+            for a in leg:
+                yield a
+                rec["steps"] += 1
+                if touching():
+                    rec["touched"] = True
+                    break
+        except SkillError as e:
+            rec["fallback"] = f"the touchdown leg failed ({e.message}): released where the hand is"
+        finally:
+            leg.close()
+        if not rec["touched"] and rec["fallback"] is None:
+            rec["fallback"] = f"no contact within {depth * 1000:.1f} mm: released where the hand is"
+    for a in motions.hold(int(cfg.attach_touchdown_hold_steps)):
+        yield a
+    if axis is not None:
+        rec["lowered_m"] = round(float(th.dot(p0 - state.eef_pose(arm)[0].float(), axis)), 5)
+    rec["contact_at_release"] = touching()
+    if rec["fallback"]:
+        log.warning("place(%s): touchdown on %s: %s", action.object, action.on, rec["fallback"])
+    else:
+        log.info("place(%s): touched down on %s after %d steps (%.1f mm)", action.object, action.on, rec["steps"], 1000 * float(rec.get("lowered_m") or 0.0))
+
+
 def _release_into_join(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
     """The attach release (owner 2026-10-10): the open command at once (+1 in one step, ``Motions.gripper(instant=True)``); the part
-    drops the hover gap onto its partner and the task's attach rule joins it there - in contact, released and aligned; never at
-    the release instant unless it already touches the partner, never in mid-air. The hand holds still until the joint exists, at
+    rests on its partner after the touchdown (after a failed one it drops the rest of the gap) and the task's attach rule joins it
+    there - in contact, released and aligned; never in mid-air. The hand holds still until the joint exists, at
     most ``attach_join_wait_steps``; the retreat follows. ``ctx["attach"]["release"]`` records the steps from the release to the first
     contact and to the join, the join record (trigger, alignment, snap size), the release hook's verdict and the part's bounce."""
     from ispatialgym.sampling import predicates as PRED

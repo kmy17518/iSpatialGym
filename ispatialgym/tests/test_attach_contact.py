@@ -346,6 +346,62 @@ def test_hover_alignment_moves_the_hand_across_the_axis_and_turns_it_about_the_a
     assert len(rec["passes"]) == 1 and rec["after"]["lateral_m"] == pytest.approx(0.0005) and rec["regime"]["max_passes"] == 4
 
 
+def _touchdown(monkeypatch, *, contact_after=None, raise_after=None, steps=10):
+    """A hand lowered 0.5 mm per streamed step; the pair touches from ``contact_after`` steps on (None: never); the leg raises
+    after ``raise_after`` steps (None: never)."""
+    seen = {"legs": [], "holds": [], "k": 0}
+    eef = {"p": th.tensor([0.0, 0.0, 1.10])}
+
+    def arm_along(arm, poses, speed=None, converge=True, soft_pos_tol=None, limit_margin=0.0, **kw):
+        seen["legs"].append({"poses": poses, "speed": speed, "converge": converge})
+        for i in range(steps):
+            if raise_after is not None and i == raise_after:
+                raise EX.SkillError("execution", "diff-IK stalled")
+            eef["p"] = eef["p"] - th.tensor([0.0, 0.0, 0.0005])
+            seen["k"] += 1
+            yield th.zeros(1)
+
+    def hold(n=1):
+        seen["holds"].append(n)
+        for _ in range(n):
+            yield th.zeros(1)
+
+    # no gripper and no command state: the touchdown never moves the fingers
+    motions = SimpleNamespace(arm_along=arm_along, hold=hold)
+    monkeypatch.setattr(EX, "_seat_axis", lambda state, action: th.tensor([0.0, 0.0, 1.0]))
+    monkeypatch.setattr(PRED, "pair_in_contact", lambda c, p: contact_after is not None and seen["k"] >= contact_after)
+    state = SimpleNamespace(object=lambda n: SimpleNamespace(name=n), eef_pose=lambda arm: (eef["p"].clone(), th.tensor([0.0, 0.0, 0.0, 1.0])))
+    ctx = {"attach": {"hover": {"part_clearance_m": 0.003}}}
+    return motions, state, ctx, seen
+
+
+def test_touchdown_comes_down_the_seat_axis_until_the_part_touches_its_partner(monkeypatch):
+    motions, state, ctx, seen = _touchdown(monkeypatch, contact_after=3)
+    cfg = EX.ExecuteConfig()
+    list(EX._touch_down(SimpleNamespace(arm="right", object="cap_0", on="bottle_0"), motions, state, ctx, cfg))
+    rec = ctx["attach"]["touchdown"]
+    leg = seen["legs"][0]
+    assert leg["converge"] is False and leg["speed"] == cfg.attach_touchdown_speed_m_s
+    assert leg["poses"][0][0].tolist() == pytest.approx([0.0, 0.0, 1.10 - 0.003 - cfg.attach_touchdown_extra_m])  # at most clearance + extra
+    assert rec["touched"] and rec["steps"] == 3 and rec["fallback"] is None and rec["contact_at_release"]
+    assert seen["holds"] == [cfg.attach_touchdown_hold_steps] and rec["lowered_m"] == pytest.approx(0.0015)
+
+
+def test_a_failed_touchdown_releases_where_the_hand_is(monkeypatch):
+    action = SimpleNamespace(arm="right", object="cap_0", on="bottle_0")
+    motions, state, ctx, seen = _touchdown(monkeypatch, raise_after=2)
+    list(EX._touch_down(action, motions, state, ctx, EX.ExecuteConfig()))
+    rec = ctx["attach"]["touchdown"]
+    assert not rec["touched"] and rec["steps"] == 2 and rec["fallback"].startswith("the touchdown leg failed (diff-IK stalled)") and seen["holds"] == [3]
+    motions, state, ctx, seen = _touchdown(monkeypatch, steps=14)
+    list(EX._touch_down(action, motions, state, ctx, EX.ExecuteConfig()))
+    rec = ctx["attach"]["touchdown"]
+    assert not rec["touched"] and rec["steps"] == 14 and rec["fallback"].startswith("no contact within 7.0 mm")
+    motions, state, ctx, seen = _touchdown(monkeypatch, contact_after=0)
+    list(EX._touch_down(action, motions, state, ctx, EX.ExecuteConfig()))
+    assert ctx["attach"]["touchdown"]["touched"] and ctx["attach"]["touchdown"]["steps"] == 0 and not seen["legs"]
+
+
 def test_release_into_join_opens_at_once_and_counts_the_steps_to_contact_and_joint(monkeypatch):
     seen = {"instant": None, "k": 0}
 

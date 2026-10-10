@@ -2,12 +2,13 @@
 
 Tagged states of this repository and what passed on them.
 
-## `v3.0-attach-contact` — attachment by contact: the pair collides until the task's rule joins it, released, touching and aligned; the oracle hovers, settles, aligns and opens at once (2026-10-10)
+## `v3.0-attach-contact` — attachment by contact: the pair collides until the task's rule joins it, released, touching and aligned; the oracle hovers, settles, aligns, touches down and opens at once (2026-10-10)
 
 - **Commits** (untagged, local, branch `v3.0-attach-contact` off `5d54b735`): `a4895689` (the rule, the join modes, the filter at the
   join, the `AttachedTo` overrides, the oracle's hover / alignment / instant release), `d9937bce` (the hover settles on arrival before
-  the first measurement). Behavior-1K unchanged (`ddbd8ff24`). The gripper A/B test's decision (owner): keep the contact-hold closure
-  everywhere (closing to -1 slides the part 1-2 cm before the assisted grasp attaches); the instant opening stays.
+  the first measurement), `ebdb93f0` (`snap` is the default join), then the touchdown before the release. Behavior-1K unchanged
+  (`ddbd8ff24`). The gripper A/B test's decision (owner): keep the contact-hold closure everywhere (closing to -1 slides the part
+  1-2 cm before the assisted grasp attaches); the instant opening stays; never a partial opening.
 - **Why** (owner): the oracle carried the part with partly opened fingers while the assisted grasp held it (+0.125 for the whole
   descent, then +0.91 -> a second attach -> +1); the release hook and the per-step `attached` check joined the part wherever it was
   within 5 cm / 15 deg (under -1 the cap 18 mm off failed, the lid 8.9 mm and the cork 6.6 mm passed the 1 cm layout tolerance off
@@ -36,9 +37,12 @@ Tagged states of this repository and what passed on them.
   cork rest beyond the 1 cm tolerance) and a snap is ~10 / 18 / 5 mm.
 - **The oracle's attach place**: contact hold through carry and descent to a hover pose where the lowest point of the part and of
   the fingertips is 3 mm above the partner's top under them; settle there (the descent arrives at 3 mm/step and `a4895689` let the
-  part go at that speed); lateral + yaw alignment modulo symmetry (the correction regime: 4 passes, targets 2 mm / 0.02 rad); +1 in
-  one step; hold until the joint exists (at most 45 steps); retreat (raised by the hover). Removed: `clear_fingers_over_partner`,
-  `gripper_open_short`, `_attach_at_place`, `_attach_after_release` and their knobs.
+  part go at that speed); lateral + yaw alignment modulo symmetry (the correction regime: 4 passes, targets 2 mm / 0.02 rad); the
+  touchdown (owner 2026-10-10, after the cap below): the hand straight down the seat axis at 1 cm/s until PhysX reports the part in
+  contact with its partner (at most the part's clearance + 4 mm), 3 steps still, the contact hold kept; a touchdown that fails (its
+  leg raises, or no contact within the depth) releases where the hand is - a plain drop; +1 in one step (a touching part is joined
+  by the release step's own check); hold until the joint exists (at most 45 steps); retreat (raised by the hover). Removed:
+  `clear_fingers_over_partner`, `gripper_open_short`, `_attach_at_place`, `_attach_after_release` and their knobs.
 - **Demos + goal-judged replays** (`d9937bce`, r5 instances, `runs_settle`): every join came from the per-step check, in contact,
   after the release step (the release hook saw no contact at the release in every run). Hover 13.2 / 21.3 / 9.4 mm above the seat,
   fingertips 7.9 / 24.9 / 21.4 mm above the partner (the part's 3 mm binds); all aligned on arrival (<= 0.9 mm, 0.005 rad), no pass.
@@ -54,6 +58,13 @@ Tagged states of this repository and what passed on them.
     never joined). The fingertips pinch the dome below its widest point; the cork and the lid do not move at the release. Under the
     old rule the release hook joined the part at the release instant, which hid any kick.
   - `a4895689` (no settle): the same outcomes; the snap cap on svl10 passed in one attempt and its replay passed.
+- **The cap's release, sandbox experiment** (`ebdb93f0` + a wrapper of `_release_into_join`, `runs_exp`, snap, hover 3 and 5 mm):
+  *unload* (the fingers 0.2 mm past the wider one's opening, 5 steps, the assisted grasp holding - they moved 0.3 / 1.0 mm), then +1:
+  the cap fell its clearance and moved <= 1.0 mm aside, tilt <= 1.4 deg, joined 1 step after the release - the contact hold's 1 mm
+  squeeze let go at once was the kick; *touchdown* (down the seat axis at 1 cm/s to contact, 3.2 / 5.2 mm in 11 / 17 steps), then +1:
+  joined in the release step (the release hook deferred to the step's check), <= 1.4 mm aside, tilt 0.2 deg; *both* likewise. All
+  six in one attempt (no rollback); every replay passed, identical to its demo. The owner chose the touchdown, a failed one falling
+  back to a plain drop - never a partial opening (the unload is one).
 - **Tests**: `d9937bce` 1487 passed, 1 skipped, the 4 pre-existing failures (`test_v2_core` x2, `test_v2_large_scale` x2) - the
   baseline's 1477 + 13 new tests in `test_attach_contact.py` - 3 removed with the old attach place. On svl nodes one more test skips
   (`a4895689` on svl10: 1486 passed, 2 skipped; `c9522ff8` on svl7: 1476 / 2).
