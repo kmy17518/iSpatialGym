@@ -108,6 +108,8 @@ def test_snap_moves_the_part_onto_its_seat_then_joins(monkeypatch):
     assert len(child.moves) == 1 and child.pos[2].item() == pytest.approx(1.07)
     assert [e[0] for e in events] == ["filter", "joint"] and events[1][-1] == pytest.approx(1.07)
     assert PRED.JOINS[-1]["snap"]["vertical_m"] == 0.010
+    monkeypatch.delenv("ISG_ATTACH_JOIN_MODE")
+    assert PRED.join_mode() == "snap"
     monkeypatch.setenv("ISG_ATTACH_JOIN_MODE", "glue")
     with pytest.raises(ValueError):
         PRED.join_mode()

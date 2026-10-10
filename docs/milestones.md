@@ -16,8 +16,9 @@ Tagged states of this repository and what passed on them.
   (or is being released), in PhysX contact with its partner (`RigidContactAPI`, this step), and aligned modulo its symmetry - 4 mm
   across the seat axis, 0.1 rad, -4..23 mm along it (the axis: the female +z unless more than 45 deg from the partner-centroid ->
   female direction - the sampler's rule; the cork's female z is horizontal). The release hook joins only a part already touching
-  (it defers to that step's own check, after its physics); no mid-air joins. `ISG_ATTACH_JOIN_MODE`: `in_place` (the joint at the
-  resting pose, default) or `snap` (the part first moved onto its seat at the nearest symmetric equivalent). `AttachedTo._update`
+  (it defers to that step's own check, after its physics); no mid-air joins. `ISG_ATTACH_JOIN_MODE`: `snap` (the part first moved
+  onto its seat at the nearest symmetric equivalent; the default since the demos below, owner 2026-10-10) or `in_place` (the
+  joint at the resting pose; the cap and the cork rest on the rim beyond the 1 cm tolerance). `AttachedTo._update`
   does nothing for registered members (it joined on contact at 5 cm / 15 deg in SO(3) and snapped a lid 4 cm out of the hand);
   `_attach` / `_detach` of a registered pair go through the same joint and filter. Every join is logged (`meta["attach_joins"]`:
   trigger, contact, offsets, snap size). No other alias uses `attached`: 20 configuration_matching problems have it in the goal,

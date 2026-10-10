@@ -34,9 +34,10 @@ mid-descent). After an OmniGibson False the **alignment** branch joins a registe
 through :func:`set_attachment_context`; ``zinf`` = yaw free) within ``JOIN_LATERAL_MAX_M`` across the female axis,
 ``JOIN_ANGLE_MAX_RAD`` and ``JOIN_VERTICAL_MIN_M`` .. ``JOIN_VERTICAL_MAX_M`` along it (the window covers the gap at which
 the part comes to rest on its partner with collision on). No join in mid-air or at the release instant of a part that does
-not touch its partner yet. The join (:func:`join_mode`, ``ISG_ATTACH_JOIN_MODE``) is ``in_place`` - the BEHAVIOR fixed joint
-at the links' current relative pose (:func:`attach_in_place`) - or ``snap`` - the part first moved onto its seat at the
-nearest symmetric equivalent (the fingers are open by then, nothing is yanked) - and it filters the pair's collision in the
+not touch its partner yet. The join (:func:`join_mode`, ``ISG_ATTACH_JOIN_MODE``) is ``snap`` (default, owner 2026-10-10) -
+the part first moved onto its seat at the nearest symmetric equivalent (the fingers are open by then, nothing is yanked) - or
+``in_place`` - the BEHAVIOR fixed joint at the links' current relative pose (:func:`attach_in_place`); a cap or a cork comes to
+rest on its partner's rim beyond the layout tolerance, so only ``snap`` seats them - and it filters the pair's collision in the
 same instant (:func:`set_pair_collision_filter`; the stock ``AttachedTo._attach`` did that, this fork's does not), so a
 joined part does not fight its partner's hull. ``JOINS`` records every join (trigger, alignment, contact, snap size).
 
@@ -391,9 +392,9 @@ def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, 
 
 
 def join_mode() -> str:
-    """The attach rule's join (``ISG_ATTACH_JOIN_MODE``): ``in_place`` (the joint at the resting pose, default) or ``snap``
-    (the part moved onto its seat at the nearest symmetric equivalent, then joined)."""
-    mode = (os.environ.get("ISG_ATTACH_JOIN_MODE") or "in_place").strip()
+    """The attach rule's join (``ISG_ATTACH_JOIN_MODE``): ``snap`` (the part moved onto its seat at the nearest symmetric
+    equivalent, then joined; default) or ``in_place`` (the joint at the resting pose)."""
+    mode = (os.environ.get("ISG_ATTACH_JOIN_MODE") or "snap").strip()
     if mode not in JOIN_MODES:
         raise ValueError(f"ISG_ATTACH_JOIN_MODE={mode!r}: one of {JOIN_MODES}")
     return mode
