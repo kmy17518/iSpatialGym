@@ -1,0 +1,599 @@
+{
+ "format": "isg-lab-expected-replays/v1",
+ "made_on": {
+  "host": "yhang-lambda (RTX 4090, driver 580.126.09)",
+  "date": "2026-10-10",
+  "code": "iSpatialGym lab-vec-eval (221c6e03 + the vectorized-evaluator commits) + lab_tools; BEHAVIOR-1K bc7180af (OmniGibson 3.9.2, Isaac Sim 5.1.0)",
+  "settings": "single-env evaluator (replay_episodes.py): horizon 1500, stop at the first success, the lab's epilogue rules, fixed_handle_ag on (default), --no-planner"
+ },
+ "rules": "Open-loop replays of recorded demos (positive controls): every listed episode reaches the goal (binary_success_ever) and succeeds, except 'borderline' entries (either verdict). Counters (first_success_step, n_steps_total) match within a few steps on another machine (compare_replays.py --step-slack); on the lab machine two runs differed by one step for train 39 / 82 (other_run_on_lab_machine). Order matters a little: the battery replays each task's episodes in one process in the listed order, as the references were made.",
+ "episodes": [
+  {
+   "split": "eval50",
+   "task": "camera_relocalization-standard",
+   "episode": 2,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 718,
+   "n_action_steps": 719,
+   "n_steps_total": 863,
+   "settle_windows": [
+    144
+   ],
+   "position_error_m": 0.04813707247376442,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/eval50/episode_000002.json"
+  },
+  {
+   "split": "eval50",
+   "task": "camera_relocalization-standard",
+   "episode": 3,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 395,
+   "n_action_steps": 396,
+   "n_steps_total": 476,
+   "settle_windows": [
+    80
+   ],
+   "position_error_m": 0.049214091151952744,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/eval50/episode_000003.json"
+  },
+  {
+   "split": "eval50",
+   "task": "camera_relocalization-standard",
+   "episode": 33,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 613,
+   "n_action_steps": 614,
+   "n_steps_total": 737,
+   "settle_windows": [
+    123
+   ],
+   "position_error_m": 0.04797346517443657,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/eval50/episode_000033.json"
+  },
+  {
+   "split": "eval50",
+   "task": "camera_relocalization-standard",
+   "episode": 34,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 434,
+   "n_action_steps": 435,
+   "n_steps_total": 522,
+   "settle_windows": [
+    87
+   ],
+   "position_error_m": 0.04657727852463722,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/eval50/episode_000034.json"
+  },
+  {
+   "split": "eval50",
+   "task": "camera_relocalization-standard",
+   "episode": 45,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 566,
+   "n_action_steps": 567,
+   "n_steps_total": 681,
+   "settle_windows": [
+    114
+   ],
+   "position_error_m": 0.04712509736418724,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/eval50/episode_000045.json"
+  },
+  {
+   "split": "eval50",
+   "task": "alignment-axial-board_game-breakfast_table",
+   "episode": 150,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 404,
+   "n_action_steps": 405,
+   "n_steps_total": 486,
+   "settle_windows": [
+    81
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/item2/align-slot3/ref/episode_000150.json"
+  },
+  {
+   "split": "eval50",
+   "task": "alignment-axial-board_game-breakfast_table",
+   "episode": 151,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 390,
+   "n_action_steps": 391,
+   "n_steps_total": 470,
+   "settle_windows": [
+    79
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/item2/align-slot3/ref/episode_000151.json"
+  },
+  {
+   "split": "eval50",
+   "task": "alignment-axial-board_game-breakfast_table",
+   "episode": 152,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 483,
+   "n_action_steps": 484,
+   "n_steps_total": 581,
+   "settle_windows": [
+    97
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/item2/align-slot3/ref/episode_000152.json"
+  },
+  {
+   "split": "eval50",
+   "task": "alignment-axial-board_game-breakfast_table",
+   "episode": 153,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 432,
+   "n_action_steps": 433,
+   "n_steps_total": 520,
+   "settle_windows": [
+    87
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/item2/align-slot3/ref/episode_000153.json"
+  },
+  {
+   "split": "eval50",
+   "task": "configuration_matching-articulation_open_large_scale-dishwasher",
+   "episode": 50,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 904,
+   "n_action_steps": 905,
+   "n_steps_total": 1086,
+   "settle_windows": [
+    181
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "5b662b9f360ddfcd35c48cad00c43e760b5a288b",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/configuration_matching-articulation_open_large_scale-dishwasher/episode_000050.json",
+   "reference_settings_differ": true,
+   "note": "reference made before fixed_handle_ag became the default (OmniGibson's stock assisted-grasp rule): only the verdict is compared"
+  },
+  {
+   "split": "eval50",
+   "task": "configuration_matching-articulation_open_large_scale-dishwasher",
+   "episode": 51,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 1216,
+   "n_action_steps": 1217,
+   "n_steps_total": 1461,
+   "settle_windows": [
+    244
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "5b662b9f360ddfcd35c48cad00c43e760b5a288b",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/configuration_matching-articulation_open_large_scale-dishwasher/episode_000051.json",
+   "reference_settings_differ": true,
+   "note": "reference made before fixed_handle_ag became the default (OmniGibson's stock assisted-grasp rule): only the verdict is compared"
+  },
+  {
+   "split": "eval50",
+   "task": "configuration_matching-articulation_open_large_scale-dishwasher",
+   "episode": 52,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 942,
+   "n_action_steps": 943,
+   "n_steps_total": 1132,
+   "settle_windows": [
+    189
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "db5e8f8ce700c2ea6b86c96a7f5a663d2ac7f633",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/configuration_matching-articulation_open_large_scale-dishwasher/episode_000052.json",
+   "reference_settings_differ": true,
+   "note": "reference made before fixed_handle_ag became the default (OmniGibson's stock assisted-grasp rule): only the verdict is compared"
+  },
+  {
+   "split": "eval50",
+   "task": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
+   "episode": 100,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 740,
+   "n_action_steps": 741,
+   "n_steps_total": 890,
+   "settle_windows": [
+    149
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "db5e8f8ce700c2ea6b86c96a7f5a663d2ac7f633",
+   "source": "lab/diagnostics/closedloop/fixed-ag/configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table/episode_000100.json"
+  },
+  {
+   "split": "eval50",
+   "task": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
+   "episode": 101,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 831,
+   "n_action_steps": 832,
+   "n_steps_total": 999,
+   "settle_windows": [
+    167
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "db5e8f8ce700c2ea6b86c96a7f5a663d2ac7f633",
+   "source": "lab/diagnostics/closedloop/fixed-ag/configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table/episode_000101.json"
+  },
+  {
+   "split": "eval50",
+   "task": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
+   "episode": 102,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 826,
+   "n_action_steps": 827,
+   "n_steps_total": 993,
+   "settle_windows": [
+    166
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "db5e8f8ce700c2ea6b86c96a7f5a663d2ac7f633",
+   "source": "lab/diagnostics/closedloop/fixed-ag/configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table/episode_000102.json"
+  },
+  {
+   "split": "eval50",
+   "task": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
+   "episode": 103,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 764,
+   "n_action_steps": 765,
+   "n_steps_total": 918,
+   "settle_windows": [
+    153
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "db5e8f8ce700c2ea6b86c96a7f5a663d2ac7f633",
+   "source": "lab/diagnostics/closedloop/fixed-ag/configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table/episode_000103.json"
+  },
+  {
+   "split": "eval50",
+   "task": "mental_rotation-banana",
+   "episode": 200,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 27,
+   "n_action_steps": 28,
+   "n_steps_total": 78,
+   "settle_windows": [
+    50
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/mental_rotation-banana/episode_000200.json"
+  },
+  {
+   "split": "eval50",
+   "task": "mental_rotation-banana",
+   "episode": 201,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 58,
+   "n_action_steps": 59,
+   "n_steps_total": 109,
+   "settle_windows": [
+    50
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/mental_rotation-banana/episode_000201.json"
+  },
+  {
+   "split": "eval50",
+   "task": "mental_rotation-banana",
+   "episode": 202,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 42,
+   "n_action_steps": 43,
+   "n_steps_total": 93,
+   "settle_windows": [
+    50
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/mental_rotation-banana/episode_000202.json"
+  },
+  {
+   "split": "eval50",
+   "task": "object_scaling-canned_food",
+   "episode": 250,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 29,
+   "n_action_steps": 30,
+   "n_steps_total": 80,
+   "settle_windows": [
+    50
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/object_scaling-canned_food/episode_000250.json"
+  },
+  {
+   "split": "eval50",
+   "task": "object_scaling-canned_food",
+   "episode": 251,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 26,
+   "n_action_steps": 27,
+   "n_steps_total": 77,
+   "settle_windows": [
+    50
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/object_scaling-canned_food/episode_000251.json"
+  },
+  {
+   "split": "eval50",
+   "task": "object_scaling-canned_food",
+   "episode": 252,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 56,
+   "n_action_steps": 57,
+   "n_steps_total": 107,
+   "settle_windows": [
+    50
+   ],
+   "position_error_m": null,
+   "horizon": 1500,
+   "evaluator_commit": "e19f17ec74ce37932ab1a4102d32d01da964f6b2",
+   "source": "lab/diagnostics/vec-eval/3b/ref-tasks/object_scaling-canned_food/episode_000252.json"
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 39,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 624,
+   "n_action_steps": 625,
+   "n_steps_total": 750,
+   "settle_windows": [
+    125
+   ],
+   "position_error_m": 0.049654290080070496,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000039.json",
+   "other_run_on_lab_machine": {
+    "source": "lab/diagnostics/replay/train/episode_000039.json",
+    "success": true,
+    "reason": null,
+    "first_success_step": 625,
+    "n_steps_total": 752
+   }
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 59,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 523,
+   "n_action_steps": 524,
+   "n_steps_total": 629,
+   "settle_windows": [
+    105
+   ],
+   "position_error_m": 0.04295925050973892,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000059.json"
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 74,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 229,
+   "n_action_steps": 230,
+   "n_steps_total": 280,
+   "settle_windows": [
+    50
+   ],
+   "position_error_m": 0.04713967442512512,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000074.json"
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 82,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 429,
+   "n_action_steps": 430,
+   "n_steps_total": 516,
+   "settle_windows": [
+    86
+   ],
+   "position_error_m": 0.04921117424964905,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000082.json",
+   "other_run_on_lab_machine": {
+    "source": "lab/diagnostics/replay/train/episode_000082.json",
+    "success": true,
+    "reason": null,
+    "first_success_step": 430,
+    "n_steps_total": 518
+   }
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 98,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 626,
+   "n_action_steps": 627,
+   "n_steps_total": 753,
+   "settle_windows": [
+    126
+   ],
+   "position_error_m": 0.04839964583516121,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000098.json",
+   "other_run_on_lab_machine": {
+    "source": "lab/diagnostics/replay/train/episode_000098.json",
+    "success": false,
+    "reason": "tolerance",
+    "first_success_step": 625,
+    "n_steps_total": 1004
+   },
+   "borderline": true,
+   "note": "ends at the 5 cm position tolerance: 5.007 cm (tolerance, 2026-10-07) and success (2026-10-08) in two runs on the lab machine; either verdict is a pass, the goal must hold at some step"
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 99,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 468,
+   "n_action_steps": 469,
+   "n_steps_total": 563,
+   "settle_windows": [
+    94
+   ],
+   "position_error_m": 0.0476856604218483,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000099.json"
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 107,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 334,
+   "n_action_steps": 335,
+   "n_steps_total": 402,
+   "settle_windows": [
+    67
+   ],
+   "position_error_m": 0.02767104282975197,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000107.json"
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 113,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 899,
+   "n_action_steps": 900,
+   "n_steps_total": 1080,
+   "settle_windows": [
+    180
+   ],
+   "position_error_m": 0.04651134833693504,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000113.json"
+  },
+  {
+   "split": "train",
+   "task": "camera_relocalization-standard",
+   "episode": 116,
+   "success": true,
+   "reason": null,
+   "binary_success_ever": true,
+   "first_success_step": 646,
+   "n_action_steps": 647,
+   "n_steps_total": 777,
+   "settle_windows": [
+    130
+   ],
+   "position_error_m": 0.04439391940832138,
+   "horizon": 1500,
+   "evaluator_commit": "221c6e03b0403ba9d3662f9197248966f2e5ae5b",
+   "source": "lab/diagnostics/eval-fixes/parity-replay/train/episode_000116.json"
+  }
+ ]
+}
