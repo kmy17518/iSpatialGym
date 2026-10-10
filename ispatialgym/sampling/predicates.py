@@ -169,6 +169,19 @@ def attachment_context(child: Any, parent: Any) -> Optional[Dict[str, Any]]:
     return _ATTACHMENTS.get((None, *names))
 
 
+def attachment_partners(child: Any) -> List[str]:
+    """Names of the parents registered for ``child``, with :func:`attachment_context`'s precedence: the pairs of the child's
+    own scene first, then the single-env registration (scene None), each in registration order."""
+    name = getattr(child, "name", str(child))
+    idx = getattr(getattr(child, "scene", None), "idx", None)
+    out: List[str] = []
+    for scene_idx in (idx, None) if idx is not None else (None,):
+        for s, c, p in _ATTACHMENTS:
+            if s == scene_idx and c == name and p not in out:
+                out.append(p)
+    return out
+
+
 def _qmul(a, b):
     ax, ay, az, aw = a
     bx, by, bz, bw = b
@@ -429,10 +442,9 @@ def attach_on_release(robot: Any, arm: str, obj: Any) -> Optional[Dict[str, Any]
     physics. The per-step check of the ``attached`` atom would join it only at the end of the step, after it fell a few
     millimetres through the collision-filtered partner. The same rule acts for an evaluated policy's release. Returns the
     alignment record (also kept in ``LAST_RELEASE_ATTACH``), or None when ``obj`` is not an attachment child."""
-    name = getattr(obj, "name", None)
     scene = getattr(obj, "scene", None)
-    for child_name, parent_name in list(_ATTACHMENTS):
-        if child_name != name or scene is None:
+    for parent_name in attachment_partners(obj):
+        if scene is None:
             continue
         parent = scene.object_registry("name", parent_name)
         if parent is None:

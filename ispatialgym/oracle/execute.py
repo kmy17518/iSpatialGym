@@ -611,6 +611,20 @@ def _hook(ctx: Dict[str, Any], name: str):
     return (ctx.get("hooks") or {}).get(name) or (lambda *a, **k: None)
 
 
+def _patch_ag_joint_type(robot, joint_type: Optional[str]) -> None:
+    """Compatibility entry point of the lab evaluator (``lab_tools/evaluator_patches.py``, ``oracle/vec_loader.py``): the
+    assisted-grasp joint of a link behind a movable joint is the task's rule (``tasks.ispatialgym_task``), not the oracle's.
+    ``"FixedJoint"`` applies that rule to ``robot`` again; ``None`` leaves the robot as it is. OmniGibson's joint choice is
+    not overridden here."""
+    if joint_type is None:
+        return
+    if joint_type != "FixedJoint":
+        raise ValueError(f"_patch_ag_joint_type: the task's rule is 'FixedJoint' (or None: no-op), got {joint_type!r}")
+    from ispatialgym.tasks.ispatialgym_task import apply_ag_joint_rule
+
+    apply_ag_joint_rule(robot)
+
+
 def _witness(ctx: Dict[str, Any], key: str):
     """The sampler's IK witness (28-D q) of the action target ``key`` when the sidecar recorded one (``arm_to`` then
     plans to that configuration, i.e. into the branch the following approach / descent was validated from)."""

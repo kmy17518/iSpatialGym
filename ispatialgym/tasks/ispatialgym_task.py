@@ -101,6 +101,11 @@ def _robots(robots):
             yield robot
 
 
+def apply_ag_joint_rule(robot) -> None:
+    """The assisted-grasp joint rule ``initialize_activity`` sets on every robot of the env, on one robot."""
+    robot.ag_moving_link_joint_type = AG_MOVING_LINK_JOINT_TYPE
+
+
 class ISpatialGymTask(BehaviorTask):
     """
     Args:
