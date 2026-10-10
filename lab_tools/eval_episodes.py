@@ -298,6 +298,9 @@ def main(argv=None) -> int:
     ap.add_argument("--tag", default=None, help="free text recorded in every episode (smoke, ...)")
     ap.add_argument("--overwrite", action="store_true")
     ap.add_argument("--no-planner", action="store_true", help="evaluator patch: no cuRobo planner in policy mode (streams never plan; saves ~5 GB of GPU memory and the build)")
+    ap.add_argument("--stream-qa", default="off", choices=["off", "stop", "log"],
+                    help="run_isg --stream-qa: off = only the timeout ends a stream (the evaluator's rule), stop = every QA monitor, "
+                         "log = the verdicts are recorded and the stream goes on")
     ap.add_argument("--stock-handle-ag", action="store_true", help="OmniGibson's stock assisted-grasp joint rule (default since 2026-10-08: the oracle's FixedJoint for links behind movable joints)")
     ap.add_argument("--cleanup", action="store_true", help="after every episode: gc.collect() + torch.cuda.empty_cache() (evaluator_patches.after_episode_cleanup)")
     args = ap.parse_args(argv)
@@ -421,7 +424,8 @@ def run_job(args, shared=None, shutdown=True) -> int:
         AP.CONTEXT = ctx
         argv_r = ["--instance", ep["tro"], "--mode", "policy", "--policy", "lab_tools.act_policy:ActPolicy", "--policy-steps", str(args.horizon),
                   "--max-steps", str(args.max_steps), "--settle-steps", str(args.settle_steps), "--out", out_root, "--record", "video", "--video",
-                  "--video-size", str(args.video_size), "--demo-gating", "none", "--no-goal-override", "--log-level", "WARNING"]
+                  "--video-size", str(args.video_size), "--demo-gating", "none", "--no-goal-override", "--log-level", "WARNING",
+                  "--stream-qa", getattr(args, "stream_qa", "off")]
         if args.external_video:
             argv_r.append("--dev")
         rargs = R.parse_args(argv_r)
@@ -433,7 +437,8 @@ def run_job(args, shared=None, shutdown=True) -> int:
                   "goal_png": os.path.relpath(goal_png, args.dataset), "goal_pngs": {cam: os.path.relpath(p, WT) for cam, p in goal_pngs.items()},
                   "goal_from_episode": goal_from, "tag": args.tag,
                   "stop_on_success": ctx["stop_on_success"], "instance_verified": ep.get("verified"), "first_frame_mean_abs_diff": ep.get("first_frame_mean_abs_diff"),
-                  "fixed_handle_ag": not getattr(args, "stock_handle_ag", False), "started_at": utc(), "finished_at": None, "provenance": provenance}
+                  "fixed_handle_ag": not getattr(args, "stock_handle_ag", False), "started_at": utc(), "finished_at": None, "provenance": provenance,
+                  "stream_qa": getattr(args, "stream_qa", "off")}
         try:
             if shared.get("env") is not None:
                 shared["template_dir"] = os.path.dirname(os.path.dirname(os.path.abspath(ep["tro"])))  # same template, possibly another path (lenient candidates)
@@ -453,7 +458,7 @@ def run_job(args, shared=None, shutdown=True) -> int:
                 "raw_dir": os.path.relpath(out_dir, WT) if out_dir else None,
                 "server_metadata": {k2: v for k2, v in (ctx.get("server_metadata") or {}).items() if k2 in ("policy", "action_horizon", "chunk_size", "execution_mode", "checkpoint_step", "goal_fusion", "goal_views", "task_map")},
                 "goal_views_sent": ctx.get("goal_views_sent"),
-                "timings": meta.get("timings"), "release_check": meta.get("release_check"),
+                "timings": meta.get("timings"), "release_check": meta.get("release_check"), "stream_qa_log": meta.get("stream_qa"),
             })
             if result.get("status") == "error" or rc == R.EXIT_ERROR:
                 record["error"] = result.get("error") or "evaluator error"

@@ -859,10 +859,11 @@ def parse_args(argv=None):
     p.add_argument("--video-size", type=int, default=None, help="downscale video frames to this square size")
     p.add_argument("--goal-image", action="store_true", help="capture the goal image after the settled check (>= 3 renders) and write goal_observation into the TRO")
     p.add_argument("--no-goal-override", action="store_true", help="do not write the settled values back into the TRO goal poses")
-    p.add_argument("--stream-qa", default="stop", choices=["stop", "log"],
+    p.add_argument("--stream-qa", default="stop", choices=["stop", "log", "off"],
                    help="replay / policy: stop = a QA monitor verdict (collision, ghost hand, ...) ends the episode; log = it is recorded in "
                         "meta.stream_qa and the stream goes on, the episode judged by its goal (a stream has no program: its grasps and "
-                        "pushes have no intended contacts)")
+                        "pushes have no intended contacts); off = only the timeout ends the episode (the collision monitor keeps its "
+                        "contact statistics)")
     p.add_argument("--demo-gating", default="auto",
                    choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "robot_wobble", "release_commanded", "none"],
                    help="demo-collection gate after the epilogue: placed_orientation = every placed object within its recorded orientation tolerance (full error; "

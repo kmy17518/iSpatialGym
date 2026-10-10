@@ -283,6 +283,9 @@ def main(argv=None) -> int:
     ap.add_argument("--task", default=TASK, help="the instances' task (default relocalization; other tasks: articulation / alignment scoring)")
     ap.add_argument("--fixed-handle-ag", dest="fixed_handle_ag", action="store_true", default=True, help="evaluator patch (default on since 2026-10-08): the oracle's FixedJoint assisted grasp for links behind movable joints")
     ap.add_argument("--stock-handle-ag", dest="fixed_handle_ag", action="store_false", help="OmniGibson's stock assisted-grasp joint rule")
+    ap.add_argument("--stream-qa", default="off", choices=["off", "stop", "log"],
+                    help="run_isg --stream-qa: off = only the timeout ends a stream (the evaluator's rule), stop = every QA monitor, "
+                         "log = the verdicts are recorded and the stream goes on")
     args = ap.parse_args(argv)
     return run_replay_job(args, shared={}, shutdown=True)
 
@@ -345,14 +348,16 @@ def run_replay_job(args, shared=None, shutdown=True) -> int:
                   "horizon": args.horizon, "wall_s": None, "evaluator_commit": provenance["evaluator_commit"], "act_commit": None, "server_args": None, "error": None,
                   "score": None, "tag": args.tag, "stop_on_success": not args.no_stop_on_success, "instance_verified": v.get("verified"),
                   "first_frame_mean_abs_diff": v.get("first_frame_mean_abs_diff"), "started_at": utc(), "finished_at": None, "provenance": provenance,
-                  "policy": "lab_tools.replay_policy:ReplayPolicy (recorded actions, open loop)", "fixed_handle_ag": bool(getattr(args, "fixed_handle_ag", False))}
+                  "policy": "lab_tools.replay_policy:ReplayPolicy (recorded actions, open loop)", "fixed_handle_ag": bool(getattr(args, "fixed_handle_ag", False)),
+                  "stream_qa": getattr(args, "stream_qa", "off")}
         try:
             actions, states, length = load_episode_arrays(args.dataset, e)
             ctx = {"actions": actions, "horizon": args.horizon, "stop_on_success": not args.no_stop_on_success, "shared": shared}
             RP.CONTEXT = ctx
             argv_r = ["--instance", v["tro"], "--mode", "policy", "--policy", "lab_tools.replay_policy:ReplayPolicy", "--policy-steps", str(args.horizon),
                       "--max-steps", str(args.max_steps), "--settle-steps", str(args.settle_steps), "--out", args.raw_out, "--record", "video", "--video",
-                      "--video-size", str(args.video_size), "--demo-gating", "none", "--no-goal-override", "--log-level", "WARNING"]
+                      "--video-size", str(args.video_size), "--demo-gating", "none", "--no-goal-override", "--log-level", "WARNING",
+                      "--stream-qa", record["stream_qa"]]
             rargs = R.parse_args(argv_r)
             if shared.get("env") is not None:
                 shared["template_dir"] = os.path.dirname(os.path.dirname(os.path.abspath(v["tro"])))
@@ -368,7 +373,7 @@ def run_replay_job(args, shared=None, shutdown=True) -> int:
                 "n_action_steps": result.get("n_action_steps"), "first_success_step": meta.get("first_success_step"), "binary_success_ever": meta.get("binary_success_ever"),
                 "binary_success_final": meta.get("binary_success_final"), "settled_success": meta.get("settled_success"), "settle_windows": meta.get("settle_windows"),
                 "video": os.path.relpath(meta["video"], WT) if meta.get("video") else None, "raw_dir": os.path.relpath(out_dir, WT) if out_dir else None,
-                "timings": meta.get("timings"), "release_check": meta.get("release_check"),
+                "timings": meta.get("timings"), "release_check": meta.get("release_check"), "stream_qa_log": meta.get("stream_qa"),
             })
             if result.get("status") == "error" or rc == R.EXIT_ERROR:
                 record["error"] = result.get("error") or "evaluator error"

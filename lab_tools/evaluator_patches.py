@@ -5,8 +5,9 @@ Installed once per process by :func:`install` (before any world is built):
 * ``InstanceLoader.behavior_output`` forced on: BEHAVIOR's sensor set (head 720 px / 40 mm, wrists 480 px, rgb + depth + proprio)
   without writing a LeRobot shard;
 * no ``depth_linear`` annotators unless ``keep_depth`` (the policy consumes RGB + proprio; rendering depth costs time);
-* stream QA: ``Monitors.check`` keeps the step counters and the contact statistics but returns only the timeout verdict
-  (collision / pause / FOV verdicts off during policy streams - machine 1, 2026-10-04T18:33:48Z);
+* stream QA: not patched any more - the drivers pass ``run_isg --stream-qa`` (their default ``off``:
+  ``Monitors.check_timeout_only`` keeps the step counters and the contact statistics and returns only the timeout verdict;
+  collision / pause / FOV verdicts off during policy streams - machine 1, 2026-10-04T18:33:48Z);
 * epilogue: when the binary goal never held during the stream, one 10-step no-op window and no second window (the verdict
   is ``not_reached`` / ``tolerance`` either way); a goal that held at some step gets the executor's default windows
   (max(50, 20 % of the streamed steps), then a 2x second window when the robot moved or the goal was lost).
@@ -100,7 +101,6 @@ def install(keep_depth: bool = False, no_planner: bool = False, fixed_handle_ag:
     if _INSTALLED:
         return
     _INSTALLED = True
-    from ispatialgym.oracle import qa as QA
     from ispatialgym.oracle import run_isg as R
     from ispatialgym.oracle.executor import Executor
 
@@ -143,17 +143,6 @@ def install(keep_depth: bool = False, no_planner: bool = False, fixed_handle_ag:
             return o
 
         BL.robot_overrides = robot_overrides
-
-    def check(self, step=None):
-        self.episode_steps = self.episode_steps + 1 if step is None else int(step)
-        self.action_steps += 1
-        try:
-            self._check_collision()  # contact statistics only
-        except Exception:  # noqa: BLE001
-            pass
-        return self._check_timeout()
-
-    QA.Monitors.check = check
 
     _orig_epilogue = Executor.epilogue
 

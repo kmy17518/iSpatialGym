@@ -498,6 +498,17 @@ class Monitors:
                 return v
         return None
 
+    def check_timeout_only(self, step: Optional[int] = None) -> Optional[Verdict]:
+        """``check`` of a stream with ``stream_qa="off"``: the step counters and the collision monitor's contact statistics,
+        its verdict discarded; only the timeout ends the episode."""
+        self.episode_steps = self.episode_steps + 1 if step is None else int(step)
+        self.action_steps += 1
+        try:
+            self._check_collision()
+        except Exception:  # noqa: BLE001  (statistics only)
+            pass
+        return self._check_timeout()
+
     # -- collision -------------------------------------------------------------------------------------------------
 
     def _contact_pairs(self):

@@ -71,6 +71,9 @@ def parse_args(argv=None):
     ap.add_argument("--video-size", type=int, default=480)
     ap.add_argument("--max-steps", type=int, default=6000)
     ap.add_argument("--settle-steps", type=int, default=25)
+    ap.add_argument("--stream-qa", default="off", choices=["off", "stop", "log"],
+                    help="VecStreamExecutor stream_qa: off = only the timeout ends a stream (the evaluator's rule), stop = every QA monitor, "
+                         "log = the verdicts are recorded per slot and the stream goes on")
     ap.add_argument("--no-stop-on-success", action="store_true")
     ap.add_argument("--overwrite", action="store_true")
     ap.add_argument("--include-unverified", action="store_true")
@@ -293,7 +296,7 @@ def args_from_job(job: dict, worker_id=None):
         argv += ["--step", str(job["step"])]
     if job.get("episodes"):
         argv += ["--episodes", *[str(e) for e in job["episodes"]]]
-    for key, flag in (("server_args", "--server-args"), ("action_horizon", "--action-horizon"), ("tag", "--tag"), ("ckpt_repo", "--ckpt-repo"), ("ckpt_file", "--ckpt-file"),
+    for key, flag in (("server_args", "--server-args"), ("action_horizon", "--action-horizon"), ("tag", "--tag"), ("stream_qa", "--stream-qa"), ("ckpt_repo", "--ckpt-repo"), ("ckpt_file", "--ckpt-file"),
                       ("ckpt_sha256", "--ckpt-sha256"), ("ckpt_path", "--ckpt-path"), ("goals_root", "--goals-root")):
         if job.get(key) not in (None, ""):
             argv += [flag, str(job[key])]
@@ -327,7 +330,7 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
     from lab_tools import act_policy as AP
     from lab_tools import evaluator_patches
 
-    evaluator_patches.install(keep_depth=args.keep_depth, no_planner=True)  # BEHAVIOR sensor set, no depth, timeout-only QA
+    evaluator_patches.install(keep_depth=args.keep_depth, no_planner=True)  # BEHAVIOR sensor set, no depth (QA: --stream-qa)
     import omnigibson as og
     from omnigibson.object_states import PoseReached  # noqa: F401
 
@@ -485,7 +488,7 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
                       "evaluator_commit": provenance["evaluator_commit"], "act_commit": provenance["act_commit"], "server_args": args.server_args if args.mode == "policy" else None,
                       "error": None, "score": None, "tag": args.tag, "stop_on_success": not args.no_stop_on_success, "instance_verified": ep.get("verified"),
                       "first_frame_mean_abs_diff": ep.get("first_frame_mean_abs_diff"), "started_at": started, "finished_at": None, "provenance": provenance,
-                      "slot": i, "num_envs": N, "batch": b, "vectorized": True, "tiled_rendering": loader.report.get("tiled_rendering")}
+                      "slot": i, "num_envs": N, "batch": b, "vectorized": True, "tiled_rendering": loader.report.get("tiled_rendering"), "stream_qa": args.stream_qa}
             if args.mode == "replay":
                 record["policy"] = "lab_tools.vec_eval:ReplaySource (recorded actions, open loop)"
             per[i] = {"ep": ep, "record": record, "out_dir": out_dir, "t0": time.time()}
@@ -537,7 +540,7 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
         t_run = time.time()
         results: Dict[int, dict] = {}
         try:
-            vex = VecStreamExecutor(env, slots, sim=og.sim, n_render_iterations=1, num_envs=N, idle_actions=idle)
+            vex = VecStreamExecutor(env, slots, sim=og.sim, n_render_iterations=1, num_envs=N, idle_actions=idle, stream_qa=args.stream_qa)
             for s, r in zip(slots, vex.run(obs_list, info_list)):
                 results[s.idx] = r
         except Exception as ex:  # noqa: BLE001
@@ -593,7 +596,7 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
                         "n_action_steps": episode.get("n_action_steps"), "first_success_step": episode.get("first_success_step"), "binary_success_ever": episode.get("binary_success_ever"),
                         "binary_success_final": episode.get("binary_success_final"), "settled_success": episode.get("settled_success"), "settle_windows": episode.get("settle_windows"),
                         "video": os.path.relpath(meta["video"], WT) if meta.get("video") else None, "raw_dir": os.path.relpath(out_dir, WT), "timings": meta.get("timings"),
-                        "batch_steps": episode.get("batch_steps"), "release_check": episode.get("release_check"),
+                        "batch_steps": episode.get("batch_steps"), "release_check": episode.get("release_check"), "stream_qa_log": episode.get("stream_qa"),
                     })
                     if args.mode == "policy":
                         record["server_metadata"] = {k2: v for k2, v in (ctx.get("server_metadata") or {}).items()

@@ -151,7 +151,8 @@ class ExecutorConfig:
     demo_gating: Tuple[str, ...] = ()
     #: replay / policy streams: ``stop`` = a QA monitor verdict (collision, ghost hand, ...) ends the episode as it does an
     #: oracle action; ``log`` = it is recorded (``result.stream_qa``) and the stream goes on, so the episode is judged by its
-    #: goal as an evaluator judges a policy (a stream has no program, so its grasps and pushes have no intended contacts)
+    #: goal as an evaluator judges a policy (a stream has no program, so its grasps and pushes have no intended contacts);
+    #: ``off`` = only the timeout is checked (``Monitors.check_timeout_only``: the collision monitor keeps its statistics)
     stream_qa: str = "stop"
     demo_orientation_tolerance_default: float = 0.2
     demo_revolution_axes: bool = True
@@ -880,6 +881,7 @@ class Executor:
         self.brace_retries: List[Dict[str, Any]] = []
         self.stream_qa: List[Dict[str, Any]] = []
         self._qa_log = False
+        self._qa_off = False
         # oracle.protection (owner 2026-09-26): the goal objects protected during transits ([(bddl name, scene object)], set by
         # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
         self.protected_goal: List[Tuple[str, Any]] = []
@@ -998,7 +1000,9 @@ class Executor:
                 rew = 0.0
             self.recorder.record(self.n, action, obs, info, state=state, phase=phase, action_index=action_index, attempt=attempt,
                                  reward=rew, terminated=bool(terminated), truncated=bool(truncated), sim_time=sim_time)
-        verdict = self.monitors.check(self.n) if (monitor and self.monitors is not None) else None
+        verdict = None
+        if monitor and self.monitors is not None:
+            verdict = self.monitors.check_timeout_only(self.n) if self._qa_off else self.monitors.check(self.n)
         if verdict is None and self.n >= self.cfg.max_steps:
             verdict = Verdict("timeout", f"episode exceeded max_steps {self.cfg.max_steps}", step=self.n)
             self.stats.record(verdict)
@@ -1828,6 +1832,7 @@ class Executor:
         t0 = time.time()
         verdict: Optional[Verdict] = None
         self._qa_log = self.cfg.stream_qa == "log"
+        self._qa_off = self.cfg.stream_qa == "off"
         self._init_torso_load()
         if self.monitors is not None:
             self.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=self.state.held_objects(), manipulation=False)
