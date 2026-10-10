@@ -100,16 +100,14 @@ def test_gripper_instant_opening_reaches_the_open_command_on_its_first_step():
     assert float(ramped[idx]) < 0.0  # the ramp starts at the fingers' opening
 
 
-def test_free_standing_follow_runs_the_handle_arc_reaimed_for_the_live_body_and_slows_while_the_torso_bends():
+def test_free_standing_follow_turns_the_hand_rigidly_about_the_start_hinge_and_slows_while_the_torso_bends():
     from types import SimpleNamespace as NS
-
-    from ispatialgym.robot import conventions as C
 
     hinge, axis, r = th.tensor([1.0, 0.0, 1.0]), th.tensor([0.0, 1.0, 0.0]), 0.1
     q0 = th.tensor([0.0, 0.0, 0.0, 1.0])
 
-    def on_circle(ang):
-        return (hinge + th.tensor([r * math.cos(ang), 0.0, r * math.sin(ang)]), q0)
+    def on_circle(ang, rad=r):
+        return (hinge + th.tensor([rad * math.cos(ang), 0.0, rad * math.sin(ang)]), q0)
 
     body = {"pos": th.tensor([1.0, 0.1, 0.8]), "calls": 0}
 
@@ -119,45 +117,44 @@ def test_free_standing_follow_runs_the_handle_arc_reaimed_for_the_live_body_and_
 
         def object_pose(self, name):
             body["calls"] += 1
-            p = body["pos"] + (th.tensor([0.005, 0.0, 0.0]) if body["calls"] > 3 else th.zeros(3))  # the body slides 5 mm mid-follow
+            p = body["pos"] + (th.tensor([0.005, 0.0, 0.0]) if body["calls"] > 1 else th.zeros(3))  # the body slides 5 mm once the follow runs
             return p, q0
 
-    seen, trunk = [], [0.0, math.radians(0.3), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        def joint_position(self, name, joint):
+            return 0.0
+
+    seen, trunk = [], [0.0, math.radians(0.3), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
     class Mot:
         cfg = NS(cartesian_speed=0.1)
         state = NS(trunk_error=lambda: trunk[min(len(seen) - 1, len(trunk) - 1)])
 
         def eef_pose(self, arm):
-            return on_circle(0.0)
+            return on_circle(0.0, 0.105)  # the grasp sits 5 mm outside the recorded handle circle
 
         def arm_along(self, arm, wps, converge=True, speed=None, **kw):
             seen.append(([w[0].clone() for w in wps], speed))
             return iter(())
 
-    art = NS(object="blender", extra={"hinge_world": hinge.tolist(), "axis_world": axis.tolist(),
-                                      "object_pose": {"position": body["pos"].tolist(), "orientation": q0.tolist()}})
+    art = NS(object="blender", joint="j_lid", extra={"hinge_world": hinge.tolist(), "axis_world": axis.tolist(),
+                                                     "object_pose": {"position": body["pos"].tolist(), "orientation": q0.tolist()}})
+    targets = {"handle_poses": [on_circle(0.31), on_circle(0.62)], "q_values": [0.31, 0.62]}
     note = {}
     cfg = EX.ExecuteConfig()
-    list(EX._follow_handle_poses(NS(arm="right", articulation=art), Mot(), State(), [on_circle(0.31), on_circle(0.62)], cfg, note))
-    info = note["live_reaim"]
-    assert info["arc"] and info["waypoints"] == 22 and info["chunks"] == 6  # 0.31 rad / 0.03 -> 11 arc waypoints per segment, 4 per chunk
-    first = seen[0][0]
-    assert all(abs(float(th.linalg.norm((p - hinge)[[0, 2]])) - r) < 1e-4 for p in first)  # on the handle's circle, not a chord
-    assert info["reaimed"] == 5 and info["max_move_m"] == pytest.approx(0.005, abs=1e-4)  # every chunk after the body slid
-    assert th.allclose(seen[0][0][-1], on_circle(4 * 0.31 / 11)[0], atol=1e-4)  # before the slide: the recorded arc
-    assert th.allclose(seen[-1][0][-1], on_circle(0.62)[0] + th.tensor([0.005, 0.0, 0.0]), atol=1e-4)  # moved with the body
+    list(EX._follow_handle_poses(NS(arm="right", articulation=art), Mot(), State(), targets, cfg, note))
+    info = note["handle_arc"]
+    assert info["waypoints"] == 21 and info["chunks"] == 6 and info["sense"] == -1.0  # 0.62 rad / 0.03 -> 21 waypoints, 4 per chunk
+    pts = [p for chunk, _ in seen for p in chunk]
+    assert all(abs(float(th.linalg.norm((p - hinge)[[0, 2]])) - 0.105) < 1e-4 for p in pts)  # the grasp's own circle: no chord, no snap
+    assert th.allclose(pts[-1], on_circle(0.62, 0.105)[0], atol=1e-4)  # the body's slide does not move the hinge the hand turns about
+    assert info["end_off_recorded_m"] == pytest.approx(0.005, abs=1e-4)
     assert seen[1][1] is None and seen[2][1] == pytest.approx(0.1 * cfg.follow_slow_factor) and seen[3][1] is None and info["slowed"] == 1
-    seen.clear()
-    fixed_state = State()
-    fixed_state.object = lambda name: NS(fixed_base=True)
-    list(EX._follow_handle_poses(NS(arm="right", articulation=art), Mot(), fixed_state, [on_circle(0.31), on_circle(0.62)], cfg, {}))
-    assert len(seen) == 1 and len(seen[0][0]) == 2  # a fixed-base articulation: the recorded poses as they are
-    seen.clear()
-    unknown = State()
-    unknown.object = lambda name: NS()
-    list(EX._follow_handle_poses(NS(arm="right", articulation=art), Mot(), unknown, [on_circle(0.31), on_circle(0.62)], cfg, {}))
-    assert len(seen) == 1  # no fixed_base attribute: as recorded
+    for obj in (NS(fixed_base=True), NS()):  # a fixed-base articulation / no fixed_base attribute: the recorded poses as they are
+        seen.clear()
+        st = State()
+        st.object = lambda name, o=obj: o
+        list(EX._follow_handle_poses(NS(arm="right", articulation=art), Mot(), st, targets, cfg, {}))
+        assert len(seen) == 1 and len(seen[0][0]) == 2
 
 
 def test_partner_clear_shift_moves_the_place_away_from_the_partner_by_what_the_opening_misses():

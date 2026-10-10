@@ -379,6 +379,8 @@ class ExecuteConfig:
     drop_lower_clear_m: float = 0.02
     drop_lower_min_m: float = 0.01
     drop_lower_limit_margin_rad: float = 0.05
+    #: ... and the fully opened fingers keep this much above whatever is under them (a container's rim)
+    drop_lower_finger_clear_m: float = 0.015
     #: ... a next-to / touching place keeps the fully open fingers ``place_partner_clear_m`` from the partner at the release: the
     #: assisted grasp lets go on the full open command only, and the pad on the partner's side swept 15 mm toward it (touching:
     #: the box of tissues shoved 6 mm). The place (and the push that follows it) is moved away from the partner by what is missing,
@@ -387,13 +389,11 @@ class ExecuteConfig:
     place_partner_clear_max_m: float = 0.03
     place_partner_clear_spacing_m: float = 0.004
     #: owner 2026-10-09 (blender open: the free-standing body tipped 0.9 deg and slid 2 mm under the arm-mode follow while the torso bent
-    #: 0.41 deg): the arm-mode follow of a free-standing object runs along the handle's arc about the hinge (``follow_arc_step_rad`` per
-    #: waypoint) instead of the chords between the five recorded poses, and every ``follow_reaim_chunk`` waypoints it is re-aimed for the
-    #: body's live pose (its motion since the follow began, once that moves the hand more than ``follow_reaim_min_m``); while the torso
-    #: is bent more than ``follow_slow_trunk_rad`` the next chunk runs at ``follow_slow_factor`` of the pace. 0 chunks = the recorded chords
+    #: 0.41 deg): the arm-mode follow of a free-standing object turns the hand rigidly about the hinge as it stands when the follow begins
+    #: (``follow_arc_step_rad`` per waypoint; <= 0 = the recorded chords), streamed in chunks of ``follow_reaim_chunk`` waypoints, the
+    #: next chunk at ``follow_slow_factor`` of the pace while the torso is bent more than ``follow_slow_trunk_rad``
     follow_reaim_chunk: int = 4
     follow_arc_step_rad: float = 0.03
-    follow_reaim_min_m: float = 0.001
     follow_slow_trunk_rad: float = math.radians(0.15)
     follow_slow_factor: float = 0.5
 
@@ -2246,6 +2246,30 @@ def surface_below(obj, robot=None, inset: float = 0.25, depth: float = 0.6) -> T
     return best, len(starts)
 
 
+def open_fingers_clearance_below(arm: str, eef_pose, q_open: float, skip: Sequence[Any], depth: float, spacing: float) -> Optional[float]:
+    """How far the hand at ``eef_pose`` can come straight down before its fingers, fully open (``q_open`` per finger), meet anything
+    other than ``skip`` (rays down from the finger surface, ``depth`` long). None without finger meshes; ``depth`` when nothing is met."""
+    import numpy as np
+
+    surf = finger_surface_points(arm, spacing)
+    if not surf:
+        return None
+    p, q = as_world_pose(eef_pose)
+    R = C.quat_to_mat(C.as_tensor(q).float()).numpy()
+    pts = np.vstack([(np.asarray(pp, dtype=float) + float(q_open) * np.asarray(ax, dtype=float)) for pp, ax in surf]) @ R.T + C.as_tensor(p).float().numpy()
+    starts = pts.tolist()
+    ends = (pts - np.array([0.0, 0.0, float(depth)])).tolist()
+    roots = [str(getattr(o, "prim_path", "") or "") for o in skip if o is not None]
+    best = float(depth)
+    for ray in _raycast_all(starts, ends):
+        for h in (ray if isinstance(ray, list) else [ray]):
+            body = str(h.get("rigidBody") or "")
+            if not h.get("hit") or any(r and body.startswith(r) for r in roots):
+                continue
+            best = min(best, float(h.get("distance", depth)))
+    return best
+
+
 def lower_drop(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
     """Owner 2026-10-09 (sandal: "the problem is the long fall and bounce, not the instant open"): before a drop's release the held
     object comes straight down from the recorded drop pose until its bottom is ``drop_lower_clear_m`` above the surface under it
@@ -2263,9 +2287,22 @@ def lower_drop(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg:
         rec["reason"] = f"no surface probe ({e!r})"[:160]
         return
     want = float(cfg.drop_lower_max_m) if surface is None else min(float(cfg.drop_lower_max_m), bottom - surface - float(cfg.drop_lower_clear_m))
-    rec.update({"bottom_z": round(bottom, 4), "surface_z": None if surface is None else round(surface, 4), "planned_m": round(want, 4), "rays": n_rays})
+    rec.update({"bottom_z": round(bottom, 4), "surface_z": None if surface is None else round(surface, 4), "rays": n_rays})
+    # the fingers open fully at the release: they must not come down onto what stands around the object (a bowl's rim - the brussels
+    # sprouts lowered into the bowl touched it with the opened fingers)
+    try:
+        _lo, hi = motions._gripper_limits(arm)
+        fingers = open_fingers_clearance_below(arm, state.eef_pose(arm), hi, [obj, getattr(motions, "robot", None)], max(want, 0.0) + float(cfg.drop_lower_finger_clear_m),
+                                               float(cfg.place_partner_clear_spacing_m))
+    except Exception as e:  # noqa: BLE001
+        fingers = None
+        rec["finger_probe"] = f"{e!r}"[:120]
+    if fingers is not None:
+        rec["open_fingers_free_m"] = round(fingers, 4)
+        want = min(want, fingers - float(cfg.drop_lower_finger_clear_m))
+    rec["planned_m"] = round(want, 4)
     if want < float(cfg.drop_lower_min_m):
-        rec["reason"] = f"{want * 1000:.0f} mm to lower (the object is already near what is under it)"
+        rec["reason"] = f"{max(want, 0.0) * 1000:.0f} mm to lower (the object or its opened fingers already near what is under them)"
         return
     p, q = (x.float() for x in as_world_pose(state.eef_pose(arm)))
     target = (p - th.tensor([0.0, 0.0, want]), q)
@@ -3875,46 +3912,48 @@ def _live_hinge(state, art) -> Optional[Tuple[th.Tensor, th.Tensor]]:
     return hinge, axis
 
 
-def _follow_handle_poses(action: BaseFollow, motions: Motions, state, poses: Sequence[Any], cfg: ExecuteConfig, note: Dict[str, Any]) -> Iterator[th.Tensor]:
-    """The arm-mode follow: the hand drives the handle through the recorded poses. For a fixed-base articulation they are streamed as
-    recorded (straight between poses). A free-standing body moves under the pull and the poses assume it where the action began, so
-    the hand runs along the handle's arc about the hinge (``arc_between``, densified at ``follow_arc_step_rad``) in chunks of
-    ``follow_reaim_chunk`` waypoints, each chunk moved with the body's rigid motion since the follow began once that moves the hand more
-    than ``follow_reaim_min_m``, at ``follow_slow_factor`` of the pace after a chunk that left the torso bent beyond
-    ``follow_slow_trunk_rad``. ``note["live_reaim"]`` records the chunks, the re-aims, the largest move and the slowed chunks."""
+def _follow_handle_poses(action: BaseFollow, motions: Motions, state, targets: Dict[str, Any], cfg: ExecuteConfig, note: Dict[str, Any]) -> Iterator[th.Tensor]:
+    """The arm-mode follow: the hand drives the handle through the recorded poses. A fixed-base articulation streams them as recorded
+    (straight between poses). For a free-standing body the hand turns rigidly about the hinge as it stands when the follow begins
+    (``_live_hinge``) through the recorded joint values (``targets["q_values"]``), one waypoint per ``follow_arc_step_rad``: the chords
+    between the five recorded poses pulled the handle off its circle (blender open 1008: torso 0.41 deg, the body tipped 0.9 deg), an
+    arc snapped onto each recorded pose jerked the hand by the grasp's offset from it, and a hinge re-aimed for the body's live pose
+    followed a tipping blender until it ran away (4.6 deg, 14 mm). After a chunk of ``follow_reaim_chunk`` waypoints that left the torso
+    bent beyond ``follow_slow_trunk_rad`` the next runs at ``follow_slow_factor`` of the pace. ``note["handle_arc"]`` records it."""
+    poses = targets["handle_poses"]
     art = action.articulation
     try:
         fixed = getattr(state.object(art.object), "fixed_base", None)
         free = fixed is not None and not bool(fixed)
         hinge = _live_hinge(state, art) if free else None
-        body0 = as_world_pose(state.object_pose(art.object)) if free else None
-        prev = as_world_pose(motions.eef_pose(action.arm)) if free else None
+        hand0 = as_world_pose(motions.eef_pose(action.arm)) if free else None
+        q0 = float(state.joint_position(art.object, art.joint)) if free else None
+        q_vals = [float(v) for v in (targets.get("q_values") or [])]
     except Exception:  # noqa: BLE001 - no live pose (the test stubs): the recorded chords
         free = False
-    if not free or int(cfg.follow_reaim_chunk) <= 0:
+    if not free or hinge is None or len(q_vals) != len(poses) or not q_vals or float(cfg.follow_arc_step_rad) <= 0:
         yield from motions.arm_along(action.arm, poses, converge=False)
         return
-    dense: List[Pose] = []
-    for p in poses:
-        p = as_world_pose(p)
-        dense.extend(arc_between(prev, p, hinge[0], hinge[1], step_rad=float(cfg.follow_arc_step_rad)) if hinge is not None else [p])
-        prev = p
-    inv0 = C.invert((body0[0].float(), body0[1].float()))
-    info: Dict[str, Any] = {"waypoints": len(dense), "arc": hinge is not None, "chunks": 0, "reaimed": 0, "max_move_m": 0.0, "slowed": 0}
-    note["live_reaim"] = info
+    centre, axis = (C.as_tensor(v).reshape(-1)[:3].float() for v in hinge)
+    p0, r0 = (C.as_tensor(v).float() for v in hand0)
+
+    def turned(ang: float) -> Tuple[th.Tensor, th.Tensor]:
+        rq = C.quat_from_axis_angle(axis, float(ang))
+        return centre + C.quat_rotate(rq, p0 - centre), C.qmul(rq, r0)
+
+    # the sense of a positive joint delta about the axis: the one that carries the hand toward the first recorded pose
+    d1, first = q_vals[0] - q0, as_world_pose(poses[0])[0].float()
+    sense = 1.0 if float(th.linalg.norm(turned(d1)[0] - first)) <= float(th.linalg.norm(turned(-d1)[0] - first)) else -1.0
+    total = q_vals[-1] - q0
+    n = max(1, int(math.ceil(abs(total) / float(cfg.follow_arc_step_rad))))
+    dense = [turned(sense * total * k / n) for k in range(1, n + 1)]
+    info: Dict[str, Any] = {"waypoints": n, "rad": round(total, 4), "sense": sense, "chunks": 0, "slowed": 0,
+                            "end_off_recorded_m": round(float(th.linalg.norm(dense[-1][0] - as_world_pose(poses[-1])[0].float())), 4)}
+    note["handle_arc"] = info
     speed: Optional[float] = None
     K = max(1, int(cfg.follow_reaim_chunk))
     for k in range(0, len(dense), K):
-        chunk = [(C.as_tensor(w[0]).float(), C.as_tensor(w[1]).float()) for w in dense[k:k + K]]
-        live = as_world_pose(state.object_pose(art.object))
-        d = C.compose((live[0].float(), live[1].float()), inv0)
-        moved = [C.compose(d, w) for w in chunk]
-        move = max(float(th.linalg.norm(m[0] - w[0])) for m, w in zip(moved, chunk))
-        info["max_move_m"] = max(info["max_move_m"], round(move, 4))
-        if move > float(cfg.follow_reaim_min_m):
-            chunk = moved
-            info["reaimed"] += 1
-        yield from motions.arm_along(action.arm, chunk, converge=False, speed=speed)
+        yield from motions.arm_along(action.arm, dense[k:k + K], converge=False, speed=speed)
         info["chunks"] += 1
         if motions.state.trunk_error() > float(cfg.follow_slow_trunk_rad):
             speed = float(motions.cfg.cartesian_speed) * float(cfg.follow_slow_factor)
@@ -3958,7 +3997,7 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
         else:
             gen = motions.base_follow_hybrid(targets["follow_path"], action.arm, axis=axis)
     else:
-        gen = _follow_handle_poses(action, motions, state, targets["handle_poses"], cfg, note)
+        gen = _follow_handle_poses(action, motions, state, targets, cfg, note)
     k = 0
     stopping = 0
     q_phase0 = None
