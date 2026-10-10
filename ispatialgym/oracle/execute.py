@@ -367,8 +367,9 @@ class ExecuteConfig:
     #: sphere aims the fingertips 24 mm below its bottom; the hand stopped on the table and pressed it up to 196 N, torso_joint1 0.8 deg,
     #: the head 17.5 mm, springing back at the lift)
     grasp_support_stop_trunk_rad: float = math.radians(0.1)
-    #: ... an object that hangs free in the hand at its release (touching nothing) is let go of with the open command at once
-    #: (``Motions.gripper(instant=True)``) instead of a ramp it would hang through between opening fingers
+    #: ... a dropped object that hangs free in the hand at its release (touching nothing) and that no later action works on is let go of
+    #: with the open command at once (``Motions.gripper(instant=True)``) instead of a ramp it would hang through between opening fingers;
+    #: one a later action works on keeps the ramp, whose release from wide-open fingers lands it as recorded
     release_free_instant: bool = True
     #: ... a next-to / touching place keeps the fully open fingers ``place_partner_clear_m`` from the partner at the release: the
     #: assisted grasp lets go on the full open command only, and the pad on the partner's side swept 15 mm toward it (touching:
@@ -1998,7 +1999,9 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             ctx["attach"]["fingers_closed"] = closed
         # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
         # support place sets the object down
-        free = drop and cfg.release_free_instant and _hangs_free(state, action.object)
+        # (not when a later action works on the object: the sandal, pushed under the table after its drop, landed turned off the
+        # fingers that opened under it and the push turned it 1.04 rad - its ramped release lands it as recorded)
+        free = drop and cfg.release_free_instant and not ctx.get("object_worked_on_later", True) and _hangs_free(state, action.object)
         if free:
             ctx["release_instant"] = True
         yield from motions.gripper(arm, close=False, instant=free)

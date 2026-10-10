@@ -100,6 +100,20 @@ def test_gripper_instant_opening_reaches_the_open_command_on_its_first_step():
     assert float(ramped[idx]) < 0.0  # the ramp starts at the fingers' opening
 
 
+def test_worked_on_later_names_a_drop_whose_landing_a_later_action_depends_on():
+    from types import SimpleNamespace as NS
+
+    from ispatialgym.oracle.executor import Executor
+
+    prog = [NS(name="grasp", objects=("sandal",)), NS(name="place", objects=("sandal", "floor")), NS(name="retreat", objects=("sandal",)),
+            NS(name="transition", objects=()), NS(name="push", objects=("sandal",), contact=NS(object="sandal"))]
+    ex = NS(program_actions=prog)
+    assert Executor.worked_on_later(ex, 1, "sandal") is True
+    assert Executor.worked_on_later(ex, 4, "sandal") is False
+    sprouts = [NS(name="place", objects=("sprouts", "bowl")), NS(name="retreat", objects=("sprouts",))]
+    assert Executor.worked_on_later(NS(program_actions=sprouts), 0, "sprouts") is False
+
+
 def test_partner_clear_shift_moves_the_place_away_from_the_partner_by_what_the_opening_misses():
     place, partner = th.tensor([1.0, 0.0, 0.8]), th.tensor([0.9, 0.0, 0.85])
     shift, need = EX.partner_clear_shift(0.012, th.tensor([-1.0, 0.0, 0.0]), place, partner, 0.03)

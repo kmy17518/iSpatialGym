@@ -512,6 +512,9 @@ NOTE_KEYS = NOTE_KEYS + ("ag_joint_type",)  # the assisted-grasp joint a handle 
 NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, carton lever): the lever fist slides out before it lifts
 #: first-demo v2.1 A3 (bar soap 0927-034001): a library pinch lifted off the support under it, a support place raised for the in-hand pose
 NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
+#: owner audit 2026-10-09: a grasp approach stopped on the support, a free-hanging drop released at once, a next-to / touching place moved
+#: off the partner for the release and the push extended by it
+NOTE_KEYS = NOTE_KEYS + ("approach_support_stop", "release_instant", "partner_release_clearance", "push_place_shift_extended_m")
 #: first-demo v2.1 A1 (cap 0927-040231): an attach place opened the fingers that would meet the partner before the part seats
 NOTE_KEYS = NOTE_KEYS + ("finger_clearance",)
 #: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
@@ -1327,6 +1330,17 @@ class Executor:
                 return a.kind
         return None
 
+    def worked_on_later(self, index: int, obj: str) -> bool:
+        """Whether a program action after ``index`` works on ``obj`` again (grasps, pushes, braces or places it; a retreat / transition /
+        navigate naming it does not): its landing pose then matters (the sandal is dropped beside the table and pushed under it)."""
+        for a in list(self.program_actions)[index + 1:]:
+            contact = getattr(a, "contact", None)
+            if contact is not None and getattr(contact, "object", None) == obj:
+                return True
+            if getattr(a, "name", None) not in ("retreat", "transition", "navigate") and obj in (getattr(a, "objects", ()) or ()):
+                return True
+        return False
+
     def _absorb_branch_decisions(self, index: int, ctx: Dict[str, Any]) -> None:
         """After a travel leg passed: a kept arm's next contact runs on the configurations tracked from it (``_witness_overrides``); an
         arm the leg re-posed to the recorded joints drops them (its next contact runs on the sampler's witnesses)."""
@@ -1438,6 +1452,8 @@ class Executor:
             ctx["stance_contacts"] = {arm: self.stance_contact(index, arm) for arm in M.ARMS}
         if isinstance(action, Grasp):
             ctx["next_place_kind"] = self.next_place_kind(index, action)
+        if isinstance(action, Place):
+            ctx["object_worked_on_later"] = self.worked_on_later(index, action.object)
         ctx["sidecar"] = self.sidecar  # attachment: the correction regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
             # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep
