@@ -104,8 +104,13 @@ SUPPORT_MARGIN = 0.02
 # footprint edge and a straight floor-level push of the target under the edge ------------------------------------------------
 PUSH_UNDER_INSIDE_M = 0.07          # goal = the target centre this far inside the footprint edge (5–10 cm; ``under`` needs the centre column)
 PUSH_UNDER_DROP_EXTRA_M = 0.10      # drop centre = half extent along the push + this outside the edge
-PUSH_UNDER_DROP_HEIGHT_M = 0.10     # object bottom above the floor at the release (≥ 2 cm; 10 cm keeps the release eef ≈ 0.1 m above the floor —
-                                    # the sandal's side pinches sit 1 cm above its sole, and z < 0.08 m is out of the arm's reach even at translate 0.95)
+PUSH_UNDER_DROP_HEIGHT_M = 0.15     # object bottom above the floor at the recorded drop pose (owner 2026-10-10: the oracle releases every free drop
+                                    # at once after bringing it straight down to 2 cm above the floor; from 0.25 m the sandal's wrist flipped 5-9 cm
+                                    # down and the fall tumbled it, from 0.15 m at the (0.95, -1.2) drop trunk the descent comes the full way: landed
+                                    # 1.2 mm aside; z < 0.08 m stays out of the arm's reach even at translate 0.95)
+#: drop-stance trunks tried in turn (``generation.drop_trunks`` overrides): the deeper (0.95, -1.2) first, from which the 0.15 m drop comes down
+#: to the floor, then the moderate ones (2026-09-20: (0.5, -0.6) cannot reach the sandal's drop beside the breakfast table)
+PUSH_UNDER_DROP_TRUNKS = ((0.95, -1.2), (0.5, -0.6), (0.5, -0.9), (0.75, -0.6), (0.25, -0.6), (0.75, -0.9))
 PUSH_UNDER_STAND_OFFS = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8)  # base stand-off from the edge: the drop cell 0.25–0.6 m ahead (B3: the floor is reachable 0.24–0.64 m ahead)
 PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)
 PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face at the push start
@@ -2359,16 +2364,17 @@ class IORSLarge(SamplerV2):
             cd = place.extras.get("drop_cell") if push else None
             # push-under = DROP FIRST, THEN CROUCH (owner 2026-09-20 08:30): the object cannot be carried into the deep push crouch
             # (the hand frozen at any carry pose sweeps into the partner / the floor / the base, and no compact carry pose keeps the
-            # grasp orientation within the wrist limits - 0920-043725 .. 075127), so the release happens from a MODERATE trunk at
-            # the same base pose ("placement" = the drop stance, drop height ``drop_height_m``), and the deep crouch ("push" stance)
-            # is entered with empty hands by a trunk-only transition before the floor push. ``generation.drop_trunks`` lists the
-            # trunks tried for the drop stance (the deepest survivors of the C search stay the push stance).
+            # grasp orientation within the wrist limits - 0920-043725 .. 075127), so the release happens from a drop trunk at the
+            # same base pose ("placement" = the drop stance, drop height ``drop_height_m``), and the deep crouch ("push" stance) is
+            # entered with empty hands by a trunk-only transition before the floor push. ``generation.drop_trunks`` (default
+            # ``PUSH_UNDER_DROP_TRUNKS``: (0.95, -1.2) first, then moderate ones) lists the trunks tried for the drop stance (the
+            # deepest survivors of the C search stay the push stance).
             push_st = None
             if push and str(self.gp.gen("push_under_drop_first", "on")) != "off":
                 push_st = place.with_trunk(place.translate, place.tilt, "push")
                 push_st.focus, push_st.arms, push_st.extras = place.focus, [arm], dict(place.extras)
                 drop_st = None
-                for tr, ti in [tuple(float(v) for v in t) for t in (self.gp.gen("drop_trunks") or ((0.5, -0.6), (0.5, -0.9), (0.75, -0.6), (0.25, -0.6), (0.75, -0.9)))]:
+                for tr, ti in [tuple(float(v) for v in t) for t in (self.gp.gen("drop_trunks") or PUSH_UNDER_DROP_TRUNKS)]:
                     cand = place.with_trunk(tr, ti, "placement")
                     cand.focus, cand.arms, cand.extras = place.focus, [arm], dict(place.extras)
                     with self._floor_relaxed():
