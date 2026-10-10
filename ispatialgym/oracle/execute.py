@@ -379,8 +379,10 @@ class ExecuteConfig:
     drop_lower_clear_m: float = 0.02
     drop_lower_min_m: float = 0.01
     drop_lower_limit_margin_rad: float = 0.05
-    #: ... and the fully opened fingers keep this much above whatever is under them (a container's rim)
+    #: ... and the fully opened fingers keep this much above whatever is under them (a container's rim). A leg whose plan jumps is tried
+    #: again shorter, at these fractions of the planned lowering
     drop_lower_finger_clear_m: float = 0.015
+    drop_lower_fractions: Tuple[float, ...] = (1.0, 0.75, 0.5, 0.35, 0.25, 0.15)
     #: ... a next-to / touching place keeps the fully open fingers ``place_partner_clear_m`` from the partner at the release: the
     #: assisted grasp lets go on the full open command only, and the pad on the partner's side swept 15 mm toward it (touching:
     #: the box of tissues shoved 6 mm). The place (and the push that follows it) is moved away from the partner by what is missing,
@@ -2305,11 +2307,23 @@ def lower_drop(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg:
         rec["reason"] = f"{max(want, 0.0) * 1000:.0f} mm to lower (the object or its opened fingers already near what is under them)"
         return
     p, q = (x.float() for x in as_world_pose(state.eef_pose(arm)))
-    target = (p - th.tensor([0.0, 0.0, want]), q)
-    try:
-        yield from motions.arm_along(arm, [target], check_collisions=True, ignore_objects=[obj], partial=True, limit_margin=float(cfg.drop_lower_limit_margin_rad))
-    except SkillError as e:
-        rec["leg"] = (e.message or e.reason)[:160]
+    tried: List[Dict[str, Any]] = []
+    rec["tried"] = tried
+    for frac in cfg.drop_lower_fractions:
+        d = want * float(frac)
+        if d < float(cfg.drop_lower_min_m):
+            break
+        try:
+            yield from motions.arm_along(arm, [(p - th.tensor([0.0, 0.0, d]), q)], check_collisions=True, ignore_objects=[obj], partial=True,
+                                         limit_margin=float(cfg.drop_lower_limit_margin_rad))
+            tried.append({"m": round(d, 4), "result": "ran"})
+            break
+        except SkillError as e:
+            # a jump (the straight line crosses a branch flip: the sandal's wrist 5-9 cm down) plans nothing and moves nothing - a
+            # shorter leg may stay on this side of it; any other failure ends the lowering where the hand is
+            tried.append({"m": round(d, 4), "result": (e.message or e.reason)[:120]})
+            if "joint jump" not in str(e.message or ""):
+                break
     yield from motions.hold(3)
     p1 = as_world_pose(state.eef_pose(arm))[0].float()
     bottom1 = float(C.as_tensor(obj.aabb[0]).reshape(-1)[2])
