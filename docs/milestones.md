@@ -45,14 +45,19 @@ Tagged states of this repository and what passed on them.
     yaw 0.7 rad off (tolerance 0.8) - marginal. With the alias drawn at `drop_height_m` 0.15 and the deeper drop trunk (0.95, -1.2) first
     (a customs copy) it comes the full 11.7 cm: released 1.7 cm above its rest, landed 1.2 mm aside, push yaw 0.075 rad off - success
     (sampler: instance 0 at attempt 0 in 1420 s). The goal-judged replay passed too
-    (3172 steps). Seed 3 at 0.15 likewise (11.7 cm down, landed 1.0 mm aside, yaw 0.073 rad off; replay passed); seed 0 at
-    `drop_height_m` 0.10 comes 6.8 cm down to the same 1.7 cm release (1.2 mm, 0.024 rad; replay passed) (`runs/r11sandal_drop*`).
-    The shipped customs entry has `drop_height_m` 0.15 with the (0.95, -1.2) trunk first (`56cb2e8e`). `c9522ff8` (owner 2026-10-10)
-    makes both the default of every under_large_scale alias (`PUSH_UNDER_DROP_HEIGHT_M` 0.15, was 0.10; `PUSH_UNDER_DROP_TRUNKS`,
-    (0.95, -1.2) before (0.5, -0.6)) and gives the sibling `...sandal-breakfast_table-floor` (was 0.25) the same entry. Of the 28 only
-    the breakfast-table sandal is an under alias, and it already had both. The ten aliases without an override (apple / marker under
-    the desk, pencil under the sofa, sandal under the bed) have no push-under tuning and no demo yet; first draws on the new default:
-    `runs/r13default_*`.
+    (3172 steps). Seed 3 at 0.15 likewise (11.7 cm down, landed 1.0 mm aside, yaw 0.073 rad off; replay passed); at
+    `drop_height_m` 0.10 seeds 0 / 3 come 6.8 / 6.9 cm down to the same 1.6-1.7 cm release (1.2 / 1.1 mm, 0.024 / 0.105 rad; replays
+    passed) (`runs/r11sandal_drop*`). The shipped customs entry has `drop_height_m` 0.15 with the (0.95, -1.2) trunk first
+    (`56cb2e8e`; drawn from it unchanged, seed 0 reproduces the customs copy's demo exactly: `runs/r12sandal_shipped_s0`). `c9522ff8`
+    (owner 2026-10-10) makes both the default of every under_large_scale alias (`PUSH_UNDER_DROP_HEIGHT_M` 0.15, was 0.10;
+    `PUSH_UNDER_DROP_TRUNKS`, (0.95, -1.2) before (0.5, -0.6)) and gives the sibling `...sandal-breakfast_table-floor` (was 0.25) the
+    same entry. Of the 28 only the breakfast-table sandal is an under alias, and it already had both. The ten aliases without an
+    override (apple / marker under the desk, pencil under the sofa, sandal under the bed) have no push-under tuning; first draws on the
+    new default (`runs/r13default_*`, seed 0): apple and marker on the desk or the floor and the pencil on the sofa or the floor are
+    rejected before any drop (no free edge / no workspace on the desk or sofa top, no stance C or A for a floor init, the pencil's
+    grasp unreachable at B). The sandal under the bed samples at attempt 0 with the drop stance (0.95, -1.2) and 0.15 m; its descent
+    stops at 5.8 cm (the 11.9 and 8.9 cm legs jump 0.25 rad at the wrist), it falls 8 cm and lands 5.4 mm aside, yaw +3.7 deg - then
+    the untuned push turns it 93 deg in its last third (4.4 cm short, extended): `placed_orientation` (the default 0.2 rad).
 - **The gate**: `executor.TorsoLoad` (`meta.torso_load`); `robot_wobble` (on with `--demo-gating auto` in oracle mode) discards a demo
   above 1 deg. After the fixes the largest over the 28 is 0.16 deg (the apple's and the sandal's grasps).
 - **Found on the way**: `goal_occluded` was not a registered QA category (the in-run occlusion gate would have raised); the sandal's
@@ -60,7 +65,7 @@ Tagged states of this repository and what passed on them.
   `ab47a362` as with the new, and passes on Ampere / Ada (A5000, A6000, 3090, L40S): the GPU, not the code or the rewritten instance.
 - **Validation** (viscam, overflow to svl's Titan RTX nodes; sample -> demo -> goal-judged replay): A/B demos on the r4/r5/r6 instances
   (`ab5`-`ab11`); r5 (`06abb98a`, all 28) 27/28 and r6 (`bdb9ec76`, the 8 articulation aliases) 8/8 for the earlier fixes; tests
-  (`f704954b`, GPU node): 1476 passed, the 4 pre-existing failures. On svl: r5 lid / blender open / world vertical's replay as on viscam.
+  (`f704954b`, `c9522ff8`; GPU node): 1476 passed, the 4 pre-existing failures. On svl: r5 lid / blender open / world vertical's replay as on viscam.
   Two r5 replays on viscam12 hit a cffi version clash in numba's cache load (Kit's bundled cffi) before any action; re-run, both passed.
 
 ## `v3.0-reconciled` — production (`v2.0-vectorized`), the multienv speedups (`v2.0-multienv`) and `first-demo-v3.0` on one branch; the goal-occlusion screen before generation; the 28 v3.0 aliases sampled, demonstrated and replayed through the evaluator on one commit (2026-10-08)
