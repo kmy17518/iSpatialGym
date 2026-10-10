@@ -9,7 +9,7 @@ Tagged states of this repository and what passed on them.
   handle is released unloaded; the follow's unwinds watch the torso every step), `e39c30bc` (notes reach `meta.json`; its ramp exception for
   the sandal was reverted by `9b422a29`), `9b422a29` (drops come down before the release), `855546a1` (a free-standing body's handle
   follow turns rigidly about the start hinge; the opened fingers bound a drop's descent), `f704954b` (a descent whose plan jumps is tried
-  shorter). Behavior-1K unchanged (`ddbd8ff24`): the assisted grasp's release-by-command rule - what demo collection and evaluation share -
+  shorter), `56cb2e8e` (customs: the sandal drops from 0.15 m, the (0.95, -1.2) trunk first). Behavior-1K unchanged (`ddbd8ff24`): the assisted grasp's release-by-command rule - what demo collection and evaluation share -
   is untouched; every change is in how the oracle commands the robot.
 - **The owner's audit** (r4 demos, `ab47a362`) - cause, fix, before -> after on the same instance (largest |torso command - measured|,
   deg; torso speed while its command and the base are still, deg/s; head-camera motion within 10 still steps, mm; finger force on the
@@ -45,7 +45,8 @@ Tagged states of this repository and what passed on them.
     (a customs copy) it comes the full 11.7 cm: released 1.7 cm above its rest, landed 1.2 mm aside, push yaw 0.075 rad off - success
     (sampler: instance 0 at attempt 0 in 1420 s). The goal-judged replay passed too
     (3172 steps). Still sampling when written: seed 3 at 0.15 and seeds 0 / 3 at `drop_height_m` 0.10 (`runs/r11sandal_drop*`). The
-    shipped customs entry still says 0.25: a new sandal drawn with it falls from 17 cm after the descent.
+    shipped customs entry now has `drop_height_m` 0.15 with the (0.95, -1.2) trunk first (`56cb2e8e`); the sibling alias
+    `...sandal-breakfast_table-floor` keeps 0.25 (not among the 28, not validated).
 - **The gate**: `executor.TorsoLoad` (`meta.torso_load`); `robot_wobble` (on with `--demo-gating auto` in oracle mode) discards a demo
   above 1 deg. After the fixes the largest over the 28 is 0.16 deg (the apple's and the sandal's grasps).
 - **Found on the way**: `goal_occluded` was not a registered QA category (the in-run occlusion gate would have raised); the sandal's
