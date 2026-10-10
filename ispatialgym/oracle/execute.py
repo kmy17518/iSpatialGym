@@ -2416,9 +2416,10 @@ class AttachCorrection:
     """The attach correction regime (owner 2026-09-20 23:39, attachment only): read from the sidecar's ``attach_correction``
     (the sampler copies ``generation.attach_correction`` of the alias), else from the customs entry of the sidecar's alias
     (a demo-only re-run of an older instance), else these defaults (two passes at ``attach_correct_min_m``). It drives the
-    hover alignment (``_align_at_hover``, owner 2026-10-10): each pass a lateral + yaw leg at ``soft_pos_tol_m`` -> settle ->
-    re-measure; the loop stops when the lateral offset is within ``target_pos_m`` and the yaw within ``target_rot_rad``, the
-    lateral improvement falls below ``stop_when_improvement_below_m`` or the passes are exhausted."""
+    hover alignment (``_align_at_hover``, owner 2026-10-10): settle on arrival (at most ``settle_steps``) -> measure; each pass a
+    lateral + yaw leg at ``soft_pos_tol_m`` -> settle -> re-measure; the loop stops when the lateral offset is within
+    ``target_pos_m`` and the yaw within ``target_rot_rad``, the lateral improvement falls below ``stop_when_improvement_below_m``
+    or the passes are exhausted."""
 
     soft_pos_tol_m: float = 0.003
     settle_steps: int = 20
@@ -2573,15 +2574,21 @@ def _hover_note(off: Optional[Dict[str, Any]]) -> Optional[Dict[str, float]]:
 
 
 def _align_at_hover(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
-    """Closed-loop alignment at the hover pose (owner 2026-10-10): each pass moves the hand so the male link comes onto the seat axis
-    and turns about that axis by the yaw to the nearest symmetric equivalent of the female frame - the hover height and the tilt
-    stay - then settles and measures again. The task's correction regime (``AttachCorrection``) gives the passes, the leg's soft
-    tolerance, the settle and the targets (lateral ``target_pos_m``, yaw ``target_rot_rad``); the loop also stops when a pass
+    """Closed-loop alignment at the hover pose (owner 2026-10-10): the hand first settles there - the descent arrives at its full
+    speed, and a part released on arrival leaves at that speed - then each pass moves the hand so the male link comes onto the seat
+    axis and turns about that axis by the yaw to the nearest symmetric equivalent of the female frame - the hover height and the
+    tilt stay - then settles and measures again. The task's correction regime (``AttachCorrection``) gives the passes, the leg's
+    soft tolerance, the settle and the targets (lateral ``target_pos_m``, yaw ``target_rot_rad``); the loop also stops when a pass
     improves the lateral offset by less than ``stop_when_improvement_below_m``. ``ctx["attach"]["alignment"]`` records the passes."""
     arm = action.arm
     rec = ctx.setdefault("attach", {}).setdefault("alignment", {})
     reg = attach_correction_regime(ctx, cfg)
     rec["regime"] = reg.as_note()
+    n = 0
+    for a in motions.settle(max_steps=reg.settle_steps):
+        n += 1
+        yield a
+    rec["settle_steps"] = n
     off = _hover_offset(state, action)
     rec["before"] = _hover_note(off)
     passes: List[Dict[str, Any]] = []

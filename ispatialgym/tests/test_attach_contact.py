@@ -310,21 +310,31 @@ def test_hover_alignment_moves_the_hand_across_the_axis_and_turns_it_about_the_a
              "male": th.tensor([0.0, 0.0, 1.10]), "axis": th.tensor([0.0, 0.0, 1.0])},
             {"lateral": th.tensor([0.0005, 0.0, 0.0]), "lateral_m": 0.0005, "vertical_m": 0.013, "yaw_rad": 0.004, "rot_rad": 0.004,
              "male": th.tensor([0.003, 0.0, 1.10]), "axis": th.tensor([0.0, 0.0, 1.0])}]
-    monkeypatch.setattr(EX, "_hover_offset", lambda state, action: offs.pop(0) if len(offs) > 1 else offs[0])
+    events = []
+
+    def measure(state, action):
+        events.append("measure")
+        return offs.pop(0) if len(offs) > 1 else offs[0]
+
+    monkeypatch.setattr(EX, "_hover_offset", measure)
     monkeypatch.setattr(EX, "attach_correction_regime", lambda ctx, cfg: EX.AttachCorrection(soft_pos_tol_m=0.0015, max_passes=4, target_pos_m=0.002, target_rot_rad=0.02))
     legs = []
 
     def arm_along(arm, poses, **kw):
         legs.append(poses)
+        events.append("leg")
         yield th.zeros(1)
 
     def settle(max_steps=None):
+        events.append(("settle", max_steps))
         yield th.zeros(1)
 
     motions = SimpleNamespace(arm_along=arm_along, settle=settle)
     state = SimpleNamespace(eef_pose=lambda arm: (th.tensor([0.1, 0.0, 1.2]), th.tensor([0.0, 0.0, 0.0, 1.0])))
     ctx = {}
     list(EX._align_at_hover(SimpleNamespace(arm="right", object="cap_0", on="bottle_0"), motions, state, ctx, EX.ExecuteConfig()))
+    assert events == [("settle", 20), "measure", "leg", ("settle", 20), "measure"]  # the arrival settles before the first measurement
+    assert ctx["attach"]["alignment"]["settle_steps"] == 1
     assert len(legs) == 1
     p, q = legs[0][0]
     c, s = math.cos(0.05), math.sin(0.05)
