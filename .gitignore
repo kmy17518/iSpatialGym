@@ -29,6 +29,12 @@ Behavior-1K/
 # Separate nested repo (project website), not part of this package
 ispatialgym/behavior-vision-suite.github.io/
 
+# Lab evaluation (lab_tools/): its records (lab/, mirrored to the coordination repo on the Hub), the ACT checkout with its
+# venv and checkpoints (act-isg/), the cluster sanity battery's outputs (sanity/)
+/lab/
+/act-isg/
+/sanity/
+
 # Generated task instances (ispatialgym.sampling default output, repo-root datasets/ only) and sampler probes
 /datasets/
 sampling_report_*.json

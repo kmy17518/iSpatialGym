@@ -1,0 +1,8 @@
+# Runtime state of the lab machine's loops, not code: pid files, loop state, the lab-local queue, stdout captures, the
+# pause flag, scratch notes (*.log is ignored by the root .gitignore)
+*.pid
+*.out
+state.json
+local_queue.json
+PAUSE
+dishwasher_suspect.txt
