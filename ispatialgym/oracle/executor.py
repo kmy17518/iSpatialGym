@@ -486,7 +486,7 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
 NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "carry_leg", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
-             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m", "follow", "attach", "reorient_finish", "approach_standoff", "partner_shift", "pre_grasp_transit",
+             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "follow", "attach", "reorient_finish", "approach_standoff", "partner_shift", "pre_grasp_transit",
              "navigate_arms_reposed", "navigate_arms_source", "retreat_partial_m", "retreat_start_contacts", "retreat_start_offenders", "brace_allowed")
 
 
@@ -514,7 +514,7 @@ NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, cart
 NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
 #: owner audit 2026-10-09: a grasp approach stopped on the support, a free-hanging drop released at once, a next-to / touching place moved
 #: off the partner for the release and the push extended by it
-NOTE_KEYS = NOTE_KEYS + ("approach_support_stop", "release_instant", "partner_release_clearance", "push_place_shift_extended_m", "drop_lowered")
+NOTE_KEYS = NOTE_KEYS + ("approach_support_stop", "partner_release_clearance", "push_place_shift_extended_m", "drop_lowered")
 #: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
 NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
 #: first-demo v2.1 (sandal on pods): the arm moved into the pre-grasp witness's posture before an approach that tracks only from there
@@ -1335,42 +1335,6 @@ class Executor:
             for i, ws in per_action.items():
                 self._witness_overrides[int(i)] = {"arm": arm, "witnesses": ws, "leg": index}
 
-    def release_stage_opening(self, action: Place) -> Optional[float]:
-        """The first-stage opening (m per finger) of the staged release of ``action.object`` (owner 2026-09-16 21:18):
-        the library pinch width / 2 + ``MotionsConfig.gripper_preshape_margin`` (the pre-shape width, ~1 cm past the
-        pinch), capped by the sampler's ``grasps[k].release_sweep.release_opening_max_m`` / 2 (core ``385de1e``: the
-        largest symmetric opening that still clears the partner by 1 cm) and never below pinch / 2 + 5 mm. None when
-        the sidecar has no library grasp with a pinch width for the object (a cube / handle grasp): ``Motions`` then
-        falls back to the remembered pre-shape, else opens fully."""
-        g = next((g for g in (getattr(self.sidecar, "grasps", None) or []) if g.object == action.object), None)
-        if g is None:
-            blk = next((b for b in (getattr(self.sidecar, "blocks", None) or []) if getattr(b, "instance", None) == action.object), None)
-            if blk is not None:
-                # a block (owner 2026-09-19): the first stage opens each pad only ``cube_release_margin_m`` past the cube's face -
-                # a placed neighbour stands 6 mm + the 5 mm place margin from the released block, the 8.4 mm fingertip beside it
-                # (demo 0919-121912: the full opening shoved the neighbour 4 cm; the pre-shape's 1 cm margin would still push it ~7 mm)
-                try:
-                    edge = float((blk.extra or {}).get("edge_m") or C.BLOCK_EDGE)
-                except (TypeError, ValueError):
-                    return None
-                margin = float(getattr(self.motions.cfg, "cube_release_margin_m", 0.0045) if self.motions is not None else 0.0045)
-                return 0.5 * edge + margin
-            return None
-        try:
-            width = (C.grasp_entry(g.grasp_key, g.grasp_name).meta or {}).get("width")
-            width = float(width)
-        except Exception:  # noqa: BLE001
-            return None
-        if not math.isfinite(width) or width <= 0:
-            return None
-        margin = getattr(self.motions.cfg, "gripper_preshape_margin", None) if self.motions is not None else None
-        stage = 0.5 * width + float(0.010 if margin is None else margin)
-        sweep = (getattr(g, "extra", None) or {}).get("release_sweep")
-        cap = sweep.get("release_opening_max_m") if isinstance(sweep, dict) else None
-        if isinstance(cap, (int, float)) and math.isfinite(float(cap)) and float(cap) > 0:
-            stage = min(stage, 0.5 * float(cap))
-        return max(stage, 0.5 * width + 0.005)
-
     def _scene_names(self, instances: Iterable[str]) -> set:
         out = set()
         for inst in instances:
@@ -1436,12 +1400,6 @@ class Executor:
         if isinstance(action, Grasp):
             ctx["next_place_kind"] = self.next_place_kind(index, action)
         ctx["sidecar"] = self.sidecar  # attachment: the hover alignment's regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
-        if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
-            # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep
-            stage = self.release_stage_opening(action)
-            if stage is not None:
-                self.motions.release_opening[action.arm] = stage
-            ctx["release_stage_m"] = stage
         ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "alias", None) if self.sidecar is not None else None,
                           "index": index}
         if self.monitors is not None:
@@ -1515,7 +1473,7 @@ class Executor:
                 rec.notes["witness_residual_left"] = {"pos_m": round(float(left[0]), 4), "rot_rad": round(float(left[1]), 4)}
                 self.motions.last_witness_residual = None
             events = list(getattr(self.motions, "release_events", None) or []) if self.motions is not None else []
-            if events:  # staged release: the first stage of this release and / or the deferred full opening a retreat completed
+            if events:  # the gripper events of this action: contact holds, releases (instant_open)
                 rec.notes["release"] = events
                 self.motions.release_events.clear()
             via = list(getattr(self.motions, "witness_via_posture_events", None) or []) if self.motions is not None else []

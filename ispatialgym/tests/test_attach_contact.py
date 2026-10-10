@@ -403,10 +403,10 @@ def test_a_failed_touchdown_releases_where_the_hand_is(monkeypatch):
 
 
 def test_release_into_join_opens_at_once_and_counts_the_steps_to_contact_and_joint(monkeypatch):
-    seen = {"instant": None, "k": 0}
+    seen = {"opened": None, "k": 0}
 
-    def gripper(arm, close, instant=False):
-        seen["instant"] = instant
+    def gripper(arm, close):  # Motions.gripper opens to +1 in one step (every release)
+        seen["opened"] = not close
         yield th.zeros(1)
 
     def hold(n=1):
@@ -432,7 +432,7 @@ def test_release_into_join_opens_at_once_and_counts_the_steps_to_contact_and_joi
     ctx = {}
     list(EX._release_into_join(SimpleNamespace(arm="right", object="cap_0", on="bottle_0"), motions, state, ctx, EX.ExecuteConfig()))
     rec = ctx["attach"]["release"]
-    assert seen["instant"] is True and rec["instant"] and rec["attached"]
+    assert seen["opened"] is True and rec["instant"] and rec["attached"]
     assert rec["steps_to_first_contact"] == 2 and rec["steps_to_join"] == 4 and rec["join"]["trigger"] == "per_step"
     assert rec["bounce_m"] == pytest.approx(0.0)
 

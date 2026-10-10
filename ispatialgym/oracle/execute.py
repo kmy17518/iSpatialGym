@@ -24,7 +24,7 @@ Behaviour per action (§3.6 / §6.1):
 * ``Grasp``      ``gripper(open)`` → ``arm_to(pre_grasp)`` → ``arm_along(approach)`` → ``gripper(close)``; the
   assisted grasp must hold the object (``failed_grasp``), then backend ``attach_object``.
 * ``Lift`` / ``Reorient``  ``arm_along`` over the recorded segment; post: still held, eef at the segment end.
-* ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (the command ramps to +1, OmniGibson's
+* ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (the open command +1 at once, OmniGibson's
   assisted grasp lets go; backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest
   (``not_settled``) or ``attached`` for ``kind="attach"``: the descent ends at a hover pose above the seat, the hand aligns
   the part laterally and in yaw there, touches it down on its partner, opens in one step, and the task's attach rule joins the
@@ -360,10 +360,8 @@ class ExecuteConfig:
     #: sphere aims the fingertips 24 mm below its bottom; the hand stopped on the table and pressed it up to 196 N, torso_joint1 0.8 deg,
     #: the head 17.5 mm, springing back at the lift)
     grasp_support_stop_trunk_rad: float = math.radians(0.1)
-    #: ... a dropped object that hangs free in the hand at its release (touching nothing) is let go of with the open command at once
-    #: (``Motions.gripper(instant=True)``) instead of a ramp it would hang through between opening fingers ...
-    release_free_instant: bool = True
-    #: ... after it was brought straight down from the recorded drop pose (``lower_drop``) until its bottom is ``drop_lower_clear_m``
+    #: ... a dropped object is let go of (the open command at once, like every release) after it was brought straight down from
+    #: the recorded drop pose (``lower_drop``) until its bottom is ``drop_lower_clear_m``
     #: above whatever is under it - at most ``drop_lower_max_m``, a collision-checked leg that ends where the arm stalls, this far from
     #: its joint limits - so it does not fall far: the sandal released 24 cm above its rest at once tumbled 7 deg, bounced 14 deg and
     #: landed 14 mm aside, and the push under the table then turned it 60 deg. Below ``drop_lower_min_m`` of planned lowering the
@@ -2000,17 +1998,13 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             # attach rule joins the part there
             yield from _align_at_hover(action, motions, state, ctx, cfg)
             yield from _touch_down(action, motions, state, ctx, cfg)
-            ctx["release_instant"] = True
             yield from _release_into_join(action, motions, state, ctx, cfg)
         else:
             # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
             # support place sets the object down
             if drop and cfg.drop_lower_max_m > 0:
                 yield from lower_drop(action, motions, state, ctx, cfg)
-            free = drop and cfg.release_free_instant and _hangs_free(state, action.object)
-            if free:
-                ctx["release_instant"] = True
-            yield from motions.gripper(arm, close=False, instant=free)
+            yield from motions.gripper(arm, close=False)
             yield from _release(motions, state, arm)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
@@ -2279,22 +2273,6 @@ def lower_drop(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg:
     rec.update({"applied": True, "lowered_m": round(float(p[2] - p1[2]), 4), "bottom_above_surface_m": None if surface is None else round(bottom1 - surface, 4)})
     log.info("place(%s): the drop came %.1f cm straight down (planned %.1f cm); its bottom is %s above what is under it", action.object, float(p[2] - p1[2]) * 100,
              want * 100, "?" if surface is None else f"{(bottom1 - surface) * 100:.1f} cm")
-
-
-def _hangs_free(state, name: str) -> bool:
-    """Whether ``name`` touches no object of the task scope (OmniGibson ``Touching``; the robot never counts): held in the air above
-    its container. False without the simulator's ``Touching`` state."""
-    try:
-        from omnigibson.object_states import Touching  # noqa: F401
-    except Exception:  # noqa: BLE001
-        return False
-    touching = getattr(state, "touching", None)
-    if touching is None:
-        return False
-    try:
-        return not touching(name)
-    except Exception:  # noqa: BLE001
-        return False
 
 
 def _open_fingers_meet(arm: str, finger_q: Sequence[float], q_open: float, place, partner, cfg: ExecuteConfig) -> Tuple[float, int, List[str], Optional[th.Tensor]]:
@@ -2688,7 +2666,7 @@ def _touch_down(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg
 
 
 def _release_into_join(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
-    """The attach release (owner 2026-10-10): the open command at once (+1 in one step, ``Motions.gripper(instant=True)``); the part
+    """The attach release (owner 2026-10-10): the open command at once (+1 in one step, like every release); the part
     rests on its partner after the touchdown (after a failed one it drops the rest of the gap) and the task's attach rule joins it
     there - in contact, released and aligned; never in mid-air. The hand holds still until the joint exists, at
     most ``attach_join_wait_steps``; the retreat follows. ``ctx["attach"]["release"]`` records the steps from the release to the first
@@ -2718,7 +2696,7 @@ def _release_into_join(action: Place, motions: Motions, state, ctx: Dict[str, An
         if h is not None:
             obs["trace"].append((obs["k"], h["vertical_m"], h["lateral_m"], h["rot_rad"], touching))
 
-    for a in motions.gripper(arm, close=False, instant=True):
+    for a in motions.gripper(arm, close=False):
         yield a
         watch()
     for a in _release(motions, state, arm):
@@ -2829,14 +2807,9 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         held = state.held_object(arm)
         if held is not None:
             articulated = bool(getattr(held, "n_joints", 0) or len(getattr(held, "joints", {}) or {}))
-            # a handle of an articulated object is released with the full opening at once, by the open command (no staged
-            # release: the assisted grasp would re-grasp the handle during the retreat and the door cannot follow the hand). A
-            # SHEET pinched across its thickness (handle_kind edge_lid, a carton flap) as well: its staged release (2026-09-19:
-            # the full opening of a released flap swept a finger against it, 0919-070252) deferred the +1 to the edge escape,
-            # but the assisted grasp holds the flap with a fixed joint (the task's rule) until that +1 and the hinge stops the
-            # radial escape, so the grasp never let go (v3.0-reconciled, cdmmwy lever: "did not let go at the open command" in
-            # both attempts). The flap is let go here; the open pads then slide off its free edge (Retreat._edge_escape)
-            yield from motions.gripper(arm, close=False, staged=False)
+            # a handle of an articulated object - a SHEET pinched across its thickness (handle_kind edge_lid, a carton flap) as
+            # well - is let go of here, by the open command; the open pads then slide off a flap's free edge (Retreat._edge_escape)
+            yield from motions.gripper(arm, close=False)
             yield from _release(motions, state, arm)
             if articulated and cfg.release_settle_steps > 0:
                 # let the constraint-removal transient die before the arm moves off the handle (the leaf keeps its angle
@@ -4318,7 +4291,7 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
             if late > 0.0:
                 trunk_total += late
                 yield from motions.hold(int(cfg.follow_still_steps))
-            yield from motions.gripper(arm, close=False, staged=False)
+            yield from motions.gripper(arm, close=False)
             yield from _release(motions, state, arm)
             # the gripper-in-FOV span closes at the release and re-opens at the next pre-grasp (qa.py rule (b): "the
             # retreat legs and the transit to the next pre-grasp are unmonitored; every grasp -> release pair is its own

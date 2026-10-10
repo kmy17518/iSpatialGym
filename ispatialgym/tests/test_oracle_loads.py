@@ -88,16 +88,13 @@ def test_until_stops_after_the_step_that_meets_the_condition_and_closes_the_moti
     assert out == [0, 1, 2, 3]
 
 
-def test_gripper_instant_opening_reaches_the_open_command_on_its_first_step():
+def test_gripper_opening_reaches_the_open_command_on_its_first_step():
     env, motions = _motions()
     r = env.robot
     idx = r.controller_action_idx["gripper_right"]
     r.q[r.gripper_control_idx["right"]] = 0.02
-    first = next(motions.gripper("right", close=False, instant=True))
+    first = next(motions.gripper("right", close=False))
     assert float(first[idx]) == pytest.approx(1.0)
-    r.q[r.gripper_control_idx["right"]] = 0.02
-    ramped = next(motions.gripper("right", close=False))
-    assert float(ramped[idx]) < 0.0  # the ramp starts at the fingers' opening
 
 
 def test_free_standing_follow_turns_the_hand_rigidly_about_the_start_hinge_and_slows_while_the_torso_bends():
