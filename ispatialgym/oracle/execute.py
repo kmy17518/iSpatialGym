@@ -26,7 +26,9 @@ Behaviour per action (§3.6 / §6.1):
 * ``Lift`` / ``Reorient``  ``arm_along`` over the recorded segment; post: still held, eef at the segment end.
 * ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (the command ramps to +1, OmniGibson's
   assisted grasp lets go; backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest
-  (``not_settled``) or ``attached`` for ``kind="attach"`` (the task's attach rule joins the part at its release).
+  (``not_settled``) or ``attached`` for ``kind="attach"``: the descent ends at a hover pose above the seat, the hand aligns
+  the part laterally and in yaw there, opens in one step, and the task's attach rule joins the part once it lands on its
+  partner.
 * ``Push``       ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(init → mid → goal)``; post: eef at the goal
   contact, the pushed object moved (``no_motion``).
 * ``Brace``      ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(pre → contact)``; held (no further command).
@@ -241,54 +243,37 @@ class ExecuteConfig:
     place_base_nudge_min_m: float = 0.005
     place_base_nudge_max_m: float = 0.04
     place_base_nudge_tol_m: float = 0.004
-    #: (2026-09-19, attachment) at an attach place the male / female meta-link offset is read from the live world; above these
-    #: the hand is corrected by the male -> female transform (a short Cartesian leg, at most ``attach_correct_max_m``) before
-    #: the assisted grasp is dropped and ``AttachedTo.set_value(True)`` snaps the residual and creates the fixed joint
+    #: (2026-09-19, attachment) the re-aim move to the pre-place stops within this of its target
     attach_correct_min_m: float = 0.003
     #: owner 2026-09-25 (cork 0925-195316 'attach refused 16.6 mm / 4.9 deg'): the attach's insertion legs - the re-aim move to the
-    #: pre-place, the descent, the correction passes - track the rotation to this soft tolerance (the default 0.03 rad let the
-    #: male arrive 4.4 deg tilted and every correction pass stop 1.7 deg short); the correction loop stops on rotation only when a
-    #: pass improves it by less than ``attach_correct_stop_rot_rad``
+    #: pre-place, the descent, the hover alignment - track the rotation to this soft tolerance (the default 0.03 rad let the male
+    #: arrive 4.4 deg tilted)
     attach_leg_soft_rot_tol: float = 0.01
-    attach_correct_stop_rot_rad: float = 0.005
     #: the attach's insertion legs keep the differential IK this far from the joint limits (the cork's correction passes swung the
     #: residual by +-10 mm / +-3 deg between passes: commanded millimetre moves at a joint limit produce uncommanded rotations)
     attach_leg_limit_margin_rad: float = 0.05
     attach_correct_min_rad: float = 0.03
-    attach_correct_max_m: float = 0.06
     attach_settle_steps: int = 20
-    #: a correction pass lifts the part by this before the lateral / rotational move and descends again (0920-213721: the pass
-    #: moved a cap hovering 4.6 mm high DOWN and 4.4 mm sideways in one straight leg; its 5 deg-tilted rim caught the neck edge and
-    #: pushed the lemonade bottle 10 mm / 5 deg, which then rocked for 145 steps after the release)
-    attach_correct_lift_m: float = 0.006
     #: (2026-09-20 22:30) the place is re-aimed for the part's LIVE in-hand pose at the pre-place: the male -> female fix measured
     #: there gives the hand pose that aligns the links (the fingertip pinch of a 1.1 cm cap lets it pivot 3-5 deg / 5 mm about the
     #: closing axis before the assisted grasp locks, and the carry leg's soft tolerance adds up to 1 cm); applied when the shift
     #: from the recorded place is within these bounds
     inhand_reaim_max_m: float = 0.03
     inhand_reaim_max_rad: float = 0.35
-    #: (owner 2026-09-20 18:25) the snap AttachedTo makes when the joint is created must stay invisible: a residual above these after
-    #: the correction gets one more correction pass, and above them still the part is NOT attached (the place fails, the executor's
-    #: retry re-aims at the partner's live pose) - 0920-164504 snapped the cap 17 mm
-    attach_snap_max_m: float = 0.008
-    attach_snap_max_rad: float = 0.10
     #: an attach place re-aims at the partner's LIVE pose: the recorded pre-place / place / descent / retreat / carry are moved by the
     #: partner's displacement since the program start when it exceeds this (0920-164504: the bottle knocked 4.7 cm during the grasp
     #: phase, the descent came down 4 cm beside the neck)
     partner_shift_min_m: float = 0.005
-    #: (owner 2026-09-27, first-demo v2.1 A1) an attach place whose fingers would meet the partner before the part seats (the cap's
-    #: 51 mm rim pinched on its axis, the lemonade bottle's collar 54 mm across: the fingertips landed on the collar 5 mm before the
-    #: cap seated, tipped the bottle 1.2 deg and the attach locked the offset, 0927-040231) opens the fingers by up to this per finger
-    #: before the descent - the assisted grasp keeps holding the part (it releases on the full open command only) ...
-    attach_finger_clear_max_m: float = 0.004
-    #: ... in steps of this: the least opening whose fingers stay ``attach_finger_clear_margin_m`` from the partner down to the seat,
-    #: else the one that meets it latest
-    attach_finger_clear_step_m: float = 0.0005
-    attach_finger_clear_margin_m: float = 0.001
-    #: the finger surface is swept along the descent from its lowest this-many metres (the part of the finger that can reach the
-    #: partner first), sampled every ``attach_finger_clear_spacing_m``
-    attach_finger_clear_band_m: float = 0.010
-    attach_finger_clear_spacing_m: float = 0.003
+    #: (owner 2026-10-10) the attach place holds the part at the contact hold down to a HOVER pose - the seated hand pose raised along
+    #: the seat axis until the lowest point of both the part and the fingertips is this far above the partner's top under them
+    #: (the partner's collision convexes whose footprint meets theirs, widened by ``attach_hover_footprint_margin_m``) ...
+    attach_hover_clear_m: float = 0.003
+    attach_hover_footprint_margin_m: float = 0.01
+    #: ... aligns the male link there with the female one - laterally (across the seat axis) and in yaw about it modulo the part's
+    #: symmetry, the height and the tilt kept - in the closed-loop passes of the task's correction regime (``AttachCorrection``),
+    #: opens in one step to +1 and holds still until the task's attach rule has joined the part (it lands on the partner in
+    #: contact), at most this many steps, before the retreat
+    attach_join_wait_steps: int = 45
     #: (owner 2026-09-27, first-demo v2.1 A3, bar soap 0927-034001: "the robot wobbles at the grasp and the release") a library pinch
     #: whose finger envelope (both finger meshes, closed..open) at the grasp pose reaches below the grasped object's lowest point + this
     #: is lifted by the deficit along world z, the pads' fingertip-side end kept ``grasp_support_pad_margin_m`` below the object's top
@@ -1884,9 +1869,8 @@ def attach_hold_kept(action: Place, motions: Motions, state, ctx: Dict[str, Any]
     the cork - and joints 5-7 crept 8-21 mrad: 3.9 mm before the offset was measured, 3.3 mm after the correction pass). In an attach
     place with the part in hand the holding arm joins ``keep_hold_arms`` from the descent until the attachment exists, so
     ``Motions._relax_if_jammed`` leaves it alone there; every other place, and this one before the descent, is unchanged. The
-    attachment exists once the open command's last increment has released the part (the task's release hook joins it), so
-    the window spans the alignment passes, the fingers' opening and the release. ``ctx["attach_hold"]`` records fired / not
-    fired and why."""
+    window spans the descent to the hover pose, the hover alignment, the release and the wait for the joint.
+    ``ctx["attach_hold"]`` records fired / not fired and why."""
     arm = action.arm
     kept = getattr(motions, "keep_hold_arms", None)
     if action.kind != "attach" or not action.on:
@@ -1968,16 +1952,10 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
         ctx["carry_leg"] = {"kind": "trajopt"}
     if action.kind == "attach" and action.on:
-        # the part is in the air above the partner: re-aim the descent for its live in-hand pose (and the carry's residual)
+        # the part is in the air above the partner: re-aim the descent for its live in-hand pose (and the carry's residual), then
+        # end it at the hover pose above the seat - the contact hold keeps the part through the carry and the descent
         targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
-        yield from clear_fingers_over_partner(action, motions, state, targets, ctx, cfg)
-        if ctx["finger_clearance"].get("applied"):
-            # the opened pads let the part settle in the assisted grasp (cap 0927-040231: 1.25 mm / 1.4 deg in the hand, which then
-            # stood as the offset before the snap and cost a correction pass): the descent is aimed again for that in-hand pose
-            first = ctx["inhand_reaim"]
-            targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
-            ctx["finger_clearance"]["reaim"] = ctx["inhand_reaim"]
-            ctx["inhand_reaim"] = first
+        targets = attach_hover_targets(action, motions, state, targets, ctx, cfg)
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     with attach_hold_kept(action, motions, state, ctx):
         # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
@@ -2010,24 +1988,21 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
                 after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
                 ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
         if action.kind == "attach" and action.on:
-            yield from _attach_at_place(action, motions, state, ctx)
-            # the fingers open to just short of the release (the assisted grasp still holds the part) and the alignment is
-            # measured and corrected again with the fingertips off the partner; the open command's last increment releases it
-            yield from motions.gripper_open_short(arm)
-            closed = ctx.get("attach")
-            yield from _attach_at_place(action, motions, state, ctx)
-            ctx["attach"]["fingers_closed"] = closed
-        # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
-        # support place sets the object down
-        if drop and cfg.drop_lower_max_m > 0:
-            yield from lower_drop(action, motions, state, ctx, cfg)
-        free = drop and cfg.release_free_instant and _hangs_free(state, action.object)
-        if free:
+            # aligned laterally and in yaw at the hover pose, released in one step; the part lands on the partner and the task's
+            # attach rule joins it there
+            yield from _align_at_hover(action, motions, state, ctx, cfg)
             ctx["release_instant"] = True
-        yield from motions.gripper(arm, close=False, instant=free)
-        yield from _release(motions, state, arm)
-    if action.kind == "attach" and action.on:
-        _attach_after_release(action, state, ctx)
+            yield from _release_into_join(action, motions, state, ctx, cfg)
+        else:
+            # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
+            # support place sets the object down
+            if drop and cfg.drop_lower_max_m > 0:
+                yield from lower_drop(action, motions, state, ctx, cfg)
+            free = drop and cfg.release_free_instant and _hangs_free(state, action.object)
+            if free:
+                ctx["release_instant"] = True
+            yield from motions.gripper(arm, close=False, instant=free)
+            yield from _release(motions, state, arm)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
     # release: a differential-IK stall is finished by arm_to like the Retreat action's leg (touching 0917-203045: the
@@ -2188,41 +2163,6 @@ def _raycast_all(starts, ends):
     from omnigibson.utils.sampling_utils import raytest_batch
 
     return raytest_batch(starts, ends, only_closest=False)
-
-
-def _finger_meets_partner(arm: str, finger_q: Sequence[float], pre, place, partner, cfg: ExecuteConfig) -> Tuple[Optional[float], int, List[str]]:
-    """Where the fingers (joint values ``finger_q``) meet ``partner`` when the hand descends straight from ``pre`` to ``place`` (same
-    orientation): rays from the finger surface's lowest ``attach_finger_clear_band_m`` along the descent, down to
-    ``attach_finger_clear_margin_m`` past the seat, against the partner's collision geometry. ``(metres before the seat at the first
-    contact - negative within the margin past it, None when clear -, rays cast, partner bodies hit)``."""
-    import numpy as np
-
-    surf = finger_surface_points(arm, cfg.attach_finger_clear_spacing_m)
-    if not surf:
-        return None, 0, []
-    pts = np.vstack([p + float(q) * ax for (p, ax), q in zip(surf, finger_q)])
-    (p0, q0), (p1, _) = as_world_pose(pre), as_world_pose(place)
-    R = C.quat_to_mat(C.as_tensor(q0).float()).numpy()
-    rise = (C.as_tensor(p0) - C.as_tensor(p1)).float().numpy()
-    length = float(np.linalg.norm(rise))
-    if length < 1e-4:
-        return None, 0, []
-    down = -rise / length
-    seat = pts @ R.T + C.as_tensor(p1).float().numpy()
-    low = seat @ down
-    seat = seat[low >= float(low.max()) - cfg.attach_finger_clear_band_m]
-    starts, ends = seat + rise, seat + cfg.attach_finger_clear_margin_m * down
-    root = str(getattr(partner, "prim_path", "") or "")
-    worst, bodies = None, set()
-    for ray in _raycast_all(starts.tolist(), ends.tolist()):
-        for h in (ray if isinstance(ray, list) else [ray]):
-            body = str(h.get("rigidBody") or "")
-            if not h.get("hit") or not root or not body.startswith(root):
-                continue
-            before = length - float(h.get("distance", length))
-            worst = before if worst is None else max(worst, before)
-            bodies.add(body[len(root):] or body)
-    return worst, len(starts), sorted(bodies)
 
 
 def surface_below(obj, robot=None, inset: float = 0.25, depth: float = 0.6) -> Tuple[Optional[float], int]:
@@ -2471,68 +2411,14 @@ def clear_release_of_partner(action: Place, motions: Motions, state, targets: Di
     return out
 
 
-def clear_fingers_over_partner(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
-    """Owner 2026-09-27 (first-demo v2.1 A1, cap 0927-040231 "the cap seems slightly off when attached"; the owner's stable attach
-    0920-235831): a part pinched by its rim can hold the fingers inside the outline of the partner's top it goes onto - the cap's 51 mm
-    rim pinched on its axis (the sampler's re-centred fingertip pinch), the lemonade bottle's collar 54 mm across - and the fingertips
-    land on the collar before the part seats: 5 mm short, the bottle tipped 1.2 deg, the attach locked that offset and the correction
-    pass (measured on the tipped bottle) did not help. At the pre-place, after the re-aim, the finger surface is swept along the descent
-    against the partner (``_finger_meets_partner``); when the fingers would meet it before the seat they open by the least
-    ``attach_finger_clear_step_m`` multiple (<= ``attach_finger_clear_max_m`` per finger) that keeps ``attach_finger_clear_margin_m``
-    down to the seat - else the one that meets it latest - and the assisted grasp keeps holding the part (OmniGibson releases it on the
-    full open command only), so the part seats before a finger touches the partner. ``ctx["finger_clearance"]`` records the facts."""
-    arm = action.arm
-    rec: Dict[str, Any] = {"applied": False}
-    ctx["finger_clearance"] = rec
-    if targets.get("place") is None or targets.get("pre_place") is None or not action.on:
-        rec["reason"] = "no place targets"
-        return
-    try:
-        partner = state.object(action.on)
-        q_now = [float(v) for v in motions.robot.get_joint_positions()[motions.robot.gripper_control_idx[arm]].tolist()]
-        before, n_rays, bodies = _finger_meets_partner(arm, q_now, targets["pre_place"], targets["place"], partner, cfg)
-    except Exception as e:  # noqa: BLE001 - no raycasts / finger meshes: the place runs as before
-        rec["reason"] = f"no finger sweep ({e!r})"[:160]
-        return
-    rec.update({"before_seat_m": None if before is None else round(before, 4), "rays": n_rays, "partner_bodies": bodies, "finger_q_m": [round(v, 4) for v in q_now]})
-    if before is None:
-        return
-    best = None  # (metres before the seat or None, opening) of the opening that meets the partner latest
-    k = 1
-    while k * cfg.attach_finger_clear_step_m <= cfg.attach_finger_clear_max_m + 1e-9:
-        dq = k * cfg.attach_finger_clear_step_m
-        after, _, _ = _finger_meets_partner(arm, [v + dq for v in q_now], targets["pre_place"], targets["place"], partner, cfg)
-        if after is None:
-            best = (None, dq)
-            break
-        if after < before and (best is None or after < best[0]):
-            best = (after, dq)
-        k += 1
-    if best is None:
-        rec["reason"] = f"no opening up to {cfg.attach_finger_clear_max_m * 1000:.1f} mm per finger meets the partner later"
-        log.warning("place(%s): the fingers meet %s %.1f mm before the seat and no bounded opening helps", action.object, action.on, before * 1000)
-        return
-    after, dq = best
-    lo, hi = motions._gripper_limits(arm)
-    opening = min(hi - 1e-4, sum(q_now) / len(q_now) + dq)  # below the full open command: the assisted grasp holds
-    motions.state.gripper_cmd[arm] = motions.gripper_command(arm, opening)
-    motions.state.stop_base()
-    for _ in range(int(motions.cfg.gripper_preshape_steps)):
-        yield motions._emit()
-    rec.update({"applied": True, "opened_m": round(dq, 4), "before_seat_after_m": None if after is None else round(after, 4), "opening_cmd_m": round(opening, 4),
-                "held": state.held_object(arm) is state.object(action.object)})
-    log.info("place(%s): the fingers would meet %s %.1f mm before the seat; opened %.1f mm per finger (%s)", action.object, action.on, before * 1000, dq * 1000,
-             "clear of it down to the seat" if after is None else f"{after * 1000:.1f} mm before the seat after")
-
-
 @dataclass
 class AttachCorrection:
     """The attach correction regime (owner 2026-09-20 23:39, attachment only): read from the sidecar's ``attach_correction``
     (the sampler copies ``generation.attach_correction`` of the alias), else from the customs entry of the sidecar's alias
-    (a demo-only re-run of an older instance), else these defaults = the behaviour before the knob (two passes at
-    ``attach_correct_min_m``). Each pass: settle -> re-measure the male / female offset modulo the symmetry -> lift /
-    lateral / descend leg at ``soft_pos_tol_m`` -> settle; the loop stops when the residual is within the targets, the
-    improvement falls below ``stop_when_improvement_below_m`` or the passes are exhausted."""
+    (a demo-only re-run of an older instance), else these defaults (two passes at ``attach_correct_min_m``). It drives the
+    hover alignment (``_align_at_hover``, owner 2026-10-10): each pass a lateral + yaw leg at ``soft_pos_tol_m`` -> settle ->
+    re-measure; the loop stops when the lateral offset is within ``target_pos_m`` and the yaw within ``target_rot_rad``, the
+    lateral improvement falls below ``stop_when_improvement_below_m`` or the passes are exhausted."""
 
     soft_pos_tol_m: float = 0.003
     settle_steps: int = 20
@@ -2583,120 +2469,208 @@ def attach_correction_regime(ctx: Dict[str, Any], cfg: ExecuteConfig) -> AttachC
     return reg
 
 
-def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th.Tensor]:
-    """The BEHAVIOR attachment at the place pose (2026-09-19; attachment lid / teapot 0916-205838: the hand reached the
-    recorded attach pose within a millimetre, opened, and the lid fell through the collision-filtered teapot onto the
-    table — nothing on the demo side ever created the attachment, and OmniGibson's contact-triggered auto-attach cannot
-    fire between the filtered members).
+def _collision_points(links: Sequence[Any]) -> Optional[th.Tensor]:
+    """World points of the collision geometry's convex hull of every link in ``links`` (None without any)."""
+    pts = [th.as_tensor(p).float() for p in (getattr(link, "collision_boundary_points_world", None) for link in links) if p is not None and len(p)]
+    return th.cat(pts, dim=0) if pts else None
 
-    The male / female meta-link offset is read from the live world (the recorded pose does not know the in-hand slip of
-    the closure or the descent's shortfall). Above ``attach_correct_min_*`` the hand is moved by the male -> female
-    transform — the part is rigid in the hand, so ``T_eef' = T_female @ inv(T_male) @ T_eef`` — as a short Cartesian leg
-    (closed-loop correction on the object, not a fallback). The part is still held when this returns; the place runs it
-    once with the fingers closed and once more with them open to just short of the release (``gripper_open_short``),
-    then opens the gripper by the command (ramp to +1) like every other place, OmniGibson's assisted grasp lets go, and the
-    task's attach rule joins the part in that instant (``predicates.attach_on_release``, the release hook of our
-    Behavior-1K fork: the fixed joint at the current relative pose, so the part neither moves nor falls through the
-    collision-filtered partner) - the same rule an evaluated policy's release meets. A residual beyond the misalignment
-    bound is refused here and the postcondition fails as before (``ctx["attach"]`` records the offsets for the audit)."""
-    cfg = _cfg(ctx)
-    arm = action.arm
-    getter = getattr(state, "attachment_offset", None)
-    off = getter(action.object, action.on) if getter is not None else None
-    rec: Dict[str, Any] = {"offset_before": None if off is None else {k: v for k, v in off.items() if k != "fix"}}
-    ctx["attach"] = rec
-    if off is None:
-        log.warning("place(%s): no attachment meta-link pair with %s; releasing without an explicit attach", action.object, action.on)
-        return
-    log.info("place(%s): attach offset %.1f mm / %.1f deg modulo the part's symmetry (raw %.1f deg; male %s -> female %s of %s)", action.object, off["pos_m"] * 1000,
-             math.degrees(off["rot_rad"]), math.degrees(off.get("rot_raw_rad", off["rot_rad"])), off["male_link"], off["female_link"], action.on)
-    # closed-loop correction passes under the task's regime (owner 2026-09-20 23:39, attachment only; AttachCorrection): each
-    # pass moves the hand by the transform carrying the (equivalent) male frame onto the female one, until the residual is
-    # within the regime's targets, the improvement falls below its floor or the passes are exhausted; a residual above
-    # attach_snap_max_* after that does NOT attach. The joint itself is created at the current relative pose
-    # (predicates.attach_in_place), so whatever residual remains is a physical misalignment, never a snap
-    reg = attach_correction_regime(ctx, cfg)
-    rec["regime"] = reg.as_note()
-    passes: List[Dict[str, Any]] = []
-    partner0 = None
+
+def _seat_axis(state, action: Place) -> Optional[th.Tensor]:
+    """The pair's insertion axis in the world, pointing out of the seat (``predicates.seat_axis``, the attach rule's own)."""
+    from ispatialgym.sampling import predicates as PRED
+
+    links = state.attachment_links(action.object, action.on) if hasattr(state, "attachment_links") else None
+    if links is None:
+        return None
+    return PRED.seat_axis(state.object(action.object), state.object(action.on), links[1].body_name).float()
+
+
+def attach_hover_targets(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
+    """The attach place's hover pose (owner 2026-10-10): ``place`` - the hand pose that seats the part, re-aimed for its live in-hand
+    pose - raised along the seat axis until the lowest point of both the part and the fingertips is ``attach_hover_clear_m`` above
+    the partner's top under them (the highest vertex of the partner's collision convexes whose footprint meets theirs, widened by
+    ``attach_hover_footprint_margin_m``). ``place`` and ``descent`` end there and the retreat is raised with it. The part and the
+    closed fingers are rigid with the hand, so their collision points are carried from where they are now to the seated hand pose.
+    ``ctx["attach"]["hover"]`` records the height above the seat, the clearances and the partner's top."""
+    rec: Dict[str, Any] = {"applied": False}
+    ctx.setdefault("attach", {})["hover"] = rec
+    if targets.get("place") is None:
+        rec["reason"] = "no place target"
+        return targets
     try:
-        partner0 = tuple(x.float().clone() for x in as_world_pose(state.object_pose(action.on)))
+        import omnigibson as og
+
+        og.sim.sync_physx_to_fabric()  # the collision points read the render-side transforms
     except Exception:  # noqa: BLE001
         pass
+    child, partner = state.object(action.object), state.object(action.on)
+    part = _collision_points(list(child.links.values()))
+    fingers = _collision_points(list((getattr(motions.robot, "finger_links", None) or {}).get(action.arm, [])))
+    meshes = []
+    for link in partner.links.values():
+        for mesh in (getattr(link, "collision_meshes", None) or {}).values():
+            pts = mesh.points_in_world_frame
+            if pts is not None and len(pts):
+                meshes.append(th.as_tensor(pts).float())
+    axis = _seat_axis(state, action)
+    if part is None or not meshes or axis is None:
+        rec["reason"] = "no collision geometry / attachment pair"
+        log.warning("place(%s): %s - descending to the seated pose", action.object, rec["reason"])
+        return targets
+    p_now, q_now = (x.float() for x in state.eef_pose(action.arm))
+    p_seat, q_seat = (x.float() for x in as_world_pose(targets["place"]))
+    carry = C.compose((p_seat, q_seat), C.invert((p_now, q_now)))
+    part_s = C.transform_points(carry, part)
+    fing_s = C.transform_points(carry, fingers) if fingers is not None else None
+    moving = th.cat([part_s] + ([fing_s] if fing_s is not None else []), dim=0)
+    lo = moving[:, :2].min(dim=0).values - cfg.attach_hover_footprint_margin_m
+    hi = moving[:, :2].max(dim=0).values + cfg.attach_hover_footprint_margin_m
+    under = [m for m in meshes if bool((m[:, :2].min(dim=0).values <= hi).all() and (m[:, :2].max(dim=0).values >= lo).all())]
+    top = max(float(m[:, 2].max()) for m in (under or meshes))
+    low_part = float(part_s[:, 2].min())
+    low_fingers = float(fing_s[:, 2].min()) if fing_s is not None else float("inf")
+    h = max(0.0, top + cfg.attach_hover_clear_m - min(low_part, low_fingers)) / max(float(axis[2]), 0.5)
+    shift = axis * h
+    hover = Pose(position=[float(v) for v in (p_seat + shift).tolist()], orientation=[float(v) for v in q_seat.tolist()])
+    out = dict(targets)
+    out["place"], out["descent"] = hover, [hover]
+    if out.get("retreat"):
+        out["retreat"] = [Pose(position=[float(v) for v in (as_world_pose(w)[0].float() + shift).tolist()], orientation=[float(v) for v in as_world_pose(w)[1].float().tolist()])
+                          for w in out["retreat"]]
+    dz = float(shift[2])
+    rec.update({"applied": True, "height_above_seat_m": round(h, 4), "part_clearance_m": round(low_part + dz - top, 4),
+                "finger_clearance_m": None if fing_s is None else round(low_fingers + dz - top, 4), "partner_top_z": round(top, 4),
+                "partner_convexes_under": len(under), "partner_convexes": len(meshes), "seat_axis": [round(float(v), 4) for v in axis.tolist()],
+                "lowest": "fingertips" if low_fingers < low_part else "part"})
+    log.info("place(%s): hover %.1f mm above the seat - the part %.1f mm and the fingertips %s mm above the top of %s", action.object, h * 1000,
+             rec["part_clearance_m"] * 1000, "n/a" if rec["finger_clearance_m"] is None else f"{rec['finger_clearance_m'] * 1000:.1f}", action.on)
+    return out
+
+
+def _hover_offset(state, action: Place) -> Optional[Dict[str, Any]]:
+    """The male link against the female one at the hover pose: the vector onto the seat axis (``lateral``, its length
+    ``lateral_m``), the height along the axis (``vertical_m``), the yaw about it to the nearest symmetric equivalent of the female
+    frame (``yaw_rad``, the twist of the alignment's fix) and the whole angle modulo the symmetry (``rot_rad``)."""
+    links = state.attachment_links(action.object, action.on) if hasattr(state, "attachment_links") else None
+    off = state.attachment_offset(action.object, action.on) if hasattr(state, "attachment_offset") else None
+    axis = _seat_axis(state, action)
+    if links is None or off is None or axis is None:
+        return None
+    pm = links[0].get_position_orientation()[0].float()
+    pf = links[1].get_position_orientation()[0].float()
+    d = pf - pm
+    lateral = d - float(th.dot(d, axis)) * axis
+    q_fix = C.as_tensor(off["fix"][1]).float()
+    if float(q_fix[3]) < 0.0:
+        q_fix = -q_fix
+    yaw = 2.0 * math.atan2(float(th.dot(q_fix[:3], axis)), float(q_fix[3]))
+    return {"lateral": lateral, "lateral_m": float(th.linalg.norm(lateral)), "vertical_m": float(th.dot(pm - pf, axis)), "yaw_rad": C.wrap_angle(yaw),
+            "rot_rad": float(off["rot_rad"]), "male": pm, "axis": axis}
+
+
+def _hover_note(off: Optional[Dict[str, Any]]) -> Optional[Dict[str, float]]:
+    return None if off is None else {k: round(float(off[k]), 5) for k in ("lateral_m", "vertical_m", "yaw_rad", "rot_rad")}
+
+
+def _align_at_hover(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
+    """Closed-loop alignment at the hover pose (owner 2026-10-10): each pass moves the hand so the male link comes onto the seat axis
+    and turns about that axis by the yaw to the nearest symmetric equivalent of the female frame - the hover height and the tilt
+    stay - then settles and measures again. The task's correction regime (``AttachCorrection``) gives the passes, the leg's soft
+    tolerance, the settle and the targets (lateral ``target_pos_m``, yaw ``target_rot_rad``); the loop also stops when a pass
+    improves the lateral offset by less than ``stop_when_improvement_below_m``. ``ctx["attach"]["alignment"]`` records the passes."""
+    arm = action.arm
+    rec = ctx.setdefault("attach", {}).setdefault("alignment", {})
+    reg = attach_correction_regime(ctx, cfg)
+    rec["regime"] = reg.as_note()
+    off = _hover_offset(state, action)
+    rec["before"] = _hover_note(off)
+    passes: List[Dict[str, Any]] = []
     for k in range(max(0, int(reg.max_passes))):
-        need = off["pos_m"] > reg.target_pos_m or off["rot_rad"] > reg.target_rot_rad
-        if not need or off["pos_m"] > cfg.attach_correct_max_m:
+        if off is None or (off["lateral_m"] <= reg.target_pos_m and abs(off["yaw_rad"]) <= reg.target_rot_rad):
             break
-        p, q = state.eef_pose(arm)
-        target = C.compose(off["fix"], (p.float(), q.float()))
-        # lift -> lateral / rotational move at height -> descend: the part is clear of the partner while it moves sideways
-        # (0920-213721: a straight down-and-sideways leg caught the tilted rim on the neck and pushed the bottle); the leg's
-        # tolerance is the regime's (the free-space 1 cm left cork 0920-212757 at 7.8 mm after two passes)
-        top = max(float(p[2]), float(target[0][2])) + cfg.attach_correct_lift_m
-        via1 = (th.tensor([float(p[0]), float(p[1]), top]), q.float())
-        via2 = (th.tensor([float(target[0][0]), float(target[0][1]), top]), target[1])
+        q_t = C.quat_from_axis_angle(off["axis"], off["yaw_rad"])
+        p_e, q_e = (x.float() for x in state.eef_pose(arm))
+        target = (C.quat_rotate(q_t, p_e - off["male"]) + off["male"] + off["lateral"], C.qmul(q_t, q_e))
         try:
-            # owner 2026-09-25 (cork 0925-195316: 'attach refused 16.6 mm / 4.9 deg', four passes corrected 9 mm but 0.017 of 0.077 rad):
-            # the legs of a correction pass track the ROTATION to the regime's target too - the default soft tolerance (0.03 rad)
-            # let every pass stop 1.7 deg short of the male -> female fix, so the tilt never closed
-            yield from motions.arm_along(arm, [via1, via2, target], soft_pos_tol=reg.soft_pos_tol_m, soft_rot_tol=min(0.5 * reg.target_rot_rad, cfg.attach_leg_soft_rot_tol),
+            yield from motions.arm_along(arm, [target], soft_pos_tol=reg.soft_pos_tol_m, soft_rot_tol=min(0.5 * reg.target_rot_rad, cfg.attach_leg_soft_rot_tol),
                                          limit_margin=cfg.attach_leg_limit_margin_rad)
             yield from motions.settle(max_steps=reg.settle_steps)
         except SkillError as e:
-            log.warning("place(%s): attach correction pass %d did not complete (%s)", action.object, k + 1, e.message)
-            rec["correction_error"] = e.message
-        off2 = getter(action.object, action.on)
+            rec["error"] = e.message
+            log.warning("place(%s): hover alignment pass %d did not complete (%s)", action.object, k + 1, e.message)
+        off2 = _hover_offset(state, action)
         if off2 is None:
             break
-        improvement = float(off["pos_m"]) - float(off2["pos_m"])
-        improvement_rot = float(off["rot_rad"]) - float(off2["rot_rad"])
-        passes.append({**{k2: v for k2, v in off2.items() if k2 != "fix"}, "improvement_m": round(improvement, 5), "improvement_rad": round(improvement_rot, 5)})
-        log.info("place(%s): after correction pass %d: %.1f mm / %.1f deg (improvement %.1f mm / %.2f deg)", action.object, k + 1, off2["pos_m"] * 1000,
-                 math.degrees(off2["rot_rad"]), improvement * 1000, math.degrees(improvement_rot))
+        improvement = off["lateral_m"] - off2["lateral_m"]
+        passes.append({**_hover_note(off2), "improvement_m": round(improvement, 5)})
+        log.info("place(%s): hover alignment pass %d: lateral %.1f mm, yaw %.2f deg (height %.1f mm)", action.object, k + 1, off2["lateral_m"] * 1000,
+                 math.degrees(off2["yaw_rad"]), off2["vertical_m"] * 1000)
         off = off2
-        # the loop stops when NEITHER the position nor the rotation residual improves any more (the rotation used to be ignored here)
-        if (improvement < reg.stop_when_improvement_below_m and improvement_rot < cfg.attach_correct_stop_rot_rad
-                and (off["pos_m"] > reg.target_pos_m or off["rot_rad"] > reg.target_rot_rad)):
-            rec["stopped"] = (f"pass {k + 1} improved the residual by {improvement * 1000:.2f} mm < {reg.stop_when_improvement_below_m * 1000:.2f} mm and "
-                              f"{math.degrees(improvement_rot):.2f} deg < {math.degrees(cfg.attach_correct_stop_rot_rad):.2f} deg")
-            log.info("place(%s): correction stopped: %s", action.object, rec["stopped"])
+        if improvement < reg.stop_when_improvement_below_m and abs(off["yaw_rad"]) <= reg.target_rot_rad and off["lateral_m"] > reg.target_pos_m:
+            rec["stopped"] = f"pass {k + 1} improved the lateral offset by {improvement * 1000:.2f} mm"
             break
-    rec["offset_after_correction"] = passes[-1] if passes else None
-    rec["correction_passes"] = len(passes)
     rec["passes"] = passes
-    if partner0 is not None:
+    rec["after"] = _hover_note(off)
+
+
+def _release_into_join(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
+    """The attach release (owner 2026-10-10): the open command at once (+1 in one step, ``Motions.gripper(instant=True)``); the part
+    drops the hover gap onto its partner and the task's attach rule joins it there - in contact, released and aligned; never at
+    the release instant unless it already touches the partner, never in mid-air. The hand holds still until the joint exists, at
+    most ``attach_join_wait_steps``; the retreat follows. ``ctx["attach"]["release"]`` records the steps from the release to the first
+    contact and to the join, the join record (trigger, alignment, snap size), the release hook's verdict and the part's bounce."""
+    from ispatialgym.sampling import predicates as PRED
+
+    arm = action.arm
+    child, partner = state.object(action.object), state.object(action.on)
+    rec: Dict[str, Any] = {"instant": True}
+    ctx.setdefault("attach", {})["release"] = rec
+    n0 = len(PRED.JOINS)
+    PRED.LAST_RELEASE_ATTACH.clear()
+    obs: Dict[str, Any] = {"k": 0, "contact": None, "joined": None, "trace": []}
+
+    def watch():
+        obs["k"] += 1
         try:
-            p1, q1 = (x.float() for x in as_world_pose(state.object_pose(action.on)))
-            rec["partner_moved_during_correction"] = {"pos_m": round(float(th.linalg.norm(p1 - partner0[0])), 5), "rot_rad": round(float(C.quat_angle(q1, partner0[1])), 5)}
-        except Exception:  # noqa: BLE001
-            pass
-    if off["pos_m"] > cfg.attach_snap_max_m or off["rot_rad"] > cfg.attach_snap_max_rad:
-        # the part would sit visibly off its seat (0920-164504: 17 mm): leave it unattached, the postcondition fails and the executor's
-        # retry re-aims the place at the partner's live pose
-        rec.update({"attached": False, "refused": f"residual {off['pos_m'] * 1000:.1f} mm / {math.degrees(off['rot_rad']):.1f} deg exceeds the misalignment bound "
-                                                    f"({cfg.attach_snap_max_m * 1000:.0f} mm / {math.degrees(cfg.attach_snap_max_rad):.0f} deg)"})
-        log.warning("place(%s): %s - not attached", action.object, rec["refused"])
-        raise SkillError("execution", f"attach refused: {rec['refused']}")  # still held: the checkpoint rollback + retry re-aim the place
-    from ispatialgym.sampling import predicates as PRED
+            touching = PRED.pair_in_contact(child, partner)
+        except Exception:  # noqa: BLE001 - no contact matrix (the test stubs)
+            touching = False
+        joined = bool(state.attached(action.object, action.on))
+        if touching and obs["contact"] is None:
+            obs["contact"] = obs["k"]
+        if joined and obs["joined"] is None:
+            obs["joined"] = obs["k"]
+        h = None if joined else _hover_offset(state, action)
+        if h is not None:
+            obs["trace"].append((obs["k"], h["vertical_m"], h["lateral_m"], h["rot_rad"], touching))
 
-    PRED.LAST_RELEASE_ATTACH.clear()  # the release that follows records its attach there
-
-
-def _attach_after_release(action: Place, state, ctx) -> None:
-    """After the attach placement's release by the command: whether the task's attach rule joined the part, and how
-    (``ctx["attach"]``: ``attached``, the release hook's alignment record)."""
-    from ispatialgym.sampling import predicates as PRED
-
-    rec = ctx.setdefault("attach", {})
-    rec["release"] = "gripper command +1"
-    rec["attached"] = bool(state.attached(action.object, action.on))
-    rec["alignment"] = dict(PRED.LAST_RELEASE_ATTACH) or None
+    for a in motions.gripper(arm, close=False, instant=True):
+        yield a
+        watch()
+    for a in _release(motions, state, arm):
+        yield a
+        watch()
+    for _ in range(int(cfg.attach_join_wait_steps)):
+        if obs["joined"] is not None:
+            break
+        for a in motions.hold(1):
+            yield a
+        watch()
+    joins = PRED.JOINS[n0:]
+    hook = {k: v for k, v in PRED.LAST_RELEASE_ATTACH.items() if k in ("attached", "reason", "trigger", "contact", "lateral_m", "vertical_m", "rot_rad")} or None
+    after = [t for t in obs["trace"] if obs["contact"] is not None and t[0] >= obs["contact"]]
+    rec.update({"steps_to_first_contact": obs["contact"], "steps_to_join": obs["joined"], "join": joins[0] if joins else None, "release_hook": hook,
+                "bounce_m": round(max(t[1] for t in after) - after[0][1], 5) if after else None,
+                "max_rot_rad_before_join": round(max(t[3] for t in obs["trace"]), 5) if obs["trace"] else None,
+                "attached": bool(state.attached(action.object, action.on))})
     if rec["attached"]:
-        log.info("place(%s): released at the open command and joined to %s (%s)", action.object, action.on,
-                 "at the release" if (rec["alignment"] or {}).get("attached") else "by the per-step check")
+        j = rec["join"] or {}
+        log.info("place(%s): released at hover, first contact after %s steps, joined to %s after %s steps (%s, %s)", action.object, obs["contact"], action.on,
+                 obs["joined"], j.get("trigger"), j.get("mode"))
     else:
-        log.warning("place(%s): released at the open command but not attached to %s (%s)", action.object, action.on,
-                    (rec["alignment"] or {}).get("reason", "no attach at the release"))
+        log.warning("place(%s): released at hover but not joined to %s within %d steps (first contact after %s steps)", action.object, action.on,
+                    cfg.attach_join_wait_steps, obs["contact"])
+
 
 
 def post_place(action: Place, state, targets, ctx) -> Optional[str]:

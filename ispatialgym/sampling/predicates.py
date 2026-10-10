@@ -24,17 +24,21 @@ measures the separation of the two objects' convex hulls (the collision boundary
 half-spaces, exact for a face-to-face contact, a lower bound otherwise) and accepts a gap up to ``TOUCHING_GAP_MAX_M``
 (3 mm; ``ISG_TOUCHING_GAP_MAX_M`` overrides).
 
-``attached`` (owner 2026-09-19 17:10): OmniGibson's ``AttachedTo`` joins two parts only through its own contact-triggered
-``_update`` (never between an ``attachment_targets`` pair — their collisions are filtered so an attached part does not
-jitter) and only when the male / female meta-link frames agree within 5 cm **and 15° in full SO(3)**, an invisible yaw
-constraint for a rotationally symmetric part (a round lid attaches in ~1/12 of its yaws). After an OmniGibson False the
-**alignment** branch tests the meta-link pair **modulo the part's recorded symmetry** (the group / pose target's
-``orientation_equivalences``, registered by the task through :func:`set_attachment_context`; ``zinf`` = yaw free) with the
-same 5 cm / 15° and, when aligned, creates the BEHAVIOR attachment — the stock fixed joint, but at the links' current
-relative pose (:func:`attach_in_place`; OmniGibson's ``set_value`` would first snap the child onto the raw female frame, a
-5° twist for a ``zinf`` cap corrected to the nearest 5° equivalence: 0920-203052) — so the atom stays a real attachment
-joint, nothing moves when it appears, and a policy can satisfy it at any equivalent yaw. The oracle's attach at the place
-pose (``executor.SimState.attach``) is the same call.
+``attached`` (owner 2026-10-10, replacing the 2026-09-19 5 cm / 15 deg join): the pair's collision stays ON until the parts
+are joined, and only the task's rule joins them - OmniGibson's contact-triggered ``AttachedTo._update`` is blocked for the
+registered pairs (once the pair can touch it joins on contact within 5 cm / 15 deg, checked without the part's symmetry,
+snaps the part - twisting a round cap up to 15 deg - and ignores the hand: 0919-174551 snapped the lid 4 cm out of the hand
+mid-descent). After an OmniGibson False the **alignment** branch joins a registered child only when (a) no robot holds it,
+(b) PhysX reports it in contact with its partner and (c) its male meta link is aligned with the partner's female link
+**modulo the part's recorded symmetry** (the group / pose target's ``orientation_equivalences``, registered by the task
+through :func:`set_attachment_context`; ``zinf`` = yaw free) within ``JOIN_LATERAL_MAX_M`` across the female axis,
+``JOIN_ANGLE_MAX_RAD`` and ``JOIN_VERTICAL_MIN_M`` .. ``JOIN_VERTICAL_MAX_M`` along it (the window covers the gap at which
+the part comes to rest on its partner with collision on). No join in mid-air or at the release instant of a part that does
+not touch its partner yet. The join (:func:`join_mode`, ``ISG_ATTACH_JOIN_MODE``) is ``in_place`` - the BEHAVIOR fixed joint
+at the links' current relative pose (:func:`attach_in_place`) - or ``snap`` - the part first moved onto its seat at the
+nearest symmetric equivalent (the fingers are open by then, nothing is yanked) - and it filters the pair's collision in the
+same instant (:func:`set_pair_collision_filter`; the stock ``AttachedTo._attach`` did that, this fork's does not), so a
+joined part does not fight its partner's hull. ``JOINS`` records every join (trigger, alignment, contact, snap size).
 
 ``pose_settled`` of an object joined by an attachment joint (owner 2026-09-20 13:57; the attached child and its parent):
 OmniGibson's ``PoseSettled`` needs the root velocity below 1 mm/s on every step of its window AND the pose drift within
@@ -80,9 +84,20 @@ BOTTOM_GAP_MAX_M = 0.008
 UP_AXIS_MAX_DEG = 15.0
 RING_POINTS = 8
 TOUCHING_GAP_MAX_M = float(os.environ.get("ISG_TOUCHING_GAP_MAX_M", "0.003"))
-#: attachment alignment (OmniGibson ``AttachedTo``'s own thresholds: m.DEFAULT_POSITION_THRESHOLD / m.DEFAULT_ORIENTATION_THRESHOLD)
+#: attachment alignment record's coarse ``ok`` (OmniGibson ``AttachedTo``'s own thresholds: m.DEFAULT_POSITION_THRESHOLD /
+#: m.DEFAULT_ORIENTATION_THRESHOLD); the join itself needs the tight bounds below
 ATTACH_POS_MAX_M = 0.05
 ATTACH_ORN_MAX_RAD = math.radians(15.0)
+#: the join's alignment (owner 2026-10-10): the male link within this of the seat axis, within this angle of the female frame
+#: modulo the part's symmetry, and this far out of the seat along the axis. Attach step 0 (2026-10-10, the r5 instances, the pair
+#: colliding, the part dropped aligned from 3 / 6 mm above first contact) found each part at rest ON its partner's hull, its male
+#: link above the seat by: cap / lemonade bottle 10.2 mm, cork / wine bottle 17.9 mm, lid / teapot 4.85 mm (lateral <= 0.63 mm,
+#: angle <= 0.018 rad, tilt <= 1.2 deg) - the vertical window covers them with 5 mm to spare
+JOIN_LATERAL_MAX_M = 0.004
+JOIN_ANGLE_MAX_RAD = 0.10
+JOIN_VERTICAL_MIN_M = -0.004
+JOIN_VERTICAL_MAX_M = 0.023
+JOIN_MODES = ("in_place", "snap")
 #: ``pose_settled`` entities judged by configuration drift after an OmniGibson False (module docstring): ``attached`` (the
 #: members of an attachment joint), ``robot`` (the agent), ``all`` (every object - the default since 2026-09-24, with the
 #: tightened drift window ``tasks.ispatialgym_task.DEFAULT_POSE_SETTLED_CONFIG``). ``ISG_DRIFT_SETTLED`` overrides (comma
@@ -147,12 +162,15 @@ def decided_by() -> Dict[str, str]:
 def set_attachment_context(pairs: Sequence[Dict[str, Any]]) -> None:
     """Register the task's attachment pairs: ``{"child": <object name>, "parent": <object name>, "child_link", "parent_link",
     "equivalences": [[x, y, z, w], ...]}`` (object-frame rotations of the child that leave its shape unchanged; the identity
-    is implied). Called by the task when the TRO targets are configured; ``[]`` clears."""
+    is implied). Called by the task when the TRO targets are configured; ``[]`` clears. Registering a pair installs the
+    ``AttachedTo`` overrides (:func:`install_attach_overrides`) that leave its joining to this module's rule."""
     _ATTACHMENTS.clear()
     for p in pairs or []:
         if p.get("child") and p.get("parent"):
             _ATTACHMENTS[(str(p["child"]), str(p["parent"]))] = {"child_link": p.get("child_link"), "parent_link": p.get("parent_link"),
                                                                  "equivalences": [[float(v) for v in q] for q in (p.get("equivalences") or [])]}
+    if _ATTACHMENTS:
+        install_attach_overrides()
 
 
 def attachment_context(child: Any, parent: Any) -> Optional[Dict[str, Any]]:
@@ -372,40 +390,215 @@ def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, 
     return True
 
 
-def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None, in_place: bool = True,
-                      released: bool = False) -> Dict[str, Any]:
-    """The BEHAVIOR attachment of ``child`` to ``parent`` when :func:`attachment_alignment` passes (its thresholds met modulo
-    the symmetry): the fixed joint is created at the current relative pose (:func:`attach_in_place`; ``in_place`` False =
-    the stock ``AttachedTo.set_value(True, bypass_alignment_checking=True)``, which snaps the child onto the raw female
-    frame first). Never while a robot holds the child (0919-174551: the evaluator's per-step check joined the lid to the
-    teapot halfway down the place descent, still in the hand, and snapped it 4 cm out of the grasp path — the part must be
-    released first, as the goal's ``(not (grasped ...))`` atoms say). ``released``: called at the instant a robot's
-    assisted grasp let go of ``child`` (:func:`attach_on_release`), while its in-hand registry still names it until the
-    release window ends. Returns the alignment record with ``attached`` and ``joint`` (``in_place`` / ``set_value``)."""
+def join_mode() -> str:
+    """The attach rule's join (``ISG_ATTACH_JOIN_MODE``): ``in_place`` (the joint at the resting pose, default) or ``snap``
+    (the part moved onto its seat at the nearest symmetric equivalent, then joined)."""
+    mode = (os.environ.get("ISG_ATTACH_JOIN_MODE") or "in_place").strip()
+    if mode not in JOIN_MODES:
+        raise ValueError(f"ISG_ATTACH_JOIN_MODE={mode!r}: one of {JOIN_MODES}")
+    return mode
+
+
+#: (child, parent, female link) -> the pair's insertion axis in the female link's frame (seat_axis)
+_SEAT_AXIS_LOCAL: Dict[Tuple[str, str, str], th.Tensor] = {}
+
+
+def seat_axis(child: Any, parent: Any, parent_link: str) -> th.Tensor:
+    """The pair's insertion axis in the world (unit, pointing out of the seat): the female link's +z, unless it deviates more than
+    45 deg from the direction from the partner's collision-hull centroid to the female link - then that direction (the sampler's
+    rule, ``sampling.v2.tasks.attachment``: BEHAVIOR's attachment frames need only match between male and female; the cork /
+    wine bottle frames have +z along the bottle's -y). Fixed in the female link's frame at the first call for the pair."""
     from omnigibson.object_states import AttachedTo
 
-    a = attachment_alignment(child, parent, equivalences)
+    pf, qf = (x.double() for x in parent.states[AttachedTo].links[parent_link].get_position_orientation())
+    key = (getattr(child, "name", str(child)), getattr(parent, "name", str(parent)), parent_link)
+    loc = _SEAT_AXIS_LOCAL.get(key)
+    if loc is None:
+        z = _rotate(qf, th.tensor([0.0, 0.0, 1.0], dtype=th.float64))
+        axis = z
+        pts = _boundary_points(parent).double()
+        if len(pts):
+            geo = pf - pts.mean(dim=0)
+            if float(th.linalg.norm(geo)) > 0.02:
+                g = geo / th.linalg.norm(geo)
+                if math.degrees(math.acos(max(-1.0, min(1.0, float(th.dot(g, z)))))) > 45.0:
+                    axis = g
+        loc = _rotate(_qinv(qf), axis)
+        _SEAT_AXIS_LOCAL[key] = loc
+    a = _rotate(qf, loc)
+    return a / th.linalg.norm(a)
+
+
+def seat_offset(child: Any, parent: Any, child_link: str, parent_link: str) -> Dict[str, float]:
+    """The male link against the female link along the pair's insertion axis (:func:`seat_axis`): ``lateral_m`` across it and
+    ``vertical_m`` along it (+ = the male frame out of the seat, i.e. above it for a part put on from above)."""
+    from omnigibson.object_states import AttachedTo
+
+    cp, _ = (x.double() for x in child.states[AttachedTo].links[child_link].get_position_orientation())
+    pp, _ = (x.double() for x in parent.states[AttachedTo].links[parent_link].get_position_orientation())
+    a = seat_axis(child, parent, parent_link)
+    d = cp - pp
+    v = float(th.dot(d, a))
+    return {"lateral_m": round(float(th.linalg.norm(d - v * a)), 5), "vertical_m": round(v, 5)}
+
+
+def pair_in_contact(child: Any, parent: Any) -> bool:
+    """PhysX reported a contact between a link of ``child`` and a link of ``parent`` in the latest physics step."""
+    from omnigibson.utils.usd_utils import RigidContactAPI
+
+    return bool(RigidContactAPI.is_in_contact(scene_idx=child.scene.idx, query_set=[child], with_set=[parent], ignore_set=None, current_only=True))
+
+
+#: (child name, parent name) of the pairs whose collision is filtered right now (set_pair_collision_filter)
+_FILTERED: set = set()
+
+
+def _filtered_pairs_rel(link: Any):
+    """The link's USD filtered-pairs relationship, its schema applied when missing - call inside an editing block (a link's own
+    ``_collision_filter_api`` applies a missing schema in a block of its own, which cannot nest)."""
+    import omnigibson.lazy as lazy
+
+    api = lazy.pxr.UsdPhysics.FilteredPairsAPI
+    prim = link._prim
+    return (api(prim) if prim.HasAPI(api) else api.Apply(prim)).GetFilteredPairsRel()
+
+
+def set_pair_collision_filter(child: Any, parent: Any, filtered: bool) -> bool:
+    """Filter (``filtered``) or restore the collision between every link of ``child`` and every link of ``parent``: the USD
+    filtered-pairs relationship of both. While the simulation plays this is the stock route (``AttachedTo.
+    _disable_collision_between_child_and_parent``): dump the state, stop, edit, play, load the state - PhysX re-creates the pair's
+    actors on the edit and an edit while playing leaves its tensor views dead (attach step 0, 2026-10-10: the next pose read failed
+    and ``og.sim.update_handles()`` segfaulted); the simulation clock (``og.sim.current_time``) restarts at the play. Stopped (or
+    inside an editing block): the edit alone. Never call it inside a physics step or a state load (see the deferrals of
+    :func:`install_attach_overrides`). Idempotent; returns True when it changed something."""
+    import omnigibson as og
+
+    key = (child.name, parent.name)
+    if bool(filtered) == (key in _FILTERED):
+        return False
+
+    def edit():
+        for cl in child.links.values():
+            for pl in parent.links.values():
+                rc, rp = _filtered_pairs_rel(cl), _filtered_pairs_rel(pl)
+                if filtered:
+                    rc.AddTarget(pl.prim_path)
+                    rp.AddTarget(cl.prim_path)
+                else:
+                    rc.RemoveTarget(pl.prim_path)
+                    rp.RemoveTarget(cl.prim_path)
+
+    if getattr(og.sim, "_editing_usd", False):
+        edit()
+    elif og.sim.is_playing():
+        state = og.sim.dump_state()
+        og.sim.stop()
+        with og.sim.editing_usd():
+            edit()
+        og.sim.play()
+        og.sim.load_state(state)
+    else:
+        with og.sim.editing_usd():
+            edit()
+    if filtered:
+        _FILTERED.add(key)
+    else:
+        _FILTERED.discard(key)
+    return True
+
+
+#: deferred work for registered pairs, done by the next attach_if_aligned (the per-step check, after the step's physics): the pair's
+#: collision restored after a detach / filtered after a re-attach that happened inside a state load (no physics restart there), and
+#: a part released while already touching its partner (the release hook runs while the step's actions are applied)
+_PENDING_UNFILTER: set = set()
+_PENDING_FILTER: set = set()
+_RELEASED_TOUCHING: set = set()
+
+
+#: every join this process made for a registered pair: {"child", "parent", "trigger", "mode", "lateral_m", "vertical_m",
+#: "rot_rad", "pos_m", "contact", "released", "snap"?, "sim_time"?} (run_isg copies it into meta.json)
+JOINS: List[Dict[str, Any]] = []
+
+
+def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None, in_place: bool = True,
+                      released: bool = False, trigger: str = "per_step") -> Dict[str, Any]:
+    """The BEHAVIOR attachment of ``child`` to ``parent`` by the attach rule (module docstring): no robot holds the child, it is
+    in PhysX contact with the parent, and its male link is aligned with the parent's free female link modulo its symmetry within
+    ``JOIN_LATERAL_MAX_M`` / ``JOIN_ANGLE_MAX_RAD`` / ``JOIN_VERTICAL_MIN_M``..``JOIN_VERTICAL_MAX_M``. Then the pair's collision
+    is filtered and the fixed joint created - at the current relative pose (``in_place``) or after moving the child onto its
+    seat at the nearest symmetric equivalent (``snap``; :func:`join_mode`). ``in_place`` False = the stock
+    ``AttachedTo.set_value(True, bypass_alignment_checking=True)``. ``released``: called at the instant a robot's assisted grasp
+    let go of ``child`` (:func:`attach_on_release`), while its in-hand registry still names it; the contact rule still applies
+    (no join at the release instant of a part that does not touch its partner), and a part that does touch is joined by the
+    step's own check after its physics (the filter restarts the physics, which must not happen while the step's actions are
+    applied) - the join keeps the trigger ``release_hook``. The deferred filter / unfilter of the pair runs first. Returns the
+    alignment record with ``attached``, ``joint`` and ``reason`` when not joined."""
+    from omnigibson.object_states import AttachedTo
+
+    key = (getattr(child, "name", None), getattr(parent, "name", None))
+    hook_call = trigger == "release_hook"
+    a = attachment_alignment(child, parent, equivalences, with_fix=True)
     if a.get("reason") == "already attached":
         a["attached"] = bool(a["ok"])
+        if a["attached"] and key in _PENDING_FILTER:
+            set_pair_collision_filter(child, parent, True)
+            _PENDING_FILTER.discard(key)
         return a
-    if not a.get("ok"):
+    if key in _PENDING_UNFILTER:
+        set_pair_collision_filter(child, parent, False)
+        _PENDING_UNFILTER.discard(key)
+    if trigger == "per_step" and key in _RELEASED_TOUCHING:
+        released, trigger = True, "release_hook"
+    _RELEASED_TOUCHING.discard(key)
+    a["trigger"] = trigger
+    if "child_link" not in a:
         a["attached"] = False
+        return a
+    a.update(seat_offset(child, parent, a["child_link"], a["parent_link"]))
+    a["aligned"] = bool(a["lateral_m"] <= JOIN_LATERAL_MAX_M and a["rot_rad"] <= JOIN_ANGLE_MAX_RAD and JOIN_VERTICAL_MIN_M <= a["vertical_m"] <= JOIN_VERTICAL_MAX_M)
+    if not a["aligned"]:
+        a.update({"attached": False, "reason": "not aligned"})
         return a
     if held_by_robot(child) and not released:
         a.update({"attached": False, "reason": "held by a robot"})
+        return a
+    a["contact"] = pair_in_contact(child, parent)
+    if not a["contact"]:
+        a.update({"attached": False, "reason": "not in contact with the partner"})
         return a
     pair = (a["child_link"], a["parent_link"])
     if a.get("first_free_pair") is not None and tuple(a["first_free_pair"]) != pair:
         a.update({"attached": False, "reason": "the aligned pair is not OmniGibson's first free candidate pair"})
         return a
-    if in_place:
-        a["attached"] = bool(attach_in_place(child, parent, a["child_link"], a["parent_link"]))
-        a["joint"] = "in_place"
-    else:
+    if hook_call:
+        _RELEASED_TOUCHING.add(key)
+        a.update({"attached": False, "reason": "touching at the release: joined by the step's own check after its physics"})
+        return a
+    try:
+        import omnigibson as og
+
+        sim_time = round(float(og.sim.current_time), 4)  # before the filter restarts the clock: the step whose physics just ran
+    except Exception:  # noqa: BLE001 - no simulator (the test stubs)
+        sim_time = None
+    mode = join_mode() if in_place else "set_value"
+    if mode == "set_value":
         a["attached"] = bool(child.states[AttachedTo].set_value(parent, True, bypass_alignment_checking=True))
-        a["joint"] = "set_value"
+    else:
+        set_pair_collision_filter(child, parent, True)
+        if mode == "snap":
+            p_fix, q_fix = (x.double() for x in a["fix"])
+            p, q = (x.double() for x in child.get_position_orientation())
+            child.set_position_orientation(position=(_rotate(q_fix, p) + p_fix).float(), orientation=_qmul(q_fix, q).float())
+            child.keep_still()
+            a["snap"] = {"pos_m": a["pos_m"], "rot_rad": a["rot_rad"], "lateral_m": a["lateral_m"], "vertical_m": a["vertical_m"]}
+        a["attached"] = bool(attach_in_place(child, parent, a["child_link"], a["parent_link"]))
+    a["joint"] = mode
     if a["attached"]:
         _JOINTS[0] += 1
+        _PENDING_FILTER.discard(key)
+        JOINS.append({"child": child.name, "parent": parent.name, "trigger": trigger, "mode": mode, "released": bool(released), "contact": True,
+                      **{k: a[k] for k in ("lateral_m", "vertical_m", "rot_rad", "pos_m")}, **({"snap": a["snap"]} if "snap" in a else {}),
+                      **({"sim_time": sim_time} if sim_time is not None else {})})
     return a
 
 
@@ -415,9 +608,9 @@ LAST_RELEASE_ATTACH: Dict[str, Any] = {}
 
 def attach_on_release(robot: Any, arm: str, obj: Any) -> Optional[Dict[str, Any]]:
     """The release hook (a robot's ``release_callbacks``, called by our Behavior-1K fork's ``_release_grasp``): a registered
-    attachment child let go aligned with its parent (modulo its symmetry) is joined in that instant, before the step's
-    physics. The per-step check of the ``attached`` atom would join it only at the end of the step, after it fell a few
-    millimetres through the collision-filtered partner. The same rule acts for an evaluated policy's release. Returns the
+    attachment child let go is judged by the attach rule in that instant - in particular it must already touch its partner -
+    and, when it holds, joined by that step's own check after its physics (``trigger`` ``release_hook``); a part released above
+    its partner is joined by the per-step check once it lands. The same rule acts for an evaluated policy's release. Returns the
     alignment record (also kept in ``LAST_RELEASE_ATTACH``), or None when ``obj`` is not an attachment child."""
     name = getattr(obj, "name", None)
     scene = getattr(obj, "scene", None)
@@ -427,12 +620,70 @@ def attach_on_release(robot: Any, arm: str, obj: Any) -> Optional[Dict[str, Any]
         parent = scene.object_registry("name", parent_name)
         if parent is None:
             continue
-        rec = attach_if_aligned(obj, parent, released=True)
+        rec = attach_if_aligned(obj, parent, released=True, trigger="release_hook")
         rec.update(hook="release", arm=arm, parent=parent_name)
         LAST_RELEASE_ATTACH.clear()
         LAST_RELEASE_ATTACH.update({k: v for k, v in rec.items() if k != "fix"})
         return rec
     return None
+
+
+def _registered_member(obj: Any) -> bool:
+    name = getattr(obj, "name", None)
+    return any(name in pair for pair in _ATTACHMENTS)
+
+
+def _link_name(obj: Any, link: Any) -> Optional[str]:
+    return next((n for n, l in getattr(obj, "links", {}).items() if l is link), None)
+
+
+_OVERRIDES: Dict[str, Any] = {}
+
+
+def install_attach_overrides() -> bool:
+    """``AttachedTo`` for the registered pairs (once per process; the overrides look the registry up at call time): ``_update``
+    (OmniGibson's contact-triggered join) does nothing for a registered child or parent - only :func:`attach_if_aligned` joins
+    them; ``_attach`` (``set_value(True)``, e.g. a state load restoring an attached checkpoint) joins a registered pair at the
+    current relative pose instead of teleporting the child onto the raw female frame; ``_detach`` (e.g. a state load rolling back
+    to before the join) frees it. Both run inside state loads, where the physics must not restart: the pair's collision is
+    filtered / restored by the next per-step check (``_PENDING_FILTER`` / ``_PENDING_UNFILTER``). Other objects keep the stock
+    behaviour. Returns True when installed by this call."""
+    if _OVERRIDES:
+        return False
+    try:
+        from omnigibson.object_states import AttachedTo
+    except Exception:  # noqa: BLE001 - no simulator (the test stubs)
+        return False
+    stock = {"_update": AttachedTo._update, "_attach": AttachedTo._attach, "_detach": AttachedTo._detach}
+
+    def _update(self):
+        if _registered_member(self.obj):
+            return None
+        return stock["_update"](self)
+
+    def _attach(self, other, child_link, parent_link, joint_type=None, can_joint_break=True):
+        key = (getattr(self.obj, "name", None), getattr(other, "name", None))
+        if key in _ATTACHMENTS:
+            attach_in_place(self.obj, other, _link_name(self.obj, child_link), _link_name(other, parent_link), can_joint_break=can_joint_break)
+            _PENDING_UNFILTER.discard(key)
+            if key not in _FILTERED:
+                _PENDING_FILTER.add(key)
+            return None
+        return stock["_attach"](self, other, child_link, parent_link, joint_type=joint_type, can_joint_break=can_joint_break)
+
+    def _detach(self):
+        parent = self.parent
+        out = stock["_detach"](self)
+        key = (getattr(self.obj, "name", None), getattr(parent, "name", None))
+        if parent is not None and key in _ATTACHMENTS:
+            _PENDING_FILTER.discard(key)
+            if key in _FILTERED:
+                _PENDING_UNFILTER.add(key)
+        return out
+
+    AttachedTo._update, AttachedTo._attach, AttachedTo._detach = _update, _attach, _detach
+    _OVERRIDES.update(stock)
+    return True
 
 
 def install_release_hook(robots: Any) -> int:

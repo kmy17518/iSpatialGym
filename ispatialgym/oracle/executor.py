@@ -515,8 +515,6 @@ NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
 #: owner audit 2026-10-09: a grasp approach stopped on the support, a free-hanging drop released at once, a next-to / touching place moved
 #: off the partner for the release and the push extended by it
 NOTE_KEYS = NOTE_KEYS + ("approach_support_stop", "release_instant", "partner_release_clearance", "push_place_shift_extended_m", "drop_lowered")
-#: first-demo v2.1 A1 (cap 0927-040231): an attach place opened the fingers that would meet the partner before the part seats
-NOTE_KEYS = NOTE_KEYS + ("finger_clearance",)
 #: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
 NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
 #: first-demo v2.1 (sandal on pods): the arm moved into the pre-grasp witness's posture before an approach that tracks only from there
@@ -796,12 +794,9 @@ class SimState:
         return None if p is None else (p[0].clone(), p[1].clone())
 
     def attach(self, child: str, parent: str) -> bool:
-        """The BEHAVIOR attachment of ``child`` to ``parent`` at their current poses — the evaluator's own rule
-        (``predicates.attach_if_aligned``, owner 2026-09-19 17:10): the meta links within OmniGibson's 5 cm / 15 deg **modulo
-        the child's recorded symmetry** (the task registers the pair's equivalences with the TRO targets), then the fixed
-        attachment joint is created at the current relative pose (``predicates.attach_in_place``: no teleport onto the raw
-        female frame, so the residual the place correction left - <= attach_snap_max_m - is never a visible snap); otherwise
-        nothing changes and False is returned. ``self.last_attach`` keeps the alignment record."""
+        """The BEHAVIOR attachment of ``child`` to ``parent`` by the evaluator's own rule (``predicates.attach_if_aligned``,
+        owner 2026-10-10): released, in contact with the parent and aligned modulo the child's recorded symmetry, then joined
+        in the configured mode; otherwise nothing changes and False is returned. ``self.last_attach`` keeps the alignment record."""
         from omnigibson.object_states import AttachedTo
 
         from ispatialgym.sampling import predicates as PRED
@@ -1440,7 +1435,7 @@ class Executor:
             ctx["stance_contacts"] = {arm: self.stance_contact(index, arm) for arm in M.ARMS}
         if isinstance(action, Grasp):
             ctx["next_place_kind"] = self.next_place_kind(index, action)
-        ctx["sidecar"] = self.sidecar  # attachment: the correction regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
+        ctx["sidecar"] = self.sidecar  # attachment: the hover alignment's regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
             # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep
             stage = self.release_stage_opening(action)

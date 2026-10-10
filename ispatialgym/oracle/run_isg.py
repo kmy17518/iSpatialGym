@@ -435,7 +435,7 @@ class InstanceLoader:
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
         extras = self.tro.meta.extras
         self.report["constraints"] = self._restore_constraints(extras.get("constraints") or [])
-        self.report["attachments"] = self._restore_attachment_filters(extras.get("attachment_targets") or [])
+        self.report["attachments"] = self._attachment_report(extras.get("attachment_targets") or [])
         self._articulation_q = {inst: self.physical[inst].get_joint_positions().clone() for inst in self.tro.meta.articulation_targets if inst in self.physical}
         self.grasps = self._restore_grasps(extras.get("grasps") or [])
         self.report["grasps"] = self.grasps
@@ -471,8 +471,8 @@ class InstanceLoader:
                 ent.set_joint_velocities(th.zeros_like(q0))
 
     def restore_after_reset(self) -> Dict[str, Any]:
-        """Re-apply the restores a ``scene.reset()`` may have undone (idempotent): hinge prims, assisted grasps, the
-        attachment collision filters (persistent USD state) and the articulation joint values."""
+        """Re-apply the restores a ``scene.reset()`` may have undone (idempotent): hinge prims, assisted grasps and the
+        articulation joint values."""
         out: Dict[str, Any] = {"hinges_recreated": 0, "grasps": []}
         stage = og.sim.stage
         for i, h in enumerate(list(self.hinges)):
@@ -642,7 +642,9 @@ class InstanceLoader:
 
     # -- attachments ----------------------------------------------------------------------------------------------
 
-    def _restore_attachment_filters(self, records: List[dict]) -> List[dict]:
+    def _attachment_report(self, records: List[dict]) -> List[dict]:
+        """The TRO's attachment pairs. Their collision stays on until the task's attach rule joins them (owner 2026-10-10;
+        ``predicates.attach_if_aligned`` filters it in that instant), so nothing is filtered at load."""
         out = []
         if not records:
             return out
@@ -654,9 +656,7 @@ class InstanceLoader:
                 raise LoadError("error", f"attachment_targets names unbound instances {rec}")
             if AttachedTo not in child.states:
                 raise LoadError("error", f"{child.name} has no AttachedTo state (not attachable)")
-            child.states[AttachedTo]._disable_collision_between_child_and_parent(child, parent)
-            out.append({"child": rec["child"], "parent": rec["parent"], "child_link": rec.get("child_link"), "parent_link": rec.get("parent_link"), "collision_filtered": True})
-            log.info("attachment collision filter: %s / %s", child.name, parent.name)
+            out.append({"child": rec["child"], "parent": rec["parent"], "child_link": rec.get("child_link"), "parent_link": rec.get("parent_link"), "collision_filtered": False})
         return out
 
     # -- grasps -----------------------------------------------------------------------------------------------------
@@ -1196,6 +1196,12 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         meta.update({k: v for k, v in episode.items() if k not in ("goal_observation", "timings")})
         meta["status"] = "success" if success else "oracle_failed"
         meta["qa_reason"] = reason
+        if loader.report.get("attachments"):
+            from ispatialgym.sampling import predicates as PRED
+
+            # the attach rule's joins in this episode (owner 2026-10-10): trigger, alignment, contact, snap size
+            meta["attach_joins"] = list(PRED.JOINS)
+            meta["attach_join_mode"] = PRED.join_mode()
         exit_code = EXIT_SUCCESS if success else EXIT_ORACLE_FAILED
         result.update({
             "status": meta["status"], "success": success, "reason": reason, "n_steps": episode["n_steps"], "n_action_steps": episode["n_action_steps"],

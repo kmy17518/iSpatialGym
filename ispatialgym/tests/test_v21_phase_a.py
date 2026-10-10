@@ -1,6 +1,5 @@
 """first-demo v2.1 Phase A (owner findings on v2.0): each rule fires only in its situation, detected at run time.
 
-A1 (cap 0927-040231): an attach place opens the fingers just enough when they would meet the partner before the part seats.
 A2 (block design 0927-040243): a travel leg keeps an arm that holds the recorded hand pose in another IK branch when it stays clear
 and the next contact tracks from there; the next contact then runs on the kept branch's configurations.
 A3 (bar soap 0927-034001): a library pinch whose fingers would reach below the object's bottom is lifted; a support place of an
@@ -10,7 +9,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import numpy as np
 import pytest
 import torch as th
 
@@ -251,66 +249,6 @@ def test_a3_place_never_lowered_and_only_for_support_places():
     ctx = {}
     assert EX.raise_place_for_inhand_pose(SimpleNamespace(kind="drop", object="soap", arm="right"), state, sidecar, targets, ctx, EX.ExecuteConfig()) is targets
     assert ctx == {}
-
-
-# ------------------------------------------------------------------------------------------------ A1
-
-
-def _box(cx, cy, z0, z1, hw=0.002, hd=0.002):
-    xs, ys, zs = np.meshgrid([cx - hw, cx + hw], [cy - hd, cy + hd], [z0, z1], indexing="ij")
-    return np.stack([xs.ravel(), ys.ravel(), zs.ravel()], axis=1)
-
-
-def test_a1_attach_place_opens_the_fingers_just_enough(monkeypatch):
-    """Two finger boxes 26 mm either side of the eef axis reaching 20 mm below the eef, a partner disc of radius 27 mm whose top the
-    fingertips would reach 5 mm before the seat: the fingers open by the smallest 0.5 mm step whose rays miss the disc."""
-    fingers = [(_box(0.0, 0.026, -0.02, 0.0), np.array([0.0, 1.0, 0.0])), (_box(0.0, -0.026, -0.02, 0.0), np.array([0.0, -1.0, 0.0]))]
-    monkeypatch.setattr(EX, "finger_surface_points", lambda arm, spacing: fingers)
-    top, r_rim = 0.815, 0.027  # the seat puts the eef at z 0.83: fingertips at 0.81, 5 mm below the partner's top
-
-    def raycast(starts, ends):
-        out = []
-        for s, e in zip(starts, ends):
-            s, e = np.asarray(s), np.asarray(e)
-            r = float(np.hypot(s[0], s[1]))
-            if r <= r_rim and s[2] > top >= e[2]:
-                out.append([{"hit": True, "distance": float(s[2] - top), "rigidBody": "/World/partner/base_link"}])
-            else:
-                out.append([{"hit": False}])
-        return out
-
-    monkeypatch.setattr(EX, "_raycast_all", raycast)
-    partner = SimpleNamespace(prim_path="/World/partner", name="partner")
-    part = SimpleNamespace(name="cap")
-    robot = SimpleNamespace(gripper_control_idx={"right": th.tensor([0, 1])}, get_joint_positions=lambda: th.tensor([0.0, 0.0]))
-    emitted = []
-    motions = SimpleNamespace(robot=robot, state=SimpleNamespace(gripper_cmd={}, stop_base=lambda: None), cfg=SimpleNamespace(gripper_preshape_steps=3),
-                              _gripper_limits=lambda arm: (0.0, 0.05), gripper_command=lambda arm, q: 2 * q / 0.05 - 1, _emit=lambda: emitted.append(1) or th.zeros(1))
-    state = SimpleNamespace(object=lambda n: partner if n == "bottle" else part, held_object=lambda arm: part)
-    action = SimpleNamespace(arm="right", on="bottle", object="cap")
-    targets = {"pre_place": _pose([0.0, 0.0, 0.93]), "place": _pose([0.0, 0.0, 0.83])}
-    ctx = {}
-    list(EX.clear_fingers_over_partner(action, motions, state, targets, ctx, EX.ExecuteConfig()))
-    rec = ctx["finger_clearance"]
-    assert rec["before_seat_m"] == pytest.approx(0.005, abs=1e-4)
-    # the inner corners stand at r = hypot(2, 24) mm: 3 mm (six steps) takes them past the 27 mm rim
-    assert rec["applied"] and rec["opened_m"] == pytest.approx(0.003, abs=1e-6) and rec["before_seat_after_m"] is None
-    assert motions.state.gripper_cmd["right"] == pytest.approx(2 * 0.003 / 0.05 - 1) and len(emitted) == 3 and rec["held"]
-
-
-def test_a1_attach_place_leaves_clear_fingers_alone(monkeypatch):
-    fingers = [(_box(0.0, 0.030, -0.02, 0.0), np.array([0.0, 1.0, 0.0])), (_box(0.0, -0.030, -0.02, 0.0), np.array([0.0, -1.0, 0.0]))]
-    monkeypatch.setattr(EX, "finger_surface_points", lambda arm, spacing: fingers)
-    monkeypatch.setattr(EX, "_raycast_all", lambda starts, ends: [[{"hit": False}] for _ in starts])
-    partner = SimpleNamespace(prim_path="/World/partner", name="partner")
-    robot = SimpleNamespace(gripper_control_idx={"right": th.tensor([0, 1])}, get_joint_positions=lambda: th.tensor([0.0, 0.0]))
-    motions = SimpleNamespace(robot=robot, state=SimpleNamespace(gripper_cmd={}, stop_base=lambda: None), cfg=SimpleNamespace(gripper_preshape_steps=3),
-                              _gripper_limits=lambda arm: (0.0, 0.05), gripper_command=lambda arm, q: 0.0, _emit=lambda: th.zeros(1))
-    state = SimpleNamespace(object=lambda n: partner, held_object=lambda arm: None)
-    ctx = {}
-    list(EX.clear_fingers_over_partner(SimpleNamespace(arm="right", on="bottle", object="cap"), motions, state,
-                                        {"pre_place": _pose([0.0, 0.0, 0.93]), "place": _pose([0.0, 0.0, 0.83])}, ctx, EX.ExecuteConfig()))
-    assert not ctx["finger_clearance"]["applied"] and ctx["finger_clearance"]["before_seat_m"] is None and motions.state.gripper_cmd == {}
 
 
 # ------------------------------------------------------------------------------------------------ A2
