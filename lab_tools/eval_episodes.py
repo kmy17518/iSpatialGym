@@ -264,6 +264,14 @@ def score_alignment(meta: dict) -> dict:
     return out
 
 
+def _spec(value: str):
+    """argparse type of --horizon / --max-steps (``lab_tools.horizon.spec``)."""
+    sys.path.insert(0, WT)
+    from lab_tools.horizon import spec
+
+    return spec(value)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True)
@@ -284,8 +292,10 @@ def main(argv=None) -> int:
     ap.add_argument("--raw-out", required=True, help="runlogs/tierB/<run>/step_XXXXXXXX (videos, meta.json per instance)")
     ap.add_argument("--episodes", type=int, nargs="*", default=None, help="episode indices (default: every episode of the task)")
     ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--horizon", type=int, default=3000, help="policy steps (the evaluator's default: run_isg --policy-steps 3000)")
-    ap.add_argument("--max-steps", type=int, default=6000)
+    ap.add_argument("--horizon", type=_spec, default="auto",
+                    help="policy steps: auto (default) = twice the longest training demo of the alias (datasets/isg-init); a number: the fixed protocol")
+    ap.add_argument("--max-steps", type=_spec, default=None,
+                    help="auto = ceil(1.6 x horizon) + 100 (the default with --horizon auto); a number (the default with a fixed horizon: 6000)")
     ap.add_argument("--settle-steps", type=int, default=50)
     ap.add_argument("--video-size", type=int, default=540)
     ap.add_argument("--external-video", action="store_true", help="also record the over-the-shoulder external camera (run_isg --dev)")
@@ -344,9 +354,11 @@ def run_job(args, shared=None, shutdown=True) -> int:
     sys.path.insert(0, WT)
     from lab_tools import act_policy as AP
     from lab_tools import evaluator_patches
+    from lab_tools import horizon as H
 
-    # -- evaluator patches (policy mode): BEHAVIOR sensor set, no depth, timeout-only stream QA, never-held epilogue ----
+    # -- evaluator patches (policy mode): BEHAVIOR sensor set, no depth, never-held epilogue (stream QA: --stream-qa) ----
     evaluator_patches.install(keep_depth=args.keep_depth, no_planner=bool(getattr(args, "no_planner", False)), fixed_handle_ag=not getattr(args, "stock_handle_ag", False))
+    budget = H.budget(args.horizon, getattr(args, "max_steps", None), "policy", task=args.task)
     from ispatialgym.oracle import run_isg as R
 
     # -- episodes ------------------------------------------------------------------------------------------------------
@@ -419,11 +431,11 @@ def run_job(args, shared=None, shutdown=True) -> int:
         out_root = raw_dir if extra_raw_sub is None else os.path.join(raw_dir, extra_raw_sub)
         goal_pngs = {"zed_link": goal_png, **{cam: p for cam, p in wrist_goals.get(goal_from if goal_from is not None else e, {}).items()}}
         ctx = {"server": args.server, "goal_rgb": load_goal(goal_png), "goal_rgbs": {cam: load_goal(p) for cam, p in goal_pngs.items()},
-               "task_id": ep["train_task_index"], "horizon": args.horizon,
+               "task_id": ep["train_task_index"], "horizon": budget["horizon"],
                "stop_on_success": not args.no_stop_on_success, "expect_action_horizon": args.action_horizon}
         AP.CONTEXT = ctx
-        argv_r = ["--instance", ep["tro"], "--mode", "policy", "--policy", "lab_tools.act_policy:ActPolicy", "--policy-steps", str(args.horizon),
-                  "--max-steps", str(args.max_steps), "--settle-steps", str(args.settle_steps), "--out", out_root, "--record", "video", "--video",
+        argv_r = ["--instance", ep["tro"], "--mode", "policy", "--policy", "lab_tools.act_policy:ActPolicy", "--policy-steps", str(budget["horizon"]),
+                  "--max-steps", str(budget["max_steps"]), "--settle-steps", str(args.settle_steps), "--out", out_root, "--record", "video", "--video",
                   "--video-size", str(args.video_size), "--demo-gating", "none", "--no-goal-override", "--log-level", "WARNING",
                   "--stream-qa", getattr(args, "stream_qa", "off")]
         if args.external_video:
@@ -432,7 +444,7 @@ def run_job(args, shared=None, shutdown=True) -> int:
         record = {"run": args.run, "step": args.step, "checkpoint": {"repo": args.ckpt_repo, "file": args.ckpt_file, "sha256": args.ckpt_sha256},
                   "split": args.split, "dataset": os.path.basename(os.path.normpath(args.dataset)),
                   "task": args.task, "episode_index": e, "instance": ep["instance"], "instance_index": ep.get("instance_index"), "seed": seed,
-                  "success": None, "steps": None, "horizon": args.horizon, "wall_s": None, "evaluator_commit": provenance["evaluator_commit"],
+                  "success": None, "steps": None, **budget, "wall_s": None, "evaluator_commit": provenance["evaluator_commit"],
                   "act_commit": provenance["act_commit"], "server_args": args.server_args, "error": None, "score": None,
                   "goal_png": os.path.relpath(goal_png, args.dataset), "goal_pngs": {cam: os.path.relpath(p, WT) for cam, p in goal_pngs.items()},
                   "goal_from_episode": goal_from, "tag": args.tag,

@@ -28,6 +28,9 @@ import traceback
 
 WT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, WT)
+
+from lab_tools import horizon as H  # noqa: E402
+
 TASK = "camera_relocalization-standard"
 
 
@@ -268,8 +271,9 @@ def main(argv=None) -> int:
     ap.add_argument("--dataset", required=True, help="LeRobot root (datasets/isg-init-eval or datasets/isg-init)")
     ap.add_argument("--instances", required=True, help="episode -> instance map (lab/instances.json or lab/instances-train.json)")
     ap.add_argument("--episodes", type=int, nargs="+", required=True)
-    ap.add_argument("--horizon", type=int, default=1500)
-    ap.add_argument("--max-steps", type=int, default=6000)
+    ap.add_argument("--horizon", type=H.spec, default="auto", help="auto (default): the episode's demo length; a number: the fixed protocol")
+    ap.add_argument("--max-steps", type=H.spec, default=None,
+                    help="auto = ceil(1.6 x horizon) + 100 (the default with --horizon auto); a number (the default with a fixed horizon: 6000)")
     ap.add_argument("--settle-steps", type=int, default=50)
     ap.add_argument("--lab-out", required=True)
     ap.add_argument("--raw-out", required=True)
@@ -352,10 +356,11 @@ def run_replay_job(args, shared=None, shutdown=True) -> int:
                   "stream_qa": getattr(args, "stream_qa", "off")}
         try:
             actions, states, length = load_episode_arrays(args.dataset, e)
-            ctx = {"actions": actions, "horizon": args.horizon, "stop_on_success": not args.no_stop_on_success, "shared": shared}
+            record.update(H.budget(args.horizon, getattr(args, "max_steps", None), "replay", demo_len=length))
+            ctx = {"actions": actions, "horizon": record["horizon"], "stop_on_success": not args.no_stop_on_success, "shared": shared}
             RP.CONTEXT = ctx
-            argv_r = ["--instance", v["tro"], "--mode", "policy", "--policy", "lab_tools.replay_policy:ReplayPolicy", "--policy-steps", str(args.horizon),
-                      "--max-steps", str(args.max_steps), "--settle-steps", str(args.settle_steps), "--out", args.raw_out, "--record", "video", "--video",
+            argv_r = ["--instance", v["tro"], "--mode", "policy", "--policy", "lab_tools.replay_policy:ReplayPolicy", "--policy-steps", str(record["horizon"]),
+                      "--max-steps", str(record["max_steps"]), "--settle-steps", str(args.settle_steps), "--out", args.raw_out, "--record", "video", "--video",
                       "--video-size", str(args.video_size), "--demo-gating", "none", "--no-goal-override", "--log-level", "WARNING",
                       "--stream-qa", record["stream_qa"]]
             rargs = R.parse_args(argv_r)

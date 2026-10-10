@@ -28,6 +28,7 @@ WT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, WT)
 
 from lab_tools.eval_episodes import closest_approach, git_head, load_goal, memory_snapshot, relative_ypr_deg, sha256_of, utc, yaw_error_deg  # noqa: E402
+from lab_tools import horizon as H  # noqa: E402
 
 TASK = "camera_relocalization-standard"
 BRIDGE_FILES = ("vec_eval.py", "act_policy.py", "replay_policy.py", "evaluator_patches.py")
@@ -50,7 +51,9 @@ def parse_args(argv=None):
     ap.add_argument("--instances", required=True, help="lab/instances.json or lab/instances-train.json")
     ap.add_argument("--episodes", type=int, nargs="*", default=None)
     ap.add_argument("--task", default=TASK)
-    ap.add_argument("--horizon", type=int, default=1500)
+    ap.add_argument("--horizon", type=H.spec, default="auto",
+                    help="auto (default): replay = each slot's own demo length, policy = twice the longest training demo of the alias "
+                         "(datasets/isg-init), shared by the batch; a number: the fixed protocol")
     ap.add_argument("--num-envs", type=int, default=4)
     ap.add_argument("--tiled", dest="tiled", action="store_true", default=False, help="one tiled render product for all clones (off: the tiles share one exposure, gate 3d)")
     ap.add_argument("--no-tiled", dest="tiled", action="store_false")
@@ -69,7 +72,8 @@ def parse_args(argv=None):
     ap.add_argument("--lab-out", required=True)
     ap.add_argument("--raw-out", required=True)
     ap.add_argument("--video-size", type=int, default=480)
-    ap.add_argument("--max-steps", type=int, default=6000)
+    ap.add_argument("--max-steps", type=H.spec, default=None,
+                    help="auto = ceil(1.6 x horizon) + 100 (the default with --horizon auto); a number (the default with a fixed horizon: 6000)")
     ap.add_argument("--settle-steps", type=int, default=25)
     ap.add_argument("--stream-qa", default="off", choices=["off", "stop", "log"],
                     help="VecStreamExecutor stream_qa: off = only the timeout ends a stream (the evaluator's rule), stop = every QA monitor, "
@@ -331,6 +335,7 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
     from lab_tools import evaluator_patches
 
     evaluator_patches.install(keep_depth=args.keep_depth, no_planner=True)  # BEHAVIOR sensor set, no depth (QA: --stream-qa)
+    policy_budget = H.budget(args.horizon, args.max_steps, "policy", task=args.task) if args.mode == "policy" else None
     import omnigibson as og
     from omnigibson.object_states import PoseReached  # noqa: F401
 
@@ -500,9 +505,10 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
                     print(f"init render not saved: {ex!r}", flush=True)
                 cam = robot.sensors.get(cam_key)
                 if args.mode == "policy":
+                    budget = policy_budget
                     goal_pngs = {"zed_link": ep["goal_png"], **{c: p for c, p in wrist_goals.get(e, {}).items()}}
                     ctx = {"server": args.server, "goal_rgb": load_goal(ep["goal_png"]), "goal_rgbs": {c: load_goal(p) for c, p in goal_pngs.items()},
-                           "task_id": ep["train_task_index"], "horizon": args.horizon, "stop_on_success": not args.no_stop_on_success,
+                           "task_id": ep["train_task_index"], "horizon": budget["horizon"], "stop_on_success": not args.no_stop_on_success,
                            "expect_action_horizon": args.action_horizon, "robot": robot.name}
                     source = TracedPolicy(AP.ActPolicy(ctx=ctx), PoseTracer(ctx, robot, scene, cam, loader.tracked(i)))
                     record["goal_png"] = os.path.relpath(ep["goal_png"], args.dataset)
@@ -514,19 +520,23 @@ def run_vec_job(args, shared=None, shutdown=True) -> int:
 
                         demo_cache[e] = load_episode_arrays(args.dataset, e)
                     actions_demo, states_demo, length = demo_cache[e]
-                    ctx = {"actions": actions_demo, "horizon": args.horizon, "stop_on_success": not args.no_stop_on_success}
+                    budget = H.budget(args.horizon, args.max_steps, "replay", demo_len=length)
+                    ctx = {"actions": actions_demo, "horizon": budget["horizon"], "stop_on_success": not args.no_stop_on_success}
                     source = ReplaySource(ctx, robot, scene, cam, tracked=loader.tracked(i))
+                record.update(budget)
                 per[i]["ctx"] = ctx
                 per[i]["source"] = source  # this slot's source (its tracer saves this slot's arrays)
                 cam_in_zed = C.camera_offset_in_zed(robot, cam_key)
                 view, tview = loader.view(i), loader.task_view(i)  # this clone's scene / scope for the monitors, state and recorder
                 state = SimState(view, tview, robot, cam_key, cam_in_zed=cam_in_zed)
-                monitors = Monitors(view, robot, QAConfig(max_episode_steps=args.max_steps), cam_key=cam_key, cam_in_zed=cam_in_zed)
+                # a stream is one action: its QA cap is the episode budget, as run_isg sets it for replay / policy streams
+                monitors = Monitors(view, robot, QAConfig(max_episode_steps=budget["max_steps"], max_action_steps=budget["max_steps"]), cam_key=cam_key,
+                                    cam_in_zed=cam_in_zed)
                 tracked = loader.tracked(i)
                 rec_cfg = RecorderConfig(hdf5=False, lerobot=False, video=True, video_size=args.video_size, all_cameras=False)
                 recorder = Recorder(out_dir, view, robot, cam_key, tracked, fps=fps, cfg=rec_cfg, task_name=loader.activity.replace("_", " "), instance_id=iid)
                 recorder.start(obs0, info0, state0=None)
-                cfg = ExecutorConfig(max_steps=args.max_steps, settle_min_steps=args.settle_steps, goal_image=False, record_state=False, demo_gating=())
+                cfg = ExecutorConfig(max_steps=budget["max_steps"], settle_min_steps=args.settle_steps, goal_image=False, record_state=False, demo_gating=())
                 slots.append(Slot(idx=i, robot=robot, source=source, cfg=cfg, task=tview, monitors=monitors, recorder=recorder, tracked=tracked,
                                   held=state.held_objects, never_held_window=10))
                 per[i].update({"monitors": monitors, "recorder": recorder, "cam_in_zed": cam_in_zed, "tracked": tracked, "iid": iid})
