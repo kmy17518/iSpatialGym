@@ -367,10 +367,18 @@ class ExecuteConfig:
     #: sphere aims the fingertips 24 mm below its bottom; the hand stopped on the table and pressed it up to 196 N, torso_joint1 0.8 deg,
     #: the head 17.5 mm, springing back at the lift)
     grasp_support_stop_trunk_rad: float = math.radians(0.1)
-    #: ... a dropped object that hangs free in the hand at its release (touching nothing) and that no later action works on is let go of
-    #: with the open command at once (``Motions.gripper(instant=True)``) instead of a ramp it would hang through between opening fingers;
-    #: one a later action works on keeps the ramp, whose release from wide-open fingers lands it as recorded
+    #: ... a dropped object that hangs free in the hand at its release (touching nothing) is let go of with the open command at once
+    #: (``Motions.gripper(instant=True)``) instead of a ramp it would hang through between opening fingers ...
     release_free_instant: bool = True
+    #: ... after it was brought straight down from the recorded drop pose (``lower_drop``) until its bottom is ``drop_lower_clear_m``
+    #: above whatever is under it - at most ``drop_lower_max_m``, a collision-checked leg that ends where the arm stalls, this far from
+    #: its joint limits - so it does not fall far: the sandal released 24 cm above its rest at once tumbled 7 deg, bounced 14 deg and
+    #: landed 14 mm aside, and the push under the table then turned it 60 deg. Below ``drop_lower_min_m`` of planned lowering the
+    #: recorded drop pose is kept
+    drop_lower_max_m: float = 0.20
+    drop_lower_clear_m: float = 0.02
+    drop_lower_min_m: float = 0.01
+    drop_lower_limit_margin_rad: float = 0.05
     #: ... a next-to / touching place keeps the fully open fingers ``place_partner_clear_m`` from the partner at the release: the
     #: assisted grasp lets go on the full open command only, and the pad on the partner's side swept 15 mm toward it (touching:
     #: the box of tissues shoved 6 mm). The place (and the push that follows it) is moved away from the partner by what is missing,
@@ -378,6 +386,16 @@ class ExecuteConfig:
     place_partner_clear_m: float = 0.005
     place_partner_clear_max_m: float = 0.03
     place_partner_clear_spacing_m: float = 0.004
+    #: owner 2026-10-09 (blender open: the free-standing body tipped 0.9 deg and slid 2 mm under the arm-mode follow while the torso bent
+    #: 0.41 deg): the arm-mode follow of a free-standing object runs along the handle's arc about the hinge (``follow_arc_step_rad`` per
+    #: waypoint) instead of the chords between the five recorded poses, and every ``follow_reaim_chunk`` waypoints it is re-aimed for the
+    #: body's live pose (its motion since the follow began, once that moves the hand more than ``follow_reaim_min_m``); while the torso
+    #: is bent more than ``follow_slow_trunk_rad`` the next chunk runs at ``follow_slow_factor`` of the pace. 0 chunks = the recorded chords
+    follow_reaim_chunk: int = 4
+    follow_arc_step_rad: float = 0.03
+    follow_reaim_min_m: float = 0.001
+    follow_slow_trunk_rad: float = math.radians(0.15)
+    follow_slow_factor: float = 0.5
 
 
 CONFIG = ExecuteConfig()
@@ -1999,9 +2017,9 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             ctx["attach"]["fingers_closed"] = closed
         # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
         # support place sets the object down
-        # (not when a later action works on the object: the sandal, pushed under the table after its drop, landed turned off the
-        # fingers that opened under it and the push turned it 1.04 rad - its ramped release lands it as recorded)
-        free = drop and cfg.release_free_instant and not ctx.get("object_worked_on_later", True) and _hangs_free(state, action.object)
+        if drop and cfg.drop_lower_max_m > 0:
+            yield from lower_drop(action, motions, state, ctx, cfg)
+        free = drop and cfg.release_free_instant and _hangs_free(state, action.object)
         if free:
             ctx["release_instant"] = True
         yield from motions.gripper(arm, close=False, instant=free)
@@ -2203,6 +2221,64 @@ def _finger_meets_partner(arm: str, finger_q: Sequence[float], pre, place, partn
             worst = before if worst is None else max(worst, before)
             bodies.add(body[len(root):] or body)
     return worst, len(starts), sorted(bodies)
+
+
+def surface_below(obj, robot=None, inset: float = 0.25, depth: float = 0.6) -> Tuple[Optional[float], int]:
+    """The highest surface under ``obj``'s footprint (rays straight down from its AABB bottom at the centre and four inset corners,
+    ``depth`` long; hits on the object itself and on ``robot`` do not count). ``(world z or None when nothing is hit, rays cast)``."""
+    lo, hi = (C.as_tensor(v).reshape(-1)[:3].float() for v in obj.aabb)
+    c = 0.5 * (lo + hi)
+    h = 0.5 * (hi - lo) * (1.0 - float(inset))
+    z = float(lo[2]) - 1e-3
+    pts = [(float(c[0]) + sx * float(h[0]), float(c[1]) + sy * float(h[1])) for sx, sy in ((0, 0), (1, 1), (1, -1), (-1, 1), (-1, -1))]
+    starts = [[x, y, z] for x, y in pts]
+    ends = [[x, y, z - float(depth)] for x, y in pts]
+    skip = [str(getattr(o, "prim_path", "") or "") for o in (obj, robot) if o is not None]
+    best = None
+    for ray in _raycast_all(starts, ends):
+        for hit in sorted((h_ for h_ in (ray if isinstance(ray, list) else [ray]) if h_.get("hit")), key=lambda h_: float(h_.get("distance", 0.0))):
+            body = str(hit.get("rigidBody") or "")
+            if any(s and body.startswith(s) for s in skip):
+                continue
+            zz = z - float(hit.get("distance", 0.0))
+            best = zz if best is None else max(best, zz)
+            break
+    return best, len(starts)
+
+
+def lower_drop(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
+    """Owner 2026-10-09 (sandal: "the problem is the long fall and bounce, not the instant open"): before a drop's release the held
+    object comes straight down from the recorded drop pose until its bottom is ``drop_lower_clear_m`` above the surface under it
+    (``surface_below``), at most ``drop_lower_max_m`` - a differential-IK leg checked against the world with only the held object left
+    out, kept ``drop_lower_limit_margin_rad`` from the joint limits, that ends where it collides or stalls. ``ctx["drop_lowered"]``
+    records the planned and the achieved lowering."""
+    arm = action.arm
+    rec: Dict[str, Any] = {"applied": False}
+    ctx["drop_lowered"] = rec
+    try:
+        obj = state.object(action.object)
+        bottom = float(C.as_tensor(obj.aabb[0]).reshape(-1)[2])
+        surface, n_rays = surface_below(obj, getattr(motions, "robot", None))
+    except Exception as e:  # noqa: BLE001 - no raycasts / aabb (the test stubs): the recorded drop
+        rec["reason"] = f"no surface probe ({e!r})"[:160]
+        return
+    want = float(cfg.drop_lower_max_m) if surface is None else min(float(cfg.drop_lower_max_m), bottom - surface - float(cfg.drop_lower_clear_m))
+    rec.update({"bottom_z": round(bottom, 4), "surface_z": None if surface is None else round(surface, 4), "planned_m": round(want, 4), "rays": n_rays})
+    if want < float(cfg.drop_lower_min_m):
+        rec["reason"] = f"{want * 1000:.0f} mm to lower (the object is already near what is under it)"
+        return
+    p, q = (x.float() for x in as_world_pose(state.eef_pose(arm)))
+    target = (p - th.tensor([0.0, 0.0, want]), q)
+    try:
+        yield from motions.arm_along(arm, [target], check_collisions=True, ignore_objects=[obj], partial=True, limit_margin=float(cfg.drop_lower_limit_margin_rad))
+    except SkillError as e:
+        rec["leg"] = (e.message or e.reason)[:160]
+    yield from motions.hold(3)
+    p1 = as_world_pose(state.eef_pose(arm))[0].float()
+    bottom1 = float(C.as_tensor(obj.aabb[0]).reshape(-1)[2])
+    rec.update({"applied": True, "lowered_m": round(float(p[2] - p1[2]), 4), "bottom_above_surface_m": None if surface is None else round(bottom1 - surface, 4)})
+    log.info("place(%s): the drop came %.1f cm straight down (planned %.1f cm); its bottom is %s above what is under it", action.object, float(p[2] - p1[2]) * 100,
+             want * 100, "?" if surface is None else f"{(bottom1 - surface) * 100:.1f} cm")
 
 
 def _hangs_free(state, name: str) -> bool:
@@ -3799,6 +3875,54 @@ def _live_hinge(state, art) -> Optional[Tuple[th.Tensor, th.Tensor]]:
     return hinge, axis
 
 
+def _follow_handle_poses(action: BaseFollow, motions: Motions, state, poses: Sequence[Any], cfg: ExecuteConfig, note: Dict[str, Any]) -> Iterator[th.Tensor]:
+    """The arm-mode follow: the hand drives the handle through the recorded poses. For a fixed-base articulation they are streamed as
+    recorded (straight between poses). A free-standing body moves under the pull and the poses assume it where the action began, so
+    the hand runs along the handle's arc about the hinge (``arc_between``, densified at ``follow_arc_step_rad``) in chunks of
+    ``follow_reaim_chunk`` waypoints, each chunk moved with the body's rigid motion since the follow began once that moves the hand more
+    than ``follow_reaim_min_m``, at ``follow_slow_factor`` of the pace after a chunk that left the torso bent beyond
+    ``follow_slow_trunk_rad``. ``note["live_reaim"]`` records the chunks, the re-aims, the largest move and the slowed chunks."""
+    art = action.articulation
+    try:
+        fixed = getattr(state.object(art.object), "fixed_base", None)
+        free = fixed is not None and not bool(fixed)
+        hinge = _live_hinge(state, art) if free else None
+        body0 = as_world_pose(state.object_pose(art.object)) if free else None
+        prev = as_world_pose(motions.eef_pose(action.arm)) if free else None
+    except Exception:  # noqa: BLE001 - no live pose (the test stubs): the recorded chords
+        free = False
+    if not free or int(cfg.follow_reaim_chunk) <= 0:
+        yield from motions.arm_along(action.arm, poses, converge=False)
+        return
+    dense: List[Pose] = []
+    for p in poses:
+        p = as_world_pose(p)
+        dense.extend(arc_between(prev, p, hinge[0], hinge[1], step_rad=float(cfg.follow_arc_step_rad)) if hinge is not None else [p])
+        prev = p
+    inv0 = C.invert((body0[0].float(), body0[1].float()))
+    info: Dict[str, Any] = {"waypoints": len(dense), "arc": hinge is not None, "chunks": 0, "reaimed": 0, "max_move_m": 0.0, "slowed": 0}
+    note["live_reaim"] = info
+    speed: Optional[float] = None
+    K = max(1, int(cfg.follow_reaim_chunk))
+    for k in range(0, len(dense), K):
+        chunk = [(C.as_tensor(w[0]).float(), C.as_tensor(w[1]).float()) for w in dense[k:k + K]]
+        live = as_world_pose(state.object_pose(art.object))
+        d = C.compose((live[0].float(), live[1].float()), inv0)
+        moved = [C.compose(d, w) for w in chunk]
+        move = max(float(th.linalg.norm(m[0] - w[0])) for m, w in zip(moved, chunk))
+        info["max_move_m"] = max(info["max_move_m"], round(move, 4))
+        if move > float(cfg.follow_reaim_min_m):
+            chunk = moved
+            info["reaimed"] += 1
+        yield from motions.arm_along(action.arm, chunk, converge=False, speed=speed)
+        info["chunks"] += 1
+        if motions.state.trunk_error() > float(cfg.follow_slow_trunk_rad):
+            speed = float(motions.cfg.cartesian_speed) * float(cfg.follow_slow_factor)
+            info["slowed"] += 1
+        else:
+            speed = None
+
+
 def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     """Move the joint with the handle grasped, **judged on the joint** (the door), not on the arm: the recorded handle
     path (arm mode) / base poses (base mode) are followed until the joint is within ``follow_stop_frac`` of its
@@ -3834,7 +3958,7 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
         else:
             gen = motions.base_follow_hybrid(targets["follow_path"], action.arm, axis=axis)
     else:
-        gen = motions.arm_along(action.arm, targets["handle_poses"], converge=False)
+        gen = _follow_handle_poses(action, motions, state, targets["handle_poses"], cfg, note)
     k = 0
     stopping = 0
     q_phase0 = None
