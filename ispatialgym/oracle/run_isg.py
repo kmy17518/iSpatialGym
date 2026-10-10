@@ -845,13 +845,13 @@ def parse_args(argv=None):
                    help="replay / policy: stop = a QA monitor verdict (collision, ghost hand, ...) ends the episode; log = it is recorded in "
                         "meta.stream_qa and the stream goes on, the episode judged by its goal (a stream has no program: its grasps and "
                         "pushes have no intended contacts)")
-    p.add_argument("--demo-gating", default="auto", choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "none"],
+    p.add_argument("--demo-gating", default="auto", choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "robot_wobble", "none"],
                    help="demo-collection gate after the epilogue: placed_orientation = every placed object within its recorded orientation tolerance (full error; "
                         "an object with a continuous symmetry about its long axis per the ICL survey - marker, pencil, bottles - modulo rotation about that axis); "
                         "root_moved = the root of a free-standing articulated object whose joint the program works stays within 5 mm / 0.02 rad at the end and "
-                        "10 mm / 0.04 rad of tilt throughout; goal_occlusion = no target / partner >= 50%% hidden in the settled goal image (auto = the three on "
-                        "for --mode oracle, off for replay / policy); placed_tilt = the retracted "
-                        "principal-axis tilt variant (unused by default); none")
+                        "10 mm / 0.04 rad of tilt throughout; goal_occlusion = no target / partner >= 50%% hidden in the settled goal image; robot_wobble = no "
+                        "load the hands bear bends the torso more than 1 deg off its command (auto = the four on for --mode oracle, off for replay / policy); "
+                        "placed_tilt = the retracted principal-axis tilt variant (unused by default); none")
     p.add_argument("--carry-leg", default="straight", choices=["straight", "trajopt"],
                    help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
     p.add_argument("--max-steps", type=int, default=6000, help="episode step budget (30 Hz control steps)")
@@ -1109,9 +1109,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         if args.demo_gating == "auto":
             # the full placed_orientation gate (owner 2026-09-16 17:10 item 4: placed_tilt retracted; cylinders are compared
             # modulo rotation about their long axis inside the gate, ExecutorConfig.demo_revolution_axes) and the operated
-            # articulated roots (owner 2026-09-27: the body of an object whose lid / flap / door the robot works stays put); a target /
-            # partner at least half hidden in the goal image (ispatialgym.eval.goal_occlusion, ISPATIALGYM_GOAL_OCCLUSION=off drops it)
-            gating = ("placed_orientation", "root_moved") if args.mode == "oracle" else ()
+            # articulated roots (owner 2026-09-27: the body of an object whose lid / flap / door the robot works stays put), the torso a
+            # load bent visibly off its command (owner 2026-10-09: "if unpreventable discard"); a target / partner at least half hidden in
+            # the goal image (ispatialgym.eval.goal_occlusion, ISPATIALGYM_GOAL_OCCLUSION=off drops it)
+            gating = ("placed_orientation", "root_moved", "robot_wobble") if args.mode == "oracle" else ()
             if args.mode == "oracle" and goal_occlusion.enabled():
                 gating += ("goal_occlusion",)
         else:

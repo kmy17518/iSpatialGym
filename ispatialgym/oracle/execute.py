@@ -355,6 +355,28 @@ class ExecuteConfig:
     follow_retreat_ramp_max_rad: float = 1.0
     follow_keep_drive_margin_m: float = 0.01
     follow_keep_self_clearance_m: float = 0.02
+    #: owner 2026-10-09 (audit of the v3.0-reconciled demos: "too much push at the end makes the robot wobble ... door case is
+    #: unacceptable"): a push-close pushes only until the leaf is closed - the arm's arc and the base drag stop once the joint is within
+    #: ``push_close_stop_rad`` of ``q_lower`` or the trunk is bent ``push_close_stop_trunk_rad`` off its target by a leaf that no longer
+    #: gives, and the hold targets are unloaded before the fist backs off. 1008: the drag drove the fist 6.7 cm on into the closed leaf,
+    #: torso_joint1 ended 4.2 deg behind its target and sprang forward at the back-off - the head lunged 78 mm
+    push_close_stop_rad: float = 0.004
+    push_close_stop_trunk_rad: float = math.radians(0.3)
+    #: ... a grasp approach stops once a finger presses the support the object rests on - the hand touches it and the trunk is bent
+    #: ``grasp_support_stop_trunk_rad`` off its target - and is unloaded before the closure (brussels sprouts: a pinch of a 4.4 cm
+    #: sphere aims the fingertips 24 mm below its bottom; the hand stopped on the table and pressed it up to 196 N, torso_joint1 0.8 deg,
+    #: the head 17.5 mm, springing back at the lift)
+    grasp_support_stop_trunk_rad: float = math.radians(0.1)
+    #: ... an object that hangs free in the hand at its release (touching nothing) is let go of with the open command at once
+    #: (``Motions.gripper(instant=True)``) instead of a ramp it would hang through between opening fingers
+    release_free_instant: bool = True
+    #: ... a next-to / touching place keeps the fully open fingers ``place_partner_clear_m`` from the partner at the release: the
+    #: assisted grasp lets go on the full open command only, and the pad on the partner's side swept 15 mm toward it (touching:
+    #: the box of tissues shoved 6 mm). The place (and the push that follows it) is moved away from the partner by what is missing,
+    #: up to ``place_partner_clear_max_m``
+    place_partner_clear_m: float = 0.005
+    place_partner_clear_max_m: float = 0.03
+    place_partner_clear_spacing_m: float = 0.004
 
 
 CONFIG = ExecuteConfig()
@@ -1635,9 +1657,33 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
         opening = 0.5 * width + float(margin)
         yield from motions.gripper_opening(arm, opening)
         ctx["preshape_opening_m"] = opening
-    yield from motions.arm_along(arm, targets["approach"], finish=finish)
+    support_objs = list(supports)
+    pressed: List[Any] = []
+    trunk0 = motions.state.trunk_error()
+
+    def presses_support() -> bool:
+        # the fingers on the support with the trunk bent off its target: the hand stands on it and the arm presses on
+        contacts = getattr(state, "hand_contacts", None)
+        if contacts is None or motions.state.trunk_error() - trunk0 < cfg.grasp_support_stop_trunk_rad:
+            return False
+        pressed[:] = [o for o in contacts(arm) if any(o is s for s in support_objs)]
+        return bool(pressed)
+
+    if support_objs and cfg.grasp_support_stop_trunk_rad > 0:
+        stopped = yield from _until(motions.arm_along(arm, targets["approach"], finish=finish), presses_support)
+    else:
+        stopped = False
+        yield from motions.arm_along(arm, targets["approach"], finish=finish)
     if finish.used:
         ctx["approach_finish"] = finish.info
+    if stopped:
+        short = float(th.linalg.norm(as_world_pose(targets["grasp"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()))
+        trunk_deg = math.degrees(motions.state.trunk_error())
+        un = yield from motions.unload([arm])
+        ctx["approach_support_stop"] = {"on": [getattr(o, "name", str(o)) for o in pressed], "trunk_deg": round(trunk_deg, 3), "short_m": round(short, 4),
+                                        "unload_rad": {k: round(v, 4) for k, v in un.items()}}
+        log.info("grasp(%s): the fingers stand on %s %.1f mm short of the grasp pose (trunk %.2f deg off its target): the approach stops there, unloaded",
+                 action.object, ctx["approach_support_stop"]["on"], short * 1000, trunk_deg)
     # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step. A handle's
     # link is attached with a FIXED joint by the task's rule (ISpatialGymTask: AG_MOVING_LINK_JOINT_TYPE), the only kind the
     # follow was designed for - the same rule an evaluated policy's grasp meets
@@ -1700,6 +1746,19 @@ def post_reorient(action: Reorient, state, targets, ctx) -> Optional[str]:
 
 
 RELEASE_WAIT_STEPS = 30
+
+
+def _until(gen: Iterator[th.Tensor], stop: Callable[[], bool]) -> Generator[th.Tensor, None, bool]:
+    """Stream ``gen`` until ``stop()`` holds after a step (the simulator has applied the action), then close it. Returns whether it
+    stopped early (read it with ``yield from``)."""
+    for a in gen:
+        yield a
+        if stop():
+            close = getattr(gen, "close", None)
+            if close is not None:
+                close()
+            return True
+    return False
 
 
 def _release(motions: Motions, state, arm: str) -> Iterator[th.Tensor]:
@@ -1854,6 +1913,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         targets = _reaim_attach_targets(action, state, targets, ctx, cfg)
     elif action.kind == "support":
         targets = raise_place_for_inhand_pose(action, state, ctx.get("sidecar"), targets, ctx, cfg)
+        if action.on and action.relation not in ("on", "into", "under"):
+            targets = clear_release_of_partner(action, motions, state, targets, ctx, cfg)
     carry = list(targets.get("carry") or ())
     if cfg.carry_leg == "straight" and carry:
         # the carry leg: a straight Cartesian leg from where the hand is (the lift end) to the recorded pre-place, through
@@ -1937,7 +1998,10 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             ctx["attach"]["fingers_closed"] = closed
         # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
         # support place sets the object down
-        yield from motions.gripper(arm, close=False)
+        free = drop and cfg.release_free_instant and _hangs_free(state, action.object)
+        if free:
+            ctx["release_instant"] = True
+        yield from motions.gripper(arm, close=False, instant=free)
         yield from _release(motions, state, arm)
     if action.kind == "attach" and action.on:
         _attach_after_release(action, state, ctx)
@@ -2136,6 +2200,145 @@ def _finger_meets_partner(arm: str, finger_q: Sequence[float], pre, place, partn
             worst = before if worst is None else max(worst, before)
             bodies.add(body[len(root):] or body)
     return worst, len(starts), sorted(bodies)
+
+
+def _hangs_free(state, name: str) -> bool:
+    """Whether ``name`` touches no object of the task scope (OmniGibson ``Touching``; the robot never counts): held in the air above
+    its container. False without the simulator's ``Touching`` state."""
+    try:
+        from omnigibson.object_states import Touching  # noqa: F401
+    except Exception:  # noqa: BLE001
+        return False
+    touching = getattr(state, "touching", None)
+    if touching is None:
+        return False
+    try:
+        return not touching(name)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _open_fingers_meet(arm: str, finger_q: Sequence[float], q_open: float, place, partner, cfg: ExecuteConfig) -> Tuple[float, int, List[str], Optional[th.Tensor]]:
+    """How far the fingers opening from ``finger_q`` to ``q_open`` (per finger) at the hand pose ``place`` reach into
+    ``place_partner_clear_m`` of ``partner``: rays from the finger surface along each finger's slide axis over its opening plus that
+    margin, against the partner's collision geometry. ``(largest overlap along a slide axis (m; 0 = clear), rays cast, partner bodies
+    hit, the world slide axis of the worst ray or None)``."""
+    import numpy as np
+
+    surf = finger_surface_points(arm, cfg.place_partner_clear_spacing_m)
+    if not surf:
+        return 0.0, 0, [], None
+    p1, q1 = as_world_pose(place)
+    R = C.quat_to_mat(C.as_tensor(q1).float()).numpy()
+    t = C.as_tensor(p1).float().numpy()
+    starts, ends, axes, lengths = [], [], [], []
+    for (pts, ax), q in zip(surf, finger_q):
+        ax = np.asarray(ax, dtype=float)
+        ax = ax / max(float(np.linalg.norm(ax)), 1e-9)
+        travel = max(float(q_open) - float(q), 0.0) + float(cfg.place_partner_clear_m)
+        a_w = R @ ax
+        s = (np.asarray(pts, dtype=float) + float(q) * ax) @ R.T + t
+        starts.append(s)
+        ends.append(s + travel * a_w)
+        axes += [a_w] * len(s)
+        lengths += [travel] * len(s)
+    root = str(getattr(partner, "prim_path", "") or "")
+    worst, worst_axis, bodies = 0.0, None, set()
+    for i, ray in enumerate(_raycast_all(np.vstack(starts).tolist(), np.vstack(ends).tolist())):
+        for h in (ray if isinstance(ray, list) else [ray]):
+            body = str(h.get("rigidBody") or "")
+            if not h.get("hit") or not root or not body.startswith(root):
+                continue
+            over = lengths[i] - float(h.get("distance", lengths[i]))
+            if over > worst:
+                worst, worst_axis = over, axes[i]
+            bodies.add(body[len(root):] or body)
+    return worst, len(lengths), sorted(bodies), None if worst_axis is None else th.as_tensor(worst_axis).float()
+
+
+PLACE_TARGET_POSES = ("pre_place", "place")
+PLACE_TARGET_PATHS = ("descent", "retreat", "carry", "carry_via")
+
+
+def shift_place_targets(targets: Dict[str, Any], shift: th.Tensor) -> Dict[str, Any]:
+    """Every place target (pre-place, place, descent, retreat, carry) moved by ``shift`` (world, m), orientations kept."""
+    d = C.as_tensor(shift).reshape(-1)[:3].float()
+
+    def moved(pose):
+        p, q = as_world_pose(pose)
+        return Pose(position=[float(v) for v in (p.float() + d).tolist()], orientation=[float(v) for v in q.float().tolist()])
+
+    out = dict(targets)
+    for k in PLACE_TARGET_POSES:
+        if out.get(k) is not None:
+            out[k] = moved(out[k])
+    for k in PLACE_TARGET_PATHS:
+        if out.get(k):
+            out[k] = [moved(w) for w in out[k]]
+    return out
+
+
+def partner_clear_shift(overlap_m: float, slide_axis: Optional[th.Tensor], place_xyz, partner_centre, max_m: float) -> Tuple[Optional[th.Tensor], float]:
+    """The horizontal move of a place away from its partner that takes an opening finger ``overlap_m`` (along its world slide axis)
+    off it: along the line from the partner's centre to the place, by the overlap over the axis' share of that direction (at least
+    0.3), capped at ``max_m``. ``(shift or None when there is no direction away, the move needed (m))``."""
+    u = C.as_tensor(place_xyz).reshape(-1)[:3].float() - C.as_tensor(partner_centre).reshape(-1)[:3].float()
+    u[2] = 0.0
+    n = float(th.linalg.norm(u))
+    if n < 1e-6:
+        return None, float(overlap_m)
+    u = u / n
+    cos = abs(float(th.dot(C.as_tensor(slide_axis).reshape(-1)[:3].float(), u))) if slide_axis is not None else 1.0
+    need = float(overlap_m) / max(cos, 0.3)
+    return u * min(need, float(max_m)), need
+
+
+def clear_release_of_partner(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
+    """Owner 2026-10-09 ("touching: can we make the grasp release a bit farther away from the partner, so when releasing the gripper
+    fingers don't touch the partner"): the assisted grasp lets go on the full open command only, so at a next-to / touching place the
+    pad on the partner's side sweeps its whole opening toward the partner (touching 1008: 15 mm; the box of tissues was shoved 6 mm).
+    The opening at the recorded place pose is swept against the partner (``_open_fingers_meet``); when it comes within
+    ``place_partner_clear_m`` of it, every place target moves away from the partner by what is missing (``partner_clear_shift``, up to
+    ``place_partner_clear_max_m``) and the move is kept for the push that closes the gap after the release (``Motions.place_shifts``:
+    ``execute_push`` extends its line by it). ``ctx["partner_release_clearance"]`` records the facts."""
+    rec: Dict[str, Any] = {"applied": False}
+    ctx["partner_release_clearance"] = rec
+    if not cfg.place_partner_clear_max_m > 0 or targets.get("place") is None:
+        return targets
+    arm = action.arm
+    try:
+        partner = state.object(action.on)
+        idx = motions.robot.gripper_control_idx[arm]
+        q_now = [float(v) for v in motions.robot.get_joint_positions()[idx].tolist()]
+        _lo, hi = motions._gripper_limits(arm)
+        over, n_rays, bodies, axis_w = _open_fingers_meet(arm, q_now, hi, targets["place"], partner, cfg)
+        lo_p, hi_p = partner.aabb
+        centre = 0.5 * (C.as_tensor(lo_p).float() + C.as_tensor(hi_p).float())
+    except Exception as e:  # noqa: BLE001 - no raycasts / finger meshes: the recorded place runs
+        rec["reason"] = f"no finger sweep ({e!r})"[:160]
+        return targets
+    rec.update({"overlap_m": round(over, 4), "rays": n_rays, "partner_bodies": bodies, "finger_q_m": [round(v, 4) for v in q_now]})
+    if over <= 0.0:
+        return targets
+    shift, need = partner_clear_shift(over, axis_w, as_world_pose(targets["place"])[0], centre, cfg.place_partner_clear_max_m)
+    rec["needed_m"] = round(need, 4)
+    if shift is None:
+        rec["reason"] = "the place stands over the partner's centre: no direction away from it"
+        return targets
+    out = shift_place_targets(targets, shift)
+    try:
+        over2, _, _, _ = _open_fingers_meet(arm, q_now, hi, out["place"], partner, cfg)
+    except Exception:  # noqa: BLE001
+        over2 = None
+    rec.update({"applied": True, "shift_m": [round(float(v), 4) for v in shift.tolist()], "overlap_after_m": None if over2 is None else round(over2, 4)})
+    shifts = getattr(motions, "place_shifts", None)
+    if shifts is None:
+        shifts = {}
+        motions.place_shifts = shifts
+    shifts[action.object] = shift.clone()
+    log.info("place(%s): the opening fingers would come %.1f mm into %.0f mm of %s at the release: the place moves %.1f mm away from it",
+             action.object, over * 1000, cfg.place_partner_clear_m * 1000, action.on, float(th.linalg.norm(shift)) * 1000)
+    return out
 
 
 def clear_fingers_over_partner(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Iterator[th.Tensor]:
@@ -3068,6 +3271,15 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             targets["waypoints"] = [_shifted(w) for w in targets["waypoints"]]
             ctx["push_recentre_m"] = [round(float(v), 4) for v in off.tolist()]
             log.info("push(%s): object %.1f cm off its recorded start position -> pad pre-pose and waypoints shifted by %s", obj, float(th.linalg.norm(off)) * 100, ctx["push_recentre_m"])
+            # a place moved away from the partner for the release (clear_release_of_partner) moved the start back along the line by
+            # design: the line keeps its recorded end, extended by that move
+            place_shift = (getattr(motions, "place_shifts", None) or {}).get(obj)
+            back = -float(th.dot(C.as_tensor(place_shift).reshape(-1)[:3].float(), d0)) if place_shift is not None else 0.0
+            if back > 0.0 and along < 0.0:
+                p_end, q_end = as_world_pose(targets["waypoints"][-1])
+                ext = min(back, -along)
+                targets["waypoints"] = list(targets["waypoints"]) + [Pose(position=[float(v) for v in (p_end + d0 * ext).tolist()], orientation=[float(v) for v in q_end.tolist()])]
+                ctx["push_place_shift_extended_m"] = round(ext, 4)
     # (owner 2026-09-18 01:33, (b)) palm clearance of a recorded top-down blade: the fingers' section is PALM_FROM_TIP
     # (7 cm) long, above it the palm is wider than the blade stand-off assumed - when the object's top rises above the
     # palm line the pad (pre-pose + waypoints) is raised until the palm stands push_palm_clear_m above the top, as long as
@@ -3694,6 +3906,9 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
         # the friction load stays in the record), re-read every step for follow_unwind_steps so the elastic strain bleeds
         # off gradually instead of snapping; the release then imparts nothing
         total = motions.unwind(action.arm)
+        # the torso the hand's load bent goes with the arm (owner 2026-10-09: dishwasher close 0.24 deg, door open 0.38 deg kept bent
+        # through the arm's unwind - the unwound arm is a rigid link - and sprung back when the gripper opened)
+        trunk_total = motions.unwind_trunk(motions.cfg.unload_min_trunk_rad)
         prev = state.object_pose(art.object)
         for k_u in range(1, max(0, int(cfg.follow_unwind_steps) - 1) + 1):
             yield from motions.hold(1)
@@ -3708,7 +3923,11 @@ def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ct
                 note["unwind_stopped"] = {"after_steps": k_u, "root_step_m": round(dp_u, 5), "root_step_rad": round(da_u, 5)}
                 break
             total += motions.unwind(action.arm)
+            if trunk_total > 0.0:
+                trunk_total += motions.unwind_trunk()
         note["unwind_rad"] = total
+        if trunk_total > 0.0:
+            note["unwind_trunk_rad"] = round(trunk_total, 5)
     hold_steps, q_end = yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
     note.update({"hold_steps": hold_steps, "q_end": q_end, "shortfall_rad": sign * (art.q_goal - q_end)})
     ctx["follow"] = note
@@ -3851,12 +4070,19 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
                 eef_prev = target
             log_moves.append({"type": "arm", "q_from": seg.get("q_from"), "q_to": seg.get("q_to")})
         elif kind == "release_move_regrasp":
-            # 1. unwind gradually, hold until the joint is still, release (full opening for a handle), settle
+            # 1. unwind gradually (the arm and the torso it bent), hold until the joint is still, release (full opening for a handle), settle
             total = motions.unwind(arm)
+            trunk_total = motions.unwind_trunk(motions.cfg.unload_min_trunk_rad)
             for _ in range(max(0, int(cfg.follow_unwind_steps) - 1)):
                 yield from motions.hold(1)
                 total += motions.unwind(arm)
+                if trunk_total > 0.0:
+                    trunk_total += motions.unwind_trunk()
             yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
+            if motions.state.trunk_error() > motions.cfg.unload_min_trunk_rad:
+                # the leaf's swing went on loading the torso while the joint came to rest (door open: the pull's momentum)
+                trunk_total += motions.unwind_trunk()
+                yield from motions.hold(int(cfg.follow_still_steps))
             yield from motions.gripper(arm, close=False, staged=False)
             yield from _release(motions, state, arm)
             # the gripper-in-FOV span closes at the release and re-opens at the next pre-grasp (qa.py rule (b): "the
@@ -3912,6 +4138,7 @@ def _follow_sequential(action: BaseFollow, motions: Motions, state, segments: Li
             motions.backend.attach_object(arm, obj)
             motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
             log_moves.append({"type": "release_move_regrasp", "q": seg.get("q"), "strides": len(seg["base_path"]), "hold_posture": seg.get("hold_posture"), "unwind_rad": round(total, 4),
+                              **({"unwind_trunk_rad": round(trunk_total, 5)} if trunk_total > 0.0 else {}),
                               "m": round(math.hypot(seg["base_to"][0] - seg["base_from"][0], seg["base_to"][1] - seg["base_from"][1]), 3),
                               **({"retreat_kept": retreat_kept} if retreat_kept is not None else {})})
         else:
@@ -4077,12 +4304,20 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
     only if the door moves under a 1 cm further push), push along the arc about the hinge to the arm's limit (the base
     drags along −m when the arc gains < 2°), back off; repeat until closed or a chunk gains nothing."""
     arm, name = action.arm, action.object
+    cfg = _cfg(ctx)
     rep: Dict[str, Any] = {"chunks": []}
     ctx["push_close"] = rep
     _hook(ctx, "fov")(False)  # the hand leaves the camera frame at the side stances: the contact span is not a grasp span
 
     def q_now() -> float:
         return float(state.joint_position(name, action.joint))
+
+    def leaf_stop(trunk0: float) -> Optional[str]:
+        if q_now() - action.q_lower <= cfg.push_close_stop_rad:
+            return f"leaf closed (q {math.degrees(q_now()):.2f} deg)"
+        if motions.state.trunk_error() - trunk0 >= cfg.push_close_stop_trunk_rad:
+            return f"trunk pressed {math.degrees(motions.state.trunk_error()):.2f} deg off its target (q {math.degrees(q_now()):.2f} deg)"
+        return None
 
     obj = state.object(name)
     d0, m0, sgn = leaf_frame(action.hinge_xy, action.handle_xy_closed, action.approach_closed)
@@ -4185,11 +4420,21 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
         cpose = (C.as_tensor(cpose[0]), C.as_tensor(cpose[1]))
         n_exec = max(int(round(abs(delta_exec) / math.radians(2.0))), 1)
         arc2 = C.arc_waypoints(cpose, hinge + th.tensor([0.0, 0.0, float(cpose[0][2])]), th.tensor([0.0, 0.0, 1.0]), delta_exec, n=n_exec)
+        why: List[Optional[str]] = [None]
+        trunk0 = [motions.state.trunk_error()]
+
+        def stop() -> bool:
+            why[0] = leaf_stop(trunk0[0])
+            return why[0] is not None
+
         try:
-            yield from motions.arm_along(arm, list(arc2), loaded=True, partial=True)
-            rec["arc"] = "complete"
+            stopped = yield from _until(motions.arm_along(arm, list(arc2), loaded=True, partial=True), stop)
+            rec["arc"] = f"stopped: {why[0]}" if stopped else "complete"
         except SkillError as e:
             rec["arc"] = f"stopped: {e.message or e.reason}"
+        if why[0] is not None:
+            un = yield from motions.unload([arm])
+            rec["arc_unload_rad"] = {k: round(v, 4) for k, v in un.items()}
         yield from motions.settle(max_steps=40)
         q_after = q_now()
         rec["q_after_deg"] = round(math.degrees(q_after), 2)
@@ -4200,16 +4445,28 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
             bx, by, byaw = motions.base_pose2d()
             tgt = (bx - action.drag_m * float(m1[0]), by - action.drag_m * float(m1[1]), byaw)
             motions.follow_phase = "base"
+            why[0] = None
+            trunk0[0] = motions.state.trunk_error()
             try:
-                yield from motions.track_path([tgt], tracker_cfg=replace(motions.cfg.base_tracker, v_max=(0.06, 0.06, 0.3)))
-                rec["base_drag"] = f"{action.drag_m:.2f} m toward the frame"
+                stopped = yield from _until(motions.track_path([tgt], tracker_cfg=replace(motions.cfg.base_tracker, v_max=(0.06, 0.06, 0.3))), stop)
+                if stopped:
+                    bx2, by2, _ = motions.base_pose2d()
+                    rec["base_drag"] = f"stopped after {math.hypot(bx2 - bx, by2 - by):.2f} m: {why[0]}"
+                else:
+                    rec["base_drag"] = f"{action.drag_m:.2f} m toward the frame"
             except SkillError as e:
                 rec["base_drag"] = f"stopped: {(e.message or e.reason)[:120]}"
             finally:
                 motions.follow_phase = "arm"
+            if why[0] is not None:
+                un = yield from motions.unload([arm])
+                rec["drag_unload_rad"] = {k: round(v, 4) for k, v in un.items()}
             yield from motions.settle(max_steps=40)
             q_after = q_now()
             rec["q_after_drag_deg"] = round(math.degrees(q_after), 2)
+        un = yield from motions.unload([arm])  # the fist leaves a leaf it may still press: nothing springs back when it goes
+        if any(v > 0.0 for v in un.values()):
+            rec["backoff_unload_rad"] = {k: round(v, 4) for k, v in un.items()}
         try:  # off the face (+m), then let it settle
             eef = motions.eef_pose(arm)
             yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + 0.10 * m1, C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)

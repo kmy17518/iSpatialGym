@@ -248,6 +248,14 @@ class MotionsConfig:
     jam_probe_steps: int = 3
     jam_pos_eps: float = 1e-3
     jam_relax_steps: int = 6
+    #: (owner 2026-10-09, audit of the v3.0-reconciled demos: "too much push at the end makes the robot wobble") a contact that bears
+    #: load is let go of only once the drives stopped pressing on it (``unload``): the hold targets of the arm and of the trunk follow
+    #: the measured joints for ``unload_steps`` steps. Nothing is emitted unless an arm is more than ``unload_min_arm_rad`` or the
+    #: trunk more than ``unload_min_trunk_rad`` off its target (a free arm converges within ~1 mrad, a free torso within 0.2 mrad;
+    #: the door push-close left torso_joint1 74 mrad behind its target against the closed leaf)
+    unload_steps: int = 12
+    unload_min_arm_rad: float = 0.005
+    unload_min_trunk_rad: float = 0.001
 
 
 # ==========================================================================================
@@ -467,6 +475,9 @@ class Motions:
         self.release_opening: Dict[str, float] = {}
         self.deferred_open: Dict[str, Dict[str, Any]] = {}
         self.release_events: List[Dict[str, Any]] = []
+        #: object -> the world move a next-to / touching place made away from its partner so the opening fingers clear it
+        #: (``execute.clear_release_of_partner``); the push that follows extends its line by it
+        self.place_shifts: Dict[str, th.Tensor] = {}
 
     # ------------------------------------------------------------------ privileged reads (state, never decisions)
 
@@ -676,7 +687,7 @@ class Motions:
         return None if v >= hi - 1e-6 else min(hi, max(lo, v))
 
     def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None, opening: Optional[float] = None,
-                staged: bool = True) -> Iterator[th.Tensor]:
+                staged: bool = True, instant: bool = False) -> Iterator[th.Tensor]:
         """Open / close the gripper and wait until the fingers stop moving (or an assisted grasp engages).
 
         Closing: ``rate`` (m per control step; ``execute_grasp`` passes ``cfg.gripper_close_rate``) ramps the smooth-mode
@@ -691,7 +702,11 @@ class Motions:
         retreat follows. Only an articulated part pinched across its thickness (``staged``: the carton flap,
         ``Retreat._edge_escape``) opens in two stages - the first to ``opening`` (default :meth:`release_stage_opening`), the
         full opening deferred until the hand has moved ``cfg.gripper_release_clearance_m`` - and the assisted grasp keeps
-        the part until that deferred +1. A gripper holding nothing opens fully in one ramp."""
+        the part until that deferred +1. A gripper holding nothing opens fully in one ramp.
+
+        ``instant`` (opening): the open command at once - for an object that hangs free in the hand (``execute_place``: touching
+        nothing at the release), which the ramp would leave hanging between visibly opening fingers until its last increment (the
+        brussels sprouts drop: 12 steps, then it fell 11 cm); the assisted grasp lets go on the first step as the fingers start to open."""
         self.state.stop_base()
         idx = self.robot.gripper_control_idx[arm]
         lo, hi = self._gripper_limits(arm)
@@ -749,7 +764,9 @@ class Motions:
                     if stage <= q_now + 1e-6:
                         stage = None  # the pads already stand clear of that width: nothing to stage
             target = hi if stage is None else stage
-            open_rate = self.cfg.gripper_open_rate
+            open_rate = None if (instant and stage is None) else self.cfg.gripper_open_rate
+            if instant and stage is None and held_before is not None:
+                self.release_events.append({"arm": arm, "event": "instant_open", "from_m": round(q_now, 4), "object": getattr(held_before, "name", None)})
             if open_rate:
                 q_target = q_now
                 while q_target < target - 1e-6:
@@ -968,6 +985,40 @@ class Motions:
         d = float(th.max(th.abs(q - prev))) if prev is not None else 0.0
         self.state.arm_target[arm] = q
         return d
+
+    def unwind_trunk(self, min_rad: float = 0.0) -> float:
+        """The trunk's :meth:`unwind`: its hold target becomes the measured torso when that lies more than ``min_rad`` off it. A load the
+        hand bears bends the torso against its effort-capped drives - the leaf a fist presses, a door held by its friction, the
+        support under the fingertips - and an arm unwound alone is then a rigid link that keeps it bent, until the contact goes and
+        the drives spring it back (door open: torso_joint1 6.6 mrad past its target through the unwind, released by the gripper).
+        Returns the change (rad); emits nothing - the caller holds."""
+        q = self.robot.get_joint_positions()[self.robot.trunk_control_idx].clone().float()
+        d = float(th.max(th.abs(q - self.state.trunk_target)))
+        if d <= float(min_rad):
+            return 0.0
+        self.state.trunk_target = q
+        return d
+
+    def unload(self, arms: Sequence[str], steps: Optional[int] = None, trunk: bool = True) -> Generator[th.Tensor, None, Dict[str, float]]:
+        """Stop pressing before a contact that bears load is let go of (``unload_steps``): every step the hold targets of ``arms`` and
+        (``trunk``) the torso's follow the measured joints, the base stopped, so the strain bleeds off while the contact still holds
+        and nothing springs back when it goes. Emits nothing when no arm is more than ``unload_min_arm_rad`` and the trunk no more
+        than ``unload_min_trunk_rad`` off its target. Returns the largest change per arm and ``"trunk"`` (rad; ``yield from``)."""
+        arms = [a for a in arms if a in M.ARMS and self.state.arm_target.get(a) is not None]
+        out: Dict[str, float] = {a: 0.0 for a in arms}
+        out["trunk"] = 0.0
+        loaded = any(self.state.arm_error(a) > self.cfg.unload_min_arm_rad for a in arms)
+        loaded = loaded or (trunk and self.state.trunk_error() > self.cfg.unload_min_trunk_rad)
+        if not loaded:
+            return out
+        self.state.stop_base()
+        for _ in range(max(1, int(self.cfg.unload_steps if steps is None else steps))):
+            for a in arms:
+                out[a] = max(out[a], self.unwind(a))
+            if trunk:
+                out["trunk"] = max(out["trunk"], self.unwind_trunk())
+            yield self._emit()
+        return out
 
     @staticmethod
     def _retime(q_traj: th.Tensor, steps: Sequence[int]) -> th.Tensor:

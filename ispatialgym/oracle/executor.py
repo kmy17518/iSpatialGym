@@ -164,6 +164,9 @@ class ExecutorConfig:
     root_moved_pos: float = 0.005
     root_moved_rot: float = 0.02
     root_transient_factor: float = 2.0
+    #: ``robot_wobble`` gate (owner 2026-10-09: "too much push at the end makes the robot wobble ... door case is unacceptable ... if
+    #: unpreventable discard"): a demo whose torso a load bent more than this off its command (:class:`TorsoLoad`, deg) is discarded
+    demo_torso_deflection_max_deg: float = 1.0
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
     #: survives in the video / dataset (:meth:`Executor.render_restored`). ``restore_renders`` frames are always
     #: rendered; from then on the head camera is read after every render until its image is **fresh** - closer to the
@@ -205,6 +208,51 @@ class ExecutorConfig:
     #: Fabric's transforms synced after every step and after a rollback's load (camera poses read as in a rendered run),
     #: and a rollback does not re-render. Default: ISPATIALGYM_PHYSICS_ONLY=1 (off when unset)
     physics_only: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_PHYSICS_ONLY", "").lower() in ("1", "true", "yes"))
+
+
+class TorsoLoad:
+    """QA fact and ``robot_wobble`` demo gate (owner 2026-10-09, audit of the v3.0-reconciled demos: "too much push at the end makes
+    the robot wobble ... door case is unacceptable ... if unpreventable discard"): how far a load the hands bear bends the torso off
+    its command - per control step the largest |trunk command - measured trunk joint| (deg), recorded from ``NOTE_DEG`` on with its
+    action, so the report has the peak, when and in which action, and the peak per action. The free torso tracks within 0.01 deg
+    (0.09 deg while it moves); the 28 v3.0-reconciled demos of 1008 peaked at 4.24 deg (door push-close: the head lunged 78 mm when
+    the fist let go), 0.81 (brussels sprouts: fingertips on the table), 0.41 (blender open), 0.38 (door open), 0.24 (dishwasher
+    close). A rolled-back attempt's steps leave the record (:meth:`trim`)."""
+
+    NOTE_DEG = 0.05
+
+    def __init__(self, robot):
+        self.robot = robot
+        self.idx_action = th.as_tensor(robot.controller_action_idx["trunk"]).long()
+        self.idx_joint = th.as_tensor(robot.trunk_control_idx).long()
+        self.steps: Dict[int, Tuple[float, Optional[str]]] = {}
+
+    def observe(self, step: int, action: th.Tensor, action_name: Optional[str]) -> None:
+        cmd = th.as_tensor(action).reshape(-1)[self.idx_action].float()
+        q = th.as_tensor(self.robot.get_joint_positions()).reshape(-1)[self.idx_joint].float()
+        dev = math.degrees(float(th.max(th.abs(cmd - q))))
+        if dev >= self.NOTE_DEG:
+            self.steps[int(step)] = (dev, action_name)
+        else:
+            self.steps.pop(int(step), None)
+
+    def trim(self, step: int) -> None:
+        self.steps = {s: v for s, v in self.steps.items() if s <= step}
+
+    def peak(self) -> Tuple[float, Optional[int], Optional[str]]:
+        if not self.steps:
+            return 0.0, None, None
+        s, (d, n) = max(self.steps.items(), key=lambda kv: kv[1][0])
+        return d, s, n
+
+    def report(self) -> Dict[str, Any]:
+        d, s, n = self.peak()
+        per: Dict[str, float] = {}
+        for _s, (dv, nm) in self.steps.items():
+            per[nm or "epilogue"] = max(per.get(nm or "epilogue", 0.0), dv)
+        return {"max_deg": round(d, 3), "at_step": s, "action": None if s is None else (n or "epilogue"),
+                "per_action_deg": {k: round(v, 3) for k, v in sorted(per.items(), key=lambda kv: -kv[1])},
+                "steps_over_note": len(self.steps), "note_deg": self.NOTE_DEG}
 
 
 class SupportLoad:
@@ -840,6 +888,7 @@ class Executor:
         self.result: Dict[str, Any] = {}
         self.verdict: Optional[Verdict] = None
         self.support_load: Optional[SupportLoad] = None  # the support loading fact (meta.support_disturbance), built by run_program
+        self.torso_load: Optional[TorsoLoad] = None  # the torso deflection fact (meta.torso_load, gate robot_wobble), built per episode
         self.root_watch: Optional[RootWatch] = None  # the operated articulated roots (meta.articulated_root, gate root_moved), built by run_program
 
     # ------------------------------------------------------------------ sim access
@@ -923,6 +972,12 @@ class Executor:
             except Exception as e:  # noqa: BLE001  (a fact, never a failure)
                 log.warning("support load monitor failed (%r); disabled", e)
                 self.support_load = None
+        if self.torso_load is not None:
+            try:
+                self.torso_load.observe(self.n, action, self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None)
+            except Exception as e:  # noqa: BLE001  (a fact; the gate then has nothing to judge)
+                log.warning("torso load monitor failed (%r); disabled", e)
+                self.torso_load = None
         if self.root_watch is not None:
             self.root_watch.observe(self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None, self.n)
         if self.recorder is not None:
@@ -1028,6 +1083,8 @@ class Executor:
         self._ag_last = None  # the restore re-establishes / drops grasps itself (not a release of the demo)
         for k in ("releases", "violations"):  # the rolled-back attempt's steps leave the recording, and its releases with them
             self.release_check[k] = [r for r in self.release_check[k] if r["step"] <= cp.step]
+        if self.torso_load is not None:
+            self.torso_load.trim(cp.step)
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
         if ag is not None:
@@ -1515,6 +1572,13 @@ class Executor:
             scene_idx = 0
         self.support_load = SupportLoad(self.robot, supports, scene_idx=scene_idx)
 
+    def _init_torso_load(self) -> None:
+        try:
+            self.torso_load = TorsoLoad(self.robot)
+        except Exception as e:  # noqa: BLE001  (a robot without a trunk controller: no fact, no gate)
+            log.warning("torso load monitor unavailable (%r)", e)
+            self.torso_load = None
+
     def operated_roots(self) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """``(watched, skipped)``: the tracked articulated objects whose joint the program works without moving them as a whole -
         the ``articulation.object`` of a handle grasp / base follow, the object of a push / brace / push-close carrying an
@@ -1563,6 +1627,7 @@ class Executor:
         actions = list(actions)
         self.program_actions = actions
         self._init_support_load()
+        self._init_torso_load()
         watched, skipped = self.operated_roots()
         self.root_watch = RootWatch(watched, skipped) if (watched or skipped) else None
         # every tracked object's pose at the start (the loaded init): the reference for a partner displaced during the run
@@ -1759,6 +1824,7 @@ class Executor:
         t0 = time.time()
         verdict: Optional[Verdict] = None
         self._qa_log = self.cfg.stream_qa == "log"
+        self._init_torso_load()
         if self.monitors is not None:
             self.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=self.state.held_objects(), manipulation=False)
         try:
@@ -2133,6 +2199,12 @@ class Executor:
                 verdict = Verdict("root_moved", "articulated object's root moved while its joint was worked: " + msg, step=self.n,
                                   details={"targets": sorted(failed_roots), "report": {o: root_report["objects"][o] for o in failed_roots}})
                 self.stats.record(verdict)
+        torso_report = self.torso_load.report() if self.torso_load is not None else {}
+        if "robot_wobble" in self.cfg.demo_gating and torso_report.get("max_deg", 0.0) > self.cfg.demo_torso_deflection_max_deg and verdict is None:
+            verdict = Verdict("robot_wobble", f"a load the hands bore bent the torso {torso_report['max_deg']:.2f} deg off its command at step {torso_report['at_step']} "
+                                              f"({torso_report['action']}; > {self.cfg.demo_torso_deflection_max_deg:.2f} deg): the robot visibly wobbles", step=self.n,
+                              details={"torso_load": torso_report})
+            self.stats.record(verdict)
         bad = self.release_check["violations"]
         if verdict is None and bad:
             msg = "; ".join(f"step {v['step']} {v['arm']} {v['object']}: {v['kind']}" + (f" ({v['gripper_command']})" if "gripper_command" in v else "") for v in bad)
@@ -2181,6 +2253,8 @@ class Executor:
             "support_disturbance": self.support_load.report() if self.support_load is not None else {},
             # owner 2026-09-27: the root drift of every articulated object whose joint the program works (gate root_moved)
             "articulated_root": root_report,
+            # owner 2026-10-09: how far a load the hands bore bent the torso off its command (gate robot_wobble)
+            "torso_load": torso_report,
             "settled_success": settled_task,
             "pose_settled_config": isg.get("pose_settled_config"),
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,

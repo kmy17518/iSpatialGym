@@ -16,6 +16,10 @@ Verdict categories (the executor's verdict / ``SkillError.reason``; this module 
 ``protected_moved``         during a transit, a protected (goal) object moved more than protection.MOVE_TOL_M
 ``root_moved``              the root (base link) of a free-standing articulated object moved or tipped while the program
                             worked its joint (epilogue demo gate, ``executor.RootWatch``)
+``goal_occluded``           a target / partner is at least half hidden in the settled goal image (epilogue demo gate,
+                            ``ispatialgym.eval.goal_occlusion``)
+``robot_wobble``            a load the hands bore bent the torso visibly off its command (epilogue demo gate,
+                            ``executor.TorsoLoad``)
 ``failed_grasp``            the assisted grasp did not attach (grasp actions; push / brace exempt)
 ``no_motion``               a push / articulation moved nothing
 ``plan_failed``             trajopt (or the differential IK along recorded waypoints) found no trajectory
@@ -98,13 +102,17 @@ CATEGORIES: Tuple[str, ...] = (
     "protected_contact",
     "protected_moved",
     "root_moved",
+    "goal_occluded",
+    "robot_wobble",
 )
 #: categories the per-step monitors can raise (``protected_*``: the transit span of oracle.protection, owner 2026-09-26)
 STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "gripper_out_of_fov", "timeout", "protected_contact", "protected_moved")
 #: categories of the epilogue (``placed_orientation`` = the demo-collection gate on a placed object's orientation
 #: against its recorded, non-gating TRO target — owner decision 2026-09-16 10:15; ``root_moved`` = the demo gate on the root
-#: of an articulated object whose joint the program works; policy evaluation is unchanged)
-EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation", "placed_tilt", "root_moved")
+#: of an articulated object whose joint the program works; ``goal_occluded`` / ``robot_wobble`` = the demo gates on the goal
+#: image and on the torso a load bent; policy evaluation is unchanged)
+EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation", "placed_tilt", "root_moved", "goal_occluded",
+                                        "robot_wobble")
 
 #: contacts with these object categories never count (the robot stands / drives on them)
 GROUND_CATEGORIES = frozenset({"floors", "carpet", "rug", "mat", "gym_mat", "yoga_mat", "lawn", "driveway", "ceramic_tile"})
