@@ -386,6 +386,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "path_buckets": None,
         **IORS_SMALL_COMMON,
         "fit_tiers": ["any_yaw", "aligned", "centred"],  # §6.11 partner top admits the footprint: preferred first
+        "target_fit_scale_min": 0.5,  # owner 2026-10-11: a target bigger than its partner is shrunk at grounding time, never below x0.5 (ground_isg / pair_rules)
     },
     "inter_object_relation_satisfaction-under_small_scale": {
         **COMMON,
@@ -394,6 +395,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "path_buckets": None,
         **IORS_SMALL_COMMON,
         "fit_tiers": ["any_yaw", "aligned", "centred"],  # §6.11
+        "target_fit_scale_min": 0.5,  # owner 2026-10-11: a target bigger than its partner is shrunk at grounding time, never below x0.5 (ground_isg / pair_rules)
         "argument_order": ["partner", "target"],  # §6.11 / iddl: (under ?partner ?target) — the partner ends under the target
     },
     "inter_object_relation_satisfaction-inside": {
@@ -406,6 +408,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "drop_height_m": 0.005,  # §6.11 released 5 mm above the rim at the fillable centroid
         "drop_settle_steps": 120,  # §6.11 settled 120 steps
         "max_protrusion_fraction": 0.5,  # §6.11 protrudes above the rim by ≤ half its height
+        "target_fit_scale_min": 0.5,  # owner 2026-10-11: a target bigger than its partner is shrunk at grounding time, never below x0.5 (ground_isg / pair_rules)
     },
     "inter_object_relation_satisfaction-nextto": {
         **COMMON,

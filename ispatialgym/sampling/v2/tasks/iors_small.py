@@ -7,7 +7,8 @@ relation, the place / pre-place IK from the manipulation stance after the goal s
 constraints it learned. Every number comes from the customs ``generation`` block (D1 ``generation_defaults``):
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
-(inside), ``tolerances``.
+(inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``tolerances``. A target bigger
+than its partner is shrunk by ``ground_isg`` before sampling (``roles.target.scale``, ``sampling/pair_rules.py``).
 """
 
 from __future__ import annotations
@@ -626,6 +627,9 @@ class IORSSmall(SamplerV2):
             if not (min(t_h, p_h) > 0):
                 raise Reject("nextto_height_mismatch", "degenerate heights")
             out["g_NT"] = float((t_ext + p_ext).mean() / 6)  # OmniGibson NextTo threshold
+            handed = self.handedness_pair()
+            if handed is not None:
+                out["handedness"] = handed
         elif self.relation == "touching":
             if float(p_ext[2]) > float(self.gen("partner_max_aspect", PARTNER_MAX_ASPECT)) * min(px, py) or px < 0.03:
                 raise Reject("partner_unstable", f"partner {px:.2f}x{py:.2f}x{float(p_ext[2]):.2f}")
@@ -637,6 +641,39 @@ class IORSSmall(SamplerV2):
             if tx + om > px or ty + om > py:
                 raise Reject("does_not_fit_inside", f"target {tx:.2f}x{ty:.2f} vs opening {px:.2f}x{py:.2f}")
         return out
+
+    def handedness_pair(self) -> Optional[Dict[str, str]]:
+        """Owner 2026-10-11 (nextto shoe pair): ``generation.handedness`` (``{"<category>/<model>": "left" | "right"}``, written by
+        ``ground_isg``) names the hand of a mirror-pair model; when the drawn target and partner both have one the target must end
+        on its own side of the partner, robot frame (the right shoe right of the left shoe): ``{"target", "partner",
+        "target_side"}``. None when either hand is unknown; ``Reject("handedness_pair")`` for two objects of one hand."""
+        from ispatialgym.sampling import pair_rules as PR
+
+        hands = self.gen("handedness") or {}
+        if not isinstance(hands, dict):
+            return None
+        t, p = self.choice.models["target"], self.choice.models["partner"]
+        ht, hp = hands.get(f"{t.category}/{t.model}"), hands.get(f"{p.category}/{p.model}")
+        try:
+            side = PR.handed_target_side(ht, hp)
+        except ValueError:
+            raise Reject("handedness_pair", f"target {t.category}/{t.model} and partner {p.category}/{p.model} are both {ht}")
+        return None if side is None else {"target": ht, "partner": hp, "target_side": side}
+
+    def handed_ranges(self, ranges: Dict[float, Tuple[float, float]]) -> Dict[float, Tuple[float, float]]:
+        """The partner sides of ``ranges`` (``place_partner``: +1 = the robot's left of the target) left by :meth:`handedness_pair`:
+        only the side that leaves the target on its own side of the partner; ``Reject("partner_placement")`` when that side has no
+        admissible gap range."""
+        from ispatialgym.sampling import pair_rules as PR
+
+        handed = (self.pair or {}).get("handedness")
+        if not handed:
+            return ranges
+        sd = PR.partner_side_for(handed["target_side"])
+        if sd not in ranges:
+            raise Reject("partner_placement", f"handedness: the {handed['target']} target must end {handed['target_side']} of the {handed['partner']} partner, "
+                                              f"but the partner side {'left' if sd > 0 else 'right'} of the target has no admissible gap range")
+        return {sd: ranges[sd]}
 
     def lateral_margins(self) -> Dict[str, Any]:
         """The IORS row of §4.4 for ``tabletop.lateral_margins`` (λ, b, R_img are filled by Phase 1b / 1c): w_t, w_p, W_p,
@@ -889,6 +926,7 @@ class IORSSmall(SamplerV2):
                                                   f"{depth_t:.2f}, target at {lat_t:+.2f}) with g ∈ [{g_lo:.2f}, {g_hi:.2f}]" if len(near) else "band has no cell at the target's depth")
         else:
             ranges = {sd: (g_lo, g_hi) for sd in sides}
+        ranges = self.handed_ranges(ranges)
         side = list(ranges)[int(rng.integers(len(ranges)))]
         if self.relation != "touching":
             return TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
@@ -1080,6 +1118,10 @@ class IORSSmall(SamplerV2):
             raise Reject("touching_side", f"target init lateral {lat_init:+.2f} is left of the partner centre {0.5 * float(p_lat.min() + p_lat.max()):+.2f}")
         depth_t, _ = st.local(t_pose[0])
         if self.relation == "nextto":
+            handed = (self.pair or {}).get("handedness")
+            if handed and self.goal_side != handed["target_side"]:
+                # the partner was placed on the other side (``handed_ranges``): a target starting on the wrong side contradicts that
+                raise Reject("handedness_side", f"the {handed['target']} target would end {self.goal_side} of the {handed['partner']} partner")
             lat, t_quat = self.avoid_release_sweep(st, depth_t, lat, t_quat, lat_init, p_lat, p_hull_w, gap)
         xy = st.world(depth_t, lat)
         return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat

@@ -16,7 +16,9 @@ every candidate) this module
    roles, ``whitelist`` (the pick's models; the whole admissible pool with ``--full-whitelists``; always the whole
    admissible pool for group roles), ``blacklist`` with reasons, ``generation`` seeded from the existing entry or
    ``sampling/generation_defaults.py``, ``constraints`` (empty, except the soft ``missing_contacts_pending_B6``
-   records while ``require/contacts.csv`` is header-only);
+   records while ``require/contacts.csv`` is header-only); IORS small scale (owner 2026-10-11, ``sampling/pair_rules.py``):
+   a target bigger than its partner (ontop / under) or than the opening (inside) gets a uniform fit scale with a key tested at
+   it, else it is withheld (``generation.target_fit``); a nextto mirror pair gets ``generation.handedness``;
 4. emits the **fallback aliases** of the primary (owner decision 2026-09-16 B; customs ``fallback_of`` /
    ``fallback_rank`` / ``fallback_kind`` / ``fallback_params``, the primary's ``fallbacks`` list, the same fields in
    ``problems.json``): large-scale IORS init surface (under: support -> the partner's own top -> floor; ontop: support
@@ -69,6 +71,7 @@ from ispatialgym.activity.problem import ISGProblemError
 from ispatialgym.sampling import customs as C
 from ispatialgym.sampling import generation_defaults as G
 from ispatialgym.sampling import iddl as I
+from ispatialgym.sampling import pair_rules as PR
 from ispatialgym.sampling.bddl_from_iddl import (
     GROUNDER,
     GroundingError,
@@ -112,6 +115,24 @@ INSIDE_ALIAS_SUFFIX = "_inside"
 #: Library key suffix a pick prefers when several keys of the pipeline are admissible (else the alphabetical first): owner
 #: 2026-10-11 item 3 - the touching#03 book starts upright in the shelf, so it is picked with its upright-shelf key (``__bu``).
 GRASP_KEY_SUFFIX_PREFERENCE = {"inter_object_relation_satisfaction-touching#03": "__bu"}
+#: Owner 2026-10-11: a target bigger than its partner is shrunk before sampling (``pair_rules``: ontop / under -> the partner's top,
+#: inside -> the opening) - the fit check of each subtask.
+TARGET_FIT_SUBTASKS = {
+    "inter_object_relation_satisfaction-ontop_small_scale": "on_partner",
+    "inter_object_relation_satisfaction-under_small_scale": "on_partner",
+    "inter_object_relation_satisfaction-inside": "inside",
+}
+#: Owner 2026-10-11: a nextto pair of mirror objects ends with the right one on the robot's right of the left one; the models' hands
+#: go to ``generation.handedness`` and the sampler places the partner on the side that leaves the target on its own side.
+HANDEDNESS_SUBTASKS = ("inter_object_relation_satisfaction-nextto",)
+#: Hand of the mirror-pair models (no sheet column says it): the side of the sole's arch (the medial side) in the canonical frame, toe
+#: along +x and up +z - arch on +y (the shoe's own left) = a right shoe. Measured on the visual meshes (sole outline within 1 cm of the
+#: bottom, per tenth of the length) 2026-10-11: the nextto#04 targets are right shoes, their partners the left shoes of the pairs.
+HANDEDNESS = {
+    ("gym_shoe", "kmcbym"): "right", ("gym_shoe", "mcfcwq"): "left",  # the pair of BEHAVIOR's putting_shoes_on_rack
+    ("gym_shoe", "picdro"): "right", ("gym_shoe", "ugbxip"): "left",
+    ("gym_shoe", "pblxfp"): "right", ("gym_shoe", "rcozpq"): "left",
+}
 #: §2.2 grasp verdicts: ``ok``, or ``flag`` with flags ⊆ {one_finger}.
 TOLERATED_GRASP_FLAGS = {"one_finger"}
 HANDLE_ADMISSIBLE_VERDICTS = ("handle", "edge", "manual")
@@ -245,6 +266,31 @@ def _parse_vec(value: str) -> Optional[List[float]]:
         return None
 
 
+def _asset_bbox(category: str, model: str) -> Optional[List[float]]:
+    """``bbox_size`` (native extents, m) of the asset's ``misc/metadata.json`` - the repo's own assets, then BEHAVIOR-1K under
+    ``$OMNIGIBSON_DATA_PATH`` (default ``Behavior-1K/datasets``); None when neither has the model."""
+    data = os.environ.get("OMNIGIBSON_DATA_PATH") or os.path.join(REPO_ROOT, "Behavior-1K", "datasets")
+    for root in (os.path.join(ASSETS_ROOT, "datasets", CUSTOM_DATASET), os.path.join(data, "behavior-1k-assets")):
+        path = os.path.join(root, "objects", category, model, "misc", "metadata.json")
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path) as f:
+                size = json.load(f).get("bbox_size")
+            return [float(v) for v in size] if size and len(size) == 3 else None
+        except (OSError, ValueError, TypeError, AttributeError):
+            return None
+    return None
+
+
+def _role_scale(re_: RoleEntry, category: str, model: str) -> Optional[List[float]]:
+    """The spawn scale a customs role gives ``category/model`` (``"<cat>/<model>"``, the bare model, ``"default"``; None = unit)."""
+    val = re_.scale.get(C.model_key(category, model), re_.scale.get(model, re_.scale.get("default")))
+    if val is None:
+        return None
+    return [float(v) for v in val] if isinstance(val, (list, tuple)) else [float(val)] * 3
+
+
 class ICL:
     """The candidate list: ``roles/`` + ``require/`` sheets with the indexes the grounder needs."""
 
@@ -263,9 +309,13 @@ class ICL:
             raise GroundingError(f"no candidates under {roles}")
         self.by_sr: Dict[Tuple[str, str], List[Dict[str, str]]] = collections.defaultdict(list)
         self.by_key: Dict[Tuple[str, str, str, str], Dict[str, str]] = {}
+        self.bbox_of_model: Dict[Tuple[str, str], Optional[List[float]]] = {}  # (category, model) -> native bbox (any candidates row / asset)
         for r in self.candidates:
             self.by_sr[(r["subtask"], r["role"])].append(r)
             self.by_key.setdefault((r["subtask"], r["role"], r["category"], r["model"]), r)
+            bbox = self._row_bbox(r)
+            if bbox is not None and r.get("kind") != "scene":
+                self.bbox_of_model.setdefault((r["category"], r["model"]), bbox)
         self.representatives = _read_csv(os.path.join(roles, "representatives.csv"))
         # pick -> role -> slot -> rows (several rows per slot for the roles the selection lists more than once, e.g.
         # the A3 support triplets); insertion order = sheet order
@@ -293,9 +343,14 @@ class ICL:
         # require sheets
         self.grasps = _read_csv(os.path.join(req, "grasps.csv"))
         self.grasps_ok: Dict[Tuple[str, str, str], List[Dict[str, str]]] = collections.defaultdict(list)
+        # per library key: the spawn scale its grasps were tested at and its rest orientation (``scale`` / ``rest_quat_wxyz``)
+        self.key_scale: Dict[str, Optional[List[float]]] = {}
+        self.key_rest: Dict[str, Optional[List[float]]] = {}
         for g in self.grasps:
             if self.grasp_row_admissible(g):
                 self.grasps_ok[(g["category"], g["model"], g["require"])].append(g)
+            self.key_scale.setdefault(g["key"], _parse_scale(g.get("scale") or ""))
+            self.key_rest.setdefault(g["key"], _parse_vec(g.get("rest_quat_wxyz") or ""))
         self.handles = _read_csv(os.path.join(req, "handles.csv"))
         self.handles_canonical: Dict[Tuple[str, str], List[Dict[str, str]]] = collections.defaultdict(list)
         self.handles_instance: Dict[Tuple[str, str], List[Dict[str, str]]] = collections.defaultdict(list)
@@ -315,6 +370,23 @@ class ICL:
 
     def row(self, subtask: str, role: str, category: str, model: str) -> Optional[Dict[str, str]]:
         return self.by_key.get((subtask, role, category, model))
+
+    @staticmethod
+    def _row_bbox(row: Dict[str, str]) -> Optional[List[float]]:
+        try:
+            bbox = [float(row[k]) for k in ("bbox_x", "bbox_y", "bbox_z")]
+        except (KeyError, TypeError, ValueError):
+            return None
+        return bbox if all(v > 0 for v in bbox) else None
+
+    def model_bbox(self, subtask: str, role: str, category: str, model: str) -> Optional[List[float]]:
+        """Native bounding box (m, canonical frame, scale 1) of a model: its candidates row of ``(subtask, role)``, else any
+        candidates row of the model, else the asset's ``bbox_size`` (sheet models without a candidates row: steaks, place mats)."""
+        row = self.row(subtask, role, category, model)
+        bbox = self._row_bbox(row) if row is not None else None
+        if bbox is None and (category, model) not in self.bbox_of_model:
+            self.bbox_of_model[(category, model)] = _asset_bbox(category, model)
+        return bbox or self.bbox_of_model.get((category, model))
 
     def kind_of(self, subtask: str, role: str) -> str:
         kinds = {r["kind"] for r in self.rows(subtask, role)}
@@ -1538,6 +1610,15 @@ class Grounder:
             if verdict.reason:
                 self.report.notes[comb.subtask].append(f"{alias}: next-model fallback candidate {row['category']}/{row['model']} ({row['slot']}) is {verdict.reason}")
                 continue
+            if comb.subtask in TARGET_FIT_SUBTASKS and "partner" in comb.roles:
+                primary = self.customs.entries.get(alias)
+                gen = primary.generation if primary is not None else G.defaults_for(comb.subtask)
+                p_re = (primary.roles.get("partner") if primary is not None else None) or RoleEntry()
+                fit = self._target_fit_verdict(iddl, gen, p_re, resolved["category"], resolved["model"], comb.roles["partner"].models, None)
+                if fit["status"] in ("pending_scaled_grasps", "below_floor"):
+                    self.report.notes[comb.subtask].append(f"{alias}: next-model fallback candidate {row['category']}/{row['model']} ({row['slot']}) "
+                                                           f"would be withheld by the target fit ({fit['status']}, x{fit['record']['scale']:.2f})")
+                    continue
             rp = RolePick("target", "sampleable", target.category, [(resolved["category"], resolved["model"])], pick_row=resolved,
                           joint=resolved.get("joint") or None, allow_heldout=True)
             fb = self._derive(comb, alias, 1, "next_model", {"model": resolved["model"], "slot": row["slot"], "primary_model": current[1]})
@@ -1808,6 +1889,10 @@ class Grounder:
                         base = re_.scale.get(key)
                         re_.scale[key] = [round(float(b) * s, 4) for b in base] if isinstance(base, list) else s
             re_.scale["default"] = s
+        if subtask in TARGET_FIT_SUBTASKS:
+            self._apply_target_fit(iddl, comb, entry, alias)
+        if subtask in HANDEDNESS_SUBTASKS:
+            self._write_handedness(entry, subtask, alias)
         return entry
 
     def _recheck_without_heldout(self, iddl: I.IDDL, role: str, row: Dict[str, str], scene: str) -> Verdict:
@@ -1819,15 +1904,24 @@ class Grounder:
         finally:
             self.icl.heldout_models |= saved
 
-    def _preferred_grasp_key(self, iddl: I.IDDL, role: str, cat: str, m: str, rp: RolePick, default: str, row: Optional[Dict[str, str]] = None) -> str:
-        """The library key of a model among its admissible keys for the role's pipeline: the key its candidates row names
-        (``grasp_key`` column) when admissible, else the pick's :data:`GRASP_KEY_SUFFIX_PREFERENCE`, else a spawn-scaled floating
-        key (``__sf``: grasps computed and attach-tested on the scaled mesh, owner 2026-10-11 - its ``scale`` comes with the
-        candidates row), else ``default`` (the alphabetically first)."""
+    def _admissible_keys(self, iddl: I.IDDL, role: str, cat: str, m: str) -> Set[str]:
         keys: Set[str] = set()
         for req in iddl.require_of(role):
             if req.kind == "grasps":
                 keys |= {r["key"] for r in self.icl.admissible_grasps(cat, m, req.pipeline or "")}
+        return keys
+
+    def _preferred_grasp_key(self, iddl: I.IDDL, role: str, cat: str, m: str, rp: RolePick, default: str, row: Optional[Dict[str, str]] = None,
+                             keys: Optional[Set[str]] = None) -> str:
+        """The library key of a model among its admissible keys for the role's pipeline (or among ``keys``): the key its candidates
+        row names (``grasp_key`` column) when admissible, else the pick's :data:`GRASP_KEY_SUFFIX_PREFERENCE`, else a spawn-scaled
+        floating key (``__sf``: grasps computed and attach-tested on the scaled mesh, owner 2026-10-11 - its ``scale`` comes with the
+        candidates row), else ``default`` (the alphabetically first)."""
+        if keys is None:
+            keys = set()
+            for req in iddl.require_of(role):
+                if req.kind == "grasps":
+                    keys |= {r["key"] for r in self.icl.admissible_grasps(cat, m, req.pipeline or "")}
         named = (row or {}).get("grasp_key") or ""
         if f"{named}__sf" in keys:  # the spawn-scaled floating key of the named one (owner 2026-10-11: the 2x thick teaspoon)
             return f"{named}__sf"
@@ -1846,9 +1940,8 @@ class Grounder:
         if v.grasp_key:
             re_.grasp_keys[key] = self._preferred_grasp_key(iddl, role, cat, m, rp, v.grasp_key, row)
         gk = re_.grasp_keys.get(key) or ""
-        key_scale = None
-        if gk.endswith("__sf"):  # a spawn-scaled key's grasps were tested at its scale: the model spawns at exactly that scale
-            key_scale = next((s for s in (_parse_scale(r.get("scale") or "") for r in self.icl.admissible_grasps(cat, m, "floating") if r.get("key") == gk) if s), None)
+        # a spawn-scaled key's grasps were tested at its scale (``__sf``, ``__s``, ``__st``, a target-fit key): the model spawns at exactly that scale
+        key_scale = self.icl.key_scale.get(gk) if gk else None
         if key_scale is not None:
             re_.scale[key] = key_scale
         scale = _parse_scale(row.get("scale") or "")
@@ -1865,6 +1958,198 @@ class Grounder:
             tags = self._orientation_equivalences(subtask, role, row)
             if tags is not None:
                 re_.orientation_equivalences[key] = tags
+
+    # -- owner rules 2026-10-11 of the IORS small-scale pairs: target fit scale, handedness --------------------------------------
+    @staticmethod
+    def _whitelisted(entry: CustomsEntry, role: str) -> List[Tuple[str, str]]:
+        return sorted({(c, m) for sc in entry.scenes.values() for c, ms in sc.whitelist.get(role, {}).items() for m in ms})
+
+    def _in_selection(self, subtask: str, role: str, cat: str, m: str) -> bool:
+        if self.opt.mode == "representative":
+            return any(r.get("category") == cat and r.get("model") == m for p, roles in self.icl.picks.items() if p.split("#")[0] == subtask
+                       for rows in roles.get(role, {}).values() for r in rows)
+        row = self.icl.row(subtask, role, cat, m)
+        return row is not None and self._marked(row)
+
+    def _shrunk_key(self, key: Optional[str], base: Optional[List[float]]) -> bool:
+        """``key``'s grasps were tested at a uniform shrink of ``base`` (None = unit): a target-fit key, never a model's own."""
+        f = PR.uniform_factor(self.icl.key_scale[key], base) if key and self.icl.key_scale.get(key) is not None else None
+        return f is not None and f < 1.0 - 1e-3
+
+    def _target_base(self, iddl: I.IDDL, cat: str, m: str, rp: Optional[RolePick]) -> Tuple[Optional[str], Optional[List[float]]]:
+        """The library key a target model gets at its own spawn scale and that scale (None = unit), as :meth:`_model_facts` derives
+        them, with the keys tested at a uniform shrink of it (target-fit keys) left out."""
+        row = self.icl.row(iddl.subtask, "target", cat, m) or {}
+        row_scale = _parse_scale(row.get("scale") or "")
+        keys = self._admissible_keys(iddl, "target", cat, m)
+        own = {k for k in keys if not self._shrunk_key(k, row_scale)}
+        if not own:
+            return None, row_scale
+        key = self._preferred_grasp_key(iddl, "target", cat, m, rp or RolePick("target", "sampleable"), sorted(own)[0], row or None, keys=own)
+        return key, self.icl.key_scale.get(key) or row_scale
+
+    def _target_fit_verdict(self, iddl: I.IDDL, gen: Dict[str, Any], p_re: RoleEntry, cat: str, m: str, partners: Sequence[Tuple[str, str]],
+                            rp: Optional[RolePick]) -> Dict[str, Any]:
+        """Fit of target ``cat/m`` with every partner it can be drawn with (``pair_rules``; thresholds from ``gen``): ``status`` =
+        ``fits`` / ``scaled`` (a key tested at the fit scale exists) / ``pending_scaled_grasps`` / ``below_floor`` / ``no_bbox``, the
+        model's own key and scale (``base_key`` / ``base_scale``) and, when it does not fit as is, the ``record`` for
+        ``generation.target_fit``."""
+        subtask = iddl.subtask
+        kind = TARGET_FIT_SUBTASKS[subtask]
+        base_key, base = self._target_base(iddl, cat, m, rp)
+        out: Dict[str, Any] = {"status": "fits", "base_key": base_key, "base_scale": base}
+        bbox = self.icl.model_bbox(subtask, "target", cat, m)
+        if bbox is None:
+            out["status"] = "no_bbox"
+            return out
+        t_ext = PR.rest_extents(bbox, base, self.icl.key_rest.get(base_key) if base_key else None)
+        worst = None
+        for pc, pm in partners:
+            pb = self.icl.model_bbox(subtask, "partner", pc, pm)
+            if pb is None:
+                continue
+            pkey = p_re.grasp_keys.get(C.model_key(pc, pm))
+            p_ext = PR.rest_extents(pb, _role_scale(p_re, pc, pm), self.icl.key_rest.get(pkey) if pkey else None)
+            if kind == "inside":
+                fit = PR.fit_inside(t_ext, p_ext, float(gen.get("opening_margin_m", 0.01)), float(gen.get("max_protrusion_fraction", 0.5)))
+            else:
+                fit = PR.fit_on_partner(t_ext, p_ext, float(gen.get("partner_footprint_margin_m", 0.01)), gen.get("fit_tiers") or PR.FIT_TIERS)
+            if worst is None or fit.scale < worst[1].scale:
+                worst = ((pc, pm), fit)
+        if worst is None or not worst[1].bigger:
+            return out
+        (pc, pm), fit = worst
+        s = PR.floor_scale(fit.scale)
+        floor = float(gen.get("target_fit_scale_min", PR.TARGET_FIT_SCALE_MIN))
+        unit = base or [1.0, 1.0, 1.0]
+        rec: Dict[str, Any] = {"rule": kind, "scale": s, "partner": C.model_key(pc, pm), "limit": fit.limit, **fit.facts,
+                               "base_scale": base, "spawn_scale": [round(b * s, 4) for b in unit]}
+        if s < floor - 1e-9:
+            rec.update(status="below_floor", scale_min=floor)
+        else:
+            best = None
+            for k in self._admissible_keys(iddl, "target", cat, m):
+                f = PR.uniform_factor(self.icl.key_scale.get(k), base) if self.icl.key_scale.get(k) is not None else None
+                if f is not None and floor - 1e-6 <= f <= s + 1e-6 and (best is None or f > best[1]):
+                    best = (k, f)
+            if best is not None:
+                rec.update(status="scaled", grasp_key=best[0], scale=round(best[1], 4), spawn_scale=list(self.icl.key_scale[best[0]]))
+            else:
+                pipeline = next((r.pipeline for r in iddl.require_of("target") if r.kind == "grasps"), None)
+                rec.update(status="pending_scaled_grasps", needs={"pipeline": pipeline, "base_key": base_key, "scale": rec["spawn_scale"]})
+        out.update(status=rec["status"], record=rec)
+        return out
+
+    def _set_target_facts(self, re_: RoleEntry, key: str, grasp_key: Optional[str], scale: Optional[List[float]]) -> None:
+        if grasp_key:
+            re_.grasp_keys[key] = grasp_key
+        else:
+            re_.grasp_keys.pop(key, None)
+        if scale is not None:
+            re_.scale[key] = list(scale)
+        else:
+            re_.scale.pop(key, None)
+
+    def _withhold_target(self, entry: CustomsEntry, subtask: str, cat: str, m: str, rec: Dict[str, Any]) -> None:
+        if rec["status"] == "below_floor":
+            code = "partner_too_small" if rec["rule"] == "on_partner" else "does_not_fit_inside"
+            text = f"{code} (needs x{rec['scale']:.2f} < {rec['scale_min']:.2f} to fit {rec['partner']})"
+        else:
+            code = f"pending_scaled_grasps:{(rec.get('needs') or {}).get('pipeline')}"
+            text = f"{code} (x{rec['scale']:.2f} to fit {rec['partner']})"
+        for se in entry.scenes.values():
+            if not se.is_blacklisted("target", cat, m):
+                se.blacklist_add("target", cat, m, self._reason(text))
+                self.report.blacklist[subtask][code] += 1
+
+    def _apply_target_fit(self, iddl: I.IDDL, comb: Combination, entry: CustomsEntry, alias: str) -> None:
+        """Owner 2026-10-11 (IORS small scale, ``pair_rules``): a whitelisted target model bigger than a whitelisted partner model
+        (ontop / under: the partner's top; inside: the opening) is shrunk before sampling - the largest uniform factor (0.01 steps)
+        that fits the smallest partner it can be drawn with (the sampler draws any target with any partner of the alias). The factor
+        needs a library key whose grasps were tested at that scale (``grasps.csv`` ``scale`` = the model's own scale x a factor in
+        [``target_fit_scale_min``, fit factor], the largest): ``roles.target.scale`` / ``grasp_keys`` then carry it. Without one the
+        model is withheld - blacklisted ``pending_scaled_grasps:<pipeline>``, never spawned scaled with grasps of another scale -, as
+        is a model that needs less than ``generation.target_fit_scale_min`` (the sampler's reason: ``partner_too_small`` /
+        ``does_not_fit_inside``). ``generation.target_fit`` records every model that does not fit as is (factor, bounding partner,
+        status, the key a grasp-library run must provide). A model withheld by an earlier combination (another slot of the alias)
+        or grounding is re-evaluated with the alias's partners of now: still too big -> withheld with the new factor; fitting now
+        -> back in the whitelist, as the whitelist union would have carried it."""
+        subtask = iddl.subtask
+        t_re, p_re = entry.roles.get("target"), entry.roles.get("partner")
+        if t_re is None or p_re is None:
+            return
+        prev = dict(entry.generation.get("target_fit") or {})
+        targets, partners = self._whitelisted(entry, "target"), self._whitelisted(entry, "partner")
+        carried: List[Tuple[str, str]] = []
+        for key, rec in prev.items():
+            cat, m = key.split("/", 1)
+            if rec.get("status") not in ("pending_scaled_grasps", "below_floor") or (cat, m) in targets or not self._in_selection(subtask, "target", cat, m):
+                continue
+            blocks = list(entry.scenes.values())
+            if blocks and all(se.is_blacklisted("target", cat, m) and not se.blacklist["target"][cat][m].split(": ", 1)[-1].startswith(
+                    ("pending_scaled_grasps", "partner_too_small", "does_not_fit_inside")) for se in blocks):
+                continue  # blacklisted for another reason everywhere (held out, no grasps): the record says nothing more
+            carried.append((cat, m))
+        records: Dict[str, Dict[str, Any]] = {}
+        for cat, m in targets + carried:
+            key = C.model_key(cat, m)
+            v = self._target_fit_verdict(iddl, entry.generation, p_re, cat, m, partners, comb.roles.get("target"))
+            restore = (prev.get(key) or {}).get("status") == "scaled" or (cat, m) in carried or self._shrunk_key(t_re.grasp_keys.get(key), v["base_scale"])
+            if v["status"] == "no_bbox":
+                self.report.notes[subtask].append(f"{alias}: target fit of {key} not checked (no bounding box in the icl or the asset)")
+            if v["status"] in ("fits", "no_bbox", "scaled") and (cat, m) in carried:
+                for se in entry.scenes.values():
+                    se.whitelist_add("target", cat, m)
+            if v["status"] in ("fits", "no_bbox"):
+                if restore:  # the earlier fit key / scale of this rule, or a model withheld before: the model's own key and scale
+                    self._set_target_facts(t_re, key, v["base_key"], v["base_scale"])
+                continue
+            rec = v["record"]
+            records[key] = rec
+            if v["status"] == "scaled":
+                self._set_target_facts(t_re, key, rec["grasp_key"], rec["spawn_scale"])
+                continue
+            if restore:
+                self._set_target_facts(t_re, key, v["base_key"], v["base_scale"])
+            self._withhold_target(entry, subtask, cat, m, rec)
+        if records:
+            entry.generation["target_fit"] = dict(sorted(records.items()))
+        else:
+            entry.generation.pop("target_fit", None)
+
+    def _write_handedness(self, entry: CustomsEntry, subtask: str, alias: str) -> None:
+        """Owner 2026-10-11 (nextto): ``generation.handedness`` = ``{"<category>/<model>": "left" | "right"}`` (:data:`HANDEDNESS`) of
+        every whitelisted target / partner model that has a hand; the sampler leaves the target on its own side of the partner (the
+        right shoe on the robot's right of the left shoe). A drawable same-hand pair and a model of a handed category without a hand
+        are reported."""
+        handed_cats = {c for c, _ in HANDEDNESS}
+        hands: Dict[str, str] = {}
+        by_role: Dict[str, Dict[str, str]] = {"target": {}, "partner": {}}
+        for role in by_role:
+            for cat, m in self._whitelisted(entry, role):
+                h = HANDEDNESS.get((cat, m))
+                if h:
+                    hands[C.model_key(cat, m)] = by_role[role][C.model_key(cat, m)] = h
+                elif cat in handed_cats:
+                    self.report.notes[subtask].append(f"{alias}: {role} {cat}/{m} has no hand in ground_isg.HANDEDNESS (its side is not enforced)")
+        for t, ht in by_role["target"].items():
+            for p, hp in by_role["partner"].items():
+                if t != p and ht == hp:  # one model is never drawn in both roles
+                    self.report.notes[subtask].append(f"{alias}: target {t} and partner {p} are both {ht} (the sampler rejects the pair: handedness_pair)")
+        if hands:
+            entry.generation["handedness"] = dict(sorted(hands.items()))
+        else:
+            entry.generation.pop("handedness", None)
+
+    def _report_target_fit(self, subtask: str) -> None:
+        """One report note per model of ``generation.target_fit`` of the aliases this run produced for ``subtask`` (final state)."""
+        for alias in sorted({gp.alias for gp in self.grounded if gp.subtask == subtask}):
+            entry = self.customs.entries.get(alias)
+            for key, rec in sorted(((entry.generation.get("target_fit") or {}) if entry is not None else {}).items()):
+                need = rec.get("needs")
+                what = {"scaled": f"key {rec.get('grasp_key')}", "below_floor": f"withheld, below target_fit_scale_min {rec.get('scale_min')}",
+                        "pending_scaled_grasps": f"withheld, needs {(need or {}).get('pipeline')} grasps of {(need or {}).get('base_key')} at {(need or {}).get('scale')}"}
+                self.report.notes[subtask].append(f"{alias}: target fit {key} x{rec['scale']:.2f} ({rec['partner']}): {what.get(rec['status'], rec['status'])}")
 
     @staticmethod
     def _orientation_equivalences(subtask: str, role: str, row: Dict[str, str]) -> Optional[List[str]]:
@@ -1914,6 +2199,8 @@ class Grounder:
                             self.report.tests.append(f"{gp.alias} @ {sc}: {outcome}")
             self._supersede_stale_primaries(subtask)
             self._prune_stale_scene_blocks(subtask)
+            if subtask in TARGET_FIT_SUBTASKS:
+                self._report_target_fit(subtask)
             if subtask in WALL_SUBTASKS:
                 self._write_dormant_wall_frames(subtask)
             if self.opt.reseed_generation:
