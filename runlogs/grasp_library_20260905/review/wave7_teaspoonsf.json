@@ -1,0 +1,42 @@
+{
+ "batch": "wave7_teaspoonsf (2026-10-11, teaspoonsf worker on strips/teaspoon__eilfij__sf.png with review_prompt.md, not the reviewer pool)",
+ "models": [
+  {
+   "key": "teaspoon__eilfij__sf",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diagonal pinch at neck/bowl junction, handle angled up past palm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl, handle angled down"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on rear of bowl"
+    }
+   ],
+   "object_note": "thickness x2 (scale [1, 1, 2.0]); pads on the visual surface in every profile view"
+  }
+ ]
+}

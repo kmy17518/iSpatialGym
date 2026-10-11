@@ -59220,11 +59220,18 @@
      "grasps": "floating"
     },
     "representative": "eilfij",
+    "scale": {
+     "teaspoon/eilfij": [
+      1.0,
+      1.0,
+      2.0
+     ]
+    },
     "orientation_equivalences": {
      "teaspoon/eilfij": []
     },
     "grasp_keys": {
-     "teaspoon/eilfij": "teaspoon__eilfij"
+     "teaspoon/eilfij": "teaspoon__eilfij__sf"
     }
    },
    "floor": {

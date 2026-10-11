@@ -1829,6 +1829,8 @@ class Grounder:
             if req.kind == "grasps":
                 keys |= {r["key"] for r in self.icl.admissible_grasps(cat, m, req.pipeline or "")}
         named = (row or {}).get("grasp_key") or ""
+        if f"{named}__sf" in keys:  # the spawn-scaled floating key of the named one (owner 2026-10-11: the 2x thick teaspoon)
+            return f"{named}__sf"
         if named in keys:
             return named
         suffix = GRASP_KEY_SUFFIX_PREFERENCE.get((rp.pick_row or {}).get("pick") or "")
@@ -1843,6 +1845,12 @@ class Grounder:
         subtask = iddl.subtask
         if v.grasp_key:
             re_.grasp_keys[key] = self._preferred_grasp_key(iddl, role, cat, m, rp, v.grasp_key, row)
+        gk = re_.grasp_keys.get(key) or ""
+        key_scale = None
+        if gk.endswith("__sf"):  # a spawn-scaled key's grasps were tested at its scale: the model spawns at exactly that scale
+            key_scale = next((s for s in (_parse_scale(r.get("scale") or "") for r in self.icl.admissible_grasps(cat, m, "floating") if r.get("key") == gk) if s), None)
+        if key_scale is not None:
+            re_.scale[key] = key_scale
         scale = _parse_scale(row.get("scale") or "")
         if scale is not None and key not in re_.scale:
             re_.scale[key] = scale

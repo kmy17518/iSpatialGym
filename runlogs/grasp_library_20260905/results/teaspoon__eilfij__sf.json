@@ -1,0 +1,267 @@
+{
+ "task": "mental_rotation",
+ "relation": null,
+ "category": "teaspoon",
+ "model": "eilfij",
+ "key": "teaspoon__eilfij__sf",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.18670419311523437,
+  0.043103225708007814,
+  0.01108286190032959
+ ],
+ "ready": true,
+ "base_key": "teaspoon__eilfij",
+ "scale": [
+  1.0,
+  1.0,
+  2.0
+ ],
+ "scale_rule": "thickness_only",
+ "bbox_scaled": [
+  0.1867,
+  0.0431,
+  0.0222
+ ],
+ "orig_n_valid": 5,
+ "provenance": {
+  "decision": "owner 2026-10-11: scale teaspoon/eilfij thickness (local z) x2.0 through the grasp-tested spawn-scale route; teaspoon__eilfij pinches 3.1-4.2 mm and 4 of 6 mental-rotation attempts failed 'assisted grasping did not attach (both pads in contact)'",
+  "isg_commit": "d8457e78",
+  "b1k_commit": "6a6194600",
+  "scripts": "isg_home/eval85/scratch_teaspoonsf/scripts = runlogs/grasp_library_20260905/scripts with cluster paths; ag_validate_render.py: env.robots[0][0] (vectorized env), 6 render frames per view",
+  "mode": "C = build_rounds.method_for('mental_rotation', None, 'teaspoon'), the mode the round-2/3 builder gave every __sf key; round 1's curated plan gives teaspoon H (confidence-first), which on the scaled mesh ranks 4-5 mm handle-end pinches first",
+  "graspgen": "same GraspGen output and scaled mesh as the mode H run (glib/graspgen, glib/meshes)"
+ },
+ "candidates_meta": {
+  "object": {
+   "category": "teaspoon",
+   "model": "eilfij"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 147,
+   "n_lever": 22,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0086,
+    0.0005,
+    0.0002
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0089,
+    0.0
+   ],
+   "score": 19.2357,
+   "meta": {
+    "com_perp": 0.00093,
+    "width": 0.00865,
+    "antipodal": 0.93482,
+    "coverage": 0.5,
+    "clearance": 0.03116,
+    "tilt_deg": 47.08217,
+    "graspgen_conf": 0.94991
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g0_wrist.png"
+   },
+   "t_s": 17.43
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0114,
+    0.0
+   ],
+   "score": 18.1472,
+   "meta": {
+    "com_perp": 0.0075,
+    "width": 0.00592,
+    "antipodal": 0.77736,
+    "coverage": 0.25,
+    "clearance": 0.02314,
+    "tilt_deg": 73.33299,
+    "graspgen_conf": 0.93108
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g1_wrist.png"
+   },
+   "t_s": 3.92
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 18.1173,
+   "meta": {
+    "com_perp": 0.01736,
+    "width": 0.00415,
+    "antipodal": 0.77587,
+    "coverage": 1.0,
+    "clearance": 0.03631,
+    "tilt_deg": 120.18979,
+    "graspgen_conf": 0.94749
+   },
+   "frames": {},
+   "t_s": 6.04
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0075,
+    0.0
+   ],
+   "score": 18.0901,
+   "meta": {
+    "com_perp": 0.01172,
+    "width": 0.00493,
+    "antipodal": 0.80988,
+    "coverage": 0.5,
+    "clearance": 0.03408,
+    "tilt_deg": 97.1347,
+    "graspgen_conf": 0.94543
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g3_wrist.png"
+   },
+   "t_s": 3.78
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0114,
+    0.0
+   ],
+   "score": 18.0184,
+   "meta": {
+    "com_perp": 0.00823,
+    "width": 0.00626,
+    "antipodal": 0.70772,
+    "coverage": 0.25,
+    "clearance": 0.02982,
+    "tilt_deg": 80.25994,
+    "graspgen_conf": 0.93451
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g4_wrist.png"
+   },
+   "t_s": 3.86
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 17.8455,
+   "meta": {
+    "com_perp": 0.02173,
+    "width": 0.00479,
+    "antipodal": 0.79191,
+    "coverage": 1.0,
+    "clearance": 0.03296,
+    "tilt_deg": 78.1393,
+    "graspgen_conf": 0.95746
+   },
+   "frames": {},
+   "t_s": 6.02
+  },
+  {
+   "grasp": "grasp_6",
+   "idx": 6,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0168,
+    0.0
+   ],
+   "score": 17.3365,
+   "meta": {
+    "com_perp": 0.01535,
+    "width": 0.00966,
+    "antipodal": 0.58424,
+    "coverage": 0.25,
+    "clearance": 0.0265,
+    "tilt_deg": 31.59209,
+    "graspgen_conf": 0.95201
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g6_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g6_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g6_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_teaspoonsf/glib_modeC/frames/teaspoon__eilfij__sf/g6_wrist.png"
+   },
+   "t_s": 3.87
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 56.2
+}

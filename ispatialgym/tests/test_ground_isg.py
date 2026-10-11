@@ -824,7 +824,9 @@ def test_grasp_key_preference_named_then_pick_suffix_then_scaled_floating():
     pref = lambda c, m, pick, row=None: GI.Grounder._preferred_grasp_key(fake, iddl, "target", c, m, types.SimpleNamespace(pick_row={"pick": pick}),
                                                                          sorted(k for k in keys if k.startswith(f"{c}__{m}"))[0], row)
     assert pref("teaspoon", "eilfij", "mental_rotation#09") == "teaspoon__eilfij__sf"
-    assert pref("teaspoon", "eilfij", "mental_rotation#09", {"grasp_key": "teaspoon__eilfij"}) == "teaspoon__eilfij"
+    # the sheet names the unscaled key (mental_rotation#03 row): its spawn-scaled floating key outranks it
+    assert pref("teaspoon", "eilfij", "mental_rotation#09", {"grasp_key": "teaspoon__eilfij"}) == "teaspoon__eilfij__sf"
+    assert pref("hardback", "acbrnv", "inter_object_relation_satisfaction-touching#01", {"grasp_key": "hardback__acbrnv__bu"}) == "hardback__acbrnv__bu"
     assert pref("hardback", "acbrnv", "inter_object_relation_satisfaction-touching#03") == "hardback__acbrnv__bu"
     assert pref("hardback", "acbrnv", "inter_object_relation_satisfaction-touching#01") == "hardback__acbrnv__bo"
     assert pref("teaspoon", "eilfij", "x", {"grasp_key": "teaspoon__eilfij__missing"}) == "teaspoon__eilfij__sf"  # a named key that is not admissible is ignored
