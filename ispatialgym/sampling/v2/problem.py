@@ -298,6 +298,8 @@ class GroundedProblem:
         self.entry.setdefault("constraints", [])
         self.entry.setdefault("scenes", {})
         self.entry.setdefault("generation", {})
+        #: scene -> the entry's own block (None: the entry had none) of every scene block :meth:`override_scene_room` replaced
+        self.scene_overrides: Dict[str, Optional[Dict[str, Any]]] = {}
 
     # -- loading ------------------------------------------------------------------------------------------------
     @classmethod
@@ -438,6 +440,45 @@ class GroundedProblem:
     def bindings(self, scene: str) -> Dict[str, Any]:
         return dict(self.entry["scenes"][scene].get("bindings") or {})
 
+    def floor_only(self) -> bool:
+        """The only scene role is the floor (held-object tasks, camera relocalization): the alias can be sampled in any room."""
+        return set(self.scene_roles()) <= {"floor"}
+
+    def override_scene_room(self, scene: str, room: str, note: str = "") -> bool:
+        """Sample ``scene`` in ``room`` (``sample_isg --room`` / ``--scene-from-split``, ``multiply_isg --split train``): the scene's
+        block becomes ``rooms [room]``, ``bindings.floor {room}``, the whitelist / blacklist of the entry's block for the scene (else
+        of its first scene) and ``_synthesized = note``; asking for the room of the entry's own block restores that block. Only for
+        aliases whose only scene role is the floor (``GroundingError`` otherwise). The entry's own block is what the source customs
+        file gets back (:meth:`save_customs`). Returns True when the block is synthesized."""
+        if not self.floor_only():
+            raise GroundingError(f"{self.alias}: a room override needs an alias whose only scene role is the floor (scene roles {self.scene_roles()})")
+        scenes = self.entry["scenes"]
+        own = self.scene_overrides[scene] if scene in self.scene_overrides else scenes.get(scene)
+        if own is not None and _block_room(own) == room:
+            if scene in self.scene_overrides:
+                scenes[scene] = self.scene_overrides.pop(scene)
+            return False
+        if scene not in self.scene_overrides:
+            self.scene_overrides[scene] = copy.deepcopy(own)
+        src = own if own is not None else next(iter(self.own_scenes().values()), {})
+        scenes[scene] = {"rooms": [room], "bindings": {"floor": {"room": room}}, "whitelist": copy.deepcopy(src.get("whitelist") or {}),
+                         "blacklist": copy.deepcopy(src.get("blacklist") or {}), "_synthesized": note or f"room {room}"}
+        return True
+
+    def own_scenes(self) -> Dict[str, Dict[str, Any]]:
+        """``scenes`` as the entry has them, without the blocks :meth:`override_scene_room` synthesized."""
+        out = {}
+        for sc, sd in self.entry["scenes"].items():
+            own = self.scene_overrides[sc] if sc in self.scene_overrides else sd
+            if own is not None:
+                out[sc] = own
+        return out
+
+    def room_tag(self, scene: str) -> Optional[str]:
+        """The room of a synthesized scene block (part of its template ids: one scene, several rooms); None otherwise."""
+        sd = self.entry["scenes"].get(scene) or {}
+        return (list(sd.get("rooms") or []) or [None])[0] if sd.get("_synthesized") else None
+
     def whitelist(self, scene: str, role: str) -> Dict[str, List[str]]:
         """``{category: [models]}`` admitted for ``role`` in ``scene`` (the blacklist already removed)."""
         sd = self.entry["scenes"].get(scene) or {}
@@ -516,15 +557,20 @@ class GroundedProblem:
         return list(self.bddl.objects.get(synset, []))
 
     def save_customs(self, path: Optional[str] = None) -> str:
-        """Write the (possibly updated) entry back into the customs file it came from (§9: blacklists, constraints)."""
+        """Write the (possibly updated) entry back into the customs file it came from (§9: blacklists, constraints). A scene block
+        synthesized by :meth:`override_scene_room` goes to other files (the copy under ``--out``) only: the source file keeps the
+        entry's own blocks."""
         path = path or self.customs_path
         if path is None:
             raise GroundingError("no customs path to save to")
+        entry = self.entry
+        if self.scene_overrides and (self.customs_path is None or os.path.abspath(path) == os.path.abspath(self.customs_path)):
+            entry = {**self.entry, "scenes": self.own_scenes()}
         data = {}
         if os.path.exists(path):
             with open(path) as f:
                 data = json.load(f)
-        data[self.alias] = self.entry
+        data[self.alias] = entry
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f, indent=1)
@@ -535,6 +581,16 @@ class GroundedProblem:
         """Hash of the entry (whitelists, generation, bindings; constraints excluded) recorded in the TRO / template_meta."""
         e = {k: v for k, v in self.entry.items() if k not in ("constraints",)}
         return sha256_of_text(json.dumps(e, sort_keys=True, default=str))
+
+
+def _block_room(block: Dict[str, Any]) -> Optional[str]:
+    """The one room of a scene block (``rooms == [room]``, a floor binding if any in that room); None when it has several."""
+    rooms = list(block.get("rooms") or [])
+    floor = (block.get("bindings") or {}).get("floor")
+    floor_room = floor.get("room") if isinstance(floor, dict) else None
+    if len(rooms) == 1 and floor_room in (None, rooms[0]):
+        return rooms[0]
+    return floor_room if not rooms else None
 
 
 def _load_iddl(path: Optional[str]):
@@ -564,13 +620,15 @@ def _load_iddl(path: Optional[str]):
 class TemplateChoice:
     """Models of one template: ``models`` per sampleable role, ``groups`` member lists per group role (``size`` drawn),
     the scene and its ``bindings`` / ``rooms``. ``choices`` is the v1 ``{role: ModelChoice}`` view (group members as
-    ``<role>[i]``) for the ``TaskSampler`` machinery; ``template_id`` follows spec §1."""
+    ``<role>[i]``) for the ``TaskSampler`` machinery; ``template_id`` follows spec §1, with ``room-<room>`` after the scene
+    when the room is not the customs entry's (``room_tag``: :meth:`GroundedProblem.room_tag`)."""
 
     scene: str
     models: Dict[str, ModelChoice]
     groups: Dict[str, List[ModelChoice]] = field(default_factory=dict)
     bindings: Dict[str, Any] = field(default_factory=dict)
     rooms: List[str] = field(default_factory=list)
+    room_tag: Optional[str] = None
 
     @property
     def choices(self) -> Dict[str, ModelChoice]:
@@ -599,18 +657,19 @@ class TemplateChoice:
             tags = {scale_tag(m.scale) for m in members}
             tag = tags.pop() if len(tags) == 1 else ""
             parts.append(f"{role}-" + "-".join(f"{c}_{len(ms)}" for c, ms in sorted(cats.items())) + tag)
-        return "__".join([self.scene] + parts) if parts else self.scene
+        return "__".join([self.scene] + ([f"room-{self.room_tag}"] if self.room_tag else []) + parts)
 
     def to_json(self) -> Dict[str, Any]:
         return {"scene": self.scene, "rooms": list(self.rooms), "bindings": self.bindings,
                 "models": {r: c.__dict__ for r, c in self.models.items()},
-                "groups": {r: [m.__dict__ for m in ms] for r, ms in self.groups.items()}, "template_id": self.template_id}
+                "groups": {r: [m.__dict__ for m in ms] for r, ms in self.groups.items()}, "template_id": self.template_id,
+                **({"room_tag": self.room_tag} if self.room_tag else {})}
 
     @staticmethod
     def from_json(d: Dict[str, Any]) -> "TemplateChoice":
         return TemplateChoice(d["scene"], {r: ModelChoice(**c) for r, c in d["models"].items()},
                               {r: [ModelChoice(**m) for m in ms] for r, ms in (d.get("groups") or {}).items()}, dict(d.get("bindings") or {}),
-                              list(d.get("rooms") or []))
+                              list(d.get("rooms") or []), d.get("room_tag"))
 
 
 class ModelCycler:
@@ -805,7 +864,7 @@ def iter_template_choices(problem: GroundedProblem, scene: str, rng, constraints
         if not ok:
             continue
         produced.add(key)
-        yield TemplateChoice(scene, models, groups, problem.bindings(scene), problem.rooms(scene))
+        yield TemplateChoice(scene, models, groups, problem.bindings(scene), problem.rooms(scene), problem.room_tag(scene))
 
 
 # ----------------------------------------------------------------------------------------------------------------

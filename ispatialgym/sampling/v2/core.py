@@ -230,6 +230,9 @@ class SamplerV2(TaskSampler):
     #: settle steps of §3.5 (90 + 10 in ``SimWorld.settle``); goal check 120
     DEFAULT_SETTLE_STEPS = 90
     GOAL_SETTLE_STEPS = 120
+    #: ``(tro_path) -> None | why`` run on every instance just written (``multiply_isg --split train``: the train-repeat rule against
+    #: the eval instances, ``instance_separation.repeat_filter``); a why removes the instance and rejects the attempt (``repeats_eval``)
+    instance_filter: Optional[Callable[[str], Optional[str]]] = None
 
     def __init__(self, ctx: ContextV2):
         self.ctx2 = ctx
@@ -997,6 +1000,21 @@ class SamplerV2(TaskSampler):
             source = {"action": last.get("name"), "index": last.get("index"), "witness": None, "stance": last.get("stance")}
         return q, tuple(float(v) for v in stance.base_pose2d), source
 
+    def check_instance_filter(self, tro_path: str) -> None:
+        """:attr:`instance_filter` on the instance just written: when it gives a reason the instance's files are removed and the
+        attempt is rejected (``repeats_eval``)."""
+        if self.instance_filter is None:
+            return
+        why = self.instance_filter(tro_path)
+        if not why:
+            return
+        for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), tro_path.replace("-tro_state.json", ".summary.json")):
+            if os.path.exists(p):
+                os.remove(p)
+        if not self.instance_seeds:
+            self.template_meta.pop("stances", None)
+        raise Reject("repeats_eval", str(why))
+
     def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
         """Pre-generation goal-image occlusion (``ispatialgym.eval.goal_occlusion``): the goal state as the goal check
         settled it (its settled poses, the goal joints) with the robot where the program check ends
@@ -1135,20 +1153,23 @@ class SamplerV2(TaskSampler):
             return 0
         return len([f for f in os.listdir(d) if f.endswith("-tro_state.json")])
 
-    def run_instances(self, n: int, max_attempts: int = 30, start_index: Optional[int] = None) -> List[str]:
+    def run_instances(self, n: int, max_attempts: int = 30, start_index: Optional[int] = None, indices: Optional[Sequence[int]] = None) -> List[str]:
         """Per attempt: sample (task module) -> apply -> settle + BEHAVIOR validation -> goal feasibility (robot parked per
         §3.3) -> ``after_goal_check`` -> program check -> TRO + sidecar -> constraints write-back. Rejections are counted
-        per reason with the first three examples. Returns the TRO paths written."""
+        per reason with the first three examples. ``indices``: the instance indices to sample (default ``n`` from ``start_index``,
+        else after the instances written). Returns the TRO paths written."""
         written: List[str] = []
-        start = self.existing_instances() if start_index is None else int(start_index)
+        if indices is None:
+            start = self.existing_instances() if start_index is None else int(start_index)
+            indices = range(start, start + int(n))
         deadline = getattr(self, "deadline", None)
         out_of_time = False
-        for index in range(start, start + int(n)):
+        for i_index, index in enumerate(indices):
             ok = False
             for attempt in range(max_attempts):
                 # the alias's time budget (sample_isg --time-budget-s) ends the run between attempts only: an attempt in progress
                 # always finishes, and a template whose setup finished gets its first attempt
-                if deadline is not None and time.time() >= deadline and (attempt > 0 or index > start):
+                if deadline is not None and time.time() >= deadline and (attempt > 0 or i_index > 0):
                     out_of_time = True
                     self.counters["time_budget_stops"] = self.counters.get("time_budget_stops", 0) + 1
                     log.warning("%s: time budget used up; no attempt %d of instance %d", self.gp.alias, attempt, index)
@@ -1192,6 +1213,8 @@ class SamplerV2(TaskSampler):
                     draft.summary["kit"] = self.kit.stats_delta(k0, self.kit.stats_snapshot())
                     draft.summary["attempt"] = attempt
                     path = self.write_instance(draft, index, seed)
+                    phase = "instance_filter"
+                    self.check_instance_filter(path)
                     phase = "goal_occlusion"
                     self.check_goal_occlusion(draft, path)
                     self.constraints_write_back(draft, self.instance_id(index))

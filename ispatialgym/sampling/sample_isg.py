@@ -4,7 +4,8 @@
 Example::
 
     OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_isg --alias <alias> [--customs task_custom_lists.json] \
-        [--scene house_single_floor] [--templates 3] [--instances-per-template 1] [--seed 0] [--out <root>]
+        [--scene house_single_floor [--room living_room_0]] [--templates 3] [--instances-per-template 1] \
+        [--seed 0 | --seed-split eval [--seed-index 0] [--scene-from-split]] [--out <root>]
 
 Per alias: ``GroundedProblem.load`` (customs entry + grounded BDDL) -> per candidate scene: one OmniGibson world (reused
 across the templates of a scene, chairs within 1 m of the support removed as a scene variant) -> the §9 model draw
@@ -19,6 +20,14 @@ the copy under ``<out>/task_custom_lists.json`` is refreshed. The run ends with 
 ``--time-budget-s`` (owner 2026-10-11): a per-alias budget, times ``generation.time_budget_factor`` (block design 1.5).
 Past it no new attempt, template or scene starts (``aliases.<alias>.time_budget_exhausted``, the template counter
 ``time_budget_stops``); an attempt in progress always finishes, so a run is only cut off while it keeps failing.
+
+Splits (owner 2026-10-11, ``split_seeds``): without ``--seed``, ``--seed-split eval|train [--seed-index k]`` gives every alias
+its own seed ``split_seed(split, alias, k)`` (k: the k-th next seed, for a re-sampled offender). ``--scene-from-split`` also
+draws the (scene, room) of the held-object aliases (object scaling, mental rotation) - ``draw_scene_room(split, alias, k)`` -
+the other aliases keep their customs scenes. ``--scene S --room R`` samples a floor-only alias in room R of S, listed in its
+customs entry or not: the scene block becomes ``rooms [R]``, ``bindings.floor {room: R}`` (``GroundedProblem.override_scene_room``,
+template id ``<S>__room-<R>__...``; the source customs file keeps the entry's own blocks). ``aliases.<alias>.split`` of the
+summary (and ``template_meta.split``) records the split, index, seed and where the seed / scene / room came from.
 
 ``--v1-spec <spec.json> --v1-problem <activity>-<def_id> --subtask <id>`` builds the grounded problem from a v1 spec
 entry through the facade (``GroundedProblem.from_v1_spec``) until ``ground_isg`` (D1) produces customs entries.
@@ -42,6 +51,7 @@ os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 import numpy as np  # noqa: E402
 
 from ispatialgym import REPO_ROOT  # noqa: E402
+from ispatialgym.sampling import split_seeds as SS  # noqa: E402
 from ispatialgym.sampling.v2 import SAMPLER_VERSION  # noqa: E402
 from ispatialgym.sampling.v2.problem import (  # noqa: E402
     DEFAULT_CUSTOMS,
@@ -243,10 +253,13 @@ class WorldPool:
 
 def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, out_root: str, n_instances: int, seed: int, max_attempts: int,
                  variant: Optional[str] = None, customs_sha256: Optional[str] = None, start_index: Optional[int] = None,
-                 deadline: Optional[float] = None) -> Dict[str, Any]:
+                 deadline: Optional[float] = None, indices: Optional[List[int]] = None, instance_filter=None,
+                 meta_extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Build the sampler of the alias's subtask for ``choice``, run ``setup()`` + ``run_instances``; returns the
     ``problems.<alias>.<template_id>`` summary entry (``error`` set when setup raised). ``deadline``: the alias's time
-    budget (``time.time()`` value), honoured between attempts (``SamplerV2.run_instances``)."""
+    budget (``time.time()`` value), honoured between attempts (``SamplerV2.run_instances``); ``indices``: the instance indices
+    (default ``n_instances`` from ``start_index``); ``instance_filter``: ``SamplerV2.instance_filter``; ``meta_extra``: keys added
+    to ``template_meta``."""
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2.core import ContextV2, get_sampler
 
@@ -256,9 +269,11 @@ def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, o
     ctx = ContextV2(problem, choice, world, kit, out_dir, base_seed=seed, customs_sha256=customs_sha256, variant=variant)
     sampler = get_sampler(problem.subtask)(ctx)
     sampler.deadline = deadline
+    sampler.instance_filter = instance_filter
+    sampler.template_meta.update(meta_extra or {})
     try:
         sampler.setup()
-        written = sampler.run_instances(n_instances, max_attempts=max_attempts, start_index=start_index)
+        written = sampler.run_instances(n_instances, max_attempts=max_attempts, start_index=start_index, indices=indices)
         entry = sampler.template_summary(len(written), time.time() - t0)
         entry["written"] = [os.path.relpath(p, out_root) for p in written]
         return entry
@@ -331,12 +346,19 @@ def main(argv=None, shutdown: bool = True):
                         help="customs JSON (default: $ISG_CUSTOMS, else the shared assets list) — an A/B run points this at a copy")
     parser.add_argument("--bddl-root", default=None, help="activity_definitions root of the grounded BDDL (default: assets)")
     parser.add_argument("--scene", default=None, help="restrict to one scene")
+    parser.add_argument("--room", default=None, help="with --scene: sample floor-only aliases in this room of the scene (customs entry or not)")
+    parser.add_argument("--scene-from-split", action="store_true",
+                        help="held-object aliases: (scene, room) = split_seeds.draw_scene_room(--seed-split, alias, --seed-index); the other "
+                             "aliases keep their customs scenes")
     parser.add_argument("--templates", type=int, default=None, help="templates per alias and scene (default: generation.templates_max)")
     parser.add_argument("--instances-per-template", type=int, default=None, help="default: generation.instances_per_template")
     parser.add_argument("--start-index", type=int, default=None,
                         help="first instance index of every template (default: the number already written under --out); "
                              "processes with the same --seed and disjoint index ranges write disjoint instances")
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=None, help="one seed for every alias (default: the split seed with --seed-split, else 0)")
+    parser.add_argument("--seed-split", choices=SS.SPLITS, default=None,
+                        help="without --seed: every alias gets split_seeds.split_seed(<split>, alias, --seed-index)")
+    parser.add_argument("--seed-index", type=int, default=0, help="k of the split seed / scene draw: the k-th next seed (re-sampled offenders)")
     parser.add_argument("--out", default=DEFAULT_OUT)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--max-attempts", type=int, default=30)
@@ -353,6 +375,12 @@ def main(argv=None, shutdown: bool = True):
                                                                  "scheduler groups aliases with equal keys into one process")
     parser.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = parser.parse_args(argv)
+    if args.room and not args.scene:
+        parser.error("--room needs --scene")
+    if args.scene_from_split and (args.scene or args.room or not args.seed_split):
+        parser.error("--scene-from-split needs --seed-split and excludes --scene / --room")
+    if args.seed_index < 0:
+        parser.error("--seed-index must be >= 0")
 
     configure_logging(args.log_level)
     if args.world_key:
@@ -406,13 +434,16 @@ def main(argv=None, shutdown: bool = True):
 
 
 def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs_copy: str, customs_sha: Optional[str]) -> None:
-    """All templates of one alias (every candidate scene unless ``--scene``): world from the pool (reused when the world key
-    matches), the §9 model draw, one ``run_template`` per choice, whitelist pruning, customs write-back."""
+    """All templates of one alias (every candidate scene unless ``--scene`` / ``--scene-from-split``; seed per :func:`alias_split`):
+    world from the pool (reused when the world key matches), the §9 model draw, one ``run_template`` per choice, whitelist pruning,
+    customs write-back."""
     args.alias = alias
     t_alias = time.time()
     gp = load_problem_from_args(args)
-    scenes = [args.scene] if args.scene else gp.scene_names()
-    rng = np.random.default_rng(args.seed)
+    seed, split = alias_split(args, gp)
+    report["aliases"].setdefault(alias, {})["split"] = split
+    scenes = [split["scene"]] if split.get("scene") else gp.scene_names()
+    rng = np.random.default_rng(seed)
     n_inst = args.instances_per_template if args.instances_per_template is not None else int(gp.gen("instances_per_template", 5))
     deadline = None
     if args.time_budget_s is not None:
@@ -446,8 +477,8 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
                 continue
             if os.path.exists(out_dir) and args.overwrite:
                 shutil.rmtree(out_dir)
-            entry = run_template(gp, choice, world, kit, args.out, n_inst, args.seed * 7919 + ti, args.max_attempts, args.variant, customs_sha,
-                                 start_index=args.start_index, deadline=deadline)
+            entry = run_template(gp, choice, world, kit, args.out, n_inst, seed * 7919 + ti, args.max_attempts, args.variant, customs_sha,
+                                 start_index=args.start_index, deadline=deadline, meta_extra={"split": split})
             if (entry.get("counters") or {}).get("time_budget_stops"):
                 report["aliases"].setdefault(alias, {})["time_budget_exhausted"] = True
             report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
@@ -460,6 +491,32 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
             if not args.no_write_back and gp.customs_path:
                 gp.save_customs()  # §1: sample_isg appends blacklists / constraints to the source customs list
             gp.save_customs(customs_copy)  # the copy under <out> always carries what this run learned
+
+
+def alias_split(args, gp: GroundedProblem) -> Tuple[int, Dict[str, Any]]:
+    """The alias's seed and its ``aliases.<alias>.split`` record. Seed: ``--seed``, else ``split_seed(--seed-split, alias,
+    --seed-index)``, else 0. Scene / room: ``--scene-from-split`` (held-object aliases: ``draw_scene_room``; the others keep their
+    customs scenes), else ``--scene`` [``--room``], else the customs scenes; a room overrides the scene block of the problem
+    (``GroundedProblem.override_scene_room``)."""
+    k = int(args.seed_index or 0)
+    if args.seed is not None:
+        seed, source = int(args.seed), "--seed"
+    elif args.seed_split:
+        seed, source = SS.split_seed(args.seed_split, gp.alias, k), "split"
+    else:
+        seed, source = 0, "default"
+    rec: Dict[str, Any] = {"split": args.seed_split, "index": k if args.seed_split else None, "seed": seed, "seed_source": source,
+                           "scene": args.scene, "room": args.room, "scene_source": ("--scene --room" if args.room else "--scene") if args.scene else "customs"}
+    if args.scene_from_split:
+        if SS.scene_draw_applies(gp.subtask):
+            rec["scene"], rec["room"] = SS.draw_scene_room(args.seed_split, gp.alias, k)
+            rec["scene_source"] = "split"
+        else:
+            rec["scene_source"] = f"customs (no scene draw for {gp.subtask})"
+    if rec["room"]:
+        note = f"sample_isg {rec['scene_source']}" + (f" ({args.seed_split} k={k})" if rec["scene_source"] == "split" else "")
+        rec["room_override"] = gp.override_scene_room(rec["scene"], rec["room"], note=note)
+    return seed, rec
 
 
 def time_budget_factor(gp: GroundedProblem) -> float:
@@ -477,15 +534,17 @@ def time_budget_factor(gp: GroundedProblem) -> float:
 
 def print_world_keys(args) -> None:
     """``--world-key``: one ``<alias>\\t<scene>|rooms=...|removed=...`` line per (alias, candidate scene) from the customs
-    entry and the stable scene json; no simulator. Aliases with equal keys can share one ``sample_isg`` process."""
+    entry and the stable scene json (with ``--room`` / ``--scene-from-split`` applied); no simulator. Aliases with equal keys can
+    share one ``sample_isg`` process."""
     for alias in list(args.alias):
         args.alias = alias
         try:
             gp = load_problem_from_args(args)
+            _, split = alias_split(args, gp)
         except Exception as e:
             print(f"{alias}\tERROR {e!r}")
             continue
-        for scene in ([args.scene] if args.scene else gp.scene_names()):
+        for scene in ([split["scene"]] if split.get("scene") else gp.scene_names()):
             try:
                 print(f"{alias}\t{world_key_str(world_key(gp, scene))}", flush=True)
             except Exception as e:
@@ -494,7 +553,7 @@ def print_world_keys(args) -> None:
 
 def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[Dict[str, str]]:
     """Model combinations already produced under ``<out>/<alias>`` (the representative template of ``ground_isg``, or
-    an interrupted run) are excluded from the draw (§9)."""
+    an interrupted run) in the scene and its current rooms are excluded from the draw (§9)."""
     d = os.path.join(out_root, gp.alias)
     out = []
     if not os.path.isdir(d):
@@ -508,6 +567,8 @@ def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[
                 m = json.load(f)
             if m.get("scene") != scene:
                 continue
+            if m.get("rooms") is not None and sorted(m["rooms"]) != sorted(gp.rooms(scene)):
+                continue  # another room of the scene (--room / --scene-from-split)
             models = (m.get("choice") or {}).get("models") or {}
             out.append({r: f"{c['category']}/{c['model']}" for r, c in models.items()})
         except Exception:
