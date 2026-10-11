@@ -79,46 +79,115 @@ def test_distinct_seeds_give_disjoint_attempt_seed_streams():
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_eligible_rooms_types_and_free_floor_threshold():
+def test_eligible_rooms_outdoor_only_exclusion_and_threshold():
+    """owner 2026-10-11 ~13:50: every room but an outdoor one with at least 1 m^2 of robot-reachable floor (the samplers' 6-cell
+    erosion); no room-type whitelist."""
+    assert SS.NAV_ERODE_PX == 6 and SS.MIN_NAV_FREE_M2 == 1.0 and not hasattr(SS, "ROOM_TYPES")
     rooms = SS.eligible_rooms()
-    assert rooms == [("house_single_floor", "bedroom_0"), ("house_single_floor", "kitchen_0"), ("house_single_floor", "living_room_0"),
-                     ("house_double_floor_lower", "kitchen_0"), ("house_double_floor_lower", "living_room_0"),
-                     ("house_double_floor_upper", "bedroom_0"), ("house_double_floor_upper", "bedroom_1"), ("house_double_floor_upper", "living_room_0"),
-                     ("Rs_int", "living_room_0"), ("restaurant_diner", "dining_room_0"), ("restaurant_diner", "kitchen_0"),
-                     ("hotel_suite_large", "bedroom_0"), ("office_cubicles_right", "private_office_1"), ("office_cubicles_right", "private_office_2"),
-                     ("office_cubicles_right", "private_office_3")]
-    assert {s for s, _ in rooms} == set(SS.SCENE_CANDIDATES)
+    assert len(rooms) == 45 and round(sum(SS.ROOM_FLOOR_M2[s][r][2] for s, r in rooms), 2) == 611.73
+    assert {sc: len(SS.eligible_rooms(sc)) for sc in SS.SCENE_CANDIDATES} == {
+        "house_single_floor": 15, "house_double_floor_lower": 5, "house_double_floor_upper": 5, "Rs_int": 1, "restaurant_diner": 5,
+        "hotel_suite_large": 2, "office_cubicles_right": 12}
+    assert SS.eligible_rooms("Rs_int") == [("Rs_int", "living_room_0")]
     for scene, room in rooms:
-        assert SS.room_type(room) in SS.ROOM_TYPES and SS.ROOM_FLOOR_M2[scene][room][2] >= SS.MIN_NAV_FREE_M2
-    assert not any(SS.room_type(r).startswith(("bathroom", "corridor", "closet", "storage", "utility", "garage", "garden")) for _, r in rooms)
-    # below the threshold: listed in the table, never drawn
-    assert ("house_single_floor", "dining_room_0") not in rooms and SS.ROOM_FLOOR_M2["house_single_floor"]["dining_room_0"][2] < SS.MIN_NAV_FREE_M2
-    assert set(SS.eligible_rooms(min_nav_free_m2=1.5)) > set(rooms) and SS.eligible_rooms("Rs_int") == [("Rs_int", "living_room_0")]
+        assert not SS.is_outdoor(room) and SS.ROOM_FLOOR_M2[scene][room][2] >= SS.MIN_NAV_FREE_M2
+    # out: the closets and Rs_int's small rooms (< 1 m^2), both gardens (outdoor, however large)
+    out = {(sc, r) for sc, table in SS.ROOM_FLOOR_M2.items() for r in table} - set(rooms)
+    assert out == ({("house_single_floor", f"closet_{i}") for i in range(5)} | {("Rs_int", r) for r in ("bathroom_0", "bedroom_0", "entryway_0", "kitchen_0")}
+                   | {("house_single_floor", "garden_0"), ("house_double_floor_lower", "garden_0")})
+    assert SS.ROOM_FLOOR_M2["house_single_floor"]["garden_0"][2] > 1000
+    assert ("office_cubicles_right", "corridor_0") in rooms and ("house_double_floor_lower", "garage_0") in rooms and ("restaurant_diner", "bathroom_0") in rooms
+    assert set(SS.eligible_rooms(min_nav_free_m2=0.5)) > set(rooms)
     assert SS.room_type("living_room_0") == "living_room" and SS.room_type("private_office_12") == "private_office" and SS.room_type("lobby") == "lobby"
     assert SS.scene_draw_applies("object_scaling") and SS.scene_draw_applies("mental_rotation")
     assert not SS.scene_draw_applies("camera_relocalization-standard") and not SS.scene_draw_applies("disembedding")
+    assert SS.scene_draw_task("object_scaling-apple") == "object_scaling" and SS.scene_draw_task("mental_rotation") == "mental_rotation"
+    assert SS.scene_draw_task("disembedding-bar_soap") is None and SS.scene_draw_task("object_scaling_x-apple") is None
 
 
-def test_scene_room_draw_is_deterministic_eligible_and_covers_every_scene():
-    assert SS.draw_scene_room("eval", "object_scaling-apple") == ("office_cubicles_right", "private_office_1")
+def _held_aliases():
+    with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
+        return [a for a in json.load(f) if SS.scene_draw_task(a)]
+
+
+def test_eval_rooms_are_the_frozen_per_task_assignment():
+    """owner 2026-10-11 ~13:50: per task 10 distinct rooms covering all 7 scenes, the 3 repeats in the scenes with more rooms; the
+    tasks share no room but Rs_int's only one; deterministic; frozen (EVAL_ROOMS = the recomputed assignment); a re-sample keeps
+    the room."""
+    aliases = _held_aliases()
+    assert sorted(aliases) == sorted(SS.EVAL_ROOMS)  # a new held-object alias needs its room added to the table
+    got, orders = SS.eval_assignment(aliases, moves=SS.EVAL_ROOM_MOVES)
+    assert got == SS.EVAL_ROOMS
+    assert SS.eval_assignment(list(reversed(aliases)) + ["camera_relocalization-standard"], moves=SS.EVAL_ROOM_MOVES)[0] == got
     eligible = set(SS.eligible_rooms())
-    draws = [SS.draw_scene_room(split, f"object_scaling-x{i}", k) for i in range(300) for split in SS.SPLITS for k in (0, 1)]
-    assert set(draws) <= eligible
-    assert {s for s, _ in draws} == set(SS.SCENE_CANDIDATES)
-    assert len(set(draws)) == len(eligible)  # every eligible room is reachable
-    assert SS.draw_scene_room("eval", "mental_rotation-mug", 3) == SS.draw_scene_room("eval", "mental_rotation-mug", 3)
-    # the scene is uniform over the scenes, not over the rooms: Rs_int (one room) gets ~1/7 of the draws
-    rs = sum(s == "Rs_int" for s, _ in draws) / len(draws)
-    assert 0.09 < rs < 0.20
-    # a re-sample (k) and the other split move the draw for some aliases
-    assert any(SS.draw_scene_room("eval", f"a{i}", 0) != SS.draw_scene_room("eval", f"a{i}", 1) for i in range(10))
-    assert any(SS.draw_scene_room("eval", f"a{i}") != SS.draw_scene_room("train", f"a{i}") for i in range(10))
+    per_task = {}
+    for task in SS.SCENE_DRAW_SUBTASKS:
+        rooms = [SS.EVAL_ROOMS[a] for a in aliases if SS.scene_draw_task(a) == task]
+        assert len(rooms) == 10 and len(set(rooms)) == 10 and set(rooms) <= eligible
+        counts = {sc: sum(s == sc for s, _ in rooms) for sc in SS.SCENE_CANDIDATES}
+        assert min(counts.values()) == 1 and max(counts.values()) == 2
+        repeats = {sc for sc, n in counts.items() if n == 2}
+        assert len(repeats) == 3 and {"house_single_floor", "office_cubicles_right"} < repeats
+        assert [len(SS.eligible_rooms(sc)) for sc in repeats - {"house_single_floor", "office_cubicles_right"}] == [5]
+        assert sorted(orders[task]) == sorted(eligible)
+        per_task[task] = set(rooms)
+    assert per_task["object_scaling"] & per_task["mental_rotation"] == {("Rs_int", "living_room_0")}
+    for a in aliases:
+        assert all(SS.draw_scene_room("eval", a, k) == SS.EVAL_ROOMS[a] for k in range(4))
+    with pytest.raises(KeyError):
+        SS.draw_scene_room("eval", "object_scaling-not_in_the_table")
+    # pinned: a changed derivation would silently move eval instances
+    assert SS.EVAL_ROOMS["object_scaling-apple"] == ("house_double_floor_lower", "living_room_0")
+    assert SS.EVAL_ROOMS["mental_rotation-mug"] == ("Rs_int", "living_room_0")
+
+
+def test_eval_room_move_takes_the_tasks_next_unused_room():
+    aliases = list(SS.EVAL_ROOMS)
+    base, orders = SS.eval_assignment(aliases)
+    a = "object_scaling-apple"
+    held = set(base.values())
+    first = next(x for x in orders["object_scaling"] if x not in held)
+    moved, _ = SS.eval_assignment(aliases, moves=[a])
+    assert moved[a] == first != base[a]
+    assert {k: v for k, v in moved.items() if k != a} == {k: v for k, v in base.items() if k != a}  # nobody else moves
+    twice, _ = SS.eval_assignment(aliases, moves=[a, a])  # never back to a room it left
+    assert twice[a] == next(x for x in orders["object_scaling"] if x not in held | {first})
+    with pytest.raises(KeyError):
+        SS.eval_assignment(aliases, moves=["object_scaling-unknown"])
+
+
+def test_train_draw_weights_rooms_by_capped_reachable_floor():
+    """owner 2026-10-11 ~13:50: one room among all eligible rooms, weighted by its reachable floor capped at 3x the median."""
+    rooms, weights, cap = SS.train_weights()
+    assert rooms == SS.eligible_rooms() and cap == 2169  # 3 x the median 7.23 m^2, in 0.01 m^2
+    assert {r for r, w in zip(rooms, weights) if w == cap} == {
+        ("office_cubicles_right", "corridor_0"), ("office_cubicles_right", "conference_hall_0"), ("house_single_floor", "corridor_0"),
+        ("house_single_floor", "living_room_0"), ("restaurant_diner", "dining_room_0"), ("house_double_floor_lower", "garage_0")}
+    total = sum(weights)
+    assert {sc: round(100 * sum(w for (s, _), w in zip(rooms, weights) if s == sc) / total, 1) for sc in SS.SCENE_CANDIDATES} == {
+        "house_single_floor": 28.7, "house_double_floor_lower": 13.9, "house_double_floor_upper": 7.7, "Rs_int": 1.3, "restaurant_diner": 14.4,
+        "hotel_suite_large": 4.7, "office_cubicles_right": 29.2}
+    # pinned: a changed derivation would silently change every train set
+    assert SS.draw_scene_room("train", "object_scaling-apple") == ("hotel_suite_large", "bedroom_0")
+    assert SS.draw_scene_room("train", "mental_rotation-mug", 3) == ("office_cubicles_right", "conference_hall_0")
+    # frequencies over many (alias, g) follow the weights (chi-square, 44 dof); only eligible rooms
+    counts: dict = {}
+    n = 0
+    for i in range(200):
+        for g in range(100):
+            r = SS.draw_scene_room("train", f"object_scaling-x{i}", g)
+            counts[r] = counts.get(r, 0) + 1
+            n += 1
+    assert set(counts) == set(rooms)
+    chi2 = sum((counts[r] - n * w / total) ** 2 / (n * w / total) for r, w in zip(rooms, weights))
+    assert chi2 < 80
+    assert all(abs(counts[r] / n - cap / total) < 0.01 for r, w in zip(rooms, weights) if w == cap)
 
 
 def test_frozen_room_table_matches_the_layout_maps():
     pytest.importorskip("cv2")
     try:
-        measured = SS.measured_table()
+        measured = SS.measured_table(erode_px=6)
     except (FileNotFoundError, OSError) as e:
         pytest.skip(f"layout maps unavailable: {e}")
     assert measured == SS.ROOM_FLOOR_M2
@@ -384,6 +453,7 @@ def test_sample_isg_alias_split_seed_scene_and_room():
     held = GroundedProblem("object_scaling-apple", _held_entry())
     seed, rec = SI.alias_split(_args(seed_split="eval", seed_index=1, scene_from_split=True), held)
     scene, room = SS.draw_scene_room("eval", "object_scaling-apple", 1)
+    assert (scene, room) == SS.EVAL_ROOMS["object_scaling-apple"]  # the re-sample (k = 1) keeps the alias's room
     assert seed == SS.split_seed("eval", "object_scaling-apple", 1)
     assert rec == {"split": "eval", "index": 1, "seed": seed, "seed_source": "split", "scene": scene, "room": room, "scene_source": "split",
                    "room_override": (scene, room) != ("house_single_floor", "living_room_0")}
@@ -417,6 +487,7 @@ def test_multiply_train_plan_indices_and_rooms(tmp_path):
     choice = next(iter_template_choices(gp, "house_single_floor", np.random.default_rng(0)))
     plan = MI.train_plan("object_scaling-apple", choice, 4, 2, True)
     assert [g for g, _, _ in plan] == [2, 3, 4, 5] and all((s, r) == SS.draw_scene_room("train", "object_scaling-apple", g) for g, s, r in plan)
+    assert all((s, r) in SS.eligible_rooms() for _, s, r in plan)
     assert MI.train_plan("object_scaling-apple", choice, 2, 0, False) == [(0, "house_single_floor", "living_room_0"), (1, "house_single_floor", "living_room_0")]
     moved = MI.choice_in_room(gp, choice, "restaurant_diner", "kitchen_0")
     assert moved.template_id == "restaurant_diner__room-kitchen_0__target-apple-a" and moved.models == choice.models
@@ -437,13 +508,15 @@ def test_multiply_train_plan_indices_and_rooms(tmp_path):
 
 def test_no_garden_or_outdoor_room_is_ever_drawn(monkeypatch):
     """owner 2026-10-11 13:31: object scaling / mental rotation never draw a garden or any other outdoor room, eval and train,
-    whatever ROOM_TYPES lists (the eval draw and multiply_isg's train draws share eligible_rooms)."""
+    however much floor it has (the eval assignment and multiply_isg's train draws share eligible_rooms)."""
     from ispatialgym.sampling import split_seeds as S
 
     assert S.is_outdoor("garden_0") and S.is_outdoor("balcony_1") and S.is_outdoor("back_garden_0") and not S.is_outdoor("living_room_0")
-    table = {"house_single_floor": {"garden_0": (40.0, 30.0, 25.0), "living_room_0": (30.0, 20.0, 10.0)}}
-    monkeypatch.setattr(S, "ROOM_TYPES", S.ROOM_TYPES + ("garden",))  # even a whitelist that lists gardens draws none
+    table = {"house_single_floor": {"garden_0": (400.0, 300.0, 250.0), "living_room_0": (30.0, 20.0, 10.0)}}
     assert S.eligible_rooms(table=table) == [("house_single_floor", "living_room_0")]
+    assert S.train_weights(table)[0] == [("house_single_floor", "living_room_0")]
+    monkeypatch.setattr(S, "ROOM_FLOOR_M2", table)  # the largest room is a garden: never drawn
+    assert {S.draw_scene_room("train", "object_scaling-apple", g) for g in range(64)} == {("house_single_floor", "living_room_0")}
     monkeypatch.undo()
     assert not any(S.is_outdoor(r) for _, r in S.eligible_rooms())
     aliases = ["object_scaling-apple", "mental_rotation-crab", "object_scaling-bell_pepper", "mental_rotation-teaspoon"]

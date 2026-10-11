@@ -23,8 +23,9 @@ Past it no new attempt, template or scene starts (``aliases.<alias>.time_budget_
 
 Splits (owner 2026-10-11, ``split_seeds``): without ``--seed``, ``--seed-split eval|train [--seed-index k]`` gives every alias
 its own seed ``split_seed(split, alias, k)`` (k: the k-th next seed, for a re-sampled offender). ``--scene-from-split`` also
-draws the (scene, room) of the held-object aliases (object scaling, mental rotation) - ``draw_scene_room(split, alias, k)`` -
-the other aliases keep their customs scenes. ``--scene S --room R`` samples a floor-only alias in room R of S, listed in its
+sets the (scene, room) of the held-object aliases (object scaling, mental rotation), ``draw_scene_room(split, alias, k)``:
+eval = the alias's frozen room of the per-task assignment (``split_seeds.EVAL_ROOMS``; a re-sample keeps it), train = the
+k-th weighted draw; the other aliases keep their customs scenes. ``--scene S --room R`` samples a floor-only alias in room R of S, listed in its
 customs entry or not: the scene block becomes ``rooms [R]``, ``bindings.floor {room: R}`` (``GroundedProblem.override_scene_room``,
 template id ``<S>__room-<R>__...``; the source customs file keeps the entry's own blocks). ``aliases.<alias>.split`` of the
 summary (and ``template_meta.split``) records the split, index, seed and where the seed / scene / room came from.
@@ -348,8 +349,8 @@ def main(argv=None, shutdown: bool = True):
     parser.add_argument("--scene", default=None, help="restrict to one scene")
     parser.add_argument("--room", default=None, help="with --scene: sample floor-only aliases in this room of the scene (customs entry or not)")
     parser.add_argument("--scene-from-split", action="store_true",
-                        help="held-object aliases: (scene, room) = split_seeds.draw_scene_room(--seed-split, alias, --seed-index); the other "
-                             "aliases keep their customs scenes")
+                        help="held-object aliases: (scene, room) = split_seeds.draw_scene_room(--seed-split, alias, --seed-index) (eval: the "
+                             "alias's frozen room, whatever the index); the other aliases keep their customs scenes")
     parser.add_argument("--templates", type=int, default=None, help="templates per alias and scene (default: generation.templates_max)")
     parser.add_argument("--instances-per-template", type=int, default=None, help="default: generation.instances_per_template")
     parser.add_argument("--start-index", type=int, default=None,

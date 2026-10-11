@@ -33,11 +33,11 @@ Train policy (owner 2026-10-11)::
 * camera relocalization: the path buckets fill by the sampler's deficit draw in the train template (``--path-buckets`` /
   ``generation.path_buckets``); object scaling: the start and goal depths are drawn as the sampler draws them (toward or away
   at random);
-* object scaling / mental rotation: every train instance draws its own (scene, room) among the ``split_seeds`` candidates,
-  ``draw_scene_room("train", alias, g)`` for train instance g, and goes to the template of that scene / room with the eval
-  template's models; ``--keep-template-scene`` keeps the eval template's scene and room. The rooms are the eval draw's
-  (``split_seeds.eligible_rooms``): living / dining / bed / kitchen / office rooms with enough free floor, never a garden or any
-  other outdoor room (owner 2026-10-11 13:31).
+* object scaling / mental rotation: every train instance draws its own (scene, room), ``draw_scene_room("train", alias, g)``
+  for train instance g, and goes to the template of that scene / room with the eval template's models;
+  ``--keep-template-scene`` keeps the eval template's scene and room. The draw picks one room among the eligible rooms of all
+  candidate scenes (``split_seeds.eligible_rooms``: any room but an outdoor one, owner 2026-10-11 13:31, with at least 1 m^2 of
+  robot-reachable floor), weighted by its reachable floor capped at 3x the median eligible room (owner 2026-10-11 ~13:50).
 
 The train instance indices g continue after the alias's train instances under ``--out``; ``--start-index`` fixes them (give
 the same value to processes that split one plan by world with ``--only-scene`` / ``--only-room``). ``--plan`` prints the plan
