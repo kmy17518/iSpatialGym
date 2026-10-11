@@ -4,8 +4,8 @@
 Example::
 
     OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_isg --alias <alias> [--customs task_custom_lists.json] \
-        [--scene house_single_floor [--room living_room_0]] [--templates 3] [--instances-per-template 1] \
-        [--seed 0 | --seed-split eval [--seed-index 0] [--scene-from-split]] [--out <root>]
+        [--scene house_single_floor [--room living_room_0 | --support countertop_kelker_0 [--support-row <pick>~T3]]] [--templates 3] \
+        [--instances-per-template 1] [--seed 0 | --seed-split eval [--seed-index 0] [--scene-from-split]] [--out <root>]
 
 Per alias: ``GroundedProblem.load`` (customs entry + grounded BDDL) -> per candidate scene: one OmniGibson world (reused
 across the templates of a scene, chairs within 1 m of the support removed as a scene variant) -> the §9 model draw
@@ -29,6 +29,14 @@ k-th weighted draw; the other aliases keep their customs scenes. ``--scene S --r
 customs entry or not: the scene block becomes ``rooms [R]``, ``bindings.floor {room: R}`` (``GroundedProblem.override_scene_room``,
 template id ``<S>__room-<R>__...``; the source customs file keeps the entry's own blocks). ``aliases.<alias>.split`` of the
 summary (and ``template_meta.split``) records the split, index, seed and where the seed / scene / room came from.
+
+Support candidates (owner 2026-10-11, the 55 representative tasks: a pick's support rows are tried one at a time, each its own job):
+``--scene S --support NAME [--support-row ROW]`` narrows the scene block of S to that support (``GroundedProblem.override_support``):
+``bindings.support [NAME]``, its ``support_surfaces`` entry (``ROW`` = the entry's row label ``<pick>~T<n>``, needed when the support
+has several) or a wall's ``support_regions`` (``ROW`` = a region id), the rooms and the floor of that support (its ``in_rooms`` in the
+stable scene json, a wall region's room); ``floor`` selects a floor-bound support. Template id ``<S>__support-<NAME>[-T<n>|-r<NN>]__...``;
+``aliases.<alias>.candidate`` of the summary and ``template_meta.candidate`` record the candidate; the source customs file keeps the
+entry's own blocks. ``support_candidates`` (eval85 ``pick_candidates.py``) lists every pick's candidates with these arguments.
 
 ``--v1-spec <spec.json> --v1-problem <activity>-<def_id> --subtask <id>`` builds the grounded problem from a v1 spec
 entry through the facade (``GroundedProblem.from_v1_spec``) until ``ground_isg`` (D1) produces customs entries.
@@ -139,11 +147,7 @@ def world_key(problem: GroundedProblem, scene: str, stable: Optional[dict] = Non
     """The **world key** of an alias in a scene — ``(scene, task rooms, removed chairs)`` — what decides whether two aliases
     can share one loaded world (C5 reschedule: aliases are grouped by this key). Needs only the stable scene json."""
     if stable is None:
-        from omnigibson.utils.asset_utils import get_dataset_path  # package import only, no simulator launch
-
-        path = os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene, "json", f"{scene}_stable.json")
-        with open(path) as f:
-            stable = json.load(f)
+        stable = stable_scene_json(scene)
     rooms = rooms_for(problem, scene, stable)
     removed = chairs_to_remove(problem, scene, stable, rooms)
     # generation.remove_objects (2026-09-19, door_crtrpa_0 first demo): scene object names the problem takes out of the stable
@@ -157,6 +161,21 @@ def world_key(problem: GroundedProblem, scene: str, stable: Optional[dict] = Non
         if isinstance(name, str) and name in init and name not in removed:
             removed.append(name)
     return scene, tuple(sorted(rooms)), tuple(removed)
+
+
+def stable_scene_json(scene: str) -> dict:
+    """The stable scene json of ``scene`` (package import only, no simulator launch)."""
+    from omnigibson.utils.asset_utils import get_dataset_path
+
+    path = os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene, "json", f"{scene}_stable.json")
+    with open(path) as f:
+        return json.load(f)
+
+
+def object_rooms(stable: dict, name: str) -> List[str]:
+    """``in_rooms`` of a scene object in the stable scene json ([] when the scene has no such object)."""
+    info = ((stable.get("objects_info") or {}).get("init_info") or {}).get(name) or {}
+    return [r for r in ((info.get("args") or {}).get("in_rooms") or []) if r]
 
 
 def world_key_str(key: Tuple[str, Tuple[str, ...], Tuple[str, ...]]) -> str:
@@ -348,6 +367,12 @@ def main(argv=None, shutdown: bool = True):
     parser.add_argument("--bddl-root", default=None, help="activity_definitions root of the grounded BDDL (default: assets)")
     parser.add_argument("--scene", default=None, help="restrict to one scene")
     parser.add_argument("--room", default=None, help="with --scene: sample floor-only aliases in this room of the scene (customs entry or not)")
+    parser.add_argument("--support", default=None,
+                        help="with --scene: sample this support candidate of the scene block alone (scene object name; 'floor' for a floor-bound "
+                             "support): bindings.support [NAME], its support_surfaces / support_regions, its rooms and floor")
+    parser.add_argument("--support-row", default=None,
+                        help="with --support: the support_surfaces row label (<pick>~T<n>) or the support_regions id (walls) to use; required "
+                             "when the support has several surface rows")
     parser.add_argument("--scene-from-split", action="store_true",
                         help="held-object aliases: (scene, room) = split_seeds.draw_scene_room(--seed-split, alias, --seed-index) (eval: the "
                              "alias's frozen room, whatever the index); the other aliases keep their customs scenes")
@@ -380,6 +405,10 @@ def main(argv=None, shutdown: bool = True):
         parser.error("--room needs --scene")
     if args.scene_from_split and (args.scene or args.room or not args.seed_split):
         parser.error("--scene-from-split needs --seed-split and excludes --scene / --room")
+    if args.support and (not args.scene or args.room):
+        parser.error("--support needs --scene and excludes --room")
+    if args.support_row and not args.support:
+        parser.error("--support-row needs --support")
     if args.seed_index < 0:
         parser.error("--seed-index must be >= 0")
 
@@ -435,14 +464,18 @@ def main(argv=None, shutdown: bool = True):
 
 
 def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs_copy: str, customs_sha: Optional[str]) -> None:
-    """All templates of one alias (every candidate scene unless ``--scene`` / ``--scene-from-split``; seed per :func:`alias_split`):
-    world from the pool (reused when the world key matches), the §9 model draw, one ``run_template`` per choice, whitelist pruning,
-    customs write-back."""
+    """All templates of one alias (every candidate scene unless ``--scene`` / ``--scene-from-split``; seed per :func:`alias_split`;
+    one support candidate with ``--support``, :func:`alias_candidate`): world from the pool (reused when the world key matches), the §9
+    model draw, one ``run_template`` per choice, whitelist pruning, customs write-back."""
     args.alias = alias
     t_alias = time.time()
     gp = load_problem_from_args(args)
     seed, split = alias_split(args, gp)
     report["aliases"].setdefault(alias, {})["split"] = split
+    cand = alias_candidate(args, gp)
+    meta_extra: Dict[str, Any] = {"split": split}
+    if cand is not None:
+        report["aliases"][alias]["candidate"] = meta_extra["candidate"] = cand
     scenes = [split["scene"]] if split.get("scene") else gp.scene_names()
     rng = np.random.default_rng(seed)
     n_inst = args.instances_per_template if args.instances_per_template is not None else int(gp.gen("instances_per_template", 5))
@@ -479,7 +512,7 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
             if os.path.exists(out_dir) and args.overwrite:
                 shutil.rmtree(out_dir)
             entry = run_template(gp, choice, world, kit, args.out, n_inst, seed * 7919 + ti, args.max_attempts, args.variant, customs_sha,
-                                 start_index=args.start_index, deadline=deadline, meta_extra={"split": split})
+                                 start_index=args.start_index, deadline=deadline, meta_extra=meta_extra)
             if (entry.get("counters") or {}).get("time_budget_stops"):
                 report["aliases"].setdefault(alias, {})["time_budget_exhausted"] = True
             report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
@@ -520,6 +553,22 @@ def alias_split(args, gp: GroundedProblem) -> Tuple[int, Dict[str, Any]]:
     return seed, rec
 
 
+def alias_candidate(args, gp: GroundedProblem, stable: Optional[dict] = None) -> Optional[Dict[str, Any]]:
+    """``--support`` [``--support-row``]: the scene block of ``--scene`` narrowed to that support candidate
+    (``GroundedProblem.override_support``; its rooms = the support's ``in_rooms`` in the stable scene json, a wall region's room) and
+    the candidate record (``aliases.<alias>.candidate``, ``template_meta.candidate``); None without ``--support``. ``GroundingError``
+    when the scene block does not bind that support / row."""
+    support = getattr(args, "support", None)
+    if not support:
+        return None
+    row = getattr(args, "support_row", None)
+    if stable is None and support != "floor":
+        stable = stable_scene_json(args.scene)
+    rooms = object_rooms(stable, support) if stable is not None else []
+    note = f"sample_isg --support {support}" + (f" --support-row {row}" if row else "")
+    return {**gp.override_support(args.scene, support, row=row, rooms=rooms, note=note), "source": "--support"}
+
+
 def time_budget_factor(gp: GroundedProblem) -> float:
     """``generation.time_budget_factor`` of the alias, else its subtask's seed (block design 1.5), else 1."""
     v = gp.gen("time_budget_factor")
@@ -535,13 +584,14 @@ def time_budget_factor(gp: GroundedProblem) -> float:
 
 def print_world_keys(args) -> None:
     """``--world-key``: one ``<alias>\\t<scene>|rooms=...|removed=...`` line per (alias, candidate scene) from the customs
-    entry and the stable scene json (with ``--room`` / ``--scene-from-split`` applied); no simulator. Aliases with equal keys can
-    share one ``sample_isg`` process."""
+    entry and the stable scene json (with ``--room`` / ``--scene-from-split`` / ``--support`` applied); no simulator. Aliases with
+    equal keys can share one ``sample_isg`` process."""
     for alias in list(args.alias):
         args.alias = alias
         try:
             gp = load_problem_from_args(args)
             _, split = alias_split(args, gp)
+            alias_candidate(args, gp)
         except Exception as e:
             print(f"{alias}\tERROR {e!r}")
             continue
@@ -554,7 +604,7 @@ def print_world_keys(args) -> None:
 
 def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[Dict[str, str]]:
     """Model combinations already produced under ``<out>/<alias>`` (the representative template of ``ground_isg``, or
-    an interrupted run) in the scene and its current rooms are excluded from the draw (§9)."""
+    an interrupted run) in the scene, its current rooms and support candidate are excluded from the draw (§9)."""
     d = os.path.join(out_root, gp.alias)
     out = []
     if not os.path.isdir(d):
@@ -570,6 +620,8 @@ def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[
                 continue
             if m.get("rooms") is not None and sorted(m["rooms"]) != sorted(gp.rooms(scene)):
                 continue  # another room of the scene (--room / --scene-from-split)
+            if (m.get("choice") or {}).get("support_tag") != gp.support_tag(scene):
+                continue  # another support candidate of the scene (--support)
             models = (m.get("choice") or {}).get("models") or {}
             out.append({r: f"{c['category']}/{c['model']}" for r, c in models.items()})
         except Exception:

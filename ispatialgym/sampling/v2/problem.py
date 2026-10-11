@@ -30,6 +30,7 @@ import datetime as _dt
 import hashlib
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
@@ -224,6 +225,14 @@ def scale_tag(scale: Optional[Sequence[float]]) -> str:
     if all(abs(v - vals[0]) < 1e-9 for v in vals):
         return f"-s{fmt(vals[0])}"
     return "-s" + "x".join(fmt(v) for v in vals)
+
+
+def support_row_tag(row: str) -> str:
+    """Template-id form of a support row (:meth:`GroundedProblem.override_support`): the part after the pick of a combination label
+    (``disembedding#05~T3`` -> ``T3``), the last part of a wall region id (``living_room_0/walls_dhsptd_0/r00`` -> ``r00``); characters
+    other than letters, digits, ``_`` and ``.`` become ``_``."""
+    tail = row.split("~", 1)[1] if "~" in row else (row.rsplit("/", 1)[-1] if "/" in row else row.rsplit("#", 1)[-1])
+    return re.sub(r"[^A-Za-z0-9_.]+", "_", tail).strip("_") or "row"
 
 
 @dataclass
@@ -465,8 +474,86 @@ class GroundedProblem:
                          "blacklist": copy.deepcopy(src.get("blacklist") or {}), "_synthesized": note or f"room {room}"}
         return True
 
+    def override_support(self, scene: str, support: str, row: Optional[str] = None, rooms: Optional[Sequence[str]] = None,
+                         note: str = "") -> Dict[str, Any]:
+        """Sample one support candidate of ``scene`` (``sample_isg --scene S --support NAME [--support-row ROW]``; owner 2026-10-11: a
+        representative's support candidates are tried one at a time, in sheet order): the scene's block becomes the block of that
+        support alone. ``bindings.support`` = ``[support]`` (most samplers bind the first name; the wall and large-scale IORS samplers
+        choose among all of them), ``bindings.support_surfaces`` = its entry (``row``: the entry's row label, required when the support
+        has several), a wall's ``bindings.support_regions`` = its regions (``row``: one region id), ``rooms`` = the support's rooms (its
+        regions' rooms, else ``rooms``, else the block's) and ``bindings.floor`` in the first of them, unless another scene role (a scene
+        partner, §5.6) anchors the floor room, which then stays. A floor-bound support (``{"room": R}``) is selected with ``support`` =
+        ``"floor"`` and keeps its block. Whitelist / blacklist are copies; ``_candidate`` records the selection and the template ids
+        carry its tag (:meth:`support_tag`); the entry's own block is what the source customs file gets back (:meth:`save_customs`).
+        Returns the candidate record (``template_meta.candidate``); ``GroundingError`` when the scene, the support or the row is not in
+        the block."""
+        if "support" not in self.roles:
+            raise GroundingError(f"{self.alias}: no support role to select (roles {sorted(self.roles)})")
+        own = self.scene_overrides[scene] if scene in self.scene_overrides else self.entry["scenes"].get(scene)
+        if own is None:
+            raise GroundingError(f"{self.alias}: no scene block {scene!r} (scenes {self.scene_names()})")
+        b = copy.deepcopy(own.get("bindings") or {})
+        req = b.get("support")
+        surfaces: List[Dict[str, Any]] = []
+        regions: List[Dict[str, Any]] = []
+        if isinstance(req, dict):
+            if support != "floor" or row is not None:
+                raise GroundingError(f"{self.alias}: the support of {scene} is the floor ({req}): select it as 'floor', without a row")
+        else:
+            names = [n for n in (req or []) if isinstance(n, str)]
+            if support not in names:
+                raise GroundingError(f"{self.alias}: {support!r} is not a support of {scene} (bindings.support {names})")
+            b["support"] = [support]
+            surfaces = [e for e in b.get("support_surfaces") or [] if isinstance(e, dict) and e.get("name") == support]
+            regions = [r for r in b.get("support_regions") or [] if isinstance(r, dict) and r.get("wall") == support]
+            if row is not None:
+                if any(e.get("row") == row for e in surfaces):
+                    surfaces = [e for e in surfaces if e.get("row") == row][:1]
+                elif any(r.get("id") == row for r in regions):
+                    regions = [r for r in regions if r.get("id") == row]
+                else:
+                    raise GroundingError(f"{self.alias}: {row!r} is neither a support_surfaces row of {support} in {scene} "
+                                         f"({[e.get('row') for e in surfaces]}) nor one of its support_regions ({[r.get('id') for r in regions]})")
+            elif len(surfaces) > 1:
+                raise GroundingError(f"{self.alias}: {support} has {len(surfaces)} support_surfaces rows in {scene} "
+                                     f"({[e.get('row') for e in surfaces]}): name one")
+            for key, kept in (("support_surfaces", surfaces), ("support_regions", regions)):
+                if kept:
+                    b[key] = kept
+                else:
+                    b.pop(key, None)
+        new_rooms = list(own.get("rooms") or [])
+        floor = b.get("floor")
+        floor_room = floor.get("room") if isinstance(floor, dict) else None
+        cand_rooms = list(dict.fromkeys([g["room"] for g in regions if g.get("room")] or [r for r in rooms or [] if r]))
+        if cand_rooms and not isinstance(req, dict):
+            anchored = any(isinstance(b.get(r), list) and b.get(r) for r in self.scene_roles() if r not in ("support", "floor"))
+            if not anchored and floor_room not in cand_rooms:
+                floor_room = cand_rooms[0]
+            new_rooms = list(dict.fromkeys(([floor_room] if floor_room else []) + cand_rooms))
+            if floor_room and (floor is None or isinstance(floor, dict)):
+                b["floor"] = {**(floor or {}), "room": floor_room}
+        surface = surfaces[0] if len(surfaces) == 1 else None
+        resolved = row if row is not None else (surface or {}).get("row") or (regions[0].get("id") if len(regions) == 1 else None)
+        rec = {"scene": scene, "support": support, "row": resolved, "init": (surface or {}).get("init"), "top_z": (surface or {}).get("top_z"),
+               "surface": (surface or {}).get("surface"), "regions": [r.get("id") for r in regions] or None, "rooms": new_rooms,
+               "floor_room": floor_room, "tag": support if not resolved else f"{support}-{support_row_tag(resolved)}"}
+        blk = {k: copy.deepcopy(v) for k, v in own.items() if k not in ("rooms", "bindings")}
+        blk.update({"rooms": new_rooms, "bindings": b, "_candidate": {**rec, "note": note or f"support {support}"}})
+        if scene not in self.scene_overrides:
+            self.scene_overrides[scene] = copy.deepcopy(own)
+        self.entry["scenes"][scene] = blk
+        return rec
+
+    def support_tag(self, scene: str) -> Optional[str]:
+        """The support candidate of a block :meth:`override_support` narrowed (part of its template ids: one scene, several
+        supports); None otherwise."""
+        sd = self.entry["scenes"].get(scene) or {}
+        return (sd.get("_candidate") or {}).get("tag")
+
     def own_scenes(self) -> Dict[str, Dict[str, Any]]:
-        """``scenes`` as the entry has them, without the blocks :meth:`override_scene_room` synthesized."""
+        """``scenes`` as the entry has them, without the blocks :meth:`override_scene_room` synthesized or :meth:`override_support`
+        narrowed."""
         out = {}
         for sc, sd in self.entry["scenes"].items():
             own = self.scene_overrides[sc] if sc in self.scene_overrides else sd
@@ -558,8 +645,8 @@ class GroundedProblem:
 
     def save_customs(self, path: Optional[str] = None) -> str:
         """Write the (possibly updated) entry back into the customs file it came from (§9: blacklists, constraints). A scene block
-        synthesized by :meth:`override_scene_room` goes to other files (the copy under ``--out``) only: the source file keeps the
-        entry's own blocks."""
+        synthesized by :meth:`override_scene_room` or narrowed by :meth:`override_support` goes to other files (the copy under
+        ``--out``) only: the source file keeps the entry's own blocks."""
         path = path or self.customs_path
         if path is None:
             raise GroundingError("no customs path to save to")
@@ -621,7 +708,8 @@ class TemplateChoice:
     """Models of one template: ``models`` per sampleable role, ``groups`` member lists per group role (``size`` drawn),
     the scene and its ``bindings`` / ``rooms``. ``choices`` is the v1 ``{role: ModelChoice}`` view (group members as
     ``<role>[i]``) for the ``TaskSampler`` machinery; ``template_id`` follows spec §1, with ``room-<room>`` after the scene
-    when the room is not the customs entry's (``room_tag``: :meth:`GroundedProblem.room_tag`)."""
+    when the room is not the customs entry's (``room_tag``: :meth:`GroundedProblem.room_tag`) and ``support-<tag>`` when one
+    support candidate of the scene was selected (``support_tag``: :meth:`GroundedProblem.support_tag`)."""
 
     scene: str
     models: Dict[str, ModelChoice]
@@ -629,6 +717,7 @@ class TemplateChoice:
     bindings: Dict[str, Any] = field(default_factory=dict)
     rooms: List[str] = field(default_factory=list)
     room_tag: Optional[str] = None
+    support_tag: Optional[str] = None
 
     @property
     def choices(self) -> Dict[str, ModelChoice]:
@@ -657,19 +746,20 @@ class TemplateChoice:
             tags = {scale_tag(m.scale) for m in members}
             tag = tags.pop() if len(tags) == 1 else ""
             parts.append(f"{role}-" + "-".join(f"{c}_{len(ms)}" for c, ms in sorted(cats.items())) + tag)
-        return "__".join([self.scene] + ([f"room-{self.room_tag}"] if self.room_tag else []) + parts)
+        head = [self.scene] + ([f"room-{self.room_tag}"] if self.room_tag else []) + ([f"support-{self.support_tag}"] if self.support_tag else [])
+        return "__".join(head + parts)
 
     def to_json(self) -> Dict[str, Any]:
         return {"scene": self.scene, "rooms": list(self.rooms), "bindings": self.bindings,
                 "models": {r: c.__dict__ for r, c in self.models.items()},
                 "groups": {r: [m.__dict__ for m in ms] for r, ms in self.groups.items()}, "template_id": self.template_id,
-                **({"room_tag": self.room_tag} if self.room_tag else {})}
+                **({"room_tag": self.room_tag} if self.room_tag else {}), **({"support_tag": self.support_tag} if self.support_tag else {})}
 
     @staticmethod
     def from_json(d: Dict[str, Any]) -> "TemplateChoice":
         return TemplateChoice(d["scene"], {r: ModelChoice(**c) for r, c in d["models"].items()},
                               {r: [ModelChoice(**m) for m in ms] for r, ms in (d.get("groups") or {}).items()}, dict(d.get("bindings") or {}),
-                              list(d.get("rooms") or []), d.get("room_tag"))
+                              list(d.get("rooms") or []), d.get("room_tag"), d.get("support_tag"))
 
 
 class ModelCycler:
@@ -864,7 +954,7 @@ def iter_template_choices(problem: GroundedProblem, scene: str, rng, constraints
         if not ok:
             continue
         produced.add(key)
-        yield TemplateChoice(scene, models, groups, problem.bindings(scene), problem.rooms(scene), problem.room_tag(scene))
+        yield TemplateChoice(scene, models, groups, problem.bindings(scene), problem.rooms(scene), problem.room_tag(scene), problem.support_tag(scene))
 
 
 # ----------------------------------------------------------------------------------------------------------------
