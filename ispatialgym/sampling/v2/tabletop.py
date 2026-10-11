@@ -58,7 +58,7 @@ STAND_OFFS = (0.35, 0.45, 0.55)  # §4.5
 TRANSLATES = tuple(float(t) for t in RB.TRANSLATES)  # §3.3 grid (0.95 = deepest trunk)
 TILT_GRID = tuple(float(k) for k in RB.TILTS)  # §3.3 grid tilts of the bands
 N_TILT_SAMPLES = 7  # §4.5 "tilt continuous from 0 to the torso_joint3 limit": samples of the scan
-ANGLE_CLASSES_DEG = (8.0, 20.0)  # §4.5 step 3
+ANGLE_CLASSES_DEG = (20.0, 30.0)  # §4.5 step 3 (owner 2026-10-11: 8 / 20 left the target almost no spread)
 IN_FRAME_MARGIN = 0.05  # §3.4 "in frame (5 %)"
 FOCUS_RADIUS = 0.05  # §4.6 step 1: target within 5 cm of the focus
 YAW_JITTER = math.radians(22.5)  # §4.6 step 1
@@ -1799,8 +1799,8 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     """§4.5: scan stand-off {0.35, 0.45, 0.55} x translate {0, …, 0.95} x tilt (0 → torso_joint3 limit, ``n_tilts`` samples)
     at the init edge and lateral; (1) whole-body collision check without objects; (2) band = the grid trunk with the
     same translate and nearest tilt, focus candidates = its cells inside the top eroded by ``target_half_extent`` +
-    0.02 (shifted with the stand-off); (3) keep (stance, focus) pairs whose optical axis is within 8° of the focus (else
-    20°) and whose target box is in frame (5 %; ``in_frame_fn(s, stance, cam, focus, info)`` overrides: the disembedding
+    0.02 (shifted with the stand-off); (3) keep (stance, focus) pairs whose optical axis is within 20° of the focus (else
+    30°) and whose target box is in frame (5 %; ``in_frame_fn(s, stance, cam, focus, info)`` overrides: the disembedding
     source tray, the block region); ``focus_candidates(s, stance, cam, cells_world)`` overrides the focus cells (block
     regions: ``[(focus_xy, info), ...]``). Returns the survivors of the **best angle class**, each a ``Stance
     ("manipulation")`` copy with ``focus`` (x, y, z) set and ``extras`` ``axis_angle`` / ``angle_class`` / ``focus_info``;

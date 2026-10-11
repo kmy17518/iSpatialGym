@@ -400,14 +400,14 @@ class Attachment(SamplerV2):
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
-                # D-009 (prepared, owner 2026-09-16 21:54; defaults = today's behaviour): A ``generation.phase2_loose_class_deg``
-                # (loose class 20-25 deg for attachment) / B ``generation.phase2_class1_when_deep_m`` (class-1 survivors admitted
-                # when every class-0 focus is deeper than that, base-forward: att_diag3 21:30 - all 15 class-0 foci at
-                # 0.77-0.81 m, the lift / SLERP fail there)
+                # D-009 (prepared, owner 2026-09-16 21:54; defaults = the tabletop classes, 20 / 30 deg since owner 2026-10-11): A
+                # ``generation.phase2_loose_class_deg`` / B ``generation.phase2_class1_when_deep_m`` (class-1 survivors admitted
+                # when every class-0 focus is deeper than that, base-forward: att_diag3 21:30 - all 15 class-0 foci of the 8 deg
+                # class at 0.77-0.81 m, the lift / SLERP fail there)
                 deep = self.gen("phase2_class1_when_deep_m", None)
                 cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.t_role], self.rest[self.t_role]), target_height=self.height[self.t_role],
                                                       bands=bands, top=self.top,
-                                                      angle_classes_deg=(float(self.gen("phase2_tight_class_deg", 8.0)), float(self.gen("phase2_loose_class_deg", 20.0))),
+                                                      angle_classes_deg=(float(self.gen("phase2_tight_class_deg", 20.0)), float(self.gen("phase2_loose_class_deg", 30.0))),
                                                       class1_when_deep_m=None if deep is None else float(deep))
                 cands = [c for c in cands if len(TT.band_cells_world(self.attach_bands, c)) > 0]
                 if not cands:

@@ -710,10 +710,16 @@ limit (same edge and lateral as the init stance):
    never requested).
 2. Band = the grid trunk with the same translate and the nearest tilt; focus candidates = its cells inside the top
    eroded by the target's half-extent + 0.02 (band shifted with the stand-off).
-3. Keep candidates where the optical axis is within 8° of the focus (if none, within 20°) and the target AABB is in
+3. Keep candidates where the optical axis is within 20° of the focus (if none, within 30°) and the target AABB is in
    frame (5 %). Disembedding: the whole source tray (centred on the focus, long axis along the edge) in frame (5 %).
    Block design: the focus is the centre of a region of band cells with ≥ n_blocks + 2 cells at spacing edge·√2 +
    0.03, the 2 × 2 goal grid (pitch = edge + 1 mm) still on the top, region in frame (8 %).
+   *Owner decision 2026‑10‑11:* the classes were 8° / 20°. 85 % of the recorded manipulation stances (`prod_0927`) fell in
+   the 8° class, which put the target 0.80–0.88 m ahead of the base and 0–8 cm right of its centre line, within ~60 px of
+   the manipulation image's centre and nearly fixed in the start image (std ~20 px across, 30–40 px down). At fx = 459 px a
+   20° focus lies within 167 px of the image centre and a 30° one within 265 px (the 5 % border is 46.6° off‑axis).
+   `generation.phase2_tight_class_deg` / `phase2_loose_class_deg` override the two classes per alias (the small‑articulation
+   aliases tuned with their own loose class keep 8°, §6.7). Sampling only: oracle and evaluator are unaffected.
 4. Draw uniformly among the survivors in the best angle class (never always the smallest angle: the target would land
    on the same cell every instance); sample tilt continuously within the surviving band. Record
    `manipulation_stance = {stand_off, translate, tilt, focus, base_pose2d}`.
@@ -1388,6 +1394,11 @@ optical axis and 25° admits 42 foci over 3 stand‑offs).
 the small‑articulation one (target hull + handle contact + at least one near / own‑side brace point in frame), i.e. the
 loose class is "focus within 25° of the optical axis and the target in frame", the same shape as the ontop‑large C rule.
 
+**Owner decision 2026‑10‑11.** Small articulation takes the tabletop classes of §4.5 step 3, 20° / 30° (were 8° / 25°). The
+aliases tuned with their own loose class keep the 8° tight class in their customs (`phase2_tight_class_deg: 8`): blender
+and `blender_eyedvd` close (loose 45°), `carton_cdmmwy` open, `_rightfirst` and `_lever` (40°), `carton_cdmmwy` close (60°);
+`carton_cdmmwy_near` keeps its own 25° / 60°.
+
 *Brace search (`d4546de2` … `6643f1be`):* handle grasp first (pre + grasp), then the brace arm's pre‑contact + contact
 with the handle arm locked, and the reverse order when that fails; brace candidates = the base link's four side faces
 (vertical / horizontal closing, either sign) plus a pitched 45° press on each face's upper part, ranked by B3's passing
@@ -1436,6 +1447,9 @@ depth (≤ 0.62 m base‑forward first) and the lift's carry height laddered 12 
 every class‑0 (8°) focus of the lid–teapot alias lies 0.77–0.81 m base‑forward, where the lift / SLERP have no IK —
 A `generation.phase2_loose_class_deg` (20–25°) or B `generation.phase2_class1_when_deep_m` (0.65: `phase2_manipulation_
 stance(class1_when_deep_m=…)` admits the class‑1 survivors when every class‑0 focus is deeper than that; §4.5 general rule).
+Since the owner decision of 2026‑10‑11 the attachment classes are the tabletop 20° / 30° of §4.5 step 3 (were 8° / 20°);
+rule B (0.65 m, set in the attachment customs) stays and now compares the 20° class: the ≤ 30° survivors are admitted
+when every ≤ 20° focus is deeper than 0.65 m base‑forward.
 
 
 Init per section 4 with: partner (female) upright on a cell of the attach-reach band, target (male) at the focus with

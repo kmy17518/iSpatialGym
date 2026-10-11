@@ -242,12 +242,12 @@ class BlockDesign(SamplerV2):
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
                 init = self._init_with_room_for_flips(init)
-                # D-009 shape for blocks (prepared, default = today's 8 / 20 deg): with the region depth caps (init cells <= 0.80 m,
-                # slots <= 0.70 m) the 20 deg cone at the arm-friendly trunks (0.5, -0.3..-0.45) meets the top beyond the caps and
-                # only the translate-0.95 trunks survive (blk_diag2 22:28: 2 survivors, both (0.95, 0 / -0.16), every pick
-                # pre-grasp out of reach from that height); a wider loose class (generation.phase2_loose_class_deg ~ 30) lets
-                # those trunks see regions at 0.55-0.70 m
-                angle_classes = (float(self.gen("phase2_tight_class_deg", 8.0)), float(self.gen("phase2_loose_class_deg", 20.0)))
+                # D-009 shape for blocks (default = the tabletop classes, 20 / 30 deg since owner 2026-10-11): with the region depth
+                # caps (init cells <= 0.80 m, slots <= 0.70 m) a 20 deg cone at the arm-friendly trunks (0.5, -0.3..-0.45) meets the
+                # top beyond the caps and only the translate-0.95 trunks survive (blk_diag2 22:28: 2 survivors, both (0.95, 0 / -0.16),
+                # every pick pre-grasp out of reach from that height); the 30 deg loose class lets those trunks see regions at
+                # 0.55-0.70 m
+                angle_classes = (float(self.gen("phase2_tight_class_deg", 20.0)), float(self.gen("phase2_loose_class_deg", 30.0)))
                 cands = []
                 # owner 2026-09-19 (in-hand flip about the forward axis, see FLIP_DIRECTIONS): the manipulation stance is scanned
                 # at the init lateral AND shifted along the edge to the robot's LEFT (``generation.manip_lateral_shifts_m``): the
