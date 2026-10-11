@@ -11041,7 +11041,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 10.0
   },
   "constraints": []
  },
@@ -11158,7 +11159,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 10.0
   },
   "constraints": []
  },
@@ -11275,7 +11277,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 3.0
   },
   "constraints": []
  },
@@ -11392,7 +11395,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 3.0
   },
   "constraints": []
  },
@@ -11509,7 +11513,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 3.0
   },
   "constraints": []
  },
@@ -11626,7 +11631,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 5.0
   },
   "constraints": []
  },
@@ -11746,7 +11752,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 5.0
   },
   "constraints": []
  },
@@ -11863,7 +11870,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 5.0
   },
   "constraints": []
  },
@@ -11980,7 +11988,8 @@
     "min_detour_m": 0.3,
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
-   }
+   },
+   "requested_bucket_m": 10.0
   },
   "constraints": []
  },
@@ -12049,7 +12058,8 @@
    "init_pose": {
     "trunk": 0.5,
     "arms": "untucked"
-   }
+   },
+   "requested_bucket_m": 5.0
   },
   "constraints": []
  },
