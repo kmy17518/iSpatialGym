@@ -528,6 +528,8 @@ NOTE_KEYS = NOTE_KEYS + ("attach_hold",)
 NOTE_KEYS = NOTE_KEYS + ("contact_arms_kept",)
 #: first-demo v3.0 F5 (nextto marker 0928-050212): a grasp transit whose plan dipped below both ends ran as a Cartesian leg
 NOTE_KEYS = NOTE_KEYS + ("transit_dip",)
+#: owner 2026-10-11: an action on an object on an interior shelf kept the support in the world but for the board pieces under it
+NOTE_KEYS = NOTE_KEYS + ("interior_support",)
 
 
 @dataclass
@@ -881,6 +883,9 @@ class Executor:
         # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
         self.protected_goal: List[Tuple[str, Any]] = []
         self._protect_force: set = set()
+        #: the interior support surface of the instance's template (``execute.interior_support_surface``, set by run_isg; None on a
+        #: support top): every action gets it as ``ctx["support_surface"]`` (``execute.interior_split``)
+        self.support_surface: Optional[Dict[str, Any]] = None
         # first-demo v2.1 A2: the witnesses of a kept arm's next contact, tracked from the branch a travel leg kept it in
         # ({action index: {"arm", "witnesses", "leg"}}, execute.keep_arm_branch)
         self._witness_overrides: Dict[int, Dict[str, Any]] = {}
@@ -1416,6 +1421,8 @@ class Executor:
         ctx["sidecar"] = self.sidecar  # attachment: the hover alignment's regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "alias", None) if self.sidecar is not None else None,
                           "index": index}
+        if self.support_surface is not None:
+            ctx["support_surface"] = self.support_surface
         if self.monitors is not None:
             ctx["hooks"] = {"fov": self.monitors.set_fov_enabled,
                             "transit": (lambda on, objects=(), label=None: self.monitors.begin_transit(objects, label) if on else self.monitors.end_transit())}

@@ -70,7 +70,7 @@ from ispatialgym.oracle.actions import (
     VOCABULARY,
 )
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.motions import ApproachFinish, Motions, SkillError, arc_between, as_pose2d, as_world_pose, joint_axis_from_contacts
+from ispatialgym.oracle.motions import ApproachFinish, Motions, SkillError, arc_between, as_pose2d, as_world_pose, joint_axis_from_contacts, links_kw
 from ispatialgym.oracle.sidecar import Pose
 from ispatialgym.robot import conventions as C
 
@@ -295,6 +295,15 @@ class ExecuteConfig:
     #: ... and a support place whose object hangs lower in the hand than the recorded ``eef_in_object`` by more than this is raised by
     #: the difference, so the object meets its support instead of being driven into it (the same pinch pressed the destination tray)
     place_inhand_raise_min_m: float = 0.002
+    #: owner 2026-10-11 (objects on an INTERIOR support surface - a shelf inside a bookcase / wardrobe / hall tree, ``interior_split``):
+    #: the object rests on the recorded board when its bottom (at the grasp, or where the place sets it down) lies within
+    #: ``interior_surface_tol_m`` of the board height; the board pieces under it are the support's collision meshes whose top face is
+    #: within ``interior_board_z_margin_m`` of that height and at most ``interior_board_max_thickness_m`` tall
+    #: (``SimWorld.support_interior``'s rule), within ``interior_board_margin_m`` of the object's footprint (the open fingers beside it)
+    interior_surface_tol_m: float = 0.06
+    interior_board_z_margin_m: float = 0.03
+    interior_board_max_thickness_m: float = 0.12
+    interior_board_margin_m: float = 0.10
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -428,6 +437,99 @@ def contact_ignores(state, name: str, extra: Sequence[str] = ()) -> List[Any]:
         if not any(o is x for x in out):
             out.append(o)
     return out
+
+
+def _interior_fact(srf: Any) -> Optional[Dict[str, Any]]:
+    """``srf`` when it is the record of an interior support surface (``surface: "interior"`` with its support and board height)."""
+    if not isinstance(srf, dict) or srf.get("surface") != "interior" or not srf.get("support") or srf.get("z_world") is None:
+        return None
+    return srf
+
+
+def interior_support_surface(template_meta: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The interior support surface the sampler worked on for the instance's template: ``template_meta.json``
+    ``template_facts.support_surface`` (``tabletop.support_surface``: a shelf inside a bookcase / wardrobe / hall tree - the
+    ``support`` scene object and the board height ``z_world``) when its surface is ``interior``; None for a support top or a
+    template without the record. The executor hands it to every action (``ctx["support_surface"]``, ``interior_split``)."""
+    facts = (template_meta or {}).get("template_facts")
+    return _interior_fact(facts.get("support_surface")) if isinstance(facts, dict) else None
+
+
+@dataclass
+class InteriorSplit:
+    """The collision world of one action on an object resting on an interior support surface (``interior_split``)."""
+
+    support: Any
+    #: the action's ignore set without the support
+    objects: List[Any]
+    #: ``(support, link name, collision mesh name)`` of the board pieces under the object - the only part of the support left out of
+    #: the legs that start or end at the contact
+    links: List[Tuple[Any, str, str]]
+    note: Dict[str, Any]
+
+
+def board_pieces(support, z: float, lo_xy: Sequence[float], hi_xy: Sequence[float], cfg: "ExecuteConfig") -> List[Tuple[Any, str, str]]:
+    """``(support, link name, collision mesh name)`` of the support's board at world height ``z`` under the xy box ``lo_xy`` ..
+    ``hi_xy``: its collision meshes whose top face lies within ``interior_board_z_margin_m`` of ``z``, at most
+    ``interior_board_max_thickness_m`` tall (the board pieces of ``SimWorld.support_interior``), overlapping the box."""
+    out: List[Tuple[Any, str, str]] = []
+    for link_name, link in (getattr(support, "links", None) or {}).items():
+        for cm in (getattr(link, "collision_meshes", None) or {}).values():
+            try:
+                plo, phi = cm.aabb
+                plo, phi = C.as_tensor(plo).float().reshape(-1), C.as_tensor(phi).float().reshape(-1)
+            except Exception:  # noqa: BLE001 - a piece without an AABB stays an obstacle
+                continue
+            if abs(float(phi[2]) - float(z)) > cfg.interior_board_z_margin_m or float(phi[2] - plo[2]) > cfg.interior_board_max_thickness_m:
+                continue
+            if float(plo[0]) > float(hi_xy[0]) or float(phi[0]) < float(lo_xy[0]) or float(plo[1]) > float(hi_xy[1]) or float(phi[1]) < float(lo_xy[1]):
+                continue
+            out.append((support, str(link_name), str(cm.prim_path).rsplit("/", 1)[-1]))
+    return out
+
+
+def interior_split(state, ctx: Dict[str, Any], name: str, ignore: Sequence[Any], place=None, arm: Optional[str] = None) -> Optional[InteriorSplit]:
+    """Owner 2026-10-11 (objects on an interior support surface): the collision world of an action on ``name`` when the sampler
+    recorded an interior surface for the instance (``ctx["support_surface"]``, ``interior_support_surface``) and the object rests on
+    it - its bottom within ``interior_surface_tol_m`` of the board height, at its live pose or, with ``place`` (an eef pose) and
+    ``arm``, where the hand that holds it sets it down. The support leaves ``ignore``: the board above, the side walls and the back
+    panel stay obstacles for every leg of the action, and only the board pieces under the object (``board_pieces``, its footprint
+    widened by ``interior_board_margin_m``) are left out of the legs that start or end at the contact - the reach bands' rule for
+    the grasp pose (``reach_bands --surface-z``). None outside that situation (no record, the object elsewhere, the support neither
+    in ``ignore`` nor under the object): the action's collision world as it was."""
+    srf = _interior_fact(ctx.get("support_surface"))
+    if srf is None:
+        return None
+    cfg = _cfg(ctx)
+    try:
+        support = state.object(str(srf["support"]))
+        lo, hi = state.object(name).aabb
+        lo, hi = C.as_tensor(lo).float().reshape(-1)[:3].clone(), C.as_tensor(hi).float().reshape(-1)[:3].clone()
+        if place is not None:
+            shift = as_world_pose(place)[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
+            lo, hi = lo + shift, hi + shift
+        z = float(srf["z_world"])
+    except Exception as e:  # noqa: BLE001 - no scene object / AABB / hand pose: the collision world as it was
+        log.debug("interior split of %s unavailable (%r)", name, e)
+        return None
+    if abs(float(lo[2]) - z) > cfg.interior_surface_tol_m:
+        return None
+    m = float(cfg.interior_board_margin_m)
+    links = board_pieces(support, z, (float(lo[0]) - m, float(lo[1]) - m), (float(hi[0]) + m, float(hi[1]) + m), cfg)
+    was = any(o is support for o in ignore)
+    if not was and not links:
+        return None
+    note = {"support": getattr(support, "name", str(srf["support"])), "z_world": round(z, 4), "object_bottom_z": round(float(lo[2]), 4),
+            "support_was_ignored": was, "board_pieces": [f"{ln}/{mesh}" for _, ln, mesh in links]}
+    if not links:
+        note["no_board_piece"] = "no board piece of the support under the object: the whole support stays an obstacle"
+        log.warning("%s: no board piece of %s at z %.3f under it - the whole support stays an obstacle", name, note["support"], z)
+    return InteriorSplit(support, [o for o in ignore if o is not support], links, note)
+
+
+def _plan_ignored(objects: Sequence[Any], links: Sequence[Tuple[Any, ...]] = ()) -> List[str]:
+    """``ctx["plan_ignored"]``: the objects and collision pieces left out of the planner's world (``object:link[:mesh]``)."""
+    return [getattr(o, "name", str(o)) for o in objects] + [":".join([str(getattr(e[0], "name", e[0]))] + [str(v) for v in e[1:]]) for e in links]
 
 
 def escape_direction(state, pose, objects: Sequence[Any], near: float = 0.15) -> Optional[th.Tensor]:
@@ -1660,16 +1762,25 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
             supports = list(supports) + [obj_h]
             log.info("grasp(%s): %s leaves the collision world for the transit (the %s hand holds its press)", arm, action.object, hold.get("arm"))
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports] + [f"{getattr(o, 'name', o)}:{ln}" for o, ln in ignore_links]
+    # owner 2026-10-11: an object on an interior shelf keeps its support in the world - the transit to the pre-grasp plans around
+    # the whole support (the reach bands check the pre-grasp so), the approach finish leaves out only the board pieces under the object
+    split = interior_split(state, ctx, action.object, supports)
+    ignored_supports = supports if split is None else split.objects
+    if split is not None:
+        ctx["interior_support"] = {**split.note, "transit": "support present", "approach_finish": "support present except the board pieces"}
+        ctx["plan_ignored"] = _plan_ignored(split.objects, list(ignore_links) + list(split.links))
     # the transit to the pre-grasp: the goal objects and the grasp's own target are protected until the approach begins
     # (owner 2026-09-26, oracle.protection: teacup 0925-222212 / 235559 - the hand passed low over the saucer and shoved it 20 cm)
     with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
-        yield from _grasp_transit(action, motions, state, targets, ctx, arm, supports, ignore_links)
+        yield from _grasp_transit(action, motions, state, targets, ctx, arm, ignored_supports, ignore_links)
         yield from _into_witness_posture(motions, targets, ctx, arm)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
-    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(supports), max_stall=cfg.approach_finish_max_stall,
+    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(ignored_supports), max_stall=cfg.approach_finish_max_stall,
                             max_remaining=cfg.approach_finish_max_remaining)
+    if split is not None and split.links:
+        finish.ignore_links = list(split.links)
     # pre-shaped opening (owner 2026-09-16 17:10 item 4, closure probe): pads at pinch width / 2 + margin before the descent,
     # so the lower pad of a tilted grasp clears the table (the fully open pad stood on it: approach 9 mm short, one pad 3
     # steps late, the cylinder rolled 19-77 deg) and the tap-to-pinch gap is <= 1 cm per side
@@ -1684,6 +1795,8 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
         yield from motions.gripper_opening(arm, opening)
         ctx["preshape_opening_m"] = opening
     support_objs = list(supports)
+    if split is not None and not split.note["support_was_ignored"]:
+        support_objs.append(split.support)  # the board it rests on is what the fingers can stand on (no contact report found it)
     pressed: List[Any] = []
     trunk0 = motions.state.trunk_error()
 
@@ -1740,7 +1853,13 @@ def execute_lift(action: Lift, motions: Motions, state, targets, ctx) -> Iterato
     ctx["object_quat0"] = state.object_pose(action.object)[1]
     # the supports the object leaves (the table, a tray) may sit within the planner's activation distance of the
     # fingers at the grasp: out of the collision world for the finish, like the sampler's lift check
-    finish = _free_leg_finish(state, targets["lift"][-1], _witness(ctx, "lift"), contact_ignores(state, action.object), cfg)
+    supports = contact_ignores(state, action.object)
+    # owner 2026-10-11: off an interior shelf only the board pieces under the object leave it (the board above stays an obstacle)
+    split = interior_split(state, ctx, action.object, supports)
+    finish = _free_leg_finish(state, targets["lift"][-1], _witness(ctx, "lift"), supports if split is None else split.objects, cfg)
+    if split is not None:
+        finish.ignore_links = list(split.links)
+        ctx["interior_support"] = {**split.note, "lift_finish": "support present except the board pieces"}
     yield from motions.arm_along(action.arm, targets["lift"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
     if finish.used:
         ctx["lift_finish"] = finish.info
@@ -1940,6 +2059,14 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         targets = raise_place_for_inhand_pose(action, state, ctx.get("sidecar"), targets, ctx, cfg)
         if action.on and action.relation not in ("on", "into", "under"):
             targets = clear_release_of_partner(action, motions, state, targets, ctx, cfg)
+    # owner 2026-10-11: set down on an interior shelf, the object's support stays in the world - whole for the carry to the pre-place
+    # (the sampler checks the pre-place so), without the board pieces under the object for the descent and the retreat finishes
+    split = interior_split(state, ctx, action.object, on, place=targets.get("place"), arm=arm)
+    if split is not None:
+        on = split.objects
+        ctx["interior_support"] = {**split.note, "carry": "support present", "descent_finish": "support present except the board pieces",
+                                   "retreat_finish": "support present except the board pieces"}
+        ctx["plan_ignored"] = _plan_ignored(on, split.links)
     carry = list(targets.get("carry") or ())
     if cfg.carry_leg == "straight" and carry:
         # the carry leg: a straight Cartesian leg from where the hand is (the lift end) to the recorded pre-place, through
@@ -1977,6 +2104,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
         targets = attach_hover_targets(action, motions, state, targets, ctx, cfg)
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
+    if split is not None and split.links:
+        finish.ignore_links = list(split.links)
     with attach_hold_kept(action, motions, state, ctx):
         # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
         # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
@@ -2030,6 +2159,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     except Exception:  # noqa: BLE001
         pass
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore_retreat, cfg)
+    if split is not None and split.links:
+        finish.ignore_links = list(split.links)
     yield from motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
     if finish.used:
         ctx["retreat_finish"] = finish.info
@@ -2754,9 +2885,9 @@ def post_place(action: Place, state, targets, ctx) -> Optional[str]:
 
 
 def _retreat_reach(motions: Motions, arm: str, here, d1: th.Tensor, normal_out: th.Tensor, far: float, out: float, ignore: Sequence[Any],
-                   cfg: ExecuteConfig) -> Tuple[float, Dict[str, Any]]:
+                   cfg: ExecuteConfig, ignore_links: Sequence[Any] = ()) -> Tuple[float, Dict[str, Any]]:
     """The radial distance of a contact escape whose end pose ``here + d1 * far + normal_out`` the collision-aware IK
-    (``backend.solve_ik``, world minus ``ignore``) reaches from the current configuration: ``far`` itself, else
+    (``backend.solve_ik``, world minus ``ignore`` and the collision pieces ``ignore_links``) reaches from the current configuration: ``far`` itself, else
     ``far`` shortened by ``retreat_reach_factors`` in turn (never below the escape ``out`` itself, the leg's first
     segment); the shortest tried when none is reachable (the leg's finish / partial acceptance then judge it).
     Returns ``(far, probe record)``; ``far`` unchanged without a backend IK (the test stubs)."""
@@ -2767,7 +2898,7 @@ def _retreat_reach(motions: Motions, arm: str, here, d1: th.Tensor, normal_out: 
     if solve_ik is None or robot is None:
         return far, {}
     try:
-        backend.update_world(ignore_objects=ignore)
+        backend.update_world(ignore_objects=ignore, **links_kw(ignore_links))
     except Exception as e:  # noqa: BLE001
         log.debug("retreat: world update for the reach probe failed (%r)", e)
     q_seed = robot.get_joint_positions()
@@ -2791,16 +2922,16 @@ def _retreat_reach(motions: Motions, arm: str, here, d1: th.Tensor, normal_out: 
     return float(tried[-1]["far_m"]), {"tried": tried, "reachable": False}
 
 
-def _start_world_offenders(motions: Motions, state, arm: str, ignore: Sequence[Any], limit: int = 4) -> List[Any]:
+def _start_world_offenders(motions: Motions, state, arm: str, ignore: Sequence[Any], limit: int = 4, ignore_links: Sequence[Any] = ()) -> List[Any]:
     """The scene objects whose collision meshes the arm's CURRENT configuration already penetrates in the planner's
-    world with ``ignore`` applied (``R1ProCuRobo.start_world_offenders`` → ``objects_of_world_meshes``); ``[]`` when the
-    start is clear or the backend has no world model (the test stubs). Never raises: a failure here leaves the leg's
-    ignore set as it was."""
+    world with ``ignore`` (and the collision pieces ``ignore_links``) applied (``R1ProCuRobo.start_world_offenders`` →
+    ``objects_of_world_meshes``); ``[]`` when the start is clear or the backend has no world model (the test stubs). Never
+    raises: a failure here leaves the leg's ignore set as it was."""
     backend = getattr(motions, "backend", None)
     if backend is None or not hasattr(backend, "start_world_offenders") or not hasattr(backend, "objects_of_world_meshes"):
         return []
     try:
-        backend.update_world(ignore_objects=list(ignore))
+        backend.update_world(ignore_objects=list(ignore), **links_kw(ignore_links))
         q_now = backend.q_full() if hasattr(backend, "q_full") else state.robot.get_joint_positions()
         names = backend.start_world_offenders(q_now, emb_name=f"{arm}_arm", limit=limit)
         if not names:
@@ -2838,6 +2969,12 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             ignore = [state.object(action.object)] + contact_ignores(state, action.object)  # the released object and its support
         except Exception:  # noqa: BLE001
             ignore = []
+    # owner 2026-10-11: off an object on an interior shelf the support stays in the world but for the board pieces under the object
+    split = interior_split(state, ctx, action.object, ignore) if getattr(action, "object", None) else None
+    links: List[Any] = []
+    if split is not None:
+        ignore, links = split.objects, list(split.links)
+        ctx["interior_support"] = {**split.note, "retreat": "support present except the board pieces"}
     # owner 2026-09-24 item 2 (a): a retreat leaves a contact - every object the retreating hand touches where the leg STARTS is
     # out of the collision world for this leg (the partner the push pad ended against, touching 0924-200220 retreat[8]: 'start
     # configuration is in collision: world; offenders: partner_box_of_tissues'); everything else the leg meets is still a collision
@@ -2850,11 +2987,13 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
     # the partner's mesh ('IK failed [start configuration is in collision: world; offenders: ntbrtz__base_link__collision__0]'),
     # so neither the collision-checked leg nor the arm_to finish had a collision-free start. The objects owning the world
     # meshes the start already penetrates (the leg's ignore set applied) join the leg's and the finish's ignore_objects
-    start_off = _start_world_offenders(motions, state, arm, ignore)
+    start_off = _start_world_offenders(motions, state, arm, ignore, **links_kw(links))
     if start_off:
         ctx["retreat_start_offenders"] = sorted(getattr(o, "name", str(o)) for o in start_off)
         ignore = ignore + start_off
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
+    if links:
+        finish.ignore_links = list(links)
     leg = list(targets["retreat"])
     after_x = (getattr(getattr(getattr(action, "after", None), "contact", None), "extra", None) or {}) if isinstance(getattr(action, "after", None), (Push, Brace)) else {}
     if after_x.get("hold"):
@@ -2916,11 +3055,13 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             normal_out = n * out if (n is not None and radial is not None) else th.zeros(3)
             # 2026-09-22: the end pose is probed for reachability first and the radial distance shortened when the arm
             # cannot get there (0918-000750: 13 mm unreachable, the straight leg toward it folded the elbow into the upper arm)
-            far_used, probe = _retreat_reach(motions, arm, here, d1, normal_out, far, out, ignore, cfg)
+            far_used, probe = _retreat_reach(motions, arm, here, d1, normal_out, far, out, ignore, cfg, **links_kw(links))
             end = here[0] + d1 * far_used + normal_out
             leg = [(here[0] + d1 * out, here[1]), (end, here[1])]
             targets["retreat"] = leg
             finish = _free_leg_finish(state, leg[-1], None, ignore, cfg)
+            if links:
+                finish.ignore_links = list(links)
             ctx["retreat_escape"] = {"radial": None if radial is None else [round(float(v), 3) for v in radial.tolist()],
                                      "normal": None if n is None else [round(float(v), 3) for v in n.tolist()], "distance_m": far_used}
             if far_used < far - 1e-6:
@@ -2930,7 +3071,8 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
     start_pose = as_world_pose(state.eef_pose(arm))
     try:
         yield from motions.arm_along(arm, leg, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free,
-                                     check_collisions=bool(cfg.retreat_check_collisions), limit_margin=float(cfg.retreat_limit_margin_rad), ignore_objects=ignore)
+                                     check_collisions=bool(cfg.retreat_check_collisions), limit_margin=float(cfg.retreat_limit_margin_rad), ignore_objects=ignore,
+                                     **links_kw(links))
     except SkillError as e:
         # rush 2026-09-17 (touching 0917-204511): the converged prefix of the leg is executed before the finish is
         # rejected (witness and cuRobo IK both in another branch); a free-space retreat that already stands within
@@ -2951,7 +3093,7 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             # lower limit at waypoint 3/11, both attempts): only here, where the action fails otherwise - a planned transit to the leg's
             # end pose from where the hand is (the same ignore set: the released object, its support, what the start touches)
             try:
-                yield from motions.arm_to(arm, pose=targets["retreat"][-1], ignore_objects=list(ignore))
+                yield from motions.arm_to(arm, pose=targets["retreat"][-1], ignore_objects=list(ignore), **links_kw(links))
             except SkillError as e2:
                 raise SkillError(e.reason, f"{e.message}; planned transit to the retreat's end pose: {e2.message[:160]}", **dict(getattr(e, "details", {}) or {})) from e
             ctx["retreat_planned_fallback"] = {"leg_failure": e.message[:200], "moved_m": round(moved, 4), "short_m": round(dp, 4)}

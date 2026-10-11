@@ -331,6 +331,15 @@ class ApproachFinish:
     max_excursion: float = 0.6
     used: bool = False
     info: Optional[Dict[str, Any]] = None
+    #: single collision pieces ``(object, link, mesh)`` out of the finishing plan's world as well (``R1ProCuRobo.update_world``):
+    #: the board pieces under an object on an interior shelf, whose support stays an obstacle otherwise (``execute.interior_split``)
+    ignore_links: Sequence[Any] = ()
+
+
+def links_kw(links: Sequence[Any]) -> Dict[str, Any]:
+    """The ``ignore_links`` keyword of a world update / ``arm_to`` for ``links``; empty when there are none, so that call is the one
+    made without them (a backend without link-level ignores never sees the keyword)."""
+    return {"ignore_links": list(links)} if links else {}
 
 
 class PathTracker(BaseTrajectoryTracker):
@@ -1580,7 +1589,7 @@ class Motions:
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
                   soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False, converge: bool = True,
                   check_collisions: bool = False, limit_margin: float = 0.0, ignore_objects: Sequence[Any] = (), soft_rot_tol: Optional[float] = None,
-                  refine_jumps: bool = True) -> Iterator[th.Tensor]:
+                  refine_jumps: bool = True, ignore_links: Sequence[Any] = ()) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto by default (contact motions must touch —
@@ -1588,7 +1597,7 @@ class Motions:
         reached from the current configuration.
 
         ``check_collisions`` (free-space legs, 2026-09-22): the joint path is validated against the world (minus
-        ``ignore_objects``) and the robot itself; the collision-free prefix is executed and the rest finished by
+        ``ignore_objects`` and the collision pieces ``ignore_links``) and the robot itself; the collision-free prefix is executed and the rest finished by
         ``arm_to`` when a ``finish`` is given (or kept as is for a ``partial`` leg), else the leg fails ``plan_failed``
         (stage ``collision``). ``limit_margin`` (rad) keeps the differential IK this far from the joint limits (the
         0918-000750 retreat folded the elbow into its own upper arm 3 mrad short of the limit and the drive fought that
@@ -1622,7 +1631,7 @@ class Motions:
             dense = [start] + dense
         if check_collisions:
             try:
-                self.backend.update_world(ignore_objects=ignore_objects)
+                self.backend.update_world(ignore_objects=ignore_objects, **links_kw(ignore_links))
             except Exception as e:  # noqa: BLE001 - a backend without a world model (the test stubs) checks nothing
                 log.debug("arm_along(%s): world update for the collision check failed (%r)", arm, e)
         extra_kw: Dict[str, Any] = {"limit_margin": float(limit_margin)} if limit_margin > 0.0 else {}
@@ -1684,13 +1693,15 @@ class Motions:
                                 f" [{pairs}]" if pairs else "")
                     by = "witness" if finish.q_hint is not None else "curobo_ik"
                     try:
-                        yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion,
+                                               **links_kw(getattr(finish, "ignore_links", ())))
                     except SkillError as e:
                         if finish.q_hint is None or e.details.get("excursion") is None:
                             raise
                         log.warning("arm_along(%s): finish toward the witness rejected (%s) -> finishing by cuRobo IK in the current branch", arm, e.message)
                         by = "curobo_ik_fallback"
-                        yield from self.arm_to(arm, pose=finish.pose, q_hint=None, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=None, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion,
+                                               **links_kw(getattr(finish, "ignore_links", ())))
                     finish.used = True
                     finish.info = {"collision": diag.get("kind"), "self_collision": diag.get("self_collision"), "converged": n_ok, "n_dense": len(dense), "by": by}
                     return
@@ -1711,7 +1722,8 @@ class Motions:
                         yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm])
                     by = "witness" if finish.q_hint is not None else "curobo_ik"
                     try:
-                        yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion,
+                                               **links_kw(getattr(finish, "ignore_links", ())))
                     except SkillError as e:
                         # the recorded witness sits in another IK branch (touching 0917-203700 retreat: 3.29 rad away): the
                         # plan is rejected before any motion, so finish without the hint - cuRobo's IK from the current
@@ -1720,7 +1732,8 @@ class Motions:
                             raise
                         log.warning("arm_along(%s): finish toward the witness rejected (%s) -> finishing by cuRobo IK in the current branch", arm, e.message)
                         by = "curobo_ik_fallback"
-                        yield from self.arm_to(arm, pose=finish.pose, q_hint=None, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=None, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion,
+                                               **links_kw(getattr(finish, "ignore_links", ())))
                     finish.used = True
                     finish.info = {"stall_m": stall, "remaining_m": remaining, "converged": int(diag.get("converged", 0)), "n_dense": len(dense), "by": by}
                     return

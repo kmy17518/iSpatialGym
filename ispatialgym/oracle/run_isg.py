@@ -1156,6 +1156,13 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
                             tracked_objects=tracked, cam_key=cam_key)
         executor.last_obs, executor.last_info = obs, info
+        # owner 2026-10-11: the template's objects start on an interior support surface (a shelf inside a bookcase / wardrobe / hall
+        # tree, template_meta template_facts.support_surface): the support stays an obstacle but for the board under the object
+        executor.support_surface = _execute.interior_support_surface(loader.tmeta)
+        if executor.support_surface is not None:
+            meta["interior_support_surface"] = {k: executor.support_surface.get(k) for k in ("support", "z_world", "z_above_floor", "open_edges", "why")}
+            log.info("interior support surface: %s at z %.3f - the oracle keeps it as an obstacle except its board pieces under the object",
+                     executor.support_surface["support"], float(executor.support_surface["z_world"]))
         # oracle.protection (owner 2026-09-26): the goal objects the task placed are protected during transits - plan-time
         # clearance check with a via-above re-plan, run-time contact / movement verdicts (ISG_PROTECT=off disables both)
         if os.environ.get("ISG_PROTECT", "on").lower() not in ("off", "0", "false"):
