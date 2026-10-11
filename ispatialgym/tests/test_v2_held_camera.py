@@ -417,6 +417,7 @@ def test_rotation_axes_one_per_antipodal_pair():
 
 
 def test_rotation_goal_set_angle_range():
+    """The 15° grid (the start set's, ``rotation_start_set``; the goal is drawn continuously)."""
     goals = HO.rotation_goal_set([30.0, 120.0], 15.0)
     mags = sorted({abs(a) for _, a in goals})
     assert mags == [30.0, 45.0, 60.0, 75.0, 90.0, 105.0, 120.0]
@@ -425,6 +426,30 @@ def test_rotation_goal_set_angle_range():
     assert any(a < 0 for _, a in goals) and any(a > 0 for _, a in goals)
     with pytest.raises(ValueError):
         HO.rotation_goal_set([0.0, 120.0])
+
+
+def test_draw_rotation_goals_draws_continuous_signed_angles_about_the_13_axes():
+    """Owner 2026-10-11: every goal candidate is one of the 13 axes (uniform), |angle| ~ U(goal_angle_range_deg) - off the
+    15° grid - and a sign + / − alike; the same seed draws the same candidates."""
+    n = 4000
+    goals = HO.draw_rotation_goals(np.random.default_rng(0), [30.0, 120.0], n)
+    mags = np.array([abs(a) for _, a in goals])
+    assert len(goals) == n and mags.min() >= 30.0 and mags.max() <= 120.0
+    off_grid = np.minimum(np.remainder(mags, 15.0), 15.0 - np.remainder(mags, 15.0))
+    assert (off_grid > 1e-6).all() and len(set(mags.tolist())) == n
+    hist, _ = np.histogram(mags, bins=9, range=(30.0, 120.0))
+    assert hist.min() > 0.8 * n / 9 and hist.max() < 1.2 * n / 9  # uniform in the range
+    assert 0.45 < np.mean([a > 0 for _, a in goals]) < 0.55
+    axes = HO.rotation_axes()
+    idx = [int(th.argmin(th.linalg.norm(axes - ax, dim=1))) for ax, _ in goals]
+    assert all(th.equal(ax, axes[i]) for (ax, _), i in zip(goals, idx)) and set(idx) == set(range(13))
+    a, b = (HO.draw_rotation_goals(np.random.default_rng(7), [30.0, 120.0], 16) for _ in range(2))
+    c = HO.draw_rotation_goals(np.random.default_rng(8), [30.0, 120.0], 16)
+    assert [(x.tolist(), d) for x, d in a] == [(x.tolist(), d) for x, d in b] and [d for _, d in a] != [d for _, d in c]
+    # a narrower range is honoured; a range touching 0 is not a goal range
+    assert all(45.0 <= abs(d) <= 50.0 for _, d in HO.draw_rotation_goals(np.random.default_rng(1), [45.0, 50.0], 200))
+    with pytest.raises(ValueError):
+        HO.draw_rotation_goals(np.random.default_rng(0), [0.0, 120.0], 4)
 
 
 def test_depth_tolerance_floor_and_fraction():
@@ -485,7 +510,10 @@ def test_generation_waypoints_default_is_three():
     osc = GD.defaults_for("object_scaling")
     assert (osc["depth_search_range_m"], osc["depth_search_grid_m"], osc["depth_margin_m"], osc["min_depth_change_m"]) == ([0.15, 0.55], 0.01, 0.02, 0.05)
     assert "goal_depth_range_m" not in osc and "goal_depth_grid_m" not in osc
-    assert "depth_search_range_m" not in GD.defaults_for("mental_rotation")
+    mr = GD.defaults_for("mental_rotation")
+    assert "depth_search_range_m" not in mr and "goal_draws_per_start" not in osc
+    assert (mr["goal_angle_range_deg"], mr["goal_draws_per_start"], mr["init_angle_range_deg"]) == ([30.0, 120.0], 192, [0.0, 180.0])
+    assert mr["goal_draws_per_start"] >= 2 * HO.MentalRotationV2.GOAL_SCREEN_MAX
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -723,8 +751,9 @@ def _mr_sampler(monkeypatch, kit):
     from ispatialgym.sampling.v2.stances import SidecarDraft
 
     s = object.__new__(HO.MentalRotationV2)
+    # a customs entry seeded before goal_draws_per_start existed: ``g`` takes it from generation_defaults
     gen = {"init_angle_range_deg": [0.0, 180.0], "goal_angle_range_deg": [30.0, 120.0], "waypoints": 3, "tolerances": {"orientation": 0.15}}
-    s.g = lambda key, default=None: gen[key]
+    s.subtask, s.gen = "mental_rotation", (lambda key, default=None: gen.get(key, default))
     s.kit, s.arm, s.hold, s.hold_arm, s.prior, s.grasp_stats, s.equivalences = kit, "right", HO.HoldConstants(), {}, {}, {}, None
     s.eef_in_base = (th.tensor([0.5, 0.0, 1.2]), C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), 0.4))
     s.cam_in_base = (th.tensor([0.1, 0.0, 1.5]), C.IDENTITY_QUAT.clone())
@@ -754,8 +783,9 @@ def test_mental_rotation_draws_a_start_and_turns_it_to_the_goal(monkeypatch):
     s.precompute_options()
     opts = s.options["grasp_0"]
     assert len(opts) == 1 + 13 * 12 * 2 and opts[0]["info"]["angle_deg"] == 0.0 and s.template_facts["start_options"]["feasible"] == len(opts)
-    assert s.template_meta["init_orientation"]["drawn"]
-    starts = set()
+    assert s.template_meta["init_orientation"]["drawn"] and s.template_meta["init_orientation"]["goal_angle"] == "continuous"
+    assert s.template_meta["init_orientation"]["goal_draws_per_start"] == 192
+    starts, angles = set(), []
     for seed in range(6):
         s.sidecar.reset_instance() if hasattr(s.sidecar, "reset_instance") else None
         d = s.sample_instance(np.random.default_rng(seed))
@@ -766,13 +796,21 @@ def test_mental_rotation_draws_a_start_and_turns_it_to_the_goal(monkeypatch):
         assert th.allclose(G_t(goal[0]), G_t(obj0[0]))  # the object turns in place
         want = HO.turned_about_root(obj0, base2d[2], info["axis_base"], info["angle_deg"])
         assert C.quat_angle(goal[1], want[1]) < 1e-5
+        assert any(th.allclose(G_t(info["axis_base"]), ax) for ax in HO.rotation_axes())  # one of the 13 axes
         # the start is the hold's object turned by the recorded start rotation
         opt = next(o for o in opts if o["info"] == {k: v for k, v in info["start"].items() if k != "axis_world"})
         assert th.allclose(d.robot_q, s.kit.q_at_base_pose(opt["q_rel"], *base2d))
         rec = s.sidecar.grasp_of("block_0")
         assert len(rec.waypoints) == 4 and th.allclose(G_t(rec.waypoints[-1][0]), G_t(C.compose(goal, s.grasps[0].pose)[0]), atol=1e-5)
+        assert s.sidecar.language["goal_numbers"]["angle_deg"] == pytest.approx(info["angle_deg"])
         starts.add(info["start"]["angle_deg"])
+        angles.append(info["angle_deg"])
     assert len(starts) > 1  # not always the hold's orientation
+    # owner 2026-10-11: the goal angle is continuous - off the 15° grid - and the same seed draws the same goal
+    assert all(min(abs(a) % 15.0, 15.0 - abs(a) % 15.0) > 1e-3 for a in angles) and len(set(angles)) == len(angles)
+    s.sidecar.reset_instance()
+    again = s.sample_instance(np.random.default_rng(5)).summary["goal"]
+    assert again["angle_deg"] == angles[5] and again["axis_base"] == info["axis_base"] and again["start"] == info["start"]
 
 
 def test_mental_rotation_without_a_reachable_goal_rejects_the_attempt(monkeypatch):
@@ -788,6 +826,183 @@ def test_mental_rotation_without_a_reachable_goal_rejects_the_attempt(monkeypatc
     with pytest.raises(Reject) as e:
         s.precompute_options()
     assert e.value.reason == "goal_infeasible"
+
+
+def test_mental_rotation_screens_the_first_draws_in_frame(monkeypatch):
+    """Per start ``goal_draws_per_start`` (192) continuous candidates; the first ``GOAL_SCREEN_MAX`` (96) that keep the
+    object in frame go to the screening IK (3 waypoints + the goal each), fewer in frame: all of them, none: no goal."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    kit = _MRKit()
+    batches, ik_batch = [], kit.ik_batch
+    kit.ik_batch = lambda poses, q_seed, arm="right", **kw: batches.append(len(poses)) or ik_batch(poses, q_seed, arm, **kw)
+    s = _mr_sampler(monkeypatch, kit)
+    s.precompute_options()
+    calls = []
+    for every, examined, screened in ((1, 96, 96), (3, 192, 64)):
+        calls.clear()
+        batches.clear()
+        s.whole_in_frame = lambda cam, pose, every=every: calls.append(1) is None and (len(calls) - 1) % every == 0
+        s.sidecar.reset_instance()
+        s.sample_instance(np.random.default_rng(0))
+        assert len(calls) == examined and batches == [4 * screened]
+    s.whole_in_frame = lambda cam, pose: False
+    s.sidecar.reset_instance()
+    with pytest.raises(Reject) as e:
+        s.sample_instance(np.random.default_rng(0))
+    assert e.value.reason == "goal_infeasible" and "no goal in frame" in str(e.value)
+
+
+def test_mental_rotation_spreads_its_instances_over_the_grasps(monkeypatch):
+    """Three rows, six kept instances at run_instances' attempt seeds: two each; the summary records the attempt's order and
+    the counts it was sorted by (owner 2026-10-11)."""
+    from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.sampling.v2.core import SamplerV2
+
+    s = _mr_sampler(monkeypatch, _MRKit())
+    s.grasps = [GL.Grasp("block__f", f"grasp_{i}", th.tensor([0.0, 0.01 * i, 0.05]), C.IDENTITY_QUAT.clone(), [0.01, 0.01]) for i in range(3)]
+    s.precompute_options()
+    monkeypatch.setattr(SamplerV2, "constraints_write_back", lambda self, draft, iid: [])
+    used = []
+    for index in range(6):
+        s.sidecar.reset_instance()
+        d = s.sample_instance(np.random.default_rng(index * 1009))
+        name, spread = d.summary["grasp"]["name"], d.summary["grasp"]["spread"]
+        assert spread["order"][0] == name and spread["instances"][name] == min(spread["instances"].values()) and spread["flagged"] == []
+        assert d.extras["grasps"][0]["grasp_name"] == name
+        s.constraints_write_back(d, f"iid_{index}")
+        used.append(name)
+    assert sorted(used[:3]) == sorted(used[3:]) == ["grasp_0", "grasp_1", "grasp_2"]
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# held object: grasps spread over a template's instances (owner 2026-10-11)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _spread_sampler(n=5, flagged=(), verdicts=None):
+    """An ``ObjectScalingV2`` whose ``n`` library rows all have options; rows in ``flagged`` carry the tolerated
+    ``one_finger`` flag, ``verdicts`` = {row: reviewer verdict}."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    s = object.__new__(HO.ObjectScalingV2)
+    s.grasps = [GL.Grasp("mug__ppzttc", f"grasp_{i}", th.zeros(3), C.IDENTITY_QUAT.clone(), [0.01, 0.01], flags=(["one_finger"] if i in flagged else []),
+                         verdict=(verdicts or {}).get(i, "ok")) for i in range(n)]
+    s.options = {g.name: {"window": (0.22, 0.51), "reference_depth": 0.5} for g in s.grasps}
+    s.grasp_stats, s.prior, s.grasp_key = {}, {}, "mug__ppzttc"
+    return s
+
+
+def test_spread_order_least_used_unflagged_first_ties_random():
+    names = ["a", "b", "c", "d", "e"]
+    uses = {"a": 2, "b": 0, "c": 1, "d": 0}
+    tails = set()
+    for seed in range(40):
+        order = HO.spread_order(np.random.default_rng(seed), names, uses, flagged=["e", "b"])
+        assert order[:3] == ["d", "c", "a"] and sorted(order[3:]) == ["b", "e"]  # the flagged rows last, whatever their uses
+        tails.add(tuple(order[3:]))
+    assert tails == {("b", "e"), ("e", "b")}  # ties in a random order
+    assert len({tuple(HO.spread_order(np.random.default_rng(seed), names, {}, ())) for seed in range(200)}) > 50
+
+
+def test_grasp_order_spreads_a_templates_instances_over_the_unflagged_grasps():
+    """Every instance takes the least used unflagged row (ties random): 5 rows, 12 instances -> 2 or 3 each, no row a third
+    before every row has two; the flagged row stays behind."""
+    s = _spread_sampler(6, flagged=(5,))
+    for index in range(12):
+        order = s.grasp_order(np.random.default_rng(index * 1009))
+        chosen = order[0]
+        assert s.grasp_uses(chosen) == min(s.grasp_uses(f"grasp_{i}") for i in range(5)) and order[-1] == "grasp_5"
+        s.count_grasp(chosen, "instances")
+        counts = [s.grasp_stats.get(f"grasp_{i}", {}).get("instances", 0) for i in range(5)]
+        assert max(counts) - min(counts) <= 1
+    assert sorted(counts) == [2, 2, 2, 3, 3] and "grasp_5" not in s.grasp_stats
+
+
+def test_flagged_rows_stay_the_fallback():
+    """A tolerated flag (``one_finger``) or a verdict other than ok puts a row behind every unflagged row, however often those
+    were used; with only flagged rows left they are spread among themselves."""
+    s = _spread_sampler(4, flagged=(0,), verdicts={1: "flag"})
+    for i in (2, 3):
+        for _ in range(5):
+            s.count_grasp(f"grasp_{i}", "instances")
+    for seed in range(50):
+        order = s.grasp_order(np.random.default_rng(seed))
+        assert set(order[:2]) == {"grasp_2", "grasp_3"} and set(order[2:]) == {"grasp_0", "grasp_1"}
+    del s.options["grasp_2"], s.options["grasp_3"]
+    s.count_grasp("grasp_0", "instances")
+    assert all(s.grasp_order(np.random.default_rng(seed)) == ["grasp_1", "grasp_0"] for seed in range(20))
+    assert s.spread_record(["grasp_1", "grasp_0"])["flagged"] == ["grasp_1", "grasp_0"]
+
+
+def test_a_failed_attach_pushes_the_row_back_by_one_use():
+    """A failed attach counts as one use: the row is not first on the next attempt while rows used as often remain, and a
+    row whose attach always fails is tried about once per round of the others instead of on every attempt."""
+    s = _spread_sampler(5)
+    s.count_grasp("grasp_3", "attach_failed")
+    assert all(s.grasp_order(np.random.default_rng(seed))[-1] == "grasp_3" for seed in range(50))
+    # run_instances' attempt seeds; the attempt takes the first row of the order and the broken row's attach rejects it
+    s = _spread_sampler(5)
+    tries = 0
+    for index in range(10):
+        for attempt in range(30):
+            chosen = s.grasp_order(np.random.default_rng(index * 1009 + attempt))[0]
+            if chosen == "grasp_3":
+                tries += 1
+                s.count_grasp(chosen, "attach_failed")
+                continue
+            s.count_grasp(chosen, "instances")
+            break
+    good = [s.grasp_stats[f"grasp_{i}"]["instances"] for i in (0, 1, 2, 4)]
+    assert sum(good) == 10 and max(good) - min(good) <= 1
+    assert 1 <= tries <= 3 and s.grasp_stats["grasp_3"] == {"instances": 0, "attach_failed": tries}
+
+
+def test_uses_count_kept_instances_and_failed_attaches_not_attach_successes(monkeypatch):
+    """A failed attach counts at once (``apply_draft``, the rejection names the row); a successful attach does not count -
+    the instance counts when the core keeps it (``constraints_write_back``, after the goal-occlusion gate)."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.tasks.base import Draft
+    from ispatialgym.sampling.v2.core import SamplerV2
+
+    class Stop(Exception):
+        pass
+
+    def stop():
+        raise Stop
+
+    def fail(obj, pose):
+        raise Reject("grasp_failed", "assisted grasping did not attach the object (both pads in contact)")
+
+    s = _spread_sampler(3)
+    target = SimpleNamespace(name="mug_0", set_position_orientation=lambda p, q: None, disable_gravity=lambda: None, wake=lambda: None,
+                             keep_still=lambda: None, get_position_orientation=stop)
+    s.kit, s.obj, s.bindings, s.grasp_debug = SimpleNamespace(apply=lambda q, base: None), (lambda role: target), SimpleNamespace(one=lambda role: target), {}
+    d = Draft(robot_q=th.zeros(28), object_poses={"mug_0": (th.zeros(3), C.IDENTITY_QUAT.clone())}, extras={"grasps": [{"grasp_name": "grasp_1"}]})
+    s.establish_grasp = fail
+    with pytest.raises(Reject) as e:
+        s.apply_draft(d)
+    assert e.value.details["grasp"] == "grasp_1" and s.grasp_stats == {"grasp_1": {"instances": 0, "attach_failed": 1}}
+    s.establish_grasp = lambda obj, pose: None
+    with pytest.raises(Stop):  # attached: apply_draft goes on to read the realised pose
+        s.apply_draft(d)
+    assert s.grasp_stats == {"grasp_1": {"instances": 0, "attach_failed": 1}}
+    monkeypatch.setattr(SamplerV2, "constraints_write_back", lambda self, draft, iid: ["records"])
+    assert s.constraints_write_back(d, "iid") == ["records"]
+    assert s.grasp_stats == {"grasp_1": {"instances": 1, "attach_failed": 1}} and s.grasp_uses("grasp_1") == 2
+
+
+def test_one_instance_per_template_takes_a_uniformly_random_unflagged_grasp_whatever_the_prior():
+    """The eval runs (one instance per template): the order is seeded (the same seed, the same order) and over seeds every
+    unflagged row comes first equally often - also with a B7 prior in which one row is far more visible than the rest."""
+    s = _spread_sampler(6, flagged=(5,))
+    s.prior = {("mug__ppzttc", f"grasp_{i}"): {"visible_fraction": 0.99 if i == 4 else 0.41, "in_frame": True} for i in range(6)}
+    assert s.grasp_order(np.random.default_rng(17)) == s.grasp_order(np.random.default_rng(17))
+    firsts = [s.grasp_order(np.random.default_rng(seed))[0] for seed in range(2000)]
+    freq = {n: firsts.count(n) / len(firsts) for n in s.options}
+    assert freq["grasp_5"] == 0.0 and all(0.16 < freq[f"grasp_{i}"] < 0.24 for i in range(5)), freq
 
 
 def G_t(x):

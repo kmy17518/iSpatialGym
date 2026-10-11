@@ -24,9 +24,12 @@ has its own cache key (arm + approach), ``left_arm_q`` fields and no B7 prior (t
 
 Grasp: a library grasp of the ``floating`` pipeline (§2.2), realised as v1 §5.2 (fingers advanced 1 mm/step until both
 pads touch, 4 mm press through the assisted-grasp window, gravity re-enabled, still held); a row whose attach fails is
-``Reject("grasp_failed")`` and the next row is tried on the next attempt — never an AABB heuristic. The realised
-grasp (finger joints, object pose in the eef frame, key / name) is what the TRO ``grasps[0]`` stores (loader
-contract §3.14).
+``Reject("grasp_failed")`` — never an AABB heuristic. The realised grasp (finger joints, object pose in the eef frame,
+key / name) is what the TRO ``grasps[0]`` stores (loader contract §3.14). Which row (owner 2026-10-11: diverse grasps
+across a template's instances unless flagged, :meth:`HeldObjectV2.grasp_order`): every attempt tries the rows with options
+least used first - an instance written with the row is one use, a failed attach counts as one more - unflagged rows
+before flagged ones, ties in a random order from the attempt RNG; with one instance per template that is a uniformly
+random unflagged row.
 
 Option sets are precomputed **once per template** (they depend on the hold and the object, not on the base pose). Mental
 rotation (owner 2026-10-11: start and goal orientations both drawn) = per grasp the **start set**: the hold's object
@@ -34,23 +37,24 @@ turned about its root by 13 rotation axes (face / edge / corner directions of th
 signed angles on a 15° grid inside ``init_angle_range_deg`` (0 = the hold itself), whole object in frame (5 %), the hand
 pose reached by the screening IK from the hold with the holding arm's embodiment only (the oracle moves the arm, not the
 torso) and the object attached; each instance draws a (grasp, start), places the start configuration at a free base
-pose, and draws the goal = the start turned about the object root by the same axes × the 15° grid inside
-``goal_angle_range_deg`` (position unchanged), screened at the three intermediate waypoints of §3.9 (SLERP about the
-object root, ``conventions.orbit_waypoints``) and confirmed once with the exact IK at its base pose (principle 3), with
-the held object attached, whole-body collision-free at every checked pose. Object scaling (owner
-2026-09-26) = per grasp the reachable **depth window**: the object at the reference hold slid along the optical axis
-over the ``depth_search_grid_m`` grid of ``depth_search_range_m``, a depth passing when the object is in frame and the
-screening IK reaches the hand pose, the continuous run through the reference depth shrunk by ``depth_margin_m``; each
-instance draws a start depth and a goal depth uniformly in the window with ``|d1 − d0| ≥ min_depth_change_m`` (toward
-or away from the camera), solves the start configuration by IK from the default posture and confirms the straight
-move (``conventions.line_waypoints``) with the exact IK at its base pose.
+pose, and draws the goal = the start turned about the object root by one of the same 13 axes and a continuous angle
+(owner 2026-10-11: magnitude ~ U(``goal_angle_range_deg``), sign + / − alike; position unchanged), screened at the three
+intermediate waypoints of §3.9 (SLERP about the object root, ``conventions.orbit_waypoints``) and confirmed once with the
+exact IK at its base pose (principle 3), with the held object attached, whole-body collision-free at every checked
+pose. Object scaling (owner 2026-09-26) = per grasp the reachable **depth window**: the object at the reference hold
+slid along the optical axis over the ``depth_search_grid_m`` grid of ``depth_search_range_m``, a depth passing when the
+object is in frame and the screening IK reaches the hand pose, the continuous run through the reference depth shrunk by
+``depth_margin_m``; each instance draws a start depth and a goal depth uniformly in the window with
+``|d1 − d0| ≥ min_depth_change_m`` (toward or away from the camera), solves the start configuration by IK from the
+default posture and confirms the straight move (``conventions.line_waypoints``) with the exact IK at its base pose.
 
 Visibility: ≥ ``min_visible_fraction`` (40 %) of the object visible at init and at the goal (segmentation render with
 and without the robot) and the whole object in frame. The B7 prior (``runlogs/held_visibility_20260915/visibility.json``,
-``scripts/held_visibility/survey.py``) skips library rows whose surveyed visible fraction is below the threshold
-before they are realised; it applies only at the hold it was rendered at (its ``hold`` record, roll 15°), so at any
-other hold every row is realised and measured by the renders. Mental rotation starts away from that hold (2026-10-11):
-there the prior only orders the rows, every start is measured by the renders.
+``scripts/held_visibility/survey.py``) is a filter only: object scaling skips library rows whose surveyed visible
+fraction is below the threshold before they are realised; it applies only at the hold it was rendered at (its ``hold``
+record, roll 15°), so at any other hold every row is realised and measured by the renders. Mental rotation does not use
+it: its starts and goals turn the object away from that hold (2026-10-11), and it no longer orders the rows (owner
+2026-10-11), so every start and goal is measured by the renders.
 
 TRO: ``grasps[0]`` (agent, arm, object, key, name, ``object_pose_in_eef_frame``, ``finger_q``, ``ag_anchor_in_eef``) and
 ``robot_state.controller_targets`` (the drive targets the start settled under, which the instance loader holds), both
@@ -111,7 +115,8 @@ PIPELINE = "floating"
 FLOATING_SUFFIXES = ("", "__f", "__sf", "__h")
 HOLD_CACHE_PATH = os.environ.get("ISPATIALGYM_HELD_HOLD_CACHE", os.path.expanduser("~/.cache/ispatialgym/held_hold.json"))
 VISIBILITY_PRIOR_PATH = os.environ.get("ISPATIALGYM_HELD_VISIBILITY", os.path.join(REPO_ROOT, "runlogs", "held_visibility_20260915", "visibility.json"))
-#: angle grid of the precomputed rotation set (the instance draws one element; 15° keeps the set at 13 x 14 candidates)
+#: angle grid of the precomputed mental-rotation start set (``rotation_start_set``: 13 axes x 12 angles x 2 signs + the hold
+#: for 0-180°); the goal angle is continuous (``draw_rotation_goals``)
 ROTATION_ANGLE_STEP_DEG = 15.0
 #: assisted-grasp window + margin: control steps the press is held while OmniGibson creates the grasp joint
 GRASP_ATTACH_STEPS = 90
@@ -283,8 +288,8 @@ def slide_to_depth(eef: C.Pose, eef_in_object: C.Pose, cam_pos, axis: th.Tensor,
 
 def rotation_axes() -> th.Tensor:
     """13 rotation axes in the base frame, one per antipodal pair of the 26 face / edge / corner directions of a cube
-    (unit vectors): the precomputed mental-rotation set is these axes × the signed angle grid, so a rotation by −θ
-    about n covers the antipodal axis."""
+    (unit vectors): the mental-rotation start set is these axes × the signed angle grid and every goal candidate one of
+    them × a signed angle, so a rotation by −θ about n covers the antipodal axis."""
     dirs = []
     for x in (-1, 0, 1):
         for y in (-1, 0, 1):
@@ -300,8 +305,10 @@ def rotation_axes() -> th.Tensor:
 
 def rotation_goal_set(angle_range_deg: Sequence[float], step_deg: float = ROTATION_ANGLE_STEP_DEG,
                       axes: Optional[th.Tensor] = None) -> List[Tuple[th.Tensor, float]]:
-    """Mental-rotation candidates ``(axis (3,) base frame, signed angle deg)``: every axis of :func:`rotation_axes` ×
-    the ``step_deg`` grid of magnitudes inside ``angle_range_deg`` (inclusive), both signs."""
+    """Mental-rotation candidates on a grid ``(axis (3,) base frame, signed angle deg)``: every axis of
+    :func:`rotation_axes` × the ``step_deg`` grid of magnitudes inside ``angle_range_deg`` (inclusive), both signs. The
+    grid of the start set (:func:`rotation_start_set`) and of ``scripts/held_comfort``; the sampler draws the goal angle
+    continuously (:func:`draw_rotation_goals`)."""
     lo, hi = float(angle_range_deg[0]), float(angle_range_deg[1])
     if not (0.0 < lo <= hi):
         raise ValueError(f"goal_angle_range_deg must satisfy 0 < lo <= hi, got {angle_range_deg}")
@@ -331,6 +338,22 @@ def rotation_start_set(angle_range_deg: Sequence[float], step_deg: float = ROTAT
     if lo <= hi:
         out += rotation_goal_set([lo, hi], step_deg, axes)
     return out
+
+
+def draw_rotation_goals(rng: np.random.Generator, angle_range_deg: Sequence[float], n: int,
+                        axes: Optional[th.Tensor] = None) -> List[Tuple[th.Tensor, float]]:
+    """``n`` mental-rotation goal candidates ``(axis (3,) base frame, signed angle deg)`` drawn from ``rng`` (owner
+    2026-10-11: the goal angle is continuous): each an axis of :func:`rotation_axes` (uniform), a magnitude ~ U(lo, hi) of
+    ``angle_range_deg`` and a sign + / − with probability ½. All ``n`` are drawn at once, so the draws that follow in
+    ``rng`` do not depend on how many candidates the caller uses."""
+    lo, hi = float(angle_range_deg[0]), float(angle_range_deg[1])
+    if not (0.0 < lo <= hi):
+        raise ValueError(f"goal_angle_range_deg must satisfy 0 < lo <= hi, got {angle_range_deg}")
+    axes = rotation_axes() if axes is None else axes
+    which = rng.integers(len(axes), size=int(n))
+    mags = rng.uniform(lo, hi, size=int(n))
+    signs = np.where(rng.random(int(n)) < 0.5, 1.0, -1.0)
+    return [(axes[int(k)].clone(), float(s * m)) for k, m, s in zip(which, mags, signs)]
 
 
 def turned_about_root(obj: C.Pose, base_yaw: float, axis_base, angle_deg: float) -> C.Pose:
@@ -413,6 +436,16 @@ def prior_admits(prior: Dict[Tuple[str, str], Dict[str, Any]], grasp_key: str, g
     if rec is None or rec.get("visible_fraction") is None:
         return None
     return bool(rec.get("in_frame", True)) and float(rec["visible_fraction"]) >= float(min_fraction)
+
+
+def spread_order(rng: np.random.Generator, names: Sequence[str], uses: Dict[str, int], flagged: Sequence[str] = ()) -> List[str]:
+    """``names`` in the order an attempt tries them (owner 2026-10-11: grasps spread over a template's instances): the rows
+    not in ``flagged`` first, then the fewest ``uses`` first, ties in a random order (one permutation from ``rng``, then a
+    stable sort)."""
+    order = [names[i] for i in rng.permutation(len(names))]
+    last = set(flagged)
+    order.sort(key=lambda n: (n in last, int(uses.get(n, 0))))
+    return order
 
 
 def floating_key(category: str, model: str, preferred: Optional[str]) -> str:
@@ -510,6 +543,7 @@ class HeldObjectV2(SamplerV2):
         self.grasps: List[GL.Grasp] = []
         self.grasp_key: Optional[str] = None
         self.options: Dict[str, List[Dict[str, Any]]] = {}  # grasp name -> feasible goal options (base frame)
+        # grasp name -> {"instances": instances written with it, "attach_failed": failed attaches}, this sampler's (grasp_order)
         self.grasp_stats: Dict[str, Dict[str, int]] = {}
         self.grasp_debug: Dict[str, Any] = {}
         self.prior: Dict[Tuple[str, str], Dict[str, Any]] = {}  # loaded with the hold (sample_template)
@@ -643,7 +677,8 @@ class HeldObjectV2(SamplerV2):
 
     def adopt_hold(self, h: HoldSolution) -> None:
         """Make ``h`` the template's hold: the holding arm (:attr:`arm`), the hold configuration, its base-frame quantities and
-        the B7 prior of that hold (none for a left hold: every library row is realised and measured)."""
+        the B7 prior of that hold (none for a left hold: every library row is realised and measured; object scaling's filter,
+        mental rotation does not use it)."""
         self.arm = h.arm
         self.q_hold_rel, self.eef_in_base, self.pad_in_base, self.cam_in_base = h.q_rel, h.eef_in_base, h.pad_in_base, h.cam_in_base
         self.hold_solution = h.sol
@@ -778,18 +813,38 @@ class HeldObjectV2(SamplerV2):
         raise Reject("no_stance", "no collision-free base pose for the start configuration")
 
     def grasp_order(self, rng: np.random.Generator) -> List[str]:
-        """Grasps with options: clean rows before tolerated ``one_finger`` rows, higher surveyed visibility first, rows
-        whose attach failed before last (per-template statistics), ties random."""
+        """The grasps with options in the order an attempt tries them (owner 2026-10-11: diverse grasps across the
+        template's instances unless flagged; :func:`spread_order`): unflagged rows first - flagged rows (a tolerated flag
+        such as ``one_finger``, or a verdict other than ``ok``) are the fallback - then the least used first
+        (:meth:`grasp_uses`), ties in a random order from the attempt RNG. A use is an instance written with the grasp; a
+        failed attach counts as one more, so a row whose attach fails waits until the rows used as often have had their
+        turn instead of coming first on every attempt. The instance takes the first grasp in this order that passes the
+        attempt's checks, so no unflagged grasp gets another instance while a less used one passes them; with one
+        instance per template it is a uniformly random unflagged grasp (deterministic for a seed). The B7 prior does not
+        order the rows. The counts belong to this sampler: a template resumed by another run starts from zero."""
         names = list(self.options)
-        names = [names[i] for i in rng.permutation(len(names))]
-        flagged = {g.name for g in self.grasps if g.flags or g.verdict != "ok"}
+        return spread_order(rng, names, {n: self.grasp_uses(n) for n in names}, self.flagged_grasps())
 
-        def vis(n):
-            rec = self.prior.get((self.grasp_key, n))
-            return -float(rec["visible_fraction"]) if rec and rec.get("visible_fraction") is not None else 0.0
+    def flagged_grasps(self) -> set:
+        """Library rows with a tolerated flag (``one_finger``) or a verdict other than ``ok``: :meth:`grasp_order`'s fallback."""
+        return {g.name for g in self.grasps if g.flags or g.verdict != "ok"}
 
-        names.sort(key=lambda n: (n in flagged, self.grasp_stats.get(n, {}).get("failed", 0) - 2 * self.grasp_stats.get(n, {}).get("ok", 0), vis(n)))
-        return names
+    def grasp_uses(self, name: str) -> int:
+        """What :meth:`grasp_order` counts for a grasp: the instances written with it plus its failed attaches."""
+        st = self.grasp_stats.get(name) or {}
+        return int(st.get("instances", 0)) + int(st.get("attach_failed", 0))
+
+    def count_grasp(self, name: str, what: str) -> None:
+        """One more ``what`` (``"instances"`` / ``"attach_failed"``) for the grasp ``name``."""
+        st = self.grasp_stats.setdefault(name, {"instances": 0, "attach_failed": 0})
+        st[what] += 1
+
+    def spread_record(self, order: Sequence[str]) -> Dict[str, Any]:
+        """``summary["grasp"]["spread"]``: the attempt's grasp order and the counts it was sorted by."""
+        flagged = self.flagged_grasps()
+        return {"order": list(order), "flagged": [n for n in order if n in flagged],
+                "instances": {n: int((self.grasp_stats.get(n) or {}).get("instances", 0)) for n in order},
+                "attach_failed": {n: int((self.grasp_stats.get(n) or {}).get("attach_failed", 0)) for n in order}}
 
     def describe_goal(self, info: Dict[str, Any], base2d) -> Dict[str, Any]:
         return info
@@ -812,13 +867,12 @@ class HeldObjectV2(SamplerV2):
         target.wake()  # sleeping bodies keep a stale render transform after a physics-side teleport
         target.keep_still()
         gname = draft.extras["grasps"][0]["grasp_name"]
-        stats = self.grasp_stats.setdefault(gname, {"ok": 0, "failed": 0})
         try:
             self.establish_grasp(target, pose)
-        except Reject:
-            stats["failed"] += 1
+        except Reject as e:
+            self.count_grasp(gname, "attach_failed")
+            e.details.setdefault("grasp", gname)  # the rejection log's examples name the row
             raise
-        stats["ok"] += 1
         draft.summary["grasp_realised"] = dict(self.grasp_debug)
         # the realised object pose (assisted grasping pulls the object into the pads by up to a few mm) and the closed
         # finger positions; the goal object pose follows the realised eef->object transform so that the object at the
@@ -1146,6 +1200,13 @@ class HeldObjectV2(SamplerV2):
                      "hard": False})
         return recs
 
+    def constraints_write_back(self, draft: Draft, iid: str) -> List[Dict[str, Any]]:
+        """The core's write-back, which ``run_instances`` calls once per kept instance (after the goal-occlusion gate, which
+        removes a written instance): the instance's grasp counts as used (:meth:`grasp_order`)."""
+        out = super().constraints_write_back(draft, iid)
+        self.count_grasp(draft.extras["grasps"][0]["grasp_name"], "instances")
+        return out
+
 
 # ----------------------------------------------------------------------------------------------------------------
 # object scaling
@@ -1158,15 +1219,17 @@ class ObjectScalingV2(HeldObjectV2):
     camera's optical axis, both uniform in the grasp's reachable depth window with |d1 − d0| >= ``min_depth_change_m``,
     orientation unchanged. The start is the reference hold (``solve_hold``) slid along the axis, its configuration solved
     by IK from the default posture; target frame = camera sensor, ``position_metric = depth``, tolerance
-    max(0.02, 0.20·|Δd|)."""
+    max(0.02, 0.20·|Δd|). The grasp: the first of :meth:`grasp_order` (the least used unflagged grasp with a window
+    first, ties random) whose start and straight move pass, of at most 4 per attempt."""
 
     def precompute_options(self):
-        """Per library grasp (B7 prior first): the depth window. The object at the reference hold is slid along the
-        optical axis over the ``depth_search_grid_m`` grid of ``depth_search_range_m``; a depth passes when the whole
-        object is in frame (5 %) and the screening IK (the holding arm from the default posture, object attached, robot +
-        object only) reaches the hand pose. The window is the continuous run of passing depths through the reference
-        depth, shrunk by ``depth_margin_m`` at both ends; a grasp whose window does not admit a ``min_depth_change_m``
-        move gets no options. Base-frame quantities: the windows hold at any base pose."""
+        """Per library grasp (but the rows the B7 prior rejects - a filter that applies only at the survey's own hold): the
+        depth window. The object at the reference hold is slid along the optical axis over the ``depth_search_grid_m`` grid
+        of ``depth_search_range_m``; a depth passes when the whole object is in frame (5 %) and the screening IK (the
+        holding arm from the default posture, object attached, robot + object only) reaches the hand pose. The window is
+        the continuous run of passing depths through the reference depth, shrunk by ``depth_margin_m`` at both ends; a
+        grasp whose window does not admit a ``min_depth_change_m`` move gets no options. Base-frame quantities: the
+        windows hold at any base pose."""
         target = self.obj("target")
         ref = self.kit.world_base_pose2d()
         self.ref_base2d = ref
@@ -1274,7 +1337,8 @@ class ObjectScalingV2(HeldObjectV2):
         min_change = float(self.g("min_depth_change_m"))
         chosen = None
         errors = []
-        for gname in self.grasp_order(rng)[:4]:
+        order = self.grasp_order(rng)
+        for gname in order[:4]:
             g = next(x for x in self.grasps if x.name == gname)
             opt = self.options[gname]
             d0, d1 = draw_start_goal(rng, opt["window"], min_change)
@@ -1338,8 +1402,8 @@ class ObjectScalingV2(HeldObjectV2):
         d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": self.arm, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
                                "object_pose_in_eef_frame": {"position": obj_in_eef[0].tolist(), "orientation": obj_in_eef[1].tolist()}}]
         d.extras["goal_robot_q"] = q_goal
-        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"},
-                          "hold": hold})
+        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags), "spread": self.spread_record(order)}, "goal": info,
+                          "feasibility": {"embodiment": f"{self.arm}_arm"}, "hold": hold})
         d.summary["arm"] = self.arm_summary()
         d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
         self.sidecar.add_stance(init)
@@ -1376,17 +1440,20 @@ class ObjectScalingV2(HeldObjectV2):
 
 @register("mental_rotation")
 class MentalRotationV2(HeldObjectV2):
-    """§6.3 goal: rotation about a sampled axis (13 base-frame axes × the signed 15° grid inside
-    ``goal_angle_range_deg``) about the object root, position unchanged; world orientation target, 0.15 rad,
+    """§6.3 goal: rotation of the start about the object root by a sampled axis (one of the 13 base-frame axes of
+    :func:`rotation_axes`) and a continuous angle (owner 2026-10-11: magnitude ~ U(``goal_angle_range_deg``), sign + / −
+    alike; :func:`draw_rotation_goals`), position unchanged; world orientation target, 0.15 rad,
     ``orientation_equivalences`` per model (§3.13); symmetric models are rejected (``symmetric_target``).
 
     Start (owner 2026-10-11: the start orientation is drawn too, not always the hold's): the reference hold's object turned
-    about its root by an axis × angle of ``init_angle_range_deg`` (0 = the hold itself), the configuration holding it solved
-    by the screening IK from the hold once per template (:meth:`precompute_options`); each instance draws a grasp and a
-    start, then a goal that turns that start, screened at the instance's base pose and confirmed by the exact IK."""
+    about its root by an axis × angle on the 15° grid of ``init_angle_range_deg`` (0 = the hold itself), the configuration
+    holding it solved by the screening IK from the hold once per template (:meth:`precompute_options`). Each instance tries
+    the grasps in :meth:`grasp_order` (the least used unflagged grasp first, ties random; at most 4 per attempt) and per
+    grasp up to 3 random starts; per start ``goal_draws_per_start`` goal candidates are drawn, the first ``GOAL_SCREEN_MAX``
+    whole in frame are screened at the instance's base pose and the first that passes the exact IK is the goal."""
 
-    #: goal candidates screened per drawn start (a random subset of the axis × angle set), exact checks per start, and starts
-    #: tried per grasp in one attempt
+    #: goal candidates screened per drawn start (the first of the start's ``goal_draws_per_start`` draws that keep the object
+    #: in frame), exact checks per start, and starts tried per grasp in one attempt
     GOAL_SCREEN_MAX = 96
     GOAL_EXACT_MAX = 4
     STARTS_PER_GRASP = 3
@@ -1447,7 +1514,8 @@ class MentalRotationV2(HeldObjectV2):
         self.kit.sync_world()
         self.template_facts["start_options"] = {**stats, "grasps_with_options": len(self.options), "per_grasp": {k: len(v) for k, v in self.options.items()}}
         self.template_meta["init_orientation"] = {"drawn": True, "init_angle_range_deg": list(self.g("init_angle_range_deg")),
-                                                  "goal_angle_range_deg": list(self.g("goal_angle_range_deg"))}
+                                                  "init_angle_step_deg": ROTATION_ANGLE_STEP_DEG, "goal_angle_range_deg": list(self.g("goal_angle_range_deg")),
+                                                  "goal_angle": "continuous", "goal_draws_per_start": int(self.g("goal_draws_per_start"))}
         if not self.options:
             raise Reject("goal_infeasible", f"no library grasp has a start in view that the screening IK reaches ({stats})")
         log.info("%s: %d grasps with start options (%s)", self.gp.alias, len(self.options), stats)
@@ -1458,11 +1526,13 @@ class MentalRotationV2(HeldObjectV2):
         target = self.obj("target")
         hc = self.hold
         n_wp = int(self.g("waypoints"))
-        goal_set = rotation_goal_set(self.g("goal_angle_range_deg"), ROTATION_ANGLE_STEP_DEG)
+        goal_range = self.g("goal_angle_range_deg")
+        n_draws = int(self.g("goal_draws_per_start"))
         scale_key = self.choice.models["target"].scale
         chosen = None
         errors: List[str] = []
-        for gname in self.grasp_order(rng)[:4]:
+        order = self.grasp_order(rng)
+        for gname in order[:4]:
             g = next(x for x in self.grasps if x.name == gname)
             opts = self.options[gname]
             for si in rng.permutation(len(opts))[: self.STARTS_PER_GRASP]:
@@ -1488,8 +1558,7 @@ class MentalRotationV2(HeldObjectV2):
                         errors.append(f"{tag}: start collides with the object attached")
                         continue
                     cands = []
-                    for k in rng.permutation(len(goal_set)):
-                        axis_b, ang = goal_set[int(k)]
+                    for axis_b, ang in draw_rotation_goals(rng, goal_range, n_draws):
                         goal = turned_about_root(obj0, base2d[2], axis_b, ang)
                         if self.whole_in_frame(cam, goal):
                             cands.append((goal, {"axis_base": axis_b.tolist(), "angle_deg": float(ang)}))
@@ -1508,7 +1577,7 @@ class MentalRotationV2(HeldObjectV2):
                     for ci in passed[: self.GOAL_EXACT_MAX]:
                         res = self.ikc.waypoints_ok([eef0] + wps_all[ci], init, self.arm, q_seed=q_init, scale_key=scale_key)
                         if not res.ok:
-                            errors.append(f"{tag} -> {cands[ci][1]['angle_deg']:+.0f} deg: {res.reason}")
+                            errors.append(f"{tag} -> {cands[ci][1]['angle_deg']:+.1f} deg: {res.reason}")
                             continue
                         chosen = (g, obj0, eef0, cands[ci][0], dict(cands[ci][1]), res.q, wps_all[ci], base2d, cam, init, opt)
                         break
@@ -1533,8 +1602,8 @@ class MentalRotationV2(HeldObjectV2):
         d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": self.arm, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
                                "object_pose_in_eef_frame": {"position": obj_in_eef[0].tolist(), "orientation": obj_in_eef[1].tolist()}}]
         d.extras["goal_robot_q"] = q_goal
-        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"},
-                          "hold": hold})
+        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags), "spread": self.spread_record(order)}, "goal": info,
+                          "feasibility": {"embodiment": f"{self.arm}_arm"}, "hold": hold})
         d.summary["arm"] = self.arm_summary()
         d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
         # sidecar: init stance (held, at the drawn start), the grasp with the in-hand key poses, the goal arm configuration, language

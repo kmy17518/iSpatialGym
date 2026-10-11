@@ -192,9 +192,15 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {},
         "path_buckets": None,
         **_HELD_OBJECT_COMMON,
-        "goal_angle_range_deg": [30.0, 120.0],  # §6.3 rotation about a sampled axis by U(30°, 120°)
-        # the start: the hold's object turned about its root by a sampled axis × angle in this range (0 = the hold itself);
-        # owner 2026-10-11: the init orientation is drawn as well, the goal turns it by goal_angle_range_deg
+        # §6.3 rotation about a sampled axis by U(30°, 120°): each goal candidate is one of the 13 base-frame axes (cube face /
+        # edge / corner directions) and a magnitude drawn continuously in this range with a random sign (owner 2026-10-11; was
+        # the 15° grid)
+        "goal_angle_range_deg": [30.0, 120.0],
+        # goal candidates drawn per start: the first 96 that keep the object in frame are screened
+        # (MentalRotationV2.GOAL_SCREEN_MAX); twice that for starts whose turns often leave the frame (the 15° grid had 182)
+        "goal_draws_per_start": 192,
+        # the start: the hold's object turned about its root by a sampled axis × angle on the 15° grid of this range (0 = the
+        # hold itself); owner 2026-10-11: the init orientation is drawn as well, the goal turns it by goal_angle_range_deg
         "init_angle_range_deg": [0.0, 180.0],
         "reject_symmetric_targets": True,  # §3.13 rule 1 (symmetric_target)
     },
