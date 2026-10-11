@@ -333,7 +333,7 @@ class R1ProCuRobo:
         self.num_ik_seeds = num_ik_seeds
         self.num_trajopt_seeds = num_trajopt_seeds
         self.use_cuda_graph = use_cuda_graph
-        self.warmup_iterations = warmup_iterations
+        self.warmup_iterations = int(os.environ.get("ISPATIALGYM_CUROBO_WARMUP_ITERS", warmup_iterations))
 
         self.joint_names: List[str] = list(robot.joints.keys())
         assert self.joint_names == M.ALL_JOINTS, "Unexpected R1Pro joint order"
@@ -446,6 +446,7 @@ class R1ProCuRobo:
         q = self.q_full()
         lock_values = {n: float(q[self._jidx[n]]) for n in emb.locked_joints}
         robot_dict = M.build_curobo_robot_dict(emb, self.urdf_path, lock_values, self._default_q, self._v1_kin)
+        t_dict = time.time()
         cfg = MotionPlannerCfg.create(
             robot=robot_dict,
             scene_model=None,
@@ -460,15 +461,21 @@ class R1ProCuRobo:
             optimizer_collision_activation_distance=self.collision_activation_distance,
         )
         cfg.trajopt_solver_config.interpolation_dt = self.control_dt
+        t_cfg = time.time()
         planner = _SharedWorldMotionPlanner(cfg, self.checker)
+        t_solvers = time.time()
         if self.warmup_iterations > 0:
             planner.warmup(enable_graph=True, num_warmup_iterations=self.warmup_iterations)
+        t_warm = time.time()
 
         entry = _PlannerEntry(embodiment=emb, planner=planner)
         entry.fk = Kinematics(planner.kinematics.config)  # same KinematicsCfg -> shares tensors with the solvers
         self._fill_lock_info(entry, entry.fk)
         entry.default_criteria = {f: ToolPoseCriteria(device_cfg=self.device_cfg) for f in planner.tool_frames}
-        log.info("Built cuRobo embodiment '%s' (%d active joints) in %.1fs", emb.name, len(emb.active_joints), time.time() - t0)
+        t1 = time.time()
+        log.info("Built cuRobo embodiment '%s' (%d active joints) in %.1fs (robot dict %.1fs, config %.1fs, solvers %.1fs, warm-up %.1fs x%d, fk %.1fs)",
+                 emb.name, len(emb.active_joints), t1 - t0, t_dict - t0, t_cfg - t_dict, t_solvers - t_cfg, t_warm - t_solvers, self.warmup_iterations,
+                 t1 - t_warm)
         return entry
 
     def _kin_state(self, entry: _PlannerEntry, q_batch: th.Tensor):
