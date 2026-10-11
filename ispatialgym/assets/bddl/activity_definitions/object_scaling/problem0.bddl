@@ -1,24 +1,27 @@
 (define (problem object_scaling-0)
     (:domain ispatialgym)
+    (:alias object_scaling-canned_food)
+
+    ; ground_isg 2.0.0: object_scaling-canned_food (object_scaling/object_scaling.iddl; object_scaling#01/representative)
+    ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of
+    ; the target along the head-camera optical axis (TRO pose target: frame = head camera, position_metric = depth).
 
     (:objects
-        mug.n.04_1 - mug.n.04
+        canned_food.n.01_1 - canned_food.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
         (ontop agent.n.01_1 floor.n.01_1)
-        (grasped agent.n.01_1 mug.n.04_1)
+        (grasped agent.n.01_1 canned_food.n.01_1)
     )
 
-    ; Binary success: the object is still held and its depth along the head-camera optical axis matches the goal
-    ; depth within tolerance (TRO pose_targets["mug.n.04_1"]: frame = head camera, position_metric = "depth").
     (:goal
         (and
-            (grasped ?agent.n.01_1 ?mug.n.04_1)
-            (pose_reached ?mug.n.04_1)
-            (pose_settled ?mug.n.04_1)
+            (grasped ?agent.n.01_1 ?canned_food.n.01_1)
+            (pose_reached ?canned_food.n.01_1)
+            (pose_settled ?canned_food.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

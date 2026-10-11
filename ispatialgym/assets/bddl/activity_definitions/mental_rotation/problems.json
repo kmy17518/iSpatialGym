@@ -2,9 +2,9 @@
  "activity": "mental_rotation",
  "problems": [
   {
-   "alias": "mental_rotation-coffee_cup",
-   "id": 1,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-classroom_mock_up",
+   "id": 0,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -14,8 +14,8 @@
   },
   {
    "alias": "mental_rotation-mug",
-   "id": 2,
-   "grounded": "2026-09-16",
+   "id": 1,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -24,9 +24,9 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-spatula",
-   "id": 3,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-teaspoon",
+   "id": 2,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -35,9 +35,9 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-sunflower",
-   "id": 4,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-toy_figure",
+   "id": 3,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -46,9 +46,9 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-teaspoon",
-   "id": 5,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-walker",
+   "id": 4,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -57,9 +57,9 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-toy_figure",
-   "id": 6,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-carving_knife",
+   "id": 5,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -68,9 +68,9 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-walker",
-   "id": 7,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-crab",
+   "id": 6,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -79,9 +79,9 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-mouse",
-   "id": 8,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-soup_ladle",
+   "id": 7,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -90,9 +90,9 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-quartz",
-   "id": 9,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-hook",
+   "id": 8,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
@@ -101,242 +101,15 @@
    "mode": "representative"
   },
   {
-   "alias": "mental_rotation-sandal",
-   "id": 10,
-   "grounded": "2026-09-16",
+   "alias": "mental_rotation-statue",
+   "id": 9,
+   "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
    "subtask": "mental_rotation",
    "iddl": "mental_rotation/mental_rotation.iddl",
    "pick": "mental_rotation#10",
    "slot": "representative",
    "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-carving_knife",
-   "id": 11,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#11",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-crab",
-   "id": 12,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#12",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-soup_ladle",
-   "id": 13,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#13",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-garlic_clove",
-   "id": 14,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#14",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-hook",
-   "id": 15,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#15",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-statue",
-   "id": 16,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#16",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-tablefork",
-   "id": 17,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#17",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-teacup",
-   "id": 18,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#18",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-toothbrush",
-   "id": 19,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#19",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-briefcase",
-   "id": 20,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#20",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-cookie_cutter",
-   "id": 21,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#21",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-pickle",
-   "id": 22,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#22",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-tablespoon",
-   "id": 23,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#23",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-bell_pepper",
-   "id": 24,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#24",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-potato",
-   "id": 25,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#25",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-cellulose_tape_dispenser",
-   "id": 26,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#26",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-banana",
-   "id": 27,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#27",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-ginger_root",
-   "id": 28,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#28",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-hammer",
-   "id": 29,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#29",
-   "slot": "representative",
-   "mode": "representative"
-  },
-  {
-   "alias": "mental_rotation-baby_shoe",
-   "id": 30,
-   "grounded": "2026-09-16",
-   "by": "ground_isg 2.0.0",
-   "subtask": "mental_rotation",
-   "iddl": "mental_rotation/mental_rotation.iddl",
-   "pick": "mental_rotation#30",
-   "slot": "representative",
-   "mode": "representative"
-  }
- ],
- "unregistered": [
-  {
-   "id": 0,
-   "alias": null,
-   "why": "the problem declares no alias"
   }
  ]
 }

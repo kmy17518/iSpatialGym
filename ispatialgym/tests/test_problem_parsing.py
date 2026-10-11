@@ -33,9 +33,10 @@ from ispatialgym.activity.problem import parse_problem_file, parse_problem_strin
 # gating layout_reached args, non-gating (:measure) pose_reached args). Binary predicates are the multiset of
 # predicate tokens of the expanded binary goal.
 EXPECTED = {
-    ("camera_relocalization", 0): (None, ["pose_reached"], ["agent.n.01_1"], ["agent.n.01_1"], [], []),
-    ("object_scaling", 0): (None, ["grasped", "pose_reached"], ["mug.n.04_1", "agent.n.01_1"], ["mug.n.04_1"], [], []),
-    ("mental_rotation", 0): (None, ["grasped", "pose_reached"], ["mug.n.04_1", "agent.n.01_1"], ["mug.n.04_1"], [], []),
+    # problem0 of these three = pick #01 of the representative sheet (grounded 2026-10-11; the hand-written mug problems before)
+    ("camera_relocalization", 0): ("camera_relocalization-standard", ["pose_reached"], ["agent.n.01_1"], ["agent.n.01_1"], [], []),
+    ("object_scaling", 0): ("object_scaling-canned_food", ["grasped", "pose_reached"], ["canned_food.n.01_1", "agent.n.01_1"], ["canned_food.n.01_1"], [], []),
+    ("mental_rotation", 0): ("mental_rotation-classroom_mock_up", ["grasped", "pose_reached"], ["mock-up.n.01_1", "agent.n.01_1"], ["mock-up.n.01_1"], [], []),
     ("disembedding", 0): (
         None,
         ["ontop", "not ontop", "not ontop", "not ontop", "not grasped"],
