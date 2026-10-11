@@ -1,6 +1,7 @@
 """The environment rules per scene on the merge of lab-vec-eval into v3.0-reconciled: the attach rule at a gripper release
-(``predicates.attach_on_release`` and the ``AttachedTo`` overrides over the per-scene attachment registry) and the
-assisted-grasp joint rule the lab evaluator re-applies through ``execute._patch_ag_joint_type``."""
+(``predicates.attach_on_release`` and the ``AttachedTo`` overrides over the per-scene attachment registry), the assisted-grasp
+joint rule the lab evaluator re-applies through ``execute._patch_ag_joint_type``, and the pad-clear release
+``VecISpatialGymTask`` applies to every scene's robots as the single-env task does."""
 
 from __future__ import annotations
 
@@ -155,5 +156,21 @@ def test_vec_task_gives_every_scenes_robot_both_rules(monkeypatch):
     for (robot,) in robots:
         assert robot.release_callbacks.count(PRED.attach_on_release) == 1
         assert robot.ag_moving_link_joint_type == AG_MOVING_LINK_JOINT_TYPE
+        assert robot.ag_release_on_pad_clear is True and robot.ag_release_max_delay_s == 0.2
     assert robots[1][0].release_callbacks == [print, PRED.attach_on_release]
     assert apply_environment_rules(robots) == 3 and robots[0][0].release_callbacks == [PRED.attach_on_release]
+
+
+def test_vec_rules_leave_a_robot_as_the_single_env_task_does(monkeypatch):
+    """``apply_environment_rules`` (``VecISpatialGymTask``) sets exactly what ``ISpatialGymTask.initialize_activity`` sets on a
+    single env's robot - a rule added there and not here fails this test."""
+    from ispatialgym.tasks import ispatialgym_task as IT
+
+    single, clone = SimpleNamespace(), SimpleNamespace()
+    env = SimpleNamespace(robots=[single], scene=SimpleNamespace(object_registry=lambda key, name: None))
+    task = SimpleNamespace(_object_bindings_source=lambda env: {}, object_scope={}, compiled_task=None, get_agent=lambda env: single, _tro=None)
+    monkeypatch.setattr(IT, "physical_instances", lambda compiled_task: [])
+    assert IT.ISpatialGymTask.initialize_activity(task, env) == (True, None)
+    assert IT.apply_environment_rules([[clone]]) == 1
+    assert vars(clone) == vars(single) and set(vars(single)) == {"release_callbacks", "ag_moving_link_joint_type", "ag_release_on_pad_clear",
+                                                                 "ag_release_max_delay_s"}

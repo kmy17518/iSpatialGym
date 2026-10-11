@@ -113,13 +113,15 @@ def apply_ag_joint_rule(robot) -> None:
 
 
 def apply_environment_rules(robots) -> int:
-    """The rules ``initialize_activity`` applies to the env's robots - the attach rule's release hook and the assisted-grasp
-    joint rule - for a task that re-implements it (``VecISpatialGymTask``). ``robots``: ``env.robots`` (one list per scene
-    in the vectorized environment). Returns the number of robots."""
+    """The rules ``initialize_activity`` applies to the env's robots - the attach rule's release hook, the assisted-grasp
+    joint rule and its pad-clear release - for a task that re-implements it (``VecISpatialGymTask``). ``robots``:
+    ``env.robots`` (one list per scene in the vectorized environment). Returns the number of robots."""
     PRED.install_release_hook(robots)
     n = 0
     for robot in _robots(robots):
         apply_ag_joint_rule(robot)
+        robot.ag_release_on_pad_clear = AG_RELEASE_ON_PAD_CLEAR
+        robot.ag_release_max_delay_s = AG_RELEASE_MAX_DELAY_S
         n += 1
     return n
 
