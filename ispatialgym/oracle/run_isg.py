@@ -1067,6 +1067,15 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             return exit_code, result
         rp, rq = robot.get_position_orientation()
         meta["robot_base_init"] = {"position": rp.tolist(), "orientation": rq.tolist()}
+        # owner 2026-10-11 11:46: textures stream in after the load - render (never step) until they are loaded, then capture
+        # init_rgb.png and the recorder's first frame from that render
+        from ispatialgym.oracle import texture_wait as _TW
+
+        t_tex = time.time()
+        meta["texture_wait"], obs_tex = _TW.wait_for_textures(lambda: SE.get_obs(env)[0], og.sim.render, robot.name, EXTERNAL_CAMERA_NAME if args.dev else None)
+        timings["texture_wait_s"] = time.time() - t_tex
+        if obs_tex is not None:
+            obs = obs_tex
         try:
             save_png(os.path.join(out_dir, "init_rgb.png"), obs[robot.name][cam_key]["rgb"])
         except Exception as e:  # noqa: BLE001
