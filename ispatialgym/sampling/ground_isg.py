@@ -1491,6 +1491,10 @@ class Grounder:
             # the pick names an object the candidates sheet does not list: keep it (the selection is explicit) and say so
             fake = {k: v for k, v in row.items() if k in ("subtask", "role", "category", "scene", "room", "joint", "handle_key", "note", "status")}
             fake.update({"kind": "scene", "model": name, "representative": "1", "_synthetic": "1"})
+            # the representative sheet has no room column: its support rows give the rooms in the note ("rooms=a,b")
+            m = None if fake.get("room") else re.search(r"\brooms=([^\s;]+)", row.get("note") or "")
+            if m:
+                fake["room"] = m.group(1).strip(",")
             objects[scene].append(fake)
             comb.notes.append(f"{role}: {name}@{scene} is not a roles/candidates.csv row of {subtask} (bound from the selection only)")
         rp.scene_objects = dict(objects)
