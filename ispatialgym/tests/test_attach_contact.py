@@ -42,12 +42,16 @@ def _rule(monkeypatch, *, lateral=0.001, vertical=0.010, rot=0.01, held=False, c
     monkeypatch.setattr(PRED, "seat_offset", lambda c, p, cl, pl: {"lateral_m": lateral, "vertical_m": vertical})
     monkeypatch.setattr(PRED, "held_by_robot", lambda o: held)
     monkeypatch.setattr(PRED, "pair_in_contact", lambda c, p: contact)
-    monkeypatch.setattr(PRED, "attach_in_place", lambda c, p, cl, pl, can_joint_break=True: events.append(("joint", c.name, p.name, cl, pl, c.pos[2].item())) or True)
+    monkeypatch.setattr(PRED, "attach_in_place", lambda c, p, cl, pl, can_joint_break=True, rel_pose=None: events.append(("joint", c.name, p.name, cl, pl, c.pos[2].item())) or True)
     monkeypatch.setattr(PRED, "set_pair_collision_filter", lambda c, p, f: events.append(("filter", c.name, p.name, f)) or True)
     monkeypatch.setattr(PRED, "JOINS", [])
     for name in ("_RELEASED_TOUCHING", "_PENDING_FILTER", "_PENDING_UNFILTER"):
         monkeypatch.setattr(PRED, name, set())
-    return _Obj("cap_0", [1.0, 2.0, 1.08]), _Obj("bottle_0", [1.0, 2.0, 0.93]), events
+    child, parent = _Obj("cap_0", [1.0, 2.0, 1.08]), _Obj("bottle_0", [1.0, 2.0, 0.93])
+    # the male frame rides on the child's root; the female frame sits 10 mm below it
+    child.links = {"M": SimpleNamespace(get_position_orientation=lambda: (child.pos.clone(), child.quat.clone()))}
+    parent.links = {"F": SimpleNamespace(get_position_orientation=lambda: (th.tensor([1.0, 2.0, 1.07]), th.tensor([0.0, 0.0, 0.0, 1.0])))}
+    return child, parent, events
 
 
 def test_join_needs_release_contact_and_tight_alignment(monkeypatch):
@@ -101,13 +105,14 @@ def test_deferred_filter_work_runs_at_the_next_check(monkeypatch):
 
 def test_snap_moves_the_part_onto_its_seat_then_joins(monkeypatch):
     monkeypatch.setenv("ISG_ATTACH_JOIN_MODE", "snap")
-    child, parent, events = _rule(monkeypatch)
+    child, parent, events = _rule(monkeypatch)  # no equivalences: the raw frame snap
     a = PRED.attach_if_aligned(child, parent)
-    assert a["attached"] and a["joint"] == "snap" and a["snap"] == {"pos_m": 0.0101, "rot_rad": 0.01, "lateral_m": 0.001, "vertical_m": 0.010}
-    # moved by the alignment's fix (10 mm down onto the seat) before the filter and the joint
+    assert a["attached"] and a["joint"] == "snap" and "fix" not in a
+    assert a["snap"]["mode"] == "raw" and a["snap"]["moved_m"] == pytest.approx(0.010, abs=1e-6) and a["snap"]["vertical_m"] == 0.010
+    # moved onto the seat (10 mm down) after the filter, before the joint
     assert len(child.moves) == 1 and child.pos[2].item() == pytest.approx(1.07)
     assert [e[0] for e in events] == ["filter", "joint"] and events[1][-1] == pytest.approx(1.07)
-    assert PRED.JOINS[-1]["snap"]["vertical_m"] == 0.010
+    assert PRED.JOINS[-1]["snap"]["mode"] == "raw" and PRED.JOINS[-1]["snap"]["vertical_m"] == 0.010
     monkeypatch.delenv("ISG_ATTACH_JOIN_MODE")
     assert PRED.join_mode() == "snap"
     monkeypatch.setenv("ISG_ATTACH_JOIN_MODE", "glue")

@@ -35,11 +35,15 @@ through :func:`set_attachment_context`; ``zinf`` = yaw free) within ``JOIN_LATER
 ``JOIN_ANGLE_MAX_RAD`` and ``JOIN_VERTICAL_MIN_M`` .. ``JOIN_VERTICAL_MAX_M`` along it (the window covers the gap at which
 the part comes to rest on its partner with collision on). No join in mid-air or at the release instant of a part that does
 not touch its partner yet. The join (:func:`join_mode`, ``ISG_ATTACH_JOIN_MODE``) is ``snap`` (default, owner 2026-10-10) -
-the part first moved onto its seat at the nearest symmetric equivalent (the fingers are open by then, nothing is yanked) - or
-``in_place`` - the BEHAVIOR fixed joint at the links' current relative pose (:func:`attach_in_place`); a cap or a cork comes to
-rest on its partner's rim beyond the layout tolerance, so only ``snap`` seats them - and it filters the pair's collision in the
-same instant (:func:`set_pair_collision_filter`; the stock ``AttachedTo._attach`` did that, this fork's does not), so a
-joined part does not fight its partner's hull. ``JOINS`` records every join (trigger, alignment, contact, snap size).
+the part first moved onto its seat (the fingers are open by then, nothing is yanked) by :func:`symmetric_snap`, anchored on
+the attachment frames: a part whose symmetry is continuous about one axis (``zinf``: 71 turns of 5° about object z) keeps its
+spin about that axis - only its tilt is removed, its male origin on the female origin and its axis on the seat's (OmniGibson's
+snap forces one spin: a cap arriving 90° off would be turned 90°) - any other part is carried onto the female frame at its
+nearest symmetric equivalent (no equivalences: the raw frame snap) - or ``in_place`` - the BEHAVIOR fixed joint at the links'
+current relative pose (:func:`attach_in_place`); a cap or a cork comes to rest on its partner's rim beyond the layout tolerance,
+so only ``snap`` seats them - or ``set_value`` (the stock path). It filters the pair's collision in the same instant
+(:func:`set_pair_collision_filter`; the stock ``AttachedTo._attach`` did that, this fork's does not), so a joined part does not
+fight its partner's hull. ``JOINS`` records every join (trigger, alignment, contact, the snap's mode / move / tilt / spin).
 
 ``pose_settled`` of an object joined by an attachment joint (owner 2026-09-20 13:57; the attached child and its parent):
 OmniGibson's ``PoseSettled`` needs the root velocity below 1 mm/s on every step of its window AND the pose drift within
@@ -98,7 +102,12 @@ JOIN_LATERAL_MAX_M = 0.004
 JOIN_ANGLE_MAX_RAD = 0.10
 JOIN_VERTICAL_MIN_M = -0.004
 JOIN_VERTICAL_MAX_M = 0.023
-JOIN_MODES = ("in_place", "snap")
+JOIN_MODES = ("in_place", "snap", "set_value")
+#: the snap of a part whose recorded symmetry is continuous about one axis (``zinf``: the 5° group about object z, 71 rotations)
+#: removes only its tilt and keeps its spin (:func:`symmetric_snap`): at least this many equivalences, every non-identity one
+#: about one axis (|dot| >= ``SNAP_CONTINUOUS_AXIS_DOT``); the oracle's ``_reaim_attach_targets`` uses the same count
+SNAP_CONTINUOUS_MIN_EQUIVALENCES = 12
+SNAP_CONTINUOUS_AXIS_DOT = 0.999
 #: ``pose_settled`` entities judged by configuration drift after an OmniGibson False (module docstring): ``attached`` (the
 #: members of an attachment joint), ``robot`` (the agent), ``all`` (every object - the default since 2026-09-24, with the
 #: tightened drift window ``tasks.ispatialgym_task.DEFAULT_POSE_SETTLED_CONFIG``). ``ISG_DRIFT_SETTLED`` overrides (comma
@@ -203,6 +212,109 @@ def _rotate(q, v):
                    [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
                    [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]], dtype=th.float64)
     return R @ v
+
+
+def _qunit(q) -> th.Tensor:
+    q = th.as_tensor(q, dtype=th.float64)
+    return q / th.linalg.norm(q)
+
+
+def _shared_axis(equivalences: Sequence[Sequence[float]]) -> Optional[th.Tensor]:
+    """The one object-frame axis every non-identity rotation of ``equivalences`` turns about (|dot| >= ``SNAP_CONTINUOUS_AXIS_DOT``),
+    or None (none, or several axes)."""
+    axis = None
+    for q in equivalences or []:
+        v = th.as_tensor([float(c) for c in q[:3]], dtype=th.float64)
+        n = float(th.linalg.norm(v))
+        if n < 1e-9:
+            continue
+        if axis is None:
+            axis = v / n
+        elif abs(float(th.dot(v / n, axis))) < SNAP_CONTINUOUS_AXIS_DOT:
+            return None
+    return axis
+
+
+def continuous_symmetry_axis(equivalences: Optional[Sequence[Sequence[float]]]) -> Optional[th.Tensor]:
+    """The object-frame axis of a continuous symmetry, or None: ``equivalences`` (xyzw, the identity implied or listed) hold at
+    least ``SNAP_CONTINUOUS_MIN_EQUIVALENCES`` rotations, all about one axis - a ``zinf`` part's 5° group about object z. Eleven
+    steps of 30° (the geometric fallback's most) are a discrete symmetry."""
+    eqs = list(equivalences or [])
+    return _shared_axis(eqs) if len(eqs) >= SNAP_CONTINUOUS_MIN_EQUIVALENCES else None
+
+
+def swing_twist(q, axis) -> Tuple[Optional[th.Tensor], Optional[th.Tensor]]:
+    """``q = swing ⊗ twist`` (xyzw, the Hamilton product of ``_qmul``): ``twist`` turns about the unit ``axis``, ``swing`` about an
+    axis perpendicular to it. ``(None, None)`` for a half turn about a perpendicular axis, which has no twist."""
+    q = _qunit(q)
+    a = th.as_tensor(axis, dtype=th.float64)
+    a = a / th.linalg.norm(a)
+    t = th.cat([float(th.dot(q[:3], a)) * a, q[3:]])
+    n = float(th.linalg.norm(t))
+    if n < 1e-9:
+        return None, None
+    t = t / n
+    return _qunit(_qmul(q, _qinv(t))), t
+
+
+def apply_fix(p_fix, q_fix, p, q) -> Tuple[th.Tensor, th.Tensor]:
+    """The pose ``(p, q)`` moved by the world transform ``(p_fix, q_fix)`` (x -> R(q_fix) x + p_fix): ``fix ∘ pose`` (float64)."""
+    return _rotate(q_fix, p) + th.as_tensor(p_fix, dtype=th.float64), _qunit(_qmul(q_fix, _qunit(q)))
+
+
+def symmetric_snap(p_male, q_male, p_female, q_female, q_obj, equivalences: Optional[Sequence[Sequence[float]]]
+                   ) -> Tuple[th.Tensor, th.Tensor, Dict[str, Any]]:
+    """The world transform ``fix = (p_fix, q_fix)`` (x -> R(q_fix) x + p_fix) that seats a symmetric part, anchored on the
+    attachment frames: the male frame's origin goes onto the female frame's (a turn about the object origin would shift a part
+    whose attachment point sits off it - lid/pbmsji, lid/ppkjuy: 1.4-2.7 mm).
+
+    A continuous symmetry about ``a_obj`` (:func:`continuous_symmetry_axis`, object frame) keeps the part's spin: ``q_err =
+    q_female ⊗ q_male^-1`` is split into swing ⊗ twist about the part's axis in the world ``a = R(q_obj) a_obj`` and only the
+    swing - the tilt correction, its axis perpendicular to ``a`` - is applied (``continuous``). Otherwise, or for a half-turn flip
+    (no twist), the male frame of the nearest equivalent (the smallest angle to the female frame, as ``attachment_alignment``
+    picks it) is carried onto the female frame - ``attachment_alignment``'s ``fix`` (``nearest_equivalence``; with no
+    equivalences ``raw``: OmniGibson's frame snap). Returns ``(p_fix, q_fix, info)``; ``info`` holds JSON-safe floats: ``mode``,
+    ``moved_m`` (the male origin's move), ``tilt_rad`` / ``spin_rad`` (the applied rotation's swing / signed twist about the
+    part's axis - its equivalences' common axis, else object z)."""
+    p_m, q_m = th.as_tensor(p_male, dtype=th.float64), _qunit(q_male)
+    p_f, q_f = th.as_tensor(p_female, dtype=th.float64), _qunit(q_female)
+    q_o = _qunit(q_obj)
+    eqs = [[float(v) for v in e] for e in (equivalences or [])]
+    a_obj = continuous_symmetry_axis(eqs)
+    q_fix, mode = None, None
+    if a_obj is not None:
+        swing, _ = swing_twist(_qmul(q_f, _qinv(q_m)), _rotate(q_o, a_obj))
+        if swing is not None:
+            q_fix, mode = swing, "continuous"
+    if q_fix is None:
+        q_best, best = q_m, _qangle(q_m, q_f)
+        for e in eqs:
+            q_alt = _qmul(_qmul(_qmul(q_o, th.as_tensor(e, dtype=th.float64)), _qinv(q_o)), q_m)
+            ang = _qangle(q_alt, q_f)
+            if ang < best:
+                q_best, best = q_alt, ang
+        q_fix, mode = _qunit(_qmul(q_f, _qinv(_qunit(q_best)))), ("nearest_equivalence" if eqs else "raw")
+    p_fix = p_f - _rotate(q_fix, p_m)
+    axis = _shared_axis(eqs)
+    a = _rotate(q_o, axis if axis is not None else th.tensor([0.0, 0.0, 1.0], dtype=th.float64))
+    swing, twist = swing_twist(q_fix, a)
+    if twist is None:
+        tilt, spin = math.pi, 0.0
+    else:
+        tilt = 2.0 * math.acos(min(1.0, abs(float(swing[3]))))
+        spin = 2.0 * math.atan2(float(th.dot(twist[:3], a)), float(twist[3]))
+        spin = math.atan2(math.sin(spin), math.cos(spin))
+    info = {"mode": mode, "moved_m": round(float(th.linalg.norm(p_f - p_m)), 6), "tilt_rad": round(tilt, 6), "spin_rad": round(spin, 6)}
+    return p_fix, q_fix, info
+
+
+def snap_joint_frame(p_fix, q_fix, p_male, q_male, p_female, q_female) -> Tuple[th.Tensor, th.Tensor]:
+    """The male link's pose in the female link's frame after the snap, computed from the transform (``fix ∘ male``) instead of
+    links re-read right after the teleport (their poses may show it only after the next physics step; OmniGibson's ``_attach``
+    never re-reads them either) - the joint frame of :func:`attach_in_place`."""
+    p_new, q_new = apply_fix(p_fix, q_fix, p_male, q_male)
+    q_f = _qunit(q_female)
+    return _rotate(_qinv(q_f), p_new - th.as_tensor(p_female, dtype=th.float64)), _qunit(_qmul(_qinv(q_f), q_new))
 
 
 def attachment_alignment(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None, with_fix: bool = False) -> Dict[str, Any]:
@@ -342,9 +454,12 @@ def held_by_robot(obj: Any) -> bool:
     return False
 
 
-def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, can_joint_break: bool = True) -> bool:
+def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, can_joint_break: bool = True,
+                    rel_pose: Optional[Tuple[th.Tensor, th.Tensor]] = None) -> bool:
     """``AttachedTo._attach`` without its teleport: the BEHAVIOR fixed joint between ``child``'s male link and ``parent``'s
-    female link is created at the links' **current** relative pose, so nothing moves when the joint appears.
+    female link is created at the links' **current** relative pose, so nothing moves when the joint appears - or at
+    ``rel_pose`` (the male link's pose in the female link's frame) when the caller has just moved the child and computed it
+    (:func:`snap_joint_frame`).
 
     OmniGibson's ``_attach`` first re-poses the child so the two meta-link frames coincide exactly (raw frames, 6-DoF) and
     only then creates the joint. For a symmetric part whose alignment was accepted modulo its recorded equivalences (a
@@ -366,10 +481,13 @@ def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, 
     c_link, p_link = child.links.get(child_link), parent.links.get(parent_link)
     if c_link is None or p_link is None:
         return False
-    parent_pos, parent_quat = p_link.get_position_orientation()
-    child_pos, child_quat = c_link.get_position_orientation()
-    # the child link (= the joint frame) expressed in the parent link's frame: pose_child = pose_parent @ rel
-    rel_pos, rel_quat = T.relative_pose_transform(child_pos, child_quat, parent_pos, parent_quat)
+    if rel_pose is not None:
+        rel_pos, rel_quat = (th.as_tensor(x, dtype=th.float32) for x in rel_pose)
+    else:
+        parent_pos, parent_quat = p_link.get_position_orientation()
+        child_pos, child_quat = c_link.get_position_orientation()
+        # the child link (= the joint frame) expressed in the parent link's frame: pose_child = pose_parent @ rel
+        rel_pos, rel_quat = T.relative_pose_transform(child_pos, child_quat, parent_pos, parent_quat)
     child.keep_still()
     parent.keep_still()
     st.parent = parent
@@ -391,9 +509,28 @@ def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, 
     return True
 
 
+def snap_join(child: Any, parent: Any, child_link: str, parent_link: str,
+              equivalences: Optional[Sequence[Sequence[float]]] = None) -> Tuple[bool, Dict[str, Any]]:
+    """The ``snap`` join of :func:`attach_if_aligned` (the pair's collision already filtered): the child's root moved by
+    :func:`symmetric_snap` (its equivalences: ``equivalences``, else the registered pair's), both objects kept still, and the
+    fixed joint created at the relative pose that transform gives (:func:`snap_joint_frame`). Returns ``(joined, info)``."""
+    p_m, q_m = (x.double() for x in child.links[child_link].get_position_orientation())
+    p_f, q_f = (x.double() for x in parent.links[parent_link].get_position_orientation())
+    p_o, q_o = (x.double() for x in child.get_position_orientation())
+    eqs = equivalences if equivalences is not None else (attachment_context(child, parent) or {}).get("equivalences") or []
+    p_fix, q_fix, info = symmetric_snap(p_m, q_m, p_f, q_f, q_o, eqs)
+    p_new, q_new = apply_fix(p_fix, q_fix, p_o, q_o)
+    child.set_position_orientation(position=p_new.float(), orientation=q_new.float())
+    child.keep_still()
+    parent.keep_still()
+    rel = snap_joint_frame(p_fix, q_fix, p_m, q_m, p_f, q_f)
+    return bool(attach_in_place(child, parent, child_link, parent_link, rel_pose=rel)), info
+
+
 def join_mode() -> str:
-    """The attach rule's join (``ISG_ATTACH_JOIN_MODE``): ``snap`` (the part moved onto its seat at the nearest symmetric
-    equivalent, then joined; default) or ``in_place`` (the joint at the resting pose)."""
+    """The attach rule's join (``ISG_ATTACH_JOIN_MODE``): ``snap`` (the part moved onto its seat by :func:`symmetric_snap`, then
+    joined; default), ``in_place`` (the joint at the resting pose) or ``set_value`` (the stock ``AttachedTo.set_value``; for a
+    registered pair its ``_attach`` override joins in place)."""
     mode = (os.environ.get("ISG_ATTACH_JOIN_MODE") or "snap").strip()
     if mode not in JOIN_MODES:
         raise ValueError(f"ISG_ATTACH_JOIN_MODE={mode!r}: one of {JOIN_MODES}")
@@ -517,7 +654,8 @@ _RELEASED_TOUCHING: set = set()
 
 
 #: every join this process made for a registered pair: {"child", "parent", "trigger", "mode", "lateral_m", "vertical_m",
-#: "rot_rad", "pos_m", "contact", "released", "snap"?, "sim_time"?} (run_isg copies it into meta.json)
+#: "rot_rad", "pos_m", "contact", "released", "snap"? ({"mode", "moved_m", "tilt_rad", "spin_rad", ...}), "sim_time"?} (run_isg
+#: copies it into meta.json)
 JOINS: List[Dict[str, Any]] = []
 
 
@@ -526,19 +664,24 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
     """The BEHAVIOR attachment of ``child`` to ``parent`` by the attach rule (module docstring): no robot holds the child, it is
     in PhysX contact with the parent, and its male link is aligned with the parent's free female link modulo its symmetry within
     ``JOIN_LATERAL_MAX_M`` / ``JOIN_ANGLE_MAX_RAD`` / ``JOIN_VERTICAL_MIN_M``..``JOIN_VERTICAL_MAX_M``. Then the pair's collision
-    is filtered and the fixed joint created - at the current relative pose (``in_place``) or after moving the child onto its
-    seat at the nearest symmetric equivalent (``snap``; :func:`join_mode`). ``in_place`` False = the stock
-    ``AttachedTo.set_value(True, bypass_alignment_checking=True)``. ``released``: called at the instant a robot's assisted grasp
+    is filtered and the fixed joint created (:func:`join_mode`) - at the current relative pose (``in_place``), or after moving
+    the child onto its seat (``snap``): by :func:`symmetric_snap`, which keeps a continuously symmetric part's spin about its
+    axis (only the tilt goes) and otherwise carries the nearest equivalent onto the female frame, both ``keep_still``; the
+    joint frame comes from that transform (:func:`snap_joint_frame`), not from the links re-read after the teleport.
+    ``set_value`` (or ``in_place`` False) = the stock ``AttachedTo.set_value(True, bypass_alignment_checking=True)``.
+    ``released``: called at the instant a robot's assisted grasp
     let go of ``child`` (:func:`attach_on_release`), while its in-hand registry still names it; the contact rule still applies
     (no join at the release instant of a part that does not touch its partner), and a part that does touch is joined by the
     step's own check after its physics (the filter restarts the physics, which must not happen while the step's actions are
     applied) - the join keeps the trigger ``release_hook``. The deferred filter / unfilter of the pair runs first. Returns the
-    alignment record with ``attached``, ``joint`` and ``reason`` when not joined."""
+    alignment record (JSON-safe; no transform tensors) with ``attached``, ``joint``, ``snap`` (``mode``, ``moved_m``,
+    ``tilt_rad``, ``spin_rad``, and the alignment at the join) for a snap, and ``reason`` when not joined."""
     from omnigibson.object_states import AttachedTo
 
     key = (getattr(child, "name", None), getattr(parent, "name", None))
     hook_call = trigger == "release_hook"
-    a = attachment_alignment(child, parent, equivalences, with_fix=True)
+    a = attachment_alignment(child, parent, equivalences)
+    a.pop("fix", None)
     if a.get("reason") == "already attached":
         a["attached"] = bool(a["ok"])
         if a["attached"] and key in _PENDING_FILTER:
@@ -587,12 +730,10 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
     else:
         set_pair_collision_filter(child, parent, True)
         if mode == "snap":
-            p_fix, q_fix = (x.double() for x in a["fix"])
-            p, q = (x.double() for x in child.get_position_orientation())
-            child.set_position_orientation(position=(_rotate(q_fix, p) + p_fix).float(), orientation=_qmul(q_fix, q).float())
-            child.keep_still()
-            a["snap"] = {"pos_m": a["pos_m"], "rot_rad": a["rot_rad"], "lateral_m": a["lateral_m"], "vertical_m": a["vertical_m"]}
-        a["attached"] = bool(attach_in_place(child, parent, a["child_link"], a["parent_link"]))
+            a["attached"], info = snap_join(child, parent, a["child_link"], a["parent_link"], equivalences)
+            a["snap"] = {**info, **{k: a[k] for k in ("pos_m", "rot_rad", "lateral_m", "vertical_m")}}
+        else:
+            a["attached"] = bool(attach_in_place(child, parent, a["child_link"], a["parent_link"]))
     a["joint"] = mode
     if a["attached"]:
         _JOINTS[0] += 1
