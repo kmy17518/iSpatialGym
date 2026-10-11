@@ -7,10 +7,12 @@ Tagged states of this repository and what passed on them.
 - **Commits** (untagged, local, branch `v3.0-attach-contact` off `5d54b735`): `a4895689` (the rule, the join modes, the filter at the
   join, the `AttachedTo` overrides, the oracle's hover / alignment / instant release), `d9937bce` (the hover settles on arrival before
   the first measurement), `ebdb93f0` (`snap` is the default join), `8947f32b` (the touchdown before the release), `696de57b` (every
-  release +1 in one step), `f2328a7e` (the pad-clear release on every robot). Behavior-1K (branch `v3.0-attach-contact` off
-  `ddbd8ff24`): `6a6194600` (the pad-clear release hook). The gripper A/B test's decision (owner): keep the contact-hold closure
-  everywhere (closing to -1 slides the part 1-2 cm before the assisted grasp attaches); the gripper commands stay binary - the
-  contact hold, then +1 at once - never a partial or ramped opening (it confuses policy learning).
+  release +1 in one step), `f2328a7e` (the pad-clear release on every robot), `2966ce0b` (the snap keeps a symmetric part's spin).
+  Behavior-1K (branch `v3.0-attach-contact` off `ddbd8ff24`): `6a6194600` (the pad-clear release hook). `v3.0-reconciled` was
+  fast-forwarded to this branch in both repos on 2026-10-11 (the two branches name the same commits). The gripper A/B test's
+  decision (owner): keep the contact-hold closure everywhere (closing to -1 slides the part 1-2 cm before the assisted grasp
+  attaches); the gripper commands stay binary - the contact hold, then +1 at once - never a partial or ramped opening (it confuses
+  policy learning).
 - **Correction of the gripper A/B record** ("open_instant breaks none of the 28"): round 1 ran both conventions together, and
   open_instant alone ran only on the cap and the block design; the carton lever's round-1 "pass" was a goal-judged replay, which never
   evaluates `root_moved` - the carton ended 1.37 deg turned there (1.59 deg just after the release), past 1.15.
@@ -47,6 +49,17 @@ Tagged states of this repository and what passed on them.
   removal changed nothing (marker 42.7 deg after 30 steps, the rest as pad-clear) - a pad still drags the marker after the let-go;
   letting go once both fingers stood 1 mm wider than at the command halved the marker's turn (20.8 deg) but tipped a block-design die
   91 deg and jumped the carton 6.3 mm (`root_moved`) again. Owner: keep the pad-clear release; the marker's roll is accepted.
+- **The snap keeps a symmetric part's spin** (`2966ce0b`, owner 2026-10-10): it still seats the part exactly (the male frame's
+  origin onto the female frame's, the tilt removed), but a part whose recorded symmetry is continuous about one axis (`zinf`: >= 12
+  equivalences about one object axis - cap, cork and lid have 71) keeps its spin about that axis: only the swing of male -> female
+  about the part's world axis is applied; any other part goes to its nearest equivalent, one without equivalences to the raw frame
+  snap. Before, the nearest of the 5 deg equivalents could still turn a cap 2.5 deg. The joint frame comes from that transform, not
+  from the links re-read after the teleport; `meta["attach_joins"]` records the snap's mode, move, tilt and spin (no `fix`). Sim
+  check (cap, cork/ncxgpe, lid/tnwisp; spins 0 / 37 / 90 / 180 deg, 8 deg tilt, 19 mm offset): spin unchanged, seated within
+  0.0007 mm / 0.0 deg, drift <= 0.004 mm / 0.003 deg over 300 steps. r15padclear's three attachment demos pass on replay (their
+  0.005-0.007 rad from r15's poses is the spin the old snap imposed), as does an oracle demo + replay on the cap
+  (`runs/r16symsnap`). Tests: 152 passed (`test_attach_snap`, 10 new; `test_attach_contact`, `test_v2_oracle`, `test_v21_phase_a`,
+  `test_v30_fixes`).
 - **Why** (owner): the oracle carried the part with partly opened fingers while the assisted grasp held it (+0.125 for the whole
   descent, then +0.91 -> a second attach -> +1); the release hook and the per-step `attached` check joined the part wherever it was
   within 5 cm / 15 deg (under -1 the cap 18 mm off failed, the lid 8.9 mm and the cork 6.6 mm passed the 1 cm layout tolerance off
@@ -56,8 +69,9 @@ Tagged states of this repository and what passed on them.
   across the seat axis, 0.1 rad, -4..23 mm along it (the axis: the female +z unless more than 45 deg from the partner-centroid ->
   female direction - the sampler's rule; the cork's female z is horizontal). The release hook joins only a part already touching
   (it defers to that step's own check, after its physics); no mid-air joins. `ISG_ATTACH_JOIN_MODE`: `snap` (the part first moved
-  onto its seat at the nearest symmetric equivalent; the default since the demos below, owner 2026-10-10) or `in_place` (the
-  joint at the resting pose; the cap and the cork rest on the rim beyond the 1 cm tolerance). `AttachedTo._update`
+  onto its seat, keeping a symmetric part's spin since `2966ce0b` - above; the default since the demos below, owner 2026-10-10),
+  `in_place` (the joint at the resting pose; the cap and the cork rest on the rim beyond the 1 cm tolerance) or `set_value` (the
+  stock path; for a registered pair the `_attach` override joins in place). `AttachedTo._update`
   does nothing for registered members (it joined on contact at 5 cm / 15 deg in SO(3) and snapped a lid 4 cm out of the hand);
   `_attach` / `_detach` of a registered pair go through the same joint and filter. Every join is logged (`meta["attach_joins"]`:
   trigger, contact, offsets, snap size). No other alias uses `attached`: 20 configuration_matching problems have it in the goal,
