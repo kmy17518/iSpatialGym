@@ -2,7 +2,9 @@
 the BEHAVIOR knowledge base is needed for the synsets)."""
 
 import atexit
+import collections
 import functools
+import hashlib
 import json
 import os
 import re
@@ -330,7 +332,8 @@ def test_groups(grounded):
         assert src.representative == "uekqey" and dst.representative == "hvlfig"
         assert src.scale == {} and dst.scale == {}
         assert gp.entry.generation["source_tray_scale"] == 1.0
-    assert {b["n_distractors"] for b in budgets} == {1, 2, 3}  # the shipped picks span the whole 3 -> 2 -> 1 range
+    # the first-demo picks at the 0.85 budget (owner 2026-10-11): 3, or 2 for the lying bottles (at 0.60 they spanned 3 -> 2 -> 1)
+    assert G.DEFAULTS["disembedding"]["tray_budget"] == 0.85 and {b["n_distractors"] for b in budgets} == {2, 3}
     assert any(b["dropped"] for b in budgets) and any(b["footprint_rule"] == "rectangle" for b in budgets)
     attachment = _entries(grounded, "configuration_matching-attachment")[0]
     assert "assembly_group.n.01_1" in attachment.problem.groups
@@ -570,15 +573,21 @@ def test_scale_fallbacks(grounded, tmp_path):
             s = fb.entry.fallback_params["scale"]
             assert fb.entry.fallback_kind == "scale" and 0 < s < 1
             cat = gp.entry.roles["target"].category
-            assert fb.alias == gp.alias.replace(f"-{cat}-", f"-{cat}{GI.scale_token(s)}-")
+            height = cat in GI.HEIGHT_SCALE_FALLBACK.get(st, ())  # owner 2026-10-11: the axial paperbacks shrink their height only
+            assert fb.alias == gp.alias.replace(f"-{cat}-", f"-{cat}{GI.scale_token(s, height)}-")
             assert P.ALIAS_RE.match(fb.alias)
             scale = fb.entry.roles["target"].scale
-            assert scale["default"] == s
+            assert ("default" not in scale and fb.entry.fallback_params["scale_axes"] == "height") if height else scale["default"] == s
             for scene_name, scene in fb.entry.scenes.items():
                 for c, models in scene.whitelist["target"].items():
                     assert models and models == gp.entry.scenes[scene_name].whitelist["target"][c]  # same models as the primary ...
                     for m in models:
-                        assert scale[f"{c}/{m}"] == s  # ... spawned at the fallback scale
+                        if height:  # ... the height axis (frame_long) at the fallback scale, the other axes at the primary's
+                            want = [1.0, 1.0, 1.0]
+                            want[grounded.grounder._height_axis(st, c, m)] = s
+                            assert scale[f"{c}/{m}"] == want and fb.entry.fallback_params["height_axis"][f"{c}/{m}"] in ("x", "y")
+                        else:
+                            assert scale[f"{c}/{m}"] == s  # ... spawned at the fallback scale
             assert fb.entry.fallback_params["scale_source"] in ("template_meta.scale_hint", "default_step")
             assert fb.problem.objects == gp.problem.objects  # same synsets, other alias
     assert GI.scale_token(0.7) == "_s070" and GI.scale_token(0.6) == "_s060" and GI.scale_token(0.85) == "_s085"
@@ -598,7 +607,7 @@ def test_scale_fallbacks(grounded, tmp_path):
     fbs = {g.entry.fallback_of: g for g in g3.grounded if g.entry.is_fallback}
     letter = fbs["alignment-axial-letter-breakfast_table"]
     assert letter.alias == "alignment-axial-letter_s080-breakfast_table" and letter.entry.fallback_params == {"scale": 0.8, "scale_source": "template_meta.scale_hint"}
-    other = next(g for a, g in fbs.items() if a != "alignment-axial-letter-breakfast_table")
+    other = next(g for a, g in fbs.items() if a != "alignment-axial-letter-breakfast_table" and g.entry.roles["target"].category != "paperback_book")
     assert other.alias.split("-")[2].endswith("_s075") and other.entry.fallback_params["scale_source"] == "default_step"
     # a --scale-hint override wins, is persisted in the customs (later runs without the flag keep it) and supersedes
     # the earlier fallback of its kind (which keeps entry, id and BDDL but leaves the primary's live list)
@@ -830,3 +839,147 @@ def test_grasp_key_preference_named_then_pick_suffix_then_scaled_floating():
     assert pref("hardback", "acbrnv", "inter_object_relation_satisfaction-touching#03") == "hardback__acbrnv__bu"
     assert pref("hardback", "acbrnv", "inter_object_relation_satisfaction-touching#01") == "hardback__acbrnv__bo"
     assert pref("teaspoon", "eilfij", "x", {"grasp_key": "teaspoon__eilfij__missing"}) == "teaspoon__eilfij__sf"  # a named key that is not admissible is ignored
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the shipped representative sheet (the owner's of 2026-10-11): disembedding pools, poses and the puzzle's layout (handoff
+# 2026-10-10) and the axial paperbacks' height-only scale fallback (owner 2026-10-11)
+# ----------------------------------------------------------------------------------------------------------------
+
+PUZZLE_LAYOUT = "ispatialgym/assets/objects/embedded_figure/model/assembly.json"
+
+
+def _ground_shipped(root: str, subtasks, tray_budget=None, **options):
+    """Ground ``subtasks`` from the shipped icl into ``root`` (``tray_budget``: the disembedding default for this run only)."""
+    with pytest.MonkeyPatch.context() as mp:
+        if tray_budget is not None:
+            mp.setitem(G.DEFAULTS["disembedding"], "tray_budget", tray_budget)
+        g = GI.Grounder(IDDLS, GI.ICL(), C.Customs.load(os.path.join(root, "c.json")), bddl_root=os.path.join(root, "bddl"),
+                        options=GI.Options(representative_test=False, **options))
+        g.run(list(subtasks))
+        g.customs.save()
+    return g
+
+
+def test_sheet_distractor_helpers():
+    assert GI.footprint_dims((0.084, 0.123, 0.181)) == (0.123, 0.084)  # canonical: the bbox's x / y
+    assert GI.footprint_dims((0.084, 0.123, 0.181), "lying") == (0.181, 0.123)  # long axis horizontal, on the broadest side
+    assert GI.footprint_dims((0.154, 0.051, 0.045), "standing") == (0.051, 0.045)  # long axis vertical
+    group_of = {("a", "1"): "g1", ("a", "2"): "g1"}
+    rule = lambda d: GI.admissible_draw(d, "a", 2, 1, group_of)  # noqa: E731
+    assert rule([("a", "1"), ("a", "3"), ("b", "1")])
+    assert not rule([("a", "1"), ("a", "2")])  # one model per look-alike group
+    assert not rule([("a", "1"), ("a", "3"), ("a", "4")])  # at most 2 of the target's category
+    assert not rule([("b", "1"), ("b", "2")])  # at most 1 of each other category
+    pool = [("a", "1"), ("a", "2"), ("a", "3"), ("b", "1"), ("c", "1")]
+    area = dict.fromkeys(pool, 0.01)
+    area[("c", "1")] = 0.05
+    n, worst, draws = GI.count_every_draw(pool, area, 0.065, 3, rule)
+    assert n == 2 and worst == pytest.approx(0.06) and draws and all(rule(d) and len(d) == 2 for d in draws)  # a draw of 3 with c: 0.07
+    assert GI.count_every_draw(pool, area, 0.1, 3, rule)[0] == 3
+    assert GI.count_every_draw(pool, area, 0.04, 3, rule)[0] == 0  # c alone does not fit: not every draw of 1 fits
+    key = "disembedding#04|bottle_of_milk/mrejrs|countertop"
+    assert GI.stable_index(key, 90) == GI.stable_index(key, 90) and 0 <= GI.stable_index(key, 7) < 7
+
+
+def test_sheet_disembedding_pools_draw_rule_budget_and_poses(tmp_path):
+    """Handoff 2026-10-10 (its docs/disembedding_distractors.md): at the owner's budget 0.85 every pool pick of the sheet gets 3
+    distractors - every admissible draw fits, the largest takes 81 % of the uekqey floor on #04 (lying milk family), 73 % on #10
+    (fork), at most 56 % elsewhere; at the former 0.60 #04 and #10 only get 2. Each alias's member set is one admissible draw of
+    the pick's same_category / other_category rows (<= 2 of the target's category, <= 1 of each other category), its whitelist the
+    pick's pool of those categories (no target model, held-out model or look-alike of the target), and #04 / #06 carry the target's
+    pose; a re-grounding draws the same member sets."""
+    icl = GI.ICL()
+    g = _ground_shipped(str(tmp_path / "a"), ["disembedding"], 0.85)
+    by_pick = collections.defaultdict(list)
+    for gp in g.grounded:
+        by_pick[gp.combination.pick.split("~")[0]].append(gp)
+    assert set(by_pick) >= {f"disembedding#{i:02d}" for i in range(2, 11)}
+    for pick, gps in by_pick.items():
+        if pick == "disembedding#01":
+            continue  # the puzzle: test_sheet_disembedding_puzzle_fixed_layout
+        rows = icl.picks[pick]["distractors"]
+        pool = {(r["category"], r["model"]) for s in GI.SHEET_POOL_SLOTS for r in rows.get(s, [])}
+        tcat, tmodel = gps[0].entry.roles["target"].category, gps[0].entry.roles["target"].representative
+        for gp in gps:
+            gen = gp.entry.generation
+            members = gen["groups"]["distractors"]["members"]
+            b = gen["distractor_budget"]
+            assert b["n_distractors"] == gen["groups"]["distractors"]["size"] == sum(members.values()) == 3
+            assert b["budget_fraction"] == 0.85 and b["count_rule"] == "every admissible draw fits" and b["n_draws"] >= 1
+            assert members.get(tcat, 0) <= 2 and all(n == 1 for c, n in members.items() if c != tcat)
+            assert collections.Counter(d.split("/")[0] for d in b["draw"]) == collections.Counter(members)
+            assert gp.alias.split("-")[2] == "_".join(f"{c}_{n}" for c, n in members.items())
+            assert len(gp.problem.groups["distractors_group.n.01_1"]) == 3
+            for sc in gp.entry.scenes.values():
+                wl = {(c, m) for c, ms in sc.whitelist["distractors"].items() for m in ms}
+                assert wl and wl <= pool and set(sc.whitelist["distractors"]) == set(members)
+                assert not wl & ({(tcat, tmodel)} | icl.heldout_models | icl.lookalikes(tcat, tmodel))
+            assert gen.get("distractor_pose") == {"disembedding#04": "lying", "disembedding#06": "standing"}.get(pick)
+            assert "fixed_layout" not in gen
+        share = max(gp.entry.generation["distractor_budget"]["worst_draw_m2"] / gp.entry.generation["distractor_budget"]["tray_floor_m2"] for gp in gps)
+        expected = {"disembedding#04": 0.81, "disembedding#10": 0.73}.get(pick)
+        assert share == pytest.approx(expected, abs=0.006) if expected else share <= 0.565
+    again = _ground_shipped(str(tmp_path / "a"), ["disembedding"], 0.85)
+    assert sorted(gp.alias for gp in again.grounded) == sorted(gp.alias for gp in g.grounded)
+    old = _ground_shipped(str(tmp_path / "b"), ["disembedding"], 0.60)
+    n = {gp.combination.pick.split("~")[0]: gp.entry.generation["distractor_budget"]["n_distractors"] for gp in old.grounded
+         if not gp.combination.pick.startswith("disembedding#01")}
+    assert {p for p, k in n.items() if k == 2} == {"disembedding#04", "disembedding#10"} and set(n.values()) == {2, 3}
+
+
+def test_sheet_disembedding_puzzle_fixed_layout(tmp_path, monkeypatch):
+    """The puzzle pick (disembedding#01, handoff 2026-10-10): its three fixed_layout parts are the alias's distractors - all of them,
+    not drawn, outside the budget - and generation.fixed_layout names the layout file of their notes (sha256 of the grounded
+    version); a checkout without the file skips the pick (fixed_layout)."""
+    if not os.path.exists(os.path.join(GI.REPO_ROOT, PUZZLE_LAYOUT)):
+        g0 = _ground_shipped(str(tmp_path / "none"), ["disembedding"])
+        assert any(lab.startswith("disembedding#01") and why.startswith("fixed_layout") for lab, why in g0.report.skipped["disembedding"])
+    path = tmp_path / "repo" / PUZZLE_LAYOUT
+    path.parent.mkdir(parents=True)
+    parts = {"isgefa": ("target", [-0.03065, 0.057516, 0.0]), "isgefb": ("context_frame", [0.0, 0.0, 0.0]),
+             "isgefc": ("context_inner_A", [-0.065081, 0.037741, 0.0]), "isgefd": ("context_inner_B", [-0.017335, 0.051505, 0.0])}
+    path.write_text(json.dumps({"target": "isgefa", "parts": {m: {"category": "jigsaw_puzzle_piece", "role": r, "origin_in_figure_m": o} for m, (r, o) in parts.items()}}))
+    monkeypatch.setattr(GI, "REPO_ROOT", str(tmp_path / "repo"))
+    g = _ground_shipped(str(tmp_path / "with"), ["disembedding"])
+    puzzle = [gp for gp in g.grounded if gp.combination.pick.startswith("disembedding#01")]
+    assert puzzle
+    for gp in puzzle:
+        gen = gp.entry.generation
+        assert gp.alias.split("-")[1:3] == ["jigsaw_puzzle_piece", "jigsaw_puzzle_piece_3"]
+        assert gen["groups"]["distractors"]["members"] == {"jigsaw_puzzle_piece": 3}
+        assert gen["fixed_layout"] == {"file": PUZZLE_LAYOUT, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "target": "jigsaw_puzzle_piece/isgefa",
+                                       "parts": ["jigsaw_puzzle_piece/isgefb", "jigsaw_puzzle_piece/isgefc", "jigsaw_puzzle_piece/isgefd"]}
+        assert gen["distractor_budget"]["fixed_layout"] == PUZZLE_LAYOUT and "budget_fraction" not in gen["distractor_budget"]
+        assert "distractor_pose" not in gen
+        for sc in gp.entry.scenes.values():
+            assert sc.whitelist["distractors"] == {"jigsaw_puzzle_piece": ["isgefb", "isgefc", "isgefd"]}
+        assert len(gp.problem.groups["distractors_group.n.01_1"]) == 3
+
+
+def test_axial_paperback_height_only_scale_fallback(tmp_path):
+    """Owner 2026-10-11: an alignment-axial paperback that fails falls back to its height scaled - the cover's long side, model x
+    (frame_long) - never to a uniform scale; the sheet's spawn scale ([1, 1, 2.5]: the 2 cm thickness) stays on the other axes. The
+    other axial targets keep the uniform _s070 fallback. A re-grounding, and an alias with several scene blocks, scale once."""
+    for _ in range(2):
+        g = _ground_shipped(str(tmp_path), ["alignment-axial"])
+        entries = g.customs.entries
+        papers = [a for a, e in entries.items() if not e.is_fallback and e.roles["target"].category == "paperback_book"]
+        assert papers
+        for a in papers:
+            primary = entries[a]
+            assert primary.roles["target"].scale == {"paperback_book/jhaltj": [1.0, 1.0, 2.5]}  # the sheet's scale column
+            assert primary.fallbacks == [a.replace("-paperback_book-", "-paperback_book_h070-")]
+            fb = entries[primary.fallbacks[0]]
+            assert fb.fallback_kind == "scale" and fb.fallback_params == {"scale": 0.7, "scale_source": "default_step", "scale_axes": "height",
+                                                                          "height_axis": {"paperback_book/jhaltj": "x"}}
+            assert fb.roles["target"].scale == {"paperback_book/jhaltj": [0.7, 1.0, 2.5]}
+        others = [e for e in entries.values() if e.is_fallback and e.roles["target"].category != "paperback_book"]
+        assert others and all(e.fallback_params == {"scale": 0.7, "scale_source": "default_step"} and e.roles["target"].scale["default"] == 0.7 for e in others)
+    assert any(len(entries[a].scenes) > 1 for a in papers)
+    assert GI.scale_token(0.7, height_only=True) == "_h070" and GI.scale_token(0.7) == "_s070"
+    # a pilot scale_hint is a uniform scale: not the height fallback's (an explicit override still is)
+    g2 = GI.Grounder(IDDLS, GI.ICL(), C.Customs.load(str(tmp_path / "c2.json")), bddl_root=str(tmp_path / "bddl2"),
+                     options=GI.Options(representative_test=False, scale_hints={papers[0]: 0.8}, scale_overrides={papers[-1]: 0.85}))
+    assert g2.scale_for(papers[0], height_only=True) == (0.7, "default_step") and g2.scale_for(papers[0]) == (0.8, "template_meta.scale_hint")
+    assert g2.scale_for(papers[-1], height_only=True) == (0.85, "override")

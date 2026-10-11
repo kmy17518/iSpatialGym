@@ -23,7 +23,8 @@ every candidate) this module
    ``fallback_rank`` / ``fallback_kind`` / ``fallback_params``, the primary's ``fallbacks`` list, the same fields in
    ``problems.json``): large-scale IORS init surface (under: support -> the partner's own top -> floor; ontop: support
    -> floor), the wall / axial scale fallback (``<target>_s070`` = ``roles.target.scale`` 0.70, the pilot's
-   ``template_meta.scale_hint`` when it recorded one) and the small-scale articulation next-model fallback
+   ``template_meta.scale_hint`` when it recorded one; the axial paperbacks shrink their height only, ``<target>_h070``,
+   owner 2026-10-11) and the small-scale articulation next-model fallback
    (``<target>_<model>``: the next admissible model of the category in variation / held-out order). A scheduler
    queues a fallback only after its primary yielded nothing — the sampler never falls back at run time;
 5. calls the representative-test hook :func:`run_representative_test` (template + instance 0; implemented by the v2
@@ -42,7 +43,10 @@ Decisions taken where the docs leave room (all reported by the CLI, see ``--help
 * a group slot whose seeded ``size`` is a range (``distractors`` ``[1, 3]``) gets a concrete member list per problem
   (the BDDL enumerates objects): ``--distractors same:2,other:1`` = 2 same-category + 1 other-category (tier 1)
   distractors, filled from the pools in deterministic order; the grounded entry's ``generation.groups.distractors``
-  carries the concrete ``size`` and the per-category ``members`` counts of the alias;
+  carries the concrete ``size`` and the per-category ``members`` counts of the alias. A disembedding pick whose sheet rows
+  list its pools (``same_category`` / ``other_category``, handoff 2026-10-10) draws its member set from them instead, the
+  pattern read as caps (``Grounder._sheet_pool_members``); the puzzle's ``fixed_layout`` rows are its members
+  (``Grounder._layout_members``);
 * group alias tokens are ``<category>_<count>``; the custom block (``dataset = ispatialgym-assets``) uses its icl
   ``display_name`` (``block_4``, as ``docs/task_bddl_formats.md`` writes it);
 * a scene role bound to the floor (large-scale IORS floor init; small-scale articulation targets taller than 0.6 m,
@@ -58,6 +62,8 @@ import argparse
 import collections
 import csv
 import datetime as _dt
+import hashlib
+import itertools
 import json
 import logging
 import os
@@ -147,12 +153,27 @@ INIT_SURFACE_FALLBACK_SUBTASKS = {
     "inter_object_relation_satisfaction-ontop_large_scale": ("floor",),
 }
 SCALE_FALLBACK_SUBTASKS = ("alignment-world_vertical", "alignment-axial")
+#: Scale fallbacks that shrink the target's height only, never the whole model (owner 2026-10-11: "if alignment axial paperback
+#: fails try scaling only the height (no uniform scale)"): subtask -> target categories. A book's height is the long side of its
+#: cover, the model axis of its reviewed ``frame_long`` (the sheet's paperbacks lie cover up: x = 0.30 m cover height, y = 0.22 m
+#: width, z = the 8-10 mm thickness the sheet spawns at 2-2.5x for the 2 cm contact class); width and thickness keep the pick's
+#: spawn scale. Alias token ``<target>_hNNN`` (:func:`scale_token`).
+HEIGHT_SCALE_FALLBACK = {"alignment-axial": ("paperback_book",)}
 NEXT_MODEL_FALLBACK_SUBTASKS = ("configuration_matching-articulation_open_small_scale", "configuration_matching-articulation_close_small_scale")
 NEXT_MODEL_SLOT_ORDER = ("variation_geometry", "variation_texture", "heldout")
 #: The single scale step used when the pilot left no ``template_meta.scale_hint`` for the primary alias.
 DEFAULT_FALLBACK_SCALE = 0.7
 #: Where the pilot wrote its template metadata (``scale_hint`` of the wall / axial templates), relative to the repo.
 DEFAULT_SCALE_HINT_GLOB = os.path.join("runlogs", "runpod", "pilot", "*", "v2__*", "*", "*", "template_meta.json")
+#: Disembedding distractor rows of the representative sheet (handoff 2026-10-10, owner 2026-10-11): a pick lists its pools as
+#: ``same_category`` (the target's category) / ``other_category`` rows, or the puzzle's ``fixed_layout`` parts; a pick without
+#: such rows keeps the ``constraints_compatible.csv`` pools (:meth:`Grounder._distractor_members`).
+SHEET_POOL_SLOTS = ("same_category", "other_category")
+SHEET_LAYOUT_SLOT = "fixed_layout"
+#: Pool row note of a pick whose distractors take the target's pose (``pose: lying like the bottle_of_milk target ...``).
+POSE_NOTE_RE = re.compile(r"\bpose: (lying|standing)\b")
+#: Fixed-layout row note naming the layout file (repo-relative).
+LAYOUT_NOTE_RE = re.compile(r"(ispatialgym/assets/\S+?\.json)")
 
 _TRUE = ("1", "true", "True", "yes")
 
@@ -207,6 +228,54 @@ def _pad_clearance(pinch_width: float) -> float:
 def _scene_object_key(row: Dict[str, str]) -> str:
     """The name a scene candidate row is bound by: the wall region id for wall regions, else the scene object name."""
     return row.get("region_id") or row.get("model") or ""
+
+
+def footprint_dims(bbox: Sequence[float], pose: Optional[str] = None) -> Tuple[float, float]:
+    """``(long, short)`` horizontal sides of an icl bbox ``(x, y, z)`` in the distractor pose of the pick: canonical = (x, y),
+    ``lying`` = the two largest sides (long axis horizontal, on the broadest side), ``standing`` = the two smallest (long axis
+    vertical)."""
+    bx, by, bz = (float(v) for v in bbox)
+    if pose == "lying":
+        d = sorted((bx, by, bz), reverse=True)[:2]
+    elif pose == "standing":
+        d = sorted((bx, by, bz))[:2]
+    else:
+        d = [bx, by]
+    return max(d), min(d)
+
+
+def admissible_draw(draw: Sequence[Tuple[str, str]], target_category: str, same_max: int, other_max: int,
+                    group_of: Dict[Tuple[str, str], str]) -> bool:
+    """The handoff's draw rule over the sheet pools (the ``same:2, other:1`` pattern read as caps): at most ``same_max`` models
+    of the target's category, at most ``other_max`` of each other category, at most one per look-alike group."""
+    per_cat = collections.Counter(c for c, _ in draw)
+    if per_cat.get(target_category, 0) > same_max:
+        return False
+    if any(n > other_max for c, n in per_cat.items() if c != target_category):
+        return False
+    groups = [group_of[cm] for cm in draw if cm in group_of]
+    return len(groups) == len(set(groups))
+
+
+def count_every_draw(pool: Sequence[Tuple[str, str]], area: Dict[Tuple[str, str], float], budget_m2: float, size_max: int,
+                     admissible) -> Tuple[int, float, List[Tuple[Tuple[str, str], ...]]]:
+    """``(n, worst_m2, draws)``: ``n`` = the largest draw size (and every size below it) whose every admissible draw of the pool
+    fits ``budget_m2``, ``worst_m2`` = the largest of those draws, ``draws`` = the admissible draws of size ``n`` in pool order."""
+    n_ok, worst, ok_draws = 0, 0.0, []
+    for n in range(1, int(size_max) + 1):
+        draws = [d for d in itertools.combinations(pool, n) if admissible(d)]
+        if not draws:
+            break
+        largest = max(sum(area[cm] for cm in d) for d in draws)
+        if largest > budget_m2:
+            break
+        n_ok, worst, ok_draws = n, largest, draws
+    return n_ok, worst, ok_draws
+
+
+def stable_index(key: str, n: int) -> int:
+    """An index in ``range(n)`` fixed by ``key`` (a re-grounding draws the same)."""
+    return int(hashlib.sha256(key.encode("utf-8")).hexdigest(), 16) % int(n)
 
 
 def support_surface(row: Dict[str, str], label: str) -> Optional[Dict[str, Any]]:
@@ -677,6 +746,8 @@ class RolePick:
     allow_heldout: bool = False  # the heldout slot itself was requested for this role
     budget: Dict[str, Any] = field(default_factory=dict)  # distractors: the §6.4 tray budget maths (generation.distractor_budget)
     surface: Optional[Dict[str, Any]] = None  # support: the surface the pick row names (:func:`support_surface`)
+    pose: Any = None  # distractors: the target's pose they take (generation.distractor_pose: lying | standing | {model: pose})
+    layout: Dict[str, Any] = field(default_factory=dict)  # distractors: the puzzle's fixed layout (generation.fixed_layout)
 
     @property
     def is_floor(self) -> bool:
@@ -686,10 +757,11 @@ class RolePick:
     def starts_inside(self) -> bool:
         return bool(self.surface) and self.surface.get("init") == "inside"
 
-    def alias_token(self, icl: ICL, subtask: str, scale: Optional[float] = None, with_model: bool = False) -> str:
+    def alias_token(self, icl: ICL, subtask: str, scale: Optional[float] = None, with_model: bool = False, height_only: bool = False) -> str:
         """The ``{role}`` slot value: the category (``floor`` for the floor; group roles ``<category>_<count>`` tokens),
         with ``_inside`` for a support the objects start inside (``bookcase_inside``), ``_s<NNN>`` for a scaled fallback
-        (``picture_s070`` = spawn scale 0.70) and ``_<model>`` for a model-specific fallback (``blender_eyedvd``)."""
+        (``picture_s070`` = spawn scale 0.70), ``_h<NNN>`` for a height-only one (``paperback_book_h070``) and ``_<model>``
+        for a model-specific fallback (``blender_eyedvd``)."""
         if self.kind == "group":
             parts = []
             for cat, n in self.members.items():
@@ -707,13 +779,13 @@ class RolePick:
         if with_model and self.models:
             token += f"_{self.models[0][1]}"
         if scale is not None:
-            token += scale_token(scale)
+            token += scale_token(scale, height_only)
         return token
 
 
-def scale_token(scale: float) -> str:
-    """``0.7`` -> ``_s070`` (two decimals, stays within the parser's alias alphabet)."""
-    return f"_s{int(round(float(scale) * 100)):03d}"
+def scale_token(scale: float, height_only: bool = False) -> str:
+    """``0.7`` -> ``_s070``, height only ``_h070`` (two decimals, stays within the parser's alias alphabet)."""
+    return f"_{'h' if height_only else 's'}{int(round(float(scale) * 100)):03d}"
 
 
 @dataclass
@@ -737,8 +809,10 @@ class Combination:
     floor_room: Dict[str, str] = field(default_factory=dict)  # scene -> the floor's room
     notes: List[str] = field(default_factory=list)
     scale: Dict[str, float] = field(default_factory=dict)  # role -> uniform spawn scale (scale fallbacks)
+    scale_axes: Dict[str, str] = field(default_factory=dict)  # role -> "height": ``scale`` applies to the height axis only
     model_tokens: Set[str] = field(default_factory=set)  # roles whose alias token carries the model (next-model fallbacks)
     fallback: Optional[FallbackSpec] = None
+    selection: Dict[str, Dict[str, str]] = field(default_factory=dict)  # role -> the sheet row the combination was built from
 
     @property
     def label(self) -> str:
@@ -746,7 +820,8 @@ class Combination:
         return f"{base}/fallback{self.fallback.rank}:{self.fallback.kind}" if self.fallback else base
 
     def alias_values(self, icl: ICL, iddl: I.IDDL) -> Dict[str, str]:
-        return {r: self.roles[r].alias_token(icl, self.subtask, scale=self.scale.get(r), with_model=r in self.model_tokens) for r in iddl.alias_slots}
+        return {r: self.roles[r].alias_token(icl, self.subtask, scale=self.scale.get(r), with_model=r in self.model_tokens,
+                                             height_only=self.scale_axes.get(r) == "height") for r in iddl.alias_slots}
 
 
 class Skip(Exception):
@@ -1021,7 +1096,7 @@ class Grounder:
     # -- building one combination ------------------------------------------------------------------------------------
     def _build(self, iddl: I.IDDL, pick: str, slot: str, rows: Dict[str, Dict[str, str]]) -> Combination:
         subtask = iddl.subtask
-        comb = Combination(subtask, pick, slot, {})
+        comb = Combination(subtask, pick, slot, {}, selection=dict(rows))
         for role in iddl.roles:
             kind = self.icl.kind_of(subtask, role)
             row = rows.get(role)
@@ -1098,7 +1173,13 @@ class Grounder:
             if target is None or not target.models:
                 raise Skip("no_target", "distractors need the target first")
             tcat, tmodel = target.models[0]
-            self._distractor_members(rp, tcat, tmodel, size)
+            sheet = self._sheet_distractor_rows(comb)
+            if sheet.get(SHEET_LAYOUT_SLOT):
+                self._layout_members(rp, sheet[SHEET_LAYOUT_SLOT], tcat, tmodel)
+            elif sheet:
+                self._sheet_pool_members(rp, sheet, tcat, tmodel, size, comb)
+            else:
+                self._distractor_members(rp, tcat, tmodel, size)
             return rp
         if row is None:
             marked = [r for r in self.icl.rows(subtask, role) if self._marked(r)]
@@ -1179,7 +1260,7 @@ class Grounder:
         if sum(members.values()) < lo:
             raise Skip("empty_distractor_pool", f"target {tcat}/{tmodel}: pools too small after the look-alike / held-out exclusions")
         # owner decision 2026-09-16 4a: the §6.4 tray budget is applied here -- the grown footprints of the member set must
-        # fit ``tray_budget`` (0.60 since 2026-09-24) of the source tray's inner floor; drop members (last pattern slot first) until they do
+        # fit ``tray_budget`` (generation defaults) of the source tray's inner floor; drop members (last pattern slot first) until they do
         rp.budget = self._distractor_budget(tcat, tmodel, members, pools, lo)
         rp.members = members
         rp.pools = pools
@@ -1195,17 +1276,8 @@ class Grounder:
         ``lo``. Until 2026-09-24 the rule was the conservative square ``(long + 2c)²`` (any yaw's axis-aligned box) at
         0.45: it charged a 22 cm bottle 0.0725 m² for a 0.016 m² footprint and left the milk tray at one distractor with
         86 % of the floor empty."""
-        gen = G.defaults_for("disembedding")
-        tray_scale = float(gen.get("source_tray_scale") or 1.0)
-        floors = gen.get("source_tray_inner_floor_m2") or {}
-        source_rows = [r for r in self.icl.rows("disembedding", "source") if (r.get("representative") or "") in _TRUE] or self.icl.rows("disembedding", "source")
-        tray_key = f"{source_rows[0]['category']}/{source_rows[0]['model']}" if source_rows else None
-        floor_native = float(floors.get(tray_key, 0.0)) if tray_key else 0.0
-        floor_m2 = floor_native * tray_scale * tray_scale
-        fraction = float(gen.get("tray_budget") or 0.60)
-        # pad clearance of the target's tightest admissible tabletop grasp (conventions.pad_clearance; icl width_m)
-        widths = [float(g["width_m"]) for g in self.icl.admissible_grasps(tcat, tmodel, "tabletop") if g.get("width_m")]
-        clearance = _pad_clearance(min(widths)) if widths else 0.0
+        tray_key, tray_scale, floor_m2, fraction = self._source_tray_floor()
+        clearance = self._target_pad_clearance(tcat, tmodel)
 
         def footprint(cat: str) -> Tuple[float, str]:
             """Largest grown rectangle ``(long + 2c) · (short + 2c)`` of the category's pool and the model it belongs to."""
@@ -1246,6 +1318,122 @@ class Grounder:
             budget["used_m2"] = None
         budget["n_distractors"] = sum(members.values())
         return budget
+
+    def _source_tray_floor(self) -> Tuple[Optional[str], float, float, float]:
+        """``(tray, tray_scale, floor_m2, fraction)`` of the §6.4 budget: the representative source tray, its inner floor
+        (``source_tray_inner_floor_m2`` at scale 1 × ``source_tray_scale``²) and ``tray_budget`` (generation defaults)."""
+        gen = G.defaults_for("disembedding")
+        tray_scale = float(gen.get("source_tray_scale") or 1.0)
+        floors = gen.get("source_tray_inner_floor_m2") or {}
+        source_rows = [r for r in self.icl.rows("disembedding", "source") if (r.get("representative") or "") in _TRUE] or self.icl.rows("disembedding", "source")
+        tray_key = f"{source_rows[0]['category']}/{source_rows[0]['model']}" if source_rows else None
+        floor_native = float(floors.get(tray_key, 0.0)) if tray_key else 0.0
+        return tray_key, tray_scale, floor_native * tray_scale * tray_scale, float(gen.get("tray_budget") or 0.60)
+
+    def _target_pad_clearance(self, tcat: str, tmodel: str) -> float:
+        """Pad clearance of the target's tightest admissible tabletop grasp (conventions.pad_clearance; icl width_m)."""
+        widths = [float(g["width_m"]) for g in self.icl.admissible_grasps(tcat, tmodel, "tabletop") if g.get("width_m")]
+        return _pad_clearance(min(widths)) if widths else 0.0
+
+    def _sheet_distractor_rows(self, comb: Combination) -> Dict[str, List[Dict[str, str]]]:
+        """The pick's distractor rows of the representative sheet by slot (``same_category`` / ``other_category`` /
+        ``fixed_layout``); empty for a pick without them."""
+        slots = self.icl.picks.get(comb.pick.split("~")[0], {}).get("distractors", {})
+        return {s: list(slots[s]) for s in SHEET_POOL_SLOTS + (SHEET_LAYOUT_SLOT,) if slots.get(s)}
+
+    def _layout_members(self, rp: RolePick, rows: List[Dict[str, str]], tcat: str, tmodel: str) -> None:
+        """The puzzle pick (handoff 2026-10-10, disembedding#01): its ``fixed_layout`` parts are always all placed, together with
+        the target, as one layout at the x / y the layout file of their notes gives (``generation.fixed_layout``; the sampler
+        reads the file). Not drawn from a pool and outside the distractor budget."""
+        files = sorted({m.group(1) for m in (LAYOUT_NOTE_RE.search(r.get("note") or "") for r in rows) if m})
+        if len(files) != 1:
+            raise Skip("fixed_layout", f"target {tcat}/{tmodel}: the fixed_layout rows name {files or 'no'} layout file, need one")
+        path = os.path.join(REPO_ROOT, files[0])
+        if not os.path.isfile(path):
+            raise Skip("fixed_layout", f"target {tcat}/{tmodel}: layout file {files[0]} is not in this checkout")
+        with open(path, "rb") as f:
+            raw = f.read()
+        parts = json.loads(raw.decode("utf-8")).get("parts") or {}
+        missing = [m for m in [tmodel] + [r["model"] for r in rows] if m not in parts]
+        if missing:
+            raise Skip("fixed_layout", f"{files[0]} has no part {missing}")
+        if (parts[tmodel].get("role") or "target") != "target":
+            raise Skip("fixed_layout", f"{files[0]}: {tmodel} is the {parts[tmodel].get('role')}, not the target")
+        resolved = [self._resolve_row("disembedding", "distractors", r) for r in rows]
+        members: Dict[str, int] = collections.OrderedDict()
+        pools: Dict[str, List[str]] = collections.OrderedDict()
+        for r in resolved:
+            members[r["category"]] = members.get(r["category"], 0) + 1
+            pools.setdefault(r["category"], []).append(r["model"])
+        rp.members, rp.pools = members, pools
+        rp.models = [(c, m) for c, ms in pools.items() for m in ms]
+        rp.pick_row = resolved[0]
+        rp.layout = {"file": files[0], "sha256": hashlib.sha256(raw).hexdigest(), "target": f"{tcat}/{tmodel}", "parts": [f"{c}/{m}" for c, m in rp.models]}
+        rp.budget = {"fixed_layout": files[0], "n_distractors": len(rp.models), "rule": "not drawn from a pool, outside the distractor budget (owner 2026-10-10)"}
+
+    def _sheet_pool_members(self, rp: RolePick, sheet: Dict[str, List[Dict[str, str]]], tcat: str, tmodel: str, size, comb: Combination) -> None:
+        """Handoff 2026-10-10 (owner 2026-10-11): the pick's ``same_category`` / ``other_category`` rows are its distractor pools,
+        minus the target, its look-alikes and the held-out models. A draw takes at most ``same`` (2) models of the target's
+        category, at most ``other`` (1) of each other category and at most one per look-alike group (:func:`admissible_draw`; the
+        ``--distractors`` pattern gives the caps). The member count is the largest size whose every admissible draw fits the §6.4
+        budget (grown rectangles in the pick's pose, ``tray_budget`` of the source tray floor; :func:`count_every_draw`). The member
+        set of the alias (categories and counts: part of the alias and of the BDDL) is one of those draws, fixed per (pick, target,
+        support category) by :func:`stable_index`; the sampler draws the models of each category per template. Pool notes with
+        ``pose: lying`` / ``pose: standing`` give ``generation.distractor_pose``."""
+        excluded = {(tcat, tmodel)} | self.icl.lookalikes(tcat, tmodel) | self.icl.heldout_models
+        excluded |= {(c, m) for (st, role, c, m) in getattr(self.adm, "extra_blacklist", {}) if st == "disembedding" and role == "distractors"}
+        pool: List[Tuple[str, str]] = []
+        poses: Dict[Tuple[str, str], Optional[str]] = {}
+        for slot in SHEET_POOL_SLOTS:
+            for r in sheet.get(slot, []):
+                cm = (r["category"], r["model"])
+                if cm in excluded or cm in poses or not _is_ready(self.icl.row("disembedding", "distractors", *cm) or {"kind": "group", "model": cm[1]}):
+                    continue
+                m = POSE_NOTE_RE.search(r.get("note") or "")
+                poses[cm] = m.group(1) if m else None
+                pool.append(cm)
+        if not pool:
+            raise Skip("empty_distractor_pool", f"target {tcat}/{tmodel}: the sheet pools are empty after the look-alike / held-out exclusions")
+        tray_key, tray_scale, floor_m2, fraction = self._source_tray_floor()
+        clearance = self._target_pad_clearance(tcat, tmodel)
+        area: Dict[Tuple[str, str], float] = {}
+        for cm in pool:
+            row = self.icl.row("disembedding", "distractors", *cm) or {}
+            try:
+                bbox = [float(row.get(k) or "") for k in ("bbox_x", "bbox_y", "bbox_z")]
+            except ValueError:
+                raise Skip("distractor_budget", f"{cm[0]}/{cm[1]}: no icl bbox for its footprint") from None
+            long_, short = footprint_dims(bbox, poses[cm])
+            area[cm] = (long_ + 2.0 * clearance) * (short + 2.0 * clearance)
+        caps = dict(self.opt.distractor_pattern)
+        same_max, other_max = int(caps.get("same", 2)), int(caps.get("other", 1))
+        group_of = {m: g for g, ms in self.icl.lookalike_groups.items() for m in ms}
+        lo = size[0] if isinstance(size, list) else int(size)
+        hi = size[1] if isinstance(size, list) else int(size)
+        budget_m2 = fraction * floor_m2 if floor_m2 > 0 else float("inf")
+        n, worst, draws = count_every_draw(pool, area, budget_m2, hi, lambda d: admissible_draw(d, tcat, same_max, other_max, group_of))
+        if n < max(lo, 1):
+            raise Skip("distractor_budget", f"target {tcat}/{tmodel}: not every draw of {max(lo, 1)} sheet distractor(s) fits {fraction:.0%} of the "
+                                            f"{floor_m2:.3f} m2 source tray floor (grown rectangle)")
+        support = (comb.selection.get("support") or {}).get("category") or ""
+        draw = draws[stable_index(f"{comb.pick.split('~')[0]}|{tcat}/{tmodel}|{support}", len(draws))]
+        order = [c for c, _ in pool]
+        cats = sorted({c for c, _ in draw}, key=lambda c: (c != tcat, order.index(c)))
+        rp.members = collections.OrderedDict((c, sum(1 for d, _ in draw if d == c)) for c in cats)
+        rp.pools = collections.OrderedDict((c, [m for pc, m in pool if pc == c]) for c in cats)
+        rp.models = [(c, m) for c, ms in rp.pools.items() for m in ms]
+        posed = [cm for cm in rp.models if poses.get(cm)]
+        if posed:
+            labels = {poses[cm] for cm in posed}
+            rp.pose = labels.pop() if len(labels) == 1 and len(posed) == len(rp.models) else {f"{c}/{m}": poses[(c, m)] for c, m in posed}
+        rp.budget = {"tray": tray_key, "tray_scale": tray_scale, "tray_floor_m2": round(floor_m2, 4), "budget_fraction": fraction,
+                     "pad_clearance_m": round(clearance, 4), "footprint_rule": "rectangle",
+                     "pose": rp.pose if isinstance(rp.pose, str) else ("per_model" if rp.pose else "canonical"),
+                     "source": "representatives.csv same_category / other_category rows",
+                     "draw_rule": {"size_max": hi, "same_category_max": same_max, "other_category_max": other_max, "lookalike_group_max": 1},
+                     "count_rule": "every admissible draw fits", "model_footprints_m2": {f"{c}/{m}": round(a, 4) for (c, m), a in area.items()},
+                     "n_draws": len(draws), "worst_draw_m2": round(worst, 4), "used_m2": round(worst, 4), "n_distractors": n,
+                     "draw": [f"{c}/{m}" for c, m in draw], "dropped": []}
 
     def _scene_pick(self, iddl: I.IDDL, role: str, row: Optional[Dict[str, str]], comb: Combination) -> RolePick:
         subtask = iddl.subtask
@@ -1523,8 +1711,10 @@ class Grounder:
             slot=comb.slot,
             roles=dict(comb.roles),
             scale=dict(comb.scale),
+            scale_axes=dict(comb.scale_axes),
             model_tokens=set(comb.model_tokens),
             fallback=FallbackSpec(primary, rank, kind, dict(params)),
+            selection=dict(comb.selection),
         )
 
     def _init_surface_fallbacks(self, comb: Combination, alias: str) -> List[Combination]:
@@ -1553,34 +1743,54 @@ class Grounder:
             out.append(fb)
         return out
 
-    def scale_for(self, alias: str) -> Tuple[float, str]:
+    def scale_for(self, alias: str, height_only: bool = False) -> Tuple[float, str]:
         """The scale of the scale fallback of ``alias`` and its source, in priority order: a ``--scale-hint alias=s``
         override of this run (``override``), an override persisted in the customs by an earlier run (the existing
         ``scale`` fallback entry of the alias with ``scale_source = override``), the pilot's ``template_meta.scale_hint``
-        (``template_meta.scale_hint``), else :attr:`Options.fallback_scale` (``default_step``)."""
+        (``template_meta.scale_hint``; a uniform scale, so not for a ``height_only`` fallback), else
+        :attr:`Options.fallback_scale` (``default_step``)."""
         if alias in self.opt.scale_overrides:
             return float(self.opt.scale_overrides[alias]), "override"
         for e in self.customs.entries.values():
             if e.fallback_of == alias and e.fallback_kind == "scale" and e.fallback_params.get("scale_source") == "override" \
                     and e.is_live:
                 return float(e.fallback_params["scale"]), "override"
-        hint = self.opt.scale_hints.get(alias)
+        hint = None if height_only else self.opt.scale_hints.get(alias)
         if hint:
             return float(hint), "template_meta.scale_hint"
         return float(self.opt.fallback_scale), "default_step"
 
+    def _height_axis(self, subtask: str, category: str, model: str) -> int:
+        """The model axis of a book's height (:data:`HEIGHT_SCALE_FALLBACK`): its reviewed ``frame_long`` (icl), else the longer
+        of the bbox's x / y sides."""
+        row = self.icl.row(subtask, "target", category, model) or {}
+        long_ = (row.get("frame_long") or "").strip().lstrip("+-")
+        if long_ in ("x", "y", "z"):
+            return "xyz".index(long_)
+        try:
+            return 0 if float(row.get("bbox_x") or 0.0) >= float(row.get("bbox_y") or 0.0) else 1
+        except ValueError:
+            return 0
+
     def _scale_fallbacks(self, comb: Combination, alias: str) -> List[Combination]:
         """§5.5 / §6.10 ``scale_hint``: the target spawned at the pilot's hint (else :attr:`Options.fallback_scale`);
-        the same models (variation / held-out included) run at that scale. Alias token ``<target>_sNNN``."""
+        the same models (variation / held-out included) run at that scale. Alias token ``<target>_sNNN``. A target category of
+        :data:`HEIGHT_SCALE_FALLBACK` gets the height-only variant instead: the scale applies to its height axis only (the other
+        axes keep the pick's spawn scale), alias token ``<target>_hNNN``, ``fallback_params.scale_axes = "height"``."""
         target = comb.roles.get("target")
         if target is None or target.kind != "sampleable" or "target" in comb.scale:
             return []
-        scale, source = self.scale_for(alias)
+        height = target.category in HEIGHT_SCALE_FALLBACK.get(comb.subtask, ())
+        scale, source = self.scale_for(alias, height_only=height)
         if scale <= 0 or scale >= 1.0:
             return []
-        params = {"scale": round(scale, 3), "scale_source": source}
+        params: Dict[str, Any] = {"scale": round(scale, 3), "scale_source": source}
+        if height:
+            params.update({"scale_axes": "height", "height_axis": {C.model_key(c, m): "xyz"[self._height_axis(comb.subtask, c, m)] for c, m in target.models}})
         fb = self._derive(comb, alias, 1, "scale", params)
         fb.scale["target"] = round(scale, 3)
+        if height:
+            fb.scale_axes["target"] = "height"
         fb.scenes, fb.rooms, fb.floor_room = list(comb.scenes), dict(comb.rooms), dict(comb.floor_room)
         return [fb]
 
@@ -1680,6 +1890,13 @@ class Grounder:
                 seed["members"] = dict(rp.members)
                 if rp.budget:
                     entry.generation["distractor_budget"] = dict(rp.budget)  # owner decision 2026-09-16 4a (§6.4 budget at grounding)
+                if role == "distractors" and subtask == "disembedding":
+                    # handoff 2026-10-10: the sheet's pose rule and the puzzle's layout; a re-grounding drops what the sheet no longer says
+                    for key, value in (("distractor_pose", rp.pose), ("fixed_layout", rp.layout)):
+                        if value:
+                            entry.generation[key] = json.loads(json.dumps(value))
+                        else:
+                            entry.generation.pop(key, None)
             elif rp.kind == "sampleable":
                 re_.category = rp.category
                 re_.sampleable = True
@@ -1878,17 +2095,28 @@ class Grounder:
             tray_scale = entry.generation.get("source_tray_scale")
             if tray_scale not in (None, 1, 1.0):
                 role_scales["source"] = float(tray_scale)
+        primary = self.customs.entries.get(comb.fallback.primary) if comb.fallback is not None else None
         for role, s in role_scales.items():
             re_ = entry.roles.get(role)
             if re_ is None:
                 continue
-            for sc in entry.scenes.values():
-                for cat, models in sc.whitelist.get(role, {}).items():
-                    for m in models:
-                        key = C.model_key(cat, m)
-                        base = re_.scale.get(key)
-                        re_.scale[key] = [round(float(b) * s, 4) for b in base] if isinstance(base, list) else s
-            re_.scale["default"] = s
+            height = comb.scale_axes.get(role) == "height"
+            # the unscaled spawn scale of a fallback's model is its primary's (a re-grounded fallback carries its own scaled value)
+            base_of = primary.roles[role].scale if primary is not None and role in primary.roles else re_.scale
+            # once per model: a model whitelisted in several scene blocks (one per support) must not be scaled again
+            models = list(dict.fromkeys((cat, m) for sc in entry.scenes.values() for cat, ms in sc.whitelist.get(role, {}).items() for m in ms))
+            for cat, m in models:
+                key = C.model_key(cat, m)
+                base = base_of.get(key)
+                if height:
+                    vec = [float(b) for b in base] if isinstance(base, list) else [float(base if base is not None else 1.0)] * 3
+                    axis = self._height_axis(subtask, cat, m)
+                    vec[axis] *= s
+                    re_.scale[key] = [round(v, 4) for v in vec]
+                else:
+                    re_.scale[key] = [round(float(b) * s, 4) for b in base] if isinstance(base, list) else s
+            if not height:
+                re_.scale["default"] = s
         if subtask in TARGET_FIT_SUBTASKS:
             self._apply_target_fit(iddl, comb, entry, alias)
         if subtask in HANDEDNESS_SUBTASKS:
@@ -1945,6 +2173,8 @@ class Grounder:
         if key_scale is not None:
             re_.scale[key] = key_scale
         scale = _parse_scale(row.get("scale") or "")
+        if scale is None and rp.pick_row is not None and (rp.pick_row.get("category"), rp.pick_row.get("model")) == (cat, m):
+            scale = _parse_scale(rp.pick_row.get("scale") or "")  # the sheet's spawn scale of the pick's own model (alignment-axial#02: 2.5x thickness)
         if scale is not None and key not in re_.scale:
             re_.scale[key] = scale
         if v.handles:

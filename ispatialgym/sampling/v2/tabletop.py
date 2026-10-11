@@ -2485,7 +2485,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                   support_z: Optional[float] = None, margin: float = SUPPORT_MARGIN, focus_radius: float = FOCUS_RADIUS, yaws: Sequence[float] = YAWS,
                   arm: str = "right", object_name: Optional[str] = None, scale_key: Any = None, eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
                   bands: Optional[RB.ReachBands] = None, jitter: float = YAW_JITTER, n_positions: int = 5, arms: Optional[Sequence[str]] = None,
-                  arm_bands: Optional[Dict[str, RB.ReachBands]] = None) -> Tuple[Pose, GraspRecord]:
+                  arm_bands: Optional[Dict[str, RB.ReachBands]] = None, fixed: Optional[Tuple[Any, float]] = None) -> Tuple[Pose, GraspRecord]:
     """§4.6 step 1: screen the 8 fixed yaws x ``grasps`` at the focus cell (12-seed IK from ``manip``, support ignored for
     the grasp pose only) -> feasible set F (stored in the band cache under (trunk, cell); empty F removes the cell);
     draw (yaw, grasp) uniformly from F, jitter ±22.5°, place the object within 5 cm of the focus with its footprint on
@@ -2499,7 +2499,10 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     first (the caller offers the other arm only where its band covers the focus). F is screened per arm at the arm's stance
     (:func:`stance_for_arm`) and stored in that arm's band (``arm_bands``; a mirrored band keeps it in memory); the draw is
     uniform over the union, and at the drawn pose the arms whose F holds the pair compete with both turns (:func:`pick_twin`).
-    The record carries the chosen arm; ``manip`` is switched to that arm's working arm and idle posture in place."""
+    The record carries the chosen arm; ``manip`` is switched to that arm's working arm and idle posture in place.
+
+    ``fixed = (xy, yaw)``: the object's pose is given (a part of a fixed layout: the embedded-figure target): F is screened at that
+    pose only and drawn there without jitter or offset; it is not stored in the band (its cell and single yaw are not the band's)."""
     IK = _ik()
     top = _top(s, top)
     z = float(support_z) if support_z is not None else float(top.z)
@@ -2507,6 +2510,9 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     if focus is None:
         raise ValueError("phase3_target needs a manipulation stance with a focus (Phase 2 survivor)")
     fx = focus[:2]
+    if fixed is not None:
+        fx = _t(fixed[0])[:2].float()
+        yaws, jitter, focus_radius, n_positions = [float(fixed[1])], 0.0, 0.0, 1
     eef_of = eef_of_grasp or (lambda g: g.pose)
     grasps = list(grasps)
     twins = grasp_twins_on(s)
@@ -2533,7 +2539,8 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     F_of: Dict[str, List[Tuple[float, Any]]] = {}
     for a in offered:
         F_of[a] = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of).get(0, [])
-        store_feasible_set(band_of.get(a), st_of[a], F_of[a], yaws)
+        if fixed is None:
+            store_feasible_set(band_of.get(a), st_of[a], F_of[a], yaws)
         if (band_of.get(a) is not None) and band_of[a].meta.get("mirrored_from"):
             _count(s, "arm_band_mirrored.foci")
             if not F_of[a]:

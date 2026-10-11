@@ -390,6 +390,83 @@ def test_tray_rest_tilt_and_repark_slots():
     assert S.world.calls == [(o, list(S.world.spawned).index(n)) for n, o in S.world.spawned.items()]
 
 
+def _box(dx, dy, dz):
+    return th.tensor([[sx * dx / 2, sy * dy / 2, sz * dz / 2] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)])
+
+
+def test_disembedding_distractors_take_the_target_pose():
+    """Handoff 2026-10-10: on the milk picks the distractors lie (smallest extent vertical: long axis horizontal, on the broadest
+    side) or stand (largest extent vertical, the wider end down: a bottle on its base, not on its cap); a model already in that pose
+    keeps its canonical orientation, and every other pick keeps the canonical one."""
+    D = _disembedding()
+    carton = _box(0.084, 0.123, 0.181)  # an upright carton (#04 lays it down)
+    q, how = D.pose_rest_quat(carton, "lying")
+    ext = TT.hull_extents(carton, q)
+    assert float(ext[2]) == pytest.approx(0.084, abs=1e-5) and sorted(float(v) for v in ext[:2]) == pytest.approx([0.123, 0.181], abs=1e-5)
+    assert how.startswith("lying: local")
+    q, how = D.pose_rest_quat(_box(0.154, 0.058, 0.0585), "lying")  # a bottle lying in its canonical pose stays
+    assert how == "lying: canonical" and th.allclose(q, C.IDENTITY_QUAT)
+    assert D.pose_rest_quat(carton, "standing")[1] == "standing: canonical" and D.pose_rest_quat(carton, None)[1] == "canonical"
+    # a lying bottle (long axis x): a 58 mm body ending in a 20 mm neck stands on its body end, whichever end of x that is
+    body = [[x, sy * 0.029, sz * 0.029] for x in (-0.077, 0.03) for sy in (-1, 1) for sz in (-1, 1)]
+    neck = [[0.077, sy * 0.01, sz * 0.01] for sy in (-1, 1) for sz in (-1, 1)]
+    for flip in (1.0, -1.0):
+        pts = th.tensor(body + neck) * th.tensor([flip, 1.0, 1.0])
+        q, how = D.pose_rest_quat(pts, "standing")
+        up = C.transform_points((th.zeros(3), q), pts)
+        assert float(up[:, 2].max() - up[:, 2].min()) == pytest.approx(0.154, abs=1e-5)  # long axis vertical
+        bottom = up[up[:, 2] < float(up[:, 2].min()) + 1e-4]
+        assert float(bottom[:, 0].max() - bottom[:, 0].min()) == pytest.approx(0.058, abs=1e-5), how  # on the body, not the neck
+
+
+def test_disembedding_figure_frame_and_layout_origins():
+    """The embedded figure on the source tray (handoff 2026-10-10): +x = the robot's right (-tangent), +y = away from the robot
+    (inward); each part's x / y from ``origin_in_figure_m`` (``origin_in_tray_m`` in the file's first version)."""
+    D = _disembedding()
+    x_axis, y_axis, yaw = D.figure_axes(th.tensor([0.0, 1.0]), th.tensor([1.0, 0.0]))  # facing world +x: the robot's left is +y
+    assert x_axis.tolist() == [0.0, -1.0] and y_axis.tolist() == [1.0, 0.0] and yaw == pytest.approx(-math.pi / 2)
+    assert C.quat_rotate(C.quat_from_yaw(yaw), th.tensor([1.0, 0.0, 0.0]))[:2].tolist() == pytest.approx(x_axis.tolist(), abs=1e-6)
+    origins = D.layout_origins({"parts": {"isgefa": {"origin_in_figure_m": [-0.03065, 0.057516, 0.0]},
+                                          "isgefb": {"origin_in_tray_m": [0.0, 0.0, 0.006]}, "other": {"role": "context"}}})
+    assert origins == {"isgefa": (-0.03065, 0.057516), "isgefb": (0.0, 0.0)}
+    assert D.FIXED_LAYOUT_RELEASE_GAP_M == pytest.approx(0.0005)
+
+
+def test_phase3_target_fixed_pose_screens_and_places_only_that_pose(monkeypatch):
+    """A fixed-layout target (the embedded figure's): F is screened at the given (xy, yaw) only, the object lands exactly there (no
+    jitter, no offset from the focus) and F stays out of the band."""
+    from types import SimpleNamespace
+
+    calls = {}
+
+    class IKC:
+        def feasible_sets(self, cells, yaws, grasps, pose_at, stance, arm, ignore, eef_of):
+            calls["cells"], calls["yaws"] = [[float(v) for v in c] for c in cells], list(yaws)
+            return {0: [(yaws[0], grasps[0])]}
+
+        def exact(self, poses, stance, arm, **kw):
+            return SimpleNamespace(ok=True, reason="", q=None)
+
+    class Top:
+        z = 0.8
+
+        def polygon_supported(self, fp, margin=0.0):
+            return True
+
+    stored = []
+    monkeypatch.setattr(TT, "store_feasible_set", lambda *a, **k: stored.append(a))
+    s = SimpleNamespace(gp=SimpleNamespace(gen=lambda k, d=None: False if k == "grasp_twins" else d), ikc=IKC(), bands=None, kit=SimpleNamespace(stats={}),
+                        world=SimpleNamespace(bottom_offset=lambda hull, q: 0.01, footprint=lambda hull, pose: th.zeros(4, 2)),
+                        bindings=SimpleNamespace(one=lambda role: SimpleNamespace(name="jigsaw_puzzle_piece.n.01_1")))
+    manip = SimpleNamespace(focus=th.tensor([1.0, 2.0, 0.8]), translate=0.3, tilt=0.0, name="manipulation", working_arms=["right"])
+    g = SimpleNamespace(name="g0", key="jigsaw_puzzle_piece__isgefa", pose=(th.zeros(3), C.IDENTITY_QUAT.clone()), finger_q=None)
+    pose, rec = TT.phase3_target(s, manip, np.random.default_rng(0), [g], _box(0.1, 0.07, 0.02), C.IDENTITY_QUAT.clone(), [], top=Top(), support_z=0.8,
+                                 fixed=(th.tensor([1.05, 1.95]), 0.3))
+    assert calls["cells"] == [pytest.approx([1.05, 1.95])] and calls["yaws"] == [0.3] and stored == []
+    assert pose[0][:2].tolist() == pytest.approx([1.05, 1.95]) and rec.yaw == pytest.approx(0.3) and rec.grasp_name == "g0"
+    assert th.allclose(pose[1], C.quat_from_yaw(0.3), atol=1e-6)
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # sidecar blocks the tabletop tasks emit, read back by the F6 sidecar / programs (schema compatibility, no simulator)
 # ----------------------------------------------------------------------------------------------------------------

@@ -218,8 +218,10 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         # §6.4 distractor footprints (the bbox rectangle grown by pad_clearance_m on both axes, yaw-invariant) cover ≤ this
         # fraction of the inner floor. 2026-09-24: 0.45 -> 0.60 together with the square -> rectangle footprint rule in
         # ground_isg._distractor_budget (the square charged a lying 22 cm bottle 4.6x its footprint: one distractor, 86 %
-        # of the milk tray empty); the same fraction gates place_distractors at sampling time
-        "tray_budget": 0.60,
+        # of the milk tray empty); the same fraction gates place_distractors at sampling time. 2026-10-11 (owner, handoff
+        # 2026-10-10): 0.60 -> 0.85 - at 0.60 the lying milk family and the fork of the new sheet guaranteed only 2
+        # distractors; at 0.85 every draw of 3 fits every pick (the largest takes 81 % of the uekqey floor)
+        "tray_budget": 0.85,
         # owner decision 2026-09-16 4a/4b: the budget is applied at grounding (ground_isg picks the member count 3 -> 2 -> 1
         # from the icl footprints, generation.distractor_budget records the maths); the source tray spawns at
         # ``source_tray_scale`` (uniform, roles.source.scale), the destination tray stays 1.0. Inner floor area of the source

@@ -13,7 +13,10 @@ Instance (``sample_instance``): a Phase-2 survivor + transition; source tray at 
 the feasible set F (footprint on the tray floor, 0.5 cm); the destination tray on a random side at the lateral
 position where exactly 4 cm of it is inside the init image (>= 4 cm from the source tray, footprint on the top);
 distractors on the source floor >= x from the target along the drawn grasp's pinch axis (x = pad_clearance + 0.01),
-footprints grown by their pad clearance <= 0.45 of the floor; every object but the destination in frame (5 %);
+footprints grown by their pad clearance <= ``tray_budget`` of the floor, each at its rest orientation - the target's pose when
+the alias says so (``generation.distractor_pose`` lying / standing, the milk picks of the handoff 2026-10-10) - or, for the
+puzzle (``generation.fixed_layout``), every part of the embedded figure at its layout position with the target held there
+too; every object but the destination in frame (5 %);
 whole-body checks at init and manipulation with the objects placed; occlusion <= 0.30 (two segmentation renders,
 visible area >= 400 px) with the destination tray confirmed visible; the §4.7 placement stance with the place /
 pre-place IK (object in hand, tray + support ignored for the place pose) and the lateral path with the object at the
@@ -26,13 +29,17 @@ carry height (>= tallest distractor + tray rim + 3 cm above the source floor). S
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
 import logging
 import math
-from typing import Any, Dict, List, Optional
+import os
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch as th
 
+from ispatialgym import REPO_ROOT
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling.constraints import apply_mass
@@ -81,6 +88,64 @@ RELEASE_GAP_M = TT.Z_OFFSET
 TRAY_RELEASE_GAP_M = 0.0002
 #: owner item 3 (2026-09-16 10:15): release this far above the actual surface under the footprint centre (``surface_z_under``)
 RELEASE_ABOVE_SURFACE = 0.01
+#: release height of the fixed-layout parts (target included) above the source floor: the embedded figure's parts sit 0.3 mm
+#: apart and its physics check settled them from 0.5 mm (embedded_figure/README.txt, 2026-10-11); ``generation.fixed_layout.
+#: release_gap_m`` overrides
+FIXED_LAYOUT_RELEASE_GAP_M = 0.0005
+#: a model already lies / stands in its canonical orientation when its vertical extent is within this fraction of the wanted one
+POSE_EXTENT_TOL = 0.05
+#: standing: the two end slices (this fraction of the length each) compared to put the wider end down (a bottle on its base)
+END_SLICE_FRACTION = 0.15
+
+
+def _end_area(pts: th.Tensor, axis: int, upper: bool) -> float:
+    """Bbox area, across ``axis``, of the hull points within ``END_SLICE_FRACTION`` of the lower / upper end along ``axis``."""
+    a = pts[:, axis]
+    lo, hi = float(a.min()), float(a.max())
+    cut = END_SLICE_FRACTION * (hi - lo)
+    sel = pts[a >= hi - cut] if upper else pts[a <= lo + cut]
+    others = [i for i in range(3) if i != axis]
+    ext = sel[:, others].max(dim=0).values - sel[:, others].min(dim=0).values
+    return float(ext[0]) * float(ext[1])
+
+
+def pose_rest_quat(hull: th.Tensor, pose: Optional[str]) -> Tuple[th.Tensor, str]:
+    """Rest orientation of a distractor that takes the target's pose (handoff 2026-10-10, sheet notes ``pose: lying`` / ``pose:
+    standing``): ``lying`` = its smallest extent vertical (long axis horizontal, on its broadest side), ``standing`` = its largest
+    extent vertical, wider end down (a bottle on its base, not on its cap). The canonical orientation when it already lies /
+    stands (vertical extent within ``POSE_EXTENT_TOL`` of the wanted one) and for any other ``pose``. Returns ``(quat, how)``."""
+    if pose not in ("lying", "standing"):
+        return C.IDENTITY_QUAT.clone(), "canonical"
+    ext = hull.max(dim=0).values - hull.min(dim=0).values
+    want = int(th.argmin(ext)) if pose == "lying" else int(th.argmax(ext))
+    if abs(float(ext[2]) - float(ext[want])) <= POSE_EXTENT_TOL * float(ext[want]):
+        return C.IDENTITY_QUAT.clone(), f"{pose}: canonical"
+    up = -1.0 if pose == "standing" and _end_area(hull, want, upper=True) > _end_area(hull, want, upper=False) else 1.0
+    # the rotation taking the local axis ``up * e_want`` onto +z
+    if want == 0:
+        q = C.quat_from_axis_angle(th.tensor([0.0, 1.0, 0.0]), -up * math.pi / 2)
+    else:
+        q = C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), up * math.pi / 2)
+    return q, f"{pose}: local {'+' if up > 0 else '-'}{'xyz'[want]} up"
+
+
+def figure_axes(tangent, inward) -> Tuple[th.Tensor, th.Tensor, float]:
+    """World xy axes and yaw of the embedded figure's frame on the source tray (handoff 2026-10-10): +x = the robot's right
+    (−tangent), +y = away from the robot (inward), aligned with the edge like the source tray."""
+    x_axis = -TT._t(tangent)[:2].float()
+    y_axis = TT._t(inward)[:2].float()
+    return x_axis, y_axis, math.atan2(float(x_axis[1]), float(x_axis[0]))
+
+
+def layout_origins(assembly: Dict[str, Any]) -> Dict[str, Tuple[float, float]]:
+    """``model -> (x, y)`` of every part of a layout file: ``parts.<model>.origin_in_figure_m`` (the part's bbox centre in the
+    figure frame; ``origin_in_tray_m`` in the 2026-10-10 version of the file). Only x / y: every part lies flat on the floor."""
+    out = {}
+    for model, part in (assembly.get("parts") or {}).items():
+        o = part.get("origin_in_figure_m", part.get("origin_in_tray_m"))
+        if o is not None:
+            out[model] = (float(o[0]), float(o[1]))
+    return out
 
 
 def repark_spawned(s) -> None:
@@ -294,6 +359,7 @@ class Disembedding(SamplerV2):
         self.arm_bands: Dict[str, Any] = {}
         self.placed_key: Optional[str] = None  # band key of the stance-relative source tray (item 9)
         self.release_surface_z: Optional[float] = None  # raycast surface under the destination goal (owner item 3)
+        self.layout: Optional[Dict[str, Tuple[float, float]]] = None  # fixed layout: bddl instance -> figure-frame (x, y)
 
     # ------------------------------------------------------------------ parameters (§2.3: numbers from generation)
 
@@ -358,7 +424,8 @@ class Disembedding(SamplerV2):
 
     def _tray_budget(self) -> float:
         """§6.4 distractor budget: D1's ``generation.distractor_budget`` (the grounding's maths: its ``budget_fraction`` /
-        ``budget`` / ``fraction`` value, or a bare number) when present, else the ``tray_budget`` default (0.60)."""
+        ``budget`` / ``fraction`` value, or a bare number) when present, else ``generation.tray_budget`` (default
+        ``generation_defaults``)."""
         db = self.gen("distractor_budget", None)
         if isinstance(db, dict):
             for k in ("budget_fraction", "budget", "fraction", "max_fraction", "tray_budget"):
@@ -417,24 +484,43 @@ class Disembedding(SamplerV2):
                 log.info("%s: %s (%s) mass %.3f -> %.3f kg (generation.tray_mass_kg)", self.gp.alias, o.name, key, self.tray_mass[o.name]["before_kg"], self.tray_mass[o.name]["after_kg"])
         self.template_facts["tray_mass_kg"] = {n: round(v["after_kg"], 4) for n, v in self.tray_mass.items()}
         self.grasps, self.grasp_key, self.rest["target"] = TT.library_grasps(self, "target", "tabletop")
+        self.layout = self._load_layout()
         for key, o in (("target", tgt), (self.src_role, src), (self.dst_role, dst)):
             self.hull[key] = self.world.local_hull(o)
             self.rest.setdefault(key, C.IDENTITY_QUAT.clone())
-        # owner 2026-09-24: a lying prism-hulled object (the bottles) is placed rolled onto a facet of its hull, not on an edge
-        # (``TT.prism_rest_quat``): bottle_of_milk/mrejrs at its canonical roll stood on two vertex lines 2 mm apart beside its
-        # mass centre and tipped ~7 deg at every release, then kept rolling
-        self.rest["target"], roll = TT.prism_rest_quat(self.hull["target"], self.rest["target"])
-        if roll:
-            log.info("%s: target rests on a hull facet at roll %+.2f deg from its library rest orientation", self.gp.alias, math.degrees(roll))
+        if self.layout is not None:
+            # every part of the layout keeps the figure frame's orientation (assembly.json): the target lies as modelled
+            self.rest["target"] = C.IDENTITY_QUAT.clone()
+        else:
+            # owner 2026-09-24: a lying prism-hulled object (the bottles) is placed rolled onto a facet of its hull, not on an edge
+            # (``TT.prism_rest_quat``): bottle_of_milk/mrejrs at its canonical roll stood on two vertex lines 2 mm apart beside its
+            # mass centre and tipped ~7 deg at every release, then kept rolling
+            self.rest["target"], roll = TT.prism_rest_quat(self.hull["target"], self.rest["target"])
+            if roll:
+                log.info("%s: target rests on a hull facet at roll %+.2f deg from its library rest orientation", self.gp.alias, math.degrees(roll))
         for key in ("target", self.src_role, self.dst_role):
             self.height[key] = TT.height_of(self.hull[key], self.rest[key])
+        # handoff 2026-10-10: on the milk picks the distractors take the target's pose (generation.distractor_pose, one pose or
+        # per "<category>/<model>"); the other picks keep each model's canonical rest pose
+        pose_rule = self.gen("distractor_pose", None)
+        rests: Dict[str, str] = {}
         for b in self.bindings.many("distractors"):
             o = self.objects[b.name]
             self.hull[b.name] = self.world.local_hull(o)
-            self.rest[b.name], roll = TT.prism_rest_quat(self.hull[b.name], C.IDENTITY_QUAT.clone())
+            if self.layout is not None:
+                self.rest[b.name], how, roll = C.IDENTITY_QUAT.clone(), "fixed_layout", 0.0
+            else:
+                pose = pose_rule.get(f"{b.category}/{b.model}") if isinstance(pose_rule, dict) else pose_rule
+                base, how = pose_rest_quat(self.hull[b.name], pose)
+                self.rest[b.name], roll = TT.prism_rest_quat(self.hull[b.name], base)
             if roll:
                 log.info("%s: %s rests on a hull facet at roll %+.2f deg", self.gp.alias, b.name, math.degrees(roll))
+            if how != "canonical":
+                rests[b.name] = how
+                log.info("%s: %s (%s/%s) rests %s", self.gp.alias, b.name, b.category, b.model, how)
             self.height[b.name] = TT.height_of(self.hull[b.name], self.rest[b.name])
+        if rests:
+            self.template_facts["distractor_rest"] = rests
         support = self.obj("support")
         self.top = self.support_top(support)
         if int(self.top.free.sum()) < 50:
@@ -527,6 +613,58 @@ class Disembedding(SamplerV2):
             return False
         return TT.in_frame(self, cam, TT.hull_corners_world(self.hull[self.src_role], pose), TT.IN_FRAME_MARGIN)
 
+    # ------------------------------------------------------------------ fixed layout (handoff 2026-10-10: the puzzle pick)
+
+    def _load_layout(self) -> Optional[Dict[str, Tuple[float, float]]]:
+        """The figure-frame (x, y) of the target and of every distractor by bddl instance, from the layout file of
+        ``generation.fixed_layout`` (ground_isg writes it from the sheet's ``fixed_layout`` rows); None for an alias without one."""
+        spec = self.gen("fixed_layout", None)
+        if not spec:
+            return None
+        rel = spec.get("file") or ""
+        path = rel if os.path.isabs(rel) else os.path.join(REPO_ROOT, rel)
+        if not os.path.isfile(path):
+            raise Reject("spec", f"{self.gp.alias}: fixed layout file {rel!r} is missing")
+        with open(path, "rb") as f:
+            raw = f.read()
+        if spec.get("sha256") and hashlib.sha256(raw).hexdigest() != spec["sha256"]:
+            log.warning("%s: %s changed since the grounding (sha256 %s...); its current layout is used", self.gp.alias, rel, str(spec["sha256"])[:12])
+        origins = layout_origins(json.loads(raw.decode("utf-8")))
+        want = {self.tname: self.choice.models["target"].model, **{b.name: b.model for b in self.bindings.many("distractors")}}
+        missing = sorted({m for m in want.values() if m not in origins})
+        if missing:
+            raise Reject("spec", f"{self.gp.alias}: {rel} places no part {missing}")
+        layout = {name: origins[m] for name, m in want.items()}
+        self.template_facts["fixed_layout"] = {"file": rel, "origin_in_figure_m": {name: list(xy) for name, xy in layout.items()}}
+        return layout
+
+    def _layout_poses(self, stance: Stance, src_w: TrayFloorWorld) -> Tuple[Dict[str, TT.Pose], float]:
+        """The layout on the source floor (handoff 2026-10-10): the figure's centre at the floor centre, +x the robot's right, +y
+        away from the robot, every part flat at its (x, y), its footprint on the floor (``tray_footprint_margin_m``), else
+        ``Reject("fixed_layout_placement")``. Returns the poses by bddl instance and the figure's yaw."""
+        x_axis, y_axis, yaw = figure_axes(stance.tangent, stance.inward)
+        margin = float(self.g("tray_footprint_margin_m"))
+        poses: Dict[str, TT.Pose] = {}
+        for name, (ox, oy) in self.layout.items():
+            key = "target" if name == self.tname else name
+            xy = src_w.centre + ox * x_axis + oy * y_axis
+            pose = TT.object_pose_on(self, self.hull[key], self.rest[key], xy, yaw, src_w.z)
+            if not src_w.polygon_supported(self.world.footprint(self.hull[key], pose), margin=margin):
+                raise Reject("fixed_layout_placement", f"{name} at figure ({ox:+.3f}, {oy:+.3f}) m is not on the source floor with the {margin:.3f} m margin")
+            poses[name] = pose
+        return poses, yaw
+
+    def _place_layout(self, poses: Dict[str, TT.Pose]) -> None:
+        """The layout's distractors at their poses (the target is placed by its grasp draw), the collision world synced: the target's
+        grasp is screened with the figure around it."""
+        for name, pose in poses.items():
+            if name == self.tname:
+                continue
+            o = self.objects[name]
+            o.set_position_orientation(TT._t(pose[0]), TT._t(pose[1]))
+            o.keep_still()
+        self.kit.sync_world()
+
     # ------------------------------------------------------------------ instance
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
@@ -564,13 +702,20 @@ class Disembedding(SamplerV2):
         src.keep_still()
         self.kit.sync_world()
         src_w = self.src_floor.at(s_pose)
+        # the puzzle (handoff 2026-10-10): the figure's parts at their layout positions first, so the target's grasp is screened with
+        # them around it; the target itself is held at its layout position
+        layout, fixed = None, None
+        if self.layout is not None:
+            layout, fig_yaw = self._layout_poses(manip, src_w)
+            self._place_layout(layout)
+            fixed = (layout[tname][0][:2], fig_yaw)
         # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray ignored for the grasp; the other
         # arm is tried only where its band covers the focus (owner 2026-09-27)
         default = self.segment_arms[0]
         arms_here = [a for a in self.segment_arms if a == default or a in (manip.extras.get("focus_arms") or [])]
         t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], [support, src], top=src_w, support_z=src_w.z,
                                          margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale, bands=self.bands,
-                                         arms=arms_here, arm_bands=self.arm_bands or None)
+                                         arms=arms_here, arm_bands=self.arm_bands or None, fixed=fixed)
         if grasp.arm != default:
             self.sidecar.transitions.clear()
             self.record_transition(init, manip)  # the other arm idles now
@@ -579,7 +724,7 @@ class Disembedding(SamplerV2):
         tried: List[str] = []
         while True:
             try:
-                return self._segment_rest(rng, d, init, manip, t_pose, grasp, s_pose, src_w, tname, sname, dname, dnames, k, arms_here)
+                return self._segment_rest(rng, d, init, manip, t_pose, grasp, s_pose, src_w, tname, sname, dname, dnames, k, arms_here, layout)
             except Reject as e:
                 tried.append(grasp.arm)
                 others = [a for a in TT.fallback_arms(grasp) if a not in tried]
@@ -597,11 +742,13 @@ class Disembedding(SamplerV2):
                 for o in self.world.spawned.values():
                     if o.name not in (src.name, tgt.name):
                         self.world.park(o, list(self.world.spawned).index(o.name))
+                if layout is not None:
+                    self._place_layout(layout)
 
     def _segment_rest(self, rng, d: Draft, init: Stance, manip: Stance, t_pose, grasp, s_pose, src_w, tname: str, sname: str, dname: str, dnames: List[str], k: int,
-                      arms_here: List[str]) -> Draft:
-        """The segment after its grasp, with the grasp's arm: destination, distractors, frame and whole-body checks, the placement
-        stance and its place, the carried path, the records."""
+                      arms_here: List[str], layout: Optional[Dict[str, TT.Pose]] = None) -> Draft:
+        """The segment after its grasp, with the grasp's arm: destination, distractors (drawn on the source floor, or the fixed
+        layout's ``layout`` poses), frame and whole-body checks, the placement stance and its place, the carried path, the records."""
         support = self.obj("support")
         dst, tgt = self.obj(self.dst_role), self.obj("target")
         grasp.place_on = dname
@@ -609,16 +756,21 @@ class Disembedding(SamplerV2):
         cam_init = self.camera_pose_at(init)
         d_pose, side, dest_diag = self._place_destination(rng, init, manip, cam_init, s_pose)
         dst_w = self.dst_floor.at(d_pose)
-        # distractors on the source floor (spacing along the pinch axis, budget)
         row_name = C.split_twin(grasp.grasp_name or "")[0]  # a twin pinches the same width as its library row
         width = TT.grasp_pinch_width(next((g for g in self.grasps if g.name == row_name), None))
-        spacing = TT.distractor_spacing(width if width is not None else 0.0, float(self.g("distractor_spacing_extra_m")))
-        pinch_axis = C.closing_axis(grasp.grasp[1])
-        items = [(n, self.hull[n], self.rest[n]) for n in dnames]
-        grow = {n: TT.distractor_spacing(width if width is not None else 0.0, 0.0) for n in dnames}
-        dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, spacing_axis=pinch_axis[:2], spacing=spacing,
-                                          margin=float(self.g("tray_footprint_margin_m")), gap=0.01, cam=cam_init, budget=self._tray_budget(), grow=grow,
-                                          n_tries=int(self.g("distractor_place_tries") or 80))
+        if layout is not None:
+            # the puzzle's parts stay where the layout puts them: no pool draw, no spacing, outside the budget (handoff 2026-10-10)
+            spacing = None
+            dist_poses = {n: layout[n] for n in dnames}
+        else:
+            # distractors on the source floor (spacing along the pinch axis, budget)
+            spacing = TT.distractor_spacing(width if width is not None else 0.0, float(self.g("distractor_spacing_extra_m")))
+            pinch_axis = C.closing_axis(grasp.grasp[1])
+            items = [(n, self.hull[n], self.rest[n]) for n in dnames]
+            grow = {n: TT.distractor_spacing(width if width is not None else 0.0, 0.0) for n in dnames}
+            dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, spacing_axis=pinch_axis[:2], spacing=spacing,
+                                              margin=float(self.g("tray_footprint_margin_m")), gap=0.01, cam=cam_init, budget=self._tray_budget(), grow=grow,
+                                              n_tries=int(self.g("distractor_place_tries") or 80))
         objects = {tname: t_pose, sname: s_pose, dname: d_pose, **dist_poses}
         # §4.6 step 4: every object in frame (5 %) in the init image except the destination tray
         items_all = [(tname, self.hull["target"], t_pose), (sname, self.hull[self.src_role], s_pose)] + [(n, self.hull[n], dist_poses[n]) for n in dnames]
@@ -675,6 +827,8 @@ class Disembedding(SamplerV2):
         d.summary.update({"manipulation_candidate": k, "grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "pinch_width": width},
                           "dest_side": "left" if side > 0 else "right", "destination": dest_diag, "distractor_spacing_m": spacing, "occlusion": occ,
                           "carry_height": grasp.carry_height, "placement_stance": place_st.to_meta(), "arm": TT.segment_arm_summary(grasp, arms_here)})
+        if layout is not None:
+            d.summary["fixed_layout"] = (self.template_facts.get("fixed_layout") or {}).get("file")
         grasp.extras["arm_offer"] = TT.arm_offer_record(self.segment_arms, arms_here, grasp, self.arm_offer_why)
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), self._descriptor(tname, objects, cam_init))
         self.sidecar.describe(sname, "source tray", "the tray in front of the robot")
@@ -846,11 +1000,13 @@ class Disembedding(SamplerV2):
             self.robot.keep_still()
         src_name = self.bindings.one(self.src_role).name
         dz = float(self.objects[src_name].get_position_orientation()[0][2]) - float(draft.object_poses[src_name][0][2]) if src_name in trays else 0.0
+        gap_layout = float((self.gen("fixed_layout", None) or {}).get("release_gap_m", FIXED_LAYOUT_RELEASE_GAP_M))
         for name in objects:
             obj = self.objects[name]
             pos, quat = TT._t(draft.object_poses[name][0]).clone(), TT._t(draft.object_poses[name][1])
             # the source tray landed (dz): keep the recorded height above its floor, minus the §3.2 drop down to RELEASE_GAP_M
-            pos[2] += dz - max(0.0, TT.Z_OFFSET - float(self.gen("release_gap_m", RELEASE_GAP_M)))
+            gap = gap_layout if name in (self.layout or {}) else float(self.gen("release_gap_m", RELEASE_GAP_M))
+            pos[2] += dz - max(0.0, TT.Z_OFFSET - gap)
             obj.set_position_orientation(pos, quat)
             if obj.name in self.world.spawned:
                 self.world.activate(obj)

@@ -1316,10 +1316,22 @@ Numbers and records kept from v1 §5.3:
 
 - Source-tray placement raster 1 cm over the tray's **inner floor** (floor polygon minus the wall thickness), 0.5 cm
   footprint margin (3.2); the distractor set's footprints (each model's bbox rectangle grown by its `pad_clearance_m`
-  on both axes, yaw-invariant) may cover at most **0.60** of the inner floor (`tray_budget`), so the target stays
-  pickable from above. (Until 2026-09-24: 0.45 of a conservative square `(long + 2c)²` per distractor, which left a
+  on both axes, yaw-invariant) may cover at most **0.85** of the inner floor (`tray_budget`), so the target stays
+  pickable from above. (0.60 until 2026-10-11, when the owner raised it for the new sheet's lying milk family and fork,
+  which got 2 distractors at 0.60. Until 2026-09-24: 0.45 of a conservative square `(long + 2c)²` per distractor, which left a
   22 cm bottle alone on the tray; the member count is fixed at grounding with the same rule, `ground_isg`
   `generation.distractor_budget`.)
+- Representative sheet (handoff 2026-10-10, owner 2026-10-11): a pick's `distractors` rows with slot `same_category` /
+  `other_category` are its pools (minus the target, its look-alikes and the held-out models). A draw takes at most 2
+  models of the target's category, at most 1 of each other category and at most one per look-alike group; the member
+  count is the largest size whose *every* admissible draw fits `tray_budget` (footprints in the pick's pose). The alias's
+  member set (part of the alias and the BDDL) is one such draw, fixed per pick, target and support category; the sampler
+  draws the models of each category per template. Pool notes `pose: lying` / `pose: standing` (the two milk picks) make
+  every distractor take the target's pose (`generation.distractor_pose`: lying = smallest extent vertical, standing =
+  largest extent vertical with the wider end down). The puzzle's `fixed_layout` rows are placed with the target at the
+  x / y of the layout file their notes name (`generation.fixed_layout`; figure centre on the source floor's centre, +x the
+  robot's right, +y away from the robot, released 0.5 mm above the floor), not drawn and outside the budget; the target's
+  grasp is screened at its layout pose with the other parts in place.
 - Occlusion: `external_occlusion_ratio = 1 − V / A` from two segmentation renders at the init stance — the complete
   scene, and the same view with the other candidate objects hidden (A = the target's own visible area, so
   self-occlusion is excluded); the target's projection must lie fully inside a 5 % image margin; ratio ≤ 0.30 and
