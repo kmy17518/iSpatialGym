@@ -145,7 +145,7 @@ _CAMERA_RELOCALIZATION_COMMON: Dict[str, Any] = {
     "min_object_pixels": 200,  # §6.1 an object counts with ≥ 200 segmentation pixels
     "min_shared_visible_fraction": 0.3,  # §6.1 ≥ 30 % of them visible from the init
     "collision_margin_m": 0.02,  # §6.1 both configurations whole-body collision-free (2 cm)
-    "init_pose": {"trunk": 0.5, "arms": "zero"},  # §6.1 JoyLo reset pose (trunk 0.5, arms zero)
+    "init_pose": {"trunk": 0.5, "arms": "untucked"},  # §6.1 trunk 0.5; untucked arms (owner 2026-10-11; "zero" = the former JoyLo reset arms)
 }
 
 #: One ``generation`` seed per iddl subtask id.

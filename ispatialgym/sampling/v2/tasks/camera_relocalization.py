@@ -2,14 +2,15 @@
 (``sampling/tasks/camera_relocalization.py``, incl. the obstacle placement of ``8c3f56d``) with the path buckets, the
 recorded path and the goal block of §7.
 
-Init: base = random free cell of the **eroded** traversability map inside the task room + yaw ~ U(−π, π); trunk and
-arms = JoyLo reset pose (trunk 0.5, arms zero, grippers open; §3.3 exception). Goal: a free eroded cell whose
+Init: base = random free cell of the **eroded** traversability map inside the task room + yaw ~ U(−π, π); trunk 0.5
+and untucked arms, grippers open (``generation.init_pose``; owner 2026-10-11 - entries grounded before keep the JoyLo
+reset arms ``zero`` of the §3.3 exception). Goal: a free eroded cell whose
 shortest path from init (``get_shortest_path`` on the eroded map) has its length inside the instance's **path bucket**
 (``generation.path_buckets``, half-open ranges ``(0, 3]``, ``(3, 5]``, ``(5, 10]`` m; the driver may request a bucket
 through ``requested_bucket_m`` / ``generation.requested_bucket_m``, ``multiply_isg --path-buckets`` overrides the
 bucket list, otherwise the bucket with the largest deficit among the instances of the template is drawn); trunk
-(translate, tilt) ~ U(``goal_translate_range`` ∩ [0, 0.95]) × U(``goal_tilt_range``); the arms stay as at init unless
-the goal trunk makes them self-collide → untucked (``goal.arms``); camera forward-axis angle init → goal ≤
+(translate, tilt) ~ U(``goal_translate_range`` ∩ [0, 0.95]) × U(``goal_tilt_range``); the arms stay as at init (a goal
+trunk at which they self-collide is skipped; reset arms are lifted to untucked there, ``goal.arms``); camera forward-axis angle init → goal ≤
 ``max_heading_deg``; goal render: ≥ ``min_goal_objects`` non-structural objects with ≥ ``min_object_pixels`` each (the
 structural categories of §6.1 never count, nor does the robot), ≥ ``min_shared_visible_fraction`` of them visible from
 the init; both configurations whole-body collision-free (``collision_margin_m``).
@@ -22,7 +23,7 @@ first / last waypoints the exact base poses, the interior waypoints carrying the
 ``style = "face_travel"``: the oracle drives it as the shared ``robot.base_path`` schedule (fillets under a 5 cm
 deviation budget, the body facing the way, end turns on the spot above 90° and blended below), and it is whole-body
 collision-checked every 0.1 m **of that schedule** (the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture
-(JoyLo reset arms, init trunk). The bucket is decided on the **geodesic** (§2.3 / §6.1: the eroded-map shortest-path
+(the init arms, init trunk). The bucket is decided on the **geodesic** (§2.3 / §6.1: the eroded-map shortest-path
 length ``kit.geodesic`` returns, the 8-connected grid path's length; on the blocked map for the obstructed variant) —
 an instance property, independent of how the path is recorded or driven: the shortcut polyline (``paths[].length_m``,
 informational) is shorter than the grid path by up to ~8 % and the driven arc shorter again by the fillets, and the
@@ -40,14 +41,14 @@ obstacle must be inside the head camera frame (``obstacle.in_frame_margin``) at 
 dense waypoint the blocked path shares with the path the robot would have taken without the obstacle (the divergence
 waypoint included, projected onto the schedule), at the pose the oracle drives there (along the shared prefix: the
 unobstructed heading; since 2026-09-22 the record and the drive are one schedule, so what is checked is what the camera
-sees) and the JoyLo reset trunk; seeing the obstacle only after the detour is not admissible. With several obstacles
+sees) and the init trunk / arms; seeing the obstacle only after the detour is not admissible. With several obstacles
 each one is checked against the shortest path before it was placed. ``divergence_waypoint_index`` (dense planner path),
 ``view_waypoint_index`` (stride of the schedule), ``view_s_m`` / ``divergence_s_m`` (arc lengths) are recorded in the
 summary and in the sidecar ``paths[]`` entry.
 
 TRO: ``pose_targets[agent]`` = the goal head-camera sensor pose (§8: 0.05 m / 0.10 rad, ``link`` = the sensor key),
-measured at the goal configuration. Sidecar: ``stances.init`` and ``stances.goal`` (reset arms recorded as
-``arms: []``), ``goal`` (base, trunk, arms ``same`` | ``untucked``), ``paths[init -> goal]`` (+ the obstacle view /
+measured at the goal configuration. Sidecar: ``stances.init`` and ``stances.goal`` (``untucked``; reset arms are recorded
+as ``arms: []``), ``goal`` (base, trunk, arms ``same`` | ``untucked``), ``paths[init -> goal]`` (+ the obstacle view /
 divergence facts), ``path_bucket_m``, ``language.objects`` (the obstacle).
 """
 
@@ -80,8 +81,11 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 
 SUBTASK_STANDARD = "camera_relocalization-standard"
 SUBTASK_OBSTRUCTED = "camera_relocalization-obstructed"
-#: JoyLo reset arms (zero) = the kit's ``tucked`` mode (§3.3 exception for camera relocalization)
+#: JoyLo reset arms (zero) = the kit's ``tucked`` mode (§3.3 exception for camera relocalization until 2026-10-11)
 RESET_ARMS = "tucked"
+#: ``generation.init_pose.arms`` -> the kit's arm mode of the init configuration, the navigation posture and an unchanged
+#: goal (owner 2026-10-11: untucked; ``zero`` / ``tucked`` / ``reset`` = the JoyLo reset arms entries grounded before)
+INIT_ARM_MODES = {"untucked": "untucked", "zero": RESET_ARMS, "tucked": RESET_ARMS, "reset": RESET_ARMS}
 #: §3.3: translate 1.0 self-collides in cuRobo; 0.95 is the deepest trunk everywhere
 MAX_TRANSLATE = 0.95
 #: §6.1 structural categories (substring match on the scene object's category): never counted as visible objects
@@ -340,8 +344,24 @@ class CameraRelocalizationV2(SamplerV2):
         ip = self.g("init_pose")
         return float(ip.get("trunk", 0.5)), 0.0
 
-    def config(self, base2d, translate: float, tilt: float, arms: str = RESET_ARMS) -> th.Tensor:
-        return self.kit.q_at_base_pose(self.kit.q_config(arms=arms, translate=translate, tilt=tilt), *base2d)
+    @property
+    def init_arms(self) -> str:
+        """The kit's arm mode at init (``generation.init_pose.arms``, :data:`INIT_ARM_MODES`): also the navigation posture
+        and the goal's arms when they stay as at init."""
+        name = str(self.g("init_pose").get("arms", "untucked"))
+        if name not in INIT_ARM_MODES:
+            raise Reject("spec", f"{self.gp.alias}: generation.init_pose.arms {name!r} is not one of {sorted(INIT_ARM_MODES)}")
+        return INIT_ARM_MODES[name]
+
+    def config(self, base2d, translate: float, tilt: float, arms: Optional[str] = None) -> th.Tensor:
+        return self.kit.q_at_base_pose(self.kit.q_config(arms=arms or self.init_arms, translate=translate, tilt=tilt), *base2d)
+
+    def posture_name(self) -> str:
+        return "JoyLo reset (arms zero)" if self.init_arms == RESET_ARMS else self.init_arms
+
+    def stance_arms(self, goal_arms: str = "same"):
+        """``Stance.arms`` of a stance in the init posture (the reset arms are recorded as ``[]``) or lifted to untucked."""
+        return [] if goal_arms == "same" and self.init_arms == RESET_ARMS else "untucked"
 
     def self_collides(self, q: th.Tensor) -> bool:
         """Whether ``q`` collides with itself (world contacts excluded): the §6.1 arm rule at the goal trunk."""
@@ -354,9 +374,9 @@ class CameraRelocalizationV2(SamplerV2):
 
     def sample_template(self):
         tr, ti = self.init_trunk()
-        self.q_reset_rel = self.kit.q_config(arms=RESET_ARMS, translate=tr, tilt=ti)
-        self.template_meta["init_arms"] = "JoyLo reset (arms zero)"
-        self.template_meta["init_config"] = {"trunk": [tr, ti], "arms": "zero"}
+        self.q_reset_rel = self.kit.q_config(arms=self.init_arms, translate=tr, tilt=ti)
+        self.template_meta["init_arms"] = self.posture_name()
+        self.template_meta["init_config"] = {"trunk": [tr, ti], "arms": "zero" if self.init_arms == RESET_ARMS else self.init_arms}
         self.template_facts["path_buckets"] = self.buckets()
         self.template_facts["bucket_counts_existing"] = {str(k): v for k, v in self.bucket_counts().items()}
         if self.obstructed:
@@ -411,7 +431,7 @@ class CameraRelocalizationV2(SamplerV2):
         pts = self.kit.random_free_points(rng, N_FREE_POINTS, room_filter=self.in_room)
         if len(pts) < 2:
             raise Reject("no_stance", "not enough free eroded cells in the task room")
-        # init: reset pose, collision free
+        # init: the init posture (generation.init_pose), collision free
         init = None
         for xy in pts:
             base = (float(xy[0]), float(xy[1]), float(rng.uniform(-math.pi, math.pi)))
@@ -427,6 +447,7 @@ class CameraRelocalizationV2(SamplerV2):
         # goal candidates: analytic filters (bucket upper bound on the Euclidean distance, heading), collision later;
         # candidates whose Euclidean distance lies inside the bucket are tried first (a path is never shorter than it)
         cands = []
+        n_self_collide = 0
         for xy in pts:
             e = math.hypot(float(xy[0]) - base0[0], float(xy[1]) - base0[1])
             if e < MIN_EUCLIDEAN_M or e > hi:
@@ -439,6 +460,9 @@ class CameraRelocalizationV2(SamplerV2):
                 q1 = self.config(base1, tr1, ti1)
                 arms = "same"
                 if self.self_collides(q1):
+                    if self.init_arms == "untucked":
+                        n_self_collide += 1  # already untucked: no other posture to lift the arms to
+                        continue
                     q1 = self.config(base1, tr1, ti1, arms="untucked")
                     arms = "untucked"
                 cam1 = self.kit.camera_pose(q1)
@@ -447,7 +471,8 @@ class CameraRelocalizationV2(SamplerV2):
                     continue
                 cands.append((e, heading, base1, tr1, ti1, q1, cam1, arms))
         if not cands:
-            raise Reject("goal_sampling", f"no goal candidate passes the analytic filters (bucket ({lo}, {hi}] m, heading <= {math.degrees(max_h):.0f} deg)")
+            raise Reject("goal_sampling", f"no goal candidate passes the analytic filters (bucket ({lo}, {hi}] m, heading <= {math.degrees(max_h):.0f} deg; "
+                                          f"{n_self_collide} self-colliding at the goal trunk)")
         order = list(rng.permutation(len(cands)))
         order.sort(key=lambda i: 0 if cands[int(i)][0] > lo else 1)  # Euclidean distance already inside the bucket first (stable: random within)
         chosen = None
@@ -497,10 +522,10 @@ class CameraRelocalizationV2(SamplerV2):
                           "goal_trunk": [tr1, ti1], "goal_arms": arms, "goal_visible_objects": goal_vis, "init_visible_objects": init_vis, "shared_fraction": shared,
                           "path_bucket_m": hi, "bucket": {"lo_m": lo, "hi_m": hi}, "candidate_failures": fails})
         # sidecar: the two stances, the goal block, the path, the bucket
-        st_init = Stance("init", base0, tr0, ti0, arms=[])
+        st_init = Stance("init", base0, tr0, ti0, arms=self.stance_arms())
         st_init.q = q0
-        st_init.extras["posture"] = "JoyLo reset (arms zero)"
-        st_goal = Stance("goal", base1, tr1, ti1, arms=[] if arms == "same" else "untucked")
+        st_init.extras["posture"] = self.posture_name()
+        st_goal = Stance("goal", base1, tr1, ti1, arms=self.stance_arms(arms))
         st_goal.q = q1
         self.sidecar.add_stance(st_init)
         self.sidecar.add_stance(st_goal)
@@ -553,15 +578,15 @@ class CameraRelocalizationV2(SamplerV2):
         """The ``paths[]`` record of an eroded-map shortest path (``path_schedule``; ``plan`` = its result when the
         caller already has it): the shortcut waypoints, ``length_m`` = their polyline length (informational — the bucket
         is decided on the geodesic), ``style = face_travel``, whole-body collision-checked at 0.1 m strides **of the driven schedule** (the
-        fillets, the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture (reset arms, init trunk). None when
-        a stride collides."""
+        fillets, the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture (the init arms, init trunk). None
+        when a stride collides."""
         waypoints, sched = plan if plan is not None else self.path_schedule(path, base0, base1)
         poses = sched.stride_poses(NAV.STRIDE_M, dwell_step_rad=BP.DWELL_CHECK_STEP_RAD)
-        ok, bad = NAV.path_collision_free(self.kit, poses, trunk, posture=RESET_ARMS)
+        ok, bad = NAV.path_collision_free(self.kit, poses, trunk, posture=self.init_arms)
         if not ok:
             log.info("%s: path %s -> %s collides at stride %d/%d (%s)", self.gp.alias, frm, to, bad, len(poses), [round(v, 2) for v in poses[bad]])
             return None
-        return PathRecord(frm, to, "global", waypoints, path_length(waypoints), posture=RESET_ARMS, carried=None, trunk=trunk, stride_m=NAV.STRIDE_M,
+        return PathRecord(frm, to, "global", waypoints, path_length(waypoints), posture=self.init_arms, carried=None, trunk=trunk, stride_m=NAV.STRIDE_M,
                           n_checked=len(poses), style=BP.FACE_TRAVEL)
 
     def map_tol(self) -> float:
@@ -622,13 +647,13 @@ class CameraRelocalizationV2(SamplerV2):
 
     def check_stances_with_objects(self, draft: Draft):
         """§4.6 step 5 for this task: init and goal configurations re-checked with the objects placed in their *recorded*
-        posture (JoyLo reset arms, or untucked where ``goal.arms`` says so) — the core's generic check locks the arms
-        untucked, which is not the posture of these stances (§3.3). TEMP until the core honours ``Stance.q``."""
+        posture (the init arms, or untucked where ``goal.arms`` says so) — the core's generic check locks the arms
+        untucked, which was not the posture of these stances before 2026-10-11 (§3.3). TEMP until the core honours ``Stance.q``."""
         self.kit.sync_world()
         margin = float(self.g("collision_margin_m"))
         q0 = self.kit.q_at_base_pose(self.q_reset_rel, *draft.base_pose2d)
         tr1, ti1 = draft.extras["goal_trunk"]
-        q1 = self.config(draft.extras["goal_base_pose2d"], tr1, ti1, arms=RESET_ARMS if draft.extras["goal_arms"] == "same" else "untucked")
+        q1 = self.config(draft.extras["goal_base_pose2d"], tr1, ti1, arms=self.init_arms if draft.extras["goal_arms"] == "same" else "untucked")
         free = self.kit.collision_free(th.stack([q0, q1]), margin=margin).tolist()
         if not all(free):
             raise Reject("stance_collision_with_objects", f"{'init' if not free[0] else 'goal'} configuration collides with the objects placed")
@@ -723,7 +748,7 @@ class CameraRelocalizationV2(SamplerV2):
 
     def view_indices(self, sched: BP.BasePath, path: th.Tensor, corners: th.Tensor, margin: float, path_before: Optional[th.Tensor] = None) -> List[int]:
         """Strides of the driven schedule ``sched`` (``drive_poses`` every ``STRIDE_M``) at which the whole box
-        ``corners`` is inside the head-camera image with ``margin``, the robot at the reset trunk / arms and the base at
+        ``corners`` is inside the head-camera image with ``margin``, the robot at the init trunk / arms and the base at
         the pose the oracle drives there (§6.2: the oracle navigates first).
 
         With ``path_before`` (the shortest path the robot would take without the obstacle) only the strides **up to the
@@ -772,7 +797,7 @@ class CameraRelocalizationV2(SamplerV2):
         facts), ``view_pose2d`` the driven pose at the view stride."""
         return {"view_waypoint_index": dict(rec["view_waypoint_index"]), "view_s_m": dict(rec["view_s_m"]), "divergence_waypoint_index": dict(rec["divergence_waypoint_index"]),
                 "divergence_s_m": dict(rec["divergence_s_m"]), "view_pose2d": {n: list(p) for n, p in rec["view_pose2d"].items()}, "view_heading": "driven schedule",
-                "view_trunk": "JoyLo reset"}
+                "view_trunk": "init"}
 
     def corridor_widths(self, blocked_map: th.Tensor, xy: th.Tensor, direction: th.Tensor, max_m: float = 3.0) -> List[float]:
         """Free floor run (m) on the blocked un-eroded map on either side of the obstacle, perpendicular to the path

@@ -192,6 +192,7 @@ def _fake_camera_sampler(trav: _FakeTrav, fov_deg: float = 80.0, reach_m: float 
     cr.kit, cr.world = kit, world
     cr.q_reset_rel = th.zeros(3)
     cr.gp = SimpleNamespace(alias="camera_relocalization-test")
+    cr.g = lambda key, default=None: {"init_pose": {"trunk": 0.5, "arms": "untucked"}}[key]
 
     def frustum_ok(cam, corners, margin):
         cx, cy = float(corners[:, 0].mean()), float(corners[:, 1].mean())
@@ -271,6 +272,31 @@ def test_camera_relocalization_records_the_shortcut_path_and_checks_the_driven_s
     again = BP.BasePath.build(rec.waypoints, BP.BasePathConfig())
     assert again.length == pytest.approx(sched.length) and len(again.pieces) == len(sched.pieces)
     assert [d.kind for d in again.dwells] == [d.kind for d in sched.dwells]
+
+
+def test_camera_relocalization_starts_untucked_and_navigates_in_the_init_posture(monkeypatch):
+    """Owner 2026-10-11: the init arms - also the navigation posture of the recorded path and the goal's arms when they
+    stay as at init - are untucked; an entry grounded before keeps its JoyLo reset arms (``init_pose.arms = zero``)."""
+    from ispatialgym.sampling import generation_defaults as GD
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    for subtask in (CR.SUBTASK_STANDARD, CR.SUBTASK_OBSTRUCTED):
+        assert GD.defaults_for(subtask)["init_pose"] == {"trunk": 0.5, "arms": "untucked"}
+    trav = _FakeTrav()
+    cr = _fake_camera_sampler(trav)
+    base0, base1 = (0.5, 0.5, 0.0), (4.5, 0.5, 0.0)
+    checked = []
+    monkeypatch.setattr(NAV, "path_collision_free", lambda kit, poses, trunk, posture, **kw: checked.append(posture) or (True, -1))
+    for arms, mode, posture, init_arms in (("untucked", "untucked", "untucked", "untucked"), ("zero", "tucked", "JoyLo reset (arms zero)", [])):
+        cr.g = lambda key, default=None, arms=arms: {"init_pose": {"trunk": 0.5, "arms": arms}}[key]
+        assert cr.init_arms == mode and cr.posture_name() == posture
+        assert cr.stance_arms() == init_arms and cr.stance_arms("same") == init_arms and cr.stance_arms("untucked") == "untucked"
+        rec = cr.build_path_record(_grid_path(trav, base0[:2], base1[:2]), base0, base1, (0.5, 0.0))
+        assert rec.posture == mode and checked[-1] == mode
+    cr.g = lambda key, default=None: {"init_pose": {"trunk": 0.5, "arms": "ready"}}[key]
+    with pytest.raises(Reject):
+        cr.init_arms
 
 
 def test_camera_relocalization_view_rule_on_the_driven_schedule():
