@@ -2,13 +2,46 @@
 
 Tagged states of this repository and what passed on them.
 
-## `v3.0-attach-contact` — attachment by contact: the pair collides until the task's rule joins it, released, touching and aligned; the oracle hovers, settles, aligns, touches down and opens at once (2026-10-10)
+## `v3.0-attach-contact` — attachment by contact: the pair collides until the task's rule joins it, released, touching and aligned; the oracle hovers, settles, aligns, touches down and opens at once; every release is +1 in one step and the assisted grasp's weld stays until a pad has left the object (2026-10-10)
 
 - **Commits** (untagged, local, branch `v3.0-attach-contact` off `5d54b735`): `a4895689` (the rule, the join modes, the filter at the
   join, the `AttachedTo` overrides, the oracle's hover / alignment / instant release), `d9937bce` (the hover settles on arrival before
-  the first measurement), `ebdb93f0` (`snap` is the default join), `8947f32b` (the touchdown before the release). Behavior-1K unchanged
-  (`ddbd8ff24`). The gripper A/B test's decision (owner): keep the contact-hold closure everywhere (closing to -1 slides the part
-  1-2 cm before the assisted grasp attaches); the instant opening stays; never a partial opening.
+  the first measurement), `ebdb93f0` (`snap` is the default join), `8947f32b` (the touchdown before the release), `696de57b` (every
+  release +1 in one step), `f2328a7e` (the pad-clear release on every robot). Behavior-1K (branch `v3.0-attach-contact` off
+  `ddbd8ff24`): `6a6194600` (the pad-clear release hook). The gripper A/B test's decision (owner): keep the contact-hold closure
+  everywhere (closing to -1 slides the part 1-2 cm before the assisted grasp attaches); the gripper commands stay binary - the
+  contact hold, then +1 at once - never a partial or ramped opening (it confuses policy learning).
+- **Correction of the gripper A/B record** ("open_instant breaks none of the 28"): round 1 ran both conventions together, and
+  open_instant alone ran only on the cap and the block design; the carton lever's round-1 "pass" was a goal-judged replay, which never
+  evaluates `root_moved` - the carton ended 1.37 deg turned there (1.59 deg just after the release), past 1.15.
+- **Every release +1 in one step** (`696de57b`, owner): `Motions.gripper(close=False)` sends exactly +1 at once - no opening ramp
+  (was 2.25 mm per step), no staged first opening of an articulated part, no deferred completion; the staging state, the executor's
+  first-stage width (with the block design's cube margin) and `release_free_instant` are gone; a fixed-base handle is still unloaded
+  first; the closure and the pre-grasp aperture are unchanged. *r14instant* (sample -> demo -> goal-judged replay, all 28, seed 0):
+  26 / 28 demos (r5 / r6: 28 / 28), the 26 replays pass (the board game's first replay process aborted in Kit's start-up, errno 28 -
+  no inotify watches left; its re-run passed), every release one step. The two failures came from the assisted grasp letting go at
+  the open command while the pads still clamped the object (the contact hold targets 1 mm inside it; both drives saturate at 100 N):
+  the block design's die 4 left the fingers at 11 -> 18 mm, moved 7 mm / tilted 10 deg in that step and lay on another face (88 deg)
+  within 5 steps (`not_reached`; r5's ramp opened to 49.6 mm before the let-go: a clean 24 mm drop); the carton lever's let-go turned
+  the free-standing carton +0.86 deg in one step (0.66 -> 1.67 deg, `root_moved` > 1.15; r6's ramp jolted it 0.15 deg under the weld,
+  then 0.11 deg at the let-go). The ramp had hidden this: the weld held while the pads opened, so they touched nothing at the let-go.
+- **The pad-clear release** (Behavior-1K `6a6194600`, off by default; on in `ISpatialGymTask` for every robot next to the fixed
+  moving-link joint, so demos, replays and evaluation share it): once a gripper's control stops applying grasp with an object in
+  hand, `Robot._ag_keep_weld` keeps the weld while `_calculate_in_hand_object` still finds the object between both pads, at most
+  `ag_release_max_delay_s` (0.2 s), then `_release_grasp` (release callbacks - the attach rule's hook - and the wake) at the real
+  removal; each delayed release is logged (`Robot.ag_release_log`), and the release check copies its delay and what ended it
+  (`pads_clear` / `cap`); `release_grasp_immediately` bypasses it; a pending release travels with the state (the dict and an optional
+  serialized block behind its own sentinel, so a stock state is unchanged). The oracle's `_release` still waits for the registry to
+  clear; the release check sees +1 at every release; no gripper command is partial.
+- **r15padclear** (demo + goal-judged replay of the 19 aliases that release a grasp, on a copy of r14's instance - block design and
+  carton lever with their sampled goals, the other 17 with r14's achieved poses as goals; the 9 without a release keep r14): 19 / 19
+  demos and replays pass, block design and carton lever included. Every weld outlived the +1 command by 1-2 control steps (4-8
+  physics steps, 33-67 ms), each ended by a pad leaving the object; the cap never acted. After the let-go: the dice dropped ~25 mm
+  into their slots tilting <= 0.8 deg, the carton moved 0.68 mm / 0.31 deg, the sandal fell 21.8 mm (0.9 deg), the attach parts
+  snapped 10.3 / 18.1 / 5.1 mm (cap / cork / lid; <= 0.5 deg), the others moved <= 1.1 mm. The marker (next to the pencil) is the
+  exception: while welded the opening pads turned it 6.1 deg relative to the hand (the hand 0.3 deg), and released it spun on to
+  44 deg, rolling 4.5 mm (r14: 2.9 deg; the task passes either way). Torso / head camera / support force match r14 within the
+  re-sampled grasps.
 - **Why** (owner): the oracle carried the part with partly opened fingers while the assisted grasp held it (+0.125 for the whole
   descent, then +0.91 -> a second attach -> +1); the release hook and the per-step `attached` check joined the part wherever it was
   within 5 cm / 15 deg (under -1 the cap 18 mm off failed, the lid 8.9 mm and the cork 6.6 mm passed the 1 cm layout tolerance off
@@ -71,9 +104,11 @@ Tagged states of this repository and what passed on them.
   check (the release hook deferred: touching), in contact; lateral offset at the release -> at the join 1.0 -> 0.4 / 2.0 -> 2.1 /
   1.0 -> 1.1 mm; snap 10.2 / 18.1 / 4.9 mm. The replays pass, bit-identical to the demos (the lid's first replay process segfaulted
   in Kit's start-up, in the viewport wait, before any replay step; the re-run passed).
-- **Tests**: `8947f32b` 1489 passed, 1 skipped, the 4 pre-existing failures (`test_v2_core` x2, `test_v2_large_scale` x2) - the
-  baseline's 1477 + 15 new tests in `test_attach_contact.py` - 3 removed with the old attach place (`d9937bce`: 1487). On svl nodes
-  one more test skips (`a4895689` on svl10: 1486 passed, 2 skipped; `c9522ff8` on svl7: 1476 / 2).
+- **Tests**: `f2328a7e` + Behavior-1K `6a6194600` (viscam8): 1496 passed, 1 skipped, the 4 pre-existing failures (`test_v2_core` x2,
+  `test_v2_large_scale` x2) - 1490 non-failing before it + 7 new (5 of the hook in `test_ag_release_hook.py`, the release check's
+  weld record, the rule's place in the task). `696de57b` (svl7): 1488 / 2; `8947f32b`: 1489 / 1 (the baseline's 1477 + 15 new tests
+  in `test_attach_contact.py` - 3 removed with the old attach place). On svl nodes one more test skips (`a4895689` on svl10: 1486
+  passed, 2 skipped; `c9522ff8` on svl7: 1476 / 2).
 
 ## `v3.0-reconciled` audit fixes — no stored force is let go of at once, drops come down before an instant release, a free-standing lid follows its arc; a visibly wobbling demo is discarded (2026-10-09/10)
 
