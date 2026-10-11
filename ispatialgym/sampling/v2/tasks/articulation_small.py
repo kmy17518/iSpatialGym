@@ -986,7 +986,7 @@ class ArticulationSmall(SamplerV2):
             passing = None
             if self.left_bands is not None:
                 cell = self.left_bands.to_base(np.asarray([[float(pose[0][0]), float(pose[0][1])]], dtype=np.float32), stance.base_pose2d)[0]
-                passing = TT.cell_classes(self.left_bands, stance.translate, stance.tilt, cell) or None
+                passing = TT.cell_classes(self.left_bands, stance.translate, stance.tilt, cell, TT.band_stand_off(self.left_bands, stance)) or None
             own_side = "left" if self.brace_arm == "left" else "right"
 
             def rank(item):

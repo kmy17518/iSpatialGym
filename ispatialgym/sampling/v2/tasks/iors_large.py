@@ -866,8 +866,10 @@ class IORSLarge(SamplerV2):
         key = (kind, support, under)
         if key in memo:
             return memo[key]
+        # the init support's interior surface (tabletop.support_surface) has its own band; the partner's top never does
+        surface = TT.surface_band_kwargs(self) if (kind == "tabletop" and support_obj is self.surface.get("obj")) else {}
         try:
-            rb = RB.ReachBands.load(self.world.scene_model, support, obj, self.grasp_key, under=under, scale=c.scale)
+            rb = RB.ReachBands.load(self.world.scene_model, support, obj, self.grasp_key, under=under, scale=c.scale, **surface)
             log.info("%s: reach band %s (%s) from %s", self.gp.alias, support, under or "-", rb.path)
             # a band computed before the A6 posture retry can be empty (every trunk stance collided with the untucked
             # arms: the fleet's floor-under bands of the beds) — an empty band is a miss, recomputed with the current script
@@ -876,8 +878,9 @@ class IORSLarge(SamplerV2):
                          rb.meta.get("arms"))
                 raise FileNotFoundError("empty band")
         except FileNotFoundError:
-            if os.environ.get("ISG_REACH_BANDS_COMPUTE", "1") == "0":
-                raise Reject("missing_band", f"no reach band for scene={self.world.scene_model} support={support} object={obj} under={under} scale={c.scale}")
+            if os.environ.get("ISG_REACH_BANDS_COMPUTE", "1") == "0" or surface:
+                raise Reject("missing_band", f"no reach band for scene={self.world.scene_model} support={support} object={obj} under={under} scale={c.scale}"
+                                             + (f" surface_z={surface['surface_z']:.2f}" if surface else ""))
             if kind == "tabletop":
                 top = self.surface.get("top") if (self.surface.get("obj") is support_obj and self.surface.get("top") is not None) else self.support_top(support_obj, ignore=[self.target])
                 rb = TT.compute_bands(self, self.make_band_spec(), top)
@@ -988,7 +991,7 @@ class IORSLarge(SamplerV2):
         """The band of the stance's grid trunk as world xy at this concrete stance (the band is base-relative)."""
         if rb is None:
             return th.zeros(0, 2)
-        cells = rb.band(stance.translate, stance.tilt)
+        cells = rb.band(stance.translate, stance.tilt, **TT.band_kw(rb, stance))
         if len(cells) == 0:
             return th.zeros(0, 2)
         return th.as_tensor(rb.to_world(cells, stance.base_pose2d), dtype=th.float32)
@@ -1020,12 +1023,12 @@ class IORSLarge(SamplerV2):
         ``tabletop.arm_bands_for``, the other arm's a mirror when it has none; survivors tagged ``focus_arms``)."""
         self.kit.sync_world()
         offered = TT.offered_arms(self)
-        top = self.support_top(support, ignore=[self.target])
+        half, height = self.target_dims()
+        top = TT.support_surface(self, support, ignore=[self.target], height=height)
         if int(top.free.sum()) < 50:
             raise Reject("support_small", f"{support.name}: too little free top")
         self.surface["top"] = top
         self.bands = None  # ``TT.ensure_bands`` caches one band per support on the sampler
-        half, height = self.target_dims()
         margins = {"w_t": half, "w_p": 0.0, "W_p": 0.0, "D_p_max": 0.0, "safety": 0.02, "relation": self.relation, "g_NT": None, "H_max": height}
         # A5 "partner's own top": the partner is the support under the target, so the partner-visibility redraw does not
         # apply (the target cell in frame is on the partner); stances A / B come from the tabletop phases unchanged.

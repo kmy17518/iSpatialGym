@@ -107,6 +107,204 @@ def _t(x) -> th.Tensor:
     return x if isinstance(x, th.Tensor) else th.tensor(x, dtype=th.float32)
 
 
+#: the selection's surface height and the support top's differ by more than this -> the sampler works on the interior surface at
+#: the selection's height (owner 2026-10-11 item 2)
+SURFACE_MISMATCH_M = 0.03
+#: headroom an interior cell needs above the tallest object (``reach_bands.INTERIOR_HEADROOM_MARGIN``)
+INTERIOR_HEADROOM_MARGIN_M = 0.02
+
+
+def support_surface_spec(s, support) -> Optional[Dict[str, Any]]:
+    """The surface the selection names for ``support`` in this scene: the first ``scenes.<scene>.bindings.support_surfaces``
+    entry of its name (``ground_isg.support_surface``: ``{"name", "init", "top_z", "row"[, "surface": "top"]}``), else None."""
+    name = getattr(support, "name", support)
+    req = s.choice.bindings.get("support_surfaces")
+    for e in req if isinstance(req, list) else []:
+        if isinstance(e, dict) and e.get("name") == name:
+            return e
+    return None
+
+
+def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[float] = None):
+    """The raster the sampler works on for ``support`` (owner 2026-10-11 item 2): ``SimWorld.support_interior`` at the selection's
+    ``top_z`` (m above the floor) when its row says ``init=inside`` or that height is more than :data:`SURFACE_MISMATCH_M` from the
+    support top's, else the support top (rows marked ``surface: top`` always). On an interior surface the cells whose headroom
+    is below ``height`` + :data:`INTERIOR_HEADROOM_MARGIN_M` count as occupied, and ``s.surface_z`` (the selection's height) makes
+    the band lookups ask for the interior band (``ReachBands.load(..., surface_z=...)``); on the top ``s.surface_z`` is None.
+    The decision goes to ``template_facts["support_surface"]``."""
+    spec = support_surface_spec(s, support)
+    s.surface_z = None
+    top, top_err = None, None
+    try:
+        top = s.support_top(support, ignore=ignore)
+    except (RuntimeError, ValueError) as e:
+        top_err = str(e)
+    floor_z = float(s.world.floor_z)
+    fact: Dict[str, Any] = {"support": support.name, "spec": spec, "top_z_above_floor": round(float(top.z) - floor_z, 4) if top is not None else None,
+                            "top_error": top_err}
+    interior = False
+    if spec is not None and spec.get("top_z") is not None and spec.get("surface") != "top":
+        if spec.get("init") == "inside":
+            interior, fact["why"] = True, "init=inside"
+        elif top is None or int(top.free.sum()) == 0:
+            interior, fact["why"] = True, "no support top raster"
+        elif abs(float(spec["top_z"]) - (float(top.z) - floor_z)) > SURFACE_MISMATCH_M:
+            interior, fact["why"] = True, f"top_z {float(spec['top_z']):.2f} vs support top {float(top.z) - floor_z:.2f} (> {SURFACE_MISMATCH_M} m)"
+    if not interior:
+        fact["surface"] = "top"
+        if spec is not None and spec.get("surface") == "top":
+            fact["why"] = spec.get("why") or "surface: top"
+        tf = getattr(s, "template_facts", None)
+        if isinstance(tf, dict):
+            tf["support_surface"] = fact
+        if top is None:
+            _reject("support_small", f"{support.name}: no support top ({top_err})")
+        return top
+    z_req = float(spec["top_z"])
+    try:
+        itop = s.world.support_interior(support, floor_z + z_req, resolution=float(s.gen("support_resolution", 0.02)),
+                                        ignore=list(ignore) + list(s.world.spawned.values()))
+    except RuntimeError as e:
+        _reject("support_surface", f"{support.name}: interior surface at {z_req:.2f} m: {e}")
+    if height is not None and getattr(itop, "headroom", None) is not None:
+        low = itop.mask & (itop.headroom < float(height) + INTERIOR_HEADROOM_MARGIN_M)
+        itop.occupied = itop.occupied | low
+        fact.update({"height_m": round(float(height), 4), "n_low_headroom_cells": int(low.sum())})
+    s.surface_z = z_req
+    fact.update({"surface": "interior", "z_world": round(float(itop.z), 4), "z_above_floor": round(float(itop.z) - floor_z, 4),
+                 "open_edges": list(getattr(itop, "open_edges", []) or []), "n_board_cells": int(itop.mask.sum()), "n_free_cells": int(itop.free.sum())})
+    log.info("%s: interior surface of %s at %.2f m above the floor (%s): %d free cells, open sides %s", s.gp.alias, support.name, z_req, fact.get("why"),
+             fact["n_free_cells"], fact["open_edges"] or "none")
+    tf = getattr(s, "template_facts", None)
+    if isinstance(tf, dict):
+        tf["support_surface"] = fact
+    return itop
+
+
+#: upright shelf start (owner 2026-10-11 item 3, touching#03): the spine this far behind the shelf's front edge, the leaning edge
+#: this far from the side board before the settle (gravity closes the gap, the book is never held up artificially)
+SHELF_SPINE_BEHIND_EDGE_M = 0.02
+SHELF_WALL_GAP_M = 0.002
+
+
+def upright_shelf_facts(grasp_key: Optional[str], rest_quat) -> Optional[Dict[str, Any]]:
+    """Facts of an upright-shelf grasp key (library ``rest_pose: upright_shelf``, e.g. ``hardback__acbrnv__bu``): the book stands
+    on its bottom edge leaning against a wall in its rest orientation, its spine toward the approach (rest-frame -x). ``lean_side``
+    = +1 when the top edge leans toward rest-frame +y (with the spine toward the robot: the robot's left), -1 toward -y;
+    ``lean_deg`` from the rest orientation. None for any other key."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    if not grasp_key:
+        return None
+    try:
+        meta = (GL._candidates(grasp_key) or {}).get("ispatialgym") or {}
+    except (FileNotFoundError, ValueError):
+        return None
+    if meta.get("rest_pose") != "upright_shelf":
+        return None
+    R = C.transform_points((th.zeros(3), _t(rest_quat)), th.eye(3))  # rows: the local axes in the rest frame
+    a = int(th.argmax(R[:, 2].abs()))
+    up = R[a] * (1.0 if float(R[a, 2]) > 0 else -1.0)  # the book's bottom -> top direction
+    return {"key": grasp_key, "lean_side": 1.0 if float(up[1]) > 0 else -1.0, "lean_deg": round(math.degrees(math.asin(min(1.0, float(th.linalg.norm(up[:2]))))), 2),
+            "context": meta.get("context")}
+
+
+def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, support) -> Tuple[Optional[float], Dict[str, Any]]:
+    """Lateral position (m along ``edge.tangent`` from ``edge.mid``, + = the robot's left) of the inner face of the support's side
+    board on the robot's ``side``: a horizontal ray at height ``z``, ``depth`` behind the edge line, from the edge midpoint outward.
+    None when it meets nothing or another object first."""
+    start = edge.mid + edge.inward * float(depth)
+    end = start + edge.tangent * float(side) * (0.5 * float(edge.length) + 0.30)
+    h = s.world.raycast(th.tensor([[float(start[0]), float(start[1]), float(z)]]), th.tensor([[float(end[0]), float(end[1]), float(z)]]))[0]
+    paths = tuple(str(l.prim_path) for l in support.links.values())
+    fact = {"hit": bool(h.get("hit")), "body": h.get("rigidBody"), "distance": h.get("distance")}
+    if not h.get("hit") or not str(h.get("rigidBody", "")).startswith(paths):
+        return None, fact
+    return float(side) * float(h["distance"]), fact
+
+
+def shelf_lean_pose(s, hull: th.Tensor, rest_quat, top, edge: EdgeFrame, support, lean_side: float) -> Tuple[Pose, Dict[str, Any]]:
+    """The upright shelf start (owner 2026-10-11 item 3): the object in its rest orientation turned to the edge's yaw (spine toward
+    the robot), its spine :data:`SHELF_SPINE_BEHIND_EDGE_M` behind the board's front edge (the raster edge line + half a cell), its
+    leaning edge :data:`SHELF_WALL_GAP_M` short of the side board on the ``lean_side`` (:func:`shelf_wall_lateral`), resting on
+    the board; gravity does the rest. ``Reject("shelf_wall")`` without a side board there, ``Reject("shelf_board")`` when the
+    bottom edge is off the board."""
+    pts = C.transform_points((th.zeros(3), _t(rest_quat)), hull)
+    spine = -float(pts[:, 0].min())
+    lat_ext = float(pts[:, 1].max()) if lean_side > 0 else -float(pts[:, 1].min())
+    height = float(pts[:, 2].max() - pts[:, 2].min())
+    depth = -0.5 * float(top.resolution) + SHELF_SPINE_BEHIND_EDGE_M + spine
+    z_ray = float(top.z) + 0.8 * height
+    wall, ray = shelf_wall_lateral(s, edge, depth, z_ray, lean_side, support)
+    facts: Dict[str, Any] = {"edge": edge.name, "lean_side": "left" if lean_side > 0 else "right", "depth_m": round(depth, 4), "ray_z": round(z_ray, 4), "ray": ray}
+    if wall is None:
+        _reject("shelf_wall", f"{support.name}: no side board on the {facts['lean_side']} at {z_ray:.2f} m ({ray})")
+    lat = wall - lean_side * (lat_ext + SHELF_WALL_GAP_M)
+    xy = edge.mid + edge.inward * depth + edge.tangent * lat
+    pose = object_pose_on(s, hull, rest_quat, xy, edge.yaw, float(top.z))
+    world = C.transform_points(pose, hull)
+    bottom = world[world[:, 2] <= float(world[:, 2].min()) + 0.005]
+    off = [p for p in bottom if not top.contains(p[:2])]
+    facts.update({"wall_lateral_m": round(wall, 4), "lateral_m": round(lat, 4), "position": [round(float(v), 4) for v in pose[0]],
+                  "n_bottom_points": len(bottom), "n_bottom_off_board": len(off)})
+    if off:
+        _reject("shelf_board", f"{support.name}: {len(off)}/{len(bottom)} bottom-edge points of the leaning start are off the board ({facts})")
+    return pose, facts
+
+
+def upright_lean_quat(hull: th.Tensor, lean_side: float, lean_deg: float) -> th.Tensor:
+    """A book's upright leaning rest orientation from its local hull (owner 2026-10-11, the touching#03 partner, which has no
+    library key): the longest local axis vertical, the middle one along rest-frame +x (into the shelf) and the shortest across,
+    tilted ``lean_deg`` about +x so that the top leans toward rest-frame +y (``lean_side`` +1, the robot's left with yaw = the
+    edge's) or -y (-1)."""
+    ext = hull.max(dim=0).values - hull.min(dim=0).values
+    order = [int(i) for i in th.argsort(ext)]  # thickness, width, height
+    e = th.eye(3, dtype=th.float64)
+    e_w, e_h = e[order[1]], e[order[2]]
+    R0 = th.stack([e_w, th.linalg.cross(e_h, e_w), e_h], dim=0)  # rows: local width -> +x, local (height x width) -> +y, height -> +z
+    phi = -float(lean_side) * math.radians(float(lean_deg))
+    Rx = th.tensor([[1.0, 0.0, 0.0], [0.0, math.cos(phi), -math.sin(phi)], [0.0, math.sin(phi), math.cos(phi)]], dtype=th.float64)
+    return C.mat_to_quat(Rx @ R0).float()
+
+
+def mirrored_lean_quat(quat, edge: EdgeFrame, lean_side: float, lean_deg: float) -> th.Tensor:
+    """``quat`` (an upright book leaning ``lean_deg`` toward ``lean_side`` of ``edge``) turned about the edge's inward axis so it
+    leans the same angle to the other side (the touching#03 goal: the target rests against the partner, parallel to it)."""
+    axis = th.tensor([float(edge.inward[0]), float(edge.inward[1]), 0.0])
+    axis = axis / th.linalg.norm(axis)
+    half = 0.5 * 2.0 * float(lean_side) * math.radians(float(lean_deg))
+    turn = th.tensor([*(axis * math.sin(half)).tolist(), math.cos(half)])  # xyzw
+    return C.qmul(turn, _t(quat))
+
+
+def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_for_grasp: Sequence[Any], yaw: float, *, arm: str = "right",
+                  scale_key: Any = None, object_name: Optional[str] = None) -> GraspRecord:
+    """The first library grasp of ``grasps`` whose pre-grasp and grasp at the fixed object ``pose`` pass the exact IK from ``manip``
+    (the upright shelf start: the pose is set by the shelf, not drawn from F). ``Reject("grasp_unreachable")`` otherwise."""
+    IK = _ik()
+    name = object_name or s.bindings.one("target").name
+    exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
+    reasons = []
+    for g in grasps:
+        eef = IK.grasp_pose(pose, g.pose)
+        pre = IK.pre_pose(eef)
+        res = s.ikc.exact([pre, eef], manip, arm, **exact_kw)
+        if not res.ok:
+            reasons.append(f"{getattr(g, 'name', '?')}: {res.reason}"[:120])
+            continue
+        rec = GraspRecord(name, arm, getattr(g, "key", None), getattr(g, "name", None), float(yaw), pre, eef,
+                          finger_q=list(getattr(g, "finger_q", []) or []) or None, eef_in_object=g.pose)
+        rec.stance = manip.name
+        return rec
+    _reject("grasp_unreachable", f"no library grasp reaches the fixed start pose from {manip.name}: {reasons[:4]}")
+
+
+def surface_band_kwargs(s) -> Dict[str, Any]:
+    """``{"surface_z": ...}`` for ``ReachBands.load`` / ``find`` while the sampler works on an interior surface, else ``{}``."""
+    z = getattr(s, "surface_z", None)
+    return {"surface_z": float(z)} if z is not None else {}
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # pure helpers: §4.3 trunk solve, §4.4 margins table
 # ----------------------------------------------------------------------------------------------------------------
@@ -625,10 +823,15 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
     spec = spec or getattr(s, "band_spec", None) or BandSpec.from_sampler(s)
     scene, support = s.world.scene_model, top.name
     gkey = "generic" if spec.generic_pinch else spec.grasp_key
+    surface = surface_band_kwargs(s)
     try:
-        bands = RB.ReachBands.load(scene, support, spec.object, gkey, placed=spec.placed, scale=spec.scale)
-        log.info("reach band cache hit for %s / %s (%s): %s", support, spec.object, gkey, bands.path)
+        bands = RB.ReachBands.load(scene, support, spec.object, gkey, placed=spec.placed, scale=spec.scale, **surface)
+        log.info("reach band cache hit for %s / %s (%s%s): %s", support, spec.object, gkey, f", surface_z {surface['surface_z']:.2f}" if surface else "", bands.path)
     except FileNotFoundError:
+        if surface:
+            # the in-process computation ignores the whole support at the grasp pose; inside a bookcase the board above and the
+            # side walls must stay obstacles (reach_bands --surface-z)
+            _reject("missing_band", f"no interior reach band for {support} at surface_z {surface['surface_z']:.2f} ({spec.object}, {gkey})")
         log.info("reach band cache miss for %s / %s (%s): computing in-process", support, spec.object, gkey)
         bands = compute_bands(s, spec, top, edge)
     s.bands = bands
@@ -822,10 +1025,12 @@ def arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None, edge: Op
     if key in cache:
         return cache[key]
     m = base.meta
+    srf = m.get("surface") or {}
+    surface = {"surface_z": float(srf["z_requested_above_floor"])} if srf.get("mode") == "interior" and srf.get("z_requested_above_floor") is not None else {}
     try:
         own = RB.ReachBands.load(m.get("scene"), m.get("support"), m.get("object"), "generic" if m.get("generic_pinch") else m.get("grasp_key"),
                                  placed=RB.canonical_placed(m), under=m.get("under_partner"), scale=m.get("scale"), arm=arm,
-                                 under_edge=None if m.get("mode") != "floor" else bool(m.get("under_edge")))
+                                 under_edge=None if m.get("mode") != "floor" else bool(m.get("under_edge")), **surface)
         log.info("%s-arm reach band: %s", arm, own.path)
     except FileNotFoundError:
         own = base.mirrored()
@@ -861,22 +1066,39 @@ def adopt_arm(stance: Stance, arm_stance: Stance) -> None:
     stance.arms, stance.idle_posture = list(arm_stance.arms), arm_stance.idle_posture
 
 
+def band_stand_off(bands: Optional[RB.ReachBands], stance) -> Optional[float]:
+    """The stand-off a band is read at (owner 2026-10-11 item 1): the stance's nominal stand-off when the band is a multi-distance
+    band (meta ``stand_offs``; ``ReachBands`` takes the nearest stored one), else None (the reference maps, as before)."""
+    if bands is None or stance is None or not bands.meta.get("stand_offs"):
+        return None
+    so = getattr(stance, "stand_off", None)
+    return None if so is None else float(so)
+
+
+def band_kw(bands: Optional[RB.ReachBands], stance) -> Dict[str, Any]:
+    """``{"stand_off": s}`` for the ``ReachBands`` getters at ``stance`` (:func:`band_stand_off`), ``{}`` when it is None."""
+    so = band_stand_off(bands, stance)
+    return {} if so is None else {"stand_off": so}
+
+
 def band_cells_world(bands: RB.ReachBands, stance: Stance, translate: Optional[float] = None, tilt: Optional[float] = None) -> th.Tensor:
-    """The band cells of the grid trunk (same translate, nearest tilt) in the world at ``stance`` (robot-relative cells,
-    §4.5 step 2 "band shifted with the stand-off")."""
+    """The band cells of the grid trunk (same translate, nearest tilt; a multi-distance band's at the stance's stand-off) in the
+    world at ``stance`` (robot-relative cells, §4.5 step 2 "band shifted with the stand-off")."""
     tr = stance.translate if translate is None else translate
     ti = stance.tilt if tilt is None else tilt
-    cells = bands.band(float(tr), float(ti))
+    cells = bands.band(float(tr), float(ti), **band_kw(bands, stance))
     if len(cells) == 0:
         return th.zeros(0, 2)
     return th.tensor(bands.to_world(cells, stance.base_pose2d), dtype=th.float32)
 
 
-def band_union_cells(bands: RB.ReachBands) -> th.Tensor:
-    """Every band cell over every trunk (base frame), deduplicated."""
-    if not bands.cells:
+def band_union_cells(bands: RB.ReachBands, stance=None) -> th.Tensor:
+    """Every band cell over every trunk (base frame), deduplicated; a multi-distance band's at ``stance``'s stand-off."""
+    so = band_stand_off(bands, stance)
+    cells_by_trunk = bands._maps(so)[0] if so is not None else bands.cells
+    if not cells_by_trunk:
         return th.zeros(0, 2)
-    allc = np.concatenate([c for c in bands.cells.values() if len(c)]) if any(len(c) for c in bands.cells.values()) else np.zeros((0, 2))
+    allc = np.concatenate([c for c in cells_by_trunk.values() if len(c)]) if any(len(c) for c in cells_by_trunk.values()) else np.zeros((0, 2))
     if len(allc) == 0:
         return th.zeros(0, 2)
     uniq = np.unique(np.round(allc, 4), axis=0)
@@ -886,7 +1108,7 @@ def band_union_cells(bands: RB.ReachBands) -> th.Tensor:
 def workspace(s, bands: RB.ReachBands, stance: Stance, top, erosion: float = 0.0) -> Dict[str, Any]:
     """§4.3 workspace = band union ∩ top of this edge at ``stance``: world cells, depths from the edge and laterals from
     the centre line (``d_near`` / ``d_ws`` / ``lam_min`` / ``lam_max``)."""
-    base = band_union_cells(bands)
+    base = band_union_cells(bands, stance)
     out: Dict[str, Any] = {"cells_world": th.zeros(0, 2), "cells_base": th.zeros(0, 2), "depths": [], "laterals": []}
     if len(base) == 0:
         return out
@@ -909,6 +1131,8 @@ def store_feasible_set(bands: RB.ReachBands, stance: Stance, F: Sequence[Tuple[f
     ``.npz`` / ``.json`` when the band was loaded from or saved to a cache file)."""
     if bands is None or stance.focus is None:
         return
+    if bands.meta.get("stand_offs"):
+        return  # the write-back below holds the reference maps only: a multi-distance band's per-stand-off arrays would be dropped
     k = bands.nearest_trunk(float(stance.translate), float(stance.tilt))
     if k is None:
         return
@@ -1068,20 +1292,22 @@ def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFra
     return bands
 
 
-def cell_classes(bands: Optional[RB.ReachBands], translate: float, tilt: float, cell_base) -> Optional[List[str]]:
+def cell_classes(bands: Optional[RB.ReachBands], translate: float, tilt: float, cell_base, stand_off: Optional[float] = None) -> Optional[List[str]]:
     """B3's per-cell pose classes that pass at ``cell_base`` (base frame) of the trunk (``ReachBands.classes_at``:
     names in bit order of ``meta["classes"]`` from the ``<trunk>__classes`` array); None when the band records no
-    classes (library-grasp bands, bands computed before A1) or the cell is not in the band."""
+    classes (library-grasp bands, bands computed before A1) or the cell is not in the band. ``stand_off``: a multi-distance
+    band's nearest stored stand-off (:func:`band_stand_off`; None = the reference maps)."""
     if bands is None or cell_base is None:
         return None
     names = bands.meta.get("classes") if isinstance(bands.meta, dict) else None
-    masks = getattr(bands, "classes", None)
+    so = {} if stand_off is None else {"stand_off": float(stand_off)}
+    masks = bands._maps(**so)[2] if so and hasattr(bands, "_maps") else getattr(bands, "classes", None)
     if not names or not masks:
         return None
-    k = bands.nearest_trunk(float(translate), float(tilt))
+    k = bands.nearest_trunk(float(translate), float(tilt), **so)
     if k is None or k not in masks:
         return None
-    i = bands.cell_index(k[0], k[1], np.asarray(cell_base, dtype=np.float32))
+    i = bands.cell_index(k[0], k[1], np.asarray(cell_base, dtype=np.float32), **so)
     if i is None or i >= len(masks[k]):
         return None
     m = int(masks[k][i])
@@ -1144,7 +1370,7 @@ def in_band(bands: Optional[RB.ReachBands], stance: Stance, xy, tol: float = CEL
     translate, nearest tilt); returns ``(ok, nearest cell in base coordinates)``."""
     if bands is None:
         return False, None
-    cells = bands.band(float(stance.translate), float(stance.tilt))
+    cells = bands.band(float(stance.translate), float(stance.tilt), **band_kw(bands, stance))
     if len(cells) == 0:
         return False, None
     base = bands.to_base(np.asarray([[float(xy[0]), float(xy[1])]], dtype=np.float32), stance.base_pose2d)[0]
@@ -1175,12 +1401,12 @@ def joint_placement(bands_right: RB.ReachBands, bands_left: Optional[RB.ReachBan
     else:
         brace_ok, brace_cell = in_band(bands_left, stance, brace_xy, tol if tol_brace is None else tol_brace)
         if brace_ok:
-            brace_classes = cell_classes(bands_left, stance.translate, stance.tilt, brace_cell)
+            brace_classes = cell_classes(bands_left, stance.translate, stance.tilt, brace_cell, band_stand_off(bands_left, stance))
             if brace_class is not None and brace_classes is not None:
                 class_ok = brace_class in brace_classes
     return {"ok": bool(work_ok and brace_ok and class_ok), "work_ok": bool(work_ok), "brace_ok": bool(brace_ok), "brace_class_ok": bool(class_ok),
             "work_cell": work_cell, "brace_cell": brace_cell, "left_band": bands_left is not None,
-            "classes": cell_classes(bands_right, stance.translate, stance.tilt, work_cell), "brace_classes": brace_classes, "brace_class": brace_class}
+            "classes": cell_classes(bands_right, stance.translate, stance.tilt, work_cell, band_stand_off(bands_right, stance)), "brace_classes": brace_classes, "brace_class": brace_class}
 
 
 def joint_two_arm_placement(s, stance: Stance, bands_right: RB.ReachBands, bands_left: Optional[RB.ReachBands], work_xy, brace_xy, work_arm: str,
@@ -1371,6 +1597,9 @@ def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[Ed
     lo, hi = support.aabb
     aabb_xy = th.tensor([[float(lo[0] if sx == 0 else hi[0]), float(lo[1] if sy == 0 else hi[1])] for sx in (0, 1) for sy in (0, 1)])
     edges = list(top.edges())
+    open_edges = list(getattr(top, "open_edges", None) or [])
+    if open_edges:  # an interior surface is reached through the open sides of its compartment only
+        edges = [e for e in edges if e[0] in open_edges]
     order = [int(i) for i in rng.permutation(len(edges))] if rng is not None else list(range(len(edges)))
     out = []
     for i in order:

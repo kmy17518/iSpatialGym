@@ -99,6 +99,19 @@ TARGET_LIKE_ROLES = ("target", "targets", "obstacles")
 CUSTOM_DATASET = "ispatialgym-assets"
 #: §5.4: small-scale articulation targets taller than this stand on the floor.
 FLOOR_SUPPORT_HEIGHT_M = 0.6
+#: Support rows whose sheet height matches no surface of the support (owner 2026-10-11 06:27): sampled on the support's top
+#: (``SimWorld.support_top``) whatever their ``top_z`` - keyed (scene, scene object name).
+SUPPORT_TOP_SURFACE = {
+    ("restaurant_diner", "flat_top_grill_szisej_0"),
+    ("restaurant_diner", "stove_ykretu_0"),
+    ("house_double_floor_upper", "bookcase_kdnyfh_0"),
+}
+#: Alias token suffix of a support the objects start inside (sheet note ``init=inside``): its BDDL starts them ``inside`` the
+#: support instead of ``ontop``, so its rows never share an alias (and a BDDL) with the ``ontop`` rows of the category.
+INSIDE_ALIAS_SUFFIX = "_inside"
+#: Library key suffix a pick prefers when several keys of the pipeline are admissible (else the alphabetical first): owner
+#: 2026-10-11 item 3 - the touching#03 book starts upright in the shelf, so it is picked with its upright-shelf key (``__bu``).
+GRASP_KEY_SUFFIX_PREFERENCE = {"inter_object_relation_satisfaction-touching#03": "__bu"}
 #: §2.2 grasp verdicts: ``ok``, or ``flag`` with flags ⊆ {one_finger}.
 TOLERATED_GRASP_FLAGS = {"one_finger"}
 HANDLE_ADMISSIBLE_VERDICTS = ("handle", "edge", "manual")
@@ -173,6 +186,23 @@ def _pad_clearance(pinch_width: float) -> float:
 def _scene_object_key(row: Dict[str, str]) -> str:
     """The name a scene candidate row is bound by: the wall region id for wall regions, else the scene object name."""
     return row.get("region_id") or row.get("model") or ""
+
+
+def support_surface(row: Dict[str, str], label: str) -> Optional[Dict[str, Any]]:
+    """The surface a support row of the selection names (note ``init=<ontop|inside>; top_z=<m above the floor> ...``) as the
+    customs ``bindings.support_surfaces`` entry ``{"name", "init", "top_z", "row"}`` (``row`` = the combination label, which
+    tells a re-grounding which entry it replaces), ``"surface": "top"`` for :data:`SUPPORT_TOP_SURFACE`; None when the note
+    gives no ``top_z``. The sampler reads it (``tabletop.support_surface``)."""
+    note = row.get("note") or ""
+    m = re.search(r"\btop_z=([0-9]*\.?[0-9]+)", note)
+    if not m:
+        return None
+    name = row.get("name") or row.get("model") or ""
+    init = re.search(r"\binit=([a-z]+)", note)
+    out: Dict[str, Any] = {"name": name, "init": init.group(1) if init else "ontop", "top_z": float(m.group(1)), "row": label}
+    if (row.get("scene") or "", name) in SUPPORT_TOP_SURFACE:
+        out.update({"surface": "top", "why": "owner 2026-10-11: the sheet height matches no surface of the support"})
+    return out
 
 
 def load_scale_hints(pattern: Optional[str] = None) -> Dict[str, float]:
@@ -574,15 +604,20 @@ class RolePick:
     pick_row: Optional[Dict[str, str]] = None
     allow_heldout: bool = False  # the heldout slot itself was requested for this role
     budget: Dict[str, Any] = field(default_factory=dict)  # distractors: the §6.4 tray budget maths (generation.distractor_budget)
+    surface: Optional[Dict[str, Any]] = None  # support: the surface the pick row names (:func:`support_surface`)
 
     @property
     def is_floor(self) -> bool:
         return self.kind == "scene" and self.category == FLOOR_CATEGORY
 
+    @property
+    def starts_inside(self) -> bool:
+        return bool(self.surface) and self.surface.get("init") == "inside"
+
     def alias_token(self, icl: ICL, subtask: str, scale: Optional[float] = None, with_model: bool = False) -> str:
         """The ``{role}`` slot value: the category (``floor`` for the floor; group roles ``<category>_<count>`` tokens),
-        with ``_s<NNN>`` for a scaled fallback (``picture_s070`` = spawn scale 0.70) and ``_<model>`` for a
-        model-specific fallback (``blender_eyedvd``)."""
+        with ``_inside`` for a support the objects start inside (``bookcase_inside``), ``_s<NNN>`` for a scaled fallback
+        (``picture_s070`` = spawn scale 0.70) and ``_<model>`` for a model-specific fallback (``blender_eyedvd``)."""
         if self.kind == "group":
             parts = []
             for cat, n in self.members.items():
@@ -595,6 +630,8 @@ class RolePick:
         if self.is_floor:
             return FLOOR_ALIAS_TOKEN
         token = self.category or ""
+        if self.starts_inside:
+            token += INSIDE_ALIAS_SUFFIX
         if with_model and self.models:
             token += f"_{self.models[0][1]}"
         if scale is not None:
@@ -1197,6 +1234,8 @@ class Grounder:
             objects[scene].append(fake)
             comb.notes.append(f"{role}: {name}@{scene} is not a roles/candidates.csv row of {subtask} (bound from the selection only)")
         rp.scene_objects = dict(objects)
+        if role == "support" and rp.same_as is None:
+            rp.surface = support_surface(row, comb.pick)
         return rp
 
     def _pair_rules(self, iddl: I.IDDL, comb: Combination) -> None:
@@ -1338,6 +1377,7 @@ class Grounder:
                                 "fallback_of": None, "fallback_rank": None, "fallback_kind": None}
         if comb.fallback is not None:
             meta.update({"fallback_of": comb.fallback.primary, "fallback_rank": comb.fallback.rank, "fallback_kind": comb.fallback.kind})
+        init_predicates = {("ontop", r): "inside" for r, rp in comb.roles.items() if rp.starts_inside}
         rendered = write_problem(
             self.bddl_root,
             activity,
@@ -1347,6 +1387,7 @@ class Grounder:
             comment=comment,
             meta=meta,
             dry_run=self.opt.dry_run,
+            init_predicates=init_predicates or None,
         )
         entry = self._customs_entry(iddl, comb, alias, rendered.definition_id)
         gp = GroundedProblem(
@@ -1642,6 +1683,8 @@ class Grounder:
                     ]
                 else:
                     se.bindings[role] = [o["model"] for o in objs]
+                if rp.surface is not None and rp.pick_row is not None and rp.pick_row.get("scene") == sc:
+                    se.bindings[f"{role}_surfaces"] = [dict(rp.surface)]
                 # scene articulated targets: joint / handle key per scene object (§5.3)
                 if any(r.kind == "handle" for r in iddl.require_of(role)):
                     for o in objs:
@@ -1730,8 +1773,14 @@ class Grounder:
                 # support of the category, A3 triplets) stay bound
                 for role, old_val in old.bindings.items():
                     new_val = se.bindings.get(role)
-                    if isinstance(old_val, list) and isinstance(new_val, list):
-                        if role.endswith("_regions"):
+                    if new_val is None and role.endswith("_surfaces") and isinstance(old_val, list):
+                        se.bindings[role] = list(old_val)
+                    elif isinstance(old_val, list) and isinstance(new_val, list):
+                        if role.endswith("_surfaces"):
+                            # a re-grounded row replaces its own entry; the other rows' entries stay
+                            rows = {e.get("row") for e in new_val if isinstance(e, dict)}
+                            new_val.extend(e for e in old_val if isinstance(e, dict) and e.get("row") not in rows)
+                        elif role.endswith("_regions"):
                             ids = {r.get("id") for r in new_val if isinstance(r, dict)}
                             new_val.extend(r for r in old_val if isinstance(r, dict) and r.get("id") not in ids)
                         else:
@@ -1770,11 +1819,30 @@ class Grounder:
         finally:
             self.icl.heldout_models |= saved
 
+    def _preferred_grasp_key(self, iddl: I.IDDL, role: str, cat: str, m: str, rp: RolePick, default: str, row: Optional[Dict[str, str]] = None) -> str:
+        """The library key of a model among its admissible keys for the role's pipeline: the key its candidates row names
+        (``grasp_key`` column) when admissible, else the pick's :data:`GRASP_KEY_SUFFIX_PREFERENCE`, else a spawn-scaled floating
+        key (``__sf``: grasps computed and attach-tested on the scaled mesh, owner 2026-10-11 - its ``scale`` comes with the
+        candidates row), else ``default`` (the alphabetically first)."""
+        keys: Set[str] = set()
+        for req in iddl.require_of(role):
+            if req.kind == "grasps":
+                keys |= {r["key"] for r in self.icl.admissible_grasps(cat, m, req.pipeline or "")}
+        named = (row or {}).get("grasp_key") or ""
+        if named in keys:
+            return named
+        suffix = GRASP_KEY_SUFFIX_PREFERENCE.get((rp.pick_row or {}).get("pick") or "")
+        for sfx in ([suffix] if suffix else []) + ["__sf"]:
+            hits = sorted(k for k in keys if k.endswith(sfx))
+            if hits:
+                return hits[0]
+        return default
+
     def _model_facts(self, re_: RoleEntry, iddl: I.IDDL, role: str, cat: str, m: str, row: Dict[str, str], v: Verdict, rp: RolePick) -> None:
         key = C.model_key(cat, m)
         subtask = iddl.subtask
         if v.grasp_key:
-            re_.grasp_keys[key] = v.grasp_key
+            re_.grasp_keys[key] = self._preferred_grasp_key(iddl, role, cat, m, rp, v.grasp_key, row)
         scale = _parse_scale(row.get("scale") or "")
         if scale is not None and key not in re_.scale:
             re_.scale[key] = scale

@@ -84,7 +84,7 @@ def _tabletop():
 from ispatialgym.sampling.v2.stances import BAND_CELL_TOL, brace_placement_admissible, in_band, nearer_side_lateral  # noqa: E402,F401  (pure rules, tested there)
 
 
-def left_contact_band_cells(s, trunk: Tuple[float, float], height: float):
+def left_contact_band_cells(s, trunk: Tuple[float, float], height: float, stance=None):
     """Base-frame cells of the left-arm generic CONTACT band (closed gripper, brace approach; one band per object height
     class — B3 A1) at ``trunk``, through ``tabletop.load_left_contact_band`` (B3's ``ReachBands.load(scene, support,
     arm="left", contact_set="generic_contact", height=h)``, nearest class within ±4 cm, in-process compute as the last
@@ -105,7 +105,7 @@ def left_contact_band_cells(s, trunk: Tuple[float, float], height: float):
         log.warning("no left contact band: key scene=%s support=%s arm=left contact_set=%s height=%.3f (class %.2f); left bands present: %s",
                     s.world.scene_model, s.top.name, getattr(TT, "CONTACT_SET", "generic_contact"), float(height), cls, present or "none")
         return None
-    cells = bands.band(trunk[0], trunk[1])
+    cells = bands.band(trunk[0], trunk[1], **TT.band_kw(bands, stance))  # a multi-distance band at ``stance``'s stand-off
     log.info("left contact band %s: %d cells at trunk (%.2f, %.2f)", getattr(bands, "path", "?"), len(cells), trunk[0], trunk[1])
     return cells
 
@@ -188,6 +188,9 @@ class IORSSmall(SamplerV2):
         self.grasps_flush: List[Any] = []  # the flush-pinch tier of ``self.grasps`` (tried first at every focus)
         self._reselected_q: Optional[th.Tensor] = None  # grasp configuration of the last re-selected grasp
         self.release_sweep: Optional[Dict[str, Any]] = None  # nextto / touching: open-jaw footprint facts of the place
+        self.shelf_start: Optional[Dict[str, Any]] = None  # touching with an upright-shelf key: the leaning start (tabletop.shelf_lean_pose)
+        self.shelf_pose: Optional[G.Pose] = None
+        self.shelf_partner_pose: Optional[G.Pose] = None  # the partner leaning against the opposite board
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -269,12 +272,17 @@ class IORSSmall(SamplerV2):
             log.info("%s: no library grasp pinches flush (closing tilts %s deg > %.0f); single tier", self.grasp_key,
                      {k: round(v, 1) for k, v in tilts.items()}, tilt_max)
         self.rest["partner"] = self._partner_rest()
+        # owner 2026-10-11 item 3 / 11:46 mirrored layout (touching#03): a book picked with its upright-shelf key starts leaning
+        # against the side board its rest orientation leans to; the partner book leans against the opposite board
+        self.shelf_start = TT.upright_shelf_facts(self.grasp_key, self.rest["target"]) if self.relation == "touching" else None
+        if self.shelf_start is not None:
+            self.rest["partner"] = TT.upright_lean_quat(self.hull["partner"], -self.shelf_start["lean_side"], self.shelf_start["lean_deg"])
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair
-        self.top = self.support_top(self.support)
+        H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        self.top = TT.support_surface(self, self.support, height=H_max)
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{self.support.name}: too little free top")
-        H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
         margins = self.lateral_margins()
         rng_t = np.random.default_rng(self.ctx.base_seed)
         errors: List[str] = []
@@ -301,6 +309,23 @@ class IORSSmall(SamplerV2):
         if self.init_stance is None:
             raise Reject("no_free_edge", "; ".join(errors) or f"{self.support.name}: no edge with a free, collision-free stance")
         self.init_stance.name = "init"
+        # owner 2026-10-11 item 3 (touching#03): a book picked with its upright-shelf key starts standing on its bottom edge, spine
+        # toward the robot, leaning against the side board of the compartment its rest orientation leans to (no drawn position)
+        self.shelf_pose = self.shelf_partner_pose = None
+        if self.shelf_start is not None:
+            side = self.shelf_start["lean_side"]
+            self.shelf_pose, facts = TT.shelf_lean_pose(self, self.hull["target"], self.rest["target"], self.top, self.edge, self.support, side)
+            self.shelf_partner_pose, pfacts = TT.shelf_lean_pose(self, self.hull["partner"], self.rest["partner"], self.top, self.edge, self.support, -side)
+            # room between the two books for the place and the push: the free span along the edge must exceed
+            # generation.shelf_free_span_min_m (default 0.15: the carried book's lean extent + the open jaw on both sides)
+            t_lat = (self.world.hull_at(self.hull["target"], self.shelf_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
+            p_lat = (self.world.hull_at(self.hull["partner"], self.shelf_partner_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
+            free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
+            self.shelf_start.update(facts)
+            self.shelf_start.update({"partner": pfacts, "free_span_m": round(free, 4)})
+            self.template_facts["shelf_start"] = self.shelf_start
+            if free < float(self.gen("shelf_free_span_min_m", 0.15)):
+                raise Reject("shelf_width", f"{self.support.name}: {free:.2f} m between the two leaning books (< {float(self.gen('shelf_free_span_min_m', 0.15)):.2f})")
         # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm when
         # it has no role besides the segment and the target is free; its band is its own or the default arm's mirrored
         self.segment_arms, self.arm_offer_why = TT.arm_offer(self, other_arm_roles=self.other_arm_roles())
@@ -595,6 +620,9 @@ class IORSSmall(SamplerV2):
         self.sidecar.add_stance(init)
         cam_init = self.camera_pose_at(init)
         order = rng.permutation(len(self.manip_candidates))
+        if self.shelf_pose is not None:  # the start is fixed: the stances whose focus is nearest it first
+            sx = self.shelf_pose[0][:2]
+            order = sorted(order, key=lambda i: float(th.linalg.norm(self.manip_candidates[int(i)].focus[:2] - sx)) if self.manip_candidates[int(i)].focus is not None else 1e9)
         errors = []
         default = self.segment_arms[0]
         for k in order[:6]:
@@ -608,8 +636,13 @@ class IORSSmall(SamplerV2):
                 # §4.5 step 5: transition init -> manipulation
                 self.sidecar.transitions.clear()
                 self.record_transition(init, manip)
-                # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation)
-                t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
+                # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation); the upright shelf start is
+                # fixed, its grasp confirmed with nothing ignored (the board above and the side walls are obstacles at the grasp pose)
+                if self.shelf_pose is not None:
+                    t_pose = self.shelf_pose
+                    grasp = TT.grasp_at_pose(self, manip, t_pose, self.grasps, [], self.edge.yaw, arm=default, scale_key=self.choice.models["target"].scale)
+                else:
+                    t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
                 if grasp.arm != default:
                     self.sidecar.transitions.clear()
                     self.record_transition(init, manip)  # the other arm idles now
@@ -753,12 +786,15 @@ class IORSSmall(SamplerV2):
         ontop / under / inside — must be a lateral the band covers at the target's depth, otherwise the place pose of
         §6.11 cannot pass. Sides with an empty admissible gap range are not drawn; touching keeps the robot's left. The band is the
         one of the arm that makes the segment (``manip``'s working arm)."""
+        if self.shelf_partner_pose is not None:
+            self._brace_gate = {"ok": False, "why": "shelf (owner 2026-10-11): the side board holds the partner, no brace"}
+            return self.shelf_partner_pose
         g_lo, g_hi = self.gap_range()
         sides = [1.0] if self.relation == "touching" else [1.0, -1.0]
         ranges: Dict[float, Tuple[float, float]] = {}
         band = self.band_of_arm((manip.working_arms or self.segment_arms)[0])
         if self.relation in ("ontop", "under", "inside") and band is not None:
-            cells = band.band(manip.translate, manip.tilt)
+            cells = band.band(manip.translate, manip.tilt, **TT.band_kw(band, manip))
             t_fp = self.world.footprint(self.hull["target"], t_pose)
             t_lat = (t_fp - manip.base_xy) @ manip.tangent
             depth_t = float(manip.world_to_base(t_pose[0][:2])[0])
@@ -785,7 +821,7 @@ class IORSSmall(SamplerV2):
             # nextto / touching: the target's *place* position (its origin at the goal gap — touching: the nextto position
             # the push starts from) must be a band lateral at the target's depth, else the place IK of §6.11 fails
             # (touching box_of_sanitary_napkins: every attempt place_unreachable with the goal 4-9 cm left of centre)
-            cells = band.band(manip.translate, manip.tilt)
+            cells = band.band(manip.translate, manip.tilt, **TT.band_kw(band, manip))
             base_t = manip.world_to_base(t_pose[0][:2])  # band cells are base-frame (x ahead, lateral + left)
             depth_t, lat_t = float(base_t[0]), float(base_t[1])
             near = cells[np.abs(cells[:, 0] - depth_t) <= 0.12] if len(cells) else cells
@@ -813,8 +849,8 @@ class IORSSmall(SamplerV2):
         # target's right face at the *place* position) lies in the right band and whose brace point (partner's far / left
         # face) lies in the left contact band of the same trunk is preferred and enables the brace; otherwise the last
         # drawn position is kept and the instance becomes push-only (``self._brace_gate`` tells ``touching_contacts``)
-        right_cells = self.bands.band(manip.translate, manip.tilt) if getattr(self, "bands", None) is not None else None
-        left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        right_cells = self.bands.band(manip.translate, manip.tilt, **TT.band_kw(self.bands, manip)) if getattr(self, "bands", None) is not None else None
+        left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=manip)
         self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
         errors = []
         p_pose = None
@@ -877,6 +913,8 @@ class IORSSmall(SamplerV2):
         return G.qmul(G.quat_from_yaw(self.edge_yaw_delta(hull, quat, manip)), G.t(quat))
 
     def target_goal_quat(self, t_pose: G.Pose, manip: Stance) -> th.Tensor:
+        if self.shelf_start is not None:  # touching#03: the book ends resting against the partner, leaning like it
+            return TT.mirrored_lean_quat(t_pose[1], self.edge, self.shelf_start["lean_side"], self.shelf_start["lean_deg"])
         return self.edge_aligned_quat(self.hull["target"], t_pose[1], manip) if self.edge_aligned() else G.t(t_pose[1])
 
     def place_pose_for(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> G.Pose:
@@ -965,7 +1003,7 @@ class IORSSmall(SamplerV2):
         _, lat_init = st.local(t_pose[0])
         # owner review 2026-09-16: the partner side that faces the target's init position (no lift over the partner)
         self.goal_side, lat = nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())), (float(t_lat.min()), float(t_lat.max())), gap)
-        if self.relation == "touching" and self.goal_side != "right":
+        if self.relation == "touching" and self.goal_side != ("left" if self.shelf_start is not None and self.shelf_start["lean_side"] > 0 else "right"):
             # §4.6 step 2 puts the partner on the robot's left of the target: the push goes toward +tangent into the
             # partner's right face, the brace holds its left face; a target starting left of the partner contradicts that
             raise Reject("touching_side", f"target init lateral {lat_init:+.2f} is left of the partner centre {0.5 * float(p_lat.min() + p_lat.max()):+.2f}")
@@ -1553,8 +1591,8 @@ class IORSSmall(SamplerV2):
     def brace_gate_at(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
         """A1 joint band gate at stance ``st``: the push work point (target's right face at the place) in the right band and the
         brace point (partner's far face) in the left contact band of the same trunk (``brace_placement_admissible``)."""
-        right_cells = self.bands.band(st.translate, st.tilt) if getattr(self, "bands", None) is not None else None
-        left_cells = left_contact_band_cells(self, (st.translate, st.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        right_cells = self.bands.band(st.translate, st.tilt, **TT.band_kw(self.bands, st)) if getattr(self, "bands", None) is not None else None
+        left_cells = left_contact_band_cells(self, (st.translate, st.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=st)
         if left_cells is None or right_cells is None:
             return {"ok": None, "why": "left contact band unavailable"}
         work, brace = self.touching_points(t_place_pose, p_pose, st)

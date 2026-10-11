@@ -1006,3 +1006,190 @@ def test_male_rest_orientation_keeps_the_library_rest_unless_physics_toppled_it(
     cap = _ring(0.0255, 0.0, 24) + _ring(0.0255, 0.011, 24)
     q, f = A.stable_rest_quat(th.tensor(cap), C.IDENTITY_QUAT)
     assert not f["flipped"] and th.allclose(q, C.IDENTITY_QUAT)
+
+
+# ---------------------------------------------------------------------------------------------------------------- support surfaces
+
+
+def _surface_sampler(surfaces, top_z, interior=None, top_raises=False):
+    """A sampler for ``TT.support_surface``: the support top at ``top_z``, ``support_interior`` returning ``interior`` (calls in
+    ``s.interior_calls``), ``bindings.support_surfaces`` = ``surfaces``."""
+    import types
+
+    from ispatialgym.sampling.sim_utils import SupportTop
+
+    top = SupportTop("bookcase_x_0", th.arange(10) * 0.02, th.arange(10) * 0.02, th.ones(10, 10, dtype=th.bool), th.zeros(10, 10, dtype=th.bool), top_z, 0.0)
+    s = types.SimpleNamespace(choice=types.SimpleNamespace(bindings={"support_surfaces": surfaces}), gp=types.SimpleNamespace(alias="a"), template_facts={},
+                              interior_calls=[], gen=lambda k, d=None: d)
+
+    def support_top(support, ignore=()):
+        if top_raises:
+            raise RuntimeError("no top cells")
+        return top
+
+    def support_interior(support, z, resolution=0.02, ignore=()):
+        s.interior_calls.append(round(z, 4))
+        return interior
+
+    s.support_top = support_top
+    s.world = types.SimpleNamespace(floor_z=0.05, spawned={}, support_interior=support_interior)
+    return s, top
+
+
+class _Interior:
+    def __init__(self, z, headroom):
+        self.name, self.z = "bookcase_x_0", z
+        self.mask = th.ones(4, 4, dtype=th.bool)
+        self.occupied = th.zeros(4, 4, dtype=th.bool)
+        self.headroom = headroom
+        self.open_edges = ["-v"]
+
+    @property
+    def free(self):
+        return self.mask & ~self.occupied
+
+
+def test_support_surface_keeps_the_top_without_a_sheet_surface_or_a_matching_one():
+    import types
+
+    sup = types.SimpleNamespace(name="bookcase_x_0")
+    s, top = _surface_sampler([], 1.12)
+    assert TT.support_surface(s, sup) is top and s.surface_z is None and TT.surface_band_kwargs(s) == {}
+    s, top = _surface_sampler([{"name": "bookcase_x_0", "init": "ontop", "top_z": 1.09}], 1.12)  # 1.07 above the floor: within 3 cm
+    assert TT.support_surface(s, sup) is top and s.surface_z is None and s.template_facts["support_surface"]["surface"] == "top"
+    # owner 2026-10-11 06:27: a row marked surface: top stays on the top whatever its height
+    s, top = _surface_sampler([{"name": "bookcase_x_0", "init": "ontop", "top_z": 0.84, "surface": "top", "why": "no surface"}], 1.12)
+    assert TT.support_surface(s, sup) is top and s.interior_calls == [] and s.template_facts["support_surface"]["why"] == "no surface"
+
+
+def test_support_surface_goes_inside_for_init_inside_or_a_height_mismatch():
+    import types
+
+    sup = types.SimpleNamespace(name="bookcase_x_0")
+    hr = th.full((4, 4), 0.30)
+    hr[0, :] = 0.10  # one row of cells under a low board
+    s, _ = _surface_sampler([{"name": "other_0", "init": "ontop", "top_z": 0.5}, {"name": "bookcase_x_0", "init": "inside", "top_z": 0.73}], 1.12,
+                            interior=_Interior(0.78, hr))
+    it = TT.support_surface(s, sup, height=0.12)
+    assert s.interior_calls == [0.78] and s.surface_z == 0.73 and TT.surface_band_kwargs(s) == {"surface_z": 0.73}
+    assert int(it.free.sum()) == 12 and not bool(it.free[0].any())  # headroom 0.10 < 0.12 + 0.02
+    f = s.template_facts["support_surface"]
+    assert f["surface"] == "interior" and f["why"] == "init=inside" and f["n_low_headroom_cells"] == 4 and f["open_edges"] == ["-v"]
+    s, _ = _surface_sampler([{"name": "bookcase_x_0", "init": "ontop", "top_z": 0.82}], 1.12, interior=_Interior(0.87, th.full((4, 4), 0.4)))
+    TT.support_surface(s, sup)
+    assert s.interior_calls == [0.87] and s.surface_z == 0.82 and "> 0.03 m" in s.template_facts["support_surface"]["why"]
+    s, _ = _surface_sampler([{"name": "bookcase_x_0", "init": "ontop", "top_z": 0.56}], 0.0, interior=_Interior(0.61, th.full((4, 4), 0.4)), top_raises=True)
+    TT.support_surface(s, sup)
+    assert s.surface_z == 0.56 and s.template_facts["support_surface"]["why"] == "no support top raster"
+
+
+def test_edge_frames_of_an_interior_surface_are_its_open_sides():
+    import types
+
+    from ispatialgym.sampling.sim_utils import SupportTop
+
+    top = SupportTop("bookcase_x_0", th.arange(10) * 0.02, th.arange(10) * 0.02, th.ones(10, 10, dtype=th.bool), th.zeros(10, 10, dtype=th.bool), 0.8, 0.0)
+    s = types.SimpleNamespace(world=types.SimpleNamespace(obj=lambda name: types.SimpleNamespace(aabb=(th.tensor([-0.02, -0.02, 0.0]), th.tensor([0.2, 0.2, 1.8])))))
+    assert sorted(e.name for e, _ in TT.edge_frames(s, top)) == ["+u", "+v", "-u", "-v"]
+    top.open_edges = ["-v"]
+    assert [e.name for e, _ in TT.edge_frames(s, top)] == ["-v"]
+
+
+BU_REST_XYZW = [0.45451947767204387, 0.4545194776720438, -0.5416752204197018, 0.5416752204197021]  # hardback__acbrnv__bu (wxyz in the library)
+
+
+def test_upright_shelf_key_leans_toward_the_robots_left(monkeypatch):
+    from ispatialgym.sampling import grasp_library as GL
+
+    monkeypatch.setattr(GL, "_candidates", lambda key: {"ispatialgym": {"rest_pose": "upright_shelf", "context": "bookcase_floor_wall"}} if key.endswith("__bu") else {"ispatialgym": {"rest_pose": "canonical"}})
+    f = TT.upright_shelf_facts("hardback__acbrnv__bu", th.tensor(BU_REST_XYZW))
+    assert f["lean_side"] == 1.0 and abs(f["lean_deg"] - 10.0) < 0.1
+    assert TT.upright_shelf_facts("hardback__acbrnv__bo", C.IDENTITY_QUAT.clone()) is None
+
+
+def test_shelf_lean_pose_puts_the_spine_behind_the_edge_and_the_top_edge_at_the_side_board():
+    import types
+
+    from ispatialgym.sampling.sim_utils import SupportTop
+    from ispatialgym.sampling.v2.stances import EdgeFrame
+
+    h = th.tensor([0.22274, 0.17153, 0.03120]) / 2
+    hull = th.tensor([[sx * h[0], sy * h[1], sz * h[2]] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)], dtype=th.float32)
+    rest = th.tensor(BU_REST_XYZW)
+    xs, ys = th.arange(-0.39, 0.40, 0.02), th.arange(0.01, 0.30, 0.02)  # board cells: x in [-0.4, 0.4], y in [0, 0.3] (front edge y = 0)
+    top = SupportTop("bookcase_x_0", xs, ys, th.ones(len(xs), len(ys), dtype=th.bool), th.zeros(len(xs), len(ys), dtype=th.bool), 0.70, 0.0)
+    edge = EdgeFrame("-v", th.tensor([0.0, 0.01]), th.tensor([0.0, 1.0]), 0.78)  # raster edge line at the first cell centres (y = 0.01)
+    link = types.SimpleNamespace(prim_path="/World/bookcase_x_0/base_link")
+    support = types.SimpleNamespace(name="bookcase_x_0", links={"base_link": link})
+    rays = []
+
+    def raycast(starts, ends):
+        rays.append((starts.clone(), ends.clone()))  # the left board's face at x = -0.30 (the tangent of inward +y is -x)
+        return [{"hit": True, "rigidBody": "/World/bookcase_x_0/base_link/collisions", "distance": 0.30, "position": [-0.30, float(starts[0, 1]), float(starts[0, 2])]}]
+
+    def bottom_offset(hl, quat):
+        return -float(C.transform_points((th.zeros(3), quat), hl)[:, 2].min())
+
+    s = types.SimpleNamespace(world=types.SimpleNamespace(raycast=raycast, bottom_offset=bottom_offset))
+    pose, facts = TT.shelf_lean_pose(s, hull, rest, top, edge, support, 1.0)
+    pts = C.transform_points(pose, hull)
+    # spine 2 cm behind the board's front edge (the raster edge line - half a cell = y 0.0)
+    assert abs(float(pts[:, 1].min()) - 0.02) < 1e-4
+    # the leaning top edge 2 mm short of the left board (x = -0.30), the bottom edge farther from it
+    assert abs(float(pts[:, 0].min()) - (-0.30 + TT.SHELF_WALL_GAP_M)) < 1e-4
+    top_pts, bot_pts = pts[pts[:, 2] > float(pts[:, 2].max()) - 0.01], pts[pts[:, 2] < float(pts[:, 2].min()) + 0.01]
+    assert float(top_pts[:, 0].min()) < float(bot_pts[:, 0].min()) - 0.03
+    # standing on its bottom edge on the board (3 mm drop), the ray at 0.8 of the book's height
+    assert abs(float(pts[:, 2].min()) - (0.70 + TT.Z_OFFSET)) < 1e-4 and abs(facts["ray_z"] - (0.70 + 0.8 * 0.2247)) < 2e-3
+    assert facts["lean_side"] == "left" and facts["n_bottom_off_board"] == 0
+    # no side board on that side -> Reject
+    s.world.raycast = lambda a, b: [{"hit": True, "rigidBody": "/World/other_book/base_link", "distance": 0.1}]
+    with pytest.raises(Exception, match="shelf_wall|side board"):
+        TT.shelf_lean_pose(s, hull, rest, top, edge, support, 1.0)
+
+
+def test_multi_distance_band_is_read_at_the_stances_stand_off():
+    """owner 2026-10-11 item 1: a band whose meta lists ``stand_offs`` is read at the stance's nominal stand-off (the nearest stored
+    one) by every stance-based lookup; a band without them reads its reference maps as before."""
+    k = (0.5, 0.0)
+    ref = {k: [[0.60, 0.00]]}  # the plain maps hold the reference (0.45) cells
+    rb = _synthetic_band(ref)
+    rb.meta["stand_offs"], rb.meta["stand_off"] = [0.35, 0.45, 0.55], 0.45
+    rb.cells_so = {0.35: {k: np.array([[0.50, 0.10]], dtype=np.float32)}, 0.45: {k: np.array([[0.60, 0.00]], dtype=np.float32)},
+                   0.55: {k: np.array([[0.70, -0.10]], dtype=np.float32)}}
+    rb.pairs_so = {s: {k: np.zeros((0, 3), dtype=np.int32)} for s in rb.cells_so}
+    near, far = _stance(*k), _stance(*k)
+    near.stand_off, far.stand_off = 0.36, 0.60
+    assert TT.band_stand_off(rb, near) == 0.36 and TT.band_kw(rb, far) == {"stand_off": 0.60}
+    assert th.allclose(TT.band_cells_world(rb, near), th.tensor([[0.50, 0.10]]))
+    assert th.allclose(TT.band_cells_world(rb, far), th.tensor([[0.70, -0.10]]))
+    assert TT.in_band(rb, far, th.tensor([0.70, -0.10]))[0] and not TT.in_band(rb, far, th.tensor([0.60, 0.00]))[0]
+    assert th.allclose(TT.band_union_cells(rb, near), th.tensor([[0.50, 0.10]]))
+    plain = _synthetic_band(ref)
+    assert TT.band_stand_off(plain, near) is None and TT.band_kw(plain, near) == {}
+    assert th.allclose(TT.band_cells_world(plain, far), th.tensor([[0.60, 0.00]]))
+
+
+def test_upright_lean_and_mirrored_lean_orientations():
+    """touching#03 (owner 2026-10-11): the partner stands on its long side leaning toward the requested side; the target's goal
+    is its start lean mirrored about the shelf's depth axis (spine kept toward the robot)."""
+    from ispatialgym.sampling.v2.stances import EdgeFrame
+
+    h = th.tensor([0.22274, 0.17153, 0.03120]) / 2
+    hull = th.tensor([[sx * h[0], sy * h[1], sz * h[2]] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)], dtype=th.float32)
+    for side in (1.0, -1.0):
+        q = TT.upright_lean_quat(hull, side, 10.0)
+        pts = C.transform_points((th.zeros(3), q), hull)
+        ext = pts.max(dim=0).values - pts.min(dim=0).values
+        assert abs(float(ext[2]) - (0.22274 * math.cos(math.radians(10)) + 0.0312 * math.sin(math.radians(10)))) < 1e-3  # long side up
+        assert abs(float(ext[0]) - 0.17153) < 1e-3  # the width along the depth (rest +x)
+        top, bot = pts[pts[:, 2] > 0.1], pts[pts[:, 2] < -0.1]
+        assert side * float(top[:, 1].mean() - bot[:, 1].mean()) > 0.03  # the top leans toward the requested side
+    # mirrored: the bu rest (leaning left, spine toward -x) turned to lean right about the inward axis of an edge facing +x
+    edge = EdgeFrame("-v", th.tensor([0.0, 0.0]), th.tensor([1.0, 0.0]), 0.8)
+    q0 = th.tensor(BU_REST_XYZW)
+    qm = TT.mirrored_lean_quat(q0, edge, 1.0, 10.0)
+    p0, pm = C.transform_points((th.zeros(3), q0), hull), C.transform_points((th.zeros(3), qm), hull)
+    lean = lambda p: float(p[p[:, 2] > 0.1][:, 1].mean() - p[p[:, 2] < -0.1][:, 1].mean())
+    assert lean(p0) > 0.03 and lean(pm) < -0.03 and abs(lean(p0) + lean(pm)) < 1e-3
+    assert abs(float(pm[:, 0].min()) - float(p0[:, 0].min())) < 1e-4  # the spine stays at the same depth

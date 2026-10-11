@@ -158,6 +158,16 @@ def _substitute(expr, mapping: Dict[str, str], where: str):
     return [head] + [_substitute(arg, mapping, where) for arg in expr[1:]]
 
 
+def rewrite_init(lit, init_predicates: Optional[Dict[Tuple[str, str], str]]):
+    """``(pred A B)`` with ``(pred, B)`` in ``init_predicates`` -> ``(new_pred A B)`` (B = the role token as the iddl writes it);
+    any other literal unchanged. ``{("ontop", "support"): "inside"}`` starts the objects on a support inside it (a shelf in a
+    bookcase, a hallstand's shoe shelf)."""
+    if not init_predicates or not isinstance(lit, list) or len(lit) != 3 or not isinstance(lit[2], str):
+        return lit
+    new = init_predicates.get((lit[0], lit[2].lstrip("?")))
+    return [new, lit[1], lit[2]] if new else lit
+
+
 def render(
     iddl: IDDL,
     groundings: Dict[str, RoleGrounding],
@@ -166,11 +176,13 @@ def render(
     activity: str,
     comment: Optional[str] = None,
     validate: bool = True,
+    init_predicates: Optional[Dict[Tuple[str, str], str]] = None,
 ) -> RenderedProblem:
     """Render the grounded BDDL of ``iddl`` and validate it (parse + compile).
 
     ``groundings`` maps every explicit role of the iddl (``iddl.roles``) to a :class:`RoleGrounding`; ``floor`` and
     ``agent`` are added when absent. ``alias`` is the full v2 alias (``bddl_alias`` decides the written spelling).
+    ``init_predicates`` rewrites ``:init`` literals (:func:`rewrite_init`).
     """
     groundings = dict(groundings)
     groundings.setdefault("floor", floor_grounding())
@@ -250,7 +262,7 @@ def render(
     lines.append("")
     lines.append("    (:init")
     for lit in iddl.init:
-        lines.append(to_sexpr(_substitute(lit, mapping, ":init"), 2))
+        lines.append(to_sexpr(_substitute(rewrite_init(lit, init_predicates), mapping, ":init"), 2))
     lines.append("    )")
     lines.append("")
     lines.append("    (:goal")
@@ -444,10 +456,11 @@ def write_problem(
     comment: Optional[str] = None,
     meta: Optional[Dict[str, Any]] = None,
     dry_run: bool = False,
+    init_predicates: Optional[Dict[Tuple[str, str], str]] = None,
 ) -> RenderedProblem:
     """Allocate the id of ``alias`` in ``<bddl_root>/<activity>/problems.json``, render, validate and write
     ``problem<N>.bddl`` (an existing problem of the same alias is rewritten under its id). ``meta`` is recorded in
-    the registry record (subtask, iddl, pick, slot, ...)."""
+    the registry record (subtask, iddl, pick, slot, ...); ``init_predicates`` see :func:`rewrite_init`."""
     activity_dir = os.path.join(bddl_root, activity)
     registry = ProblemRegistry.load(activity_dir, activity)
     written_alias = bddl_alias(alias)
@@ -456,7 +469,7 @@ def write_problem(
     # where the grounding changed)
     grounded = existing.get("grounded") if existing else None
     definition_id = registry.allocate(alias, written_alias, grounded=grounded or _dt.date.today().isoformat(), by=GROUNDER, **(meta or {}))
-    rendered = render(iddl, groundings, definition_id, alias, activity, comment=comment)
+    rendered = render(iddl, groundings, definition_id, alias, activity, comment=comment, init_predicates=init_predicates)
     if not dry_run:
         os.makedirs(activity_dir, exist_ok=True)
         path = os.path.join(activity_dir, f"problem{definition_id}.bddl")

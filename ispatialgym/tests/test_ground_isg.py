@@ -735,6 +735,55 @@ def test_several_representative_supports_per_pick(tmp_path):
     assert P.validate_problem_registry("inter_object_relation_satisfaction", str(tmp_path / "bddl"))
 
 
+def test_support_surface_from_the_sheet_note():
+    row = {"scene": "house_double_floor_upper", "name": "bookcase_otwukr_2", "note": "init=inside; top_z=0.73 (shelf) area=0.20 best_edge=-y"}
+    assert GI.support_surface(row, "p#02~T2") == {"name": "bookcase_otwukr_2", "init": "inside", "top_z": 0.73, "row": "p#02~T2"}
+    assert GI.support_surface(dict(row, note="init=ontop; top_z=1.07 area=0.23"), "p#02~T1")["init"] == "ontop"
+    assert GI.support_surface(dict(row, note="living-room table"), "p") is None
+    # owner 2026-10-11 06:27: the sheet heights of these supports match no surface -> their top
+    for scene, name in GI.SUPPORT_TOP_SURFACE:
+        s = GI.support_surface({"scene": scene, "name": name, "note": "init=ontop; top_z=1.02 area=0.64"}, "p")
+        assert s["surface"] == "top" and s["top_z"] == 1.02
+
+
+def test_inside_init_rewrites_only_the_support_literals():
+    assert B.rewrite_init(["ontop", "target", "support"], {("ontop", "support"): "inside"}) == ["inside", "target", "support"]
+    assert B.rewrite_init(["ontop", "agent", "floor"], {("ontop", "support"): "inside"}) == ["ontop", "agent", "floor"]
+    assert B.rewrite_init(["not", ["touching", "target", "partner"]], {("ontop", "support"): "inside"}) == ["not", ["touching", "target", "partner"]]
+    assert B.rewrite_init(["ontop", "target", "support"], None) == ["ontop", "target", "support"]
+
+
+def test_inside_support_rows_get_their_own_alias_bddl_and_surface(tmp_path):
+    """Sheet notes ``init=`` / ``top_z=`` (owner 2026-10-11 item 2): an ``init=inside`` support row grounds an alias of its own
+    (support token ``<category>_inside``) whose BDDL starts the objects ``inside`` the support; every row's surface goes to
+    ``scenes.<scene>.bindings.support_surfaces`` and a re-grounding replaces its own entry."""
+    icl = GI.ICL(first_demo_icl())
+    pick = "inter_object_relation_satisfaction-nextto#01"
+    rows = icl.picks[pick]["support"]["representative"]
+    base = rows[0]
+    rows[0] = dict(base, note="init=ontop; top_z=0.81 area=3.38", triplet="1")
+    rows.append(dict(base, note="init=inside; top_z=0.40 (shelf)", triplet="2"))
+    for _ in range(2):  # the second run re-grounds the same rows into the same customs
+        g = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"), options=GI.Options(representative_test=False))
+        g.run(["inter_object_relation_satisfaction-nextto"])
+        g.customs.save()
+    by_alias = {gp.alias: gp for gp in g.grounded if gp.combination.pick.startswith(pick)}
+    cat = base["category"]
+    ontop = next(a for a in by_alias if a.endswith(f"-{cat}"))
+    inside = next(a for a in by_alias if a.endswith(f"-{cat}_inside"))
+    t, p, s = (by_alias[inside].rendered.instances[r] for r in ("target", "partner", "support"))
+    assert ["inside", t, s] in by_alias[inside].problem.init and ["inside", p, s] in by_alias[inside].problem.init
+    assert not any(lit[0] == "ontop" and lit[-1] == s for lit in by_alias[inside].problem.init)
+    t, p, s = (by_alias[ontop].rendered.instances[r] for r in ("target", "partner", "support"))
+    assert ["ontop", t, s] in by_alias[ontop].problem.init and not any(lit[0] == "inside" for lit in by_alias[ontop].problem.init)
+    scene = base["scene"]
+    srf_in = g.customs.entries[inside].scenes[scene].bindings["support_surfaces"]
+    srf_on = g.customs.entries[ontop].scenes[scene].bindings["support_surfaces"]
+    assert [(e["name"], e["init"], e["top_z"]) for e in srf_in] == [(base["name"], "inside", 0.40)]
+    assert [(e["name"], e["init"], e["top_z"]) for e in srf_on] == [(base["name"], "ontop", 0.81)]
+    assert P.validate_problem_registry("inter_object_relation_satisfaction", str(tmp_path / "bddl"))
+
+
 def test_hyphenated_synset_instances_parse():
     """BEHAVIOR synsets may hold a hyphen (``deep-freeze.n.02``; ``mock-up.n.01``, the category of the 2026-10-11
     mental-rotation block): their instances are valid names; empty or doubled hyphen segments are not."""
@@ -764,3 +813,18 @@ def test_scene_entry_keeps_underscore_comments():
     assert se.notes == {"_note": raw["_note"]} and se.to_dict() == raw
     with pytest.raises(C.CustomsError):
         C.SceneEntry.from_dict(dict(raw, note="no underscore"))
+
+
+def test_grasp_key_preference_named_then_pick_suffix_then_scaled_floating():
+    """The key a model's candidates row names wins when admissible; else the pick's suffix (touching#03 __bu); else a spawn-scaled
+    floating key (__sf, owner 2026-10-11: the thickness-scaled teaspoon); else the grounder's default (alphabetical first)."""
+    keys = {"teaspoon__eilfij", "teaspoon__eilfij__sf", "hardback__acbrnv__bo", "hardback__acbrnv__bu"}
+    fake = types.SimpleNamespace(icl=types.SimpleNamespace(admissible_grasps=lambda c, m, p: [{"key": k} for k in sorted(keys) if k.startswith(f"{c}__{m}")]))
+    iddl = types.SimpleNamespace(require_of=lambda role: [types.SimpleNamespace(kind="grasps", pipeline="floating")])
+    pref = lambda c, m, pick, row=None: GI.Grounder._preferred_grasp_key(fake, iddl, "target", c, m, types.SimpleNamespace(pick_row={"pick": pick}),
+                                                                         sorted(k for k in keys if k.startswith(f"{c}__{m}"))[0], row)
+    assert pref("teaspoon", "eilfij", "mental_rotation#09") == "teaspoon__eilfij__sf"
+    assert pref("teaspoon", "eilfij", "mental_rotation#09", {"grasp_key": "teaspoon__eilfij"}) == "teaspoon__eilfij"
+    assert pref("hardback", "acbrnv", "inter_object_relation_satisfaction-touching#03") == "hardback__acbrnv__bu"
+    assert pref("hardback", "acbrnv", "inter_object_relation_satisfaction-touching#01") == "hardback__acbrnv__bo"
+    assert pref("teaspoon", "eilfij", "x", {"grasp_key": "teaspoon__eilfij__missing"}) == "teaspoon__eilfij__sf"  # a named key that is not admissible is ignored
