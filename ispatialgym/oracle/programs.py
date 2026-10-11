@@ -160,6 +160,11 @@ def _place_and_retreat(g: GraspRecord, kind: str, relation: str = "on") -> List[
 # annotation relation word of the IORS place per relation (the partner ends under the target for under_small)
 _IORS_RELATION_WORDS = {"ontop": "on", "under": "under", "under_small": "on", "inside": "into", "nextto": "next to", "touching": "next to"}
 
+#: ``contacts.push.layout`` of the touching#03 shelf layout (owner 2026-10-11 11:46): the target starts leaning against one side
+#: board of an interior shelf and the partner against the other; the hand that carried the target pushes it toward the partner
+#: (the left hand rightward for a partner on the right board) and nothing braces the partner
+TOUCHING_SHELF_LAYOUT = "upright_shelf"
+
 
 def _pack_stage_actions(sc: Sidecar, brace, pushes, base_yaw: float) -> List[Action]:
     """Block design packing stage (owner 2026-09-19 21:47): the wide brace (fingers pre-shaped to ``fingers_opening_m`` so a
@@ -889,11 +894,17 @@ def program_iors_touching(sc: Sidecar) -> List[Action]:
     ``contacts.brace`` only when the A1 joint two-arm placement admits the partner position and a two-arm candidate
     passes the exact IK (core ``6de8803``: ``summary.brace.present``); without it the instance is push-only —
     ``transition → grasp → lift → carry → place (nextto position) → retreat → push → retreat`` — and the oracle's push
-    closure (hold at the goal, residual re-push, ``execute_push``) is the stop, as for ``program_alignment_axial``."""
+    closure (hold at the goal, residual re-push, ``execute_push``) is the stop, as for ``program_alignment_axial``.
+
+    Shelf layout (``contacts.push.layout`` = :data:`TOUCHING_SHELF_LAYOUT`, touching#03): the same push-only chain with the
+    grasping hand as the push arm (the left hand pushing rightward toward a partner on the right board); a brace is refused."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     push = _push_contact(sc)
     brace = sc.contacts.brace if sc.contacts is not None else None
-    if push.arm != "right" or (brace is not None and brace.arm != "left"):
+    if push.extra.get("layout") == TOUCHING_SHELF_LAYOUT:
+        if brace is not None or push.arm != g.arm:
+            raise SidecarError("touching (shelf layout): the grasping hand pushes the target and nothing braces the partner")
+    elif push.arm != "right" or (brace is not None and brace.arm != "left"):
         raise SidecarError("touching: the right gripper pushes the target and the left gripper braces the partner (spec §6.11)")
     if push.object != g.object:
         raise SidecarError("contacts.push.object: the push must act on the placed target")

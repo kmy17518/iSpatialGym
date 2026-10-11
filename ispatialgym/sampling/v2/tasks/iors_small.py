@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch as th
 
+from ispatialgym.oracle.programs import TOUCHING_SHELF_LAYOUT
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.sim_utils import Reject, SupportTop
@@ -42,6 +43,8 @@ CLOSED_TIP_SPREAD_M = 0.027
 #: r 1.8 cm spheres 4-7 cm to the side of the gripper at the palm-line height) lies on the eef's -y side; ``eef_quat(a, c·outward)``
 #: puts eef +y = c·outward, so c = +1 hangs the camera over the pushed object's top and c = -1 turns it away from it. The camera
 #: contacting the box top pushed the robot down against the table (demos 0918-190236 / 191811: robot and table shaking).
+#: ``left_realsense_link`` sits at the same eef-frame position and every class derives its axes from the push direction, so the
+#: left hand's push along -tangent (the touching shelf layout) keeps this order: camera away from the pushed object / up first.
 PUSH_WRIST_TURNS = (-1.0, 1.0)
 #: Hand geometry beyond the finger profile, sphere centres in the EEF frame (gripper-link spheres of
 #: ``r1pro_description_curobo_default.yaml`` mapped by ``EEF_IN_GRIPPER`` (0, 0, -0.06; rpy 0, pi, 0): p_eef = (-x, y, -(z + 0.06)))
@@ -139,6 +142,29 @@ THIN_PARTNER_HEIGHT = 0.04
 #: half width along eef x (conservative; only the open-gripper lowest point is derived from them)
 FINGER_THICKNESS = 0.012
 FINGER_HALF_WIDTH = 0.012
+#: touching#03 shelf layout: the lift of the target before it is slid along the board to the partner's side (it never passes over
+#: the partner); 5 mm under the headroom the interior raster keeps above the tallest book at every free cell
+SHELF_CARRY_HEIGHT_M = TT.INTERIOR_HEADROOM_MARGIN_M - 0.005
+
+
+def push_face_point(hull_w: th.Tensor, direction) -> th.Tensor:
+    """The contact of a push along ``direction`` (world, horizontal) on a hull given in world points: the face the pad meets (the
+    hull's extreme against ``direction``) at mid height, on the line through the hull centre along ``direction``. Along +tangent
+    this is the right-face point of ``touching_points``, along -tangent the left-face point."""
+    d = th.tensor([float(direction[0]), float(direction[1])])
+    d = d / th.linalg.norm(d)
+    z = float(hull_w[:, 2].min()) + 0.5 * float(hull_w[:, 2].max() - hull_w[:, 2].min())
+    face = float((hull_w[:, :2] @ d).min())
+    centre = hull_w.mean(dim=0)
+    return th.tensor([*(centre[:2] + d * (face - float(centre[:2] @ d))).tolist(), z])
+
+
+def gap_along(behind_w: th.Tensor, ahead_w: th.Tensor, direction) -> float:
+    """Gap (m) along ``direction`` (world, horizontal) from a hull to the hull ahead of it, both world points: the nearest extent of
+    ``ahead_w`` minus the farthest of ``behind_w`` (negative when they overlap along it)."""
+    d = th.tensor([float(direction[0]), float(direction[1])])
+    d = d / th.linalg.norm(d)
+    return float((ahead_w[:, :2] @ d).min() - (behind_w[:, :2] @ d).max())
 
 
 def gripper_corners_world(eef: G.Pose, open_width: float = C.GRIPPER_OPEN_M, thickness: float = FINGER_THICKNESS,
@@ -328,12 +354,22 @@ class IORSSmall(SamplerV2):
                 raise Reject("shelf_width", f"{self.support.name}: {free:.2f} m between the two leaning books (< {float(self.gen('shelf_free_span_min_m', 0.15)):.2f})")
         # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm when
         # it has no role besides the segment and the target is free; its band is its own or the default arm's mirrored
-        self.segment_arms, self.arm_offer_why = TT.arm_offer(self, other_arm_roles=self.other_arm_roles())
-        self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands) if len(self.segment_arms) > 1 else {}
+        phase2_band: Dict[str, Any] = {}
+        if self.shelf_start is not None:
+            # owner 2026-10-11 11:46 (touching#03): the arm on the target's side grasps, places and pushes (the left one for a partner on
+            # the right board), the other arm has no role; Phase 2's foci come from that arm's band (its own, else the mirror)
+            arm = self.shelf_push_arm()
+            self.segment_arms = [arm]
+            self.arm_offer_why = f"touching shelf layout: the {arm} arm on the target's side grasps, places and pushes it; nothing braces the partner"
+            self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands)
+            phase2_band = {"bands": self.band_of_arm(arm)}
+        else:
+            self.segment_arms, self.arm_offer_why = TT.arm_offer(self, other_arm_roles=self.other_arm_roles())
+            self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands) if len(self.segment_arms) > 1 else {}
         # Phase 2: manipulation stance survivors of the best angle class (each with its focus)
         self.manip_candidates = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                                               target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top,
-                                                              arm_bands=self.arm_bands)
+                                                              arm_bands=self.arm_bands, **phase2_band)
         if not self.manip_candidates:
             raise Reject("no_manipulation_stance", "Phase 2 left no survivor")
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
@@ -630,6 +666,14 @@ class IORSSmall(SamplerV2):
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, [default]
             manip.extras.update(cand.extras)
+            if self.shelf_start is not None:
+                # an idle posture Phase 2 recorded belongs to the arm the stance search idled: the shelf layout's arm works, the other
+                # arm idles in its first collision-free posture
+                st_arm = TT.stance_for_arm(self, cand.with_trunk(cand.translate, cand.tilt, "manipulation"), default)
+                if st_arm is None:
+                    errors.append(f"candidate {int(k)}: no collision-free idle posture of the other arm with the {default} arm working")
+                    continue
+                TT.adopt_arm(manip, st_arm)
             # the other arm is tried only where its band covers the focus (owner 2026-09-27)
             arms_here = [a for a in self.segment_arms if a == default or a in (cand.extras.get("focus_arms") or [])]
             try:
@@ -671,6 +715,10 @@ class IORSSmall(SamplerV2):
                         self.apply_height_extra_to_grasp(grasp, t_pose, manip)
                 # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
                 grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
+                if self.shelf_start is not None:
+                    # the shelf layout slides the book along the board to the partner's side: it clears the board, not the partner
+                    # (a lift by the partner's height runs into the board above; the lift check ignores the support)
+                    grasp.carry_height = float(self.gen("shelf_carry_height_m", SHELF_CARRY_HEIGHT_M))
                 d.object_poses[tname] = t_pose
                 d.object_poses[pname] = p_pose
                 d.robot_q = self.stance_q(init)
@@ -930,9 +978,32 @@ class IORSSmall(SamplerV2):
         xy = manip.world(depth_t, lat)
         return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
 
+    # ------------------------------------------------------------------ touching shelf layout (touching#03, owner 2026-10-11 11:46)
+
+    def shelf_push_sign(self) -> float:
+        """The shelf layout's push along the edge tangent, toward the partner leaning against the board opposite the target's: -1
+        (the robot's right) for a target leaning against the left board."""
+        return -float(self.shelf_start["lean_side"])
+
+    def shelf_push_arm(self) -> str:
+        """The arm on the target's side: it grasps, places and pushes the target in the shelf layout (the left arm for a partner on
+        the right board), with the right hand's push parameters mirrored."""
+        return "left" if self.shelf_push_sign() < 0 else "right"
+
+    def shelf_push_direction(self, st: Stance) -> th.Tensor:
+        """The shelf layout's unit push direction (world xyz) from ``st``: :meth:`shelf_push_sign` x the edge tangent."""
+        sg = self.shelf_push_sign()
+        return th.tensor([sg * float(st.tangent[0]), sg * float(st.tangent[1]), 0.0])
+
     def touching_points(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:
         """§6.11 touching: the push contact on the target's right face (mid height) and the brace point on the partner's far
-        (left) face (mid height), world xyz, from the target / partner poses."""
+        (left) face (mid height), world xyz, from the target / partner poses. Shelf layout: the push contact on the target's face
+        away from the partner along the shelf push direction (the left face for a push to the right) and the partner's far face
+        on the other side (no brace uses it)."""
+        if self.shelf_start is not None:
+            d = self.shelf_push_direction(manip)
+            return (push_face_point(self.world.hull_at(self.hull["target"], t_pose), d),
+                    push_face_point(self.world.hull_at(self.hull["partner"], p_pose), -d))
         tangent = manip.tangent
         t_hull = self.world.hull_at(self.hull["target"], t_pose)
         p_hull = self.world.hull_at(self.hull["partner"], p_pose)
@@ -1450,6 +1521,8 @@ class IORSSmall(SamplerV2):
                 # the place sits the nominal gap (g_NT - 1 cm) short of the settled contact; the push (recorded in
                 # ``touching_contacts``) spans the measured gap at that place plus the margin
                 place_pos = goal_pos - th.tensor([float(tangent[0]), float(tangent[1]), 0.0]) * self.place_gap()
+                if self.shelf_start is not None:  # shelf layout: back against the shelf push direction (the robot's left for a push to the right)
+                    place_pos = goal_pos - self.shelf_push_direction(manip) * self.place_gap()
                 self._touching_place_pos = place_pos
                 draft.summary["touching"] = {"place_gap_m": round(self.place_gap(), 4)}
             place = IK.grasp_pose((place_pos, goal_quat), grasp.eef_in_object)
@@ -1590,7 +1663,10 @@ class IORSSmall(SamplerV2):
 
     def brace_gate_at(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
         """A1 joint band gate at stance ``st``: the push work point (target's right face at the place) in the right band and the
-        brace point (partner's far face) in the left contact band of the same trunk (``brace_placement_admissible``)."""
+        brace point (partner's far face) in the left contact band of the same trunk (``brace_placement_admissible``). The shelf
+        layout has no brace at any stance."""
+        if self.shelf_start is not None:
+            return {"ok": False, "stance": st.name, "why": "shelf layout: the side board holds the partner, no brace"}
         right_cells = self.bands.band(st.translate, st.tilt, **TT.band_kw(self.bands, st)) if getattr(self, "bands", None) is not None else None
         left_cells = left_contact_band_cells(self, (st.translate, st.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=st)
         if left_cells is None or right_cells is None:
@@ -1634,7 +1710,8 @@ class IORSSmall(SamplerV2):
         posed at the place (the checks ``touching_contacts`` repeats when recording); None when no class passes. With
         ``with_brace`` the class must also admit a left brace in the two-arm solve (``exact_both_arms``, the right arm locked
         at its push goal) — the first ``brace_search_candidates`` brace candidates are tried; the returned kind is then
-        ``"<push kind>+<brace kind>"``."""
+        ``"<push kind>+<brace kind>"``. Shelf layout: the push along the shelf push direction by the arm on the target's side
+        (:meth:`_touching_push_choice`), never braced."""
         tangent = st.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])
         p_init, b_point = self.touching_points(t_place_pose, p_pose, st)
@@ -1644,6 +1721,11 @@ class IORSSmall(SamplerV2):
         face_z = (float(p_hull[:, 2].min()), float(p_hull[:, 2].max()))
         gap = float((p_hull[:, :2] @ tangent).min() - (t_hull_w[:, :2] @ tangent).max())
         dist = self.push_distance(gap)
+        if self.shelf_start is not None:
+            if with_brace:
+                return None
+            direction = self.shelf_push_direction(st)
+            dist = self.push_distance(gap_along(t_hull_w, p_hull, direction))
         ignore_push = self.support_objects() + [self.obj("target")]
         ignore_brace = self.support_objects() + [self.obj("partner")]
         n_brace = int(self.gen("brace_search_candidates", 12))
@@ -1681,7 +1763,8 @@ class IORSSmall(SamplerV2):
         line (default -0.12: every push that worked had it 7-18 cm right of centre; at -0.05 the right arm crosses the body
         and joints 2 / 3 sit on their limits, 0918-173814). The box is carried there in hand and set down from there.
         Pure geometry (nothing recorded); None when the shift is below ``push_stance_min_shift_m`` or the feature is off
-        (``generation.push_stance``)."""
+        (``generation.push_stance``). Shelf layout: the contact on the target's face away from the partner and the right hand's
+        lateral mirrored for the left hand (+0.12: left of centre), the stance's working arm the shelf push arm."""
         if self.relation != "touching" or not bool(self.gen("push_stance", True)):
             return None
         tangent = manip.tangent
@@ -1689,6 +1772,11 @@ class IORSSmall(SamplerV2):
         right_face_xy = t_hull[int(th.argmin(t_hull[:, :2] @ tangent)), :2]
         _, lat_work = manip.local(right_face_xy)
         want = float(self.gen("push_contact_lateral_m", -0.12)) if lateral is None else float(lateral)
+        if self.shelf_start is not None:
+            sg = self.shelf_push_sign()
+            _, lat_work = manip.local(t_hull[int(th.argmin(t_hull[:, :2] @ (sg * tangent))), :2])
+            if lateral is None:
+                want = sg * float(self.gen("push_contact_lateral_m", -0.12))
         dlat = float(lat_work - want)
         if abs(dlat) < float(self.gen("push_stance_min_shift_m", 0.02)):
             return None
@@ -1697,6 +1785,8 @@ class IORSSmall(SamplerV2):
         st = min(cands, key=lambda c: float(th.linalg.norm(G.t(c.base_xy) - target_xy)))
         st = st.with_trunk(manip.translate, manip.tilt, "push")
         st.focus, st.arms = G.t(t_place_pose[0]).clone(), ["right"]
+        if self.shelf_start is not None:
+            st.arms = [self.shelf_push_arm()]
         st.extras.update({"second_base_pose": True, "lateral_shift_m": round(dlat, 4), "push_contact_lateral_m": round(float(lat_work - dlat), 4),
                           "rule": "base moved along the edge (box in hand) so the push contact lies at push_contact_lateral_m from the centre line"})
         return st
@@ -1716,6 +1806,8 @@ class IORSSmall(SamplerV2):
         # the contact lateral is searched (default -0.12 first, then further right / nearer): the first stance from which a push
         # class passes the chain + retreat clear pose (0918-174815: at -0.12 alone joint 4 / the clear pose failed 9/16 attempts)
         laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        if self.shelf_start is not None:  # the right hand's laterals mirrored for the left hand (+0.12, +0.16, +0.20, +0.08)
+            laterals = [self.shelf_push_sign() * v for v in laterals]
         # owner 2026-09-18 20:48: a lateral from which the push AND a left brace pass together is preferred (the push shoves both
         # boxes; from the first push-feasible lateral the brace failed the two-arm solve while the left arm alone reached it,
         # 0918-210216); the first push-only lateral is the fallback
@@ -1782,7 +1874,10 @@ class IORSSmall(SamplerV2):
 
     def touching_contacts(self, draft: Draft, manip: Stance):
         """§6.11 touching: push contact on the target's right face (right arm) toward the partner, brace pre-contact +
-        contact of the closed left gripper on the partner's far (left) side; both IK-checked (§4.6 step 6)."""
+        contact of the closed left gripper on the partner's far (left) side; both IK-checked (§4.6 step 6). Shelf layout
+        (touching#03): the push on the target's face away from the partner along the shelf push direction by the arm on the
+        target's side (the left arm pushing to the right), recorded with ``layout`` = ``TOUCHING_SHELF_LAYOUT`` for the oracle's
+        program; no brace."""
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         # the push starts at the *place* (nextto) position the program sets the target down at and ends at the settled
         # contact position (+5 mm of pressing): ``push_distance`` (the old code pushed from the contact position onward)
@@ -1802,6 +1897,12 @@ class IORSSmall(SamplerV2):
         # the push direction) plus the margin; the recorded goal lies past the contact by the margin
         t_hull_place = self.world.hull_at(self.hull["target"], t_pose)
         gap_at_place = float((p_hull[:, :2] @ tangent).min() - (t_hull_place[:, :2] @ tangent).max())
+        if self.shelf_start is not None:
+            direction = self.shelf_push_direction(manip)
+            gap_at_place = gap_along(t_hull_place, p_hull, direction)
+            self._brace_gate = self.brace_gate_at(manip, t_pose, p_pose)
+            draft.summary.setdefault("touching", {}).update({"layout": TOUCHING_SHELF_LAYOUT, "push_arm": self.shelf_push_arm(),
+                                                             "push_direction": [round(float(v), 4) for v in direction]})
         dist = self.push_distance(gap_at_place)
         draft.summary.setdefault("touching", {}).update({"gap_at_place_m": round(gap_at_place, 4), "push_distance_m": round(dist, 4), "push_margin_m": round(self.push_margin(), 4)})
         # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6).
@@ -1844,6 +1945,9 @@ class IORSSmall(SamplerV2):
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, "classes_failed": why[:6], **{k: v for k, v in push_extras.items() if v is not None}})
         log.info("%s: touching push class %s from the %s stance%s", self.gp.alias, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
+        if self.shelf_start is not None:
+            push_rec.arm = self.shelf_push_arm()
+            push_rec.extras["layout"] = TOUCHING_SHELF_LAYOUT
         push_rec.stance = manip.name  # the stance the chain was checked from ("manipulation" or the second base pose "push")
         self.sidecar.add_contact(push_rec)
         if brace_chosen is not None:
@@ -1860,18 +1964,22 @@ class IORSSmall(SamplerV2):
             draft.summary["brace"] = {"present": False, "gate": gate, "candidates_failed": len([w for w in why if "/" in w]),
                                       "why": "; ".join(why[-3:]) if try_brace else str(gate.get("why"))}
             manip.arms = ["right"]
+            if self.shelf_start is not None:
+                manip.arms = [self.shelf_push_arm()]
             manip.contacts = ["push"]
             self.sidecar.contacts.pop("brace", None)
 
     def _touching_push_choice(self, st: Stance, t_pose: G.Pose, p_init: th.Tensor, t_face_z: Tuple[float, float], direction: th.Tensor, dist: float,
-                              ignore_push: Sequence[Any]):
+                              ignore_push: Sequence[Any], arm: Optional[str] = None):
         """The push of the touching task (the box posed at the place by the caller): ``touching_push_candidates`` in their order,
         a class's two wrist turns chosen by ``orient.choose`` (owner 2026-09-27). A candidate passes when (0) the hand beyond the
         finger profile (wrist camera, knuckles, body) clears the box at the contact and the goal, (1) the [pre, init, goal] chain
         passes the exact IK on its own (the requirement; the brace is optional, owner 2026-09-16 17:10: the axial rule) and (2)
         the oracle's retreat after the push - 10 cm back along the approach axis from the push GOAL (above it for a blade) - has a
-        configuration (a class without one dies in the program check, 9/16 of 0918-173814). Returns ``orient.choose_first``'s
-        ``(chosen, decision, failures)``."""
+        configuration (a class without one dies in the program check, 9/16 of 0918-173814). ``arm``: the push arm (default the
+        right arm; the shelf layout's :meth:`shelf_push_arm`). Returns ``orient.choose_first``'s ``(chosen, decision, failures)``."""
+        if arm is None:
+            arm = self.shelf_push_arm() if self.shelf_start is not None else "right"
 
         def chain(c):
             _kind, init, extras = c
@@ -1882,16 +1990,16 @@ class IORSSmall(SamplerV2):
             overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist)
             if overlap is not None:
                 return False, None, None, overlap
-            r_push = self.ikc.exact(p.chain, st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED, q_first=p.q_first)
+            r_push = self.ikc.exact(p.chain, st, arm, ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED, q_first=p.q_first)
             if not r_push.ok:
-                return False, r_push, None, f"right: {r_push.reason}"
-            qs = O.chain_qs(self.ikc, "right", p.chain)
-            r_ret = self.ikc.exact([IK.pre_pose(goal)], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+                return False, r_push, None, f"{arm}: {r_push.reason}"
+            qs = O.chain_qs(self.ikc, arm, p.chain)
+            r_ret = self.ikc.exact([IK.pre_pose(goal)], st, arm, ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
             if not r_ret.ok:
                 return False, r_push, None, f"retreat clear pose: {r_ret.reason}"
             return True, r_push, qs, ""
 
-        return O.choose_first(self.ikc, "right", self.touching_push_candidates(st, p_init, t_face_z, direction), key=lambda c: c[1], label=lambda c: c[0],
+        return O.choose_first(self.ikc, arm, self.touching_push_candidates(st, p_init, t_face_z, direction), key=lambda c: c[1], label=lambda c: c[0],
                               chain=chain, evaluate=evaluate, q_start=self.ikc.q_locked(st), camera_idx=[1], stage="touching push")
 
     def _touching_brace_choice(self, st: Stance, push_chain: List[G.Pose], t_pose: G.Pose, p_pose: G.Pose, b_point: th.Tensor, face_z: Tuple[float, float],
@@ -2206,6 +2314,8 @@ class IORSSmall(SamplerV2):
 
         t, p = self.objects[tname], self.objects[pname]
         direction = self.sidecar.stance("manipulation").tangent
+        if self.shelf_start is not None:  # toward the partner on the other side board
+            direction = self.shelf_push_direction(self.sidecar.stance("manipulation"))[:2]
         for _ in range(max_steps):
             self.world.wake([t, p])
             if t.states[Touching].get_value(p):

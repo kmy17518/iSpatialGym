@@ -280,20 +280,32 @@ def mirrored_lean_quat(quat, edge: EdgeFrame, lean_side: float, lean_deg: float)
 def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_for_grasp: Sequence[Any], yaw: float, *, arm: str = "right",
                   scale_key: Any = None, object_name: Optional[str] = None) -> GraspRecord:
     """The first library grasp of ``grasps`` whose pre-grasp and grasp at the fixed object ``pose`` pass the exact IK from ``manip``
-    (the upright shelf start: the pose is set by the shelf, not drawn from F). ``Reject("grasp_unreachable")`` otherwise."""
+    with ``arm`` (the upright shelf start: the pose is set by the shelf, not drawn from F). The library pinch serves either hand
+    (the two grippers and their wrist cameras are alike in the eef frame); with ``generation.grasp_twins`` it is offered in both
+    turns by the orientation rule (:func:`pick_twin`, as the segment fallback takes a pinch with the other arm), the wrist camera
+    checked against the world only - the board under the object is no infinite plane, a camera in front of its edge is clear.
+    ``Reject("grasp_unreachable")`` otherwise."""
     IK = _ik()
     name = object_name or s.bindings.one("target").name
     exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
+    twins = grasp_twins_on(s)
     reasons = []
     for g in grasps:
-        eef = IK.grasp_pose(pose, g.pose)
+        eio = g.pose
+        eef = IK.grasp_pose(pose, eio)
         pre = IK.pre_pose(eef)
         res = s.ikc.exact([pre, eef], manip, arm, **exact_kw)
-        if not res.ok:
+        pick = None
+        if twins and getattr(g, "name", None):
+            pick = pick_twin(s, manip, arm, g, eio, eef, pre, res, exact_kw, where="fixed start")
+            g, eio, eef, pre, res = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res
+        if not (pick.passed if pick is not None else res.ok):
             reasons.append(f"{getattr(g, 'name', '?')}: {res.reason}"[:120])
             continue
         rec = GraspRecord(name, arm, getattr(g, "key", None), getattr(g, "name", None), float(yaw), pre, eef,
-                          finger_q=list(getattr(g, "finger_q", []) or []) or None, eef_in_object=g.pose)
+                          finger_q=list(getattr(g, "finger_q", []) or []) or None, eef_in_object=eio)
+        if pick is not None:
+            rec.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts})
         rec.stance = manip.name
         return rec
     _reject("grasp_unreachable", f"no library grasp reaches the fixed start pose from {manip.name}: {reasons[:4]}")
