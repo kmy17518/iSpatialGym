@@ -134,7 +134,7 @@ def main(argv=None):
                         if removed:
                             from ispatialgym.sampling import scene_variants as SV
 
-                            vpath, _ = SV.write_variant(stable_scene_path(scene), removed, os.path.join(args.out, "scene_variants"))
+                            vpath, _ = SV.write_variant(stable_scene_path(scene), removed, os.path.join(args.out, "scene_variants"), mode="remove")
                             variant = {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed)}
                             log.info("scene variant for %s: %d objects removed (%s)", scene, len(removed), removed)
                         current_world = SimWorld(scene, rooms, scene_variant=variant)

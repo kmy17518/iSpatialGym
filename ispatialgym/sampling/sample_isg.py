@@ -212,9 +212,10 @@ class WorldPool:
         if removed:
             from ispatialgym.sampling import scene_variants as SV
 
-            vpath, _ = SV.write_variant(stable_scene_path(scene), removed, os.path.join(self.out_root, "scene_variants"))
-            variant = {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed)}
-            log.info("scene variant for %s: %d objects removed (%s)", scene, len(removed), removed)
+            vpath, vjson = SV.write_variant(stable_scene_path(scene), removed, os.path.join(self.out_root, "scene_variants"))
+            variant = {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed),
+                       "moved_objects": vjson["metadata"]["ispatialgym"].get("moved_objects")}
+            log.info("scene variant for %s: %d objects moved out of the scene (%s)", scene, len(removed), removed)
         self.world = SimWorld(scene, rooms, scene_variant=variant)
         cache = kit_mesh_cache(self.world)
         self.kit = RobotKit(self.world, prebuild=("right_arm",), mesh_cache_size=cache)  # the left-arm planner is built on first use (brace tasks)

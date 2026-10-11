@@ -170,13 +170,17 @@ class TaskSampler:
     DEFAULT_INIT_ARMS = "untucked"
 
     def _scene_variant_meta(self) -> Optional[dict]:
-        """Scene variant used (chairs removed, ...): scene file relative to the template dir, removed objects and the
-        traversability-map footprints to free at evaluation time (``scene_variants.patch_trav_map_from_meta``)."""
+        """Scene variant used (chairs removed, ...): scene file relative to the template dir, removed objects (``moved_objects``:
+        parked outside the scene, with their pose in the scene file) and the traversability-map footprints to free at
+        evaluation time (``scene_variants.patch_trav_map_from_meta``)."""
         sv = getattr(self.world, "scene_variant", None) or {}
         if not sv:
             return None
-        return {"scene_file": os.path.relpath(sv["path"], self.ctx.out_dir), "removed_objects": list(sv.get("removed_objects", [])),
-                "freed_footprints": sv.get("freed_footprints")}
+        out = {"scene_file": os.path.relpath(sv["path"], self.ctx.out_dir), "removed_objects": list(sv.get("removed_objects", [])),
+               "freed_footprints": sv.get("freed_footprints")}
+        if sv.get("moved_objects"):
+            out["moved_objects"] = sv["moved_objects"]
+        return out
 
     def init_arms(self) -> str:
         """Init arm mode from the spec; fixed per task so that every instance of a task starts in the same arm pose

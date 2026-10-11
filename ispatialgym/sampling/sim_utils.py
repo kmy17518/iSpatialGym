@@ -1005,6 +1005,12 @@ class SimWorld:
         with open(partial) as f:
             scene_b = json.load(f)
         merged = merge_scene_files(copy.deepcopy(self.stable_scene), scene_b, keep_robot_from="b")
+        variant_meta = (self.stable_scene.get("metadata") or {}).get("ispatialgym") or {}
+        if variant_meta.get("moved_objects"):
+            # the scene variant's objects parked outside the scene, each with its pose in the source scene file (owner 2026-10-11)
+            isg = merged.setdefault("metadata", {}).setdefault("ispatialgym", {})
+            isg["moved_objects"] = copy.deepcopy(variant_meta["moved_objects"])
+            isg["source_scene_file"] = variant_meta.get("source_scene_file")
         full = os.path.join(out_dir, "template.json")
         with open(full, "w") as f:
             json.dump(merged, f, cls=TorchEncoder, indent=2)

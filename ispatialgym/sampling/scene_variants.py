@@ -1,8 +1,11 @@
 """Scene variants: the stable scene minus objects that must not be there for a task (chairs around the work table).
 
-A variant is a copy of ``<scene>_stable.json`` without the listed objects, written next to the sampler output
-(``<out>/scene_variants/<scene>__<hash>.json``). The sampler loads it as the scene file, so templates (merged from
-it) and every instance are self-consistent, and the reload checks compare against it.
+A variant is a copy of ``<scene>_stable.json`` with the listed objects out of the scene, written next to the sampler
+output (``<out>/scene_variants/<scene>__<hash>.json``). The sampler loads it as the scene file, so templates (merged from
+it) and every instance are self-consistent, and the reload checks compare against it. Since 2026-10-11 (owner) the
+objects are **moved**, not deleted: they stay in the file - and so in every template - parked far outside the scene
+(:func:`park_positions`) with a fixed base, and ``metadata.ispatialgym.moved_objects`` (copied into ``template.json``)
+lists each one with its root pose in the source scene file. The reach-band worlds still delete them (``mode="remove"``).
 
 The traversability map is a PNG baked with the furniture, so removing a chair leaves its footprint marked as an
 obstacle. :func:`patch_trav_map` frees those cells in the loaded ``TraversableMap`` (only where the no-object map has
@@ -136,22 +139,58 @@ def tables_in_rooms(stable: dict, rooms: Iterable[str], names_or_categories: Ite
     return sorted(out)
 
 
-def write_variant(stable_path: str, remove: Sequence[str], out_dir: str) -> Tuple[str, dict]:
-    """Write the stable scene minus ``remove`` to ``out_dir`` and return (path, json)."""
+#: ``write_variant`` modes: ``move`` parks the listed objects outside the scene (templates keep every scene object, owner
+#: 2026-10-11), ``remove`` deletes them from the file (the reach-band worlds, which drop objects for speed)
+VARIANT_MODES = ("move", "remove")
+#: parked objects: this far beyond the scene's object roots (-x, -y, below the lowest), this far apart along -x
+PARK_MARGIN_M = 100.0
+PARK_SPACING_M = 5.0
+
+
+def park_positions(stable: dict, n: int, margin: float = PARK_MARGIN_M, spacing: float = PARK_SPACING_M) -> List[List[float]]:
+    """``n`` positions outside the scene: ``margin`` beyond the minimum x, y and z of every object root of the scene file,
+    ``spacing`` apart along -x."""
+    reg = stable["state"]["registry"]["object_registry"]
+    roots = [s["root_link"]["pos"] for s in reg.values() if isinstance(s, dict) and "root_link" in s]
+    lo = [min(float(p[k]) for p in roots) for k in range(3)] if roots else [0.0, 0.0, 0.0]
+    return [[lo[0] - margin - spacing * i, lo[1] - margin, lo[2] - margin] for i in range(n)]
+
+
+def write_variant(stable_path: str, remove: Sequence[str], out_dir: str, mode: str = "move") -> Tuple[str, dict]:
+    """Write the stable scene without ``remove`` in it to ``out_dir`` and return (path, json). ``move``: every listed object
+    stays in the file, parked at :func:`park_positions` with a fixed base (there is no floor there), and
+    ``metadata.ispatialgym.moved_objects`` records its root pose and ``fixed_base`` in the source scene file; ``remove``: the
+    objects are deleted from the file. ``metadata.ispatialgym.removed_objects`` lists the objects taken out either way."""
+    if mode not in VARIANT_MODES:
+        raise ValueError(f"write_variant mode must be one of {VARIANT_MODES}, got {mode!r}")
     with open(stable_path) as f:
         scene = json.load(f)
     variant = copy.deepcopy(scene)
     init = variant["objects_info"]["init_info"]
     reg = variant["state"]["registry"]["object_registry"]
-    removed = []
-    for name in remove:
-        if name in init:
+    removed = [name for name in remove if name in init]
+    meta = variant.setdefault("metadata", {}).setdefault("ispatialgym", {})
+    if mode == "move":
+        moved = {}
+        for name, pos in zip(removed, park_positions(scene, len(removed))):
+            root = reg[name]["root_link"]
+            moved[name] = {"pos": list(root["pos"]), "ori": list(root["ori"]), "fixed_base": bool(init[name]["args"].get("fixed_base", False)),
+                           "moved_to": pos}
+            root["pos"] = pos
+            for k in ("lin_vel", "ang_vel"):
+                if k in root:
+                    root[k] = [0.0, 0.0, 0.0]
+            init[name]["args"]["fixed_base"] = True
+        meta["moved_objects"] = moved
+    else:
+        for name in removed:
             init.pop(name)
             reg.pop(name, None)
-            removed.append(name)
-    variant.setdefault("metadata", {}).setdefault("ispatialgym", {})["removed_objects"] = removed
-    variant["metadata"]["ispatialgym"]["source_scene_file"] = os.path.basename(stable_path)
-    tag = hashlib.sha256(",".join(sorted(removed)).encode()).hexdigest()[:10]
+    meta["removed_objects"] = removed
+    meta["variant_mode"] = mode
+    meta["source_scene_file"] = os.path.basename(stable_path)
+    key = ",".join(sorted(removed))
+    tag = hashlib.sha256((key if mode == "remove" else f"move:{key}").encode()).hexdigest()[:10]
     scene_model = os.path.basename(stable_path).replace("_stable.json", "")
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{scene_model}__{tag}.json")

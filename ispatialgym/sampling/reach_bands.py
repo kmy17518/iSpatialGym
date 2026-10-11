@@ -1905,7 +1905,7 @@ def _chairs_variant(scene: str, support_name: str, rooms: List[str], out_dir: st
                  sorted(set(loaded) - set(rooms)))
     if not removed and not dropped:
         return None, []
-    vpath, _ = SV.write_variant(stable_scene_path(scene), list(removed) + dropped, out_dir)
+    vpath, _ = SV.write_variant(stable_scene_path(scene), list(removed) + dropped, out_dir, mode="remove")
     variant = {"path": vpath, "removed_objects": list(removed), "freed_footprints": SV.freed_footprints(stable, removed) if removed else None}
     if dropped:
         variant["slim_dropped"] = dropped
