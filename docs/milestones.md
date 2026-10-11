@@ -42,6 +42,11 @@ Tagged states of this repository and what passed on them.
   exception: while welded the opening pads turned it 6.1 deg relative to the hand (the hand 0.3 deg), and released it spun on to
   44 deg, rolling 4.5 mm (r14: 2.9 deg; the task passes either way). Torso / head camera / support force match r14 within the
   re-sampled grasps.
+- **The marker's roll, sandbox experiment** (`attach/runs_weld`, the rule patched in-process for demo and replay; marker, block
+  design, carton lever, cap, apple, sandal on r14's instances): giving a released single-body object the hand's velocity at the
+  removal changed nothing (marker 42.7 deg after 30 steps, the rest as pad-clear) - a pad still drags the marker after the let-go;
+  letting go once both fingers stood 1 mm wider than at the command halved the marker's turn (20.8 deg) but tipped a block-design die
+  91 deg and jumped the carton 6.3 mm (`root_moved`) again. Owner: keep the pad-clear release; the marker's roll is accepted.
 - **Why** (owner): the oracle carried the part with partly opened fingers while the assisted grasp held it (+0.125 for the whole
   descent, then +0.91 -> a second attach -> +1); the release hook and the per-step `attached` check joined the part wherever it was
   within 5 cm / 15 deg (under -1 the cap 18 mm off failed, the lid 8.9 mm and the cork 6.6 mm passed the 1 cm layout tolerance off
