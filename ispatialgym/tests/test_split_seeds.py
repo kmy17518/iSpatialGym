@@ -120,25 +120,31 @@ def test_eval_rooms_are_the_frozen_per_task_assignment():
     assert got == SS.EVAL_ROOMS
     assert SS.eval_assignment(list(reversed(aliases)) + ["camera_relocalization-standard"], moves=SS.EVAL_ROOM_MOVES)[0] == got
     eligible = set(SS.eligible_rooms())
-    per_task = {}
+    base, _ = SS.eval_assignment(aliases)  # before any room move (EVAL_ROOM_MOVES may cost a task a scene)
+    for table in (base, SS.EVAL_ROOMS):
+        per_task = {}
+        for task in SS.SCENE_DRAW_SUBTASKS:
+            rooms = [table[a] for a in aliases if SS.scene_draw_task(a) == task]
+            assert len(rooms) == 10 and len(set(rooms)) == 10 and set(rooms) <= eligible
+            assert sorted(orders[task]) == sorted(eligible)
+            per_task[task] = set(rooms)
+        shared = per_task["object_scaling"] & per_task["mental_rotation"]
+        assert shared == {("Rs_int", "living_room_0")} if table is base else shared <= {("Rs_int", "living_room_0")}
     for task in SS.SCENE_DRAW_SUBTASKS:
-        rooms = [SS.EVAL_ROOMS[a] for a in aliases if SS.scene_draw_task(a) == task]
-        assert len(rooms) == 10 and len(set(rooms)) == 10 and set(rooms) <= eligible
+        rooms = [base[a] for a in aliases if SS.scene_draw_task(a) == task]
         counts = {sc: sum(s == sc for s, _ in rooms) for sc in SS.SCENE_CANDIDATES}
         assert min(counts.values()) == 1 and max(counts.values()) == 2
         repeats = {sc for sc, n in counts.items() if n == 2}
         assert len(repeats) == 3 and {"house_single_floor", "office_cubicles_right"} < repeats
         assert [len(SS.eligible_rooms(sc)) for sc in repeats - {"house_single_floor", "office_cubicles_right"}] == [5]
-        assert sorted(orders[task]) == sorted(eligible)
-        per_task[task] = set(rooms)
-    assert per_task["object_scaling"] & per_task["mental_rotation"] == {("Rs_int", "living_room_0")}
+    assert all(SS.EVAL_ROOMS[a] == base[a] for a in aliases if a not in SS.EVAL_ROOM_MOVES)
     for a in aliases:
         assert all(SS.draw_scene_room("eval", a, k) == SS.EVAL_ROOMS[a] for k in range(4))
     with pytest.raises(KeyError):
         SS.draw_scene_room("eval", "object_scaling-not_in_the_table")
     # pinned: a changed derivation would silently move eval instances
-    assert SS.EVAL_ROOMS["object_scaling-apple"] == ("house_double_floor_lower", "living_room_0")
-    assert SS.EVAL_ROOMS["mental_rotation-mug"] == ("Rs_int", "living_room_0")
+    assert base["object_scaling-apple"] == ("house_double_floor_lower", "living_room_0")
+    assert base["mental_rotation-mug"] == ("Rs_int", "living_room_0")
 
 
 def test_eval_room_move_takes_the_tasks_next_unused_room():
