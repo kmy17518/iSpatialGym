@@ -32,6 +32,11 @@ Modes::
         # of the top with its long axis along the edge, the object stands on its floor at the cell; one band per
         # (support, object, tray spec) serves every template (see PlacedSpec / placed_spec())
     python -m ispatialgym.sampling.reach_bands ... --generic-pinch                 # blocks / pushes, no library grasps
+    python -m ispatialgym.sampling.reach_bands --scene S --support bookcase_x_0 --surface-z 0.73 --object C/M --grasp-key K
+        # interior surface (a shelf inside the support, SimWorld.support_interior): board cells whose headroom fits the object,
+        # stance at an open side, only the board ignored at the grasp pose; ReachBands.load(..., surface_z=0.73) reads it
+    python -m ispatialgym.sampling.reach_bands ... --stand-offs 0.35,0.45,0.55
+        # multi-distance band: every stand-off's stance on the same edge; rb.band(tr, ti, stand_off=0.55) (nearest stored)
     python -m ispatialgym.sampling.reach_bands --scene S --support floor --room R --object C/M [--under PARTNER]
     python -m ispatialgym.sampling.reach_bands --scene S --support T --target toolbox/redmtl --handle-key toolbox__redmtl \
         --joint j_lid --joint-values 0.0,1.48,2.1,2.97 --brace                      # small‑scale articulation
@@ -146,6 +151,10 @@ POSTURES = ("untucked", "ready", "tucked")
 UNDER_EDGE_OUT_M = 0.50
 UNDER_EDGE_IN_M = 0.30
 UNDER_EDGE_CLEARANCE_EXTRA_M = 0.03  # a cell under the partner needs clearance >= object height + this
+#: interior surface bands (``--surface-z``): a board cell is usable when its headroom >= object height + this (default of
+#: ``--headroom-margin``); ``ReachBands.find(surface_z=...)`` matches the requested height within SURFACE_MATCH_TOL
+INTERIOR_HEADROOM_MARGIN = 0.02
+SURFACE_MATCH_TOL = 0.03
 STRIP_MAX_DEPTH = 0.95  # m into the support from the edge; deeper cells are never reachable
 STRIP_HALF_WIDTH = 0.80
 CACHE_DEFAULT = os.path.expanduser("~/.cache/ispatialgym/reach_bands")
@@ -404,6 +413,12 @@ class ReachBands:
     pairs: Dict[Tuple[float, float], np.ndarray] = field(default_factory=dict)  # (translate, tilt) -> (M, 3) int [cell, yaw, grasp]
     path: Optional[str] = None
     classes: Dict[Tuple[float, float], np.ndarray] = field(default_factory=dict)  # (translate, tilt) -> (N,) int class bitmask
+    #: multi-distance bands (``--stand-offs``, meta ``stand_offs``): stand-off (m) -> the same three maps, in the base frame of
+    #: that stand-off's stance (meta ``stances``); empty for single-distance bands. ``cells`` / ``pairs`` / ``classes`` hold
+    #: the reference stand-off (meta ``stand_off``, 0.45).
+    cells_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = field(default_factory=dict)
+    pairs_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = field(default_factory=dict)
+    classes_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = field(default_factory=dict)
 
     # -- loading --------------------------------------------------------------------------------------------------
     @staticmethod
@@ -412,23 +427,39 @@ class ReachBands:
         with open(path_npz[:-4] + ".json") as f:
             meta = json.load(f)
         cells, pairs, classes = {}, {}, {}
+        multi = [float(s) for s in (meta.get("stand_offs") or [])]
+        ref = float(meta.get("stand_off", STAND_OFF))
+        cells_so = {s: {} for s in multi}
+        pairs_so = {s: {} for s in multi}
+        classes_so = {s: {} for s in multi}
         for t in meta["trunks"]:
             if t.get("collides"):
                 continue
             k = trunk_key(t["translate"], t["tilt"])
             key = (float(t["translate"]), float(t["tilt"]))
-            cells[key] = d[k] if k in d.files else np.zeros((0, 2))
-            pairs[key] = d[k + "__pairs"] if (k + "__pairs") in d.files else np.zeros((0, 3), dtype=np.int32)
-            if (k + "__classes") in d.files:
-                classes[key] = d[k + "__classes"]
-        return ReachBands(meta, cells, pairs, path_npz, classes)
+            so = t.get("stand_off")
+            if not multi or so is None or abs(float(so) - ref) < 1e-6:
+                cells[key] = d[k] if k in d.files else np.zeros((0, 2))
+                pairs[key] = d[k + "__pairs"] if (k + "__pairs") in d.files else np.zeros((0, 3), dtype=np.int32)
+                if (k + "__classes") in d.files:
+                    classes[key] = d[k + "__classes"]
+            if multi and so is not None:
+                p = f"so{float(so):.2f}__{k}"
+                cells_so.setdefault(float(so), {})[key] = d[p] if p in d.files else np.zeros((0, 2))
+                pairs_so.setdefault(float(so), {})[key] = d[p + "__pairs"] if (p + "__pairs") in d.files else np.zeros((0, 3), dtype=np.int32)
+                if (p + "__classes") in d.files:
+                    classes_so.setdefault(float(so), {})[key] = d[p + "__classes"]
+        return ReachBands(meta, cells, pairs, path_npz, classes, cells_so, pairs_so, classes_so)
 
     @staticmethod
     def find(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
              mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
-             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None) -> List[str]:
+             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None, surface_z: Optional[float] = None) -> List[str]:
         """Paths (``.npz``) of the cached bands matching the given factors, best match first.
+
+        ``surface_z`` (m above the floor): an interior-surface band (``--surface-z``, a shelf inside the support) requested
+        within :data:`SURFACE_MATCH_TOL` of that height; ``None`` = the support's top, interior bands are never returned.
 
         ``object`` = ``CATEGORY/MODEL`` (``None`` for object-less generic bands); ``grasp_key`` = the library key,
         ``"generic"`` for ``--generic-pinch`` bands, ``None`` = any grasp set; ``placed`` = the ``--placed`` objects
@@ -447,6 +478,11 @@ class ReachBands:
         for d in (dirs if dirs is not None else default_dirs()):
             for npz, meta in _index(d):
                 if meta.get("scene") != scene or meta.get("support") != support:
+                    continue
+                srf = meta.get("surface") or {}
+                if (srf.get("mode") == "interior") != (surface_z is not None):
+                    continue
+                if surface_z is not None and abs(float(srf.get("z_requested_above_floor", -9.0)) - float(surface_z)) > SURFACE_MATCH_TOL:
                     continue
                 if mode is not None and meta.get("mode") != mode:
                     continue
@@ -488,7 +524,7 @@ class ReachBands:
     def load(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
              mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
-             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None) -> "ReachBands":
+             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None, surface_z: Optional[float] = None) -> "ReachBands":
         """Load the cached band for the given factors (see :meth:`find`); ``FileNotFoundError`` on a cache miss.
 
         Left-arm contact band of an object of height ``h`` on ``support``::
@@ -500,50 +536,75 @@ class ReachBands:
             ReachBands.load(scene, "floor", obj, "generic", under=partner, under_edge=True)
         """
         paths = ReachBands.find(scene, support, object, grasp_key, placed=placed, under=under, scale=scale, target=target, joint=joint, mode=mode, arm=arm,
-                                contact_set=contact_set, height=height, under_edge=under_edge, dirs=dirs)
+                                contact_set=contact_set, height=height, under_edge=under_edge, dirs=dirs, surface_z=surface_z)
         if not paths:
             raise FileNotFoundError(f"no reach band for scene={scene} support={support} object={object} grasp_key={grasp_key} placed={list(placed)} "
                                     f"under={under} under_edge={under_edge} scale={scale} target={target} joint={joint} arm={arm} contact_set={contact_set} height={height} "
-                                    f"in {list(dirs) if dirs is not None else default_dirs()}")
+                                    f"surface_z={surface_z} in {list(dirs) if dirs is not None else default_dirs()}")
         if len(paths) > 1:
             log.debug("%d reach bands match (%s ...); using %s", len(paths), object or target or contact_set, paths[0])
         return ReachBands.from_files(paths[0])
 
     # -- queries --------------------------------------------------------------------------------------------------
-    def trunks(self) -> List[Tuple[float, float]]:
-        return sorted(self.cells)
+    def stand_off_of(self, stand_off: Optional[float]) -> Optional[float]:
+        """The stored stand-off nearest to ``stand_off`` (multi-distance bands); None for ``None`` or a single-distance band."""
+        if stand_off is None or not self.cells_so:
+            return None
+        return min(self.cells_so, key=lambda s: abs(s - float(stand_off)))
 
-    def nearest_trunk(self, translate: float, tilt: float) -> Optional[Tuple[float, float]]:
-        cands = [k for k in self.cells if abs(k[0] - translate) < 1e-6]
+    def _maps(self, stand_off: Optional[float] = None):
+        """``(cells, pairs, classes)`` of the stored stand-off nearest to ``stand_off``; the reference maps for ``None``."""
+        so = self.stand_off_of(stand_off)
+        if so is None:
+            return self.cells, self.pairs, self.classes
+        return self.cells_so[so], self.pairs_so.get(so, {}), self.classes_so.get(so, {})
+
+    def stance(self, stand_off: Optional[float] = None) -> Dict[str, Any]:
+        """The stance the cells of ``stand_off`` (nearest stored; ``None`` = the reference) are relative to."""
+        so = self.stand_off_of(stand_off)
+        if so is None:
+            return dict(self.meta.get("stance") or {})
+        return dict((self.meta.get("stances") or {}).get(f"{so:.2f}") or self.meta.get("stance") or {})
+
+    def trunks(self, stand_off: Optional[float] = None) -> List[Tuple[float, float]]:
+        return sorted(self._maps(stand_off)[0])
+
+    def nearest_trunk(self, translate: float, tilt: float, stand_off: Optional[float] = None) -> Optional[Tuple[float, float]]:
+        cells = self._maps(stand_off)[0]
+        cands = [k for k in cells if abs(k[0] - translate) < 1e-6]
         if not cands:
             return None
         return min(cands, key=lambda k: abs(k[1] - tilt))
 
-    def band(self, translate: float, tilt: float) -> np.ndarray:
-        """Cells of the grid trunk with the same translate and the nearest tilt (empty array when that trunk collides)."""
-        k = self.nearest_trunk(translate, tilt)
-        return self.cells[k] if k is not None else np.zeros((0, 2))
+    def band(self, translate: float, tilt: float, stand_off: Optional[float] = None) -> np.ndarray:
+        """Cells of the grid trunk with the same translate and the nearest tilt (empty array when that trunk collides);
+        ``stand_off``: the cells of the nearest stored stand-off of a multi-distance band (``None`` = the reference)."""
+        cells = self._maps(stand_off)[0]
+        k = self.nearest_trunk(translate, tilt, stand_off)
+        return cells[k] if k is not None else np.zeros((0, 2))
 
     def union_extent(self) -> Tuple[float, float]:
         lat = np.concatenate([c[:, 1] for c in self.cells.values() if len(c)]) if self.cells else np.zeros(0)
         return (float(lat.min()), float(lat.max())) if len(lat) else (0.0, 0.0)
 
-    def cell_index(self, translate: float, tilt: float, cell) -> Optional[int]:
-        k = self.nearest_trunk(translate, tilt)
-        if k is None or not len(self.cells[k]):
+    def cell_index(self, translate: float, tilt: float, cell, stand_off: Optional[float] = None) -> Optional[int]:
+        cells = self._maps(stand_off)[0]
+        k = self.nearest_trunk(translate, tilt, stand_off)
+        if k is None or not len(cells[k]):
             return None
-        d = np.linalg.norm(self.cells[k] - np.asarray(cell, dtype=float)[None, :2], axis=1)
+        d = np.linalg.norm(cells[k] - np.asarray(cell, dtype=float)[None, :2], axis=1)
         i = int(np.argmin(d))
         return i if d[i] <= 0.51 * float(self.meta.get("lattice", LATTICE)) else None
 
-    def feasible(self, translate: float, tilt: float, cell) -> List[Tuple[Any, Any]]:
+    def feasible(self, translate: float, tilt: float, cell, stand_off: Optional[float] = None) -> List[Tuple[Any, Any]]:
         """Recorded feasible (yaw offset [rad, relative to the base yaw], grasp name) pairs of the band cell nearest to
-        ``cell`` (generic pinch: ``("generic", candidate index)``); the seed of the feasible set F of spec 4.6."""
-        k = self.nearest_trunk(translate, tilt)
-        i = self.cell_index(translate, tilt, cell)
+        ``cell`` (generic pinch: ``("generic", candidate index)``); the seed of the feasible set F of spec 4.6.
+        ``stand_off``: the nearest stored stand-off of a multi-distance band (``None`` = the reference)."""
+        k = self.nearest_trunk(translate, tilt, stand_off)
+        i = self.cell_index(translate, tilt, cell, stand_off)
         if k is None or i is None:
             return []
-        p = self.pairs.get(k)
+        p = self._maps(stand_off)[1].get(k)
         if p is None or not len(p):
             return []
         names = self.meta.get("grasp_names") or []
@@ -560,33 +621,41 @@ class ReachBands:
         """Pose class names of the ``classes`` bitmask (generic pinch / push pitch x yaw classes, or the contact classes)."""
         return list(self.meta.get("classes") or [])
 
-    def classes_at(self, translate: float, tilt: float, cell) -> List[str]:
+    def classes_at(self, translate: float, tilt: float, cell, stand_off: Optional[float] = None) -> List[str]:
         """Pose classes that passed at the band cell nearest to ``cell`` (generic / contact bands; ``[]`` for library-grasp
-        bands or when the cell is not in the band). Placement prefers a class from this list (e.g. the shallowest pitch)."""
-        k = self.nearest_trunk(translate, tilt)
-        i = self.cell_index(translate, tilt, cell)
-        m = self.classes.get(k) if k is not None else None
+        bands or when the cell is not in the band). Placement prefers a class from this list (e.g. the shallowest pitch).
+        ``stand_off``: the nearest stored stand-off of a multi-distance band (``None`` = the reference)."""
+        k = self.nearest_trunk(translate, tilt, stand_off)
+        i = self.cell_index(translate, tilt, cell, stand_off)
+        classes = self._maps(stand_off)[2]
+        m = classes.get(k) if k is not None else None
         if i is None or m is None or i >= len(m):
             return []
         bits = int(m[i])
         return [n for b, n in enumerate(self.class_names) if bits & (1 << b)]
 
-    def band_for_class(self, translate: float, tilt: float, class_name: str) -> np.ndarray:
+    def band_for_class(self, translate: float, tilt: float, class_name: str, stand_off: Optional[float] = None) -> np.ndarray:
         """Cells of the trunk (same translate, nearest tilt) at which the given pose class passed."""
-        k = self.nearest_trunk(translate, tilt)
-        if k is None or k not in self.classes or class_name not in self.class_names:
+        cells, _, classes = self._maps(stand_off)
+        k = self.nearest_trunk(translate, tilt, stand_off)
+        if k is None or k not in classes or class_name not in self.class_names:
             return np.zeros((0, 2))
         b = self.class_names.index(class_name)
-        m = self.classes[k]
-        return self.cells[k][(m & (1 << b)) != 0] if len(m) == len(self.cells[k]) else np.zeros((0, 2))
+        m = classes[k]
+        return cells[k][(m & (1 << b)) != 0] if len(m) == len(cells[k]) else np.zeros((0, 2))
 
-    def posture(self, translate: float, tilt: float) -> Optional[Dict[str, Any]]:
+    def posture(self, translate: float, tilt: float, stand_off: Optional[float] = None) -> Optional[Dict[str, Any]]:
         """Idle-arm posture recorded for the trunk (same translate, nearest tilt): ``{"posture": name, "idle_arm_q": {arm: [7]}}``
         (``posture`` = ``untucked`` for bands computed before A6, which skipped colliding trunks)."""
-        k = self.nearest_trunk(translate, tilt)
+        k = self.nearest_trunk(translate, tilt, stand_off)
         if k is None:
             return None
+        so = self.stand_off_of(stand_off)
+        ref = float(self.meta.get("stand_off", STAND_OFF))
         for t in self.meta.get("trunks", []):
+            t_so = t.get("stand_off")
+            if t_so is not None and abs(float(t_so) - (ref if so is None else so)) > 1e-6:
+                continue
             if abs(float(t["translate"]) - k[0]) < 1e-6 and abs(float(t["tilt"]) - k[1]) < 1e-6:
                 return {"posture": t.get("posture", "untucked"), "idle_arm_q": t.get("idle_arm_q")}
         return None
@@ -635,8 +704,9 @@ class ReachBands:
         ext = meta.get("union_extent")
         if ext is not None and len(ext) == 2:
             meta["union_extent"] = [-float(ext[1]), -float(ext[0])]
-        base = (meta.get("stance") or {}).get("base_pose2d")
+        base0 = (meta.get("stance") or {}).get("base_pose2d")
         for t in meta.get("trunks", []):
+            base = ((meta.get("stances") or {}).get(f"{float(t['stand_off']):.2f}") or {}).get("base_pose2d", base0) if t.get("stand_off") is not None else base0
             if t.get("idle_arm_q"):
                 t["idle_arm_q"] = {other_arm(a): [round(v, 4) for v in mirror_arm_q(q)] for a, q in t["idle_arm_q"].items()}
             if t.get("shoulder_world") is not None:
@@ -650,14 +720,21 @@ class ReachBands:
             if fs.get("cell") is not None:
                 fs["cell"] = [float(fs["cell"][0]), -float(fs["cell"][1])]
             fs["feasible"] = [[round(float((-float(y)) % (2 * math.pi)), 3), g] if y != "generic" else [y, g] for y, g in fs.get("feasible", [])]
-        cells = {k: np.asarray(c, dtype=np.float32).reshape(-1, 2) * np.array([1.0, -1.0], dtype=np.float32) for k, c in self.cells.items()}
-        pairs = {}
-        for k, p in self.pairs.items():
-            p = np.asarray(p, dtype=np.int32).reshape(-1, 3).copy()
-            yi = p[:, 1]
-            p[:, 1] = np.where(yi >= 0, (-yi) % n, yi)
-            pairs[k] = p
-        return ReachBands(meta, cells, pairs, None, {k: np.asarray(m).copy() for k, m in self.classes.items()})
+        def mirror_cells(cm):
+            return {k: np.asarray(c, dtype=np.float32).reshape(-1, 2) * np.array([1.0, -1.0], dtype=np.float32) for k, c in cm.items()}
+
+        def mirror_pairs(pm):
+            out = {}
+            for k, p in pm.items():
+                p = np.asarray(p, dtype=np.int32).reshape(-1, 3).copy()
+                yi = p[:, 1]
+                p[:, 1] = np.where(yi >= 0, (-yi) % n, yi)
+                out[k] = p
+            return out
+
+        return ReachBands(meta, mirror_cells(self.cells), mirror_pairs(self.pairs), None, {k: np.asarray(m).copy() for k, m in self.classes.items()},
+                          {s: mirror_cells(cm) for s, cm in self.cells_so.items()}, {s: mirror_pairs(pm) for s, pm in self.pairs_so.items()},
+                          {s: {k: np.asarray(m).copy() for k, m in cm.items()} for s, cm in self.classes_so.items()})
 
     @staticmethod
     def load_arm(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, arm: str = "right", **kw) -> "ReachBands":
@@ -1053,6 +1130,15 @@ class BandComputer:
         self.cell_obstacle: Optional[MovingPlaced] = None
         #: idle-arm postures tried per trunk, in order (``--posture``; default :data:`POSTURES`)
         self.postures: Tuple[str, ...] = tuple(POSTURES)
+        #: interior surface bands (``--surface-z``): pseudo-objects -> cuRobo mesh names registered in every scope (the board
+        #: the object stands on, ignored at the grasp pose instead of the whole support) and objects never pruned per trunk
+        self.mesh_groups: Dict[str, List[str]] = {}
+        self.protect_extra: List[Any] = []
+        #: ``--trunk-check idle-arm``: when every idle-arm posture collides with the whole body, retry the postures with this
+        #: arm's spheres out of the model - the band's arm, whose configuration comes from the IK at every cell (checked there
+        #: with the whole body); ``None`` = whole-body check only. ``last_trunk_arm_excluded`` tells the caller which check passed
+        self.trunk_skip_arm: Optional[str] = None
+        self.last_trunk_arm_excluded = False
 
     def ignoring(self, objs):
         return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
@@ -1063,12 +1149,14 @@ class BandComputer:
     #: width 1.8 m minus this keeps the whole body inside the grid for the trunk (0.5, 0) check)
     SDF_RECENTRE_TOL = 0.5
 
-    def sdf_prepare(self, scene: str, ignore_for_grasp: Sequence[Any], cache_dir: Optional[str]):
+    def sdf_prepare(self, scene: str, ignore_for_grasp: Sequence[Any], cache_dir: Optional[str], split: Optional[Dict[str, Any]] = None):
         """Arm the sdf-grid mode for this band (before the stance search): the layers are built around every base pose the
         whole-body checks of :meth:`trunk_config` ask about (re-centred when it moves by more than ``SDF_RECENTRE_TOL``), and
         finally at the band's stance by :meth:`setup_sdf_world`. ``ignore_for_grasp``: the non-spawned objects ignored at the
-        grasp pose (the support / the floor) - they get their own layer."""
-        self._sdf = {"scene": scene, "ignore": list(ignore_for_grasp), "cache_dir": cache_dir, "centre": None, "meta": None}
+        grasp pose (the support / the floor) - they get their own layer. ``split`` (interior surface bands):
+        ``{"support": obj, "board": prim paths, "label": name}`` - the board pieces get the support layer under ``label``,
+        the rest of the support stays in the static layer."""
+        self._sdf = {"scene": scene, "ignore": list(ignore_for_grasp), "cache_dir": cache_dir, "centre": None, "meta": None, "split": split}
 
     def _sdf_ensure_centre(self, x0: float, y0: float, tol: Optional[float] = None):
         ctx = getattr(self, "_sdf", None)
@@ -1096,6 +1184,15 @@ class BandComputer:
         support_objs = [o for o in ctx["ignore"] if getattr(o, "name", None) is not None and o.name not in world.spawned]
         support_names = {o.name for o in support_objs}
         static, ground = [], []
+        split = ctx.get("split")
+        if split:  # interior surface: the board is the support layer, the rest of the support a static entry
+            sup = split["support"]
+            support_names = support_names | {sup.name}
+            rest = {str(cm.prim_path) for l in sup.links.values() for cm in l.collision_meshes.values()} - set(split["board"])
+            if rest:
+                static.append((sup, rest, sup.name))
+            if split["board"]:
+                support_objs = support_objs + [(sup, set(split["board"]), split["label"])]
         for o in world.scene.objects:
             if o is world.robot or getattr(o, "visual_only", False) or o.name in world.spawned or o.name in support_names:
                 continue
@@ -1168,13 +1265,40 @@ class BandComputer:
         e.g. translate 0.95 / tilt -1.2): ``(q, posture)`` or ``(None, None)`` when every posture collides."""
         kit = self.kit
         self._sdf_ensure_centre(x0, y0)  # sdf-grid mode only: the layers must surround the queried base pose
-        for posture in (postures if postures is not None else self.postures):
+        self.last_trunk_arm_excluded = False
+        order = list(postures if postures is not None else self.postures)
+        for posture in order:
             try:
                 q = kit.q_at_base_pose(kit.q_config(arms=posture, translate=translate, tilt=tilt, fingers=self.fingers), x0, y0, yaw0)
             except (ValueError, KeyError):
                 continue
             if bool(kit.collision_free(q, margin=0.01)[0]):
                 return q, posture
+        if self.trunk_skip_arm is None:
+            return None, None
+        # the cuRobo kinematics config is shared by every solver: the arm's spheres are restored before returning
+        kc = kit.backend.kin_entry("whole_body").fk.kinematics_config
+        arm = self.trunk_skip_arm
+        off = []
+        try:
+            for link in list(kc.link_name_to_idx_map):
+                if link.startswith(arm + "_") or link == f"attached_object_{arm}_eef_link":
+                    try:
+                        kc.disable_link_spheres(link)
+                        off.append(link)
+                    except Exception:  # noqa: BLE001 - a link without spheres
+                        pass
+            for posture in order:
+                try:
+                    q = kit.q_at_base_pose(kit.q_config(arms=posture, translate=translate, tilt=tilt, fingers=self.fingers), x0, y0, yaw0)
+                except (ValueError, KeyError):
+                    continue
+                if bool(kit.collision_free(q, margin=0.01)[0]):
+                    self.last_trunk_arm_excluded = True
+                    return q, posture
+        finally:
+            for link in off:
+                kc.enable_link_spheres(link)
         return None, None
 
     def idle_arm_q(self, q: th.Tensor) -> Dict[str, List[float]]:
@@ -1257,6 +1381,71 @@ class BandComputer:
         return {"edge": name, "edge_mid": mid.tolist(), "inward": inward.tolist(), "tangent": tangent.tolist(), "length_m": float(length),
                 "base_pose2d": [float(base_xy[0]), float(base_xy[1]), yaw], "stand_off": stand_off, "overhang": overhang,
                 "edge_depth": float(th.dot(mid - base_xy, inward))}
+
+    def stance_at_open_edge(self, top, support, stand_off: float = STAND_OFF, edge_name: Optional[str] = None) -> Dict[str, Any]:
+        """Interior surface (``--surface-z``): :meth:`stance_at_edge` at the open sides of the compartment only
+        (``top.open_edges``, :meth:`SimWorld.support_interior`; ``edge_name`` overrides), the collision-free stance first,
+        then the longest side; every side when none was found open (logged)."""
+        names = [edge_name] if edge_name else list(top.open_edges)
+        if not names:
+            log.warning("%s: no open side found at z %.3f; the stance may face a closed side", top.name, top.z)
+            st = self.stance_at_edge(top, support, stand_off, None)
+            st["open_edges"] = []
+            return st
+        best = None
+        for name in names:
+            try:
+                st = self.stance_at_edge(top, support, stand_off, name)
+            except RuntimeError as e:
+                log.info("%s: no stance at open side %s (%s)", top.name, name, e)
+                continue
+            free = self.trunk_config(0.5, 0.0, *st["base_pose2d"])[0] is not None
+            if best is None or (free, st["length_m"]) > (best[0], best[1]):
+                best = (free, st["length_m"], st)
+        if best is None:
+            raise RuntimeError(f"no stance on free floor at an open side of {top.name} (open sides {names})")
+        best[2]["open_edges"] = list(top.open_edges)
+        return best[2]
+
+    def stances_at_edges(self, top, support, stand_offs: Sequence[float], ref_stand_off: float, edge_name: Optional[str] = None,
+                         edges: Optional[Sequence[str]] = None) -> Dict[float, Dict[str, Any]]:
+        """Multi-distance bands (``--stand-offs``): one edge of the top, and on it the stance at every stand-off (edge midpoint,
+        stand-off + the AABB overhang as :meth:`stance_at_edge`, yaw = inward normal), each marked ``on_free_floor``. Edges:
+        ``edge_name``, else ``edges`` (an interior surface's open sides), else all four. Ranking: the reference stand-off on
+        free floor and collision-free at trunk (0.5, 0), then the number of such stand-offs, then the number on free floor,
+        then the edge length. ``RuntimeError`` when no stand-off of any edge is on free floor."""
+        G, kit = self.G, self.kit
+        lo, hi = support.aabb
+        aabb_xy = G.aabb_corners(lo, hi)[:, :2]
+        best = None
+        for name, mid, normal, length in top.edges():
+            if edge_name is not None and name != edge_name:
+                continue
+            if edge_name is None and edges and name not in edges:
+                continue
+            inward = -normal
+            overhang = max(0.0, float((aabb_xy @ normal).max()) - float(th.dot(mid, normal)))
+            if overhang < 0.05:
+                overhang = 0.0
+            yaw = math.atan2(float(inward[1]), float(inward[0]))
+            tangent = th.tensor([-float(inward[1]), float(inward[0])])
+            per = {}
+            for so in stand_offs:
+                base_xy = mid + normal * (float(so) + overhang)
+                free_floor = bool(kit.trav_free(base_xy))
+                free_trunk = free_floor and self.trunk_config(0.5, 0.0, float(base_xy[0]), float(base_xy[1]), yaw)[0] is not None
+                per[float(so)] = {"edge": name, "edge_mid": mid.tolist(), "inward": inward.tolist(), "tangent": tangent.tolist(), "length_m": float(length),
+                                  "base_pose2d": [float(base_xy[0]), float(base_xy[1]), yaw], "stand_off": float(so), "overhang": overhang,
+                                  "edge_depth": float(th.dot(mid - base_xy, inward)), "on_free_floor": free_floor, "free_at_trunk_0.5_0": free_trunk}
+            ref = per.get(float(ref_stand_off))
+            score = (bool(ref and ref["free_at_trunk_0.5_0"]), sum(v["free_at_trunk_0.5_0"] for v in per.values()), sum(v["on_free_floor"] for v in per.values()), float(length))
+            if best is None or score > best[0]:
+                best = (score, per)
+        if best is None or not best[0][2]:
+            raise RuntimeError(f"no stance on free floor around {top.name} at stand-offs {list(stand_offs)} (edges {edge_name or list(edges or []) or 'all'})")
+        log.info("multi-distance stances at edge %s: %s", next(iter(best[1].values()))["edge"],
+                 ", ".join(f"{so:.2f} m {'free' if v['on_free_floor'] else 'NOT on free floor'}{'' if v['free_at_trunk_0.5_0'] else ' (trunk (0.5, 0) collides)'}" for so, v in best[1].items()))
+        return best[1]
 
     def stance_free_floor(self, room: Optional[str], facing: Optional[Sequence[float]] = None) -> Dict[str, Any]:
         """Floor mode: the room's floor centroid with the base facing +x (or ``facing``), nudged to a free cell."""
@@ -1402,6 +1591,8 @@ class BandComputer:
         grasp_index = {g.name: k for k, g in enumerate(grasp_sets)} if grasp_sets is not None else {}
         common = (stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index, grasp_index, fwd, left)
         self.scope = ObstacleScope(kit, self.world, (x0, y0), drop_ground=(z_support - self.world.floor_z) >= 0.55).__enter__()
+        if self.mesh_groups:
+            self.scope.names_of.update(self.mesh_groups)
         try:
             if self.cell_obstacle is not None:
                 self.cell_obstacle.hide()  # the stance-relative placed object enters per cell (_verify_with_placed)
@@ -1458,7 +1649,11 @@ class BandComputer:
                 return (entry,) + empty
             entry["posture"] = posture
             entry["idle_arm_q"] = self.idle_arm_q(q)
-            if posture != self.postures[0]:
+            if self.last_trunk_arm_excluded:
+                entry["active_arm_excluded"] = True
+                log.info("%strunk (%.2f, %+.1f): every whole-body posture collides; free with the %s arm out of the check (its pose comes from the IK), "
+                         "the %s posture for the other arm", tag, tr, ti, self.trunk_skip_arm, posture)
+            elif posture != self.postures[0]:
                 log.info("%strunk (%.2f, %+.1f): %s arms collide, using the %s posture", tag, tr, ti, self.postures[0], posture)
             shoulder, arm_len = self.shoulder_and_reach(q, arm)
             reach = arm_len + max_grasp_offset + PRE_GRASP + 0.05
@@ -1466,7 +1661,7 @@ class BandComputer:
             entry["arm_len"] = round(arm_len, 4)
             entry["reach"] = round(reach, 4)
             # near meshes no sphere can reach at this trunk (exact, TrunkBound); re-enabled after the trunk's IK passes
-            pruned = self.scope.trunk_prune(q, shoulder, arm, protect=ignore_for_grasp) if (self.scope is not None and self.TRUNK_BOUND) else []
+            pruned = self.scope.trunk_prune(q, shoulder, arm, protect=list(ignore_for_grasp) + list(self.protect_extra)) if (self.scope is not None and self.TRUNK_BOUND) else []
             pts = th.cat([world_cells, th.full((len(world_cells), 1), z_support)], dim=1)
             near = th.linalg.norm(pts - shoulder, dim=1) <= reach
             todo = [i for i in range(len(base_cells)) if bool(near[i])]
@@ -2009,12 +2204,26 @@ def build_parser() -> argparse.ArgumentParser:
                     f"partner's near footprint edge from {UNDER_EDGE_OUT_M} m outside (drop cells) to {UNDER_EDGE_IN_M} m under it (goal cells, clearance >= object height + "
                     f"{UNDER_EDGE_CLEARANCE_EXTRA_M}); use with --generic-pinch (pitched push classes), --posture tucked and --fingers 0 (blade)")
     ap.add_argument("--posture", default=None, help="idle-arm postures to try per trunk, comma-separated in order (default untucked,ready,tucked; e.g. 'tucked')")
+    ap.add_argument("--trunk-check", choices=("whole-body", "idle-arm"), default="whole-body",
+                    help="idle-arm: a trunk whose idle-arm postures all collide with the whole body is retried with the band's arm out of the check "
+                    "(its configuration comes from the IK at every cell, checked there with the whole body) - e.g. the crouched ground trunks, where "
+                    "the untucked active hand meets furniture and the ready / tucked arms meet the trunk; trunks[].active_arm_excluded marks them; "
+                    "single-arm bands only; part of the cache key")
     ap.add_argument("--fingers", type=float, default=None, help="locked finger opening (default 0.05 open; --generic-contact 0; 0 = closed blade for push bands)")
     ap.add_argument("--target", default=None, help="brace mode: articulated CATEGORY/MODEL")
     ap.add_argument("--handle-key", default=None)
     ap.add_argument("--joint", default=None)
     ap.add_argument("--joint-values", default=None, help="comma-separated joint values whose handle poses are screened")
     ap.add_argument("--brace", action="store_true")
+    ap.add_argument("--surface-z", type=float, default=None, help="interior surface: height (m above the floor) of the shelf inside the support the object "
+                    "stands on (the sheet's surface=z=; a bookcase / wardrobe shelf, a hallstand's shoe shelf). Default: the support's top (SimWorld.support_top). "
+                    "Cells = the board at that height whose headroom fits the object + --headroom-margin; the stance at an open side; the rest of the support "
+                    "(board above, side walls, back panel) stays an obstacle for the pre-grasp and the grasp pose, only the board under the cells is ignored at the grasp pose")
+    ap.add_argument("--surface-tol", type=float, default=0.03, help="--surface-z: a board hit counts within this of the requested height (m)")
+    ap.add_argument("--stand-offs", default=None, help="multi-distance band, e.g. 0.35,0.45,0.55 (must contain --stand-off): the trunk collision check and the "
+                    "pre-grasp / grasp IK at the stance of every stand-off (same edge, + the same AABB overhang); meta stand_offs / stances, trunks[] entries "
+                    "carry stand_off, the npz keeps the plain t*_k* keys for --stand-off and adds so<so>__t*_k* keys per stand-off; part of the cache key")
+    ap.add_argument("--headroom-margin", type=float, default=INTERIOR_HEADROOM_MARGIN, help="--surface-z: headroom needed above the object (m)")
     ap.add_argument("--edge", default=None, help="edge name (+u/-u/+v/-v); default: longest collision-free edge")
     ap.add_argument("--stand-off", type=float, default=STAND_OFF)
     ap.add_argument("--lattice", type=float, default=None, help=f"cell size (default {LATTICE} m; --smoke: 0.16 m)")
@@ -2197,8 +2406,24 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         bc.postures = tuple(p.strip() for p in args.posture.split(",") if p.strip())
         if any(p not in POSTURES for p in bc.postures):
             raise SystemExit(f"--posture: unknown posture in {bc.postures}; known {list(POSTURES)}")
+    trunk_idle = getattr(args, "trunk_check", "whole-body") == "idle-arm"
+    if trunk_idle:
+        if args.brace:
+            raise SystemExit("--trunk-check idle-arm is for single-arm bands (not --brace)")
+        bc.trunk_skip_arm = band_arm
     if args.under_edge and not (floor_mode and args.under):
         raise SystemExit("--under-edge needs --support floor --under PARTNER")
+    interior = getattr(args, "surface_z", None) is not None
+    if interior and (floor_mode or args.brace or args.placed):
+        raise SystemExit("--surface-z is for a support's interior surface (tabletop / contact bands; not --support floor, --brace or --placed)")
+    stand_offs = [round(float(v), 3) for v in str(args.stand_offs).split(",") if v.strip()] if getattr(args, "stand_offs", None) else None
+    results_so: Optional[Dict[float, Dict[str, Any]]] = None
+    if stand_offs:
+        if floor_mode or args.brace or args.placed:
+            raise SystemExit("--stand-offs is for edge stances of a support (tabletop / interior / contact bands; not --support floor, --brace or --placed)")
+        if not any(abs(s - float(args.stand_off)) < 1e-9 for s in stand_offs):
+            raise SystemExit(f"--stand-offs {stand_offs} must contain the reference --stand-off {args.stand_off} (its cells keep the plain trunk keys)")
+        stand_offs = sorted(stand_offs)
     meta: Dict[str, Any] = {"scene": args.scene, "rooms": rooms, "support": args.support, "removed_chairs": removed, "lattice": lattice,
                             "stand_off": args.stand_off, "arms": "untucked (ready / tucked per trunk when untucked collides, see trunks[].posture)",
                             "postures": list(bc.postures), "arm": band_arm, "fingers": bc.fingers,
@@ -2237,15 +2462,25 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
     placed_objs = []
     placed_specs = [PlacedSpec.parse(s) for s in args.placed]
     under_edge_parts = None  # --under-edge: (outside cells, under cells near the edge, their clearances), finalized with the object height
+    itop = board_key = None
+    if interior:
+        # interior surface (owner 2026-10-11 05:04): the shelf at --surface-z above the floor; only its board is ignored at
+        # the grasp pose, the rest of the support (board above, side walls, back panel) stays an obstacle for both poses
+        itop = world.support_interior(world.obj(args.support), world.floor_z + float(args.surface_z), z_margin=float(args.surface_tol))
+        board_key = f"{args.support}::board@{itop.z:.2f}"
     if grid_mode:
         # the stance search below runs whole-body checks at candidate base poses: the layers are built around each of them
         # (BandComputer.trunk_config), the object ignored at the grasp pose (support / floor) in its own layer from the start
+        split = None
         if floor_mode:
             room = rooms[0] if args.under else args.room
             sdf_ignore = [world.floor_of_room(room)] if room else []
+        elif interior:
+            sdf_ignore = []
+            split = {"support": world.obj(args.support), "board": set(itop.board_pieces), "label": board_key}
         else:
             sdf_ignore = [world.obj(args.support)]
-        bc.sdf_prepare(args.scene, sdf_ignore, sdf_cache_dir(args, out_dir))
+        bc.sdf_prepare(args.scene, sdf_ignore, sdf_cache_dir(args, out_dir), **({"split": split} if split else {}))
     if floor_mode:
         z_support = world.floor_z
         if args.under:
@@ -2303,11 +2538,36 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
             lattice_world = th.stack([c for c in lattice_world if kit.trav_free(c)]) if len(lattice_world) else lattice_world
             ignore_grasp = [world.floor_of_room(args.room)] if args.room else []
         top_json = {"z": z_support, "kind": "floor"}
+    elif interior:
+        support = world.obj(args.support)
+        top = itop
+        z_support = top.z
+        if stand_offs:
+            stances = bc.stances_at_edges(top, support, stand_offs, float(args.stand_off), args.edge, edges=top.open_edges or None)
+            stance = stances[float(args.stand_off)]
+        else:
+            stance = bc.stance_at_open_edge(top, support, args.stand_off, args.edge)
+        lattice_world = top.cells(free_only=True)  # the headroom filter needs the object height (below)
+        board_meshes = [n for n in top.board_pieces if n in kit.backend._world_mesh_names]  # exact mode; the sdf-grid mode has them as the support layer
+        bc.mesh_groups = {board_key: board_meshes}
+        bc.protect_extra = [support]
+        ignore_grasp = [board_key]
+        top_json = top.to_json()
+        meta["surface"] = {"mode": "interior", "z_requested_above_floor": float(args.surface_z), "z_world": round(top.z, 4),
+                           "z_above_floor": round(top.z - world.floor_z, 4), "tol": float(args.surface_tol), "board_key": board_key,
+                           "board_pieces": list(top.board_pieces), "board_ignored_at_grasp": bool(top.board_pieces), "open_edges": list(top.open_edges),
+                           "collision": "pre-grasp and grasp pose: the whole support is an obstacle except, at the grasp pose only, the board pieces under the cells"}
+        if not top.board_pieces:
+            log.warning("%s: no board piece found under the interior cells at z %.3f; the board stays an obstacle at the grasp pose", args.support, top.z)
     else:
         support = world.obj(args.support)
         top = world.support_top(support)
         z_support = top.z
-        stance = bc.stance_at_edge(top, support, args.stand_off, args.edge)
+        if stand_offs:
+            stances = bc.stances_at_edges(top, support, stand_offs, float(args.stand_off), args.edge)
+            stance = stances[float(args.stand_off)]
+        else:
+            stance = bc.stance_at_edge(top, support, args.stand_off, args.edge)
         lattice_world = top.cells(free_only=True)
         ignore_grasp = [support]
         top_json = top.to_json()
@@ -2397,6 +2657,10 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
                 origin, fwd, left = bc.base_frame(stance)
                 meta["placed"][-1]["self_check"] = bc.cell_obstacle.self_check(origin + 0.56 * fwd - 0.08 * left)
     meta.update({"stance": stance, "top": top_json, "z_support": z_support})
+    if stand_offs:
+        meta.update({"stand_offs": stand_offs, "stances": {f"{so:.2f}": st for so, st in stances.items()},
+                     "stand_offs_note": "multi-distance band: the plain t*_k* keys hold the reference stand-off's cells (meta stand_off); so<so>__t*_k* keys every "
+                                        "stand-off's, relative to meta stances[<so>]; trunks[] entries carry stand_off"})
 
     def restore_placed():
         """``world.spawn`` (of the grasped object) re-parks every object spawned before it: put the placed objects back
@@ -2574,6 +2838,16 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
                                        "n_lattice": int(len(lattice_world))})
             log.info("under-edge band: %d of %d cells under the edge have clearance >= %.3f m (object %.3f m); %d lattice points", int(keep.sum()), len(under_near), need, h,
                      len(lattice_world))
+        if interior:
+            # a board cell is usable when its headroom fits the object (height in its rest pose) plus the margin
+            h_rest = (world.top_offset(hull, rest_quat) + world.bottom_offset(hull, rest_quat)) if hull is not None and len(hull) else h
+            if args.generic_contact and args.height is not None:
+                h_rest = float(args.height)
+            lattice_world = top.cells_usable(h_rest, float(args.headroom_margin))
+            meta["surface"].update({"object_height_rest_m": round(h_rest, 4), "headroom_margin_m": float(args.headroom_margin), "n_board_cells": int(top.mask.sum()),
+                                    "n_free_cells": int(top.free.sum()), "n_usable_cells": int(len(lattice_world))})
+            log.info("interior band: %d of %d free board cells have headroom >= %.3f m (object %.3f m in its rest pose + %.3f)", len(lattice_world), int(top.free.sum()),
+                     h_rest + float(args.headroom_margin), h_rest, float(args.headroom_margin))
         if args.generic_contact:
             # left-arm (brace) contact band: one per object height class; the cell is the contact point on the object's
             # side face at 3/4 of the class height (top press at the class height); z_support = the top the object stands on
@@ -2601,23 +2875,50 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         kit.sync_world()
         trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
         meta["grid"] = grid_meta((z_support - world.floor_z) < LOW_TOP_Z)  # the ground trunks are part of a LOW top's key (W1)
-        if grid_mode:
-            meta["schedule"]["collision"] = bc.setup_sdf_world(stance, trunks, (band_arm,))
-        result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
-                            arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
+        if stand_offs:
+            # multi-distance: the trunk collision check and the pre-grasp / grasp IK at every stand-off's stance, same lattice
+            results_so = {}
+            for so in stand_offs:
+                st = stances[so]
+                if not st["on_free_floor"]:
+                    results_so[so] = {"trunks": [{"translate": tr, "tilt": ti, "collides": True, "base_not_on_free_floor": True, "n_lattice": 0, "n_after_prune": 0,
+                                                  "n_reachable": 0, "rounds": 0, "n_pairs": 0, "n_dropped_no_pre": 0, "n_pose_pruned": 0, "time_s": 0.0, "posture": None}
+                                                 for tr, ti in trunks], "cells": {}, "pairs": {}, "classes": {}}
+                    log.info("stand-off %.2f m: base not on free floor, every trunk skipped", so)
+                    continue
+                if grid_mode:
+                    meta["schedule"].setdefault("collision_by_stand_off", {})[f"{so:.2f}"] = bc.setup_sdf_world(st, trunks, (band_arm,))
+                log.info("stand-off %.2f m: base %s", so, [round(v, 3) for v in st["base_pose2d"]])
+                results_so[so] = bc.compute(st, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
+                                            arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
+            result = results_so[float(args.stand_off)]
+            if grid_mode:
+                cbs = meta["schedule"].get("collision_by_stand_off") or {}
+                meta["schedule"]["collision"] = cbs.get(f"{float(args.stand_off):.2f}") or (next(iter(cbs.values())) if cbs else None)
+        else:
+            if grid_mode:
+                meta["schedule"]["collision"] = bc.setup_sdf_world(stance, trunks, (band_arm,))
+            result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
+                                arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
         gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
         key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": meta.get("object"),
                     "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": meta["placed_specs"], "under": args.under, "grid": meta["grid"], "lattice": lattice,
                     "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(bc.postures),
                     # only non-default extras enter the key (the file names of the existing modes stay stable)
                     **({"fingers": bc.fingers} if abs(bc.fingers - (0.0 if args.generic_contact else 0.05)) > 1e-9 else {}),
-                    **({"under_edge": meta["under_edge"]} if meta.get("under_edge") else {}), **key_extra})
+                    **({"under_edge": meta["under_edge"]} if meta.get("under_edge") else {}), **({"surface": "interior"} if interior else {}),
+                    **({"stand_offs": stand_offs} if stand_offs else {}), **({"trunk_check": "idle_arm"} if trunk_idle else {}), **key_extra})
         oname = f"h{meta['height_class']:.2f}" if args.generic_contact else (args.object.replace("/", "-") if args.object else "generic")
         for ps in placed_specs:
             oname += f"__placed-{ps.category}-{ps.model}" + (f"-s{ps.scale[0]:g}" if ps.scale else "") + ("-focus" if ps.mode == PLACED_MODE_FOCUS else "")
         mode_name = "contact" if args.generic_contact else meta["mode"]
         under_tag = ("-under-edge-" if args.under_edge else "-under-") + args.under if args.under else ""
-        name = f"{mode_name}__{args.scene}__{args.support}{under_tag}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
+        surface_tag = ((f"-interior-z{z_support - world.floor_z:.2f}" if interior else "") + ("-so" + "_".join(f"{s:.2f}" for s in stand_offs) if stand_offs else "")
+                       + ("-tcidle" if trunk_idle else ""))
+        if trunk_idle:
+            meta["trunk_check"] = {"mode": "idle_arm", "note": f"a trunk whose idle-arm postures all collide with the whole body is retried with the {band_arm} arm "
+                                   "out of the check (its configuration comes from the IK at every cell); see trunks[].active_arm_excluded"}
+        name = f"{mode_name}__{args.scene}__{args.support}{surface_tag}{under_tag}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
         if args.smoke:
             meta["sanity"] = band_sanity(stance, result, z_eval)
 
@@ -2640,6 +2941,21 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
     for (tr, ti), m in result.get("classes", {}).items():
         if meta.get("classes"):
             arrays[trunk_key(tr, ti) + "__classes"] = np.asarray(m, dtype=np.int32).reshape(-1)
+    if results_so:
+        # multi-distance: trunks[] = every stand-off's entries (the reference first), tagged; so<so>__ keys per stand-off
+        ref = float(args.stand_off)
+        order = [ref] + [s for s in stand_offs if abs(s - ref) > 1e-9]
+        meta["trunks"] = [dict(e, stand_off=so) for so in order for e in results_so[so]["trunks"]]
+        meta["n_reachable_by_stand_off"] = {f"{so:.2f}": int(sum(len(c) for c in results_so[so]["cells"].values())) for so in order}
+        for so in order:
+            res, pre = results_so[so], f"so{so:.2f}__"
+            for (tr, ti), c in res["cells"].items():
+                arrays[pre + trunk_key(tr, ti)] = np.asarray(c, dtype=np.float32).reshape(-1, 2)
+            for (tr, ti), p in res.get("pairs", {}).items():
+                arrays[pre + trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)
+            for (tr, ti), m in res.get("classes", {}).items():
+                if meta.get("classes"):
+                    arrays[pre + trunk_key(tr, ti) + "__classes"] = np.asarray(m, dtype=np.int32).reshape(-1)
     np.savez_compressed(os.path.join(out_dir, name + ".npz"), **arrays)
     with open(os.path.join(out_dir, name + ".json"), "w") as f:
         json.dump(meta, f, indent=1, default=str)

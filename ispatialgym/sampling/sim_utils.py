@@ -771,6 +771,93 @@ class SimWorld:
         yaw = G.yaw_of(support.get_position_orientation()[1])
         return SupportTop(support.name, xs, ys, mask, occupied, z_top, yaw, sorted(occupants), resolution)
 
+    def support_interior(self, support, z_surface: float, resolution: float = 0.02, z_margin: float = 0.03, ignore: Iterable = (),
+                         probe: float = 0.04, headroom_cap: float = 1.5, board_max_thickness: float = 0.12) -> "SupportInterior":
+        """Raster of an interior surface of ``support`` (a shelf inside a bookcase / wardrobe / hallstand) at world height
+        ``z_surface``; :meth:`support_top` only sees the topmost face. Per cell of the support's AABB: a downward ray from
+        ``z_surface + probe`` whose first hit is the support itself within ``z_margin`` of ``z_surface`` on an upward face
+        marks a board cell (a ray that starts inside a wall / panel / the board above hits at distance ~0 and is dropped);
+        another object hit there marks the cell occupied. Headroom of a board cell = distance from the board to the first
+        body an upward ray meets (any object, the board above included; ``headroom_cap`` when nothing is hit). Recorded:
+        the board pieces (the support's collision meshes whose top face is at the surface, at most
+        ``board_max_thickness`` tall, under the board cells) and the open sides of the compartment (horizontal rays from
+        just inside a side, at half the median headroom up to 0.15 m, leave the support's AABB without hitting it)."""
+        lo, hi = support.aabb
+        z0 = float(z_surface)
+        xs = th.arange(float(lo[0]) + resolution / 2, float(hi[0]), resolution)
+        ys = th.arange(float(lo[1]) + resolution / 2, float(hi[1]), resolution)
+        gx, gy = th.meshgrid(xs, ys, indexing="ij")
+        starts = th.stack([gx.flatten(), gy.flatten(), th.full_like(gx.flatten(), z0 + probe)], dim=1)
+        ends = starts.clone()
+        ends[:, 2] = z0 - 2 * z_margin
+        ignore_paths = [self.robot.prim_path] + [o.prim_path for o in ignore]
+        prim_to_obj = {}
+        for o in self.scene.objects:
+            for l in o.links.values():
+                prim_to_obj[l.prim_path] = o
+        mask = th.zeros(len(xs), len(ys), dtype=th.bool)
+        occupied = th.zeros_like(mask)
+        zs = th.full((len(xs), len(ys)), float("nan"))
+        occupants = set()
+        for k, h in enumerate(raytest_batch(starts.tolist(), ends.tolist(), only_closest=True)):
+            i, j = divmod(k, len(ys))
+            if not h["hit"] or float(h.get("distance", 1.0)) < 1e-3:
+                continue
+            body = h["rigidBody"]
+            if any(body.startswith(p) for p in ignore_paths):
+                continue
+            o = prim_to_obj.get(body)
+            hz = float(h["position"][2])
+            if o is support:
+                if abs(hz - z0) <= z_margin and float(h["normal"][2]) >= 0.9:
+                    mask[i, j] = True
+                    zs[i, j] = hz
+            elif o is not None and hz > z0 - z_margin:
+                occupied[i, j] = True
+                occupants.add(o.name)
+        if not bool(mask.any()):
+            raise RuntimeError(f"{support.name}: no board cells within {z_margin} m of z = {z0:.3f} (interior surface)")
+        z_meas = float(zs[mask].median())
+        idx = th.nonzero(mask)
+        headroom = th.zeros(len(xs), len(ys))
+        up_s = th.stack([xs[idx[:, 0]], ys[idx[:, 1]], zs[idx[:, 0], idx[:, 1]] + 0.005], dim=1)
+        up_e = up_s.clone()
+        up_e[:, 2] += headroom_cap
+        for (i, j), h in zip(idx.tolist(), raytest_batch(up_s.tolist(), up_e.tolist(), only_closest=True)):
+            if not h["hit"] or any(h["rigidBody"].startswith(p) for p in ignore_paths):
+                headroom[i, j] = headroom_cap
+            else:
+                headroom[i, j] = max(0.0, float(h.get("distance", 0.0)))
+        cell_xy = th.stack([xs[idx[:, 0]], ys[idx[:, 1]]], dim=1)
+        cmin, cmax = cell_xy.min(dim=0).values, cell_xy.max(dim=0).values
+        board = []
+        for link in support.links.values():
+            for cm in link.collision_meshes.values():
+                plo, phi = cm.aabb
+                if abs(float(phi[2]) - z_meas) > z_margin or float(phi[2] - plo[2]) > board_max_thickness:
+                    continue
+                if float(plo[0]) > float(cmax[0]) or float(phi[0]) < float(cmin[0]) or float(plo[1]) > float(cmax[1]) or float(phi[1]) < float(cmin[1]):
+                    continue
+                board.append(str(cm.prim_path))
+        yaw = G.yaw_of(support.get_position_orientation()[1])
+        out = SupportInterior(support.name, xs, ys, mask, occupied, z_meas, yaw, sorted(occupants), resolution, headroom=headroom, z_requested=z0,
+                              board_pieces=board, headroom_cap=headroom_cap)
+        z_probe = z_meas + min(0.5 * float(headroom[mask].median()), 0.15)
+        corners = G.aabb_corners(lo, hi)[:, :2]
+        for name, mid, normal, length in out.edges():
+            tangent = th.tensor([-float(normal[1]), float(normal[0])])
+            pts = [mid - normal * 0.04 + tangent * float(t) for t in th.linspace(-0.4 * float(length), 0.4 * float(length), 7)]
+            reach = float((corners @ normal).max()) - float(th.dot(mid, normal)) + 0.10
+            s = [[float(p[0]), float(p[1]), z_probe] for p in pts]
+            e = [[float(p[0] + normal[0] * reach), float(p[1] + normal[1] * reach), z_probe] for p in pts]
+            blocked = sum(1 for h in raytest_batch(s, e, only_closest=True)
+                          if h["hit"] and (prim_to_obj.get(h["rigidBody"]) is support or float(h.get("distance", 1.0)) < 1e-3))
+            if blocked <= 1:
+                out.open_edges.append(name)
+        log.info("interior surface of %s at z %.3f (requested %.3f): %d board cells (%d occupied), headroom median %.3f m, open sides %s, board pieces %d",
+                 support.name, z_meas, z0, int(mask.sum()), int((mask & occupied).sum()), float(headroom[mask].median()), out.open_edges or "none", len(board))
+        return out
+
     def raycast(self, starts: th.Tensor, ends: th.Tensor):
         return raytest_batch(G.t(starts).tolist(), G.t(ends).tolist(), only_closest=True)
 
@@ -1152,3 +1239,32 @@ class SupportTop:
         umin, umax, vmin, vmax = self.local_bounds()
         return {"name": self.name, "z": self.z, "yaw": self.yaw, "local_bounds": [umin, umax, vmin, vmax],
                 "n_free_cells": int(self.free.sum()), "occupants": self.occupants, "resolution": self.resolution}
+
+
+@dataclass
+class SupportInterior(SupportTop):
+    """Raster of an interior surface of a support (a shelf inside a bookcase / wardrobe / hallstand) at a chosen height
+    (:meth:`SimWorld.support_interior`): :class:`SupportTop` plus the headroom above each board cell, the open sides of the
+    compartment and the collision pieces of the board the objects stand on."""
+
+    headroom: Optional[th.Tensor] = None  # (nx, ny) m from the board to the first body above; 0 off the board
+    z_requested: float = 0.0
+    open_edges: List[str] = field(default_factory=list)
+    board_pieces: List[str] = field(default_factory=list)  # collision mesh prim paths of the board under the cells
+    headroom_cap: float = 1.5
+
+    def usable(self, height: float, margin: float) -> th.Tensor:
+        """Free board cells whose headroom fits an object of ``height`` plus ``margin``."""
+        return self.free & (self.headroom >= height + margin)
+
+    def cells_usable(self, height: float, margin: float) -> th.Tensor:
+        idx = th.nonzero(self.usable(height, margin))
+        return th.stack([self.xs[idx[:, 0]], self.ys[idx[:, 1]]], dim=1)
+
+    def to_json(self):
+        d = super().to_json()
+        hr = self.headroom[self.mask] if self.headroom is not None and bool(self.mask.any()) else th.zeros(0)
+        d.update({"kind": "interior", "z_requested": self.z_requested, "open_edges": list(self.open_edges), "board_pieces": list(self.board_pieces),
+                  "n_board_cells": int(self.mask.sum()), "headroom_cap": self.headroom_cap,
+                  "headroom_m": {"min": round(float(hr.min()), 4), "median": round(float(hr.median()), 4), "max": round(float(hr.max()), 4)} if len(hr) else None})
+        return d
