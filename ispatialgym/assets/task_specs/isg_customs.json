@@ -11637,7 +11637,10 @@
    "obstacles": {
     "category": "trash_can",
     "sampleable": true,
-    "representative": "cdzyew"
+    "representative": "cdzyew",
+    "scale": {
+     "trash_can/cdzyew": 1.4
+    }
    },
    "floor": {
     "sampleable": false
