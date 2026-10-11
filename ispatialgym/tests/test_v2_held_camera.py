@@ -646,3 +646,149 @@ def test_both_held_object_subtasks_write_the_start_drive_targets(monkeypatch):
         assert cls.write_instance is HO.HeldObjectV2.write_instance and cls.settle_start is HO.HeldObjectV2.settle_start
     assert HO.MentalRotationV2.record_settled_start is HO.HeldObjectV2.record_settled_start
     assert HO.ObjectScalingV2.record_settled_start is not HO.HeldObjectV2.record_settled_start
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# mental rotation: the drawn start (owner 2026-10-11)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_rotation_start_set_includes_the_hold_and_the_grid():
+    starts = HO.rotation_start_set([0.0, 180.0], 15.0)
+    assert starts[0][1] == 0.0 and len(starts) == 1 + 13 * 12 * 2
+    assert [(a.tolist(), d) for a, d in HO.rotation_start_set([30.0, 120.0])] == [(a.tolist(), d) for a, d in HO.rotation_goal_set([30.0, 120.0])]
+    assert len(HO.rotation_start_set([0.0, 10.0], 15.0)) == 1
+    with pytest.raises(ValueError):
+        HO.rotation_start_set([-15.0, 90.0])
+
+
+def test_turned_about_root_keeps_the_position_and_turns_about_the_base_axis():
+    obj = (th.tensor([1.0, 2.0, 0.8]), C.quat_from_yaw(0.3))
+    p, q = HO.turned_about_root(obj, math.pi / 2, [1.0, 0.0, 0.0], 90.0)  # base yaw pi/2: base +x is world +y
+    assert th.allclose(p, obj[0])
+    assert C.quat_angle(q, C.qmul(C.quat_from_axis_angle(th.tensor([0.0, 1.0, 0.0]), math.pi / 2), obj[1])) < 1e-5
+
+
+class _MRKit:
+    """A planner without a simulator: every screening / exact IK solution is its seed; ``batch_ok`` decides the goal
+    screening, ``start_ok`` the start set."""
+
+    def __init__(self, start_ok=None, batch_ok=True):
+        from ispatialgym.oracle import r1pro_model as M
+
+        self.M = M
+        self.floor_z = 0.0
+        self.jidx = {n: i for i, n in enumerate(M.BASE_VIRTUAL_JOINTS)}
+        self.start_ok = start_ok or (lambda pose: True)
+        self.batch_ok = batch_ok
+
+    def world_base_pose2d(self):
+        return (0.0, 0.0, 0.0)
+
+    def apply(self, q, base):
+        pass
+
+    def sync_world(self):
+        pass
+
+    def ignoring(self, objs):
+        import contextlib
+
+        return contextlib.nullcontext()
+
+    def ik_batch_solve(self, poses, q_seed, arm="right", **kw):
+        return th.tensor([bool(self.start_ok(p)) for p in poses]), q_seed.unsqueeze(0).repeat(len(poses), 1)
+
+    def ik_batch(self, poses, q_seed, arm="right", **kw):
+        return th.full((len(poses),), bool(self.batch_ok))
+
+    def collision_free(self, q, margin=0.01):
+        return th.ones(1, dtype=th.bool)
+
+    def random_free_points(self, rng, n, room_filter=None):
+        return [th.tensor([1.0, 2.0])]
+
+    def q_at_base_pose(self, q_rel, x, y, yaw):
+        q = q_rel.clone()
+        names = self.M.BASE_VIRTUAL_JOINTS
+        q[self.jidx[names[0]]], q[self.jidx[names[1]]], q[self.jidx[names[-1]]] = x, y, yaw
+        return q
+
+
+def _mr_sampler(monkeypatch, kit):
+    import contextlib
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.sampling.v2.stances import SidecarDraft
+
+    s = object.__new__(HO.MentalRotationV2)
+    gen = {"init_angle_range_deg": [0.0, 180.0], "goal_angle_range_deg": [30.0, 120.0], "waypoints": 3, "tolerances": {"orientation": 0.15}}
+    s.g = lambda key, default=None: gen[key]
+    s.kit, s.arm, s.hold, s.hold_arm, s.prior, s.grasp_stats, s.equivalences = kit, "right", HO.HoldConstants(), {}, {}, {}, None
+    s.eef_in_base = (th.tensor([0.5, 0.0, 1.2]), C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), 0.4))
+    s.cam_in_base = (th.tensor([0.1, 0.0, 1.5]), C.IDENTITY_QUAT.clone())
+    s.q_hold_rel = th.linspace(0.0, 1.0, 28)
+    target = SimpleNamespace(name="block_0", set_position_orientation=lambda p, q: None, keep_still=lambda: None)
+    s.world = SimpleNamespace(park=lambda obj, i: None, spawned={"block_0": target})
+    s.obj = lambda role: target
+    s.bindings = SimpleNamespace(one=lambda role: target)
+    s.grasps = [GL.Grasp("block__f", "grasp_0", th.tensor([0.0, 0.0, 0.05]), C.IDENTITY_QUAT.clone(), [0.01, 0.01])]
+    s.grasp_key = "block__f"
+    s.scene_obstacles = lambda: []
+    s.whole_in_frame = lambda cam, pose: True
+    s.in_room = lambda xy: True
+    s.template_facts, s.template_meta = {}, {}
+    s.gp = SimpleNamespace(alias="mental_rotation-test")
+    s.choice = SimpleNamespace(models={"target": SimpleNamespace(scale=None, category="classroom_mock_up")})
+    s.ikc = SimpleNamespace(waypoints_ok=lambda poses, stance, arm, q_seed=None, scale_key=None: SimpleNamespace(ok=True, q=q_seed.clone(), reason=""))
+    s.robot = SimpleNamespace(arm_control_idx={"right": th.arange(10, 17)})
+    s.sidecar = SidecarDraft("mental_rotation-test", "mental_rotation")
+    s.arm_offer_record = lambda: {"fired": False}
+    monkeypatch.setattr(HO, "attached", lambda kit, arm, obj: contextlib.nullcontext())
+    return s
+
+
+def test_mental_rotation_draws_a_start_and_turns_it_to_the_goal(monkeypatch):
+    s = _mr_sampler(monkeypatch, _MRKit())
+    s.precompute_options()
+    opts = s.options["grasp_0"]
+    assert len(opts) == 1 + 13 * 12 * 2 and opts[0]["info"]["angle_deg"] == 0.0 and s.template_facts["start_options"]["feasible"] == len(opts)
+    assert s.template_meta["init_orientation"]["drawn"]
+    starts = set()
+    for seed in range(6):
+        s.sidecar.reset_instance() if hasattr(s.sidecar, "reset_instance") else None
+        d = s.sample_instance(np.random.default_rng(seed))
+        info = d.summary["goal"]
+        obj0, goal = d.object_poses["block_0"], d.goal_poses["block_0"]
+        base2d = d.base_pose2d
+        assert 30.0 <= abs(info["angle_deg"]) <= 120.0 and "start" in info and "axis_world" in info["start"]
+        assert th.allclose(G_t(goal[0]), G_t(obj0[0]))  # the object turns in place
+        want = HO.turned_about_root(obj0, base2d[2], info["axis_base"], info["angle_deg"])
+        assert C.quat_angle(goal[1], want[1]) < 1e-5
+        # the start is the hold's object turned by the recorded start rotation
+        opt = next(o for o in opts if o["info"] == {k: v for k, v in info["start"].items() if k != "axis_world"})
+        assert th.allclose(d.robot_q, s.kit.q_at_base_pose(opt["q_rel"], *base2d))
+        rec = s.sidecar.grasp_of("block_0")
+        assert len(rec.waypoints) == 4 and th.allclose(G_t(rec.waypoints[-1][0]), G_t(C.compose(goal, s.grasps[0].pose)[0]), atol=1e-5)
+        starts.add(info["start"]["angle_deg"])
+    assert len(starts) > 1  # not always the hold's orientation
+
+
+def test_mental_rotation_without_a_reachable_goal_rejects_the_attempt(monkeypatch):
+    from ispatialgym.sampling.sim_utils import Reject
+
+    s = _mr_sampler(monkeypatch, _MRKit(batch_ok=False))
+    s.precompute_options()
+    with pytest.raises(Reject) as e:
+        s.sample_instance(np.random.default_rng(0))
+    assert e.value.reason == "goal_infeasible" and "screening IK" in str(e.value)
+    # no start the screening IK reaches: the template has no option
+    s = _mr_sampler(monkeypatch, _MRKit(start_ok=lambda pose: False))
+    with pytest.raises(Reject) as e:
+        s.precompute_options()
+    assert e.value.reason == "goal_infeasible"
+
+
+def G_t(x):
+    return th.as_tensor(x, dtype=th.float32)

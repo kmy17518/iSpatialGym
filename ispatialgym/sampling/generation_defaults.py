@@ -193,6 +193,9 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "path_buckets": None,
         **_HELD_OBJECT_COMMON,
         "goal_angle_range_deg": [30.0, 120.0],  # §6.3 rotation about a sampled axis by U(30°, 120°)
+        # the start: the hold's object turned about its root by a sampled axis × angle in this range (0 = the hold itself);
+        # owner 2026-10-11: the init orientation is drawn as well, the goal turns it by goal_angle_range_deg
+        "init_angle_range_deg": [0.0, 180.0],
         "reject_symmetric_targets": True,  # §3.13 rule 1 (symmetric_target)
     },
     # ---- disembedding (§6.4, §4.7) -----------------------------------------------------------------------------

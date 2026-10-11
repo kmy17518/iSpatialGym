@@ -28,13 +28,16 @@ pads touch, 4 mm press through the assisted-grasp window, gravity re-enabled, st
 grasp (finger joints, object pose in the eef frame, key / name) is what the TRO ``grasps[0]`` stores (loader
 contract §3.14).
 
-Goal sets are precomputed **once per template** (they depend on the hold and the object, not on the base pose). Mental
-rotation = 13 rotation axes (face / edge / corner directions of the base frame, one per antipodal pair) × signed angles
-on a 15° grid inside ``goal_angle_range_deg`` (position unchanged), each candidate screened with the holding arm's
-embodiment only (the oracle moves the arm, not the torso) at the three intermediate waypoints of §3.9 (SLERP about the
-object root, ``conventions.orbit_waypoints``) with the object attached to the planner, the whole object in frame (5 %);
-each instance draws a (grasp, goal) from the feasible set and confirms it once with the exact IK at its base pose
-(principle 3), with the held object attached, whole-body collision-free at every checked pose. Object scaling (owner
+Option sets are precomputed **once per template** (they depend on the hold and the object, not on the base pose). Mental
+rotation (owner 2026-10-11: start and goal orientations both drawn) = per grasp the **start set**: the hold's object
+turned about its root by 13 rotation axes (face / edge / corner directions of the base frame, one per antipodal pair) ×
+signed angles on a 15° grid inside ``init_angle_range_deg`` (0 = the hold itself), whole object in frame (5 %), the hand
+pose reached by the screening IK from the hold with the holding arm's embodiment only (the oracle moves the arm, not the
+torso) and the object attached; each instance draws a (grasp, start), places the start configuration at a free base
+pose, and draws the goal = the start turned about the object root by the same axes × the 15° grid inside
+``goal_angle_range_deg`` (position unchanged), screened at the three intermediate waypoints of §3.9 (SLERP about the
+object root, ``conventions.orbit_waypoints``) and confirmed once with the exact IK at its base pose (principle 3), with
+the held object attached, whole-body collision-free at every checked pose. Object scaling (owner
 2026-09-26) = per grasp the reachable **depth window**: the object at the reference hold slid along the optical axis
 over the ``depth_search_grid_m`` grid of ``depth_search_range_m``, a depth passing when the object is in frame and the
 screening IK reaches the hand pose, the continuous run through the reference depth shrunk by ``depth_margin_m``; each
@@ -46,7 +49,8 @@ Visibility: ≥ ``min_visible_fraction`` (40 %) of the object visible at init an
 and without the robot) and the whole object in frame. The B7 prior (``runlogs/held_visibility_20260915/visibility.json``,
 ``scripts/held_visibility/survey.py``) skips library rows whose surveyed visible fraction is below the threshold
 before they are realised; it applies only at the hold it was rendered at (its ``hold`` record, roll 15°), so at any
-other hold every row is realised and measured by the renders.
+other hold every row is realised and measured by the renders. Mental rotation starts away from that hold (2026-10-11):
+there the prior only orders the rows, every start is measured by the renders.
 
 TRO: ``grasps[0]`` (agent, arm, object, key, name, ``object_pose_in_eef_frame``, ``finger_q``, ``ag_anchor_in_eef``) and
 ``robot_state.controller_targets`` (the drive targets the start settled under, which the instance loader holds), both
@@ -310,6 +314,30 @@ def rotation_goal_set(angle_range_deg: Sequence[float], step_deg: float = ROTATI
             for sign in (1.0, -1.0):
                 out.append((ax.clone(), sign * m))
     return out
+
+
+def rotation_start_set(angle_range_deg: Sequence[float], step_deg: float = ROTATION_ANGLE_STEP_DEG,
+                       axes: Optional[th.Tensor] = None) -> List[Tuple[th.Tensor, float]]:
+    """Mental-rotation start candidates ``(axis (3,) base frame, signed angle deg)`` (owner 2026-10-11: the start
+    orientation is drawn too): the reference hold's object turned about its root by every axis of :func:`rotation_axes`
+    × the signed ``step_deg`` grid inside ``angle_range_deg``; a range from 0 includes the hold itself (0°)."""
+    lo, hi = float(angle_range_deg[0]), float(angle_range_deg[1])
+    if not (0.0 <= lo <= hi):
+        raise ValueError(f"init_angle_range_deg must satisfy 0 <= lo <= hi, got {angle_range_deg}")
+    out: List[Tuple[th.Tensor, float]] = []
+    if lo == 0.0:
+        out.append((th.tensor([0.0, 0.0, 1.0]), 0.0))
+        lo = step_deg
+    if lo <= hi:
+        out += rotation_goal_set([lo, hi], step_deg, axes)
+    return out
+
+
+def turned_about_root(obj: C.Pose, base_yaw: float, axis_base, angle_deg: float) -> C.Pose:
+    """``obj`` (world) turned about its own root by ``angle_deg`` about the base-frame axis ``axis_base``."""
+    axis_w = C.quat_rotate(C.quat_from_yaw(base_yaw), th.as_tensor(axis_base, dtype=th.float32))
+    dq = C.quat_from_axis_angle(axis_w, math.radians(float(angle_deg)))
+    return G.t(obj[0]).clone(), C.qmul(dq, G.t(obj[1]))
 
 
 def line_key_poses(eef0: C.Pose, eef1: C.Pose, n_intermediate: int) -> List[C.Pose]:
@@ -721,95 +749,33 @@ class HeldObjectV2(SamplerV2):
     def check_symmetry(self):
         """§3.13 rule 1 hook (mental rotation only)."""
 
-    def goal_candidates(self, cam: C.Pose, obj0: C.Pose) -> List[Tuple[C.Pose, Dict[str, Any]]]:
-        """Goal object poses (world, at the reference base) with their descriptions — the per-subtask goal set."""
-        raise NotImplementedError
-
     def key_poses(self, eef0: C.Pose, eef1: C.Pose, obj0: C.Pose) -> List[C.Pose]:
         """The §3.9 key poses of the in-hand motion eef0 -> eef1 (3 intermediate + the goal)."""
         raise NotImplementedError
 
     def precompute_options(self):
-        """Per library grasp (B7 prior first): held object in frame at the hold, then every goal candidate whose key
-        poses pass the screening IK (the holding arm only, object attached) with the object in frame at the goal. Expressed
-        in the base frame so the options hold for any base pose; each instance confirms its draw with the exact IK."""
-        target = self.obj("target")
-        ref = self.kit.world_base_pose2d()
-        base3 = self.base_pose3d(ref)
-        cam = C.compose(base3, self.cam_in_base)
-        eef0_w = C.compose(base3, self.eef_in_base)
-        q_hold = self.q_init_at(ref)
-        min_vis = float(self.g("min_visible_fraction"))
-        stats = {"grasps": len(self.grasps), "prior_skipped": 0, "prior_unknown": 0, "held_out_of_view": 0, "candidates": 0, "goal_out_of_view": 0,
-                 "ik_failed": 0, "feasible": 0}
-        self.options = {}
-        skipped = []
-        for g in self.grasps:
-            admits = prior_admits(self.prior, g.key, g.name, min_vis)
-            if admits is False:
-                stats["prior_skipped"] += 1
-                skipped.append(g.name)
-                continue
-            if admits is None:
-                stats["prior_unknown"] += 1
-            obj0 = C.compose(eef0_w, C.invert(g.pose))
-            if not self.whole_in_frame(cam, obj0):
-                stats["held_out_of_view"] += 1
-                continue
-            entries = []
-            for goal, info in self.goal_candidates(cam, obj0):
-                stats["candidates"] += 1
-                if not self.whole_in_frame(cam, goal):
-                    stats["goal_out_of_view"] += 1
-                    continue
-                eef1 = C.compose(goal, g.pose)
-                wps = self.key_poses(eef0_w, eef1, obj0)
-                entries.append((goal, info, eef1, wps))
-            if not entries:
-                continue
-            # the object at the hold in the simulation so the planner attaches it with the right transform
-            self.kit.apply(q_hold, ref)
-            target.set_position_orientation(obj0[0], obj0[1])
-            target.keep_still()
-            self.kit.sync_world()
-            poses = [p for _, _, _, wps in entries for p in wps]
-            # robot + held object only (the world is re-checked per instance at the sampled base pose)
-            with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, self.arm, target):
-                ok = self.kit.ik_batch(poses, q_hold, arm=self.arm)
-            n_wp = len(entries[0][3])
-            ok = ok.view(len(entries), n_wp).all(dim=1)
-            opts = []
-            for (goal, info, eef1, wps), s in zip(entries, ok.tolist()):
-                if not s:
-                    stats["ik_failed"] += 1
-                    continue
-                opts.append({"goal_in_base": C.relative(goal, base3), "eef1_in_base": C.relative(eef1, base3),
-                             "wps_in_base": [C.relative(p, base3) for p in wps], "info": info})
-                stats["feasible"] += 1
-            if opts:
-                self.options[g.name] = opts
-        self.world.park(target, list(self.world.spawned).index(target.name))
-        self.kit.sync_world()
-        self.template_facts["goal_options"] = {**stats, "grasps_with_options": len(self.options), "prior_skipped_names": skipped,
-                                               "per_grasp": {k: len(v) for k, v in self.options.items()}}
-        if not self.options:
-            raise Reject("goal_infeasible", f"no library grasp has a visible hold with a feasible goal ({stats})")
-        log.info("%s: %d grasps with goal options (%s)", self.gp.alias, len(self.options), stats)
+        """The template's per-grasp options (base-frame quantities, valid at any base pose) that every instance draws from
+        (:attr:`options`, grasp name -> options); ``Reject("goal_infeasible")`` when no grasp has one."""
+        raise NotImplementedError
 
     # ------------------------------------------------------------------ instance (§6.3)
 
-    def sample_base(self, rng: np.random.Generator) -> Tuple[float, float, float]:
-        """Random free cell of the eroded map inside the task room + yaw ~ U(−π, π), the hold configuration whole-body
-        collision-free (2 cm; the object is checked once it is attached)."""
+    def default_q_at(self, base2d) -> th.Tensor:
+        """The default posture (arms zero, trunk ``hold.trunk``) at a base pose: the seed of every hold IK."""
+        return self.kit.q_at_base_pose(self.kit.q_config(arms=IDLE_ARMS, translate=self.hold.translate, tilt=self.hold.tilt), *base2d)
+
+    def sample_start_base(self, rng: np.random.Generator, q_rel: th.Tensor) -> Tuple[float, float, float]:
+        """Random free cell of the eroded map inside the task room + yaw ~ U(−π, π) at which the instance's start
+        configuration ``q_rel`` is whole-body collision-free (2 cm; the object is checked once it is attached)."""
         pts = self.kit.random_free_points(rng, 30, room_filter=self.in_room)
         if not pts:
             raise Reject("no_stance", "no free eroded cell in the task room")
         cands = [(float(xy[0]), float(xy[1]), float(rng.uniform(-math.pi, math.pi))) for xy in pts]
-        free = self.kit.collision_free(th.stack([self.q_init_at(b) for b in cands]), margin=0.02)
+        free = self.kit.collision_free(th.stack([self.kit.q_at_base_pose(q_rel, *b) for b in cands]), margin=0.02)
         for b, f in zip(cands, free.tolist()):
             if f:
                 return b
-        raise Reject("no_stance", "no collision-free base pose for the hold configuration")
+        raise Reject("no_stance", "no collision-free base pose for the start configuration")
 
     def grasp_order(self, rng: np.random.Generator) -> List[str]:
         """Grasps with options: clean rows before tolerated ``one_finger`` rows, higher surveyed visibility first, rows
@@ -824,81 +790,6 @@ class HeldObjectV2(SamplerV2):
 
         names.sort(key=lambda n: (n in flagged, self.grasp_stats.get(n, {}).get("failed", 0) - 2 * self.grasp_stats.get(n, {}).get("ok", 0), vis(n)))
         return names
-
-    def sample_instance(self, rng: np.random.Generator) -> Draft:
-        d = Draft()
-        tname = self.target_name
-        target = self.obj("target")
-        hc = self.hold
-        base2d = self.sample_base(rng)
-        base3 = self.base_pose3d(base2d)
-        q_init = self.q_init_at(base2d)
-        cam = self.camera_at(base2d)
-        eef0 = C.compose(base3, self.eef_in_base)
-        init = Stance("init", base2d, hc.translate, hc.tilt, arms=[self.arm], carried=tname)
-        init.q = q_init
-        init.extras.update({"posture": hold_posture(self.arm), "hold": hold_json(self.hold, self.arm)})
-        n_wp = int(self.g("waypoints"))
-        chosen = None
-        errors = []
-        for gname in self.grasp_order(rng)[:4]:
-            g = next(x for x in self.grasps if x.name == gname)
-            obj0 = C.compose(eef0, C.invert(g.pose))
-            self.kit.apply(q_init, base2d)
-            target.set_position_orientation(obj0[0], obj0[1])
-            target.keep_still()
-            self.kit.sync_world()
-            with attached(self.kit, self.arm, target):
-                if not bool(self.kit.collision_free(q_init, margin=0.01)[0]):
-                    errors.append(f"{gname}: hold collides with the object attached")
-                    continue
-                opts = self.options[gname]
-                for oi in rng.permutation(len(opts))[:4]:
-                    opt = opts[int(oi)]
-                    wps = [C.compose(base3, p) for p in opt["wps_in_base"]]
-                    if len(wps) != n_wp + 1:
-                        raise Reject("spec", f"{len(wps) - 1} intermediate waypoints precomputed, generation.waypoints = {n_wp}")
-                    res = self.ikc.waypoints_ok([eef0] + wps, init, self.arm, q_seed=q_init, scale_key=self.choice.models["target"].scale)
-                    if not res.ok:
-                        errors.append(f"{gname}/{oi}: {res.reason}")
-                        continue
-                    goal = C.compose(base3, opt["goal_in_base"])
-                    if not self.whole_in_frame(cam, goal):
-                        errors.append(f"{gname}/{oi}: goal out of frame")
-                        continue
-                    chosen = (g, obj0, goal, dict(opt["info"]), res.q, wps)
-                    break
-            if chosen is not None:
-                break
-        if chosen is None:
-            raise Reject("goal_infeasible", "no precomputed (grasp, goal) confirmed at this base pose: " + "; ".join(errors[-4:]))
-        g, obj0, goal, info, q_goal, wps = chosen
-        self._start_q = q_init.clone()  # the hold: the drive targets the recorded start settles under
-        info = self.describe_goal(info, base2d)
-        d.object_poses[tname] = obj0
-        d.goal_poses[tname] = goal
-        d.robot_q = q_init
-        d.base_pose2d = base2d
-        d.settle_free = []
-        obj_in_eef = C.invert(g.pose)
-        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": self.arm, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
-                               "object_pose_in_eef_frame": {"position": obj_in_eef[0].tolist(), "orientation": obj_in_eef[1].tolist()}}]
-        d.extras["goal_robot_q"] = q_goal
-        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"},
-                          "hold": hold_json(self.hold, self.arm)})
-        d.summary["arm"] = self.arm_summary()
-        d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
-        # sidecar: init stance (held), the grasp with the in-hand key poses, the goal arm configuration, language
-        self.sidecar.add_stance(init)
-        rec = GraspRecord(tname, self.arm, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0, finger_q=list(g.finger_q),
-                          eef_in_object=g.pose, stance="init", waypoints=wps)
-        rec.extras["arm_offer"] = self.arm_offer_record()
-        self.sidecar.add_grasp(rec)
-        goal_block = self.sidecar.set_goal(base2d, hc.translate, hc.tilt, arms="same")
-        goal_block.update({f"{self.arm}_arm_q": q_goal[self.robot.arm_control_idx[self.arm]].tolist(), "embodiment": f"{self.arm}_arm",
-                           "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}, "hold": hold_json(self.hold, self.arm)})
-        self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), **self.goal_numbers(info))
-        return d
 
     def describe_goal(self, info: Dict[str, Any], base2d) -> Dict[str, Any]:
         return info
@@ -1343,10 +1234,6 @@ class ObjectScalingV2(HeldObjectV2):
             raise Reject("goal_infeasible", f"no library grasp has a depth window admitting a {min_change:.2f} m move ({stats}; {windows})")
         log.info("%s: depth windows per grasp %s (%s)", self.gp.alias, {k: v["window"] for k, v in self.options.items()}, stats)
 
-    def default_q_at(self, base2d) -> th.Tensor:
-        """The default posture (arms zero, trunk ``hold.trunk``) at a base pose: the seed of every hold IK."""
-        return self.kit.q_at_base_pose(self.kit.q_config(arms=IDLE_ARMS, translate=self.hold.translate, tilt=self.hold.tilt), *base2d)
-
     def start_config(self, g: GL.Grasp, d0: float) -> Optional[Tuple[th.Tensor, C.Pose, C.Pose]]:
         """The start of an instance: ``g``'s object with its root at depth ``d0`` (the reference hold slid along the optical
         axis) and the configuration holding it, solved by IK from the default posture with the scene ignored and checked
@@ -1377,18 +1264,6 @@ class ObjectScalingV2(HeldObjectV2):
         hold["start_depth_m"] = d0
         hold["depth_m"] = round(float(th.dot(G.t(C.pad_center(eef)) - G.t(cam[0]), axis)), 6)
         self.sidecar.language["goal_numbers"].update(self.goal_numbers(info))
-
-    def sample_start_base(self, rng: np.random.Generator, q_rel: th.Tensor) -> Tuple[float, float, float]:
-        """``sample_base`` for the instance's start configuration ``q_rel`` instead of the reference hold."""
-        pts = self.kit.random_free_points(rng, 30, room_filter=self.in_room)
-        if not pts:
-            raise Reject("no_stance", "no free eroded cell in the task room")
-        cands = [(float(xy[0]), float(xy[1]), float(rng.uniform(-math.pi, math.pi))) for xy in pts]
-        free = self.kit.collision_free(th.stack([self.kit.q_at_base_pose(q_rel, *b) for b in cands]), margin=0.02)
-        for b, f in zip(cands, free.tolist()):
-            if f:
-                return b
-        raise Reject("no_stance", "no collision-free base pose for the start configuration")
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         d = Draft()
@@ -1503,22 +1378,176 @@ class ObjectScalingV2(HeldObjectV2):
 class MentalRotationV2(HeldObjectV2):
     """§6.3 goal: rotation about a sampled axis (13 base-frame axes × the signed 15° grid inside
     ``goal_angle_range_deg``) about the object root, position unchanged; world orientation target, 0.15 rad,
-    ``orientation_equivalences`` per model (§3.13); symmetric models are rejected (``symmetric_target``)."""
+    ``orientation_equivalences`` per model (§3.13); symmetric models are rejected (``symmetric_target``).
+
+    Start (owner 2026-10-11: the start orientation is drawn too, not always the hold's): the reference hold's object turned
+    about its root by an axis × angle of ``init_angle_range_deg`` (0 = the hold itself), the configuration holding it solved
+    by the screening IK from the hold once per template (:meth:`precompute_options`); each instance draws a grasp and a
+    start, then a goal that turns that start, screened at the instance's base pose and confirmed by the exact IK."""
+
+    #: goal candidates screened per drawn start (a random subset of the axis × angle set), exact checks per start, and starts
+    #: tried per grasp in one attempt
+    GOAL_SCREEN_MAX = 96
+    GOAL_EXACT_MAX = 4
+    STARTS_PER_GRASP = 3
 
     def check_symmetry(self):
         if self.equivalences is not None and len(self.equivalences) > 1 and bool(self.g("reject_symmetric_targets", True)):
             c = self.choice.models["target"]
             raise Reject("symmetric_target", f"{c.category}/{c.model} has a rotational symmetry ({len(self.equivalences)} equivalent orientations); §3.13 rule 1")
 
-    def goal_candidates(self, cam: C.Pose, obj0: C.Pose) -> List[Tuple[C.Pose, Dict[str, Any]]]:
-        base_q = C.quat_from_yaw(self.kit.world_base_pose2d()[2])
-        out = []
-        for axis_base, angle_deg in rotation_goal_set(self.g("goal_angle_range_deg"), ROTATION_ANGLE_STEP_DEG):
-            axis_w = C.quat_rotate(base_q, axis_base)
-            dq = C.quat_from_axis_angle(axis_w, math.radians(angle_deg))
-            goal = (G.t(obj0[0]).clone(), C.qmul(dq, G.t(obj0[1])))
-            out.append((goal, {"axis_base": axis_base.tolist(), "angle_deg": float(angle_deg)}))
-        return out
+    def precompute_options(self):
+        """Per library grasp, the start set: the reference hold's object turned by every element of
+        :func:`rotation_start_set` (``init_angle_range_deg``), whole object in frame (5 %), its hand pose reached by the
+        screening IK from the hold (the holding arm, object attached, robot + object only, the scene removed from the
+        planner world); the IK solutions are kept as the start configurations. Base-frame quantities: the starts hold at
+        any base pose."""
+        target = self.obj("target")
+        ref = self.kit.world_base_pose2d()
+        self.ref_base2d = ref
+        base3 = self.base_pose3d(ref)
+        cam = C.compose(base3, self.cam_in_base)
+        eef_hold = C.compose(base3, self.eef_in_base)
+        q_hold = self.q_init_at(ref)
+        base_idx = [self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]
+        starts = rotation_start_set(self.g("init_angle_range_deg"), ROTATION_ANGLE_STEP_DEG)
+        stats = {"grasps": len(self.grasps), "starts": len(starts), "grasps_out_of_view": 0, "out_of_view": 0, "ik_failed": 0, "feasible": 0}
+        self.options = {}
+        for g in self.grasps:
+            obj_hold = C.compose(eef_hold, C.invert(g.pose))
+            entries = []
+            for axis_b, ang in starts:
+                obj0 = turned_about_root(obj_hold, ref[2], axis_b, ang)
+                if not self.whole_in_frame(cam, obj0):
+                    stats["out_of_view"] += 1
+                    continue
+                entries.append((obj0, C.compose(obj0, g.pose), {"axis_base": axis_b.tolist(), "angle_deg": float(ang)}))
+            if not entries:
+                stats["grasps_out_of_view"] += 1
+                continue
+            # the object at the hold in the simulation so the planner attaches it with the right transform
+            self.kit.apply(q_hold, ref)
+            target.set_position_orientation(obj_hold[0], obj_hold[1])
+            target.keep_still()
+            self.kit.sync_world()
+            with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, self.arm, target):
+                ok, qs = self.kit.ik_batch_solve([eef0 for _, eef0, _ in entries], q_hold, arm=self.arm)
+            opts = []
+            for (obj0, eef0, info), s, q in zip(entries, ok.tolist(), qs):
+                if not s:
+                    stats["ik_failed"] += 1
+                    continue
+                q_rel = G.t(q).clone()
+                q_rel[base_idx] = 0.0
+                opts.append({"q_rel": q_rel, "obj_in_base": C.relative(obj0, base3), "eef_in_base": C.relative(eef0, base3), "info": info})
+                stats["feasible"] += 1
+            if opts:
+                self.options[g.name] = opts
+        self.world.park(target, list(self.world.spawned).index(target.name))
+        self.kit.sync_world()
+        self.template_facts["start_options"] = {**stats, "grasps_with_options": len(self.options), "per_grasp": {k: len(v) for k, v in self.options.items()}}
+        self.template_meta["init_orientation"] = {"drawn": True, "init_angle_range_deg": list(self.g("init_angle_range_deg")),
+                                                  "goal_angle_range_deg": list(self.g("goal_angle_range_deg"))}
+        if not self.options:
+            raise Reject("goal_infeasible", f"no library grasp has a start in view that the screening IK reaches ({stats})")
+        log.info("%s: %d grasps with start options (%s)", self.gp.alias, len(self.options), stats)
+
+    def sample_instance(self, rng: np.random.Generator) -> Draft:
+        d = Draft()
+        tname = self.target_name
+        target = self.obj("target")
+        hc = self.hold
+        n_wp = int(self.g("waypoints"))
+        goal_set = rotation_goal_set(self.g("goal_angle_range_deg"), ROTATION_ANGLE_STEP_DEG)
+        scale_key = self.choice.models["target"].scale
+        chosen = None
+        errors: List[str] = []
+        for gname in self.grasp_order(rng)[:4]:
+            g = next(x for x in self.grasps if x.name == gname)
+            opts = self.options[gname]
+            for si in rng.permutation(len(opts))[: self.STARTS_PER_GRASP]:
+                opt = opts[int(si)]
+                tag = f"{gname} start {opt['info']['angle_deg']:+.0f} deg"
+                try:
+                    base2d = self.sample_start_base(rng, opt["q_rel"])
+                except Reject as e:
+                    errors.append(f"{tag}: {e}")
+                    continue
+                base3 = self.base_pose3d(base2d)
+                q_init = self.kit.q_at_base_pose(opt["q_rel"], *base2d)
+                cam = self.camera_at(base2d)
+                eef0, obj0 = C.compose(base3, opt["eef_in_base"]), C.compose(base3, opt["obj_in_base"])
+                self.kit.apply(q_init, base2d)
+                target.set_position_orientation(obj0[0], obj0[1])
+                target.keep_still()
+                self.kit.sync_world()
+                init = Stance("init", base2d, hc.translate, hc.tilt, arms=[self.arm], carried=tname)
+                init.q = q_init
+                with attached(self.kit, self.arm, target):
+                    if not bool(self.kit.collision_free(q_init, margin=0.01)[0]):
+                        errors.append(f"{tag}: start collides with the object attached")
+                        continue
+                    cands = []
+                    for k in rng.permutation(len(goal_set)):
+                        axis_b, ang = goal_set[int(k)]
+                        goal = turned_about_root(obj0, base2d[2], axis_b, ang)
+                        if self.whole_in_frame(cam, goal):
+                            cands.append((goal, {"axis_base": axis_b.tolist(), "angle_deg": float(ang)}))
+                            if len(cands) >= self.GOAL_SCREEN_MAX:
+                                break
+                    if not cands:
+                        errors.append(f"{tag}: no goal in frame")
+                        continue
+                    wps_all = [self.key_poses(eef0, C.compose(goal, g.pose), obj0) for goal, _ in cands]
+                    if any(len(w) != n_wp + 1 for w in wps_all):
+                        raise Reject("spec", f"key poses != generation.waypoints ({n_wp}) + 1")
+                    ok = self.kit.ik_batch([p for w in wps_all for p in w], q_init, arm=self.arm).view(len(cands), n_wp + 1).all(dim=1)
+                    passed = [i for i, s in enumerate(ok.tolist()) if s]
+                    if not passed:
+                        errors.append(f"{tag}: none of {len(cands)} goals passes the screening IK")
+                    for ci in passed[: self.GOAL_EXACT_MAX]:
+                        res = self.ikc.waypoints_ok([eef0] + wps_all[ci], init, self.arm, q_seed=q_init, scale_key=scale_key)
+                        if not res.ok:
+                            errors.append(f"{tag} -> {cands[ci][1]['angle_deg']:+.0f} deg: {res.reason}")
+                            continue
+                        chosen = (g, obj0, eef0, cands[ci][0], dict(cands[ci][1]), res.q, wps_all[ci], base2d, cam, init, opt)
+                        break
+                if chosen is not None:
+                    break
+            if chosen is not None:
+                break
+        if chosen is None:
+            raise Reject("goal_infeasible", "no (grasp, start, goal) confirmed: " + "; ".join(errors[-4:]))
+        g, obj0, eef0, goal, info, q_goal, wps, base2d, cam, init, opt = chosen
+        self._start_q = init.q.clone()  # the start's IK solution: the drive targets the recorded start settles under
+        info["start"] = dict(opt["info"])
+        info = self.describe_goal(info, base2d)
+        hold = {**hold_json(hc, self.arm), "start_rotation": dict(info["start"])}
+        init.extras.update({"posture": hold_posture(self.arm), "hold": hold})
+        d.object_poses[tname] = obj0
+        d.goal_poses[tname] = goal
+        d.robot_q = init.q
+        d.base_pose2d = base2d
+        d.settle_free = []
+        obj_in_eef = C.invert(g.pose)
+        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": self.arm, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
+                               "object_pose_in_eef_frame": {"position": obj_in_eef[0].tolist(), "orientation": obj_in_eef[1].tolist()}}]
+        d.extras["goal_robot_q"] = q_goal
+        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags)}, "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"},
+                          "hold": hold})
+        d.summary["arm"] = self.arm_summary()
+        d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
+        # sidecar: init stance (held, at the drawn start), the grasp with the in-hand key poses, the goal arm configuration, language
+        self.sidecar.add_stance(init)
+        rec = GraspRecord(tname, self.arm, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0, finger_q=list(g.finger_q),
+                          eef_in_object=g.pose, stance="init", waypoints=wps)
+        rec.extras["arm_offer"] = self.arm_offer_record()
+        self.sidecar.add_grasp(rec)
+        goal_block = self.sidecar.set_goal(base2d, hc.translate, hc.tilt, arms="same")
+        goal_block.update({f"{self.arm}_arm_q": q_goal[self.robot.arm_control_idx[self.arm]].tolist(), "embodiment": f"{self.arm}_arm",
+                           "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}, "hold": hold})
+        self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), **self.goal_numbers(info))
+        return d
 
     def key_poses(self, eef0: C.Pose, eef1: C.Pose, obj0: C.Pose) -> List[C.Pose]:
         # the rotation that carries the eef from eef0 to eef1 about the object root (the object turns in place)
@@ -1526,8 +1555,13 @@ class MentalRotationV2(HeldObjectV2):
         return orbit_key_poses(eef0, G.t(obj0[0]), dq, int(self.g("waypoints")))
 
     def describe_goal(self, info: Dict[str, Any], base2d) -> Dict[str, Any]:
+        """The start -> goal rotation (``axis_base`` / ``angle_deg``) and the start's turn from the hold (``start``), each
+        with its world axis."""
         info = dict(info)
-        info["axis_world"] = C.quat_rotate(C.quat_from_yaw(base2d[2]), th.tensor(info["axis_base"], dtype=th.float32)).tolist()
+        to_world = C.quat_from_yaw(base2d[2])
+        info["axis_world"] = C.quat_rotate(to_world, th.tensor(info["axis_base"], dtype=th.float32)).tolist()
+        if info.get("start"):
+            info["start"] = {**info["start"], "axis_world": C.quat_rotate(to_world, th.tensor(info["start"]["axis_base"], dtype=th.float32)).tolist()}
         return info
 
     def pose_target_for(self, cam: C.Pose, goal: C.Pose, info: Dict[str, Any]) -> Dict[str, Any]:
