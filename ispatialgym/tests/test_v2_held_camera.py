@@ -387,6 +387,31 @@ def test_draw_start_goal_moves_both_ways_inside_the_window():
         HO.draw_start_goal(rng, (0.30, 0.34), 0.05)
 
 
+def test_draw_start_goal_honours_the_requested_direction_and_start_band():
+    """owner 2026-10-11 (eval): customs requested_direction / start_depth_band; without them the draw is unchanged."""
+    w, m = (0.23, 0.49), 0.05
+    a, b = np.random.default_rng(3), np.random.default_rng(3)
+    assert [HO.draw_start_goal(a, w, m) for _ in range(50)] == [HO.draw_start_goal(b, w, m, direction=None, start_band=None) for _ in range(50)]
+    rng = np.random.default_rng(0)
+    for direction, (s_lo, s_hi) in (("toward", (0.28, 0.49)), ("away", (0.23, 0.44))):  # the starts that admit the move
+        for i in range(5):
+            band = (i / 5, (i + 1) / 5)
+            for d0, d1 in (HO.draw_start_goal(rng, w, m, direction=direction, start_band=band) for _ in range(200)):
+                assert 0.23 <= d1 <= 0.49 and abs(d1 - d0) >= m - 1e-12 and ((d1 < d0) if direction == "toward" else (d1 > d0))
+                assert s_lo + band[0] * (s_hi - s_lo) - 1e-12 <= d0 <= s_lo + band[1] * (s_hi - s_lo) + 1e-12
+    # the five bands of a direction spread the starts over the window
+    starts = sorted(HO.draw_start_goal(rng, w, m, direction="away", start_band=(i / 5, (i + 1) / 5))[0] for i in range(5) for _ in range(50))
+    assert starts[0] < 0.25 and starts[-1] > 0.42
+    # a direction alone: the whole start range; a band alone: both directions
+    assert all(d1 < d0 for d0, d1 in (HO.draw_start_goal(rng, w, m, direction="toward") for _ in range(100)))
+    both = [HO.draw_start_goal(rng, w, m, start_band=(0.4, 0.6)) for _ in range(400)]
+    assert all(abs(d1 - d0) >= m for d0, d1 in both) and 0.3 < sum(d1 > d0 for d0, d1 in both) / len(both) < 0.7
+    with pytest.raises(ValueError):
+        HO.draw_start_goal(rng, w, m, direction="sideways")
+    with pytest.raises(ValueError):
+        HO.draw_start_goal(rng, w, m, direction="away", start_band=(0.6, 0.4))
+
+
 def test_slide_to_depth_puts_the_object_root_at_the_depth():
     """The start / goal hand pose at any depth: the object root lands at the depth along the optical axis, its lateral
     offset from the axis and the hand orientation are kept, and the hand-object transform is unchanged."""
@@ -509,6 +534,7 @@ def test_generation_waypoints_default_is_three():
         assert d["min_visible_fraction"] == pytest.approx(0.40)
     osc = GD.defaults_for("object_scaling")
     assert (osc["depth_search_range_m"], osc["depth_search_grid_m"], osc["depth_margin_m"], osc["min_depth_change_m"]) == ([0.15, 0.55], 0.01, 0.02, 0.05)
+    assert osc["requested_direction"] is None and osc["start_depth_band"] is None  # eval aliases set them in the customs
     assert "goal_depth_range_m" not in osc and "goal_depth_grid_m" not in osc
     mr = GD.defaults_for("mental_rotation")
     assert "depth_search_range_m" not in mr and "goal_draws_per_start" not in osc

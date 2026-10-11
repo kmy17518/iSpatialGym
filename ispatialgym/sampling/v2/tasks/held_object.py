@@ -45,8 +45,9 @@ pose. Object scaling (owner 2026-09-26) = per grasp the reachable **depth window
 slid along the optical axis over the ``depth_search_grid_m`` grid of ``depth_search_range_m``, a depth passing when the
 object is in frame and the screening IK reaches the hand pose, the continuous run through the reference depth shrunk by
 ``depth_margin_m``; each instance draws a start depth and a goal depth uniformly in the window with
-``|d1 − d0| ≥ min_depth_change_m`` (toward or away from the camera), solves the start configuration by IK from the
-default posture and confirms the straight move (``conventions.line_waypoints``) with the exact IK at its base pose.
+``|d1 − d0| ≥ min_depth_change_m`` (toward or away from the camera; an eval alias fixes the direction and a start-depth
+band, ``generation.requested_direction`` / ``start_depth_band``, owner 2026-10-11), solves the start configuration by IK
+from the default posture and confirms the straight move (``conventions.line_waypoints``) with the exact IK at its base pose.
 
 Visibility: ≥ ``min_visible_fraction`` (40 %) of the object visible at init and at the goal (segmentation render with
 and without the robot) and the whole object in frame. The B7 prior (``runlogs/held_visibility_20260915/visibility.json``,
@@ -263,17 +264,38 @@ def depth_window(depths: Sequence[float], passed: Sequence[bool], anchor: float,
     return ((lo, hi) if hi >= lo else None), run
 
 
-def draw_start_goal(rng: np.random.Generator, window: Sequence[float], min_change_m: float, max_draws: int = 10000) -> Tuple[float, float]:
-    """Object-scaling start and goal depths: both uniform in ``window``, redrawn until ``|d1 − d0| ≥ min_change_m`` - the
-    object moves toward or away from the camera alike."""
+def draw_start_goal(rng: np.random.Generator, window: Sequence[float], min_change_m: float, max_draws: int = 10000, *,
+                    direction: Optional[str] = None, start_band: Optional[Sequence[float]] = None) -> Tuple[float, float]:
+    """Object-scaling start and goal depths in ``window`` with ``|d1 − d0| ≥ min_change_m``. Without ``direction`` and
+    ``start_band``: both uniform in the window, redrawn until the move is long enough - toward or away from the camera alike.
+    An eval instance (owner 2026-10-11, customs ``requested_direction`` / ``start_depth_band``): ``direction`` "toward"
+    (d1 < d0) or "away" (d1 > d0), d0 uniform in ``start_band`` = fractions ``[lo, hi]`` of the start depths that admit the
+    move (0 = the nearest), then d1 uniform among the depths that make it."""
     lo, hi = float(window[0]), float(window[1])
     if hi - lo <= min_change_m:
         raise ValueError(f"depth window [{lo:.3f}, {hi:.3f}] m does not admit a {min_change_m:.3f} m move")
+    if direction is None and start_band is None:
+        for _ in range(int(max_draws)):
+            d0, d1 = float(rng.uniform(lo, hi)), float(rng.uniform(lo, hi))
+            if abs(d1 - d0) >= min_change_m:
+                return d0, d1
+        raise RuntimeError(f"no start / goal pair {min_change_m:.3f} m apart in [{lo:.3f}, {hi:.3f}] m after {max_draws} draws")
+    if direction not in (None, "toward", "away"):
+        raise ValueError(f"requested_direction must be 'toward', 'away' or None, got {direction!r}")
+    b0, b1 = (0.0, 1.0) if start_band is None else (float(start_band[0]), float(start_band[1]))
+    if not 0.0 <= b0 <= b1 <= 1.0:
+        raise ValueError(f"start_depth_band must be fractions 0 <= lo <= hi <= 1, got {start_band!r}")
+    s_lo, s_hi = {"toward": (lo + min_change_m, hi), "away": (lo, hi - min_change_m), None: (lo, hi)}[direction]
+    d0 = float(rng.uniform(s_lo + b0 * (s_hi - s_lo), s_lo + b1 * (s_hi - s_lo)))
+    if direction == "toward":
+        return d0, float(rng.uniform(lo, d0 - min_change_m))
+    if direction == "away":
+        return d0, float(rng.uniform(d0 + min_change_m, hi))
     for _ in range(int(max_draws)):
-        d0, d1 = float(rng.uniform(lo, hi)), float(rng.uniform(lo, hi))
+        d1 = float(rng.uniform(lo, hi))
         if abs(d1 - d0) >= min_change_m:
             return d0, d1
-    raise RuntimeError(f"no start / goal pair {min_change_m:.3f} m apart in [{lo:.3f}, {hi:.3f}] m after {max_draws} draws")
+    raise RuntimeError(f"no goal {min_change_m:.3f} m from the start {d0:.3f} m in [{lo:.3f}, {hi:.3f}] m after {max_draws} draws")
 
 
 def slide_to_depth(eef: C.Pose, eef_in_object: C.Pose, cam_pos, axis: th.Tensor, depth: float) -> Tuple[C.Pose, C.Pose]:
@@ -1335,13 +1357,14 @@ class ObjectScalingV2(HeldObjectV2):
         hc = self.hold
         n_wp = int(self.g("waypoints"))
         min_change = float(self.g("min_depth_change_m"))
+        direction, band = self.g("requested_direction"), self.g("start_depth_band")
         chosen = None
         errors = []
         order = self.grasp_order(rng)
         for gname in order[:4]:
             g = next(x for x in self.grasps if x.name == gname)
             opt = self.options[gname]
-            d0, d1 = draw_start_goal(rng, opt["window"], min_change)
+            d0, d1 = draw_start_goal(rng, opt["window"], min_change, direction=direction, start_band=band)
             start = self.start_config(g, d0)
             if start is None:
                 errors.append(f"{gname}: no start configuration at {d0:.3f} m")
@@ -1389,6 +1412,8 @@ class ObjectScalingV2(HeldObjectV2):
         d1 = float(th.dot(G.t(goal[0]) - G.t(cam[0]), axis))
         info = {"init_depth_m": d0, "goal_depth_m": d1, "depth_change_m": d1 - d0, "direction": "away" if d1 > d0 else "toward",
                 "window_m": list(opt["window"])}
+        if direction is not None or band is not None:
+            info.update({"requested_direction": direction, "start_depth_band": None if band is None else list(band)})
         # the hold of this instance: the reference hold's pad slid with the object (depth_m = pad depth, as HoldConstants)
         hold = {**hold_json(hc, self.arm), "depth_m": round(hc.depth_m + d0 - float(opt["reference_depth"]), 6), "start_depth_m": d0,
                 "reference_depth_m": hc.depth_m}

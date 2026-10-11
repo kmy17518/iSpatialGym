@@ -185,6 +185,11 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "depth_search_grid_m": 0.01,
         "depth_margin_m": 0.02,
         "min_depth_change_m": 0.05,  # §6.3 |d1 − d0| ≥ 0.05 m, toward or away from the camera
+        # eval instances (owner 2026-10-11, set per alias in the customs, dropped for train by multiply_isg): the move "toward" /
+        # "away" from the camera (None: either), and the start-depth band = fractions [lo, hi] of the start depths that admit
+        # that move (0 = the nearest; None: all of them)
+        "requested_direction": None,
+        "start_depth_band": None,
     },
     "mental_rotation": {
         **COMMON,

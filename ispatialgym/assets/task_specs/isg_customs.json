@@ -59574,7 +59574,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "toward",
+   "start_depth_band": [
+    0.6,
+    0.8
+   ]
   },
   "constraints": []
  },
@@ -59656,7 +59661,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "toward",
+   "start_depth_band": [
+    0.2,
+    0.4
+   ]
   },
   "constraints": []
  },
@@ -59738,7 +59748,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "toward",
+   "start_depth_band": [
+    0.8,
+    1.0
+   ]
   },
   "constraints": []
  },
@@ -59820,7 +59835,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "away",
+   "start_depth_band": [
+    0.6,
+    0.8
+   ]
   },
   "constraints": []
  },
@@ -59902,7 +59922,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "away",
+   "start_depth_band": [
+    0.0,
+    0.2
+   ]
   },
   "constraints": []
  },
@@ -59984,7 +60009,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "away",
+   "start_depth_band": [
+    0.8,
+    1.0
+   ]
   },
   "constraints": []
  },
@@ -60066,7 +60096,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "away",
+   "start_depth_band": [
+    0.4,
+    0.6
+   ]
   },
   "constraints": []
  },
@@ -60148,7 +60183,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "toward",
+   "start_depth_band": [
+    0.4,
+    0.6
+   ]
   },
   "constraints": []
  },
@@ -60230,7 +60270,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "toward",
+   "start_depth_band": [
+    0.0,
+    0.2
+   ]
   },
   "constraints": []
  },
@@ -60312,7 +60357,12 @@
    ],
    "depth_search_grid_m": 0.01,
    "depth_margin_m": 0.02,
-   "min_depth_change_m": 0.05
+   "min_depth_change_m": 0.05,
+   "requested_direction": "away",
+   "start_depth_band": [
+    0.2,
+    0.4
+   ]
   },
   "constraints": []
  }
