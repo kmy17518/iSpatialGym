@@ -35,7 +35,9 @@ Train policy (owner 2026-10-11)::
   at random);
 * object scaling / mental rotation: every train instance draws its own (scene, room) among the ``split_seeds`` candidates,
   ``draw_scene_room("train", alias, g)`` for train instance g, and goes to the template of that scene / room with the eval
-  template's models; ``--keep-template-scene`` keeps the eval template's scene and room.
+  template's models; ``--keep-template-scene`` keeps the eval template's scene and room. The rooms are the eval draw's
+  (``split_seeds.eligible_rooms``): living / dining / bed / kitchen / office rooms with enough free floor, never a garden or any
+  other outdoor room (owner 2026-10-11 13:31).
 
 The train instance indices g continue after the alias's train instances under ``--out``; ``--start-index`` fixes them (give
 the same value to processes that split one plan by world with ``--only-scene`` / ``--only-room``). ``--plan`` prints the plan

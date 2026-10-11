@@ -22,7 +22,8 @@ Scene / room draw (held-object tasks: object scaling, mental rotation - their on
 re-sampled offender moves too; train: k = the train instance index, one draw per instance), from SHA-256 of
 ``"scene:<split>:<alias>[:<k>]"``: the scene uniformly among the ``SCENE_CANDIDATES`` that have an eligible room, then a room
 uniformly among that scene's eligible rooms. Eligible (:func:`eligible_rooms`): a room of a ``ROOM_TYPES`` type (living /
-dining / bed / kitchen / office; never bathrooms, corridors, closets, storage, utility rooms, garages, gardens, entryways)
+dining / bed / kitchen / office; never bathrooms, corridors, closets, storage, utility rooms, garages, entryways, and never a
+garden or any other outdoor room - ``OUTDOOR_ROOM_TYPES``, owner 2026-10-11 13:31, whatever ``ROOM_TYPES`` lists)
 with at least ``MIN_NAV_FREE_M2`` (2.0 m^2) of free floor in the robot-eroded navigation map - the cells the held-object
 start base is drawn from (``HeldObjectV2.sample_start_base``: a free cell of the eroded map inside the task room).
 
@@ -60,6 +61,10 @@ SCENE_CANDIDATES = ("house_single_floor", "house_double_floor_lower", "house_dou
                     "hotel_suite_large", "office_cubicles_right")
 #: room types with floor to stand and hold an object in: living / dining / bed / kitchen / office
 ROOM_TYPES = ("living_room", "television_room", "dining_room", "bedroom", "childs_room", "kitchen", "private_office", "shared_office")
+#: outdoor room types the draw never picks, whatever ``ROOM_TYPES`` lists (owner 2026-10-11 13:31: object scaling / mental rotation
+#: never in a garden or any other outdoor room, eval and train); a type containing "garden", "yard" or "outdoor" counts too
+OUTDOOR_ROOM_TYPES = ("garden", "balcony", "porch", "patio", "terrace", "deck", "yard", "backyard", "front_yard", "courtyard", "veranda",
+                      "lawn", "driveway", "outdoor", "exterior")
 #: minimum free floor of the robot-eroded navigation map inside the room
 MIN_NAV_FREE_M2 = 2.0
 MAP_RESOLUTION_M = 0.1
@@ -160,6 +165,12 @@ def room_type(room: str) -> str:
     return head if head and tail.isdigit() else room
 
 
+def is_outdoor(room: str) -> bool:
+    """Whether a room instance is of an outdoor type (:data:`OUTDOOR_ROOM_TYPES`): never drawn."""
+    t = room_type(room)
+    return t in OUTDOOR_ROOM_TYPES or any(w in t for w in ("garden", "yard", "outdoor"))
+
+
 def scene_draw_applies(subtask: str) -> bool:
     """Whether the subtask's (scene, room) comes from :func:`draw_scene_room` (the held-object tasks)."""
     return any(subtask == s or subtask.startswith(s + "-") for s in SCENE_DRAW_SUBTASKS)
@@ -167,15 +178,16 @@ def scene_draw_applies(subtask: str) -> bool:
 
 def eligible_rooms(scene: Optional[str] = None, table: Optional[Dict[str, Dict[str, Tuple[float, float, float]]]] = None,
                    min_nav_free_m2: float = MIN_NAV_FREE_M2) -> List[Tuple[str, str]]:
-    """``(scene, room)`` pairs of the draw, in ``SCENE_CANDIDATES`` order then room name: a ``ROOM_TYPES`` room with at least
-    ``min_nav_free_m2`` of eroded free floor (``table`` defaults to ``ROOM_FLOOR_M2``)."""
+    """``(scene, room)`` pairs of the draw, in ``SCENE_CANDIDATES`` order then room name: a ``ROOM_TYPES`` room, never an outdoor one
+    (:func:`is_outdoor`), with at least ``min_nav_free_m2`` of eroded free floor (``table`` defaults to ``ROOM_FLOOR_M2``). The eval
+    draw and every train draw (``multiply_isg --split train``) go through this function."""
     table = ROOM_FLOOR_M2 if table is None else table
     out = []
     for sc in SCENE_CANDIDATES:
         if scene is not None and sc != scene:
             continue
         for room, (_, _, nav) in sorted((table.get(sc) or {}).items()):
-            if room_type(room) in ROOM_TYPES and float(nav) >= float(min_nav_free_m2):
+            if room_type(room) in ROOM_TYPES and not is_outdoor(room) and float(nav) >= float(min_nav_free_m2):
                 out.append((sc, room))
     return out
 

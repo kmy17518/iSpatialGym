@@ -433,3 +433,22 @@ def test_multiply_train_plan_indices_and_rooms(tmp_path):
     assert MI.next_train_index(str(tmp_path), "object_scaling-apple") == 6 and MI.next_train_index(str(tmp_path), "other") == 0
     assert MI.template_seed(SimpleNamespace(seed=None, split="train", seed_index=0), "object_scaling-apple")[0] == SS.split_seed("train", "object_scaling-apple")
     assert MI.template_seed(SimpleNamespace(seed=None, split=None, seed_index=0), "x")[0] == 1
+
+
+def test_no_garden_or_outdoor_room_is_ever_drawn(monkeypatch):
+    """owner 2026-10-11 13:31: object scaling / mental rotation never draw a garden or any other outdoor room, eval and train,
+    whatever ROOM_TYPES lists (the eval draw and multiply_isg's train draws share eligible_rooms)."""
+    from ispatialgym.sampling import split_seeds as S
+
+    assert S.is_outdoor("garden_0") and S.is_outdoor("balcony_1") and S.is_outdoor("back_garden_0") and not S.is_outdoor("living_room_0")
+    table = {"house_single_floor": {"garden_0": (40.0, 30.0, 25.0), "living_room_0": (30.0, 20.0, 10.0)}}
+    monkeypatch.setattr(S, "ROOM_TYPES", S.ROOM_TYPES + ("garden",))  # even a whitelist that lists gardens draws none
+    assert S.eligible_rooms(table=table) == [("house_single_floor", "living_room_0")]
+    monkeypatch.undo()
+    assert not any(S.is_outdoor(r) for _, r in S.eligible_rooms())
+    aliases = ["object_scaling-apple", "mental_rotation-crab", "object_scaling-bell_pepper", "mental_rotation-teaspoon"]
+    for split in S.SPLITS:
+        for a in aliases:
+            for k in range(64):
+                sc, room = S.draw_scene_room(split, a, k)
+                assert not S.is_outdoor(room) and (sc, room) in S.eligible_rooms()
