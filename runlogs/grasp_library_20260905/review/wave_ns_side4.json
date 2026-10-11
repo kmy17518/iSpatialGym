@@ -1,0 +1,29 @@
+{
+  "batch": "wave_ns_side4",
+  "models": [
+    {
+      "key": "plate__luhkiz__ts",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinched ~1 cm inside lip (11/0); both pads touch; table clear"}
+      ],
+      "object_note": "V3 blocked by table. Label clear context -30 mm, yet V5 gripper above table."
+    },
+    {
+      "key": "plate__aynjhg__ts",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Upper pad well inside lip, lower meets rim underside (17/0); table clear"}
+      ],
+      "object_note": "V3 blocked by table. Lip solid, not paper-thin. Label clear context -27 mm, yet V5 gripper above table."
+    },
+    {
+      "key": "plate__ntedfx__ts",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinched well inside lip (12/0); both pads touch; table clear"}
+      ],
+      "object_note": "Thick rounded rim, not paper-thin. Label clear context -31 mm, yet V5 gripper above table."
+    }
+  ]
+}

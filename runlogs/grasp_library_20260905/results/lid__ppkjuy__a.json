@@ -1,0 +1,150 @@
+{
+ "task": "configuration_matching",
+ "subtask": "configuration_matching-attachment",
+ "pick": "configuration_matching-attachment#04",
+ "slot": "heldout",
+ "category": "lid",
+ "model": "ppkjuy",
+ "key": "lid__ppkjuy__a",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.23193212890625,
+  0.23193253326416016,
+  0.06240023040771484
+ ],
+ "ready": true,
+ "dataset": "behavior-1k-assets",
+ "key_exists": false,
+ "candidates_meta": {
+  "object": {
+   "category": "lid",
+   "model": "ppkjuy"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 5868,
+   "n_tilt": 737,
+   "n_width_antipodal": 493,
+   "n_table": 488,
+   "n_collision": 7,
+   "n_sweep": 3,
+   "n_lever": 3,
+   "n_attachment_free": 3,
+   "n_selected": 3,
+   "com": [
+    0.0015,
+    -0.0018,
+    -0.0012
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0231,
+    0.0
+   ],
+   "score": 9.2195,
+   "meta": {
+    "com_perp": 0.02654,
+    "width": 0.02171,
+    "antipodal": 0.97886,
+    "coverage": 1.0,
+    "clearance": 0.00131,
+    "tilt_deg": 32.2372,
+    "attach_dist": 0.05108,
+    "attach_side": -38.83969
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g0_wrist.png"
+   },
+   "t_s": 18.6
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0239,
+    0.0
+   ],
+   "score": 8.6291,
+   "meta": {
+    "com_perp": 0.00578,
+    "width": 0.02276,
+    "antipodal": 0.95749,
+    "coverage": 1.0,
+    "clearance": 0.0041,
+    "tilt_deg": 14.96479,
+    "attach_dist": 0.05028,
+    "attach_side": 68.79389
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g1_wrist.png"
+   },
+   "t_s": 3.58
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0246,
+    0.0
+   ],
+   "score": 7.9662,
+   "meta": {
+    "com_perp": 0.00601,
+    "width": 0.02198,
+    "antipodal": 0.97913,
+    "coverage": 1.0,
+    "clearance": 0.00129,
+    "tilt_deg": 36.68526,
+    "attach_dist": 0.04955,
+    "attach_side": 9.74813
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__ppkjuy__a/g2_wrist.png"
+   },
+   "t_s": 3.48
+  }
+ ],
+ "n_valid": 3,
+ "error": null,
+ "t_model_s": 48.2
+}

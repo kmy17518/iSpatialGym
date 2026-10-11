@@ -1,0 +1,100 @@
+{
+ "batch": "wave_ns_st1_final",
+ "models": [
+  {
+   "key": "carving_knife__awvoox__st",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch at bolster; V1 blank, V2-V4 clear"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch just behind bolster, centred, no gap"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilted pinch at bolster/handle junction, blade free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilted pinch on handle behind bolster, clean contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilted pinch at bolster, blade free, clean contact"
+    }
+   ],
+   "object_note": "scale [1.0, 1.0, 1.25] (height_only, search key carving_knife__awvoox__st125); rank 1 V1 frame is blank (render glitch); judged from V2-V4"
+  },
+  {
+   "key": "tablespoon__yxxfdj__st",
+   "n_rows": 3,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across neck next to bowl, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilted pinch across neck next to bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across handle near neck, clean"
+    }
+   ],
+   "object_note": "scale [1.0, 1.0, 1.75] (height_only, search key tablespoon__yxxfdj__st175); "
+  },
+  {
+   "key": "tablespoon__ubuhoz__st",
+   "n_rows": 4,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "spoon skewed nearly along jaw axis; neck vs bowl contact unclear"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across neck next to bowl, clean"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across neck above bowl, clean"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilted pinch across neck, bowl free"
+    }
+   ],
+   "object_note": "scale [1.0, 1.0, 1.75] (height_only, search key tablespoon__ubuhoz__st175); chrome hides contacts; rank 1 closed at 7.8 mm on 12.3 mm nominal width"
+  }
+ ]
+}

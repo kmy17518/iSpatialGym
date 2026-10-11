@@ -1,0 +1,68 @@
+{
+  "batch": "wave_ns_side2",
+  "models": [
+    {
+      "key": "trash_can__hqdnjz__ts",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["gap", "end_grasp"], "note": "Rim pinch, outer pad off thin wall; CoM ~28 cm, pivots"},
+        {"rank": 2, "verdict": "flag", "flags": ["gap", "end_grasp"], "note": "Top-of-rim pinch, daylight at outer pad; CoM ~25 cm away"},
+        {"rank": 3, "verdict": "flag", "flags": ["gap", "end_grasp"], "note": "Rim pinch, daylight at outer pad; bin cantilevered ~25 cm"},
+        {"rank": 4, "verdict": "flag", "flags": ["gap", "end_grasp"], "note": "Side-of-rim pinch, outer pad off wall; CoM ~28 cm, pivots"},
+        {"rank": 5, "verdict": "flag", "flags": ["gap", "end_grasp"], "note": "Side-of-rim pinch, outer pad off wall; CoM ~28 cm, pivots"}
+      ],
+      "object_note": "Rest x_down: bin on its side; wall hull thicker than mesh; row-1 V1 blank; V5 oblique."
+    },
+    {
+      "key": "gym_shoe__kmcbym__ts",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "unsure", "flags": ["unsure"], "note": "Midfoot side pinch; near pad flush, fully open far pad hidden"}
+      ],
+      "object_note": "Sole-down; V5 camera under table, unusable (label 29 mm clear); prior review: instep hull ~1 cm wide."
+    },
+    {
+      "key": "gym_shoe__pblxfp__ts",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp", "task_violation"], "note": "Toe-box pinch, shoe top-heavy (CoM ~10 cm above); only valid toe-standing"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp", "task_violation"], "note": "Toe-box pinch, top-heavy; wrist camera ~3 cm below table plane"}
+      ],
+      "object_note": "Rest x_down: shoe stands on its toe; sole-down these grasps hit the table. Wrist camera not in spheres."
+    },
+    {
+      "key": "beer_glass__lymciz__ts",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "Lip pinch, one finger inside glass, as in top-down pass"},
+        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "Lip pinch on 4 mm wall, finger inside; body grasp exists"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Horizontal body grasp at 76 mm, both pads on glass"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "Low body grasp near base; fingertips ~3 mm above table"},
+        {"rank": 5, "verdict": "flag", "flags": ["task_violation"], "note": "Low base grasp; wrist camera on table side ~2 cm below plane"}
+      ],
+      "object_note": "Ranks 1-2 repeat lip pinch. V5 under table rows 3-4; wrist camera (not in spheres) checked from URDF."
+    },
+    {
+      "key": "steak__akoxpw__ts",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["task_violation"], "note": "Clean pinch near top; valid only with steak standing on end"},
+        {"rank": 2, "verdict": "flag", "flags": ["task_violation"], "note": "Clean pinch ~5 cm below top; needs steak standing on end"},
+        {"rank": 3, "verdict": "flag", "flags": ["task_violation"], "note": "Clean pinch near top end; flat steak would put palm in table"}
+      ],
+      "object_note": "Rest y_down: steak stands on its thick end. Lying flat, pinch axis vertical, gripper in table."
+    },
+    {
+      "key": "storage_box__bwbpvg__ts",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "Wall-top pinch near corner; tray cantilevered ~14 cm"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "Wall-top pinch near corner, cantilever ~13 cm; wrist camera ~1 cm up"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "Mid-wall top pinch on 3 mm wall; tray cantilevered ~11 cm"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "Mid-wall top pinch; tray cantilevered ~11 cm; wrist camera ~1 cm up"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "Wall-top pinch near corner; tray cantilevered ~13 cm"}
+      ],
+      "object_note": "Open tray; every row pinches one 3-5 mm wall top, tray cantilevered 11-14 cm; contacts clean."
+    }
+  ]
+}

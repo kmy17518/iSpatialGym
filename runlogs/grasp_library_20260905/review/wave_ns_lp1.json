@@ -1,0 +1,62 @@
+{
+  "batch": "wave_ns_lp1",
+  "models": [
+    {
+      "key": "plate__ntedfx__le",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Firm rim pinch, 15 mm rim held, plate near level; V5 blocked"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Firm rim pinch, pads flush in V1; V5 blocked by table"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Firm rim pinch; top-down V5 shows body outside table edge"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "V5 profile: lower finger under rim, above table; firm pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Firm rim pinch; top-down V5 shows body outside table edge"}
+      ],
+      "object_note": "10.9 mm rim; lower finger base ~4.5 mm below plate foot, outside table edge (expected for __le)."
+    },
+    {
+      "key": "plate__spppps__le",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Firm rim pinch, ~10 mm held; V2 sliver ~1 px, V5 blocked"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "V5 profile: lower finger under rim, above table; V1 pads flush"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Firm rim pinch, ~7 deg tilt after closing; V5 blocked"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "Firm rim pinch, both pads on rim in V1; V5 blocked"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Firm rim pinch; V2 sliver <=2 px; top-down V5 clear of table"}
+      ],
+      "object_note": "Thin 5.8 mm rim, ~10 mm held; lower finger base ~4.7 mm below foot, outside table edge."
+    },
+    {
+      "key": "pillow__mltefs__lp",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Edge pinch, 50 mm overlap, pads on both surfaces; table clear"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Edge pinch, 50 mm overlap, pads touching; lower finger 10 mm up"}
+      ],
+      "object_note": "V5 oblique top-down for both rows; vertical clearance from V1-V3 and labels."
+    },
+    {
+      "key": "pillow__msghqj__lp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Full-thickness edge pinch, pads on surfaces; V5 blocked by table"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Full-thickness edge pinch, pads on surfaces; V5 blocked by table"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Edge pinch, mild pad sink; oblique V5, no table conflict"},
+        {"rank": 4, "verdict": "flag", "flags": ["penetration"], "note": "Pads 35 mm apart on 86 mm edge, each ~25 mm deep"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Edge pinch, light contact; overlap below finger is perspective; V5 blocked"}
+      ],
+      "object_note": "V5 blocked in ranks 1, 2, 5; rank 4 V5 profile clean, its sink happens on closing."
+    },
+    {
+      "key": "pillow__dkdrwr__lp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Edge pinch, pads on surfaces; V5 shows fingers around raised edge"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Edge pinch, pillow hangs slightly tilted; V5 blocked by table"},
+        {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "Corner pinch, pads 30 mm apart on 73 mm edge, sunk deep"},
+        {"rank": 4, "verdict": "flag", "flags": ["penetration"], "note": "Corner pinch, pads 26 mm apart on 73 mm edge, sunk deep"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Edge pinch, mild pad sink; V5 shows fingers around raised edge"}
+      ],
+      "object_note": "Puffy baseball pillow, edge 8-19 cm above table; corner station +y@0.11 lets pads sink 2-3 cm."
+    }
+  ]
+}

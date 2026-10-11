@@ -1,0 +1,18 @@
+{
+ "batch": "wave_ns_qtfzeq_st_final",
+ "models": [
+  {
+   "key": "plate__qtfzeq__st",
+   "n_rows": 1,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch, 30 deg tilt; both pads on rim; 36/0 tolerated"
+    }
+   ],
+   "object_note": "scale [1.0, 1.0, 3.0] (height_only, search key plate__qtfzeq__st300); Only candidate. Rim collision hull: 12 flat-chord sectors; here the inner pad lands within ~3 mm of wall."
+  }
+ ]
+}

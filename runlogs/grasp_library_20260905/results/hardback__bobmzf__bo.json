@@ -1,0 +1,419 @@
+{
+ "task": "IORS",
+ "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+ "pick": "inter_object_relation_satisfaction-inside_large_scale#01",
+ "slot": "heldout",
+ "category": "hardback",
+ "model": "bobmzf",
+ "bbox": [
+  0.3653603668212891,
+  0.2132728500366211,
+  0.02130827331542969
+ ],
+ "ready": true,
+ "dataset": "behavior-1k-assets",
+ "key": "hardback__bobmzf__bo",
+ "pipeline": "side",
+ "mode": null,
+ "constraint": "book_overhang",
+ "mesh_key": "hardback__bobmzf__t",
+ "candidates_meta": {
+  "object": {
+   "category": "hardback",
+   "model": "bobmzf"
+  },
+  "task": "IORS",
+  "constraint": "book_overhang",
+  "pipeline": "side",
+  "gripper": "r1pro_right",
+  "source": "side_book_overhang",
+  "log": {
+   "n_contact_points": 60,
+   "n_poses": 480,
+   "n_fail_object": 320,
+   "n_fail_context": 0,
+   "n_context": 160,
+   "n_width_antipodal": 160,
+   "n_sweep": 160,
+   "n_selected": 12
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "context": "table_edge"
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0246,
+    0.0
+   ],
+   "score": 3.6105,
+   "meta": {
+    "width": 0.02268,
+    "antipodal": 0.9397,
+    "coverage": 1.0,
+    "com_perp": 0.09024,
+    "tilt_deg": 70.0,
+    "along_frac": 0.0,
+    "approach_tilt_deg": 20.0,
+    "edge_offset_m": 0.01,
+    "thickness_m": 0.0213,
+    "gap_below_m": 0.0,
+    "pre_grasp_opening_m": 0.0293,
+    "clear_object_m": 0.0014,
+    "clear_context_m": 0.0212,
+    "mode": "book_overhang",
+    "side": "+y",
+    "pad_ref": "tip",
+    "approach": [
+     -0.0,
+     -0.9397,
+     -0.342
+    ],
+    "context": "table_edge",
+    "proxy": [
+     {
+      "center": [
+       0.0006,
+       -0.2226,
+       -0.0257
+      ],
+      "size": [
+       0.6,
+       1.2,
+       0.03
+      ],
+      "quat_xyzw": [
+       0.0,
+       0.0,
+       0.7071067811865475,
+       0.7071067811865475
+      ],
+      "rgba": [
+       0.55,
+       0.42,
+       0.3,
+       0.55
+      ]
+     }
+    ],
+    "overhang_m": 0.03,
+    "table_edge_s_m": 0.0774
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g0_wrist.png",
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g0_v5.png"
+   },
+   "t_s": 3.06
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0247,
+    0.0
+   ],
+   "score": 3.6102,
+   "meta": {
+    "width": 0.02268,
+    "antipodal": 0.93969,
+    "coverage": 1.0,
+    "com_perp": 0.09034,
+    "tilt_deg": 70.0,
+    "along_frac": 0.0,
+    "approach_tilt_deg": 20.0,
+    "edge_offset_m": 0.01,
+    "thickness_m": 0.0213,
+    "gap_below_m": 0.0,
+    "pre_grasp_opening_m": 0.0293,
+    "clear_object_m": 0.0014,
+    "clear_context_m": 0.0212,
+    "mode": "book_overhang",
+    "side": "-y",
+    "pad_ref": "tip",
+    "approach": [
+     -0.0,
+     0.9397,
+     -0.342
+    ],
+    "context": "table_edge",
+    "proxy": [
+     {
+      "center": [
+       0.0006,
+       0.2253,
+       -0.0257
+      ],
+      "size": [
+       0.6,
+       1.2,
+       0.03
+      ],
+      "quat_xyzw": [
+       0.0,
+       0.0,
+       -0.7071067811865475,
+       0.7071067811865475
+      ],
+      "rgba": [
+       0.55,
+       0.42,
+       0.3,
+       0.55
+      ]
+     }
+    ],
+    "overhang_m": 0.03,
+    "table_edge_s_m": 0.0747
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g1_wrist.png",
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g1_v5.png"
+   },
+   "t_s": 3.08
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.023,
+    0.0
+   ],
+   "score": 3.5689,
+   "meta": {
+    "width": 0.02268,
+    "antipodal": 0.9397,
+    "coverage": 1.0,
+    "com_perp": 0.10545,
+    "tilt_deg": 70.0,
+    "along_frac": 0.15,
+    "approach_tilt_deg": 20.0,
+    "edge_offset_m": 0.01,
+    "thickness_m": 0.0213,
+    "gap_below_m": 0.0,
+    "pre_grasp_opening_m": 0.0293,
+    "clear_object_m": 0.0014,
+    "clear_context_m": 0.0212,
+    "mode": "book_overhang",
+    "side": "+y",
+    "pad_ref": "tip",
+    "approach": [
+     -0.0,
+     -0.9397,
+     -0.342
+    ],
+    "context": "table_edge",
+    "proxy": [
+     {
+      "center": [
+       0.0006,
+       -0.2227,
+       -0.0257
+      ],
+      "size": [
+       0.6,
+       1.2,
+       0.03
+      ],
+      "quat_xyzw": [
+       0.0,
+       0.0,
+       0.7071067811865475,
+       0.7071067811865475
+      ],
+      "rgba": [
+       0.55,
+       0.42,
+       0.3,
+       0.55
+      ]
+     }
+    ],
+    "overhang_m": 0.03,
+    "table_edge_s_m": 0.0773
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g2_wrist.png",
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g2_v5.png"
+   },
+   "t_s": 3.08
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.023,
+    0.0
+   ],
+   "score": 3.5686,
+   "meta": {
+    "width": 0.02268,
+    "antipodal": 0.93969,
+    "coverage": 1.0,
+    "com_perp": 0.10554,
+    "tilt_deg": 70.0,
+    "along_frac": 0.15,
+    "approach_tilt_deg": 20.0,
+    "edge_offset_m": 0.01,
+    "thickness_m": 0.0213,
+    "gap_below_m": 0.0,
+    "pre_grasp_opening_m": 0.0293,
+    "clear_object_m": 0.0014,
+    "clear_context_m": 0.0212,
+    "mode": "book_overhang",
+    "side": "-y",
+    "pad_ref": "tip",
+    "approach": [
+     -0.0,
+     0.9397,
+     -0.342
+    ],
+    "context": "table_edge",
+    "proxy": [
+     {
+      "center": [
+       0.0006,
+       0.2254,
+       -0.0257
+      ],
+      "size": [
+       0.6,
+       1.2,
+       0.03
+      ],
+      "quat_xyzw": [
+       0.0,
+       0.0,
+       -0.7071067811865475,
+       0.7071067811865475
+      ],
+      "rgba": [
+       0.55,
+       0.42,
+       0.3,
+       0.55
+      ]
+     }
+    ],
+    "overhang_m": 0.03,
+    "table_edge_s_m": 0.0746
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g3_wrist.png",
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g3_v5.png"
+   },
+   "t_s": 3.32
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0245,
+    0.0
+   ],
+   "score": 3.5681,
+   "meta": {
+    "width": 0.02268,
+    "antipodal": 0.9397,
+    "coverage": 1.0,
+    "com_perp": 0.10571,
+    "tilt_deg": 70.0,
+    "along_frac": -0.15,
+    "approach_tilt_deg": 20.0,
+    "edge_offset_m": 0.01,
+    "thickness_m": 0.0213,
+    "gap_below_m": 0.0,
+    "pre_grasp_opening_m": 0.0293,
+    "clear_object_m": 0.0014,
+    "clear_context_m": 0.0212,
+    "mode": "book_overhang",
+    "side": "+y",
+    "pad_ref": "tip",
+    "approach": [
+     -0.0,
+     -0.9397,
+     -0.342
+    ],
+    "context": "table_edge",
+    "proxy": [
+     {
+      "center": [
+       0.0006,
+       -0.2224,
+       -0.0257
+      ],
+      "size": [
+       0.6,
+       1.2,
+       0.03
+      ],
+      "quat_xyzw": [
+       0.0,
+       0.0,
+       0.7071067811865475,
+       0.7071067811865475
+      ],
+      "rgba": [
+       0.55,
+       0.42,
+       0.3,
+       0.55
+      ]
+     }
+    ],
+    "overhang_m": 0.03,
+    "table_edge_s_m": 0.0776
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g4_wrist.png",
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/hardback__bobmzf__bo/g4_v5.png"
+   },
+   "t_s": 3.05
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.3
+}

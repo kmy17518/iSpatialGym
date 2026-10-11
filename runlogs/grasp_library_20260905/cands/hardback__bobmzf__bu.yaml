@@ -1,0 +1,420 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: hardback
+    model: bobmzf
+  task: IORS
+  constraint: book_upright_shelf
+  pipeline: side
+  gripper: r1pro_right
+  source: side_book_upright_shelf
+  log:
+    n_contact_points: 15
+    n_poses: 45
+    n_fail_object: 0
+    n_fail_context: 19
+    n_context: 26
+    n_width_antipodal: 26
+    n_sweep: 26
+    n_selected: 5
+  rest_pose: upright_shelf
+  rest_quat_wxyz:
+  - 0.45451947767204365
+  - -0.541675220419702
+  - -0.5416752204197021
+  - -0.4545194776720437
+  context: bookcase_floor_wall
+grasps:
+  grasp_0:
+    confidence: 3.6595
+    position:
+    - -0.137038
+    - -0.08342600000000001
+    - -1.374658525940542e-06
+    orientation:
+      w: 0.0
+      xyz:
+      - 0.0
+      - 0.7071067811865475
+      - 0.7071067811865475
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.0146
+      right_gripper_finger_joint2: 0.0146
+    ispatialgym:
+      width: 0.02131
+      antipodal: 1.0
+      coverage: 1.0
+      com_perp: 0.16825
+      tilt_deg: 90.0
+      along_frac: 0.045
+      approach_tilt_deg: 0.0
+      edge_offset_m: 0.01
+      thickness_m: 0.0213
+      gap_below_m: 0.0
+      pre_grasp_opening_m: 0.0293
+      clear_object_m: 0.0024
+      clear_context_m: 0.0188
+      mode: book_upright_shelf
+      side: spine-y
+      pad_ref: center
+      approach:
+      - 0.0
+      - 1.0
+      - 0.0
+      context: bookcase_floor_wall
+      proxy:
+      - center:
+        - -0.1926
+        - 0.0747
+        - 0.034
+        size:
+        - 0.4
+        - 2.0
+        - 0.03
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      - center:
+        - 0.0537
+        - 0.0747
+        - 0.0486
+        size:
+        - 0.4
+        - 0.03
+        - 0.45
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      height_above_bottom_m: 0.045
+      clear_floor_m: 0.0198
+      clear_wall_m: 0.0188
+      lean_deg: 10.0
+  grasp_1:
+    confidence: 3.5325
+    position:
+    - -0.12203800000000001
+    - -0.08342600000000001
+    - -1.3326377829754599e-06
+    orientation:
+      w: 0.0
+      xyz:
+      - 0.0
+      - 0.7071067811865475
+      - 0.7071067811865475
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.0146
+      right_gripper_finger_joint2: 0.0146
+    ispatialgym:
+      width: 0.02131
+      antipodal: 1.0
+      coverage: 1.0
+      com_perp: 0.15621
+      tilt_deg: 90.0
+      along_frac: 0.06
+      approach_tilt_deg: 0.0
+      edge_offset_m: 0.01
+      thickness_m: 0.0213
+      gap_below_m: 0.0
+      pre_grasp_opening_m: 0.0293
+      clear_object_m: 0.0024
+      clear_context_m: 0.0172
+      mode: book_upright_shelf
+      side: spine-y
+      pad_ref: center
+      approach:
+      - 0.0
+      - 1.0
+      - 0.0
+      context: bookcase_floor_wall
+      proxy:
+      - center:
+        - -0.1926
+        - 0.0747
+        - 0.034
+        size:
+        - 0.4
+        - 2.0
+        - 0.03
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      - center:
+        - 0.0537
+        - 0.0747
+        - 0.0486
+        size:
+        - 0.4
+        - 0.03
+        - 0.45
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      height_above_bottom_m: 0.06
+      clear_floor_m: 0.0311
+      clear_wall_m: 0.0172
+      lean_deg: 10.0
+  grasp_2:
+    confidence: 3.4238
+    position:
+    - -0.1540661794499212
+    - -0.08360618004927522
+    - 0.00035620607947066456
+    orientation:
+      w: 0.061621462347419324
+      xyz:
+      - 0.05979053620322877
+      - -0.6937926541676611
+      - -0.7150382088963418
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.0146
+      right_gripper_finger_joint2: 0.0146
+    ispatialgym:
+      width: 0.02132
+      antipodal: 0.99955
+      coverage: 1.0
+      com_perp: 0.18072
+      tilt_deg: 91.72794
+      along_frac: 0.03
+      approach_tilt_deg: 10.0
+      edge_offset_m: 0.01
+      thickness_m: 0.0213
+      gap_below_m: 0.0
+      pre_grasp_opening_m: 0.0293
+      clear_object_m: 0.0017
+      clear_context_m: 0.0186
+      mode: book_upright_shelf
+      side: spine-y
+      pad_ref: center
+      approach:
+      - -0.171
+      - 0.9848
+      - 0.0302
+      context: bookcase_floor_wall
+      proxy:
+      - center:
+        - -0.1926
+        - 0.0747
+        - 0.034
+        size:
+        - 0.4
+        - 2.0
+        - 0.03
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      - center:
+        - 0.0537
+        - 0.0747
+        - 0.0486
+        size:
+        - 0.4
+        - 0.03
+        - 0.45
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      height_above_bottom_m: 0.03
+      clear_floor_m: 0.0186
+      clear_wall_m: 0.019
+      lean_deg: 10.0
+  grasp_3:
+    confidence: 3.374
+    position:
+    - -0.102038
+    - -0.08342600000000001
+    - -1.276610125701405e-06
+    orientation:
+      w: 0.0
+      xyz:
+      - 0.0
+      - 0.7071067811865475
+      - 0.7071067811865475
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.0146
+      right_gripper_finger_joint2: 0.0146
+    ispatialgym:
+      width: 0.02131
+      antipodal: 1.0
+      coverage: 1.0
+      com_perp: 0.14105
+      tilt_deg: 90.0
+      along_frac: 0.08
+      approach_tilt_deg: 0.0
+      edge_offset_m: 0.01
+      thickness_m: 0.0213
+      gap_below_m: 0.0
+      pre_grasp_opening_m: 0.0293
+      clear_object_m: 0.0024
+      clear_context_m: 0.0152
+      mode: book_upright_shelf
+      side: spine-y
+      pad_ref: center
+      approach:
+      - 0.0
+      - 1.0
+      - 0.0
+      context: bookcase_floor_wall
+      proxy:
+      - center:
+        - -0.1926
+        - 0.0747
+        - 0.034
+        size:
+        - 0.4
+        - 2.0
+        - 0.03
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      - center:
+        - 0.0537
+        - 0.0747
+        - 0.0486
+        size:
+        - 0.4
+        - 0.03
+        - 0.45
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      height_above_bottom_m: 0.08
+      clear_floor_m: 0.0485
+      clear_wall_m: 0.0152
+      lean_deg: 10.0
+  grasp_4:
+    confidence: 3.2418
+    position:
+    - -0.082038
+    - -0.08342600000000001
+    - -1.2205824684238809e-06
+    orientation:
+      w: 0.0
+      xyz:
+      - 0.0
+      - 0.7071067811865475
+      - 0.7071067811865475
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.0146
+      right_gripper_finger_joint2: 0.0146
+    ispatialgym:
+      width: 0.02131
+      antipodal: 1.0
+      coverage: 1.0
+      com_perp: 0.12723
+      tilt_deg: 90.0
+      along_frac: 0.1
+      approach_tilt_deg: 0.0
+      edge_offset_m: 0.01
+      thickness_m: 0.0213
+      gap_below_m: 0.0
+      pre_grasp_opening_m: 0.0293
+      clear_object_m: 0.0024
+      clear_context_m: 0.0135
+      mode: book_upright_shelf
+      side: spine-y
+      pad_ref: center
+      approach:
+      - 0.0
+      - 1.0
+      - 0.0
+      context: bookcase_floor_wall
+      proxy:
+      - center:
+        - -0.1926
+        - 0.0747
+        - 0.034
+        size:
+        - 0.4
+        - 2.0
+        - 0.03
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      - center:
+        - 0.0537
+        - 0.0747
+        - 0.0486
+        size:
+        - 0.4
+        - 0.03
+        - 0.45
+        quat_xyzw:
+        - 0.541675220419702
+        - 0.5416752204197021
+        - 0.4545194776720437
+        - 0.45451947767204365
+        rgba:
+        - 0.35
+        - 0.45
+        - 0.6
+        - 0.45
+      height_above_bottom_m: 0.1
+      clear_floor_m: 0.0669
+      clear_wall_m: 0.0135
+      lean_deg: 10.0

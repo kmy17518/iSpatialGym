@@ -1,0 +1,29 @@
+{
+  "batch": "wave_ns1_p",
+  "models": [
+    {
+      "key": "tablespoon__yxxfdj__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["task_violation"], "note": "Neck pinch near CoM, but fingertips ~1 cm below spoon bottom"},
+        {"rank": 2, "verdict": "flag", "flags": ["task_violation"], "note": "Neck pinch; fingertips ~1 cm below spoon's support plane (V1)"},
+        {"rank": 3, "verdict": "flag", "flags": ["task_violation"], "note": "Neck pinch, 30 deg tilt; fingertips ~1 cm below spoon bottom"},
+        {"rank": 4, "verdict": "flag", "flags": ["task_violation"], "note": "Neck pinch by bowl, 30 deg; fingertips ~1 cm below bottom"},
+        {"rank": 5, "verdict": "flag", "flags": ["task_violation"], "note": "Neck pinch, 30 deg; fingertips ~1 cm below spoon bottom face"}
+      ],
+      "object_note": "Deep neck pinches: fingertips ~1 cm past bowl-to-handle support line in V1. Contacts clean; 10/0 asymmetry tolerated."
+    },
+    {
+      "key": "lid__pbmsji__a",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Knob pinched at its widest part, centred; lid rim free. V1 blank."},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Knob pinch, knob centred between pads; lid rim free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Knob pinch, 13 deg tilt, knob centred; lid rim free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "Knob pinch, 15 deg tilt, knob centred; lid rim free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Knob pinch, 26 deg tilt, knob centred; lid rim free"}
+      ],
+      "object_note": "Hairline 2-3 mm seams at both pads (hull slightly larger), not flagged; 50/38 shows no off-centre knob."
+    }
+  ]
+}

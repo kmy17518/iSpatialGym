@@ -1,0 +1,290 @@
+{
+ "task": "IORS",
+ "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+ "pick": "inter_object_relation_satisfaction-ontop_small_scale#04",
+ "slot": "heldout",
+ "category": "carving_knife",
+ "model": "gixmnd",
+ "key": "carving_knife__gixmnd__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.32097663879394533,
+  0.052768798828125,
+  0.028283538818359377
+ ],
+ "ready": true,
+ "dataset": "behavior-1k-assets",
+ "key_exists": false,
+ "candidates_meta": {
+  "object": {
+   "category": "carving_knife",
+   "model": "gixmnd"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5904,
+   "n_tilt": 231,
+   "n_width_antipodal": 53,
+   "n_table": 46,
+   "n_collision": 43,
+   "n_sweep": 38,
+   "n_lever": 38,
+   "n_selected": 12,
+   "com": [
+    -0.0407,
+    -0.0015,
+    0.0018
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0312,
+    0.0
+   ],
+   "score": 10.6799,
+   "meta": {
+    "com_perp": 0.00498,
+    "width": 0.02781,
+    "antipodal": 0.9526,
+    "coverage": 0.75,
+    "clearance": 0.02715,
+    "tilt_deg": 16.06105
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g0_wrist.png"
+   },
+   "t_s": 3.85,
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0131,
+    "lift_m": 0.0131,
+    "overlap_m": 0.0064,
+    "finger_low_m": -0.0091,
+    "pad_end_m": 0.0083,
+    "pad_end_lifted_m": 0.0214,
+    "pinch_top_m": 0.0278,
+    "object_top_m": 0.0313,
+    "oracle_top_refusal": false,
+    "face_slope": 0.8162,
+    "oracle_slope_refusal": true,
+    "next_place": "support",
+    "pass": true,
+    "reason": "lifted 13.1 mm, 6.4 mm of pad on the object"
+   }
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0307,
+    0.0
+   ],
+   "score": 10.5895,
+   "meta": {
+    "com_perp": 0.00449,
+    "width": 0.02781,
+    "antipodal": 0.9526,
+    "coverage": 0.75,
+    "clearance": 0.02829,
+    "tilt_deg": 22.84841
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g1_wrist.png"
+   },
+   "t_s": 3.93,
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0134,
+    "lift_m": 0.0134,
+    "overlap_m": 0.0048,
+    "finger_low_m": -0.0094,
+    "pad_end_m": 0.0083,
+    "pad_end_lifted_m": 0.0217,
+    "pinch_top_m": 0.0265,
+    "object_top_m": 0.0313,
+    "oracle_top_refusal": false,
+    "face_slope": 0.8162,
+    "oracle_slope_refusal": true,
+    "next_place": "support",
+    "pass": false,
+    "reason": "after the 13.4 mm lift only 4.8 mm of pad stays on the object"
+   }
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0336,
+    0.0
+   ],
+   "score": 10.3674,
+   "meta": {
+    "com_perp": 0.01728,
+    "width": 0.03098,
+    "antipodal": 0.9277,
+    "coverage": 1.0,
+    "clearance": 0.03075,
+    "tilt_deg": 8.58177
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g2_wrist.png"
+   },
+   "t_s": 3.91,
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0132,
+    "lift_m": 0.0132,
+    "overlap_m": 0.0125,
+    "finger_low_m": -0.0092,
+    "pad_end_m": 0.0029,
+    "pad_end_lifted_m": 0.0161,
+    "pinch_top_m": 0.0286,
+    "object_top_m": 0.0313,
+    "oracle_top_refusal": false,
+    "face_slope": 0.2113,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "lifted 13.2 mm, 12.5 mm of pad on the object"
+   }
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0322,
+    0.0
+   ],
+   "score": 10.3584,
+   "meta": {
+    "com_perp": 0.00814,
+    "width": 0.0309,
+    "antipodal": 0.98223,
+    "coverage": 0.75,
+    "clearance": 0.02129,
+    "tilt_deg": 18.74529
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g3_wrist.png"
+   },
+   "t_s": 3.98,
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0126,
+    "lift_m": 0.0126,
+    "overlap_m": 0.0007,
+    "finger_low_m": -0.0086,
+    "pad_end_m": 0.0126,
+    "pad_end_lifted_m": 0.0252,
+    "pinch_top_m": 0.0259,
+    "object_top_m": 0.0313,
+    "oracle_top_refusal": false,
+    "face_slope": 0.9968,
+    "oracle_slope_refusal": true,
+    "next_place": "support",
+    "pass": false,
+    "reason": "after the 12.6 mm lift only 0.7 mm of pad stays on the object"
+   }
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0343,
+    0.0
+   ],
+   "score": 10.3525,
+   "meta": {
+    "com_perp": 0.01273,
+    "width": 0.03098,
+    "antipodal": 0.9277,
+    "coverage": 1.0,
+    "clearance": 0.03107,
+    "tilt_deg": 24.92318
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/carving_knife__gixmnd__t/g4_wrist.png"
+   },
+   "t_s": 3.73,
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.014,
+    "lift_m": 0.014,
+    "overlap_m": 0.012,
+    "finger_low_m": -0.01,
+    "pad_end_m": 0.0028,
+    "pad_end_lifted_m": 0.0168,
+    "pinch_top_m": 0.0289,
+    "object_top_m": 0.0313,
+    "oracle_top_refusal": false,
+    "face_slope": 0.3736,
+    "oracle_slope_refusal": true,
+    "next_place": "support",
+    "pass": true,
+    "reason": "lifted 14.0 mm, 12.0 mm of pad on the object"
+   }
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 26.4,
+ "dip_rule_summary": {
+  "ag_valid": 5,
+  "dip": 5,
+  "pass": 3,
+  "next_place": "support"
+ }
+}

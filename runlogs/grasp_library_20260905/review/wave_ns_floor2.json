@@ -1,0 +1,17 @@
+{
+  "batch": "wave_ns_floor2",
+  "models": [
+    {
+      "key": "trash_can__jlawet__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rolled-rim pinch; inner pad flush, outer ~2 mm hairline; 13/0 tolerated"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rolled-rim pinch; inner pad flush, outer ~2 mm hairline; 11/0 tolerated"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rolled-rim pinch; inner pad flush, outer ~2 mm hairline; 12/0 tolerated"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "Rolled-rim pinch, clear in V3; outer ~2 mm hairline; 11/0 tolerated"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Rolled-rim pinch, clear in V3; outer ~2 mm hairline; 11/0 tolerated"}
+      ],
+      "object_note": "Rim pinches on rolled lip; one finger at closing stop (x/0), outer pad ~2 mm hairline seam, not flagged."
+    }
+  ]
+}

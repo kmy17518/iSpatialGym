@@ -1,0 +1,211 @@
+{
+ "task": "configuration_matching",
+ "subtask": "configuration_matching-attachment",
+ "pick": "configuration_matching-attachment#04",
+ "slot": "representative",
+ "category": "lid",
+ "model": "pbmsji",
+ "key": "lid__pbmsji__a",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.3388137512207031,
+  0.3388137512207031,
+  0.1097373104095459
+ ],
+ "ready": true,
+ "dataset": "behavior-1k-assets",
+ "key_exists": false,
+ "candidates_meta": {
+  "object": {
+   "category": "lid",
+   "model": "pbmsji"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 5940,
+   "n_tilt": 105,
+   "n_width_antipodal": 40,
+   "n_table": 34,
+   "n_collision": 17,
+   "n_sweep": 17,
+   "n_lever": 17,
+   "n_attachment_free": 17,
+   "n_selected": 10,
+   "com": [
+    -0.0022,
+    -0.0009,
+    -0.0165
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "side_rule": "lid: contact at or above the CoM (the rim is the mating side), attachment-point clearance >= 1 cm"
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0395
+   ],
+   "score": 12.2473,
+   "meta": {
+    "com_perp": 0.00198,
+    "width": 0.08649,
+    "antipodal": 0.98621,
+    "coverage": 1.0,
+    "clearance": 0.00436,
+    "tilt_deg": 4.00146,
+    "attach_dist": 0.05029,
+    "attach_side": -2.67022
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g0_wrist.png"
+   },
+   "t_s": 11.76
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0377
+   ],
+   "score": 11.7004,
+   "meta": {
+    "com_perp": 0.00952,
+    "width": 0.08656,
+    "antipodal": 0.99695,
+    "coverage": 1.0,
+    "clearance": 0.00531,
+    "tilt_deg": 6.42979,
+    "attach_dist": 0.04735,
+    "attach_side": -2.45818
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g1_wrist.png"
+   },
+   "t_s": 2.59
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0381
+   ],
+   "score": 11.2679,
+   "meta": {
+    "com_perp": 0.00913,
+    "width": 0.08596,
+    "antipodal": 0.97789,
+    "coverage": 1.0,
+    "clearance": 0.00203,
+    "tilt_deg": 13.0884,
+    "attach_dist": 0.04412,
+    "attach_side": -2.51263
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g2_wrist.png"
+   },
+   "t_s": 2.6
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0381
+   ],
+   "score": 11.1123,
+   "meta": {
+    "com_perp": 0.00652,
+    "width": 0.08325,
+    "antipodal": 0.90862,
+    "coverage": 1.0,
+    "clearance": 0.00116,
+    "tilt_deg": 15.27693,
+    "attach_dist": 0.0417,
+    "attach_side": -2.07021
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g3_wrist.png"
+   },
+   "t_s": 2.56
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0379
+   ],
+   "score": 10.7322,
+   "meta": {
+    "com_perp": 0.02477,
+    "width": 0.08656,
+    "antipodal": 0.99695,
+    "coverage": 1.0,
+    "clearance": 0.00524,
+    "tilt_deg": 25.97163,
+    "attach_dist": 0.04809,
+    "attach_side": -2.45818
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/lid__pbmsji__a/g4_wrist.png"
+   },
+   "t_s": 2.63
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 40.4
+}

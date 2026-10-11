@@ -1,0 +1,66 @@
+{
+ "batch": "wave_ns_zbu_acbrnv15",
+ "models": [
+  {
+   "key": "hardback__acbrnv__bu",
+   "n_rows": 9,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "45 mm up, level approach; pads flush; V5 boxes clear"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "60 mm up, level approach; pads flush; V5 boxes clear"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 mm up, 10 deg down; V5 fingers occluded, label 16 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "45 mm up, 10 deg down; V5 fingers occluded, label 14 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 mm up, level approach; pads flush; V5 boxes clear"
+    },
+    {
+     "rank": 6,
+     "verdict": "ok",
+     "flags": [],
+     "note": "60 mm up, 10 deg down; V5 fingers occluded, label 12 mm"
+    },
+    {
+     "rank": 7,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 mm up, 20 deg down; V5 fully occluded, label 13 mm"
+    },
+    {
+     "rank": 8,
+     "verdict": "ok",
+     "flags": [],
+     "note": "45 mm up, 20 deg down; V5 fully occluded, label 12 mm"
+    },
+    {
+     "rank": 9,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 mm up, 30 deg down; V5 fully occluded, label 10 mm"
+    }
+   ],
+   "object_note": "Covers pinched by spine, ~3 cm between pads; 33/0 tolerated, pads flush; pitched rows: V5 camera behind wall box"
+  }
+ ]
+}

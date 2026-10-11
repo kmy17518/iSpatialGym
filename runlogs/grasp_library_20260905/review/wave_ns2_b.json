@@ -1,0 +1,71 @@
+{
+  "batch": "wave_ns2_b",
+  "models": [
+    {
+      "key": "gym_shoe__picdro__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Toe-box pinch, 35/29 near-symmetric; shoe hangs straight below"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/11: finger stuck at open limit, toe ~19 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/19: finger stuck at open limit, toe ~15 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: finger stuck at open limit, toe ~19 mm off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Toe-box pinch at 31 deg, 28/42 both closed; hangs below"}
+      ],
+      "object_note": "Stands on heel (x_up); toe-tip pinches hang below; in 50/x rows the stuck pad touches only at fingertip."
+    },
+    {
+      "key": "gym_shoe__pblxfp__t",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "Toe pinch, lying shoe cantilevered ~10 cm (CoM offset 99 mm)"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "Toe pinch, lying shoe cantilevered ~11 cm (CoM offset 112 mm)"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "18 deg toe pinch, shoe cantilevered ~11 cm (CoM offset 113 mm)"}
+      ],
+      "object_note": "Lies on side; all rows pinch 80-87 mm toe box, shoe cantilevered ~10 cm; 50/x only 5-9 mm off-centre"
+    },
+    {
+      "key": "spray_bottle__lwmelf__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Sprayer-head pinch, both pads touch; bottle hangs below"},
+        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "37/0 on 25 mm head: ~12 mm daylight, head floats"},
+        {"rank": 3, "verdict": "flag", "flags": ["gap"], "note": "36/0 on 25 mm head: daylight both sides in V2/V3"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "Sprayer-head pinch, 26/0 off-centre but both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Sprayer-head pinch, 26/0 off-centre but both pads touch"}
+      ],
+      "object_note": "Rows 2-3 stop ~12 mm wider than the visual head (coarser hull); other rows touch it."
+    },
+    {
+      "key": "spray_bottle__miqtui__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["gap"], "note": "37/0 on 25 mm head: ~12 mm daylight, head floats"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Sprayer-head pinch, 26/0, both pads touch; coverage 0.75"},
+        {"rank": 3, "verdict": "flag", "flags": ["gap"], "note": "36/0 on 25 mm head: daylight both sides in V2/V3"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "Sprayer-head pinch, 26/0 off-centre but both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Sprayer-head pinch, 26/0 off-centre but both pads touch"}
+      ],
+      "object_note": "Same sprayer head as lwmelf; rows 1 and 3 stop ~12 mm wider than visual head."
+    },
+    {
+      "key": "lid__gerjlh__a",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Knob cap pinch, rim free; 45/0 yet both pads on cap"}
+      ],
+      "object_note": "30 cm domed lid hangs level from knob (CoM 2 mm); 45/0 finger closed 5 mm, not stuck."
+    },
+    {
+      "key": "storage_box__bwbpvg__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "30 deg rim pinch on 4 mm wall; tray cantilevered ~12 cm"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "Mid-wall rim pinch on 3 mm wall; tray cantilevered ~12 cm"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "Mid-wall rim pinch on 4 mm wall; tray cantilevered ~12 cm"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "30 deg rim pinch on 4 mm wall; tray cantilevered ~12 cm"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "30 deg rim pinch on 4 mm wall; tray cantilevered ~12 cm"}
+      ],
+      "object_note": "25x25x6 cm open tray; every row pinches one 4 mm wall top, too wide for body grasp."
+    }
+  ]
+}

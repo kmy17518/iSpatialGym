@@ -1,0 +1,71 @@
+{
+  "batch": "wave_ns2_a",
+  "models": [
+    {
+      "key": "beer_glass__lymciz__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "Lip pinch on 4 mm glass wall, one finger inside"},
+        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "Lip pinch on 8 mm glass wall; body grasp would fit"},
+        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "Lip pinch on 4 mm wall, CoM 4 mm; contacts look clean"},
+        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "Lip pinch on 8 mm glass wall, 6 deg tilt"},
+        {"rank": 5, "verdict": "flag", "flags": ["fragile"], "note": "Lip pinch on 6 mm wall, 10 deg tilt"}
+      ],
+      "object_note": "All five pinch the glass lip, one finger inside; rim ~76 mm fits 97 mm opening."
+    },
+    {
+      "key": "carving_knife__gixmnd__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Handle pinch just behind bolster, near CoM; fingertips flush with underside"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Handle pinch behind bolster, 23 deg tilt; both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Handle pinch near bolster, blade pointing other way; CoM 17 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "Pinch at bolster/handle junction per V4; oblique V1/V2, fine"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "Handle pinch near bolster, 25 deg tilt; contacts clean"}
+      ],
+      "object_note": "All pinch the handle at the bolster, not the blade; x/0 asymmetry with both pads touching."
+    },
+    {
+      "key": "steak__lcebsq__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Top pinch across 67 mm thickness, CoM-centred; both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Same centred top pinch, 0 deg tilt; clean contacts"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "30 deg tilt, CoM-centred pinch; both pads on steak"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "30 deg tilt, centred pinch; clean contacts, bottom face free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "30 deg tilt, CoM 5 mm; clean contacts, bottom face free"}
+      ],
+      "object_note": "Steak stands on edge (x_down); 50/18 only offsets the gripper, steak fills the pad gap."
+    },
+    {
+      "key": "steak__akoxpw__t",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "Corner pinch of large slab, CoM offset 57 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "Pinch at the very end of slab, CoM offset 87 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "Pinch beside slab end face (V3), CoM offset 81 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "End pinch, 30 deg tilt, CoM offset 93 mm"}
+      ],
+      "object_note": "~150 mm block pinched only at one end (V3), lever arms 57-93 mm; contacts clean."
+    },
+    {
+      "key": "tablespoon__ubuhoz__t",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["task_violation"], "note": "Neck pinch near CoM; fingertips ~1 cm below spoon support line"},
+        {"rank": 2, "verdict": "flag", "flags": ["task_violation"], "note": "Neck pinch, 26 deg tilt; fingertips ~1 cm past spoon underside"}
+      ],
+      "object_note": "Deep neck pinches: fingertips protrude below bowl-to-handle support line in V1; 10/0 asymmetry tolerated."
+    },
+    {
+      "key": "lid__ppkjuy__a",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "Pinches ring top edge on woven side; mating rim free. V1 blank"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "Top-edge pinch of ring, ~50 mm above mating rim"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "Top-edge pinch, 37 deg tilt; bottom rim free (V3 shows top)"}
+      ],
+      "object_note": "Ring ~18 mm thick; ~3 mm seam at outer pad (hull slightly larger), not flagged. Small top loop exists."
+    }
+  ]
+}
