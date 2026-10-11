@@ -13,7 +13,8 @@ holds re-applied where the TRO recorded targets. This is the single-env ``Instan
 Every TRO kind: the §3.14 restores of ``run_isg.InstanceLoader`` run per clone through :class:`SlotLoader` (the single-env
 methods bound to that clone's scene, robot and scope): hinge constraints (``anchor_position`` translated into the clone's
 frame, the axis unchanged - clones are translated copies -, the parent link from that scene's object), joint-friction /
-counterbalance / mass records, the attachment collision filters on that clone's prims, the assisted grasps on that clone's
+counterbalance / mass records, the attachment pairs' report (their collision stays on until the task's attach rule joins
+them, as in the single-env loader), the assisted grasps on that clone's
 robot (``ag_anchor_in_eef`` and the object-in-eef placement are eef-relative), ``restore_after_reset`` per env after the
 batched ``env.reset`` (lost hinge prims recreated, grasps re-established, articulation joints re-checked), and the reuse
 cleanup per scene (that scene's hinges removed, that robot's grasps released) before the scene goes back to the template's
@@ -456,7 +457,7 @@ class VecInstanceLoader:
             self.slots[i] = sl
             try:
                 rep["constraints"] = sl._restore_constraints(extras.get("constraints") or [])
-                rep["attachments"] = sl._restore_attachment_filters(extras.get("attachment_targets") or [])
+                rep["attachments"] = sl._attachment_report(extras.get("attachment_targets") or [])
                 sl._articulation_q = {inst: physical[inst].get_joint_positions().clone() for inst in tro.meta.articulation_targets if inst in physical}
                 sl.grasps = sl._restore_grasps(extras.get("grasps") or [])
                 rep["grasps"] = sl.grasps
