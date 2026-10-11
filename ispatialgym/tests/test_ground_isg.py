@@ -1,10 +1,14 @@
 """``ground_isg`` v2 (iddl + icl -> BDDL + customs list) on the shipped icl, into a temporary directory (no simulator;
 the BEHAVIOR knowledge base is needed for the synsets)."""
 
+import atexit
+import functools
 import json
 import os
 import re
+import shutil
 import sys
+import tempfile
 import types
 
 import pytest
@@ -17,6 +21,25 @@ from ispatialgym.sampling import ground_isg as GI
 from ispatialgym.sampling import iddl as I
 
 IDDLS = I.load_all()
+
+#: the representative sheet these tests were written against: the first-demo selection (``roles/representatives.csv`` until
+#: the owner's new sheet replaced it on 2026-10-11), grounded with the shipped icl's other sheets
+FIRST_DEMO_SHEET = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "representatives_first_demo.csv")
+
+
+@functools.lru_cache(maxsize=None)
+def first_demo_icl() -> str:
+    """An icl root: the shipped ``roles/`` and ``require/`` sheets (symlinked) with :data:`FIRST_DEMO_SHEET` as
+    ``roles/representatives.csv``."""
+    root = tempfile.mkdtemp(prefix="icl_first_demo_")
+    atexit.register(shutil.rmtree, root, True)
+    for sub in ("roles", "require"):
+        os.makedirs(os.path.join(root, sub))
+        for name in os.listdir(os.path.join(GI.DEFAULT_ICL, sub)):
+            if (sub, name) != ("roles", "representatives.csv"):
+                os.symlink(os.path.join(GI.DEFAULT_ICL, sub, name), os.path.join(root, sub, name))
+    shutil.copy(FIRST_DEMO_SHEET, os.path.join(root, "roles", "representatives.csv"))
+    return root
 
 #: one subtask per family (+ the two ``under`` argument orders, a :groups composite, a scene target, a wall support)
 SUBTASKS = [
@@ -43,7 +66,7 @@ def grounded(tmp_path_factory):
     root = tmp_path_factory.mktemp("ground_isg")
     bddl_root = os.path.join(root, "activity_definitions")
     customs_path = os.path.join(root, "isg_customs.json")
-    icl = GI.ICL()
+    icl = GI.ICL(first_demo_icl())
     customs = C.Customs.load(customs_path)
     grounder = GI.Grounder(IDDLS, icl, customs, bddl_root=bddl_root, options=GI.Options(representative_test=False))
     report = grounder.run(SUBTASKS)
@@ -426,11 +449,11 @@ def test_representative_test_hook_is_skipped_without_the_sampler(grounded, monke
 
 
 def test_cli_dry_run(tmp_path):
-    rc = GI.main(["--dry-run", "--subtask", "object_scaling", "--out-bddl", str(tmp_path / "bddl"), "--customs", str(tmp_path / "c.json"),
+    rc = GI.main(["--icl", first_demo_icl(), "--dry-run", "--subtask", "object_scaling", "--out-bddl", str(tmp_path / "bddl"), "--customs", str(tmp_path / "c.json"),
                   "--no-representative-test"])
     assert rc == 0
     assert not (tmp_path / "c.json").exists() and not (tmp_path / "bddl").exists()
-    rc = GI.main(["--subtask", "object_scaling", "--out-bddl", str(tmp_path / "bddl"), "--customs", str(tmp_path / "c.json"),
+    rc = GI.main(["--icl", first_demo_icl(), "--subtask", "object_scaling", "--out-bddl", str(tmp_path / "bddl"), "--customs", str(tmp_path / "c.json"),
                   "--no-representative-test", "--legacy-activity-names", "--report", str(tmp_path / "report.md")])
     assert rc == 0 and (tmp_path / "report.md").exists() and (tmp_path / "report.json").exists()
     data = json.load(open(tmp_path / "c.json"))
@@ -439,7 +462,7 @@ def test_cli_dry_run(tmp_path):
 
 
 def test_legacy_activity_names(tmp_path):
-    icl = GI.ICL()
+    icl = GI.ICL(first_demo_icl())
     customs = C.Customs.load(str(tmp_path / "c.json"))
     grounder = GI.Grounder(IDDLS, icl, customs, bddl_root=str(tmp_path / "bddl"),
                            options=GI.Options(representative_test=False, legacy_activity_names=True, fallbacks=False))
@@ -645,7 +668,7 @@ def test_pilot_blacklist_gives_the_next_model_fallback(tmp_path):
     """Owner decision 2026-09-16 item 5: a pick the pilot rejected (hanger unstable_init) is blacklisted with the pilot
     reason in every scene block, the primary keeps its alias with an empty whitelist and gets the next model of the
     category as its rank-1 fallback; the blacklist and the fallback survive a re-run without the flag."""
-    icl = GI.ICL()
+    icl = GI.ICL(first_demo_icl())
     bl = {("alignment-world_vertical", "target", "hanger", "agrpio"): "unstable_init"}
     g = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
                     options=GI.Options(representative_test=False, blacklist=bl))
@@ -670,7 +693,7 @@ def test_pilot_blacklist_gives_the_next_model_fallback(tmp_path):
 
 
 def test_no_fallbacks_option(tmp_path):
-    g = GI.Grounder(IDDLS, GI.ICL(), C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
+    g = GI.Grounder(IDDLS, GI.ICL(first_demo_icl()), C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
                     options=GI.Options(representative_test=False, fallbacks=False))
     g.run(["inter_object_relation_satisfaction-under_large_scale", "alignment-axial"])
     assert g.grounded and not any(gp.entry.is_fallback for gp in g.grounded) and not g.report.fallbacks
@@ -680,7 +703,7 @@ def test_no_fallbacks_option(tmp_path):
 def test_several_representative_supports_per_pick(tmp_path):
     """A3 support triplets: several support rows in the representative slot of one pick -> one alias per support
     category (scene per support), same-category supports share the alias and union their scene blocks."""
-    icl = GI.ICL()
+    icl = GI.ICL(first_demo_icl())
     pick = "inter_object_relation_satisfaction-nextto#01"
     base = icl.picks[pick]["support"]["representative"][0]
     extra = [
@@ -710,3 +733,34 @@ def test_several_representative_supports_per_pick(tmp_path):
     ids = P.list_problem_ids("inter_object_relation_satisfaction", str(tmp_path / "bddl"))
     assert len(ids) == len({gp.alias for gp in g.grounded})
     assert P.validate_problem_registry("inter_object_relation_satisfaction", str(tmp_path / "bddl"))
+
+
+def test_hyphenated_synset_instances_parse():
+    """BEHAVIOR synsets may hold a hyphen (``deep-freeze.n.02``; ``mock-up.n.01``, the category of the 2026-10-11
+    mental-rotation block): their instances are valid names; empty or doubled hyphen segments are not."""
+    for ok in ("mock-up.n.01_1", "deep-freeze.n.02_12", "t-shirt.n.01_1", "mug.n.04_1"):
+        assert P.INSTANCE_RE.match(ok), ok
+    for bad in ("-mock.n.01_1", "mock-.n.01_1", "mock--up.n.01_1", "mock-up.n.1_1", "Mock-up.n.01_1"):
+        assert not P.INSTANCE_RE.match(bad), bad
+
+
+def test_custom_asset_without_a_candidate_row_gets_its_dataset(tmp_path):
+    """A sheet model without a ``candidates.csv`` row that is one of the repo's own assets is grounded with the
+    ``ispatialgym-assets`` dataset (the sampler loads the model from the dataset of its customs role)."""
+    assert GI._is_custom_asset("toy_dice", "isgblk") and not GI._is_custom_asset("toy_dice", "nosuchmodel") and not GI._is_custom_asset("apple", None)
+    g = GI.Grounder(IDDLS, GI.ICL(first_demo_icl()), C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
+                    options=GI.Options(representative_test=False))
+    row = {"subtask": "mental_rotation", "role": "target", "kind": "sampleable", "category": "toy_dice", "model": "isgblk"}
+    merged = g._resolve_row("mental_rotation", "target", row)
+    assert merged["_synthetic"] == "1" and merged["dataset"] == GI.CUSTOM_DATASET
+    assert not g._resolve_row("mental_rotation", "target", dict(row, model="nosuchmodel")).get("dataset")
+
+
+def test_scene_entry_keeps_underscore_comments():
+    """A scene block's hand-written ``_``-keys (the sandal aliases' ``_note``) survive a load / write round trip; other
+    unknown keys are still errors."""
+    raw = {"rooms": ["kitchen_0"], "bindings": {}, "whitelist": {}, "blacklist": {}, "_note": "the 0.15 m drop, the deeper trunk first"}
+    se = C.SceneEntry.from_dict(raw)
+    assert se.notes == {"_note": raw["_note"]} and se.to_dict() == raw
+    with pytest.raises(C.CustomsError):
+        C.SceneEntry.from_dict(dict(raw, note="no underscore"))

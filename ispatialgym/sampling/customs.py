@@ -220,6 +220,8 @@ class SceneEntry:
     bindings: Dict[str, Any] = field(default_factory=dict)  # role -> [scene object names] | {"room": ...} | {"category": [...]}
     whitelist: Dict[str, Dict[str, List[str]]] = field(default_factory=dict)  # role -> category -> [models]
     blacklist: Dict[str, Dict[str, Dict[str, str]]] = field(default_factory=dict)  # role -> category -> model -> reason
+    # hand-written comments of the scene block (keys starting with ``_``, e.g. the sandal aliases' ``_note``): kept verbatim
+    notes: Dict[str, Any] = field(default_factory=dict)
 
     def whitelist_add(self, role: str, category: str, model: str) -> None:
         if self.is_blacklisted(role, category, model):
@@ -261,11 +263,13 @@ class SceneEntry:
             "bindings": copy.deepcopy(self.bindings),
             "whitelist": {r: cats for r, cats in whitelist.items() if cats},
             "blacklist": {r: cats for r, cats in blacklist.items() if cats},
+            **copy.deepcopy(self.notes),
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "SceneEntry":
-        unknown = set(d) - set(SCENE_KEYS)
+        notes = {k: copy.deepcopy(v) for k, v in d.items() if k.startswith("_")}
+        unknown = set(d) - set(SCENE_KEYS) - set(notes)
         if unknown:
             raise CustomsError(f"scene entry has unknown keys {sorted(unknown)}")
         return cls(
@@ -273,6 +277,7 @@ class SceneEntry:
             bindings=copy.deepcopy(d.get("bindings") or {}),
             whitelist={r: {c: list(ms) for c, ms in (cats or {}).items()} for r, cats in (d.get("whitelist") or {}).items()},
             blacklist={r: {c: dict(ms) for c, ms in (cats or {}).items()} for r, cats in (d.get("blacklist") or {}).items()},
+            notes=notes,
         )
 
 

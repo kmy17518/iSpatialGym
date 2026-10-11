@@ -97,7 +97,8 @@ FORBIDDEN_IN_INIT = frozenset({"pose_reached", "pose_settled", "layout_reached"}
 LOGICAL_TOKENS = frozenset({"and", "or", "not", "imply", "forall", "exists", "forn", "forpairs", "fornpairs"})
 QUANTIFIER_TOKENS = frozenset({"forall", "exists", "forn", "forpairs", "fornpairs"})
 
-INSTANCE_RE = re.compile(r"^[a-z0-9_]+\.n\.\d{2}_\d+$")
+#: ``<synset>_<n>``; a synset word may contain single hyphens, as BEHAVIOR's do (``deep-freeze.n.02``, ``mock-up.n.01``)
+INSTANCE_RE = re.compile(r"^[a-z0-9_]+(?:-[a-z0-9_]+)*\.n\.\d{2}_\d+$")
 #: ``<family>-<subtask>-<category slots>`` (v2, e.g. ``inter_object_relation_satisfaction-ontop_small_scale-apple-
 #: plate-breakfast_table``) or a bare v1 variant (``table_surface``): segments of lowercase letters, digits and ``_``
 #: joined by single ``-``; the alias starts with a letter and has no empty segment.

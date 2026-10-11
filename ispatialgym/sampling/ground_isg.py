@@ -135,6 +135,11 @@ def _read_csv(path: str) -> List[Dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def _is_custom_asset(category: Optional[str], model: Optional[str]) -> bool:
+    """``category/model`` is one of the repo's own converted assets (``assets/datasets/ispatialgym-assets/objects``)."""
+    return bool(category and model) and os.path.isdir(os.path.join(ASSETS_ROOT, "datasets", CUSTOM_DATASET, "objects", category, model))
+
+
 def _split_rooms(value: str) -> List[str]:
     return [r.strip() for r in (value or "").split(",") if r.strip()]
 
@@ -945,6 +950,8 @@ class Grounder:
                 merged[k] = v
         if cand is None:
             merged["_synthetic"] = "1"
+            if row.get("kind") != "scene" and not merged.get("dataset") and _is_custom_asset(row.get("category"), row.get("model")):
+                merged["dataset"] = CUSTOM_DATASET
         return merged
 
     def _sampleable_pick(self, iddl: I.IDDL, role: str, row: Optional[Dict[str, str]], slot: str) -> RolePick:
@@ -1556,6 +1563,8 @@ class Grounder:
                 re_.sampleable = True
                 if rp.pick_row is not None:
                     re_.representative = rp.pick_row["model"]
+                    if rp.pick_row.get("dataset"):
+                        re_.dataset = rp.pick_row["dataset"]
                 elif rp.models:
                     re_.representative = rp.models[0][1]
             else:
