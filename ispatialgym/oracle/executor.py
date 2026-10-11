@@ -949,7 +949,15 @@ class Executor:
         for arm, obj in before.items():
             if obj is not None and after.get(arm) is None:
                 cmd = float(action[self.robot.controller_action_idx[f"gripper_{arm}"]].flatten()[0])
-                self.release_check["releases"].append({"step": self.n, "arm": arm, "object": obj, "gripper_command": round(cmd, 4)})
+                rec = {"step": self.n, "arm": arm, "object": obj, "gripper_command": round(cmd, 4)}
+                # the fork's pad-clear release (Robot.ag_release_on_pad_clear): how long the weld outlived the open command
+                # and what ended it ("pads_clear" or "cap")
+                log_ = getattr(self.robot, "ag_release_log", None)
+                ev = next((e for e in reversed(log_ or []) if e.get("arm") == arm and e.get("object") == obj), None)
+                if ev is not None:
+                    rec.update({"weld_delay_s": round(float(ev["delay_s"]), 4), "weld_delay_physics_steps": int(ev["delay_steps"]), "weld_released_by": ev["by"]})
+                    log_.remove(ev)
+                self.release_check["releases"].append(rec)
                 if cmd < 1.0 - 1e-6:
                     self.release_check["violations"].append({"step": self.n, "arm": arm, "object": obj, "kind": "gripper_command_below_open",
                                                              "gripper_command": round(cmd, 4)})

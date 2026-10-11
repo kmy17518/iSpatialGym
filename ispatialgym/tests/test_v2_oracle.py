@@ -3977,6 +3977,23 @@ def _held_marker(joints=None):
     return robot, env, m, marker
 
 
+def test_release_check_records_how_long_the_weld_outlived_the_open_command(tmp_path):
+    """Our Behavior-1K fork's pad-clear release logs each delayed release (``Robot.ag_release_log``); the release check copies
+    the delay and what ended it ("pads_clear" / "cap") into the release it records at the step the weld went (the command +1
+    there, no violation) and consumes the entry."""
+    sc, env = iors_world()
+    ex, motions, *_ = make_executor(env, sc, tmp_path)
+    robot = env.robot
+    robot.ag_release_log = [{"arm": "right", "object": "apple_omzprq_0", "by": "pads_clear", "delay_steps": 12, "delay_s": 0.1}]
+    action = th.zeros(robot.action_dim)
+    action[robot.controller_action_idx["gripper_right"]] = 1.0
+    ex._check_releases({"left": None, "right": "apple_omzprq_0"}, {"left": None, "right": None}, action)
+    rec = ex.release_check["releases"][-1]
+    assert rec["object"] == "apple_omzprq_0" and rec["gripper_command"] == 1.0
+    assert rec["weld_delay_s"] == 0.1 and rec["weld_delay_physics_steps"] == 12 and rec["weld_released_by"] == "pads_clear"
+    assert robot.ag_release_log == [] and not ex.release_check["violations"]
+
+
 def test_free_object_is_released_by_the_open_command():
     """Release semantics (owner 2026-10-03 / 2026-10-10): a held free object leaves the hand only through OmniGibson's rule -
     the open command (+1) in one step with the hand still, the assisted grasp letting go at that step; nothing is released
@@ -4147,3 +4164,17 @@ def test_ag_joint_rule_is_the_tasks_not_the_oracles():
         src = open(path).read()
         assert "_get_assisted_grasp_joint_type =" not in src, path
         assert "ag_moving_link_joint_type" not in src, path
+
+
+def test_ag_release_rule_is_the_tasks_not_the_oracles():
+    """The assisted grasp's pad-clear release (owner 2026-10-10: the weld stays after the open command until a pad has left the
+    object, at most 0.2 s) is a rule of the environment: ``ISpatialGymTask`` sets our Behavior-1K fork's
+    ``Robot.ag_release_on_pad_clear`` / ``ag_release_max_delay_s`` on every robot, so demo collection, replays and an evaluated
+    policy meet the same release; no oracle module sets them (the executor only reads the fork's ``ag_release_log``)."""
+    pkg = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    task = open(os.path.join(pkg, "tasks", "ispatialgym_task.py")).read()
+    assert "AG_RELEASE_ON_PAD_CLEAR = True" in task and "AG_RELEASE_MAX_DELAY_S = 0.2" in task
+    assert "robot.ag_release_on_pad_clear = AG_RELEASE_ON_PAD_CLEAR" in task and "robot.ag_release_max_delay_s = AG_RELEASE_MAX_DELAY_S" in task
+    for path in glob.glob(os.path.join(pkg, "oracle", "*.py")):
+        src = open(path).read()
+        assert "ag_release_on_pad_clear =" not in src and "ag_release_max_delay_s =" not in src, path
