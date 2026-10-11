@@ -794,8 +794,10 @@ def attach_on_release(robot: Any, arm: str, obj: Any) -> Optional[Dict[str, Any]
 
 
 def _registered_member(obj: Any) -> bool:
+    """``obj`` is a child or parent of a pair registered for its own scene or for a single env (scene None)."""
     name = getattr(obj, "name", None)
-    return any(name in pair for pair in _ATTACHMENTS)
+    idx = getattr(getattr(obj, "scene", None), "idx", None)
+    return any(name in (c, p) for s, c, p in _ATTACHMENTS if s is None or s == idx)
 
 
 def _link_name(obj: Any, link: Any) -> Optional[str]:
@@ -828,7 +830,7 @@ def install_attach_overrides() -> bool:
 
     def _attach(self, other, child_link, parent_link, joint_type=None, can_joint_break=True):
         key = (getattr(self.obj, "name", None), getattr(other, "name", None))
-        if key in _ATTACHMENTS:
+        if attachment_context(self.obj, other) is not None:
             attach_in_place(self.obj, other, _link_name(self.obj, child_link), _link_name(other, parent_link), can_joint_break=can_joint_break)
             _PENDING_UNFILTER.discard(key)
             if key not in _FILTERED:
@@ -840,7 +842,7 @@ def install_attach_overrides() -> bool:
         parent = self.parent
         out = stock["_detach"](self)
         key = (getattr(self.obj, "name", None), getattr(parent, "name", None))
-        if parent is not None and key in _ATTACHMENTS:
+        if parent is not None and attachment_context(self.obj, parent) is not None:
             _PENDING_FILTER.discard(key)
             if key in _FILTERED:
                 _PENDING_UNFILTER.add(key)
