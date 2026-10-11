@@ -1141,9 +1141,18 @@ class SamplerV2(TaskSampler):
         per reason with the first three examples. Returns the TRO paths written."""
         written: List[str] = []
         start = self.existing_instances() if start_index is None else int(start_index)
+        deadline = getattr(self, "deadline", None)
+        out_of_time = False
         for index in range(start, start + int(n)):
             ok = False
             for attempt in range(max_attempts):
+                # the alias's time budget (sample_isg --time-budget-s) ends the run between attempts only: an attempt in progress
+                # always finishes, and a template whose setup finished gets its first attempt
+                if deadline is not None and time.time() >= deadline and (attempt > 0 or index > start):
+                    out_of_time = True
+                    self.counters["time_budget_stops"] = self.counters.get("time_budget_stops", 0) + 1
+                    log.warning("%s: time budget used up; no attempt %d of instance %d", self.gp.alias, attempt, index)
+                    break
                 seed = int(self.ctx.base_seed * 1000003 + index * 1009 + attempt)
                 rng = np.random.default_rng(seed)
                 t0 = time.time()
@@ -1200,6 +1209,8 @@ class SamplerV2(TaskSampler):
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.alias, index, attempt, phase, time.time() - t0, e)
                     self.on_reject(e)
+            if out_of_time:
+                break
             if not ok:
                 log.error("%s: instance %d failed after %d attempts; rejections=%s", self.gp.alias, index, max_attempts, self.rejection_log.counts)
         self.template_meta["n_written"] = self.template_meta.get("n_written", 0) + len(written)

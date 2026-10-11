@@ -257,6 +257,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     # ---- configuration matching (§6.5–6.8) ---------------------------------------------------------------------
     "configuration_matching-block_design": {
         **COMMON,
+        "time_budget_factor": 1.5,  # owner 2026-10-11: block design takes longer - 1.5 x the sampling / demo / replay time budgets
         "tolerances": {"position": 0.010, "position_edge_fraction": 0.4, "orientation": 0.15},  # §8 0.4·edge (≈ 0.010 m) / 0.15 rad
         "groups": {"targets": {"size": 4, "draw": "same_model"}},  # §2.3 targets {size: 4, draw: same_model}
         "path_buckets": None,

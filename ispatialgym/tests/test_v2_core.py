@@ -1460,3 +1460,67 @@ def test_flipped_push_chain_check_rejects_only_a_witness_in_another_branch():
     ok, why = PC._flipped_push_chain_check(make(far), chain, None, "right", q_wit, [], [], None, None)
     assert not ok and why.startswith("approach_untrackable") and "3.10 rad" in why
     assert IKResult(False, None, why, 3).code == "approach_untrackable"
+
+
+def _budget_sampler(outcomes):
+    """A ``SamplerV2`` whose attempts follow ``outcomes`` (True = an instance is written, False = rejected), the rest stubbed."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2.core import SamplerV2
+
+    s = object.__new__(SamplerV2)
+    seq = iter(outcomes)
+    s.attempts = []
+
+    def sample(rng):
+        s.attempts.append(len(s.attempts))
+        if not next(seq):
+            raise Reject("goal_infeasible", "stub")
+        return SimpleNamespace(summary={})
+
+    noop = lambda *a, **k: None  # noqa: E731
+    s.ctx = SimpleNamespace(base_seed=0)
+    s.kit = SimpleNamespace(stats_snapshot=lambda: {}, stats_delta=lambda a, b: {})
+    s.world = SimpleNamespace(reset_scene_objects=lambda names=None: 0)
+    s.objects, s.counters, s.template_meta, s.rejections, s.instance_seeds = {}, {}, {}, {}, []
+    s.template_paths = None
+    s.ikc = SimpleNamespace(solutions={}, attempt=None)
+    s.gp = SimpleNamespace(alias="alias-test")
+    s.rejection_log = SimpleNamespace(add=noop, counts={})
+    s.sample = sample
+    for name in ("park_robot", "apply_draft", "settle_and_validate", "check_stances_with_objects", "check_goal_feasible", "after_goal_check",
+                 "verify_carry_legs", "program_check", "save_template", "check_goal_occlusion", "constraints_write_back", "write_template_meta", "on_reject"):
+        setattr(s, name, noop)
+    s.write_instance = lambda draft, index, seed: f"inst{index}"
+    s.instance_id = lambda index: f"iid{index}"
+    return s
+
+
+def test_time_budget_stops_only_between_failing_attempts():
+    """``sample_isg --time-budget-s`` (owner 2026-10-11): past the deadline no new attempt starts, but the attempt in progress
+    and a template's first attempt always run; without a deadline every attempt runs."""
+    import time
+
+    s = _budget_sampler([False] * 5)
+    assert s.run_instances(1, max_attempts=5, start_index=0) == [] and len(s.attempts) == 5 and "time_budget_stops" not in s.counters
+    s = _budget_sampler([False] * 5)
+    s.deadline = time.time() - 1.0
+    assert s.run_instances(1, max_attempts=5, start_index=0) == [] and len(s.attempts) == 1 and s.counters["time_budget_stops"] == 1
+    s = _budget_sampler([True, False, False])
+    s.deadline = time.time() - 1.0
+    assert s.run_instances(2, max_attempts=3, start_index=0) == ["inst0"] and len(s.attempts) == 1 and s.counters["time_budget_stops"] == 1
+    s = _budget_sampler([False, False, True])
+    s.deadline = time.time() + 3600.0
+    assert s.run_instances(1, max_attempts=5, start_index=0) == ["inst0"] and len(s.attempts) == 3 and "time_budget_stops" not in s.counters
+
+
+def test_block_design_has_one_and_a_half_times_the_time_budget():
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling import sample_isg as SI
+
+    gp = SimpleNamespace(subtask="configuration_matching-block_design", gen=lambda key, default=None: None)
+    assert SI.time_budget_factor(gp) == 1.5
+    assert SI.time_budget_factor(SimpleNamespace(subtask="mental_rotation", gen=lambda key, default=None: None)) == 1.0
+    assert SI.time_budget_factor(SimpleNamespace(subtask="mental_rotation", gen=lambda key, default=None: 2.0)) == 2.0

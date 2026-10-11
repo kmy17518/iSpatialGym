@@ -16,6 +16,10 @@ Blacklists and constraints are written back into the source customs file (``--no
 the copy under ``<out>/task_custom_lists.json`` is refreshed. The run ends with the ``SAMPLING_REPORT`` stdout line and
 ``<out>/summary.json`` (``problems.<alias>.<template>.{n_written, time_s, rejections, ...}``).
 
+``--time-budget-s`` (owner 2026-10-11): a per-alias budget, times ``generation.time_budget_factor`` (block design 1.5).
+Past it no new attempt, template or scene starts (``aliases.<alias>.time_budget_exhausted``, the template counter
+``time_budget_stops``); an attempt in progress always finishes, so a run is only cut off while it keeps failing.
+
 ``--v1-spec <spec.json> --v1-problem <activity>-<def_id> --subtask <id>`` builds the grounded problem from a v1 spec
 entry through the facade (``GroundedProblem.from_v1_spec``) until ``ground_isg`` (D1) produces customs entries.
 """
@@ -237,9 +241,11 @@ class WorldPool:
 
 
 def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, out_root: str, n_instances: int, seed: int, max_attempts: int,
-                 variant: Optional[str] = None, customs_sha256: Optional[str] = None, start_index: Optional[int] = None) -> Dict[str, Any]:
+                 variant: Optional[str] = None, customs_sha256: Optional[str] = None, start_index: Optional[int] = None,
+                 deadline: Optional[float] = None) -> Dict[str, Any]:
     """Build the sampler of the alias's subtask for ``choice``, run ``setup()`` + ``run_instances``; returns the
-    ``problems.<alias>.<template_id>`` summary entry (``error`` set when setup raised)."""
+    ``problems.<alias>.<template_id>`` summary entry (``error`` set when setup raised). ``deadline``: the alias's time
+    budget (``time.time()`` value), honoured between attempts (``SamplerV2.run_instances``)."""
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2.core import ContextV2, get_sampler
 
@@ -248,6 +254,7 @@ def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, o
     t0 = time.time()
     ctx = ContextV2(problem, choice, world, kit, out_dir, base_seed=seed, customs_sha256=customs_sha256, variant=variant)
     sampler = get_sampler(problem.subtask)(ctx)
+    sampler.deadline = deadline
     try:
         sampler.setup()
         written = sampler.run_instances(n_instances, max_attempts=max_attempts, start_index=start_index)
@@ -332,6 +339,10 @@ def main(argv=None, shutdown: bool = True):
     parser.add_argument("--out", default=DEFAULT_OUT)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--max-attempts", type=int, default=30)
+    parser.add_argument("--time-budget-s", type=float, default=None,
+                        help="per alias: once this much time has passed (times the subtask's generation.time_budget_factor) no new "
+                             "attempt, template or scene is started; an attempt in progress always finishes, so a run is cut off only "
+                             "while it keeps failing")
     parser.add_argument("--variant", default=None, help="task sub-variant (open / close, ...)")
     parser.add_argument("--no-write-back", action="store_true", help="do not append blacklists / constraints to the source customs file")
     parser.add_argument("--v1-spec", default=None, help="facade: v1 task spec json (until ground_isg lands)")
@@ -397,11 +408,21 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
     """All templates of one alias (every candidate scene unless ``--scene``): world from the pool (reused when the world key
     matches), the §9 model draw, one ``run_template`` per choice, whitelist pruning, customs write-back."""
     args.alias = alias
+    t_alias = time.time()
     gp = load_problem_from_args(args)
     scenes = [args.scene] if args.scene else gp.scene_names()
     rng = np.random.default_rng(args.seed)
     n_inst = args.instances_per_template if args.instances_per_template is not None else int(gp.gen("instances_per_template", 5))
+    deadline = None
+    if args.time_budget_s is not None:
+        budget = float(args.time_budget_s) * time_budget_factor(gp)
+        deadline = t_alias + budget
+        report["aliases"].setdefault(alias, {})["time_budget_s"] = round(budget, 1)
     for scene in scenes:
+        if deadline is not None and time.time() >= deadline:
+            report["aliases"].setdefault(alias, {})["time_budget_exhausted"] = True
+            log.warning("%s: time budget used up; scene %s not started", alias, scene)
+            break
         if scene not in gp.scene_names():
             report["errors"].append({"alias": alias, "scene": scene, "error": "scene not in the customs entry"})
             continue
@@ -414,6 +435,10 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
             continue
         exclude = _existing_templates(args.out, gp, scene)
         for ti, choice in enumerate(iter_template_choices(gp, scene, rng, exclude=exclude, max_templates=args.templates)):
+            if deadline is not None and time.time() >= deadline:
+                report["aliases"].setdefault(alias, {})["time_budget_exhausted"] = True
+                log.warning("%s: time budget used up; template %s not started", alias, choice.template_id)
+                break
             out_dir = os.path.join(args.out, gp.alias, choice.template_id)
             if os.path.exists(os.path.join(out_dir, "template.json")) and not args.overwrite:
                 log.info("skip existing template %s", out_dir)
@@ -421,7 +446,9 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
             if os.path.exists(out_dir) and args.overwrite:
                 shutil.rmtree(out_dir)
             entry = run_template(gp, choice, world, kit, args.out, n_inst, args.seed * 7919 + ti, args.max_attempts, args.variant, customs_sha,
-                                 start_index=args.start_index)
+                                 start_index=args.start_index, deadline=deadline)
+            if (entry.get("counters") or {}).get("time_budget_stops"):
+                report["aliases"].setdefault(alias, {})["time_budget_exhausted"] = True
             report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
             if entry.get("n_written", 0) == 0:
                 entry["blacklisted"] = blacklist_after_failure(gp, choice, entry)
@@ -432,6 +459,19 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
             if not args.no_write_back and gp.customs_path:
                 gp.save_customs()  # §1: sample_isg appends blacklists / constraints to the source customs list
             gp.save_customs(customs_copy)  # the copy under <out> always carries what this run learned
+
+
+def time_budget_factor(gp: GroundedProblem) -> float:
+    """``generation.time_budget_factor`` of the alias, else its subtask's seed (block design 1.5), else 1."""
+    v = gp.gen("time_budget_factor")
+    if v is None:
+        from ispatialgym.sampling import generation_defaults as GD
+
+        try:
+            v = GD.defaults_for(gp.subtask).get("time_budget_factor", 1.0)
+        except KeyError:
+            v = 1.0
+    return float(v)
 
 
 def print_world_keys(args) -> None:
