@@ -1905,89 +1905,52 @@ def test_epilogue_reports_the_predicate_branch_of_the_final_binary_evaluation(tm
     assert result2["success"] and result2["binary_branch"] == {} and result2["binary_branch_fallback"] == [] and result2["binary_branch_log"] == []
 
 
-def test_release_ramps_to_open_and_only_an_articulated_part_stages():
-    """Owner 2026-10-03 (release semantics): opening moves ramp at ``gripper_open_rate`` to exactly the open command (+1);
-    a held free object is released by that command, with nothing staged or deferred. Only an articulated part pinched
-    across its thickness (a carton flap) stages: first to the pre-shape width (or the executor's value) with the assisted
-    grasp still holding it, the full opening deferred until the hand has moved ``gripper_release_clearance_m`` (or
-    ``gripper_release_deferred_max_steps`` passed) and ending on the +1 that releases it; a closing command supersedes a
-    pending deferral and the deferral round-trips through the checkpoints."""
+def test_every_release_opens_to_plus_one_at_once():
+    """Owner 2026-10-10: every opening is exactly the open command (+1) in one step - no ramp, no staged or partial opening,
+    nothing deferred. A held object, free or articulated, is released by that command; an empty gripper opens the same way;
+    the checkpoints carry no release staging (an older checkpoint's staging keys are ignored)."""
     robot = FakeRobot()
     env = FakeEnv(robot, {})
     m = Motions(env, FakeBackend(robot), MotionsConfig(gripper_steps=30, settle_steps=5, cartesian_step=0.05, cartesian_rot_step=0.3))
     idx = robot.gripper_control_idx["right"]
     cmds = []
     env.after_step = lambda a: cmds.append(float(a[robot.controller_action_idx["gripper_right"]]))
-    # (a) nothing held: closed -> open is one ramp of 2.25 mm per step (22 steps for 50 mm) ending on exactly +1
+    # (a) nothing held: from closed, every opening command is +1
     drive(env, m.gripper("right", close=True))
     cmds.clear()
     drive(env, m.gripper("right", close=False))
-    targets = [0.05 * (c + 1.0) / 2.0 for c in cmds]
-    ramp = [t for t in targets if t < 0.05 - 1e-9]
-    assert len(ramp) == 22 and all(abs((ramp[i + 1] - ramp[i]) - 0.00225) < 1e-6 for i in range(len(ramp) - 1)), ramp
-    assert cmds[len(ramp)] == 1.0 and cmds[-1] == 1.0 and not m.gripper_closed("right") and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
-    # (b) a held free object, its grasp's pre-shape remembered: the same ramp to exactly +1, released by that command
-    ep, _ = robot.eef_pose("right")
-    marker = FakeObject("marker_xakoic_0", ep.tolist(), category="marker", extent=(0.1536, 0.0171, 0.0141))
-    env.objects["marker.n.03_1"] = marker
-    drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
-    drive(env, m.gripper("right", close=True, rate=0.00225))
-    assert robot._ag_obj_in_hand["right"] is marker and m.gripper_closed("right")
-    cmds.clear()
-    drive(env, m.gripper("right", close=False))
-    opened = [0.05 * (c + 1.0) / 2.0 for c in cmds]
-    assert all(opened[i + 1] - opened[i] <= 0.00225 + 1e-6 for i in range(len(opened) - 1)) and cmds[-1] == 1.0
-    assert robot._ag_obj_in_hand["right"] is None and "right" not in m.deferred_open and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
-    assert not any(e["event"] == "staged" for e in m.release_events)
-    m.backend.detach_object("right")
-    # (c) an articulated flap: staged at the pre-shape width with the assisted grasp still on it; the retreat leg's
-    # clearance completes the opening at 2.25 mm/step, exactly +1 at the end, which releases it
-    del env.objects["marker.n.03_1"]
-    ep, _ = robot.eef_pose("right")
-    flap = FakeObject("carton_flap_0", ep.tolist(), category="carton", extent=(0.1536, 0.0171, 0.0141), joints=["flap_joint"])
-    env.objects["carton.n.02_1"] = flap
-    drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
-    drive(env, m.gripper("right", close=True, rate=0.00225))
-    assert robot._ag_obj_in_hand["right"] is flap
-    drive(env, m.gripper("right", close=False))
-    stage = 0.017925
-    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and robot._ag_obj_in_hand["right"] is flap
-    assert "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == stage
-    assert m.release_events[-1]["event"] == "staged" and m.release_events[-1]["ag_released"] == "deferred_open"
-    cmds.clear()
-    p0, q0 = m.eef_pose("right")
-    drive(env, m.arm_along("right", [(p0 + th.tensor([0.0, 0.0, 0.10]), q0)]))
-    assert "right" not in m.deferred_open and cmds[-1] == 1.0 and robot._ag_obj_in_hand["right"] is None
-    ev = m.release_events[-1]
-    assert ev["event"] == "full_open" and ev["by"] == "clearance" and 0.03 <= ev["started_clearance_m"] < 0.04, ev
-    # (d) the executor's value wins over the pre-shape; a closing command supersedes a pending deferral; checkpoints
-    m.backend.detach_object("right")
-    p1, q1 = m.eef_pose("right")
-    flap.pos = p1.clone()
-    drive(env, m.gripper_opening("right", 0.030))
-    drive(env, m.gripper("right", close=True, rate=0.00225))
-    assert robot._ag_obj_in_hand["right"] is flap
-    m.release_opening["right"] = 0.021
-    drive(env, m.gripper("right", close=False))
-    assert abs(float(robot.q[idx].max()) - 0.021) < 1e-6 and m.release_events[-1]["source"] == "release_opening"
+    assert cmds and set(cmds) == {1.0} and not m.gripper_closed("right") and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    # (b) a held free object, (c) an articulated flap: +1 from the first step of the opening, released by that command
+    for key, name, joints in (("marker.n.03_1", "marker_xakoic_0", None), ("carton.n.02_1", "carton_flap_0", ["flap_joint"])):
+        env.objects.clear()
+        ep, _ = robot.eef_pose("right")
+        obj = FakeObject(name, ep.tolist(), category="marker", extent=(0.1536, 0.0171, 0.0141), joints=joints)
+        env.objects[key] = obj
+        drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
+        drive(env, m.gripper("right", close=True, rate=0.00225))
+        assert robot._ag_obj_in_hand["right"] is obj and m.gripper_closed("right")
+        seen = []
+        env.after_step = lambda a: seen.append((float(a[robot.controller_action_idx["gripper_right"]]), robot._ag_obj_in_hand["right"]))
+        drive(env, m.gripper("right", close=False))
+        assert seen[0] == (1.0, None) and set(c for c, _ in seen) == {1.0}, name  # let go on the first step, at +1
+        assert m.release_events[-1] == {"arm": "right", "event": "instant_open", "from_m": m.release_events[-1]["from_m"], "object": name}
+        m.backend.detach_object("right")
+    assert not any(e["event"] in ("staged", "full_open") for e in m.release_events)
+    # (d) checkpoints: no staging state; an older checkpoint's staging keys load and change nothing
     st = m.export_state()
-    assert st["deferred_open"]["right"]["stage_m"] == 0.021 and st["gripper_intent_closed"]["right"] is False
-    drive(env, m.gripper("right", close=True))
-    assert "right" not in m.deferred_open and m.gripper_closed("right")
-    m.import_state(st)
-    assert "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == 0.021 and not m.gripper_closed("right")
-    # (e) the deferred opening completes at the latest after gripper_release_deferred_max_steps without any clearance
-    m.cfg.gripper_release_deferred_max_steps = 25
-    m.deferred_open["right"]["steps"] = 0
-    drive(env, m.hold(60))
-    assert "right" not in m.deferred_open and m.release_events[-1]["by"] == "max_steps" and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    assert not {"deferred_open", "release_opening", "preshape_opening"} & set(st)
+    m.import_state({**st, "deferred_open": {"right": {"stage_m": 0.021, "steps": 0}}, "release_opening": {"right": 0.021}})
+    cmds.clear()
+    env.after_step = lambda a: cmds.append(float(a[robot.controller_action_idx["gripper_right"]]))
+    drive(env, m.hold(5))
+    assert set(cmds) == {1.0} and not m.gripper_closed("right")
     env.after_step = None
 
 
 def test_place_releases_with_the_open_command_at_the_place_pose(tmp_path):
-    """Owner 2026-10-03: the place opens the gripper to exactly +1 at the place pose and the assisted grasp lets go at
-    that command, before the retreat; no staged opening, no deferred one; the opening never jumps (2.25 mm per step from
-    the closure's contact hold on); the release check counts one commanded release and no violation; the demo passes."""
+    """Owner 2026-10-03 / 2026-10-10: the place opens the gripper to exactly +1 in one step at the place pose and the
+    assisted grasp lets go at that command, before the retreat - from the closure's contact hold straight to +1, no ramp,
+    no staged or deferred opening; the release check counts one commanded release and no violation; the demo passes."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     robot = env.robot
@@ -1997,22 +1960,14 @@ def test_place_releases_with_the_open_command_at_the_place_pose(tmp_path):
     result = ex.run_program(expand(sc.alias, sc))
     assert result["success"], result["verdict"]
     place = result["actions"][3]
-    assert place["name"] == "place" and not [e for e in place["notes"].get("release") or [] if e["event"] in ("staged", "full_open")]
+    events = [e["event"] for e in place["notes"].get("release") or []]
+    assert place["name"] == "place" and events == ["instant_open"], events
     assert robot._ag_obj_in_hand["right"] is None and float(robot.q[robot.gripper_control_idx["right"]].max()) > 0.049
     i0 = min(range(len(cmds)), key=lambda i: cmds[i])
     assert -1.0 < cmds[i0] < 0.9  # the symmetric closure holds at the apple's contact width, never at -1
-    steps = [0.05 * (b - a) / 2.0 for a, b in zip(cmds[i0:-1], cmds[i0 + 1:]) if b > a]
-    assert steps and max(steps) <= 0.00225 + 1e-6 and 1.0 in cmds[i0:], max(steps)
+    rises = [(a, b) for a, b in zip(cmds[i0:-1], cmds[i0 + 1:]) if b > a]
+    assert rises and all(b == 1.0 for _, b in rises), rises  # every opening after the hold is one step to +1
     assert not result["release_check"]["violations"]
-    # the executor's first-stage value (still used by an articulated part) is unchanged: sidecar pinch, sweep cap
-    sc2, env2 = iors_world()
-    sc2.grasps[0].extra["release_sweep"] = {"release_opening_max_m": 0.086, "pinch_width_m": 0.0734, "clearance_at_place_m": -0.004}
-    ex2, motions2, *_ = make_executor(env2, sc2, tmp_path / "b")
-    # a cap below pinch / 2 + 5 mm is not honoured (never less than 5 mm of clearance per pad)
-    assert abs(ex2.release_stage_opening(SimpleNamespace(object="apple.n.01_1", arm="right")) - 0.043) < 1e-6
-    sc2.grasps[0].extra["release_sweep"]["release_opening_max_m"] = 0.075
-    assert abs(ex2.release_stage_opening(SimpleNamespace(object="apple.n.01_1", arm="right")) - (0.5 * 0.0734 + 0.005)) < 1e-6
-    assert ex2.release_stage_opening(SimpleNamespace(object="plate.n.04_1", arm="right")) is None
 
 
 def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(tmp_path):
@@ -2058,7 +2013,7 @@ def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(t
     result2 = ex2.run_program(expand(sc2.alias, sc2))
     assert result2["success"] and "preshape_opening_m" not in result2["actions"][1]["notes"]
     i_close = next(i for i, c in enumerate(cmds) if c < 1.0 - 1e-6)  # the first command below fully open = the closure's first ramp step
-    before_close = cmds[:i_close]  # the descent runs fully open (the staged release later may use the pre-shape width)
+    before_close = cmds[:i_close]  # the descent runs fully open
     assert not any(abs(c - pre) < 1e-6 for c in before_close) and before_close and set(before_close) == {1.0}
 
 
@@ -4022,10 +3977,27 @@ def _held_marker(joints=None):
     return robot, env, m, marker
 
 
+def test_release_check_records_how_long_the_weld_outlived_the_open_command(tmp_path):
+    """Our Behavior-1K fork's pad-clear release logs each delayed release (``Robot.ag_release_log``); the release check copies
+    the delay and what ended it ("pads_clear" / "cap") into the release it records at the step the weld went (the command +1
+    there, no violation) and consumes the entry."""
+    sc, env = iors_world()
+    ex, motions, *_ = make_executor(env, sc, tmp_path)
+    robot = env.robot
+    robot.ag_release_log = [{"arm": "right", "object": "apple_omzprq_0", "by": "pads_clear", "delay_steps": 12, "delay_s": 0.1}]
+    action = th.zeros(robot.action_dim)
+    action[robot.controller_action_idx["gripper_right"]] = 1.0
+    ex._check_releases({"left": None, "right": "apple_omzprq_0"}, {"left": None, "right": None}, action)
+    rec = ex.release_check["releases"][-1]
+    assert rec["object"] == "apple_omzprq_0" and rec["gripper_command"] == 1.0
+    assert rec["weld_delay_s"] == 0.1 and rec["weld_delay_physics_steps"] == 12 and rec["weld_released_by"] == "pads_clear"
+    assert robot.ag_release_log == [] and not ex.release_check["violations"]
+
+
 def test_free_object_is_released_by_the_open_command():
-    """Release semantics (owner 2026-10-03): a held free object leaves the hand only through OmniGibson's rule - the
-    command ramps to exactly +1 with the hand still, the assisted grasp holds it while the command is below +1 and lets
-    go at the first +1 step; nothing is released directly and no opening is deferred."""
+    """Release semantics (owner 2026-10-03 / 2026-10-10): a held free object leaves the hand only through OmniGibson's rule -
+    the open command (+1) in one step with the hand still, the assisted grasp letting go at that step; nothing is released
+    directly and nothing is staged."""
     robot, env, m, marker = _held_marker()
     seen = []
     cmd_idx = robot.controller_action_idx["gripper_right"]
@@ -4033,39 +4005,20 @@ def test_free_object_is_released_by_the_open_command():
     robot.release_grasp_immediately = lambda arm: (_ for _ in ()).throw(AssertionError("direct release"))
     drive(env, m.gripper("right", close=False))
     env.after_step = None
-    first_free = next(i for i, (_, held) in enumerate(seen) if held is None)
-    assert all(held is marker and cmd < 1.0 for cmd, held in seen[:first_free]), "held while the command is below +1"
-    assert seen[first_free][0] == 1.0, "let go at the step whose command is exactly +1"
-    assert "right" not in m.deferred_open and not any(e.get("event") == "staged" for e in m.release_events)
-
-
-def test_attach_opens_short_of_the_release_before_the_last_alignment():
-    """The attach placement first opens the fingers to one increment short of the open limit (cap 0005: the fingertips
-    opening against the neck pushed the hand 7 mm before the release): the command stays below +1, the assisted grasp still
-    holds the part for the last alignment, and the open command that follows releases it at exactly +1."""
-    robot, env, m, marker = _held_marker()
-    cmd_idx = robot.controller_action_idx["gripper_right"]
-    drive(env, m.gripper_open_short("right"))
-    assert robot._ag_obj_in_hand["right"] is marker and float(env.last_action[cmd_idx]) < 1.0
-    seen = []
-    env.after_step = lambda a: seen.append((float(a[cmd_idx]), robot._ag_obj_in_hand["right"]))
-    drive(env, m.gripper("right", close=False))
-    env.after_step = None
-    first_free = next(i for i, (_, held) in enumerate(seen) if held is None)
-    assert first_free <= 2 and seen[first_free][0] == 1.0
+    assert seen[0] == (1.0, None), "let go at the first step, whose command is exactly +1"
+    assert not any(e.get("event") == "staged" for e in m.release_events)
 
 
 def test_attach_rule_acts_at_the_release(monkeypatch):
-    """Attach tasks (owner 2026-10-06): the part leaves the hand by the open command like any place, and at the instant the
-    assisted grasp lets go the release hook joins a registered attachment child to its parent through the task's attach
-    rule (``released``: the in-hand registry still names it until the release window ends); any other released object is
-    left alone."""
+    """Attach tasks (owner 2026-10-06 / 2026-10-10): at the instant the assisted grasp lets go, the release hook hands a registered
+    attachment child to the task's attach rule (``released``: the in-hand registry still names it until the release window ends;
+    the rule itself decides - it joins only a part already touching its partner); any other released object is left alone."""
     from ispatialgym.sampling import predicates as PRED
 
     calls = []
 
-    def fake_attach(child, parent, equivalences=None, in_place=True, released=False):
-        calls.append((child.name, parent.name, released))
+    def fake_attach(child, parent, equivalences=None, in_place=True, released=False, trigger="per_step"):
+        calls.append((child.name, parent.name, released, trigger))
         return {"ok": True, "attached": True, "joint": "in_place", "fix": "T"}
 
     monkeypatch.setattr(PRED, "attach_if_aligned", fake_attach)
@@ -4076,7 +4029,7 @@ def test_attach_rule_acts_at_the_release(monkeypatch):
     PRED.set_attachment_context([{"child": "cork_0", "parent": "wine_bottle_0", "equivalences": []}])
     try:
         rec = PRED.attach_on_release(None, "right", reg["cork_0"])
-        assert calls == [("cork_0", "wine_bottle_0", True)] and rec["hook"] == "release" and rec["parent"] == "wine_bottle_0"
+        assert calls == [("cork_0", "wine_bottle_0", True, "release_hook")] and rec["hook"] == "release" and rec["parent"] == "wine_bottle_0"
         assert PRED.LAST_RELEASE_ATTACH["attached"] and "fix" not in PRED.LAST_RELEASE_ATTACH
         assert PRED.attach_on_release(None, "right", reg["apple_0"]) is None and len(calls) == 1
     finally:
@@ -4087,13 +4040,12 @@ def test_attach_rule_acts_at_the_release(monkeypatch):
     assert robots[0].release_callbacks == [PRED.attach_on_release] and robots[1].release_callbacks == [print, PRED.attach_on_release]
 
 
-def test_articulated_sheet_keeps_its_staged_opening():
-    """A flap (an articulated part) pinched across its thickness still opens in two stages: the assisted grasp keeps it
-    until the deferred full opening, which is the same +1 command."""
+def test_articulated_sheet_is_released_by_the_same_one_step_opening():
+    """A flap (an articulated part) pinched across its thickness opens like every release (owner 2026-10-10: never a partial
+    opening): +1 in one step, which releases it."""
     robot, env, m, marker = _held_marker(joints=["flap_joint"])
     drive(env, m.gripper("right", close=False))
-    assert robot._ag_obj_in_hand["right"] is marker and "right" in m.deferred_open
-    assert m.release_events[-1]["event"] == "staged" and m.release_events[-1]["ag_released"] == "deferred_open"
+    assert robot._ag_obj_in_hand["right"] is None and m.release_events[-1]["event"] == "instant_open"
 
 
 def _arching(backend, robot, arm, rise):
@@ -4212,3 +4164,17 @@ def test_ag_joint_rule_is_the_tasks_not_the_oracles():
         src = open(path).read()
         assert "_get_assisted_grasp_joint_type =" not in src, path
         assert "ag_moving_link_joint_type" not in src, path
+
+
+def test_ag_release_rule_is_the_tasks_not_the_oracles():
+    """The assisted grasp's pad-clear release (owner 2026-10-10: the weld stays after the open command until a pad has left the
+    object, at most 0.2 s) is a rule of the environment: ``ISpatialGymTask`` sets our Behavior-1K fork's
+    ``Robot.ag_release_on_pad_clear`` / ``ag_release_max_delay_s`` on every robot, so demo collection, replays and an evaluated
+    policy meet the same release; no oracle module sets them (the executor only reads the fork's ``ag_release_log``)."""
+    pkg = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    task = open(os.path.join(pkg, "tasks", "ispatialgym_task.py")).read()
+    assert "AG_RELEASE_ON_PAD_CLEAR = True" in task and "AG_RELEASE_MAX_DELAY_S = 0.2" in task
+    assert "robot.ag_release_on_pad_clear = AG_RELEASE_ON_PAD_CLEAR" in task and "robot.ag_release_max_delay_s = AG_RELEASE_MAX_DELAY_S" in task
+    for path in glob.glob(os.path.join(pkg, "oracle", "*.py")):
+        src = open(path).read()
+        assert "ag_release_on_pad_clear =" not in src and "ag_release_max_delay_s =" not in src, path

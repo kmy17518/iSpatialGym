@@ -310,7 +310,7 @@ def execute_pull_push(action: PullPushOpen, motions: Motions, state, targets, ct
     log.info("pull done: %s; door at %.1f deg", pull["stop"], math.degrees(q_pull))
 
     # ---------------------------------------------------------------- 2. release, hand back, fist
-    yield from motions.gripper(arm, close=False, staged=False)
+    yield from motions.gripper(arm, close=False)
     EX._release(motions, state, arm)
     if "fov" in hooks:
         hooks["fov"](False)  # the grasp -> release span is over (qa rule (b)); the wedge entry is a contact, not a grasp

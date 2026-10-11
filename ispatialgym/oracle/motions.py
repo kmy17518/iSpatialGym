@@ -49,7 +49,7 @@ from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Seq
 import torch as th
 
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.action import GRIPPER_OPEN, ActionState
+from ispatialgym.oracle.action import ActionState
 from ispatialgym.oracle.base_tracker import BaseTrackerConfig, BaseTrajectoryTracker
 from ispatialgym.oracle.trunk import TrunkState
 from ispatialgym.robot import base_path as BP
@@ -169,21 +169,8 @@ class MotionsConfig:
     #: pre-shaped opening before a grasp descent: fingers at pinch width / 2 + this margin (m) so the lower pad of a
     #: tilted grasp clears the table (the fully open pad stood on it); None = fully open
     gripper_preshape_margin: Optional[float] = 0.010
-    #: block design (owner 2026-09-19): the first release stage of a cube opens each pad only this far past the cube's face
-    #: (a placed neighbour stands 6 mm + the 5 mm place margin away, the 8.4 mm fingertip beside it; demo 0919-121912: the
-    #: full opening shoved the neighbour 4 cm along the table)
-    cube_release_margin_m: float = 0.0045  # 8.4 mm fingertip + 4.5 mm = 12.9 mm <= the 10 mm gap + 3 mm place margin: no nudge of the neighbour
     #: hold steps of the pre-shaped opening before the descent
     gripper_preshape_steps: int = 12
-    #: opening ramp (m per control step; None = the step command): every opening move is rate-limited like the grasp
-    #: closure. Staged release (nextto 0916-201902 / 0916-201730): at the release the lower pad of a tilted grasp is
-    #: blocked by the table at 16-20 mm, so the step command left it there for ~60 steps and it snapped to 50 mm during
-    #: the retreat, flinging the partner 5.2 cm (or the released marker itself 26 deg). A release of a held object
-    #: therefore opens in two stages: first to the pre-shape width (pinch / 2 + ``gripper_preshape_margin``, capped by
-    #: the sampler's ``release_sweep.release_opening_max_m`` / 2 - just enough to free the object), the full opening
-    #: only once the hand has moved ``gripper_release_clearance_m`` away from the release pose (the retreat leg; the
-    #: deferred target is completed by whatever motion moves the hand, ``_emit``), at the same rate.
-    gripper_open_rate: Optional[float] = 0.00225
     #: symmetric closure (core 2026-09-16 22:09, closure probe): once both pads touch the object the ramp stops and the
     #: command holds the fingers where they are minus this squeeze (m). The two position drives (stiffness 1e7, max
     #: effort 100 N: any target inside the object saturates them) otherwise keep driving to 0 through the object and
@@ -191,10 +178,6 @@ class MotionsConfig:
     #: toward finger 1 (0916-202403) before the assisted grasp attached. With the targets frozen at the contact width the
     #: drift is bounded by the squeeze. None = the stock command (the fight).
     gripper_contact_squeeze_m: Optional[float] = 0.001
-    gripper_release_clearance_m: float = 0.03
-    #: the deferred full opening completes at the latest this many control steps after the release (a hand that never
-    #: moves 3 cm away; the ramp keeps even that late opening slow)
-    gripper_release_deferred_max_steps: int = 300
     #: base tracking (paths) and base-follow (articulation) tracker configurations
     base_tracker: BaseTrackerConfig = field(default_factory=BaseTrackerConfig)
     base_follow_speed: float = 0.15  # m/s along the recorded b_k
@@ -465,15 +448,9 @@ class Motions:
         self.tracker: Optional[BaseTrajectoryTracker] = None
         #: steps emitted by the last motion (diagnostics)
         self.last_steps = 0
-        #: gripper bookkeeping of the staged release (executor state, exported with the checkpoints): the intended
-        #: open / closed state per arm (a staged opening emits a command < 0 while the fingers are meant to be open),
-        #: the pre-shaped opening of the last grasp (``gripper_opening``), the first-stage release opening the executor
-        #: derived from the sidecar for the coming place (``release_opening``), the pending deferred full openings
-        #: (``deferred_open``: release eef position, steps since, per arm) and the release events for the record
+        #: gripper bookkeeping (executor state, exported with the checkpoints): the intended open / closed state per arm (a
+        #: pre-shaped opening emits a command < 0 while the fingers are meant to be open) and the release events for the record
         self.gripper_intent_closed: Dict[str, bool] = {}
-        self.preshape_opening: Dict[str, float] = {}
-        self.release_opening: Dict[str, float] = {}
-        self.deferred_open: Dict[str, Dict[str, Any]] = {}
         self.release_events: List[Dict[str, Any]] = []
         #: object -> the world move a next-to / touching place made away from its partner so the opening fingers clear it
         #: (``execute.clear_release_of_partner``); the push that follows extends its line by it
@@ -520,8 +497,8 @@ class Motions:
             return False
 
     def gripper_closed(self, arm: str) -> bool:
-        """Whether the gripper is meant to be closed (the last ``gripper`` intent; a staged release or a pre-shaped
-        opening emits a command below zero while the fingers are meant to be open)."""
+        """Whether the gripper is meant to be closed (the last ``gripper`` intent; a pre-shaped opening emits a command
+        below zero while the fingers are meant to be open)."""
         intent = self.gripper_intent_closed.get(arm)
         return bool(intent) if intent is not None else self.state.gripper_cmd[arm] < 0.0
 
@@ -536,9 +513,6 @@ class Motions:
             "trunk": (float(self.trunk.translate), float(self.trunk.tilt)),
             "tracker_index": None if self.tracker is None else int(self.tracker.k),
             "gripper_intent_closed": dict(self.gripper_intent_closed),
-            "preshape_opening": dict(self.preshape_opening),
-            "release_opening": dict(self.release_opening),
-            "deferred_open": {arm: {k: (v.clone() if isinstance(v, th.Tensor) else v) for k, v in d.items()} for arm, d in self.deferred_open.items()},
         }
 
     def import_state(self, d: Dict[str, Any]) -> None:
@@ -550,49 +524,12 @@ class Motions:
         self.trunk = TrunkState(float(t), float(k), translate_rate=self.cfg.trunk_translate_rate, tilt_rate=self.cfg.trunk_tilt_rate)
         self.tracker = None
         self.gripper_intent_closed = dict(d.get("gripper_intent_closed") or {})
-        self.preshape_opening = dict(d.get("preshape_opening") or {})
-        self.release_opening = dict(d.get("release_opening") or {})
-        self.deferred_open = {arm: {k: (v.clone() if isinstance(v, th.Tensor) else v) for k, v in dd.items()} for arm, dd in (d.get("deferred_open") or {}).items()}
 
     # ------------------------------------------------------------------ emitters
 
     def _emit(self) -> th.Tensor:
         self.last_steps += 1
-        if self.deferred_open:
-            self._advance_deferred_open()
         return self.state.action()
-
-    def _advance_deferred_open(self) -> None:
-        """Complete a staged release: once the hand has moved ``gripper_release_clearance_m`` from where it released
-        (or ``gripper_release_deferred_max_steps`` have passed) the gripper command ramps from the first-stage opening
-        to fully open at ``gripper_open_rate`` (every emitted step advances it by one increment), ending on the exact
-        open command so the assisted grasp sees a released gripper."""
-        for arm in list(self.deferred_open):
-            d = self.deferred_open[arm]
-            d["steps"] = int(d.get("steps", 0)) + 1
-            pos = self.eef_pose(arm)[0]
-            dist = float(th.linalg.norm(pos - d["pos"]))
-            d["clearance_m"] = max(float(d.get("clearance_m", 0.0)), dist)
-            if dist < float(self.cfg.gripper_release_clearance_m) and d["steps"] < int(self.cfg.gripper_release_deferred_max_steps):
-                continue
-            lo, hi = self._gripper_limits(arm)
-            q_cmd = lo + 0.5 * (float(self.state.gripper_cmd[arm]) + 1.0) * (hi - lo)  # the opening the current command asks for
-            rate = self.cfg.gripper_open_rate
-            q_next = hi if not rate else min(hi, q_cmd + float(rate))
-            if not d.get("started"):
-                d["started"] = True
-                d["started_after_steps"] = d["steps"]
-                d["started_clearance_m"] = dist
-            if q_next >= hi - 1e-9:
-                self.state.set_gripper(arm, close=False)  # exactly the open command: the assisted grasp's release condition
-                self.release_events.append({"arm": arm, "event": "full_open", "after_steps": d["steps"], "clearance_m": round(dist, 4),
-                                            "started_after_steps": d.get("started_after_steps"), "started_clearance_m": round(float(d.get("started_clearance_m", dist)), 4),
-                                            "by": "clearance" if d.get("started_clearance_m", dist) >= float(self.cfg.gripper_release_clearance_m) else "max_steps"})
-                del self.deferred_open[arm]
-                self.preshape_opening.pop(arm, None)
-                self.release_opening.pop(arm, None)
-            else:
-                self.state.gripper_cmd[arm] = self.gripper_command(arm, q_next)
 
     def hold(self, steps: int = 1) -> Iterator[th.Tensor]:
         """Emit hold actions (zero base velocity, current targets)."""
@@ -640,54 +577,16 @@ class Motions:
     def gripper_opening(self, arm: str, q_m: float, steps: Optional[int] = None) -> Iterator[th.Tensor]:
         """Hold the fingers at opening ``q_m`` per finger (smooth-mode command; the pre-shaped opening of a grasp,
         ``execute_grasp``: pinch width / 2 + ``gripper_preshape_margin`` before the descent so no pad stands on the
-        table). The opening is remembered as the arm's pre-shape width: the first stage of the release of the object
-        this grasp picks up (``gripper(close=False)``)."""
+        table)."""
         lo, hi = self._gripper_limits(arm)
         q_m = min(hi, max(lo, float(q_m)))
-        self.deferred_open.pop(arm, None)
         self.gripper_intent_closed[arm] = False
-        self.preshape_opening[arm] = q_m
         self.state.gripper_cmd[arm] = self.gripper_command(arm, q_m)
         self.state.stop_base()
         for _ in range(int(self.cfg.gripper_preshape_steps if steps is None else steps)):
             yield self._emit()
 
-    def gripper_open_short(self, arm: str) -> Iterator[th.Tensor]:
-        """Open the fingers at ``cfg.gripper_open_rate`` to one ramp increment short of the open limit and wait until they
-        stop: the command stays below +1, so OmniGibson's assisted grasp keeps what the hand holds (it lets go only at the
-        open command, which the following ``gripper(close=False)`` reaches in one increment). The attach placement opens
-        this far before its last alignment, with the fingertips off the partner (cap/xxqyrt 0005: the fingertips reach
-        ~1 cm below the rim and, opening against the neck, pushed the hand 7 mm before the release)."""
-        self.state.stop_base()
-        idx = self.robot.gripper_control_idx[arm]
-        lo, hi = self._gripper_limits(arm)
-        rate = float(self.cfg.gripper_open_rate or 0.002)
-        target = max(lo, hi - rate)
-        q = float(self.robot.get_joint_positions()[idx].float().mean())
-        while q < target - 1e-6:
-            q = min(target, q + rate)
-            self.state.gripper_cmd[arm] = self.gripper_command(arm, q)
-            yield self._emit()
-        self.state.gripper_cmd[arm] = self.gripper_command(arm, target)
-        for i in range(self.cfg.gripper_steps):
-            yield self._emit()
-            if i > 10 and float(self.robot.get_joint_velocities()[idx].abs().max()) < 1e-3:
-                break
-        yield from self.hold(5)
-
-    def release_stage_opening(self, arm: str) -> Optional[float]:
-        """The first-stage opening (m per finger) of a release with ``arm``: the executor's sidecar-derived value
-        (``release_opening``: pinch / 2 + margin capped by the sampler's ``release_sweep.release_opening_max_m`` / 2),
-        else the pre-shaped opening of the grasp, else None (a full opening)."""
-        v = self.release_opening.get(arm, self.preshape_opening.get(arm))
-        if v is None:
-            return None
-        lo, hi = self._gripper_limits(arm)
-        v = float(v)
-        return None if v >= hi - 1e-6 else min(hi, max(lo, v))
-
-    def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None, opening: Optional[float] = None,
-                staged: bool = True, instant: bool = False) -> Iterator[th.Tensor]:
+    def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None) -> Iterator[th.Tensor]:
         """Open / close the gripper and wait until the fingers stop moving (or an assisted grasp engages).
 
         Closing: ``rate`` (m per control step; ``execute_grasp`` passes ``cfg.gripper_close_rate``) ramps the smooth-mode
@@ -696,26 +595,17 @@ class Motions:
         the un-pinched cylinder along the table and roll it 19-77 deg); the stock step command follows the ramp (and is
         the whole command without a rate: the push / brace closures).
 
-        Opening: ramped at ``cfg.gripper_open_rate`` (None = the step command) to exactly the open command (+1), the hand
-        held where it is. A held free object is released by that command alone: OmniGibson's assisted grasp lets go when
-        the finger target reaches the open limit (and wakes the object), as it does for a policy imitating the demo; the
-        retreat follows. Only an articulated part pinched across its thickness (``staged``: the carton flap,
-        ``Retreat._edge_escape``) opens in two stages - the first to ``opening`` (default :meth:`release_stage_opening`), the
-        full opening deferred until the hand has moved ``cfg.gripper_release_clearance_m`` - and the assisted grasp keeps
-        the part until that deferred +1. A gripper holding nothing opens fully in one ramp.
-
-        ``instant`` (opening): the open command at once - for an object that hangs free in the hand (``execute_place``: touching
-        nothing at the release), which the ramp would leave hanging between visibly opening fingers until its last increment (the
-        brussels sprouts drop: 12 steps, then it fell 11 cm); the assisted grasp lets go on the first step as the fingers start to open."""
+        Opening (owner 2026-10-10): exactly the open command (+1) in one step, every release, the hand held where it is -
+        no ramp, no partial or staged opening. A held object is released by that command alone: OmniGibson's assisted
+        grasp lets go when the finger target reaches the open limit (and wakes the object), as it does for a policy
+        imitating the demo; the retreat follows. A handle of a fixed-base body is unloaded first."""
         self.state.stop_base()
         idx = self.robot.gripper_control_idx[arm]
         lo, hi = self._gripper_limits(arm)
-        self.deferred_open.pop(arm, None)  # a new command supersedes a pending deferred opening
         self.gripper_intent_closed[arm] = bool(close)
         q_now = float(self.robot.get_joint_positions()[idx].float().mean())
         held_before = None if close else self.held_object(arm)
         if close:
-            self.release_opening.pop(arm, None)  # the pre-shape of the grasp this closure completes stays: the release's first stage
             contact_hold = None
             if rate:
                 q_target = q_now
@@ -752,43 +642,15 @@ class Motions:
                 self.release_events[-1]["fallback"] = "full_close"
             self.state.set_gripper(arm, True)
         else:
-            stage = None
             articulated = held_before is not None and bool(getattr(held_before, "n_joints", 0) or len(getattr(held_before, "joints", {}) or {}))
             if articulated and bool(getattr(held_before, "fixed_base", False)):
                 # a handle of a door / appliance: the drives stop pressing before the fingers open (dishwasher close 1008: the
                 # torso bent 0.24 deg against the closed door sprang back at the release). A free-standing body (a blender,
                 # a carton) is left as it is: re-reading the loaded arm turns it (execute_base_follow's unwind)
                 yield from self.unload([arm])
-            if articulated and staged:
-                # (staged=False: a handle of an articulated object - OmniGibson's assisted grasp treats any command short
-                # of fully open as "applying grasp" and re-grasps the handle during the retreat, then the door cannot
-                # follow the hand: dishwasher 0917-210503 "drifted 42 cm off the right hand while grasped")
-                stage = opening if opening is not None else self.release_stage_opening(arm)
-                if stage is not None:
-                    stage = min(hi, max(lo, float(stage)))
-                    if stage <= q_now + 1e-6:
-                        stage = None  # the pads already stand clear of that width: nothing to stage
-            target = hi if stage is None else stage
-            open_rate = None if (instant and stage is None) else self.cfg.gripper_open_rate
-            if instant and stage is None and held_before is not None:
+            if held_before is not None:
                 self.release_events.append({"arm": arm, "event": "instant_open", "from_m": round(q_now, 4), "object": getattr(held_before, "name", None)})
-            if open_rate:
-                q_target = q_now
-                while q_target < target - 1e-6:
-                    q_target = min(target, q_target + float(open_rate))
-                    self.state.gripper_cmd[arm] = self.gripper_command(arm, q_target) if q_target < hi - 1e-9 else GRIPPER_OPEN
-                    yield self._emit()
-            if stage is None:
-                self.state.set_gripper(arm, False)  # exactly the open command (the assisted grasp's release condition)
-                self.preshape_opening.pop(arm, None)
-                self.release_opening.pop(arm, None)
-            else:
-                self.state.gripper_cmd[arm] = self.gripper_command(arm, stage)
-                pos = self.eef_pose(arm)[0].clone()
-                self.deferred_open[arm] = {"pos": pos, "steps": 0, "stage_m": float(stage)}
-                self.release_events.append({"arm": arm, "event": "staged", "stage_m": round(float(stage), 4), "from_m": round(q_now, 4),
-                                            "source": "opening" if opening is not None else ("release_opening" if arm in self.release_opening else "preshape"),
-                                            "clearance_m": float(self.cfg.gripper_release_clearance_m), "ag_released": "deferred_open"})
+            self.state.set_gripper(arm, False)  # exactly the open command (the assisted grasp's release condition)
         steps = self.cfg.gripper_steps if steps is None else int(steps)
         for i in range(steps):
             yield self._emit()

@@ -14,6 +14,7 @@ import torch as th
 
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import grasp_library as GL
+from ispatialgym.sampling import predicates as PRED
 from ispatialgym.sampling.bddl_writer import GROUP_NAMES
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import TABLE_CATEGORIES, Draft, TaskSampler
@@ -119,10 +120,8 @@ class AttachmentSampler(TaskSampler):
         # attachment goal frame: child root pose in the parent link frame (rigid, computed once)
         child_link, parent_link = self.pair
         male = self.obj("male")
-        # OmniGibson's AttachedTo no longer filters child / parent collisions on attach; an attached cap whose collision
-        # hull overlaps the bottle neck then jitters violently. Filter the pair once (stop / play inside) so the goal
-        # settle measures the attachment, not the interpenetration. The evaluator must do the same on attach.
-        male.states[AttachedTo]._disable_collision_between_child_and_parent(male, self.obj("female"))
+        # the members collide until they are joined (owner 2026-10-10): the goal check filters the pair at its own attach
+        # (apply_goal) and restores the collision afterwards (check_goal_feasible)
         og.sim.step_physics()
         self.kit.sync_world()
         cp, cq = child_link.get_position_orientation()
@@ -260,8 +259,11 @@ class AttachmentSampler(TaskSampler):
         draft.groups[GROUP_NAMES["attachment"]] = self._group_target(f_pose, goal, mname, fname)
 
     def apply_goal(self, draft: Draft):
-        super().apply_goal(draft)
         male, female = self.obj("male"), self.obj("female")
+        # the seated part overlaps the partner's convex hulls (attach step 0): the pair's collision is filtered before it is put
+        # in its seat, else the next physics step pushes it out
+        PRED.set_pair_collision_filter(male, female, True)
+        super().apply_goal(draft)
         og.sim.step_physics()
         ok = male.states[AttachedTo].set_value(female, True)
         if not ok:
@@ -282,6 +284,8 @@ class AttachmentSampler(TaskSampler):
             male, female = self.obj("male"), self.obj("female")
             if male.states[AttachedTo].get_value(female):
                 male.states[AttachedTo].set_value(female, False)
+            # the snapshot restore has put the part back at its init pose: the pair collides again
+            PRED.set_pair_collision_filter(male, female, False)
             og.sim.step_physics()
             self.world.keep_still(self.objects.values())
 

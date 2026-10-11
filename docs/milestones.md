@@ -2,6 +2,133 @@
 
 Tagged states of this repository and what passed on them.
 
+## `v3.0-attach-contact` — attachment by contact: the pair collides until the task's rule joins it, released, touching and aligned; the oracle hovers, settles, aligns, touches down and opens at once; every release is +1 in one step and the assisted grasp's weld stays until a pad has left the object (2026-10-10)
+
+- **Commits** (untagged, local, branch `v3.0-attach-contact` off `5d54b735`): `a4895689` (the rule, the join modes, the filter at the
+  join, the `AttachedTo` overrides, the oracle's hover / alignment / instant release), `d9937bce` (the hover settles on arrival before
+  the first measurement), `ebdb93f0` (`snap` is the default join), `8947f32b` (the touchdown before the release), `696de57b` (every
+  release +1 in one step), `f2328a7e` (the pad-clear release on every robot), `2966ce0b` (the snap keeps a symmetric part's spin).
+  Behavior-1K (branch `v3.0-attach-contact` off `ddbd8ff24`): `6a6194600` (the pad-clear release hook). `v3.0-reconciled` was
+  fast-forwarded to this branch in both repos on 2026-10-11 (the two branches name the same commits). The gripper A/B test's
+  decision (owner): keep the contact-hold closure everywhere (closing to -1 slides the part 1-2 cm before the assisted grasp
+  attaches); the gripper commands stay binary - the contact hold, then +1 at once - never a partial or ramped opening (it confuses
+  policy learning).
+- **Correction of the gripper A/B record** ("open_instant breaks none of the 28"): round 1 ran both conventions together, and
+  open_instant alone ran only on the cap and the block design; the carton lever's round-1 "pass" was a goal-judged replay, which never
+  evaluates `root_moved` - the carton ended 1.37 deg turned there (1.59 deg just after the release), past 1.15.
+- **Every release +1 in one step** (`696de57b`, owner): `Motions.gripper(close=False)` sends exactly +1 at once - no opening ramp
+  (was 2.25 mm per step), no staged first opening of an articulated part, no deferred completion; the staging state, the executor's
+  first-stage width (with the block design's cube margin) and `release_free_instant` are gone; a fixed-base handle is still unloaded
+  first; the closure and the pre-grasp aperture are unchanged. *r14instant* (sample -> demo -> goal-judged replay, all 28, seed 0):
+  26 / 28 demos (r5 / r6: 28 / 28), the 26 replays pass (the board game's first replay process aborted in Kit's start-up, errno 28 -
+  no inotify watches left; its re-run passed), every release one step. The two failures came from the assisted grasp letting go at
+  the open command while the pads still clamped the object (the contact hold targets 1 mm inside it; both drives saturate at 100 N):
+  the block design's die 4 left the fingers at 11 -> 18 mm, moved 7 mm / tilted 10 deg in that step and lay on another face (88 deg)
+  within 5 steps (`not_reached`; r5's ramp opened to 49.6 mm before the let-go: a clean 24 mm drop); the carton lever's let-go turned
+  the free-standing carton +0.86 deg in one step (0.66 -> 1.67 deg, `root_moved` > 1.15; r6's ramp jolted it 0.15 deg under the weld,
+  then 0.11 deg at the let-go). The ramp had hidden this: the weld held while the pads opened, so they touched nothing at the let-go.
+- **The pad-clear release** (Behavior-1K `6a6194600`, off by default; on in `ISpatialGymTask` for every robot next to the fixed
+  moving-link joint, so demos, replays and evaluation share it): once a gripper's control stops applying grasp with an object in
+  hand, `Robot._ag_keep_weld` keeps the weld while `_calculate_in_hand_object` still finds the object between both pads, at most
+  `ag_release_max_delay_s` (0.2 s), then `_release_grasp` (release callbacks - the attach rule's hook - and the wake) at the real
+  removal; each delayed release is logged (`Robot.ag_release_log`), and the release check copies its delay and what ended it
+  (`pads_clear` / `cap`); `release_grasp_immediately` bypasses it; a pending release travels with the state (the dict and an optional
+  serialized block behind its own sentinel, so a stock state is unchanged). The oracle's `_release` still waits for the registry to
+  clear; the release check sees +1 at every release; no gripper command is partial.
+- **r15padclear** (demo + goal-judged replay of the 19 aliases that release a grasp, on a copy of r14's instance - block design and
+  carton lever with their sampled goals, the other 17 with r14's achieved poses as goals; the 9 without a release keep r14): 19 / 19
+  demos and replays pass, block design and carton lever included. Every weld outlived the +1 command by 1-2 control steps (4-8
+  physics steps, 33-67 ms), each ended by a pad leaving the object; the cap never acted. After the let-go: the dice dropped ~25 mm
+  into their slots tilting <= 0.8 deg, the carton moved 0.68 mm / 0.31 deg, the sandal fell 21.8 mm (0.9 deg), the attach parts
+  snapped 10.3 / 18.1 / 5.1 mm (cap / cork / lid; <= 0.5 deg), the others moved <= 1.1 mm. The marker (next to the pencil) is the
+  exception: while welded the opening pads turned it 6.1 deg relative to the hand (the hand 0.3 deg), and released it spun on to
+  44 deg, rolling 4.5 mm (r14: 2.9 deg; the task passes either way). Torso / head camera / support force match r14 within the
+  re-sampled grasps.
+- **The marker's roll, sandbox experiment** (`attach/runs_weld`, the rule patched in-process for demo and replay; marker, block
+  design, carton lever, cap, apple, sandal on r14's instances): giving a released single-body object the hand's velocity at the
+  removal changed nothing (marker 42.7 deg after 30 steps, the rest as pad-clear) - a pad still drags the marker after the let-go;
+  letting go once both fingers stood 1 mm wider than at the command halved the marker's turn (20.8 deg) but tipped a block-design die
+  91 deg and jumped the carton 6.3 mm (`root_moved`) again. Owner: keep the pad-clear release; the marker's roll is accepted.
+- **The snap keeps a symmetric part's spin** (`2966ce0b`, owner 2026-10-10): it still seats the part exactly (the male frame's
+  origin onto the female frame's, the tilt removed), but a part whose recorded symmetry is continuous about one axis (`zinf`: >= 12
+  equivalences about one object axis - cap, cork and lid have 71) keeps its spin about that axis: only the swing of male -> female
+  about the part's world axis is applied; any other part goes to its nearest equivalent, one without equivalences to the raw frame
+  snap. Before, the nearest of the 5 deg equivalents could still turn a cap 2.5 deg. The joint frame comes from that transform, not
+  from the links re-read after the teleport; `meta["attach_joins"]` records the snap's mode, move, tilt and spin (no `fix`). Sim
+  check (cap, cork/ncxgpe, lid/tnwisp; spins 0 / 37 / 90 / 180 deg, 8 deg tilt, 19 mm offset): spin unchanged, seated within
+  0.0007 mm / 0.0 deg, drift <= 0.004 mm / 0.003 deg over 300 steps. r15padclear's three attachment demos pass on replay (their
+  0.005-0.007 rad from r15's poses is the spin the old snap imposed), as does an oracle demo + replay on the cap
+  (`runs/r16symsnap`). Tests: 152 passed (`test_attach_snap`, 10 new; `test_attach_contact`, `test_v2_oracle`, `test_v21_phase_a`,
+  `test_v30_fixes`).
+- **Why** (owner): the oracle carried the part with partly opened fingers while the assisted grasp held it (+0.125 for the whole
+  descent, then +0.91 -> a second attach -> +1); the release hook and the per-step `attached` check joined the part wherever it was
+  within 5 cm / 15 deg (under -1 the cap 18 mm off failed, the lid 8.9 mm and the cork 6.6 mm passed the 1 cm layout tolerance off
+  their seats); the pair's collision was filtered from load, so a part could only be seated by moving it through its partner.
+- **The rule** (`sampling/predicates.py`, shared by oracle and evaluator): a registered pair joins only when the part is not held
+  (or is being released), in PhysX contact with its partner (`RigidContactAPI`, this step), and aligned modulo its symmetry - 4 mm
+  across the seat axis, 0.1 rad, -4..23 mm along it (the axis: the female +z unless more than 45 deg from the partner-centroid ->
+  female direction - the sampler's rule; the cork's female z is horizontal). The release hook joins only a part already touching
+  (it defers to that step's own check, after its physics); no mid-air joins. `ISG_ATTACH_JOIN_MODE`: `snap` (the part first moved
+  onto its seat, keeping a symmetric part's spin since `2966ce0b` - above; the default since the demos below, owner 2026-10-10),
+  `in_place` (the joint at the resting pose; the cap and the cork rest on the rim beyond the 1 cm tolerance) or `set_value` (the
+  stock path; for a registered pair the `_attach` override joins in place). `AttachedTo._update`
+  does nothing for registered members (it joined on contact at 5 cm / 15 deg in SO(3) and snapped a lid 4 cm out of the hand);
+  `_attach` / `_detach` of a registered pair go through the same joint and filter. Every join is logged (`meta["attach_joins"]`:
+  trigger, contact, offsets, snap size). No other alias uses `attached`: 20 configuration_matching problems have it in the goal,
+  their 19 customs aliases all use `attachment.iddl`; of the 28 v3.0 aliases only cap, cork and lid.
+- **Collision**: the load-time filters are gone (sampler v1/v2, `run_isg._restore_attachment_filters`); the pair's filtered pairs
+  are added at the join and removed at a detach (state loads queue the edit for the next check). Editing them while the simulation
+  plays invalidates PhysX's tensor views (`update_handles()` then segfaulted); the stock route (dump state, stop, edit, play, load
+  state) takes 2.7-3.3 s, keeps robot, partner and joints exactly and restarts `og.sim.current_time`. The fixed joint does not
+  filter the pair (joined in the seated pose without the filter the part is thrown 83-190 mm); joined and filtered it holds within
+  0.006 mm / 0.0007 rad of its partner over 60 steps (all three). The sampler's goal check filters before seating the part.
+- **Step 0** (r5 instances, collision on): seated, the hulls interpenetrate - cap 20 convex pairs, deepest vertex 3.95 mm, 10.2 mm
+  of lift to separate; cork 8 / 2.72 / 18.1 mm; lid 10 / 4.91 / 4.91 mm. Dropped aligned from a few mm (no robot) each rests on the
+  rim: cap +10.19 mm (lateral 0.01 mm, angle <= 0.0004 rad), cork +17.9 mm (0.11-0.13 mm, 0.014-0.018 rad, tilt 1.0-2.7 deg), lid
+  +4.85 mm (0.13-0.63 mm, 0.002 rad, tilt 0.1 deg); none tipped, bounce <= 0.14 mm. So `in_place` can pass for the lid only (cap and
+  cork rest beyond the 1 cm tolerance) and a snap is ~10 / 18 / 5 mm.
+- **The oracle's attach place**: contact hold through carry and descent to a hover pose where the lowest point of the part and of
+  the fingertips is 3 mm above the partner's top under them; settle there (the descent arrives at 3 mm/step and `a4895689` let the
+  part go at that speed); lateral + yaw alignment modulo symmetry (the correction regime: 4 passes, targets 2 mm / 0.02 rad); the
+  touchdown (owner 2026-10-10, after the cap below): the hand straight down the seat axis at 1 cm/s until PhysX reports the part in
+  contact with its partner (at most the part's clearance + 4 mm), 3 steps still, the contact hold kept; a touchdown that fails (its
+  leg raises, or no contact within the depth) releases where the hand is - a plain drop; +1 in one step (a touching part is joined
+  by the release step's own check); hold until the joint exists (at most 45 steps); retreat (raised by the hover). Removed:
+  `clear_fingers_over_partner`, `gripper_open_short`, `_attach_at_place`, `_attach_after_release` and their knobs.
+- **Demos + goal-judged replays** (`d9937bce`, r5 instances, `runs_settle`): every join came from the per-step check, in contact,
+  after the release step (the release hook saw no contact at the release in every run). Hover 13.2 / 21.3 / 9.4 mm above the seat,
+  fingertips 7.9 / 24.9 / 21.4 mm above the partner (the part's 3 mm binds); all aligned on arrival (<= 0.9 mm, 0.005 rad), no pass.
+  - lid: `in_place` pass (4.8 mm / 0.001 rad), `snap` pass (0.13 mm, snap 4.9 mm); contact and join 1 step after the release step;
+    tilt <= 0.2 deg; replays pass, identical to the demos.
+  - cork: `in_place` fails as step 0 says (17.8 mm, `not_reached`), `snap` pass (0.93 mm, snap 17.9 mm in one frame); join 1 step
+    after the release; replays identical (snap pass, in_place fail).
+  - cap: the instant open kicks it. From the hand at rest the first attempt shot it 4.2 mm sideways in the release step and 7.8 mm
+    by the next (tilt 2.7 deg); it landed flat 7.6 mm off the axis, was never joined (correctly: > 4 mm), the place's postcondition
+    failed and the executor rolled back; the retry (from the restored checkpoint, the assisted grasp re-created) kicked it up 3.8 mm
+    and 17.7 deg, it fell back 2.9 mm off and joined 3 steps after the release: `snap` pass (0.18 mm, snap 10.7 mm), `in_place`
+    `not_reached` (10.6 mm). The replays reproduce the first attempt's sideways kick (no rollback in a replay) and fail (12.8-13.0 mm,
+    never joined). The fingertips pinch the dome below its widest point; the cork and the lid do not move at the release. Under the
+    old rule the release hook joined the part at the release instant, which hid any kick.
+  - `a4895689` (no settle): the same outcomes; the snap cap on svl10 passed in one attempt and its replay passed.
+- **The cap's release, sandbox experiment** (`ebdb93f0` + a wrapper of `_release_into_join`, `runs_exp`, snap, hover 3 and 5 mm):
+  *unload* (the fingers 0.2 mm past the wider one's opening, 5 steps, the assisted grasp holding - they moved 0.3 / 1.0 mm), then +1:
+  the cap fell its clearance and moved <= 1.0 mm aside, tilt <= 1.4 deg, joined 1 step after the release - the contact hold's 1 mm
+  squeeze let go at once was the kick; *touchdown* (down the seat axis at 1 cm/s to contact, 3.2 / 5.2 mm in 11 / 17 steps), then +1:
+  joined in the release step (the release hook deferred to the step's check), <= 1.4 mm aside, tilt 0.2 deg; *both* likewise. All
+  six in one attempt (no rollback); every replay passed, identical to its demo. The owner chose the touchdown, a failed one falling
+  back to a plain drop - never a partial opening (the unload is one).
+- **Demos with the touchdown** (`8947f32b`, snap, r5 instances, `runs_touchdown`): all three pass in one attempt - cap 0.18 mm /
+  0.000 rad, cork 0.93 mm / 0.002 rad, lid 0.13 mm / 0.001 rad. The hand came down 3.2 / 3.6 / 4.6 mm in 11 / 12 / 18 steps to
+  contact (the lid's rim sits inside the teapot's opening), no fallback; each part was joined in the release step by that step's own
+  check (the release hook deferred: touching), in contact; lateral offset at the release -> at the join 1.0 -> 0.4 / 2.0 -> 2.1 /
+  1.0 -> 1.1 mm; snap 10.2 / 18.1 / 4.9 mm. The replays pass, bit-identical to the demos (the lid's first replay process segfaulted
+  in Kit's start-up, in the viewport wait, before any replay step; the re-run passed).
+- **Tests**: `f2328a7e` + Behavior-1K `6a6194600` (viscam8): 1496 passed, 1 skipped, the 4 pre-existing failures (`test_v2_core` x2,
+  `test_v2_large_scale` x2) - 1490 non-failing before it + 7 new (5 of the hook in `test_ag_release_hook.py`, the release check's
+  weld record, the rule's place in the task). `696de57b` (svl7): 1488 / 2; `8947f32b`: 1489 / 1 (the baseline's 1477 + 15 new tests
+  in `test_attach_contact.py` - 3 removed with the old attach place). On svl nodes one more test skips (`a4895689` on svl10: 1486
+  passed, 2 skipped; `c9522ff8` on svl7: 1476 / 2).
+
 ## `v3.0-reconciled` audit fixes — no stored force is let go of at once, drops come down before an instant release, a free-standing lid follows its arc; a visibly wobbling demo is discarded (2026-10-09/10)
 
 - **Commits** (untagged, local, on `v3.0-reconciled`): `06abb98a` (unload, push-close / grasp stops, the instant drop release, the

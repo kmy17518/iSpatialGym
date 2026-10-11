@@ -84,6 +84,12 @@ _SHARED_COUNTS = {"steps": 0, "reused": 0, "joint_steps": 0, "mismatches": 0, "p
 #: position only - a handle pinched across a 13 mm tab could not turn a blender lid on its 4 cm lever (2026-09-18). The
 #: demos are recorded under this rule, and an evaluated policy meets the same one.
 AG_MOVING_LINK_JOINT_TYPE = "FixedJoint"
+#: The assisted grasp's release, set on every robot of the env (our Behavior-1K fork's ``Robot.ag_release_on_pad_clear`` /
+#: ``ag_release_max_delay_s``, owner 2026-10-10): after the open command (+1, binary) the weld stays until a pad has left the
+#: object, at most this long. Let go at the command itself, the pads still clamped it: r14 tipped a block-design die to
+#: 88 deg and turned the free-standing carton 0.86 deg in one step. Demos are recorded and policies evaluated under it.
+AG_RELEASE_ON_PAD_CLEAR = True
+AG_RELEASE_MAX_DELAY_S = 0.2
 
 
 def _compact(expr) -> str:
@@ -307,6 +313,8 @@ class ISpatialGymTask(BehaviorTask):
         PRED.install_release_hook(getattr(env, "robots", None))
         for robot in _robots(getattr(env, "robots", None)):
             robot.ag_moving_link_joint_type = AG_MOVING_LINK_JOINT_TYPE
+            robot.ag_release_on_pad_clear = AG_RELEASE_ON_PAD_CLEAR
+            robot.ag_release_max_delay_s = AG_RELEASE_MAX_DELAY_S
         if self._tro is not None:
             self.configure_targets(self._tro.meta)
         return True, None
