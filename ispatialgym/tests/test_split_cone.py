@@ -241,8 +241,46 @@ def test_split_cone_on_from_the_subtask_defaults():
                 "configuration_matching-articulation_close_small_scale", "configuration_matching-attachment", "alignment-axial",
                 "inter_object_relation_satisfaction-ontop_small_scale", "inter_object_relation_satisfaction-under_small_scale",
                 "inter_object_relation_satisfaction-inside", "inter_object_relation_satisfaction-nextto", "inter_object_relation_satisfaction-touching"):
-        assert TT.split_cone_opts(sampler(sub, {})) == on, sub
+        fallback = (8.0, 20.0) if sub in ("alignment-axial", "inter_object_relation_satisfaction-inside") else (20.0, 30.0)
+        assert TT.split_cone_opts(sampler(sub, {})) == {**on, "fallback_classes_deg": fallback}, sub
     assert TT.split_cone_opts(sampler("alignment-axial", {"phase2_split_cone": False})) is None
     assert TT.split_cone_opts(sampler("alignment-axial", {"phase2_tight_class_deg": 5}))["work_classes_deg"] == (5.0, 20.0)
     for sub in ("alignment-world_vertical", "configuration_matching-articulation_open_large_scale", "inter_object_relation_satisfaction-ontop_large_scale"):
         assert TT.split_cone_opts(sampler(sub, {})) is None, sub
+
+
+def test_split_cone_draw_reads_the_subtask_defaults():
+    """The per-attempt position draw is on when C comes from the subtask's generation_defaults (504df81e left it reading the
+    alias's customs only, so the launched jobs kept every position's stances in the task's own order)."""
+    edge = EdgeFrame.from_edge("+x", th.tensor([1.0, 0.0]), th.tensor([-1.0, 0.0]), 1.6)
+
+    def cand(pos):
+        st = Stance("manipulation", (0.55, 0.0, 0.0), 0.5, 0.0, 0.45, edge)
+        st.focus = th.tensor([0.9, 0.1 * pos, 0.78])
+        st.extras.update({"angle_class": 0, "init_view_class": 0, "_position": (pos, 0)})
+        return st
+
+    cands = [cand(p) for p in (1, 1, 2, 3)]
+    s = SimpleNamespace(subtask="inter_object_relation_satisfaction-ontop_small_scale", gen=lambda k, d=None: d, manip_candidates=list(cands))
+    TT.split_cone_draw(s, np.random.default_rng(0))
+    assert len({tuple(c.extras["_position"]) for c in s.manip_candidates}) == 1 and len(s.manip_candidates) < len(cands)
+    off = SimpleNamespace(subtask="inter_object_relation_satisfaction-ontop_small_scale", gen=lambda k, d=None: {"phase2_split_cone": False}.get(k, d),
+                          manip_candidates=list(cands))
+    TT.split_cone_draw(off, np.random.default_rng(0))
+    assert off.manip_candidates == cands
+
+
+def test_split_cone_without_a_pair_falls_back_to_the_plain_phase2(monkeypatch):
+    """Owner 2026-10-11 ~20:10: a template whose split cone finds no (stance, position) pair (the 55's first jobs: 0 pairs on
+    countertop_kelker_0 and four other supports) runs the plain Phase 2 with ``fallback_classes_deg`` instead of producing no
+    instance; without the key it stays empty."""
+    s, init, top = _scene(monkeypatch, {})
+    monkeypatch.setattr(TT, "phase2_split_cone", lambda *a, **k: [])
+    split = {"init_view_classes_deg": (20.0, 30.0), "lateral_shifts": SHIFTS, "work_classes_deg": (8.0, 20.0)}
+    with tempfile.TemporaryDirectory() as d:
+        rb = _band(d)
+        plain = TT.phase2_manipulation_stance(s, init, 0.03, target_height=0.06, stand_offs=STAND_OFFS, translates=(0.5,), n_tilts=3, bands=rb, top=top,
+                                              focus_z=0.78, angle_classes_deg=(20.0, 30.0))
+        none = _phase2(s, init, top, rb, split)
+        fb = _phase2(s, init, top, rb, {**split, "fallback_classes_deg": (20.0, 30.0)})
+    assert none == [] and plain and [_key(c) for c in fb] == [_key(c) for c in plain]

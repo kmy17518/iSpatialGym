@@ -1854,11 +1854,18 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     whichever of those arms reaches better - so stances that suit the other arm reach the orientation chooser.
 
     ``split_cone`` (:func:`split_cone_opts`, opt-in ``generation.phase2_split_cone``): :func:`phase2_split_cone` instead - the
-    start position in a wide cone of the init view, the work stance in its own cone with a search along the edge."""
+    start position in a wide cone of the init view, the work stance in its own cone with a search along the edge. When it finds
+    no (stance, position) pair and the options carry ``fallback_classes_deg``, the plain Phase 2 below with those classes."""
     if split_cone is not None:
-        return phase2_split_cone(s, init, target_half_extent, target_height=target_height, in_frame_fn=in_frame_fn, focus_candidates=focus_candidates,
-                                 stand_offs=stand_offs, translates=translates, n_tilts=n_tilts, margin=margin, bands=bands,
-                                 class1_when_deep_m=class1_when_deep_m, top=top, erosion_extra=erosion_extra, focus_z=focus_z, arm_bands=arm_bands, **split_cone)
+        opts = {k: v for k, v in split_cone.items() if k != "fallback_classes_deg"}
+        out = phase2_split_cone(s, init, target_half_extent, target_height=target_height, in_frame_fn=in_frame_fn, focus_candidates=focus_candidates,
+                                stand_offs=stand_offs, translates=translates, n_tilts=n_tilts, margin=margin, bands=bands,
+                                class1_when_deep_m=class1_when_deep_m, top=top, erosion_extra=erosion_extra, focus_z=focus_z, arm_bands=arm_bands, **opts)
+        fallback = split_cone.get("fallback_classes_deg")
+        if out or not fallback:
+            return out
+        angle_classes_deg = (float(fallback[0]), float(fallback[1]))
+        log.info("phase 2 (split cone): no (stance, position) pair - the plain Phase 2 with the %.0f / %.0f deg classes", *angle_classes_deg)
     top = _top(s, top)
     bands = bands or ensure_bands(s, top=top, edge=init.edge)
     arm_bands = {a: b for a, b in (arm_bands or {}).items() if b is not None}
@@ -1959,13 +1966,19 @@ def split_cone_opts(s) -> Optional[Dict[str, Any]]:
     """Owner 2026-10-11 (cone A/B variant C), opt-in per subtask with ``generation.phase2_split_cone``: the keyword arguments of
     :func:`phase2_split_cone` - the start position's classes at the init view (``init_view_class_deg``), the work stance's shifts
     along the edge (``phase2_lateral_shifts_m``) and its classes (``phase2_tight_class_deg`` / ``phase2_loose_class_deg``) - or None
-    (off: Phase 2 as before). Every key through :func:`phase2_gen` (the alias's customs, else its subtask's generation_defaults)."""
+    (off: Phase 2 as before). Every key through :func:`phase2_gen` (the alias's customs, else its subtask's generation_defaults).
+    ``phase2_split_fallback_classes_deg`` adds ``fallback_classes_deg``: the plain Phase 2's classes for a template whose split
+    cone finds no (stance, position) pair."""
     if not phase2_gen(s, "phase2_split_cone", False):
         return None
     iv = phase2_gen(s, "init_view_class_deg") or SPLIT_INIT_VIEW_CLASSES_DEG
-    return {"init_view_classes_deg": (float(iv[0]), float(iv[1])),
-            "lateral_shifts": tuple(float(v) for v in (phase2_gen(s, "phase2_lateral_shifts_m") or SPLIT_LATERAL_SHIFTS)),
-            "work_classes_deg": phase2_angle_classes(s)}
+    out = {"init_view_classes_deg": (float(iv[0]), float(iv[1])),
+           "lateral_shifts": tuple(float(v) for v in (phase2_gen(s, "phase2_lateral_shifts_m") or SPLIT_LATERAL_SHIFTS)),
+           "work_classes_deg": phase2_angle_classes(s)}
+    fb = phase2_gen(s, "phase2_split_fallback_classes_deg")
+    if fb:
+        out["fallback_classes_deg"] = (float(fb[0]), float(fb[1]))
+    return out
 
 
 def stance_cameras(s, stances: Sequence[Stance]) -> List[Pose]:
@@ -2108,7 +2121,7 @@ def split_cone_draw(s, rng: np.random.Generator) -> None:
     them), and that position's work stances of the best class made the task's candidates for this attempt (the task's own order
     applies among them). A no-op that leaves ``rng`` untouched unless the split cone is on. A task's memory of failed candidates by
     index (attachment's ``_candidate_rejects``) starts empty with each position."""
-    if not s.gen("phase2_split_cone", False):
+    if not phase2_gen(s, "phase2_split_cone", False):
         return
     pool = getattr(s, "_split_cone_pool", None)
     if pool is None:

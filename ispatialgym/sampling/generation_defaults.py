@@ -159,6 +159,9 @@ _TABLETOP_SPLIT_CONE: Dict[str, Any] = {
     "phase2_lateral_shifts_m": [0.0, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3],
     "phase2_tight_class_deg": 8.0,
     "phase2_loose_class_deg": 20.0,
+    # owner 2026-10-11 ~20:10: a template whose split cone finds no (stance, position) pair runs the plain Phase 2 with these
+    # classes - cone B; cone A for alignment-axial and IORS inside (the owner's 18:26 fallback rule)
+    "phase2_split_fallback_classes_deg": [20.0, 30.0],
 }
 
 DEFAULTS: Dict[str, Dict[str, Any]] = {
@@ -392,6 +395,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     "alignment-axial": {
         **COMMON,
         **_TABLETOP_SPLIT_CONE,
+        "phase2_split_fallback_classes_deg": [8.0, 20.0],
         "tolerances": {"orientation": 0.10},  # §8 alignment axial 0.10 rad
         "groups": {},
         "path_buckets": None,
@@ -426,6 +430,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     "inter_object_relation_satisfaction-inside": {
         **COMMON,
         **_TABLETOP_SPLIT_CONE,
+        "phase2_split_fallback_classes_deg": [8.0, 20.0],
         "tolerances": {**TOLERANCES_MEASURED, "orientation_metric": None},  # §8; §6.11 inside: orientation not evaluated
         "groups": {},
         "path_buckets": None,
