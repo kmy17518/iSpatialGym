@@ -18,7 +18,8 @@ spot when steps 1–3 pass for δ = +30° and δ = −30° at the configured sca
 Instance (:meth:`sample_instance`): spot drawn weighted by its survivors, δ = sign · U(15°, 45°), the target's back
 ``wall_gap_m`` off the wall, Phase 1 (β_max 35°, d 0.5–1.5 m, the whole tilted target in frame), Phase 2 steps 2–4
 (contacts of §5.5, all acting in the wall plane: the fingers point into the wall and a finger's outer side meets the
-edge; the push carries the corner of the low end along its circle about C with the arc waypoints δ/2 and goal, brace
+edge, every contact point on the target's material at its mid-thickness plane — the cut of its collision pieces; the push
+carries the corner of the low end along its circle about C with the arc waypoints δ/2 and goal, brace
 kinds ``below_high`` → ``above_low`` → ``side_high`` at the goal edge; focus C; C, the pushed corner and B in frame),
 step 5 (brace arm first with the target not ignored, then the push arm with the brace locked and the target ignored
 for the contact poses, combined whole-body check), step 6 path + transition; the hinge at the COM after apply; hinge
@@ -61,6 +62,11 @@ BRACE_KINDS = ("below_high", "above_low", "side_high")
 #: low end of the tilted level axis, so arm and direction follow the tilt sign, and it gets no brace (no edge reaches a stop;
 #: the hinge resistance holds the upright pose). Rectangles within |δ| ≤ MAX_DEVIATION_DEG keep their lowest corner.
 NO_CORNER_OFFSET_FRACTION = 0.15
+#: Owner 2026-10-12 (world_vertical#03, paper towel dispenser jacqxv): a wall contact keeps the hull's band extreme moved onto
+#: the mid-thickness plane while that point lies within this distance (m) of the target's material at the plane (the cut of its
+#: collision pieces), else it is chosen on the cut. The passed flat targets' points lie within 0.9 mm of it at every spot and
+#: tilt; the dispenser's low corner and its below_high stop lay 4.7 cm off (the bottom recedes toward the wall).
+CONTACT_MATERIAL_TOL_M = 0.003
 #: A8 (owner decision 2026‑09‑16): |δ| ≤ 25° until the two-stroke push for larger tilts exists (TODO: two strokes with a
 #: re-grasp of the push point between them, each within the arm's arc reach; the ±30° template filter then returns)
 MAX_DEVIATION_DEG = 25.0
@@ -189,6 +195,75 @@ def extreme_z_point(pts: th.Tensor, lowest: bool = True, band: float = 0.003) ->
     return sel.mean(dim=0)
 
 
+def _plane_basis(normal) -> Tuple[th.Tensor, th.Tensor]:
+    n = C.unit(th.as_tensor(normal, dtype=th.float32))
+    k = th.tensor([1.0, 0.0, 0.0]) if abs(float(n[0])) < 0.9 else th.tensor([0.0, 1.0, 0.0])
+    e1 = C.unit(th.cross(n, k, dim=0))
+    return e1, th.cross(n, e1, dim=0)
+
+
+def _in_plane(pts, plane_point, basis: Tuple[th.Tensor, th.Tensor]) -> th.Tensor:
+    d = th.as_tensor(pts, dtype=th.float32) - th.as_tensor(plane_point, dtype=th.float32)
+    return th.stack([d @ basis[0], d @ basis[1]], dim=-1)
+
+
+def _from_plane(uv: th.Tensor, plane_point, basis: Tuple[th.Tensor, th.Tensor]) -> th.Tensor:
+    return th.as_tensor(plane_point, dtype=th.float32) + uv[..., :1] * basis[0] + uv[..., 1:] * basis[1]
+
+
+def plane_section(pieces: Sequence[th.Tensor], plane_point, normal, eps: float = 1e-6) -> List[th.Tensor]:
+    """The cut of convex pieces by the plane through ``plane_point`` ⟂ ``normal``: for every piece that reaches the plane, the
+    corners of the polygon where the piece's convex hull meets it (spanned by the piece's points on the plane and the crossings
+    of the segments between its points on either side), on the plane. Pieces that do not reach the plane are left out."""
+    o = th.as_tensor(plane_point, dtype=th.float32)
+    n = C.unit(th.as_tensor(normal, dtype=th.float32))
+    basis = _plane_basis(n)
+    out = []
+    for P in pieces:
+        P = th.as_tensor(P, dtype=th.float32).reshape(-1, 3)
+        s = (P - o) @ n
+        below, above = s < -eps, s > eps
+        cand = [P[~below & ~above]]
+        if bool(below.any()) and bool(above.any()):
+            s_lo, s_hi = s[below][:, None], s[above][None, :]
+            w = (s_lo / (s_lo - s_hi))[..., None]
+            cand.append((P[below][:, None, :] + (P[above][None, :, :] - P[below][:, None, :]) * w).reshape(-1, 3))
+        cand = th.cat(cand)
+        if len(cand):
+            out.append(_from_plane(G.convex_hull_2d(_in_plane(cand, o, basis)), o, basis))
+    return out
+
+
+def section_outline(polys: Sequence[th.Tensor], plane_point, normal) -> th.Tensor:
+    """Corners of the convex outline of a plane cut (:func:`plane_section`): its extreme points, each a corner of a cut piece."""
+    if not polys:
+        return th.zeros(0, 3)
+    basis = _plane_basis(normal)
+    return _from_plane(G.convex_hull_2d(_in_plane(th.cat(list(polys)), plane_point, basis)), plane_point, basis)
+
+
+def material_offset(p, polys: Sequence[th.Tensor], plane_point, normal) -> Tuple[float, th.Tensor]:
+    """(distance, nearest point) of ``p``, taken onto the plane, to the nearest piece of a plane cut (:func:`plane_section`): 0
+    and ``p`` on the plane when a piece contains it, else the distance to and the nearest point of the closest piece's polygon."""
+    n = C.unit(th.as_tensor(normal, dtype=th.float32))
+    basis = _plane_basis(n)
+    q = _in_plane(p, plane_point, basis)
+    best, near = math.inf, q
+    for P in polys:
+        a = _in_plane(P, plane_point, basis)
+        ab, aq = th.roll(a, -1, 0) - a, q - a
+        if len(a) >= 3:
+            cr = ab[:, 0] * aq[:, 1] - ab[:, 1] * aq[:, 0]
+            if bool((cr >= -1e-9).all()) or bool((cr <= 1e-9).all()):
+                return 0.0, on_plane(th.as_tensor(p, dtype=th.float32), plane_point, n)
+        foot = a + ab * ((aq * ab).sum(dim=1) / (ab * ab).sum(dim=1).clamp_min(1e-18)).clamp(0.0, 1.0)[:, None]
+        d = th.linalg.norm(q - foot, dim=1)
+        i = int(th.argmin(d))
+        if float(d[i]) < best:
+            best, near = float(d[i]), foot[i]
+    return best, _from_plane(near, plane_point, basis)
+
+
 def fist_half_extents(depth: float, arm: str = "right") -> Tuple[float, float]:
     """(along the closing axis, across it) half-widths (m) of the closed fist over the ``depth`` behind the fingertips:
     the outer side of a finger stands the first from the eef axis where a wall contact touches the target, the second
@@ -279,6 +354,10 @@ def half_turn_equivalence(front) -> List[float]:
 @register(*SUBTASKS)
 class AlignmentWall(SamplerV2):
     """World vertical: the wall-hung target is pushed back to its upright goal."""
+
+    #: the target's collision pieces in its root frame (``SimWorld.local_collision_pieces``); None: unknown, the contacts keep
+    #: the hull's projected extremes
+    pieces: Optional[List[th.Tensor]] = None
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -442,9 +521,20 @@ class AlignmentWall(SamplerV2):
 
     # ------------------------------------------------------------------ contacts (§5.5)
 
-    def contacts_for(self, spot: Dict[str, Any], delta: float, hull: Optional[th.Tensor] = None, com: Optional[th.Tensor] = None) -> Dict[str, Any]:
+    def contact_section(self, hull: Optional[th.Tensor] = None, pieces: Optional[Sequence[th.Tensor]] = None) -> List[th.Tensor]:
+        """The target's material at its contact plane, in the root frame: the cut of its collision pieces by the mid-thickness
+        plane (:func:`plane_section`); ``[]`` when no piece reaches the plane or the pieces are unknown."""
+        if not pieces:
+            return []
+        s = (self.hull if hull is None else hull) @ self.front
+        return plane_section(pieces, self.front * (0.5 * (float(s.min()) + float(s.max()))), self.front)
+
+    def contacts_for(self, spot: Dict[str, Any], delta: float, hull: Optional[th.Tensor] = None, com: Optional[th.Tensor] = None,
+                     pieces: Optional[Sequence[th.Tensor]] = None) -> Dict[str, Any]:
         """Geometry of one (spot, δ): the tilted / level hull, C, E_low / E_high, the push contact poses (pre, init,
-        mid, goal, direction) and the brace candidates in order ({kind, B, a, pose, pre})."""
+        mid, goal, direction) and the brace candidates in order ({kind, B, a, pose, pre}). ``pieces``: the collision pieces
+        that go with ``hull`` (default: the target's own when ``hull`` is not given); ``contact_rules`` records how each
+        contact point was chosen."""
         n = spot["normal"]
         band = float(self.param("contact_extreme_band_m", 0.03))
         pose_t = self.hang_pose(spot, delta, hull, com)
@@ -454,8 +544,45 @@ class AlignmentWall(SamplerV2):
         _, thickness = self.depth_extents(hull, com)
         mid_plane = self.mid_plane_point(spot, hull, com)
         level_axis_t = G.rotate(pose_t[1], self.side)  # ℓ_δ = the level axis rotated by δ
+        # Contacts on the target's material (owner 2026-10-12, world_vertical#03): a contact point taken from the hull's band
+        # extreme and moved onto the mid-thickness plane may lie in free air there (a deep target whose bottom recedes toward
+        # the wall: the dispenser's lowest point is behind the plane, both grippers ended a few cm under it). Each contact keeps
+        # that point while it lies on the cut of the collision pieces by the plane (within ``contact_material_tolerance_m``);
+        # else the same selection runs on the cut's outline, and a band mean that falls between two cut pieces moves onto the
+        # nearer one. No cut (no piece reaches the plane, or no pieces): the projected point.
+        cut = self.contact_section(hull, self.pieces if pieces is None and hull is None else pieces)
+        cut_t, cut_l = [G.local_points_world(P, pose_t) for P in cut], [G.local_points_world(P, pose_l) for P in cut]
+        outline_t, outline_l = section_outline(cut_t, mid_plane, n), section_outline(cut_l, mid_plane, n)
+        tol = float(self.param("contact_material_tolerance_m", CONTACT_MATERIAL_TOL_M))
+        rules: Dict[str, Any] = {"B": {}}
+
+        def on_material(rec: Dict[str, Any], key: str, projected: Tuple[th.Tensor, ...], cut_w: List[th.Tensor], on_cut) -> Tuple[th.Tensor, ...]:
+            if not cut_w:
+                rec[key] = {"rule": "projection", "off_m": None}
+                return projected
+            off, _ = material_offset(projected[0], cut_w, mid_plane, n)
+            rec[key] = {"rule": "projection" if off <= tol else "section", "off_m": round(off, 4)}
+            if off <= tol:
+                return projected
+            p, *rest = on_cut()
+            p = on_plane(p, mid_plane, n)
+            gap, near = material_offset(p, cut_w, mid_plane, n)
+            if gap > tol:
+                rec[key]["moved_m"] = round(gap, 4)
+                p = near
+            return (p, *rest)
+
+        def ends_on_cut() -> Tuple[th.Tensor, th.Tensor]:
+            lo, hi = extreme_points(outline_t, level_axis_t, band)
+            if float(th.dot(lo - hi, level_axis_t)) * float(th.dot(E_low - E_high, level_axis_t)) < 0:
+                lo, hi = hi, lo  # the ends of the projected pair (the z order of two near-level ends may differ)
+            return lo, hi
+
         E_low, E_high = extreme_points(pts_t, level_axis_t, band)
         E_low, E_high = on_plane(E_low, mid_plane, n), on_plane(E_high, mid_plane, n)
+        (E_low_m,) = on_material(rules, "E_low", (E_low,), cut_t, lambda: (ends_on_cut()[0],))
+        (E_high_m,) = on_material(rules, "E_high", (E_high,), cut_t, lambda: (ends_on_cut()[1],))
+        E_low, E_high = E_low_m, E_high_m
         # Every wall contact acts in the wall plane (owner 2026-09-27, first-demo v1.2 review): the fingers point into the
         # wall and the outer side of a finger (normal ±c, c in the wall plane) meets the target's edge, the pre-contact lies
         # PRE_DIST back along the contact direction in the same plane, and the fingertips stay on the target's mid-plane
@@ -467,12 +594,14 @@ class AlignmentWall(SamplerV2):
         # carried along its circle about C — the finger side stands square to the circle's tangent, so the corner stays
         # where it touches the finger along the whole arc (a push at the middle of the end runs parallel to its side face)
         push_high = str(self.param("push_end", "low")).lower() == "high"
-        E_push = on_plane(extreme_z_point(pts_t, lowest=not push_high), mid_plane, n)
+        (E_push,) = on_material(rules, "E_push", (on_plane(extreme_z_point(pts_t, lowest=not push_high), mid_plane, n),), cut_t,
+                                lambda: (extreme_z_point(outline_t, lowest=not push_high),))
         _, width, _ = self.dims(hull)
         lateral = th.tensor([float(n[1]), -float(n[0]), 0.0])
         no_corner = abs(float(th.dot((E_push - C_)[:2], lateral[:2]))) < float(self.param("no_corner_offset_fraction", NO_CORNER_OFFSET_FRACTION)) * width / 2
         if no_corner:
             E_push = E_high if push_high else E_low
+            rules["E_push"] = dict(rules["E_high" if push_high else "E_low"])
         a_push = leveling_tangent(E_push, C_, n, delta, rises=not push_high)
         # the corner meets the middle of the finger side (0927-010159: with the corner 3 mm inside the finger's edge the first
         # arc lost it after 0.1 rad - the loaded fist sags across the tangent); the target's lower edge then rests on the
@@ -500,7 +629,7 @@ class AlignmentWall(SamplerV2):
         braces = []
         for kind in () if no_corner else brace_candidate_order(h, w, self.param("brace_kinds", BRACE_KINDS)):
             B, a = brace_point(pts_l, kind, side_l, high_sign, C_l, band)
-            B = on_plane(B, mid_plane, n)
+            B, a = on_material(rules["B"], kind, (on_plane(B, mid_plane, n), a), cut_l, lambda: brace_point(outline_l, kind, side_l, high_sign, C_l, band))
             # the stop: a finger's outer side ``brace_offset_m`` before B along a (toward the target), reached along a in the
             # wall plane from PRE_DIST out (spec §5.5: "the approach slides along the wall from outside the hull")
             for tilt_b, label, sgn in wall_brace_turns(tilts):
@@ -513,7 +642,7 @@ class AlignmentWall(SamplerV2):
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,
                          "distance": float(th.linalg.norm(push_goal[0] - push_init[0])), "variants": push_variants, "end": "high" if push_high else "low",
                          "face_m": face},
-                "braces": braces, "brace_arm": other_arm(push_arm), "delta": delta, "no_corner": no_corner}
+                "braces": braces, "brace_arm": other_arm(push_arm), "delta": delta, "no_corner": no_corner, "contact_rules": rules, "cut_pieces": len(cut)}
 
     def brace_clear(self, geo: Dict[str, Any], brace: Dict[str, Any]) -> bool:
         """§5.5: at init the brace hand must be ≥ 2 cm clear of the tilted hull (fingertip, pad centre and the finger side
@@ -732,6 +861,7 @@ class AlignmentWall(SamplerV2):
         """Wall spots for the spawned (scaled) target, the wall with the most spots bound as the support role."""
         target = self.target
         self.hull = self.world.local_hull(target)
+        self.pieces = self.world.local_collision_pieces(target)
         self.com_local = self._com_local(target)
         frame = self.reviewed_frame()
         try:
@@ -754,7 +884,9 @@ class AlignmentWall(SamplerV2):
         self.template_facts.update({"frame": {**frame, "level_axis_derived": "+" + "xyz"[int(th.argmax(self.side.abs()))] if float(self.side.sum()) > 0
                                               else "-" + "xyz"[int(th.argmax(self.side.abs()))], "symmetric_180": self.symmetric_180(), "source": "customs"},
                                     "dims": {"thickness": t, "width": w, "height": h}, "scale": self.choice.models["target"].scale, "wall": wall_name,
-                                    "com_local": self.com_local.tolist()})
+                                    "com_local": self.com_local.tolist(),
+                                    "wall_contacts": {"collision_pieces": len(self.pieces), "pieces_cut": len(self.contact_section(pieces=self.pieces)),
+                                                      "material_tolerance_m": float(self.param("contact_material_tolerance_m", CONTACT_MATERIAL_TOL_M))}})
 
     def sample_template(self):
         try:
@@ -782,6 +914,8 @@ class AlignmentWall(SamplerV2):
             for sign in (1.0, -1.0):
                 geo = self.contacts_for(s, sign * filt)
                 n_ok[f"{sign * filt_deg:+.0f}"] = len(self.screen(self.step1[s["id"]], geo))
+                # the rule each contact took at the filter tilts (the same at every spot: the cut is fixed in the target's frame)
+                self.template_facts.setdefault("wall_contacts", {}).setdefault("rules", {}).setdefault(f"{sign * filt_deg:+.0f}", geo["contact_rules"])
             s["n_survivors"] = n_ok
             s["weight"] = sum(n_ok.values())
             if all(v > 0 for v in n_ok.values()):
@@ -800,10 +934,11 @@ class AlignmentWall(SamplerV2):
         (hull and COM scaled about the root; the reach cache is robot-only). Never applied."""
         for s in [float(v) for v in self.param("scale_hint_steps", [0.9, 0.8, 0.7, 0.6, 0.5])]:
             hull, com = self.hull * s, self.com_local * s
+            pieces = [p * s for p in self.pieces] if self.pieces else None
             for spot in self.spots:
                 ok = True
                 for sign in (1.0, -1.0):
-                    geo = self.contacts_for(spot, sign * filt, hull, com)
+                    geo = self.contacts_for(spot, sign * filt, hull, com, pieces)
                     if not self.screen(self.step1[spot["id"]], geo):
                         ok = False
                         break
@@ -892,7 +1027,8 @@ class AlignmentWall(SamplerV2):
         brace = self.sidecar.contacts.get("brace")
         d.summary.update({"wall": spot["wall_name"], "spot": spot["id"], "deviation_deg": math.degrees(delta), "push_arm": geo["push"]["arm"],
                           "brace_arm": brace.arm if brace is not None else None, "brace_kind": brace.brace_kind if brace is not None else None,
-                          "push_point": "level_axis_end" if geo.get("no_corner") else "lowest_point", "scale": self.choice.models["target"].scale, "phase2": stats,
+                          "push_point": "level_axis_end" if geo.get("no_corner") else "lowest_point", "wall_contacts": geo["contact_rules"],
+                          "scale": self.choice.models["target"].scale, "phase2": stats,
                           "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip), "symmetric_180": self.symmetric_180(),
                           "frame": dict(self.template_facts.get("frame") or {}),
                           "hang": {"back_off_wall_m": self.wall_offset(spot), "wall_protrusion_m": spot.get("wall_protrusion_m"),

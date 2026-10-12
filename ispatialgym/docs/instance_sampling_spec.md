@@ -1182,7 +1182,8 @@ icl review, TODO B6).
 
 **Contacts**: push arm + brace arm. ℓ_δ = the target's level axis (side = up × front) rotated by δ in the wall plane;
 C = COM. E_low / E_high = mean of the hull points within 3 cm of the two extremes along ℓ_δ (E_low the lower one), both
-on the mid-thickness plane (thickness/2 + 0.01 off the wall). Reviewed contact candidates per model
+moved onto the mid-thickness plane (the contact plane, thickness/2 in front of the target's back), each kept only where it
+lies on the target's material there ("Contact points on the material" below). Reviewed contact candidates per model
 (`contacts/<category>__<model>.json`, TODO B6) override the geometric E_low / brace points where present.
 
 - Push arm at E_low: a = t(E_low) = unit tangent of the circle about C through E_low, signed so the low end rises
@@ -1199,6 +1200,29 @@ on the mid-thickness plane (thickness/2 + 0.01 off the wall). Reviewed contact c
   C, c = n; fingertip face 5 mm outside B; admitted only when the target's height ≥ half its width (frames). For every
   candidate: pre-contact = eef − 0.10·a; at init the brace hand must be ≥ 2 cm clear of the tilted hull (exact IK
   checks the brace with the target not ignored); class = nearest push class of a.
+
+**Contact points on the material** (owner 2026‑10‑12, world_vertical#03: the paper towel dispenser `jacqxv` is a deep
+wedge whose bottom recedes toward the wall; at its mid-thickness plane there is no material as low as its lowest point, so
+the projected low corner hung 4.7 cm under the dispenser and the pad never touched it). Every wall contact point — E_low /
+E_high, the push corner E_push (the tilted target's lowest point, its highest with `push_end: high`, the level-axis end of
+a target without a low corner) and every brace kind's B — lies on the target's material at the contact plane. That
+material is the **cut** of the target's collision pieces by the plane: `SimWorld.local_collision_pieces` gives every
+collision mesh of every link as one convex piece in the root frame (`local_hull` merges a link's meshes into one hull), and
+the cut is, per piece that reaches the plane, the polygon where the piece's convex hull meets it. A contact keeps its point
+from the rules above (the hull's band extreme moved onto the plane) while that point lies within
+`generation.contact_material_tolerance_m` (3 mm) of the cut; otherwise the same selection (the band extreme, the brace
+kind's band) runs on the corners of the cut's convex outline, and a band mean that falls between two cut pieces moves to
+the nearest point of the nearer piece. No cut (no piece reaches the plane, or the pieces are unknown): the projected point.
+The `scale_hint` pass scales the pieces with the hull. Record: per contact the rule (`projection` / `section`), the
+projected point's distance to the cut (`off_m`, null without a cut) and `moved_m` when a mean was moved onto a piece, in
+`template_facts.wall_contacts.rules` at the template-filter tilts (the cut is fixed in the target's frame: the same at every
+spot) next to `collision_pieces`, `pieces_cut` and `material_tolerance_m`, and in the instance summary (`wall_contacts`).
+Flat targets keep their contacts: the passed painting, wall clock, signpost and license plate have every projected point
+within 0.9 mm of the cut at every spot at ±15°, ±25° and the instance δ (positions unchanged); on the dispenser the low
+corner and the `below_high` stop move 5.1–5.8 cm up onto the cut while the high corner, `above_low` and `side_high` points
+(≤ 1.3 mm off) are kept. Unit tests: a two-piece wedge (deep top, shallow recessed bottom) whose push corner and brace
+points lie on the cut where the projected low corner and `below_high` point lie 4.4 cm under it; boxes, a framed canvas and
+a disc unchanged; no cut → the projected points; a band mean between two posts moved onto one.
 
 **Phase 1**: β_max = 35°, d_min = 0.5 m, d_max = 1.5 m; the spot is drawn per instance weighted by its number of
 Phase-2 survivors.

@@ -657,6 +657,208 @@ def test_wall_screen_keeps_push_only_stances_of_a_round_target(monkeypatch):
     assert B.screen([SimpleNamespace(extras={}, focus=None)], B.contacts_for(spot_b, math.radians(-20.0))) == []
 
 
+def _box_piece(x0, x1, y0, y1, z0, z1):
+    return th.tensor([[x, y, z] for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)], dtype=th.float32)
+
+
+#: the wedge's material at its mid-thickness plane reaches down to this height (its bottom piece's slanted front crosses x = 0)
+WEDGE_CUT_Z = -0.12 * 0.07 / 0.11
+
+
+def _wedge_pieces():
+    """A deep wedge in two collision pieces (front +x, up +z): a deep top box (14 cm thick, 30 cm wide, 14 cm high) over a shallow
+    bottom piece recessed toward the wall - its front slants from the top box's front edge back to 3 cm off the back, 12 cm lower."""
+    top = _box_piece(-0.07, 0.07, -0.15, 0.15, 0.0, 0.14)
+    bottom = th.tensor([[x, y, z] for y in (-0.15, 0.15) for x, z in ((-0.07, 0.0), (0.07, 0.0), (-0.07, -0.12), (-0.04, -0.12))], dtype=th.float32)
+    return [top, bottom]
+
+
+def _wedge_stub(push_end="low"):
+    S, spot, _ = _wall_stub()
+    S.pieces = _wedge_pieces()
+    S.hull = th.unique(th.cat(S.pieces), dim=0)
+    S.com_local = th.tensor([-0.01, 0.0, 0.03])
+    base = S.param
+    S.param = lambda k, d=None, v1=None: push_end if k == "push_end" else base(k, d, v1)
+    return S, spot
+
+
+def _local(p, pose):
+    return C.quat_to_mat(pose[1]).T @ (p - pose[0])
+
+
+def _same_contacts(g0, g1, atol=1e-6):
+    for k in ("E_low", "E_high", "E_push", "C"):
+        assert th.allclose(g0[k], g1[k], atol=atol), k
+    assert [v["wrist"] for v in g0["push"]["variants"]] == [v["wrist"] for v in g1["push"]["variants"]]
+    for v0, v1 in zip(g0["push"]["variants"], g1["push"]["variants"]):
+        for key in ("pre", "init", "mid", "goal"):
+            assert th.allclose(v0[key][0], v1[key][0], atol=atol) and th.allclose(v0[key][1], v1[key][1], atol=atol), (v0["wrist"], key)
+    assert [(b["kind"], b["wrist"]) for b in g0["braces"]] == [(b["kind"], b["wrist"]) for b in g1["braces"]]
+    for b0, b1 in zip(g0["braces"], g1["braces"]):
+        assert th.allclose(b0["B"], b1["B"], atol=atol) and th.allclose(b0["a"], b1["a"], atol=atol)
+        for key in ("pose", "pre"):
+            assert th.allclose(b0[key][0], b1[key][0], atol=atol) and th.allclose(b0[key][1], b1[key][1], atol=atol), (b0["kind"], key)
+    assert g0["push"]["arm"] == g1["push"]["arm"] and g0["no_corner"] == g1["no_corner"]
+
+
+def _rules(geo):
+    out = {k: v for k, v in geo["contact_rules"].items() if k != "B"}
+    out.update({f"B.{k}": v for k, v in geo["contact_rules"]["B"].items()})
+    return out
+
+
+def test_wall_plane_section_of_convex_pieces():
+    """The cut of convex pieces by a plane: per piece that reaches it, the corners of the polygon where its hull meets the plane
+    (points on the plane count, a slanted face is cut where its edges cross); the outline of the cut; the in-plane distance of a
+    point to the nearest cut piece and the nearest point on it."""
+    o, n = th.zeros(3), th.tensor([1.0, 0.0, 0.0])
+    yz = lambda poly: sorted((round(float(p[1]), 5), round(float(p[2]), 5)) for p in poly)  # noqa: E731
+    box = _box_piece(-0.02, 0.02, -0.1, 0.1, -0.05, 0.05)
+    (poly,) = AW.plane_section([box], o, n)
+    assert th.allclose(poly[:, 0], th.zeros(len(poly)), atol=1e-7) and yz(poly) == [(-0.1, -0.05), (-0.1, 0.05), (0.1, -0.05), (0.1, 0.05)]
+    assert AW.plane_section([box], th.tensor([0.03, 0.0, 0.0]), n) == []  # the plane misses the piece
+    (face,) = AW.plane_section([_box_piece(0.0, 0.02, -0.1, 0.1, -0.05, 0.05)], o, n)  # a piece touching the plane with a face
+    assert yz(face) == yz(poly)
+    top, bottom = _wedge_pieces()
+    (cut_b,) = AW.plane_section([bottom], o, n)
+    assert yz(cut_b) == [(-0.15, round(WEDGE_CUT_Z, 5)), (-0.15, 0.0), (0.15, round(WEDGE_CUT_Z, 5)), (0.15, 0.0)]
+    cut = AW.plane_section([top, bottom], o, n)
+    assert yz(AW.section_outline(cut, o, n)) == [(-0.15, round(WEDGE_CUT_Z, 5)), (-0.15, 0.14), (0.15, round(WEDGE_CUT_Z, 5)), (0.15, 0.14)]
+    d, near = AW.material_offset(th.tensor([0.03, 0.05, -0.12]), cut, o, n)  # below the cut: the bottom piece's lower edge
+    assert d == pytest.approx(0.12 + WEDGE_CUT_Z, abs=1e-6) and th.allclose(near, th.tensor([0.0, 0.05, WEDGE_CUT_Z]), atol=1e-6)
+    d_in, p_in = AW.material_offset(th.tensor([0.03, 0.05, 0.02]), cut, o, n)  # inside: taken onto the plane
+    assert d_in == 0.0 and th.allclose(p_in, th.tensor([0.0, 0.05, 0.02]), atol=1e-7)
+
+
+def test_wall_contacts_lie_on_the_material_of_a_wedge():
+    """Owner 2026-10-12 (world_vertical#03, paper towel dispenser jacqxv): a deep target whose bottom recedes toward the wall has
+    no material at its mid-thickness plane as low as its lowest point, so the low corner and the below_high stop projected from
+    the hull's extremes hung in free air (both grippers a few cm under the dispenser). On the two-piece wedge the push corner and
+    every brace point lie on the cut of the pieces by the contact plane; today's projection of the low corner and of the
+    below_high point lies 4.4 cm under it. The deep top keeps its projected points (they lie on the cut), and so does a
+    scaled copy (``scale_hint`` passes scaled pieces with the scaled hull)."""
+    for deg in (20.0, -20.0, 25.0, -15.0):
+        delta = math.radians(deg)
+        S, spot = _wedge_stub()
+        geo = S.contacts_for(spot, delta)
+        pose_t, pose_l = geo["pose_tilted"], geo["pose_level"]
+        rules = _rules(geo)
+        assert geo["cut_pieces"] == 2
+        assert {k: v["rule"] for k, v in rules.items()} == {"E_low": "projection", "E_high": "projection", "E_push": "section", "B.below_high": "section",
+                                                           "B.above_low": "projection", "B.side_high": "projection"}
+        assert rules["E_push"]["off_m"] == pytest.approx(0.12 + WEDGE_CUT_Z, abs=2e-4) and "moved_m" not in rules["E_push"]
+
+        def on_material(p, pose):
+            q = _local(p, pose)
+            return abs(float(q[0])) < 1e-5 and abs(float(q[1])) <= 0.15 + 1e-5 and WEDGE_CUT_Z - 1e-5 <= float(q[2]) <= 0.14 + 1e-5
+
+        # the push corner = the lower bottom corner of the cut at the tilt, on the material; the finger side meets it
+        corners = [C.transform_points(pose_t, th.tensor([[0.0, y, WEDGE_CUT_Z]]))[0] for y in (-0.15, 0.15)]
+        assert th.allclose(geo["E_push"], min(corners, key=lambda c: float(c[2])), atol=1e-5) and on_material(geo["E_push"], pose_t)
+        a_push = geo["push"]["direction"]
+        assert th.allclose(C.fingertip(geo["push"]["init"]), geo["E_push"] - a_push * geo["push"]["face_m"], atol=1e-5)
+        assert float(a_push[2]) > 0 and abs(float(th.dot(a_push, spot["normal"]))) < 1e-6
+        for b in geo["braces"]:
+            assert on_material(b["B"], pose_l), b["kind"]
+        below = next(b for b in geo["braces"] if b["kind"] == "below_high")
+        assert float(_local(below["B"], pose_l)[2]) == pytest.approx(WEDGE_CUT_Z, abs=1e-5)
+        # today's rule (no pieces): the same corner and stop 4.4 cm under the material at the plane
+        S.pieces = None
+        old = S.contacts_for(spot, delta)
+        assert all(v == {"rule": "projection", "off_m": None} for v in _rules(old).values())
+        assert float(_local(old["E_push"], pose_t)[2]) == pytest.approx(-0.12, abs=1e-5) and not on_material(old["E_push"], pose_t)
+        old_below = next(b for b in old["braces"] if b["kind"] == "below_high")
+        assert float(_local(old_below["B"], pose_l)[2]) == pytest.approx(-0.12, abs=1e-5) and not on_material(old_below["B"], pose_l)
+        assert old["push"]["arm"] == geo["push"]["arm"]
+        for kind in ("above_low", "side_high"):
+            assert th.allclose(next(b["B"] for b in old["braces"] if b["kind"] == kind), next(b["B"] for b in geo["braces"] if b["kind"] == kind), atol=1e-6)
+        # the high end (push_end "high"): the deep top's corner, on the material either way
+        Sh, _ = _wedge_stub("high")
+        gh = Sh.contacts_for(spot, delta)
+        assert _rules(gh)["E_push"]["rule"] == "projection" and gh["push"]["end"] == "high"
+        assert float(_local(gh["E_push"], gh["pose_tilted"])[2]) == pytest.approx(0.14, abs=1e-5) and on_material(gh["E_push"], gh["pose_tilted"])
+    s = 0.7
+    S, spot = _wedge_stub()
+    g = S.contacts_for(spot, math.radians(20.0), S.hull * s, S.com_local * s, [p * s for p in S.pieces])
+    assert _rules(g)["E_push"]["rule"] == "section" and float(_local(g["E_push"], g["pose_tilted"])[2]) == pytest.approx(s * WEDGE_CUT_Z, abs=1e-5)
+
+
+def test_wall_flat_targets_keep_their_contacts():
+    """Owner 2026-10-12: flat targets come out unchanged. The painting box (one piece, or a frame of four full-depth bars around
+    a canvas that stops short of the mid-plane) and the round clock (one piece) give the hull's own contacts at every tilt -
+    every contact point lies on the cut, so each keeps its projected point - and the clock keeps its push-only level-axis end."""
+    S, spot, (t, w, h) = _wall_stub()
+    bars = [_box_piece(-t / 2, t / 2, -w / 2, -w / 2 + 0.03, -h / 2, h / 2), _box_piece(-t / 2, t / 2, w / 2 - 0.03, w / 2, -h / 2, h / 2),
+            _box_piece(-t / 2, t / 2, -w / 2, w / 2, -h / 2, -h / 2 + 0.03), _box_piece(-t / 2, t / 2, -w / 2, w / 2, h / 2 - 0.03, h / 2)]
+    canvas = _box_piece(-t / 2, -t / 4, -w / 2 + 0.03, w / 2 - 0.03, -h / 2 + 0.03, h / 2 - 0.03)
+    D, spot_d = _disc_stub()
+    for stub, sp, pieces_set in ((S, spot, ([S.hull.clone()], bars + [canvas])), (D, spot_d, ([D.hull.clone()],))):
+        for pieces in pieces_set:
+            for deg in (-23.97, 23.97, -15.0, 25.0):
+                stub.pieces = None
+                g0 = stub.contacts_for(sp, math.radians(deg))
+                stub.pieces = pieces
+                g1 = stub.contacts_for(sp, math.radians(deg))
+                assert all(v["rule"] == "projection" and v["off_m"] <= 1e-5 for v in _rules(g1).values()), _rules(g1)
+                _same_contacts(g0, g1)
+    assert g1["no_corner"] and g1["braces"] == [] and g1["cut_pieces"] == 1
+
+
+def test_wall_contacts_without_a_cut_keep_the_projection():
+    """No collision piece reaches the mid-thickness plane (a back plate and a front plate, nothing between them at mid-depth):
+    every contact keeps today's projected point, recorded with no distance to the (absent) cut."""
+    S, spot, (t, w, h) = _wall_stub()
+    plates = [_box_piece(-t / 2, -t / 4, -w / 2, w / 2, -h / 2, h / 2), _box_piece(t / 4, t / 2, -w / 2, w / 2, -h / 2, h / 2)]
+    for deg in (-20.0, 20.0):
+        g0 = S.contacts_for(spot, math.radians(deg))
+        S.pieces = plates
+        g1 = S.contacts_for(spot, math.radians(deg))
+        S.pieces = None
+        assert g1["cut_pieces"] == 0 and all(v == {"rule": "projection", "off_m": None} for v in _rules(g1).values())
+        _same_contacts(g0, g1)
+
+
+def test_wall_contact_between_cut_pieces_moves_onto_the_nearer_one():
+    """A selection on the cut is a band mean of its outline's corners: when the corners come from two separate cut pieces it can
+    fall between them, and it then moves onto the nearer piece. Full-depth posts over a recessed back plate (the hull's lowest
+    points are behind the contact plane): an inner post per side down to z = -0.10 and an outer one down to -0.08, so
+    below_high's band on the high side holds the inner post's outer bottom corner and the outer post's outer bottom corner;
+    their mean lies between the posts and moves 3.4 cm onto the outer post's nearest corner."""
+    S, spot, (t, w, h) = _wall_stub()
+    posts = [_box_piece(-t / 2, t / 2, y0, y1, z0, h / 2) for y0, y1, z0 in ((-0.05, -0.02, -0.1), (0.02, 0.05, -0.1), (-w / 2, -w / 2 + 0.03, -0.08),
+                                                                             (w / 2 - 0.03, w / 2, -0.08))]
+    plate = _box_piece(-t / 2, -t / 4, -w / 2, w / 2, -h / 2, h / 2)
+    S.pieces = posts + [plate]
+    S.hull = th.unique(th.cat(S.pieces), dim=0)
+    geo = S.contacts_for(spot, math.radians(20.0))
+    rule = geo["contact_rules"]["B"]["below_high"]
+    mean_y = (0.05 + w / 2) / 2
+    assert rule["rule"] == "section" and rule["moved_m"] == pytest.approx(math.hypot(w / 2 - 0.03 - mean_y, 0.01), abs=1e-4)
+    B = _local(next(b["B"] for b in geo["braces"] if b["kind"] == "below_high"), geo["pose_level"])
+    assert abs(float(B[0])) < 1e-5 and abs(float(B[1])) == pytest.approx(w / 2 - 0.03, abs=1e-5) and float(B[2]) == pytest.approx(-0.08, abs=1e-5)
+
+
+def test_local_collision_pieces_keeps_each_mesh():
+    """``SimWorld.local_collision_pieces``: every collision mesh of every link, one point set per mesh, through the link's scaled
+    transform into the object's root frame (as ``local_hull`` places them); meshes without points are skipped."""
+    from ispatialgym.sampling import sim_utils as SU
+
+    q_root = C.quat_from_axis_angle(th.tensor([0.0, 0.0, 1.0]), 0.7)
+    p_root = th.tensor([1.0, 2.0, 0.5])
+    R = C.quat_to_mat(q_root)
+    to_world = lambda pts: (pts * 0.8) @ R.T + p_root  # noqa: E731  (the link at the root pose, object scale 0.8)
+    a, b = _box_piece(-0.1, 0.1, -0.2, 0.2, 0.0, 0.05), _wedge_pieces()[1]
+    link = SimpleNamespace(collision_meshes={"a": SimpleNamespace(points_in_parent_frame=a), "empty": SimpleNamespace(points_in_parent_frame=th.zeros(0, 3)),
+                                             "b": SimpleNamespace(points_in_parent_frame=b)}, transform_local_points_to_world=to_world)
+    visual = SimpleNamespace(collision_meshes={}, transform_local_points_to_world=to_world)
+    obj = SimpleNamespace(get_position_orientation=lambda: (p_root, q_root), links={"base_link": link, "visual": visual})
+    world = object.__new__(SU.SimWorld)
+    world.sync_render_transforms = lambda: None
+    pieces = SU.SimWorld.local_collision_pieces(world, obj)
+    assert len(pieces) == 2 and th.allclose(pieces[0], a * 0.8, atol=1e-5) and th.allclose(pieces[1], b * 0.8, atol=1e-5)
+
+
 def test_brace_order():
     assert AW.brace_candidate_order(height=0.6, width=0.8) == ["below_high", "above_low", "side_high"]
     assert AW.brace_candidate_order(height=0.1, width=0.8) == ["below_high", "above_low"]  # side_high needs height >= width/2

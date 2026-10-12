@@ -602,6 +602,25 @@ class SimWorld:
         Rt = T.quat2mat(root[1]).T
         return (world - root[0]) @ Rt.T
 
+    def local_collision_pieces(self, obj) -> List[th.Tensor]:
+        """The points of every collision mesh of every link, one tensor per mesh, in the object's root frame.
+
+        :meth:`local_hull` merges a link's meshes into one convex hull; here each mesh stays a piece of its own (PhysX collides
+        the convex hull of a ``convexHull``-approximated mesh, the approximation of BEHAVIOR-1K's object collision meshes), placed
+        by the same transform (``points_in_parent_frame`` through the link's render-side scaled transform, see
+        :meth:`local_hull`), so the pieces' points together span the same hull."""
+        self.sync_render_transforms()
+        root = obj.get_position_orientation()
+        Rt = T.quat2mat(root[1]).T
+        out = []
+        for link in obj.links.values():
+            for mesh in link.collision_meshes.values():
+                p = mesh.points_in_parent_frame
+                if p is None or len(p) == 0:
+                    continue
+                out.append((link.transform_local_points_to_world(p) - root[0]) @ Rt.T)
+        return out
+
     def sync_render_transforms(self):
         """Push the PhysX poses to the render-side (Fabric) transforms that ``collision_boundary_points_world`` / ``aabb``
         read (``og.sim.sync_physx_to_fabric``; a single render frame when the fabric interface is unavailable)."""
