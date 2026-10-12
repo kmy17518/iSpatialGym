@@ -98,7 +98,9 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -285,7 +287,9 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -430,7 +434,9 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -555,7 +561,9 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -750,7 +758,9 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -903,7 +913,9 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -4893,7 +4905,9 @@
    },
    "up_axis": {
     "painting/dacihj": "+z"
-   }
+   },
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -5282,7 +5296,9 @@
    },
    "up_axis": {
     "painting/dacihj": "+z"
-   }
+   },
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel"
   },
   "constraints": [
    {
@@ -9140,10 +9156,10 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.18,
+    0.21
    ],
-   "stable_set_fractions": 7,
+   "stable_set_fractions": 2,
    "stable_hold_steps": 120,
    "stable_drift_tolerance_fraction": 0.5,
    "stable_probe_tolerances": {
@@ -9170,7 +9186,14 @@
     "beta_max_deg": 20.0,
     "d_min_m": 0.5,
     "d_max_m": 2.5,
-    "d_scan_max_m": 1.1
+    "d_scan_max_m": 1.1,
+    "init_tilts": [
+     0.0,
+     -0.2,
+     -0.35,
+     -0.5
+    ],
+    "_init_tilts_note": "2026-09-19: the open leaf fits the frame only from 1.15 m upright (base into the kitchen bar): let the init view lean forward"
    },
    "lateral_range_m": {
     "right": [
@@ -9184,7 +9207,31 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open",
+   "_counterbalance_note": "2026-09-19: generation.counterbalance defaults to auto (horizontal-axis revolute joint -> gravity off on the leaf, joint damping 5); witness relaxations removed - the 8-19 mm residuals were the TF32 lock-transform bug",
+   "follow_mode_override": "hybrid",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 120,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 5,
+    "lookahead_steps": 8,
+    "budget_s": 900.0
+   },
+   "joint_limit_margin_rad": 0.025,
+   "_wide_note": "2026-09-19 overnight: open wider than the arm-only ~21 deg - hybrid base+arm follow with the counterbalance; S = 36/40.5/45/49.5 deg + full",
+   "_close_note": "2026-09-20 01:25: q_init 16-19 deg - the reach-volume class tolerates 20 deg of pitch and the wrist little more (the arm-mode open demo is 21 deg): the close is its inverse",
+   "stable_set_include_full": false
   },
   "constraints": []
  },
@@ -9243,8 +9290,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.3,
+    0.45
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -9260,7 +9307,7 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
@@ -9272,8 +9319,13 @@
    "prompt0": {
     "beta_max_deg": 20.0,
     "d_min_m": 0.5,
-    "d_max_m": 2.5,
-    "d_scan_max_m": 1.1
+    "d_max_m": 3.5,
+    "d_scan_max_m": 1.1,
+    "init_tilts": [
+     0.0,
+     -0.2,
+     -0.35
+    ]
    },
    "lateral_range_m": {
     "right": [
@@ -9287,7 +9339,38 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
+   "_door_note": "2026-09-19: door_crtrpa_0 / j_leaf (vertical axis -> A4 room_door class -> hybrid base+arm follow); copied unchanged from the shared customs for the door sample",
+   "remove_objects": {
+    "house_single_floor": [
+     "armchair_qhcrgb_3",
+     "armchair_qhcrgb_4",
+     "coffee_table_wgtaip_0",
+     "pot_plant_lligdl_0",
+     "armchair_qhcrgb_2"
+    ]
+   },
+   "_remove_objects_note": "2026-09-19 door_crtrpa_0 (run 0919-021001): the 2.33 m door is in frame only from d >= 2.1 m in front of its garden face, and there the base stands in the garden armchairs / coffee table (Phase-1 collision debug: armchair_qhcrgb_4 x10, _3 x3, coffee_table_wgtaip_0 x3 spheres); removed as a scene variant like the chairs near a table; 0919-122043: with the hybrid follow complete, step 6 (path init -> manipulation, drive-in, trunk sweep) collided in the 0.75-1.4 m band - pot_plant_lligdl_0 (0.6 m in front of the face, 0.9 m beside the lane, 1.5 m tall) and armchair_qhcrgb_2 removed too",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 120,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 5,
+    "lookahead_steps": 8,
+    "budget_s": 900.0
+   },
+   "_hybrid_follow_note": "2026-09-19 experiment: hard joint-limit margin of a follow pose lowered 0.05 -> 0.03 rad (the program check's own floor is 0.025): at 17 deg every IK solution for the vertical-bar pinch was rejected by the margin (run 0919-074439)",
+   "_arm_note": "2026-09-19 experiment: the handle-side rule picks the LEFT arm (handle 0.38 m left of the face centre), but this door pulls open toward the robot and its handle sweeps to the robot's right; at 17-26 deg every left-arm IK solution sat on a joint limit (joint4 0.002 rad, run 0919-083006) -> right arm",
+   "_hybrid_follow_note2": "2026-09-19: the 40 IK calls per step went to the nearest lattice candidates, whose solutions all sat on right_arm_joint4's extension limit (run 0919-090231) -> only comfortably-reaching candidates (reach_fraction 0.85) and 120 IK calls per step",
+   "_open_fraction_note": "2026-09-19 experiment: the door's stable set spans 55-109 deg (every fraction of the 109 deg limit holds), and the hybrid follow from the 1.65 m garden strip stalls at 8-26 deg on joint limits (runs 0919-083006 / 090231 / 095306); a 33-50 deg opening is the first-demo goal (owner D-011 B: 20 deg minimum for door units)",
+   "_floor_note": "2026-09-19: the door's handle face looks onto garden_0 (room_in_front), so every stance stands on the garden floor; the shared alias binds floor.n.01_1 to sauna_0 and (ontop agent floor) was false after settling (0919-143618, attempts 3-4: init_false unsatisfied [1]) -> garden_0",
+   "joint_limit_margin_rad": 0.025,
+   "_close_note": "2026-09-20 01:25: init view of the open door needs d > 2.5 m (0920-000347: no (d,t) in frame up to 2.5); manipulation face re-aimed at the open handle (manip_face_from_open_handle)"
   },
   "constraints": []
  },
@@ -9386,12 +9469,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -9410,7 +9493,31 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "phase2_tight_class_deg": 8.0,
+   "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -9656,12 +9763,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -9680,7 +9787,31 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "phase2_tight_class_deg": 8.0,
+   "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -9786,12 +9917,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -9810,7 +9941,31 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "phase2_tight_class_deg": 8.0,
+   "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -9914,12 +10069,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -9938,7 +10093,31 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "phase2_tight_class_deg": 8.0,
+   "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -10194,12 +10373,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -10218,7 +10397,31 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "phase2_tight_class_deg": 8.0,
+   "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -10329,12 +10532,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -10353,7 +10556,31 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "phase2_tight_class_deg": 8.0,
+   "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -11462,10 +11689,10 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.3,
+    0.35
    ],
-   "stable_set_fractions": 7,
+   "stable_set_fractions": 2,
    "stable_hold_steps": 120,
    "stable_drift_tolerance_fraction": 0.5,
    "stable_probe_tolerances": {
@@ -11506,7 +11733,31 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open",
+   "_counterbalance_note": "2026-09-19: generation.counterbalance defaults to auto (horizontal-axis revolute joint -> gravity off on the leaf, joint damping 5); witness relaxations removed - the 8-19 mm residuals were the TF32 lock-transform bug",
+   "follow_mode_override": "hybrid",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 90,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 4,
+    "lookahead_steps": 6,
+    "budget_s": 2700.0,
+    "policy": "sequential"
+   },
+   "joint_limit_margin_rad": 0.025,
+   "_wide_note": "2026-09-20 00:30: 36-50 deg is kinematically out of reach for the rigid pinch grasp (wrist pitch; 0919-232626: every base pose fails IK past ~22-28 deg) - S = 27/31.5/36 deg + full; wider needs a re-grasp at ~25 deg",
+   "stable_set_include_full": false
   },
   "constraints": []
  },
@@ -11565,8 +11816,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.3,
+    0.45
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -11582,7 +11833,7 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
@@ -11609,7 +11860,38 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
+   "_door_note": "2026-09-19: door_crtrpa_0 / j_leaf (vertical axis -> A4 room_door class -> hybrid base+arm follow); copied unchanged from the shared customs for the door sample",
+   "remove_objects": {
+    "house_single_floor": [
+     "armchair_qhcrgb_3",
+     "armchair_qhcrgb_4",
+     "coffee_table_wgtaip_0",
+     "pot_plant_lligdl_0",
+     "armchair_qhcrgb_2"
+    ]
+   },
+   "_remove_objects_note": "2026-09-19 door_crtrpa_0 (run 0919-021001): the 2.33 m door is in frame only from d >= 2.1 m in front of its garden face, and there the base stands in the garden armchairs / coffee table (Phase-1 collision debug: armchair_qhcrgb_4 x10, _3 x3, coffee_table_wgtaip_0 x3 spheres); removed as a scene variant like the chairs near a table; 0919-122043: with the hybrid follow complete, step 6 (path init -> manipulation, drive-in, trunk sweep) collided in the 0.75-1.4 m band - pot_plant_lligdl_0 (0.6 m in front of the face, 0.9 m beside the lane, 1.5 m tall) and armchair_qhcrgb_2 removed too",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 90,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 4,
+    "lookahead_steps": 6,
+    "budget_s": 2700.0,
+    "policy": "sequential"
+   },
+   "_hybrid_follow_note": "2026-09-19 experiment: hard joint-limit margin of a follow pose lowered 0.05 -> 0.03 rad (the program check's own floor is 0.025): at 17 deg every IK solution for the vertical-bar pinch was rejected by the margin (run 0919-074439)",
+   "_arm_note": "2026-09-19 experiment: the handle-side rule picks the LEFT arm (handle 0.38 m left of the face centre), but this door pulls open toward the robot and its handle sweeps to the robot's right; at 17-26 deg every left-arm IK solution sat on a joint limit (joint4 0.002 rad, run 0919-083006) -> right arm",
+   "_hybrid_follow_note2": "2026-09-19: the 40 IK calls per step went to the nearest lattice candidates, whose solutions all sat on right_arm_joint4's extension limit (run 0919-090231) -> only comfortably-reaching candidates (reach_fraction 0.85) and 120 IK calls per step",
+   "_open_fraction_note": "2026-09-19 experiment: the door's stable set spans 55-109 deg (every fraction of the 109 deg limit holds), and the hybrid follow from the 1.65 m garden strip stalls at 8-26 deg on joint limits (runs 0919-083006 / 090231 / 095306); a 33-50 deg opening is the first-demo goal (owner D-011 B: 20 deg minimum for door units)",
+   "_floor_note": "2026-09-19: the door's handle face looks onto garden_0 (room_in_front), so every stance stands on the garden floor; the shared alias binds floor.n.01_1 to sauna_0 and (ontop agent floor) was false after settling (0919-143618, attempts 3-4: init_false unsatisfied [1]) -> garden_0",
+   "joint_limit_margin_rad": 0.025
   },
   "constraints": []
  },
@@ -11691,8 +11973,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.6,
+    0.8
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -11713,7 +11995,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "open",
@@ -11732,7 +12014,24 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-18/19 first-demo TEST setting (this alias only): the lid's pull ring (7.8 mm) is the handle (pinch min 5 mm), approach 20 deg toward the hinge; joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (USD force drive) so the lid holds any angle (stock it falls closed below ~102 deg); STAGE 2 demo (owner 22:38): goal 0.6-0.8 of the range (77-98 deg, beyond the arm's roll from the ring grasp) -> follow to the last reachable waypoint, release, closed-gripper push on the lid underside from inside the opening along the hinge arc (stage2_push); focus_at_handle: Phase-2 focus at the ring's height (the reaching stances failed gripper_not_in_frame at the mid-height focus); lid_facing hinge_right; brace optional + brace_search off; margin 0 + residual gates 15 mm; stage2_max_follow_k 0.75: the hand swings to 73.5 deg, the fist push does the last quarter (0919-001843 reached 98 deg by hand alone)",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true,
+   "stage2_max_follow_k": 0.75
   },
   "constraints": []
  },
@@ -11814,8 +12113,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.6,
+    0.8
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -11836,7 +12135,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "open",
@@ -11855,7 +12154,24 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-18/19 first-demo TEST setting (this alias only): the lid's pull ring (7.8 mm) is the handle (pinch min 5 mm), approach 20 deg toward the hinge; joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (USD force drive) so the lid holds any angle (stock it falls closed below ~102 deg); STAGE 2 demo (owner 22:38): goal 0.6-0.8 of the range (77-98 deg, beyond the arm's roll from the ring grasp) -> follow to the last reachable waypoint, release, closed-gripper push on the lid underside from inside the opening along the hinge arc (stage2_push); focus_at_handle: Phase-2 focus at the ring's height (the reaching stances failed gripper_not_in_frame at the mid-height focus); lid_facing hinge_right; brace optional + brace_search off; margin 0 + residual gates 15 mm; stage2_max_follow_k 0.75: the hand swings to 73.5 deg, the fist push does the last quarter (0919-001843 reached 98 deg by hand alone)",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true,
+   "stage2_max_follow_k": 0.75
   },
   "constraints": []
  },
@@ -11937,8 +12253,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.6,
+    0.8
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -11959,7 +12275,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "open",
@@ -11978,7 +12294,24 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-18/19 first-demo TEST setting (this alias only): the lid's pull ring (7.8 mm) is the handle (pinch min 5 mm), approach 20 deg toward the hinge; joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (USD force drive) so the lid holds any angle (stock it falls closed below ~102 deg); STAGE 2 demo (owner 22:38): goal 0.6-0.8 of the range (77-98 deg, beyond the arm's roll from the ring grasp) -> follow to the last reachable waypoint, release, closed-gripper push on the lid underside from inside the opening along the hinge arc (stage2_push); focus_at_handle: Phase-2 focus at the ring's height (the reaching stances failed gripper_not_in_frame at the mid-height focus); lid_facing hinge_right; brace optional + brace_search off; margin 0 + residual gates 15 mm; stage2_max_follow_k 0.75: the hand swings to 73.5 deg, the fist push does the last quarter (0919-001843 reached 98 deg by hand alone)",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true,
+   "stage2_max_follow_k": 0.75
   },
   "constraints": []
  },
@@ -12067,8 +12400,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.6,
+    0.8
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -12089,7 +12422,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "open",
@@ -12108,7 +12441,24 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-18/19 first-demo TEST setting (this alias only): the lid's pull ring (7.8 mm) is the handle (pinch min 5 mm), approach 20 deg toward the hinge; joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (USD force drive) so the lid holds any angle (stock it falls closed below ~102 deg); STAGE 2 demo (owner 22:38): goal 0.6-0.8 of the range (77-98 deg, beyond the arm's roll from the ring grasp) -> follow to the last reachable waypoint, release, closed-gripper push on the lid underside from inside the opening along the hinge arc (stage2_push); focus_at_handle: Phase-2 focus at the ring's height (the reaching stances failed gripper_not_in_frame at the mid-height focus); lid_facing hinge_right; brace optional + brace_search off; margin 0 + residual gates 15 mm; stage2_max_follow_k 0.75: the hand swings to 73.5 deg, the fist push does the last quarter (0919-001843 reached 98 deg by hand alone)",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true,
+   "stage2_max_follow_k": 0.75
   },
   "constraints": []
  },
@@ -12217,7 +12567,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.01,
     0.08
    ],
    "direction": "open",
@@ -12236,7 +12586,21 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "brace_search": false,
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "_test_note": "2026-09-18 first-demo TEST setting (owner 22:38): the lid's lug beside the hinge is the handle (manual bar record A, 13.3 mm -> pinch min 10 mm); joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (constraints.apply_joint_brake) so the lid holds any angle - stock, it falls closed (the PhysX jointFriction coefficient does not hold it even at 5.0); lid_facing hinge_right (hinge line along the line of sight, the hand rolls above the hinge); brace optional + brace_search off (handle-only, second stances for the handle alone); margin 0 + residual gates 15 mm as on the touching alias"
   },
   "constraints": []
  },
@@ -12345,7 +12709,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.01,
     0.08
    ],
    "direction": "open",
@@ -12364,7 +12728,21 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "brace_search": false,
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "_test_note": "2026-09-18 first-demo TEST setting (owner 22:38): the lid's lug beside the hinge is the handle (manual bar record A, 13.3 mm -> pinch min 10 mm); joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (constraints.apply_joint_brake) so the lid holds any angle - stock, it falls closed (the PhysX jointFriction coefficient does not hold it even at 5.0); lid_facing hinge_right (hinge line along the line of sight, the hand rolls above the hinge); brace optional + brace_search off (handle-only, second stances for the handle alone); margin 0 + residual gates 15 mm as on the touching alias"
   },
   "constraints": []
  },
@@ -12473,7 +12851,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.01,
     0.08
    ],
    "direction": "open",
@@ -12492,7 +12870,21 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "brace_search": false,
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "_test_note": "2026-09-18 first-demo TEST setting (owner 22:38): the lid's lug beside the hinge is the handle (manual bar record A, 13.3 mm -> pinch min 10 mm); joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (constraints.apply_joint_brake) so the lid holds any angle - stock, it falls closed (the PhysX jointFriction coefficient does not hold it even at 5.0); lid_facing hinge_right (hinge line along the line of sight, the hand rolls above the hinge); brace optional + brace_search off (handle-only, second stances for the handle alone); margin 0 + residual gates 15 mm as on the touching alias"
   },
   "constraints": []
  },
@@ -12608,7 +13000,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.01,
     0.08
    ],
    "direction": "open",
@@ -12627,7 +13019,21 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "brace_search": false,
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "_test_note": "2026-09-18 first-demo TEST setting (owner 22:38): the lid's lug beside the hinge is the handle (manual bar record A, 13.3 mm -> pinch min 10 mm); joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (constraints.apply_joint_brake) so the lid holds any angle - stock, it falls closed (the PhysX jointFriction coefficient does not hold it even at 5.0); lid_facing hinge_right (hinge line along the line of sight, the hand rolls above the hinge); brace optional + brace_search off (handle-only, second stances for the handle alone); margin 0 + residual gates 15 mm as on the touching alias"
   },
   "constraints": []
  },
@@ -14322,13 +14728,30 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "grasp_height_extra_m": 0.005,
+   "_grasp_height_note": "attachment-agent 2026-09-20 19:35: +5 mm (thin-part rule: fingertips 3 mm below the cap top) - 0920-184902 pinched the 1.1 cm cap rim with the fingertip plane 1.4 mm above the table: 23 table-contact steps, 123 N at the closure",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -14424,13 +14847,30 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "grasp_height_extra_m": 0.005,
+   "_grasp_height_note": "attachment-agent 2026-09-20 19:35: +5 mm (thin-part rule: fingertips 3 mm below the cap top) - 0920-184902 pinched the 1.1 cm cap rim with the fingertip plane 1.4 mm above the table: 23 table-contact steps, 123 N at the closure",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -14526,13 +14966,30 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "grasp_height_extra_m": 0.005,
+   "_grasp_height_note": "attachment-agent 2026-09-20 19:35: +5 mm (thin-part rule: fingertips 3 mm below the cap top) - 0920-184902 pinched the 1.1 cm cap rim with the fingertip plane 1.4 mm above the table: 23 table-contact steps, 123 N at the closure",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -14628,13 +15085,30 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "grasp_height_extra_m": 0.005,
+   "_grasp_height_note": "attachment-agent 2026-09-20 19:35: +5 mm (thin-part rule: fingertips 3 mm below the cap top) - 0920-184902 pinched the 1.1 cm cap rim with the fingertip plane 1.4 mm above the table: 23 table-contact steps, 123 N at the closure",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -14732,13 +15206,26 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -14836,13 +15323,26 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -14988,13 +15488,26 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15136,7 +15649,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15238,7 +15765,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15347,7 +15888,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15449,7 +16004,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15551,7 +16120,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15653,7 +16236,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15755,7 +16352,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15857,7 +16468,21 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -15958,7 +16583,7 @@
    "region_extra_cells": 2,
    "region_in_frame_margin": 0.08,
    "goal_face_visible_fraction": 0.5,
-   "yaw_align_max_deg": 45.0,
+   "yaw_align_max_deg": 1.0,
    "cube_grasp_tilts_deg": [
     0.0,
     30.0,
@@ -15966,7 +16591,32 @@
     60.0
    ],
    "flip_tilt_deg": 45.0,
-   "orientation_equivalences": null
+   "orientation_equivalences": null,
+   "block_pack_tail": true,
+   "place_gap_m": 0.01,
+   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "block_brace_push": false,
+   "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
+   "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
+   "_yaw_align_note": "owner 2026-09-19 first demo: 1 deg = the blocks start table-aligned (+-0.5 deg), the yaw-align snaps to 0 (yaw_align_snap_deg) so no yaw-align orbit runs in hand (pod runs 0919-140558 / 151544: the anchor's 11-22 deg yaw-align on a pitched pinch failed the oracle's differential IK twice - joint jump 0.23 rad, then a 14 mm stall - from the branch the grasp left the arm in; the flippers already run at flip_yaw_jitter_max_deg 0)",
+   "block_no_flip": true,
+   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream). 2026-09-19: with the repeated-colour pattern two blocks flip in hand regardless (distinct up faces) - see flip_directions",
+   "_block_gap_note": "owner D-006 default A (Slack, unanswered at 21:00 PDT 2026-09-16): 6 mm gaps so the last 2x2 block passes the finger-clearance gate (4c66d53a); B (push-only tail for 1 mm gaps) stays the end-state question",
+   "flip_directions": [
+    "right"
+   ],
+   "manip_lateral_shifts_m": [
+    0.35,
+    0.45,
+    0.25
+   ],
+   "flip_yaw_jitter_max_deg": 0.0,
+   "_flip_yaw_jitter_note": "0 for the first demo: the flip class sits on joint 6 / 7 limits and the exact chain that passes in the probe (block axes aligned with the table) fails with a 5 deg yaw-align stage (pod run 0919-052744)",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_witness_residual_note": "pod run 0919-100626 attempt 1: the whole 4-block program passed the check up to a place witness 3.6 mm short after polishing (2 mm default) - the oracle's descent finish closes that; the touching / articulation aliases run at 15 mm",
+   "_flip_note": "owner 2026-09-19: in-hand flip = 90 deg wrist roll about the pinch axis (steep side pick -> near-top-down place). Probe /tmp/blkflip: only the flip about the FORWARD axis (goal face toward the robot's right, hand from the block's right leaning left 60-70 deg, camera up) passes the whole chain, at cells 0.55-0.70 m ahead and 0.15-0.35 m right of the base; the manipulation stance is scanned 0.25-0.45 m left of the init lateral so the flipping blocks (right of it) lie left of the init camera and their right face is visible; per-block stances along the edge (paths + transitions). Joint-limit margin relaxed as for touching (owner 2026-09-18 01:01) with the witness-residual reach check: the flip class's wrist roll sits near joint 7's limit"
   },
   "constraints": []
  },
@@ -16067,7 +16717,7 @@
    "region_extra_cells": 2,
    "region_in_frame_margin": 0.08,
    "goal_face_visible_fraction": 0.5,
-   "yaw_align_max_deg": 45.0,
+   "yaw_align_max_deg": 1.0,
    "cube_grasp_tilts_deg": [
     0.0,
     30.0,
@@ -16075,7 +16725,32 @@
     60.0
    ],
    "flip_tilt_deg": 45.0,
-   "orientation_equivalences": null
+   "orientation_equivalences": null,
+   "block_pack_tail": true,
+   "place_gap_m": 0.01,
+   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "block_brace_push": false,
+   "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
+   "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
+   "_yaw_align_note": "owner 2026-09-19 first demo: 1 deg = the blocks start table-aligned (+-0.5 deg), the yaw-align snaps to 0 (yaw_align_snap_deg) so no yaw-align orbit runs in hand (pod runs 0919-140558 / 151544: the anchor's 11-22 deg yaw-align on a pitched pinch failed the oracle's differential IK twice - joint jump 0.23 rad, then a 14 mm stall - from the branch the grasp left the arm in; the flippers already run at flip_yaw_jitter_max_deg 0)",
+   "block_no_flip": true,
+   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream). 2026-09-19: with the repeated-colour pattern two blocks flip in hand regardless (distinct up faces) - see flip_directions",
+   "_block_gap_note": "owner D-006 default A (Slack, unanswered at 21:00 PDT 2026-09-16): 6 mm gaps so the last 2x2 block passes the finger-clearance gate (4c66d53a); B (push-only tail for 1 mm gaps) stays the end-state question",
+   "flip_directions": [
+    "right"
+   ],
+   "manip_lateral_shifts_m": [
+    0.35,
+    0.45,
+    0.25
+   ],
+   "flip_yaw_jitter_max_deg": 0.0,
+   "_flip_yaw_jitter_note": "0 for the first demo: the flip class sits on joint 6 / 7 limits and the exact chain that passes in the probe (block axes aligned with the table) fails with a 5 deg yaw-align stage (pod run 0919-052744)",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_witness_residual_note": "pod run 0919-100626 attempt 1: the whole 4-block program passed the check up to a place witness 3.6 mm short after polishing (2 mm default) - the oracle's descent finish closes that; the touching / articulation aliases run at 15 mm",
+   "_flip_note": "owner 2026-09-19: in-hand flip = 90 deg wrist roll about the pinch axis (steep side pick -> near-top-down place). Probe /tmp/blkflip: only the flip about the FORWARD axis (goal face toward the robot's right, hand from the block's right leaning left 60-70 deg, camera up) passes the whole chain, at cells 0.55-0.70 m ahead and 0.15-0.35 m right of the base; the manipulation stance is scanned 0.25-0.45 m left of the init lateral so the flipping blocks (right of it) lie left of the init camera and their right face is visible; per-block stances along the edge (paths + transitions). Joint-limit margin relaxed as for touching (owner 2026-09-18 01:01) with the witness-residual reach check: the flip class's wrist roll sits near joint 7's limit"
   },
   "constraints": []
  },
@@ -16176,7 +16851,7 @@
    "region_extra_cells": 2,
    "region_in_frame_margin": 0.08,
    "goal_face_visible_fraction": 0.5,
-   "yaw_align_max_deg": 45.0,
+   "yaw_align_max_deg": 1.0,
    "cube_grasp_tilts_deg": [
     0.0,
     30.0,
@@ -16184,7 +16859,32 @@
     60.0
    ],
    "flip_tilt_deg": 45.0,
-   "orientation_equivalences": null
+   "orientation_equivalences": null,
+   "block_pack_tail": true,
+   "place_gap_m": 0.01,
+   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "block_brace_push": false,
+   "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
+   "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
+   "_yaw_align_note": "owner 2026-09-19 first demo: 1 deg = the blocks start table-aligned (+-0.5 deg), the yaw-align snaps to 0 (yaw_align_snap_deg) so no yaw-align orbit runs in hand (pod runs 0919-140558 / 151544: the anchor's 11-22 deg yaw-align on a pitched pinch failed the oracle's differential IK twice - joint jump 0.23 rad, then a 14 mm stall - from the branch the grasp left the arm in; the flippers already run at flip_yaw_jitter_max_deg 0)",
+   "block_no_flip": true,
+   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream). 2026-09-19: with the repeated-colour pattern two blocks flip in hand regardless (distinct up faces) - see flip_directions",
+   "_block_gap_note": "owner D-006 default A (Slack, unanswered at 21:00 PDT 2026-09-16): 6 mm gaps so the last 2x2 block passes the finger-clearance gate (4c66d53a); B (push-only tail for 1 mm gaps) stays the end-state question",
+   "flip_directions": [
+    "right"
+   ],
+   "manip_lateral_shifts_m": [
+    0.35,
+    0.45,
+    0.25
+   ],
+   "flip_yaw_jitter_max_deg": 0.0,
+   "_flip_yaw_jitter_note": "0 for the first demo: the flip class sits on joint 6 / 7 limits and the exact chain that passes in the probe (block axes aligned with the table) fails with a 5 deg yaw-align stage (pod run 0919-052744)",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_witness_residual_note": "pod run 0919-100626 attempt 1: the whole 4-block program passed the check up to a place witness 3.6 mm short after polishing (2 mm default) - the oracle's descent finish closes that; the touching / articulation aliases run at 15 mm",
+   "_flip_note": "owner 2026-09-19: in-hand flip = 90 deg wrist roll about the pinch axis (steep side pick -> near-top-down place). Probe /tmp/blkflip: only the flip about the FORWARD axis (goal face toward the robot's right, hand from the block's right leaning left 60-70 deg, camera up) passes the whole chain, at cells 0.55-0.70 m ahead and 0.15-0.35 m right of the base; the manipulation stance is scanned 0.25-0.45 m left of the init lateral so the flipping blocks (right of it) lie left of the init camera and their right face is visible; per-block stances along the edge (paths + transitions). Joint-limit margin relaxed as for touching (owner 2026-09-18 01:01) with the witness-residual reach check: the flip class's wrist roll sits near joint 7's limit"
   },
   "constraints": []
  },
@@ -16320,7 +17020,7 @@
    "region_extra_cells": 2,
    "region_in_frame_margin": 0.08,
    "goal_face_visible_fraction": 0.5,
-   "yaw_align_max_deg": 45.0,
+   "yaw_align_max_deg": 1.0,
    "cube_grasp_tilts_deg": [
     0.0,
     30.0,
@@ -16328,7 +17028,32 @@
     60.0
    ],
    "flip_tilt_deg": 45.0,
-   "orientation_equivalences": null
+   "orientation_equivalences": null,
+   "block_pack_tail": true,
+   "place_gap_m": 0.01,
+   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "block_brace_push": false,
+   "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
+   "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
+   "_yaw_align_note": "owner 2026-09-19 first demo: 1 deg = the blocks start table-aligned (+-0.5 deg), the yaw-align snaps to 0 (yaw_align_snap_deg) so no yaw-align orbit runs in hand (pod runs 0919-140558 / 151544: the anchor's 11-22 deg yaw-align on a pitched pinch failed the oracle's differential IK twice - joint jump 0.23 rad, then a 14 mm stall - from the branch the grasp left the arm in; the flippers already run at flip_yaw_jitter_max_deg 0)",
+   "block_no_flip": true,
+   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream). 2026-09-19: with the repeated-colour pattern two blocks flip in hand regardless (distinct up faces) - see flip_directions",
+   "_block_gap_note": "owner D-006 default A (Slack, unanswered at 21:00 PDT 2026-09-16): 6 mm gaps so the last 2x2 block passes the finger-clearance gate (4c66d53a); B (push-only tail for 1 mm gaps) stays the end-state question",
+   "flip_directions": [
+    "right"
+   ],
+   "manip_lateral_shifts_m": [
+    0.35,
+    0.45,
+    0.25
+   ],
+   "flip_yaw_jitter_max_deg": 0.0,
+   "_flip_yaw_jitter_note": "0 for the first demo: the flip class sits on joint 6 / 7 limits and the exact chain that passes in the probe (block axes aligned with the table) fails with a 5 deg yaw-align stage (pod run 0919-052744)",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_witness_residual_note": "pod run 0919-100626 attempt 1: the whole 4-block program passed the check up to a place witness 3.6 mm short after polishing (2 mm default) - the oracle's descent finish closes that; the touching / articulation aliases run at 15 mm",
+   "_flip_note": "owner 2026-09-19: in-hand flip = 90 deg wrist roll about the pinch axis (steep side pick -> near-top-down place). Probe /tmp/blkflip: only the flip about the FORWARD axis (goal face toward the robot's right, hand from the block's right leaning left 60-70 deg, camera up) passes the whole chain, at cells 0.55-0.70 m ahead and 0.15-0.35 m right of the base; the manipulation stance is scanned 0.25-0.45 m left of the init lateral so the flipping blocks (right of it) lie left of the init camera and their right face is visible; per-block stances along the edge (paths + transitions). Joint-limit margin relaxed as for touching (owner 2026-09-18 01:01) with the witness-residual reach check: the flip class's wrist roll sits near joint 7's limit"
   },
   "constraints": []
  },
@@ -31311,7 +32036,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -31429,7 +32157,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -31547,7 +32278,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -31665,7 +32399,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -31783,7 +32520,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -31950,7 +32690,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -32072,7 +32815,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -32194,7 +32940,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -32316,7 +33065,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -32489,7 +33241,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -32621,7 +33376,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -32746,7 +33504,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -32911,7 +33672,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
@@ -33022,7 +33786,10 @@
     "max_min_extent_m": 0.089,
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
-   }
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
   },
   "constraints": []
  },
