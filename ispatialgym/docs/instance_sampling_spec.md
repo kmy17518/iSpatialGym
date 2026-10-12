@@ -294,9 +294,20 @@ footprint as `blocked_footprints` in the same structure.
   along n, λ = lateral offset from P along the face tangent (+ = robot's left when facing the face).
 - Whole-body collision freedom: cuRobo spheres against every collision mesh of the loaded rooms, 1 cm margin for
   non-floor links (2 cm where a rule says so).
-- **Parking** (object settling, goal-feasibility checks, template resets): the robot is parked tucked at a free cell
-  inside the task room's floor polygon, ≥ 1 m from every spawned object and support (a base parked over an unloaded
-  room falls through; the v1 room-centre `PARK_POSITION` is replaced by this rule).
+- **Parking** (object settling, goal-feasibility checks, template resets): the robot is parked tucked (yaw 0) at a free
+  cell of the eroded traversability map inside the task room's floor polygon, ≥ 1 m from every spawned object and
+  support (a base parked over an unloaded room falls through; the v1 room-centre `PARK_POSITION` is replaced by this
+  rule): of these cells, the one nearest their centre whose footprint is **clear** (owner 2026-10-12) — the tucked
+  chassis box (OmniGibson's reset AABB extent, R1Pro 0.728 × 0.684 m) grown by 5 cm on every side overlaps the AABB of
+  no collision piece (convex mesh) of a scene object between 2 cm above the floor and the chassis height + 5 cm (every
+  object but the floors and visual-only ones, at the scene file's poses; per piece, as the box of a multi-part object —
+  a paving, a wall run, an L-shaped bar, stairs — covers floor it leaves free), and its corners lie over the loaded
+  rooms. OmniGibson's erosion keeps only ~0.35 m from mapped obstacles, less than the chassis' half-extent: in axial#02
+  the free cell nearest the centre put the chassis 6.5 cm into `ottoman_hnmndv_1`, which the park pushed 13–17 cm in
+  every attempt. The world-load park cell (`SimWorld.park_cell`: no keep-away) follows the same rule
+  (`SimWorld.choose_park_cell`). An AABB test, not the whole-body check: the world-load park comes before the cuRobo
+  world exists. Where the nearest cell is clear it stays the cell; where no cell is clear, the nearest cell is kept with
+  a warning naming the objects it overlaps.
 
 ### 3.4 Camera model and visibility
 
@@ -344,9 +355,11 @@ At init **and** at the goal configuration: whole body collision-free, robot and 
 surface fully supported (3.2); when a gripper pose near the goal is known, its IK feasibility is checked (section 3.6);
 then the validation steps of v1 §3.6, unchanged: settle (90 physics steps + 10), BEHAVIOR `validate_task` checks
 (scene unchanged 5 cm / 0.05 rad, velocities ~0, `:init` true, stability over 1 + 10 steps), binary goal **false** at
-init, goal feasibility by teleport + settle (120 steps) **with the robot parked** (tucked, room centre) and every
-binary goal atom true, drift ≤ tolerance, TRO written and validated against the BDDL. Every attempt and every
-template starts from the stable scene (`reset_scene_objects`, robot parked).
+init, goal feasibility by teleport + settle (120 steps) **with the robot parked** (tucked, at the clear park cell of
+3.3) and every binary goal atom true, drift ≤ tolerance, TRO written and validated against the BDDL. Every attempt and
+every template starts from the stable scene (`reset_scene_objects`, robot parked); the objects it puts back (moved
+> 1 mm / 0.005 rad) are logged by name with their displacement, at the template setup, per attempt and before the
+template is saved.
 
 **Program check** (new in v2, TODO D2 / F6): once the draft sidecar is complete, the sampler expands the oracle's
 program for the alias (`expand(alias, sidecar)`, `oracle_primitives_design.md` §3.7) and IK- and collision-checks

@@ -560,7 +560,7 @@ class TaskSampler:
         robot_poses = {"robot": [{"position": p.tolist(), "orientation": q.tolist()}]}
         t0 = time.time()
         # the template must equal the stable scene except for the task objects and the robot
-        n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()])
+        n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()], context=f"{self.spec.name}: before saving the template")
         if n_reset:
             log.warning("%s: %d non-task scene objects were reset right before saving the template", self.spec.name, n_reset)
         partial, full = self.world.save_template(self.ctx.out_dir, inst_to_name, robot_poses)

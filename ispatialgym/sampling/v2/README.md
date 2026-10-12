@@ -96,7 +96,7 @@ out_dir, base_seed, customs_sha256, variant)`. Attributes a task module uses:
 | `s.ikc` (`ik.IKChecker`) | `q_locked(stance)`, `stance_collision_free(stance)`, `stances_collision_free([...])`, `screen(poses, stance, arm, ignore)`, `screen_pairs(pairs, ...)`, `exact(poses, stance, arm, ignore_for_last, scale_key)`, `exact_both_arms(work, other, stance, ...)`, `waypoints_ok(list, stance, arm, policy, ...)`, `eef_in_frame(pose, cam_pose)`, `feasible_sets(cells, yaws, grasps, pose_at, stance, ...)` (F per cell) |
 | `s.record_transition(frm, to, carried, arm)` | §3.8 sweep -> `Transition` in the sidecar or `Reject("no_transition")` |
 | `s.record_path(frm, to, carried, arm, max_length_m, blocked)` | §3.7 path -> `PathRecord` or `Reject(no_path / path_collision / path_too_long)` |
-| `s.park_robot()` | §3.3 parking (free cell in the task rooms, >= 1 m from the task objects) |
+| `s.park_robot()` | §3.3 parking (free cell in the task rooms, >= 1 m from the task objects, tucked footprint + 5 cm clear of every scene object) |
 | `s.camera_pose_at(stance)`, `s.stance_q(stance)` | FK helpers |
 | v1 helpers still available | `support_top(obj)`, `frustum_ok(cam, pts)`, `hull_corners_world(hull, pose)`, `world.footprint / bottom_offset / local_hull`, `bind_scene_object`, `spawn_role`, `tol(key, default)` |
 

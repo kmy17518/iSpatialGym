@@ -36,6 +36,11 @@ from ispatialgym.sampling.knowledge import STRUCTURE_CATEGORIES  # noqa: E402
 log = logging.getLogger("ispatialgym.sampling")
 
 PARK_POSITION = th.tensor([40.0, 40.0, 5.0])
+#: the parked robot's clearance (owner 2026-10-12 ~02:40): its tucked footprint grown by this on every side must not overlap
+#: any scene object's AABB (``SimWorld.park_clear_mask``)
+PARK_CLEARANCE_M = 0.05
+#: objects lying within this height above the floor (the two carpets of the scene set, fixed) do not count: the robot stands on them
+PARK_FLOOR_BAND_M = 0.02
 HEAD_APERTURE_MM = 40.0
 IMAGE_SIZE = 1080
 
@@ -76,6 +81,38 @@ def adjacent_rooms(scene_model: str, rooms: Sequence[str], reach_m: float = 0.6)
     exclude = tuple(s for s in os.environ.get("ISG_ADJACENT_EXCLUDE", "").split(",") if s)
     names = sorted(seg.room_ins_id_to_ins_name[int(i)] for i in touched if int(i) in seg.room_ins_id_to_ins_name and int(i) not in ids and int(i) != 0)
     return [n for n in names if not any(s in n for s in exclude)]
+
+
+def _collision_piece_aabbs(obj) -> List[Tuple[th.Tensor, th.Tensor]]:
+    """World AABBs of ``obj``'s collision meshes, from the render-side link transforms as ``obj.aabb``; the object's AABB
+    when the meshes cannot be read; [] without collision geometry."""
+    out = []
+    try:
+        for link in obj.links.values():
+            meshes = link.collision_meshes
+            if not meshes:
+                continue
+            tf = link.scaled_transform
+            for mesh in meshes.values():
+                pts = mesh.points_in_parent_frame
+                if pts is not None and len(pts):
+                    w = T.transform_points(pts, tf)
+                    out.append((w.min(dim=0).values.float(), w.max(dim=0).values.float()))
+    except Exception:  # noqa: BLE001 - e.g. a mesh type without readable points
+        out = []
+    if out:
+        return out
+    try:
+        lo, hi = obj.aabb
+    except Exception:  # noqa: BLE001
+        return []
+    return [(th.as_tensor(lo, dtype=th.float32), th.as_tensor(hi, dtype=th.float32))]
+
+
+def _fmt_blockers(blockers: Sequence[Tuple[str, float]]) -> str:
+    if not blockers:
+        return "no scene object (its footprint leaves the loaded rooms)"
+    return ", ".join(f"{n} by {d * 100:.1f} cm" for n, d in blockers)
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -340,9 +377,10 @@ class SimWorld:
         return bool(vals) and all(vals)
 
     def park_cell(self) -> th.Tensor:
-        """World xy of the robot's parking cell: the free (eroded) traversability cell nearest the centre of the free
-        cells inside the task rooms (elsewhere there is no floor under partial-room loading and the robot falls, which
-        silently shifts the cuRobo world: meshes are stored relative to the robot root at sync time)."""
+        """World xy of the robot's parking cell: of the free (eroded) traversability cells inside the task rooms (elsewhere
+        there is no floor under partial-room loading and the robot falls, which silently shifts the cuRobo world: meshes
+        are stored relative to the robot root at sync time), the one nearest their centre that keeps the tucked robot
+        clear of every scene object (:meth:`choose_park_cell`)."""
         trav = self.scene.trav_map
         m = trav._erode_trav_map(th.clone(trav.floor_map[0]), robot=self.robot)
         free = th.nonzero(m == 255)
@@ -356,8 +394,105 @@ class SimWorld:
             else:
                 log.warning("no free traversable cell inside %s; parking the robot elsewhere", self.rooms)
         centre = free.float().mean(dim=0)
-        k = int(th.argmin(th.linalg.norm(free.float() - centre, dim=1)))
+        k = self.choose_park_cell(trav.map_to_world(free), th.linalg.norm(free.float() - centre, dim=1), "world load")
         return trav.map_to_world(free[k])
+
+    def park_footprint_half(self) -> th.Tensor:
+        """Half extents (x, y) of the parked robot's footprint at yaw 0 (``park_robot``): OmniGibson's chassis extent at the
+        reset joints (``reset_joint_pos_aabb_extent``, the box its traversability erosion uses; R1Pro 0.728 x 0.684 m, the
+        tucked arms inside it)."""
+        return th.as_tensor(self.robot.reset_joint_pos_aabb_extent, dtype=th.float32)[:2] / 2.0
+
+    def park_obstacles(self) -> Tuple[List[str], th.Tensor, th.Tensor]:
+        """``(names, lo, hi)``: one AABB ``(M, 3)`` per collision mesh (a convex piece; its object's name in ``names``) of
+        every scene object a parked robot could touch - all but the robot, the floors and visual-only objects -, read once,
+        at the world-load park: the scene file's poses, which ``reset_scene_objects`` restores before every later park. Per
+        piece, not per object: the box of a multi-part object (a paving, a wall run, an L-shaped bar, stairs) covers floor
+        it leaves free. Objects spawned later are kept away by ``park_pose``."""
+        if getattr(self, "_park_obstacles", None) is None:
+            names, los, his = [], [], []
+            for o in self.scene.objects:
+                if o is self.robot or o.category == "floors" or getattr(o, "visual_only", False):
+                    continue
+                for lo, hi in _collision_piece_aabbs(o):
+                    names.append(o.name)
+                    los.append(lo)
+                    his.append(hi)
+            self._park_obstacles = (names, th.stack(los) if los else th.zeros(0, 3), th.stack(his) if his else th.zeros(0, 3))
+        return self._park_obstacles
+
+    def _park_overlaps(self, pts: th.Tensor, margin: float) -> Tuple[th.Tensor, th.Tensor]:
+        """``(idx, over)``: the pieces of :meth:`park_obstacles` within the robot's height and reach of ``pts`` (indices), and
+        ``(N, len(idx))`` how far (m) the tucked footprint at each xy of ``pts``, grown by ``margin``, reaches into each of
+        their AABBs (the smaller of the x / y overlaps; <= 0: apart)."""
+        _, lo, hi = self.park_obstacles()
+        half = self.park_footprint_half() + margin
+        z0 = float(self.floor_z)
+        top = z0 + float(self.robot.reset_joint_pos_aabb_extent[2]) + margin
+        pts = th.as_tensor(pts, dtype=th.float32).reshape(-1, 2)
+        reach_lo, reach_hi = pts.min(dim=0).values - half, pts.max(dim=0).values + half
+        near = (hi[:, 2] > z0 + PARK_FLOOR_BAND_M) & (lo[:, 2] < top) & (hi[:, 0] > reach_lo[0]) & (lo[:, 0] < reach_hi[0]) & \
+               (hi[:, 1] > reach_lo[1]) & (lo[:, 1] < reach_hi[1])
+        idx = th.nonzero(near).flatten()
+        lo, hi = lo[idx], hi[idx]
+        ox = th.minimum(pts[:, None, 0] + half[0], hi[None, :, 0]) - th.maximum(pts[:, None, 0] - half[0], lo[None, :, 0])
+        oy = th.minimum(pts[:, None, 1] + half[1], hi[None, :, 1]) - th.maximum(pts[:, None, 1] - half[1], lo[None, :, 1])
+        return idx, th.minimum(ox, oy)
+
+    def park_clear_mask(self, pts: th.Tensor, margin: float = PARK_CLEARANCE_M) -> th.Tensor:
+        """``(N,)`` bool per world xy of ``pts``: the tucked robot parked there (yaw 0) keeps ``margin`` from the AABB of
+        every collision piece of the scene objects (:meth:`park_obstacles`; from ``PARK_FLOOR_BAND_M`` above the floor to the
+        chassis height + ``margin``) and its footprint lies over the loaded rooms (partial-room loading leaves no floor
+        elsewhere). An AABB test, not the kit's whole-body check: the world-load park runs before the cuRobo world exists."""
+        pts = th.as_tensor(pts, dtype=th.float32).reshape(-1, 2)
+        # in chunks: without a free cell in the task rooms the candidates are every free cell of the scene (~10^5)
+        ok = th.cat([~(self._park_overlaps(c, margin)[1] > 0).any(dim=1) for c in th.split(pts, 1024)]) if len(pts) else th.zeros(0, dtype=th.bool)
+        rooms = self.loaded_rooms
+        seg = getattr(self.scene, "seg_map", None)
+        if rooms and seg is not None:
+            ids = th.tensor([seg.room_ins_name_to_ins_id[r] for r in rooms if r in seg.room_ins_name_to_ins_id], dtype=th.long)
+            half = self.park_footprint_half()
+            shape = seg.room_ins_map.shape
+            for sx, sy in ((-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)):
+                corner = pts + th.stack([sx * half[0], sy * half[1]])
+                # SegmentationMap.world_to_map for a batch (its flip over every dim reverses the point order of an (N, 2) input)
+                ij = th.flip(corner / seg.map_resolution + seg.map_size / 2.0, dims=(1,)).int()
+                inside = (ij[:, 0] >= 0) & (ij[:, 0] < shape[0]) & (ij[:, 1] >= 0) & (ij[:, 1] < shape[1])
+                room = th.zeros(len(pts), dtype=th.long)
+                room[inside] = seg.room_ins_map[ij[inside, 0], ij[inside, 1]].long()
+                ok &= th.isin(room, ids)
+        return ok
+
+    def park_blockers(self, xy, margin: float = PARK_CLEARANCE_M) -> List[Tuple[str, float]]:
+        """``[(name, overlap m)]``, deepest first: the scene objects whose collision pieces' AABBs the tucked footprint at
+        ``xy``, grown by ``margin``, reaches into (the deepest piece per object)."""
+        names = self.park_obstacles()[0]
+        idx, over = self._park_overlaps(th.as_tensor(xy, dtype=th.float32)[:2], margin)
+        deepest: Dict[str, float] = {}
+        for i, d in zip(idx.tolist(), over[0].tolist()):
+            if d > 0:
+                deepest[names[i]] = max(d, deepest.get(names[i], 0.0))
+        return sorted(deepest.items(), key=lambda b: -b[1])
+
+    def choose_park_cell(self, pts: th.Tensor, dist: th.Tensor, who: str) -> int:
+        """Index into ``pts`` (world xy ``(N, 2)``, the admissible park cells) of the cell to park on: the smallest ``dist``
+        (the caller's distance to its centre) among the cells :meth:`park_clear_mask` keeps clear - OmniGibson's eroded
+        traversability map keeps only ~0.35 m from mapped obstacles, less than the chassis' half-extent, so a free cell
+        can still put the robot into furniture (2026-10-12: ottoman_hnmndv_1 pushed 13-17 cm). The first minimum wins
+        ties, so a clear cell that was the nearest stays the choice. No cell clear: the nearest cell, with a warning."""
+        k0 = int(th.argmin(dist))
+        clear = self.park_clear_mask(pts)
+        if not bool(clear.any()):
+            log.warning("%s: no park cell keeps the tucked robot %.2f m clear of the scene objects and inside %s; parking at the nearest "
+                        "cell to the centre, (%.2f, %.2f), which overlaps %s", who, PARK_CLEARANCE_M, self.loaded_rooms, float(pts[k0][0]),
+                        float(pts[k0][1]), _fmt_blockers(self.park_blockers(pts[k0])))
+            return k0
+        k = int(th.argmin(th.where(clear, dist, th.full_like(dist, math.inf))))
+        if k != k0:
+            log.info("%s: park cell (%.2f, %.2f); the nearest cell to the centre, (%.2f, %.2f), overlaps %s with the tucked footprint + %.2f m",
+                     who, float(pts[k][0]), float(pts[k][1]), float(pts[k0][0]), float(pts[k0][1]), _fmt_blockers(self.park_blockers(pts[k0])),
+                     PARK_CLEARANCE_M)
+        return k
 
     #: a floor hit counts when it lies within this of the nominal floor height (a step / mezzanine is another floor)
     FLOOR_MEASURE_RANGE = 0.30
@@ -911,29 +1046,36 @@ class SimWorld:
                 return f"scene object {o.name} rotated"
         return None
 
-    def reset_scene_objects(self, task_object_names: Iterable[str] = ()) -> int:
+    def reset_scene_objects(self, task_object_names: Iterable[str] = (), context: str = "") -> int:
         """Put every non-task scene object back into exactly the state of the stable scene json (pose, velocities,
         joints). Called before every instance attempt and before a template is saved, so that instances differ from
         the scene json only in the task-relevant objects and the robot, whatever physics did meanwhile (objects
         nudged by a settling task object, slow creep of stacked furniture over thousands of steps, ...).
-        Returns the number of objects whose pose actually changed by more than 1 mm / 0.005 rad."""
+        Returns the number of objects whose pose actually changed by more than 1 mm / 0.005 rad; those are logged by
+        name with their displacement (``context``: where in the run) and kept in ``last_reset`` as ``(name, m, rad)``."""
         from omnigibson.utils.python_utils import recursively_convert_to_torch
 
         task_names = set(task_object_names) | set(self.spawned) | {self.robot.name}
         ref = self.stable_scene["state"]["registry"]["object_registry"]
-        n_changed = 0
+        moved_objects = []
         for o in self.scene.objects:
             if o.name in task_names or o.name not in ref:
                 continue
             r = ref[o.name]["root_link"]
             p, q = o.get_position_orientation()
-            moved = float(th.linalg.norm(p - th.tensor(r["pos"]))) > 0.001 or G.quat_angle(q, th.tensor(r["ori"])) > 0.005
+            d, a = float(th.linalg.norm(p - th.tensor(r["pos"]))), float(G.quat_angle(q, th.tensor(r["ori"])))
+            moved = d > 0.001 or a > 0.005
             if moved:
-                n_changed += 1
+                moved_objects.append((o.name, d, a))
             if moved or o.n_joints > 0:  # articulated scene objects (doors, drawers) can drift in their joints too
                 o.load_state(recursively_convert_to_torch(copy.deepcopy(ref[o.name])), serialized=False)
                 o.keep_still()
-        return n_changed
+        self.last_reset = sorted(moved_objects, key=lambda m: -m[1])
+        if self.last_reset:
+            shown = ", ".join(f"{n} {d * 1000:.1f} mm / {math.degrees(a):.1f} deg" for n, d, a in self.last_reset[:12])
+            more = f" (+{len(self.last_reset) - 12} more)" if len(self.last_reset) > 12 else ""
+            log.info("%s%d scene objects put back to the scene file: %s%s", f"{context}: " if context else "", len(self.last_reset), shown, more)
+        return len(moved_objects)
 
     def settle(self, task_entities: Iterable, steps: int = 60, robot_still: bool = True, still: Iterable = ()) -> Optional[str]:
         """Let the task objects settle under physics (robot base held) and report residual motion. ``still`` = entities

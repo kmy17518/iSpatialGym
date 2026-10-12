@@ -360,7 +360,7 @@ def _filter_sampler(tmp_path, outcomes, instance_filter):
     noop = lambda *a, **k: None  # noqa: E731
     s.ctx = NS(base_seed=0)
     s.kit = NS(stats_snapshot=lambda: {}, stats_delta=lambda a, b: {})
-    s.world = NS(reset_scene_objects=lambda names=None: 0)
+    s.world = NS(reset_scene_objects=lambda names=None, context="": 0)
     s.objects, s.counters, s.template_meta, s.rejections, s.instance_seeds = {}, {}, {"stances": {}}, {}, []
     s.template_paths = None
     s.ikc = NS(solutions={}, attempt=None)

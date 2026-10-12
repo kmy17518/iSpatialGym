@@ -845,7 +845,8 @@ def departure_transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance
 
 def park_pose(kit: "RobotKit", rooms: Sequence[str], keep_away: Sequence[Any] = (), min_dist: float = PARK_MIN_DIST, floor: int = 0) -> th.Tensor:
     """§3.3: a free (eroded) cell inside the task rooms' floor, >= ``min_dist`` from every AABB in ``keep_away``
-    (spawned objects and supports), nearest to the rooms' centre among the admissible cells."""
+    (spawned objects and supports); of these admissible cells the one nearest to their centre that keeps the tucked
+    robot clear of every scene object (``SimWorld.choose_park_cell``, shared with the world-load park cell)."""
     trav = kit.world.scene.trav_map
     free = kit.eroded_trav_map(floor) == 255
     seg = kit.world.scene.seg_map
@@ -874,4 +875,4 @@ def park_pose(kit: "RobotKit", rooms: Sequence[str], keep_away: Sequence[Any] = 
         raise NavigationError("no_park", f"no cell >= {min_dist} m from the task objects inside {list(rooms)}")
     pts = pts[ok]
     centre = pts.mean(dim=0)
-    return pts[int(th.argmin(th.linalg.norm(pts - centre, dim=1)))]
+    return pts[kit.world.choose_park_cell(pts, th.linalg.norm(pts - centre, dim=1), "park_pose")]

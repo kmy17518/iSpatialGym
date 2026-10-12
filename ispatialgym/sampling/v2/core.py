@@ -400,7 +400,7 @@ class SamplerV2(TaskSampler):
     def setup(self):
         t0 = time.time()
         k0 = self.kit.stats_snapshot()
-        n_reset = self.world.reset_scene_objects()
+        n_reset = self.world.reset_scene_objects(context=f"{self.gp.alias}: before the template setup")
         if n_reset:
             log.info("%s: %d scene objects reset before the template setup", self.gp.alias, n_reset)
         self.park_robot()
@@ -1242,7 +1242,8 @@ class SamplerV2(TaskSampler):
                 k0 = self.kit.stats_snapshot()
                 phase = "reset"
                 try:
-                    n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()])
+                    n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()],
+                                                             context=f"{self.gp.alias}: instance {index} attempt {attempt}")
                     if n_reset:
                         # a counter (scene objects put back before the attempt), not a rejection
                         self.counters["scene_reset"] = self.counters.get("scene_reset", 0) + n_reset

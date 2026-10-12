@@ -1482,7 +1482,7 @@ def _budget_sampler(outcomes):
     noop = lambda *a, **k: None  # noqa: E731
     s.ctx = SimpleNamespace(base_seed=0)
     s.kit = SimpleNamespace(stats_snapshot=lambda: {}, stats_delta=lambda a, b: {})
-    s.world = SimpleNamespace(reset_scene_objects=lambda names=None: 0)
+    s.world = SimpleNamespace(reset_scene_objects=lambda names=None, context="": 0)
     s.objects, s.counters, s.template_meta, s.rejections, s.instance_seeds = {}, {}, {}, {}, []
     s.template_paths = None
     s.ikc = SimpleNamespace(solutions={}, attempt=None)
