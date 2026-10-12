@@ -534,6 +534,11 @@ carried drive keeps the holding arm's configuration for that chain (IORS large�
   and the object factor (grasp mask; key = model + grasp set + rest orientation + objects placed before it).
   A band missing from the cache is computed in-process on a cuRobo kit of its own (owner 2026-10-12, item 2a; 4.1),
   never on the sampler's kit; the mesh-store capacity it was computed with is in `meta.schedule`, not in the key.
+  On an interior surface (an `init=inside` row, or a `top_z` the support top misses by > 3 cm) every lookup, the left
+  contact band's included, asks for that surface's band (`reach_bands --surface-z`; `ReachBands.find` matches the surface
+  on the band's meta, not on its file name), and a miss is never computed in-process — that band would ignore the whole
+  support, the board above and the side walls included: the target band's miss is `missing_band`, the left contact band
+  is unavailable (the exact two-arm IK decides the brace).
 - **Feasible grasp sets F** per (trunk, cell) found in Phase 3 are stored in the band cache; a cell with empty F is
   removed from the band.
 - Stance survivors of Prompt 0 steps 1–3 per (scene, target, init state).

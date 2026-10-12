@@ -110,9 +110,11 @@ def left_contact_band_cells(s, trunk: Tuple[float, float], height: float, stance
 
         cls = TT.height_class(float(height))
         root = os.environ.get("ISPATIALGYM_REACH_BANDS", "runlogs/reach_bands_20260915/bands")
-        present = sorted(os.path.basename(p) for p in glob.glob(os.path.join(root, f"contact__{s.world.scene_model}__{s.top.name}__left_*.npz")))
-        log.warning("no left contact band: key scene=%s support=%s arm=left contact_set=%s height=%.3f (class %.2f); left bands present: %s",
-                    s.world.scene_model, s.top.name, getattr(TT, "CONTACT_SET", "generic_contact"), float(height), cls, present or "none")
+        stem = os.path.join(root, f"contact__{s.world.scene_model}__{s.top.name}")
+        present = sorted(os.path.basename(p) for pat in ("__left_*.npz", "-interior-*__left_*.npz") for p in glob.glob(stem + pat))
+        log.warning("no left contact band: key scene=%s support=%s arm=left contact_set=%s height=%.3f (class %.2f) surface_z=%s; left bands present: %s",
+                    s.world.scene_model, s.top.name, getattr(TT, "CONTACT_SET", "generic_contact"), float(height), cls, getattr(s, "surface_z", None),
+                    present or "none")
         return None
     cells = bands.band(trunk[0], trunk[1], **TT.band_kw(bands, stance))  # a multi-distance band at ``stance``'s stand-off
     log.info("left contact band %s: %d cells at trunk (%.2f, %.2f)", getattr(bands, "path", "?"), len(cells), trunk[0], trunk[1])

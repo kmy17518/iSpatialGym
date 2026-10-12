@@ -1757,3 +1757,37 @@ def test_phase2_angle_classes_customs_then_subtask_default_then_global(monkeypat
     gen.update(phase2_tight_class_deg=25, phase2_loose_class_deg=60)
     assert TT.phase2_angle_classes(s) == (25.0, 60.0)
     assert TT.phase2_angle_classes(NS(subtask="no-such-subtask", gen=lambda k, d=None: d)) == tuple(TT.ANGLE_CLASSES_DEG)
+
+
+def test_left_contact_band_of_an_interior_surface_is_its_surface_band_and_never_computed_in_process(monkeypatch):
+    """s3 touching#02 c5_k1 (bookcase_jpdtvg_0: the row's top_z 0.82 lies 0.6 m under the support top, so the sampler works on the interior
+    surface): the left contact band published for that surface (reach_bands --surface-z; ReachBands.find matches surface.mode on the meta)
+    was missed because the lookup asked for the top's band, and the job computed it in-process for 2945 s. Every lookup carries the
+    surface's height now; an interior miss is not computed in-process (that band ignores the whole support), a miss on the top still is."""
+    from types import SimpleNamespace as NS
+
+    calls, computed, store = [], [], {}
+
+    def load(scene, support, object=None, grasp_key=None, *, arm="right", contact_set=None, height=None, surface_z=None, **kw):
+        calls.append({"support": support, "arm": arm, "contact_set": contact_set, "height": height, "surface_z": surface_z})
+        if surface_z in store:
+            return store[surface_z]
+        raise FileNotFoundError("no band")
+
+    monkeypatch.setattr(TT.RB.ReachBands, "load", staticmethod(load))
+    monkeypatch.setattr(TT, "compute_bands", lambda s, spec, top, edge=None: computed.append(spec) or NS(path="tabletop__inproc.npz", meta={}))
+
+    def sampler(surface_z):
+        return NS(world=NS(scene_model="restaurant_diner"), top=NS(name="bookcase_jpdtvg_0"), surface_z=surface_z)
+
+    store[0.82] = band = NS(path="contact__restaurant_diner__bookcase_jpdtvg_0-interior-z0.84__left_h0.24__3d6e.npz", meta={"height_class": 0.24})
+    assert TT.load_left_contact_band(sampler(0.82), 0.24) is band and computed == []
+    assert calls == [{"support": "bookcase_jpdtvg_0", "arm": "left", "contact_set": TT.CONTACT_SET, "height": 0.24, "surface_z": 0.82}]
+    # the interior surface without its band: both lookups (the class, then the nearest class) ask for the surface; nothing is computed
+    calls.clear()
+    store.clear()
+    assert TT.load_left_contact_band(sampler(0.82), 0.24) is None and computed == [] and [c["surface_z"] for c in calls] == [0.82, 0.82]
+    # the support top: the lookups without a surface height, a miss computed in-process as before
+    calls.clear()
+    assert TT.load_left_contact_band(sampler(None), 0.24).path == "tabletop__inproc.npz" and [c["surface_z"] for c in calls] == [None, None]
+    assert len(computed) == 1 and computed[0].arm == "left" and computed[0].contact

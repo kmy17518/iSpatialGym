@@ -1333,7 +1333,10 @@ def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFra
     ``compute_bands`` with ``BandSpec(arm="left", generic_pinch=True, contact=True)`` (B3's ``BandComputer`` contact
     mode when it has one — closed fingers, the contact classes —, else the generic top-down / pitched set with the left
     arm) under the object token ``left_contact_object(cls)`` with the meta fields B3's ``find`` matches (``arm``,
-    ``contact_set``, ``height_class``). ``compute=False`` returns None on a miss (unit tests, dry runs)."""
+    ``contact_set``, ``height_class``). On an interior surface (``s.surface_z``, :func:`support_surface`) every lookup asks for
+    that surface's band (``reach_bands --surface-z --generic-contact``; ``find`` matches the surface on the meta) and a miss is
+    not computed in-process (as :func:`ensure_bands`: the board above and the side walls must stay obstacles) - None.
+    ``compute=False`` returns None on a miss (unit tests, dry runs)."""
     cls = height_class(height)
     cache = getattr(s, "bands_left", None)
     if cache is None:
@@ -1346,9 +1349,10 @@ def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFra
         return cache[cls]
     top = _top(s, top)
     scene, support = s.world.scene_model, top.name
+    surface = surface_band_kwargs(s)
     bands = None
     try:
-        bands = RB.ReachBands.load(scene, support, arm="left", contact_set=CONTACT_SET, height=float(height))
+        bands = RB.ReachBands.load(scene, support, arm="left", contact_set=CONTACT_SET, height=float(height), **surface)
         log.info("left contact band cache hit for %s (height class %.2f): %s", support, cls, bands.path)
     except TypeError:
         log.info("reach_bands loader has no left-arm mode yet: using the in-process left contact band")
@@ -1360,7 +1364,7 @@ def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFra
         # the B3 manifest computes the classes of its own object-height table (band metas' object_extent): a neighbouring
         # class stands in when the exact 2 cm class is missing (contact height differs by <= a few cm)
         try:
-            bands = RB.ReachBands.load(scene, support, arm="left", contact_set=CONTACT_SET, height=None)
+            bands = RB.ReachBands.load(scene, support, arm="left", contact_set=CONTACT_SET, height=None, **surface)
             near = bands.meta.get("height_class")
             if near is not None and abs(float(near) - cls) > 0.04 + 1e-6:
                 log.info("left contact band of %s: nearest class %.2f is > 4 cm from %.2f; not used", support, float(near), cls)
@@ -1368,10 +1372,13 @@ def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFra
             else:
                 log.info("left contact band for %s: class %.2f stands in for %.2f (%s)", support, float(near) if near is not None else float("nan"), cls, bands.path)
         except (FileNotFoundError, TypeError):
-            log.info("no B3 left contact band for %s (height class %.2f)", support, cls)
+            log.info("no B3 left contact band for %s (height class %.2f%s)", support, cls, f", surface_z {surface['surface_z']:.2f}" if surface else "")
     if bands is None and compute:
-        spec = BandSpec(object=left_contact_object(cls), generic_pinch=True, height=cls, arm="left", contact=True)
-        bands = compute_bands(s, spec, top, edge)
+        if surface:
+            log.info("left contact band of the interior surface of %s at surface_z %.2f: not computed in-process", support, surface["surface_z"])
+        else:
+            spec = BandSpec(object=left_contact_object(cls), generic_pinch=True, height=cls, arm="left", contact=True)
+            bands = compute_bands(s, spec, top, edge)
     cache[cls] = bands
     return bands
 
