@@ -124,6 +124,9 @@ PUSH_MAX_PINCH = 0.089
 PUSH_MAX_LONG = 0.30
 PUSH_MAX_HEIGHT = 0.30
 PARTNER_MAX_ASPECT = 2.5
+#: 7g (owner 2026-10-12), the flat base: free spots of the top the target is settled on alone at the template before it counts as
+#: trembling (``generation.tremble_screen_spots``; the default for touching, 0 = off for the other relations)
+TREMBLE_SCREEN_SPOTS = 2
 #: inside (owner decision 2026-09-16): the open gripper's lowest point clears the partner's rim by this at the release
 RELEASE_CLEARANCE = 0.02
 #: ontop / under (owner item 3): the object is released at most this far above the actual surface under its footprint
@@ -244,6 +247,23 @@ def gap_along(behind_w: th.Tensor, ahead_w: th.Tensor, direction) -> float:
     d = th.tensor([float(direction[0]), float(direction[1])])
     d = d / th.linalg.norm(d)
     return float((ahead_w[:, :2] @ d).min() - (behind_w[:, :2] @ d).max())
+
+
+def tremble_screen_spots(top: SupportTop, fp: th.Tensor, n: int, margin: float = 0.02) -> List[th.Tensor]:
+    """7g: up to ``n`` free cells of ``top`` (world xy) that take the footprint ``fp`` (about the cell, (V, 2)) on free cells with
+    ``margin`` (``tabletop.polygons_supported``): the one nearest the middle of those cells first, then each next one farthest from the
+    spots already taken. Empty when none does."""
+    cells = top.cells(free_only=True)
+    if n <= 0 or len(cells) == 0:
+        return []
+    cells = cells[TT.polygons_supported(top, cells[:, None, :] + G.t(fp).float()[None, :, :2], margin)]
+    if len(cells) == 0:
+        return []
+    spots = [cells[int(th.argmin(th.linalg.norm(cells - cells.mean(dim=0), dim=1)))]]
+    while len(spots) < min(int(n), len(cells)):
+        d = th.stack([th.linalg.norm(cells - sp, dim=1) for sp in spots]).min(dim=0).values
+        spots.append(cells[int(th.argmax(d))])
+    return spots
 
 
 def gripper_corners_world(eef: G.Pose, open_width: float = C.GRIPPER_OPEN_M, thickness: float = FINGER_THICKNESS,
@@ -415,6 +435,7 @@ class IORSSmall(SamplerV2):
         self.top = TT.support_surface(self, self.support, height=H_max)
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{self.support.name}: too little free top")
+        self.target_tremble_screen()  # 7g: before the bands and the stances
         margins = self.lateral_margins()
         rng_t = np.random.default_rng(self.ctx.base_seed)
         errors: List[str] = []
@@ -773,6 +794,52 @@ class IORSSmall(SamplerV2):
             if tx + om > px or ty + om > py:
                 raise Reject("does_not_fit_inside", f"target {tx:.2f}x{ty:.2f} vs opening {px:.2f}x{py:.2f}")
         return out
+
+    def target_tremble_screen(self) -> None:
+        """7g (owner 2026-10-12): touching's target stability gate - :meth:`pair_admissibility` checks sizes only and the spec's flat base
+        was not implemented (touching#04: 96 ``trembling`` + 29 ``unstable_init`` rejections, every one the target spray_bottle/asztxi, each
+        ~50 s into its attempt). The target alone, at its rest orientation, is set 3 mm above free spots of the top (:func:`tremble_screen_spots`,
+        ``pose_centred_on``) and judged as ``settle_and_validate`` judges an instance: ``SimWorld.settle`` (``settle_steps`` + 10 physics
+        steps), then ``SimWorld.tremble_after`` with the ``tremble_*`` limits. The first still spot passes; trembling on all of
+        ``generation.tremble_screen_spots`` (touching: :data:`TREMBLE_SCREEN_SPOTS`, the other relations 0 = off) rejects the template
+        (``target_unstable``). Not run for the shelf layout (the book leans against a board) nor for a template continued with instances
+        written. The target is parked again; the facts go to ``template_facts["tremble_screen"]``."""
+        n = int(self.gen("tremble_screen_spots", TREMBLE_SCREEN_SPOTS if self.relation == "touching" else 0))
+        facts: Dict[str, Any] = {"spots_max": n, "spots": []}
+        self.template_facts["tremble_screen"] = facts
+        tgt, W = self.obj("target"), self.world
+        if n <= 0:
+            facts["skipped"] = "off"
+            return
+        if self.shelf_start is not None:
+            facts["skipped"] = "shelf layout: the target leans against a board"
+            return
+        if int(self.template_meta.get("n_written_before", 0) or 0) > 0 or tgt.name not in W.spawned:
+            facts["skipped"] = "template continued with instances written" if tgt.name in W.spawned else "the target is not a spawned object"
+            return
+        fp = W.footprint(self.hull["target"], (th.zeros(3), G.t(self.rest["target"])))
+        spots = tremble_screen_spots(self.top, fp - 0.5 * (fp.max(dim=0).values + fp.min(dim=0).values), n, margin=self.margin_support)
+        if not spots:
+            facts["skipped"] = "no free spot of the top takes the target's footprint"
+            return
+        limits = {"frames": int(self.gen("tremble_frames", W.TREMBLE_FRAMES)), "pos_tol": float(self.gen("tremble_pos_tol_m", W.TREMBLE_POS_TOL)),
+                  "ang_tol": float(self.gen("tremble_ang_tol_rad", W.TREMBLE_ANG_TOL)), "drift_pos_tol": float(self.gen("tremble_drift_pos_tol_m", W.TREMBLE_DRIFT_POS_TOL)),
+                  "drift_ang_tol": float(self.gen("tremble_drift_ang_tol_rad", W.TREMBLE_DRIFT_ANG_TOL))}
+        err = None
+        try:
+            for xy in spots:
+                tgt.set_position_orientation(*TT.pose_centred_on(self, self.hull["target"], self.rest["target"], xy, top=self.top))
+                W.activate(tgt)
+                vel = W.settle([tgt], steps=int(self.gen("settle_steps", self.DEFAULT_SETTLE_STEPS)))
+                err = W.tremble_after([tgt], **limits)
+                facts["spots"].append({"xy": [round(float(v), 3) for v in xy], "still": err is None, "residual_velocity": vel,
+                                       "tremble": dict((getattr(W, "last_tremble", None) or {}).get(tgt.name) or {})})
+                if err is None:
+                    return
+        finally:
+            W.park(tgt, list(W.spawned).index(tgt.name))
+            self.kit.sync_world()
+        raise Reject("target_unstable", f"{tgt.name} at its rest orientation trembles alone on each of {len(spots)} free spots of {self.top.name}: {err}")
 
     def handedness_pair(self) -> Optional[Dict[str, str]]:
         """Owner 2026-10-11 (nextto shoe pair): ``generation.handedness`` (``{"<category>/<model>": "left" | "right"}``, written by

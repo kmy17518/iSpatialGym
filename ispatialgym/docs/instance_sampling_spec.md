@@ -1873,7 +1873,14 @@ the partner, so that the opening fingers clear it at the release; the push cover
 - touching: **partner stability** — base contact ≥ 25 % of its footprint (or a foot ≥ 0.6 × / 0.45 × the body width),
   height ≤ 2.5 × its smallest horizontal extent, no rolling body (`partner_unstable`); **target pushability** —
   smallest horizontal extent ≤ 8.9 cm when it is grasped (pinch width), long side ≤ 30 cm, height ≤ 30 cm, flat base
-  (`target_not_pushable`).
+  (`target_not_pushable`). *The flat base (owner decision 2026‑10‑12, item 7g; touching#04's 125 settle rejections all named
+  its target spray_bottle/asztxi):* judged in the sampler's template phase, before the bands and the stances — the target
+  alone at its rest orientation, 3 mm above a free spot of the top, settled and judged exactly as an instance's settle
+  judges it (3.5: `settle_steps` + 10 physics steps, then the trembling gate with the `tremble_*` limits over 45 frames,
+  ~280 physics steps in all); the first still spot passes, trembling on each of `generation.tremble_screen_spots` (2; the
+  free cell nearest the middle of the top, then the farthest from it) rejects the template (`target_unstable`). Off for the
+  other relations by default (`tremble_screen_spots: 0`) and for the shelf layout (the book leans against a board);
+  `template_facts.tremble_screen` records the spots and their tremble numbers.
 
 Goal numbers kept from v1 §5.10: ontop / under(small) z = partner top + target bottom offset + 1 cm drop; inside drop
 from partner rim + 5 mm, xy at the `fillable` meta-link centroid; touching nudges of 1 mm (≤ 25) with physics steps
