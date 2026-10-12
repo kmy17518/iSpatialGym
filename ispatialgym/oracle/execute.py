@@ -5120,7 +5120,8 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
         q_after = q_now()
         rec["q_after_deg"] = round(math.degrees(q_after), 2)
         rec["plan"]["actual_landing_deg"] = round(math.degrees(q_after), 2)
-        if sgn * (q - q_after) < math.radians(2.0):
+        # progress is q falling toward q_lower whatever the swing sign (sgn only turns the leaf in the world frame)
+        if q - q_after < math.radians(2.0):
             # the arm's arc gained little: drive the base along -m with the fist on the face (the base does the pushing)
             motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
             bx, by, byaw = motions.base_pose2d()
@@ -5158,7 +5159,7 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
         motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
         rep["chunks"].append(rec)
         log.info("push_close chunk %d: door %.1f -> %.1f deg (settled %.1f), %s", chunk, math.degrees(q), math.degrees(q_after), math.degrees(q_now()), rec.get("arc"))
-        if sgn * (q - q_now()) < math.radians(0.5):
+        if q - q_now() < math.radians(0.5):
             rec["result"] = "no progress"
             break
     q_end = q_now()

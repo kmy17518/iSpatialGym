@@ -857,6 +857,155 @@ def test_planned_push_close_replays_the_sampler_chunk(monkeypatch):
     assert motions.calls[:2] == [("arm_to", "ready", 0), ("gripper", True)]
 
 
+@dataclass
+class _Tracker:
+    v_max: Tuple[float, float, float] = (0.3, 0.3, 0.5)
+
+
+class _RoomPushMotions:
+    """Stub motions of the room-door push-close loop (no plan) on a leaf about ``hinge`` whose joint value q turns it about +z by s·q:
+    the guarded approach touches the face after ``gap`` steps (each further step shuts the leaf ``step_close`` rad), an arc waypoint
+    turning the fist about the hinge the closing way (−s) shuts the leaf by ``gain`` x the turn (a hard stop at 0) and one turning it the
+    other way leaves it, a base drag (``track_path`` with a tracker config) shuts it by ``drag_gain``; ``trace`` records every decision."""
+
+    def __init__(self, q, hinge, s, gap=3, gain=1.0, drag_gain=0.0, step_close=0.01, base=(10.0, -6.5, math.pi)):
+        self.q, self.hinge, self.s, self.gap, self.gain, self.drag_gain, self.base = q, hinge, s, gap, gain, drag_gain, base
+        self.step_close = step_close
+        self.trace: List[Tuple] = []
+        self.arc_turns: List[float] = []
+        self.steps = 0
+        self.follow_phase = "arm"
+        self.backend = SimpleNamespace(update_world=lambda **kw: None)
+        self.robot = SimpleNamespace(arm_control_idx={"right": th.arange(14, 21), "left": th.arange(7, 14)}, get_joint_positions=lambda: th.zeros(28))
+        self.state = SimpleNamespace(trunk_error=lambda: 0.0, arm_target={})
+        self.cfg = SimpleNamespace(diff_ik_soft_pos_tol_free=0.02, base_tracker=_Tracker())
+        self.eef = (th.zeros(3), C.IDENTITY_QUAT.clone())
+
+    def _angle(self, p) -> float:
+        return math.atan2(float(p[1]) - self.hinge[1], float(p[0]) - self.hinge[0])
+
+    def base_pose2d(self):
+        return self.base
+
+    def eef_pose(self, arm):
+        return self.eef
+
+    def _deflection(self, arm):
+        return None
+
+    def gripper(self, arm, close, **kw):
+        yield th.zeros(23)
+
+    def arm_to(self, arms, pose=None, q=None, ignore_objects=(), **kw):
+        if pose is not None:
+            self.eef = as_world_pose(pose)
+        yield th.zeros(23)
+
+    def track_path(self, waypoints, tracker_cfg=None, **kw):
+        if tracker_cfg is not None:  # the base drag with the fist on the face
+            self.trace.append(("drag", round(self.q[0], 4)))
+            self.q[0] = max(0.0, self.q[0] - self.drag_gain)
+        else:
+            self.trace.append(("drive",))
+        self.base = tuple(waypoints[-1])
+        yield th.zeros(23)
+
+    def arm_along(self, arm, waypoints, loaded=False, partial=False, soft_pos_tol=None, **kw):
+        wps = [as_world_pose(w) for w in waypoints]
+        if partial:
+            self.arc_turns.append(0.0)
+            for w in wps:
+                turn = C.wrap_angle(self._angle(w[0]) - self._angle(self.eef[0]))
+                self.arc_turns[-1] += turn
+                if self.s * turn < 0.0:
+                    self.q[0] = max(0.0, self.q[0] + self.gain * self.s * turn)
+                self.eef = w
+                yield th.zeros(23)
+            self.trace.append(("arc", round(self.arc_turns[-1], 4), round(self.q[0], 4)))
+            return
+        if soft_pos_tol is not None:
+            self.trace.append(("back_off",))
+            self.steps = 0
+            self.eef = wps[-1]
+            yield th.zeros(23)
+            return
+        self.steps += 1
+        self.eef = wps[-1]
+        if self.steps > self.gap:
+            self.q[0] = max(0.0, self.q[0] - self.step_close)
+        yield th.zeros(23)
+
+    def hold(self, steps=1):
+        for _ in range(int(steps)):
+            yield th.zeros(23)
+
+    def settle(self, max_steps=None, vel_tol=None):
+        yield th.zeros(23)
+
+    def unload(self, arms, steps=None, trunk=True):
+        if False:
+            yield th.zeros(23)
+        return {a: 0.0 for a in arms}
+
+
+def _run_room_push(push, motions, q, monkeypatch):
+    """``execute_push_close`` without a plan: the arms-ready posture stubbed, and the stance search's IK (``pushable_arc_from``) reaching
+    the whole arc from the first candidate of each chunk (the front stance straight out from the pre-contact) and nothing from the others."""
+    calls = [0]
+
+    def arc_from(motions_, arm, base, pre, contact, arc):
+        calls[0] += 1
+        return (len(arc), None) if calls[0] % 20 == 1 else (-1, None)
+
+    monkeypatch.setattr(EX, "posture_q", lambda robot, name, arm: th.zeros(7))
+    monkeypatch.setattr(EX, "pushable_arc_from", arc_from)
+    state = SimpleNamespace(joint_position=lambda o, j: float(q[0]), object=lambda n: SimpleNamespace(name=n, links={}))
+    ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(), "hooks": {}}
+    list(EX.execute_push_close(push, motions, state, push.targets(None, None), ctx))
+    return ctx["push_close"], EX.check_postcondition(push, state, {}, ctx)
+
+
+def _chunk_qs(rep) -> List[Tuple]:
+    return [(c.get("q_before_deg"), c.get("q_after_deg"), c.get("q_after_drag_deg"), c.get("q_settled_deg"), "base_drag" in c, c.get("result")) for c in rep["chunks"]]
+
+
+def test_room_door_push_close_counts_progress_in_the_joint_for_either_swing_sign(monkeypatch):
+    """The room-door push-close loop judges a chunk by the joint: q falls toward ``q_lower`` as the leaf shuts, whatever the swing sign s
+    (the arc about the hinge turns by −s·Δ in the world). A −1 leaf (the office cabinet door of close_large#03, −z hinge) that the arcs
+    shut chunk by chunk is closed without a base drag, exactly like its mirror image, a +1 leaf (the same chunks, the same joint values);
+    a +1 leaf takes the decisions it always took: the base drags when an arc gains < 2°, the loop stops when a chunk gains < 0.5°."""
+    cab = PushClose(arm="right", object="bottom_cabinet.n.01_1", joint="j_link_2", hinge_xy=(8.6734, -6.7254), handle_xy_closed=(8.6936, -6.3612),
+                    approach_closed=(-1.0, 0.0, 0.0), handle_radius_m=0.364, handle_z=0.7311, q_from=1.021, q_lower=0.0)
+    mirror = replace(cab, handle_xy_closed=(8.6936, 2 * -6.7254 + 6.3612))  # reflected across the hinge's x line
+    assert EX.leaf_frame(cab.hinge_xy, cab.handle_xy_closed, cab.approach_closed)[2] == -1.0
+    assert EX.leaf_frame(mirror.hinge_xy, mirror.handle_xy_closed, mirror.approach_closed)[2] == 1.0
+    runs = {}
+    for name, push, s in (("cabinet", cab, -1.0), ("mirror", mirror, 1.0)):
+        q = [1.021]
+        motions = _RoomPushMotions(q, push.hinge_xy, s)
+        rep, verdict = _run_room_push(push, motions, q, monkeypatch)
+        runs[name] = (rep, verdict, motions)
+    rep, verdict, motions = runs["cabinet"]
+    assert verdict is None and rep["closed"] and len(rep["chunks"]) == 3 and not any("base_drag" in c for c in rep["chunks"])
+    assert [t[0] for t in motions.trace].count("drag") == 0 and all(t > 0.0 for t in motions.arc_turns)  # counter-clockwise shuts a -1 leaf
+    assert [c["q_before_deg"] for c in rep["chunks"]] == pytest.approx([58.5, 37.93, 17.35], abs=0.02) and rep["chunks"][-1]["arc"].startswith("stopped: leaf closed")
+    rep_m, verdict_m, motions_m = runs["mirror"]
+    assert _chunk_qs(rep_m) == _chunk_qs(rep) and verdict_m is None and all(t < 0.0 for t in motions_m.arc_turns)
+    assert motions_m.arc_turns == pytest.approx([-t for t in motions.arc_turns], abs=1e-4)
+    # +1, an arc that gains only 1.4 deg per chunk (2.0 deg with the approach's step): the base drags each chunk (0.5 deg more), the loop
+    # goes on while the chunks gain
+    q = [1.021]
+    motions = _RoomPushMotions(q, mirror.hinge_xy, 1.0, gain=0.07, drag_gain=math.radians(0.5))
+    rep, verdict = _run_room_push(replace(mirror, max_chunks=3), motions, q, monkeypatch)
+    assert [c["base_drag"].startswith("0.20 m") for c in rep["chunks"]] == [True, True, True] and [t[0] for t in motions.trace].count("drag") == 3
+    assert "result" not in rep["chunks"][-1] and verdict == "tolerance" and not rep["closed"]
+    # +1, nothing but the approach's touch (0.46 deg) moves the leaf: a drag, then the loop stops at the first chunk
+    q = [1.021]
+    motions = _RoomPushMotions(q, mirror.hinge_xy, 1.0, gain=0.0, step_close=0.008)
+    rep, verdict = _run_room_push(mirror, motions, q, monkeypatch)
+    assert len(rep["chunks"]) == 1 and "base_drag" in rep["chunks"][0] and rep["chunks"][0]["result"] == "no progress" and verdict == "no_motion"
+
+
 def test_postcondition_push_no_motion():
     sc = Sidecar.load(os.path.join(SIDECARS, "alignment-axial.json"))
     push = [a for a in expand(sc.alias, sc) if isinstance(a, Push)][0]
