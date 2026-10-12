@@ -1,0 +1,456 @@
+{
+ "task": "IORS",
+ "relation": "under",
+ "category": "beer_glass",
+ "model": "mxsliu",
+ "key": "beer_glass__mxsliu__t2f",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.06021333885192871,
+  0.060468841552734375,
+  0.11692424774169922
+ ],
+ "ready": true,
+ "base_key": "beer_glass__mxsliu",
+ "multi_hit": true,
+ "two_finger": {
+  "center_tol_m": 0.003,
+  "min_pad_cover": 0.5,
+  "tilt_bins": [
+   [
+    0,
+    8
+   ],
+   [
+    8,
+    22
+   ],
+   [
+    22,
+    40.01
+   ]
+  ],
+  "sym_axis": "z",
+  "dedup_height_m": 0.006,
+  "top_k": 12
+ },
+ "n_cand": 12000,
+ "n_orient": 24,
+ "provenance": {
+  "decision": "owner 2026-10-12 ~00:30 (B6): inter_object_relation_satisfaction-under_small_scale#02 picks beer_glass/mxsliu from a table, and today's five beer_glass__mxsliu rows are all flagged one_finger (the glass pushed against the open-limit finger, 22 mm off-centre); a new key whose grasps close with both fingers on the glass and hold in sim, made with the flow of spatula__hkvsep__t076 (d42e9b0e) / sunflower__dkajbh__r50 (86d7c073)",
+  "isg_commit": "6cabe73f",
+  "b1k_commit": "6a6194600",
+  "scripts": "isg_home/eval85/scratch_beerB6/scripts = runlogs/grasp_library_20260905/scripts with cluster paths (as scratch_sunflower_r50 / scratch_spatula076); gen_candidates.py: multi_hit (the antipodal sampler's multiple-hit ray query collected by re-casting 0.01 mm past each hit: trimesh's embree loop re-casts 1e-4 x 100 / mesh.scale = 69 mm past a hit on this 0.145 m glass, so the sampler only ever saw the wall it started in - every round-1 candidate was a wall / chord pinch 22-27 mm off the axis), two_finger (both pads meet the object at the same closing distance within center_tol_m, pad cover >= min_pad_cover; width = the pads' span = what the oracle pre-shapes from; top_k spread over approach-tilt bins, picks closer than dedup_height_m along the glass's z symmetry axis dropped as the same grasp turned about it), GLIB_N_CAND 12000 / GLIB_N_ORIENT 24 (15 deg approach steps); ag_validate_render.py: GLIB_CLOSURE=oracle - each candidate is closed twice, first with the stock step command (step_close), then the oracle's way (Motions.gripper as execute_grasp calls it: pre-shape width / 2 + 10 mm, smooth command ramped 2.25 mm/step, held 1 mm inside the contact once both pads touch), which is the record (attached / held 30 steps under gravity / finger_q / frames); the pads' span / off-centre shift from the closed fingers and the object's shift in the eef frame from placement to attach are recorded for both",
+  "pipeline": "a1 / tabletop = the pipeline and constraint of the base key beer_glass__mxsliu (round 1): under_small_scale.iddl requires (grasps target tabletop); approach <= 40 deg from vertical (the a1 tilt filter), the a1 width / antipodal / table / collision / sweep / lever filters unchanged",
+  "closure": "exploration pass 17821111 (glib_v1, 12 candidates, all tested): with the stock step close every centred body grasp attached at step 12 and held, but finger 1 stayed at its open limit (0.05) and finger 2 shoved the glass 19 mm into it (fingers 50/11 mm - the round-1 one_finger picture; motions.py: the saturated drives fight and finger 2 wins); with the oracle's closure every one attached at step 15 and held with both pads on the glass (fingers 31/30 mm, glass 0.7 mm off-centre, moved <= 0.7 mm)",
+  "jobs": {
+   "17821111": "exploration pass (glib_v1): export + cands + all 12 candidates through both closures",
+   "17821222": "this run: cands + AG (oracle closure as the record, step close kept) of the first 6 candidates + the round-1 key's 12 candidates under the same test (glib_oldkey)"
+  },
+  "review": "review/wave7_beerglasst2f.json (6 ok)"
+ },
+ "n_need": 6,
+ "candidates_meta": {
+  "object": {
+   "category": "beer_glass",
+   "model": "mxsliu"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 11808,
+   "n_tilt": 2176,
+   "n_width_antipodal": 1585,
+   "n_table": 1585,
+   "n_collision": 455,
+   "n_sweep": 387,
+   "n_two_finger": 350,
+   "n_lever": 350,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    0.0003,
+    -0.0183
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.031,
+    0.0296
+   ],
+   "score": 12.3848,
+   "meta": {
+    "com_perp": 0.00017,
+    "width": 0.06005,
+    "antipodal": 0.99523,
+    "coverage": 1.0,
+    "clearance": 0.01842,
+    "tilt_deg": 0.19259,
+    "width_ray": 0.05267,
+    "pad_offset": 0.0,
+    "pad_cover": 1.0
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g0_wrist.png"
+   },
+   "shift_at_attach_m": 0.0004,
+   "pads_span_m": 0.0576,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.04,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0313,
+     0.0295
+    ],
+    "contact_hold_q": 0.0294,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0111
+    ],
+    "shift_at_attach_m": 0.019,
+    "pads_span_m": 0.0581,
+    "off_centre_m": 0.0194,
+    "two_finger": false
+   },
+   "t_s": 22.89
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0307,
+    0.0292
+   ],
+   "score": 10.4669,
+   "meta": {
+    "com_perp": 0.00669,
+    "width": 0.06,
+    "antipodal": 0.99593,
+    "coverage": 1.0,
+    "clearance": 0.00551,
+    "tilt_deg": 15.19338,
+    "width_ray": 0.05151,
+    "pad_offset": 1e-05,
+    "pad_cover": 0.83333
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g1_wrist.png"
+   },
+   "shift_at_attach_m": 0.0005,
+   "pads_span_m": 0.057,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.04,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0308,
+     0.0292
+    ],
+    "contact_hold_q": 0.029,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0109
+    ],
+    "shift_at_attach_m": 0.0193,
+    "pads_span_m": 0.0579,
+    "off_centre_m": 0.0195,
+    "two_finger": false
+   },
+   "t_s": 11.17
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0307,
+    0.0292
+   ],
+   "score": 8.8817,
+   "meta": {
+    "com_perp": 0.01421,
+    "width": 0.05996,
+    "antipodal": 0.99593,
+    "coverage": 1.0,
+    "clearance": 0.00117,
+    "tilt_deg": 30.19257,
+    "width_ray": 0.05154,
+    "pad_offset": 1e-05,
+    "pad_cover": 0.66667
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g2_wrist.png"
+   },
+   "shift_at_attach_m": 0.0004,
+   "pads_span_m": 0.0569,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.04,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0308,
+     0.0293
+    ],
+    "contact_hold_q": 0.029,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0118
+    ],
+    "shift_at_attach_m": 0.0186,
+    "pads_span_m": 0.0588,
+    "off_centre_m": 0.0191,
+    "two_finger": false
+   },
+   "t_s": 11.14
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0309,
+    0.0293
+   ],
+   "score": 12.1314,
+   "meta": {
+    "com_perp": 2e-05,
+    "width": 0.06006,
+    "antipodal": 0.97649,
+    "coverage": 1.0,
+    "clearance": 0.01842,
+    "tilt_deg": 0.22521,
+    "width_ray": 0.05309,
+    "pad_offset": 0.0,
+    "pad_cover": 0.75
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g3_wrist.png"
+   },
+   "shift_at_attach_m": 0.0006,
+   "pads_span_m": 0.0572,
+   "off_centre_m": 0.0008,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.04,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0308,
+     0.0292
+    ],
+    "contact_hold_q": 0.029,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0106
+    ],
+    "shift_at_attach_m": 0.0194,
+    "pads_span_m": 0.0576,
+    "off_centre_m": 0.0197,
+    "two_finger": false
+   },
+   "t_s": 11.08
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0307,
+    0.0292
+   ],
+   "score": 10.3184,
+   "meta": {
+    "com_perp": 0.01248,
+    "width": 0.06,
+    "antipodal": 0.99887,
+    "coverage": 1.0,
+    "clearance": 0.01665,
+    "tilt_deg": 15.13292,
+    "width_ray": 0.05232,
+    "pad_offset": 1e-05,
+    "pad_cover": 0.83333
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g4_wrist.png"
+   },
+   "shift_at_attach_m": 0.0005,
+   "pads_span_m": 0.0569,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.04,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0308,
+     0.0292
+    ],
+    "contact_hold_q": 0.029,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0111
+    ],
+    "shift_at_attach_m": 0.0193,
+    "pads_span_m": 0.0581,
+    "off_centre_m": 0.0195,
+    "two_finger": false
+   },
+   "t_s": 11.31
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0307,
+    0.0293
+   ],
+   "score": 8.5145,
+   "meta": {
+    "com_perp": 0.02346,
+    "width": 0.05995,
+    "antipodal": 0.99386,
+    "coverage": 1.0,
+    "clearance": 0.00696,
+    "tilt_deg": 29.9766,
+    "width_ray": 0.05213,
+    "pad_offset": 0.0,
+    "pad_cover": 0.83333
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g5_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g5_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g5_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_beerB6/glib/frames/beer_glass__mxsliu__t2f/g5_wrist.png"
+   },
+   "shift_at_attach_m": 0.0007,
+   "pads_span_m": 0.057,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.04,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0309,
+     0.0293
+    ],
+    "contact_hold_q": 0.0291,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0108
+    ],
+    "shift_at_attach_m": 0.0194,
+    "pads_span_m": 0.0578,
+    "off_centre_m": 0.0196,
+    "two_finger": false
+   },
+   "t_s": 11.3
+  }
+ ],
+ "n_valid": 6,
+ "error": null,
+ "ag_closure": "oracle: per candidate the stock step close first (step_close), then the record: pre-shape to width / 2 + 10 mm, the smooth command ramped 2.25 mm per step, held 1 mm inside the contact once both pads touch (Motions.gripper), attach, 30 steps under gravity",
+ "t_model_s": 85.1
+}

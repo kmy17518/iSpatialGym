@@ -1,0 +1,48 @@
+{
+ "batch": "wave7_beerglasst2f (2026-10-12, beer_glass B6 worker on strips/beer_glass__mxsliu__t2f.png (rows 1-5) and the six grasps' frames with 3x crops of both pads in V1 / V2 (review_crops/), review_prompt.md, not the reviewer pool; frames = the oracle's closure held under gravity)",
+ "models": [
+  {
+   "key": "beer_glass__mxsliu__t2f",
+   "n_rows": 6,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down body pinch, both pads on the glass below the rim"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch tilted 15 deg, both pads on the glass"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch tilted 30 deg, both pads on glass, palm near rim"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down body pinch high on the glass, both pads on it"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch tilted 15 deg, both pads on the upper body"
+    },
+    {
+     "rank": 6,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch tilted 30 deg, both pads on the upper body"
+    }
+   ],
+   "object_note": "fingers 31/29 mm on the 60 mm glass, centred; rim and bottom free; no gap or penetration at the pads"
+  }
+ ]
+}
