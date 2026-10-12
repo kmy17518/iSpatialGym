@@ -164,6 +164,13 @@ REGION_ARMS = "start_region_arms"
 META_SPOTS = "meta_link_spots"
 
 
+def merge_shelf_pose_facts(start: Dict[str, Any], facts: Dict[str, Any]) -> None:
+    """``tabletop.shelf_lean_pose``'s facts into the shelf start. They name the side (``"left"`` / ``"right"``); it is kept as
+    ``lean_side_name`` so ``lean_side`` stays the sign (+1 = the robot's left) the push, the partner's lean and the goal side
+    compute with."""
+    start.update({("lean_side_name" if k == "lean_side" else k): v for k, v in facts.items()})
+
+
 def partner_sides(relation: str, handed: Optional[Dict[str, str]] = None) -> List[float]:
     """A1 step 3 (owner 2026-10-12): the partner sides (+1 = the robot's left of the target, -1 = its right) a pair admits - touching the
     robot's left (the right hand pushes toward it, the left braces its far side, §6.11), a handed nextto pair (``handedness_pair``) the
@@ -404,7 +411,7 @@ class IORSSmall(SamplerV2):
             t_lat = (self.world.hull_at(self.hull["target"], self.shelf_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
             p_lat = (self.world.hull_at(self.hull["partner"], self.shelf_partner_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
             free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
-            self.shelf_start.update(facts)
+            merge_shelf_pose_facts(self.shelf_start, facts)
             self.shelf_start.update({"partner": pfacts, "free_span_m": round(free, 4)})
             self.template_facts["shelf_start"] = self.shelf_start
             if free < float(self.gen("shelf_free_span_min_m", 0.15)):

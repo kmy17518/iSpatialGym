@@ -491,3 +491,18 @@ def test_the_oracle_refuses_a_shelf_record_with_a_brace_or_another_pushing_hand(
     plain = copy.deepcopy(d)
     del plain["contacts"]["push"]["layout"]
     assert any("right gripper pushes" in p for p in Sidecar.from_dict(plain).problems())
+
+
+def test_shelf_pose_facts_keep_the_lean_sign():
+    """The shelf pose facts name the side ('left' / 'right'); merged into the shelf start they must not replace the lean sign the
+    push arm, the partner's lean and the goal side compute with (s3 touching#03 c6_k0: float('left') in shelf_push_sign)."""
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    for sign, name, arm in ((1.0, "left", "left"), (-1.0, "right", "right")):
+        start = {"key": "hardback__x__u", "lean_side": sign, "lean_deg": 6.0}
+        IS.merge_shelf_pose_facts(start, {"edge": "+u", "lean_side": name, "depth_m": 0.2})
+        assert start["lean_side"] == sign and start["lean_side_name"] == name and start["edge"] == "+u"
+        s = SimpleNamespace(shelf_start=start)
+        assert IS.IORSSmall.shelf_push_sign(s) == -sign
+        s.shelf_push_sign = lambda s=s: IS.IORSSmall.shelf_push_sign(s)
+        assert IS.IORSSmall.shelf_push_arm(s) == arm
