@@ -7,8 +7,10 @@ relation, the place / pre-place IK from the manipulation stance after the goal s
 constraints it learned. Every number comes from the customs ``generation`` block (D1 ``generation_defaults``):
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
-(inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``tolerances``. A target bigger
-than its partner is shrunk by ``ground_isg`` before sampling (``roles.target.scale``, ``sampling/pair_rules.py``).
+(inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
+model axis the target stands on in its partner - it starts at its grasp key's rest and the goal stands it on that axis),
+``tolerances``. A target bigger than its partner is shrunk by ``ground_isg`` before sampling (``roles.target.scale``,
+``sampling/pair_rules.py``).
 """
 
 from __future__ import annotations
@@ -208,6 +210,7 @@ class IORSSmall(SamplerV2):
         self.arm_bands: Dict[str, Any] = {}
         self.goal_side: Optional[str] = None  # nextto / touching: partner side the target goes to ("left" / "right", robot frame)
         self.release: Optional[Dict[str, Any]] = None  # inside: release-height facts of :meth:`release_pose`
+        self.standing: Optional[Dict[str, Any]] = None  # inside with target_up_axis: the goal orientation's facts (:meth:`standing_goal_quat`)
         self.release_surface_z: Optional[float] = None  # ontop / under: the raycast surface under the goal footprint centre
         self.release_above_m: Optional[float] = None  # ontop / under: the release height above that surface
         self._touching_place_pos: Optional[th.Tensor] = None  # touching: the nextto position the program places at
@@ -602,10 +605,13 @@ class IORSSmall(SamplerV2):
         """§6.11 per (target, partner): ontop / under -> the partner's top admits the target footprint with >= 1 cm
         (tier any_yaw / aligned / centred, else ``partner_too_small``); nextto -> the centre heights overlap
         (``nextto_height_mismatch``); touching -> partner stability / target pushability; inside -> opening >= footprint
-        + 1 cm at the standing or lying orientation (the drop test runs in the goal check)."""
-        t_ext = TT.hull_extents(self.hull["target"], self.rest["target"])
+        + 1 cm at the rest orientation - standing on :meth:`up_axis` when the alias names one (the drop test runs in the goal check)."""
+        up = self.up_axis() if self.gen("target_up_axis") is not None else None
+        t_ext = TT.hull_extents(self.hull["target"], self.standing_quats()[0] if up is not None else self.rest["target"])
         p_ext = TT.hull_extents(self.hull["partner"], self.rest["partner"])
         out: Dict[str, Any] = {"target_extent": t_ext.tolist(), "partner_extent": p_ext.tolist(), "relation": self.relation}
+        if up is not None:
+            out["target_up_axis"] = up
         tx, ty = sorted([float(t_ext[0]), float(t_ext[1])])
         px, py = sorted([float(p_ext[0]), float(p_ext[1])])
         m = float(self.gen("partner_footprint_margin_m", 0.01))
@@ -801,7 +807,7 @@ class IORSSmall(SamplerV2):
             cam_manip = self.camera_pose_at(manip)
             goal_guess = self.goal_pose(t_pose, p_pose)
             place_guess = IK.grasp_pose(goal_guess, grasp.eef_in_object)
-            for what, pose in (("place", place_guess), ("pre-place", IK.pre_pose(place_guess))):
+            for what, pose in (("place", place_guess), ("pre-place", self.pre_place_of(place_guess))):
                 if not self.ikc.eef_in_frame(pose, cam_manip):
                     raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
                                                          f"(trunk {manip.translate}, {manip.tilt:.2f})")
@@ -816,7 +822,7 @@ class IORSSmall(SamplerV2):
             # touching (owner 2026-09-18 16:32): the place is made from the second base pose the box is carried to
             st_place = (self.push_stance_for(manip, obj_at_place) if self.relation == "touching" else None) or manip
             with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-                res_place = self.ikc.exact([IK.pre_pose(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
+                res_place = self.ikc.exact([self.pre_place_of(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
                                            scale_key=self.choice.models["target"].scale, cache=False, approached=ign_place)
             if not res_place.ok:
                 raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
@@ -1001,6 +1007,8 @@ class IORSSmall(SamplerV2):
     def target_goal_quat(self, t_pose: G.Pose, manip: Stance) -> th.Tensor:
         if self.shelf_start is not None:  # touching#03: the book ends resting against the partner, leaning like it
             return TT.mirrored_lean_quat(t_pose[1], self.edge, self.shelf_start["lean_side"], self.shelf_start["lean_deg"])
+        if self.relation == "inside" and self.up_axis() is not None:
+            return self.standing_goal_quat(t_pose[1], manip)
         return self.edge_aligned_quat(self.hull["target"], t_pose[1], manip) if self.edge_aligned() else G.t(t_pose[1])
 
     def place_pose_for(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> G.Pose:
@@ -1054,6 +1062,89 @@ class IORSSmall(SamplerV2):
         z_p = float(p_hull[:, 2].min()) + 0.5 * float(p_hull[:, 2].max() - p_hull[:, 2].min())
         brace = th.tensor([*(centre_p[:2] + tangent * (left_face - float(centre_p[:2] @ tangent))).tolist(), z_p])
         return work, brace
+
+    # ------------------------------------------------------------------ standing target (inside, owner 2026-10-11, inside#03)
+
+    def up_axis(self) -> Optional[str]:
+        """Inside: the model axis the drawn target stands on in its partner - ``generation.target_up_axis`` in the per-model dict form
+        (``pair_rules.target_up_axis``: the sunflower's stem end -> head). None for every other relation and without the key."""
+        from ispatialgym.sampling import pair_rules as PR
+
+        if self.relation != "inside" or self.gen("target_up_axis") is None:
+            return None
+        t = self.choice.models["target"]
+        try:
+            return PR.target_up_axis(self.gen("target_up_axis"), t.category, t.model)
+        except ValueError as e:
+            raise Reject("spec", f"{self.gp.alias}: generation.target_up_axis of {t.category}/{t.model}: {e}")
+
+    def up_vector(self) -> th.Tensor:
+        """:meth:`up_axis` as a unit vector in the target's frame."""
+        from ispatialgym.sampling import pair_rules as PR
+
+        i, sign = PR.up_axis(self.up_axis())
+        v = th.zeros(3)
+        v[i] = sign
+        return v
+
+    def standing_quats(self) -> List[th.Tensor]:
+        """The target standing on :meth:`up_axis`: the four orientations (xyzw), a quarter turn apart about the vertical, whose
+        footprint (its minimum-area rectangle) lies along the world axes - those of the partner AABB the release fit checks."""
+        from ispatialgym.sampling import pair_rules as PR
+
+        w, x, y, z = PR.standing_quat_wxyz(self.up_axis())
+        q0 = th.tensor([x, y, z, w])
+        theta = self.footprint_axis_angle(self.hull["target"], q0)
+        return [G.qmul(G.quat_from_yaw(k * math.pi / 2 - theta), q0) for k in range(4)]
+
+    def standing_goal_quat(self, q_init, manip: Stance) -> th.Tensor:
+        """The goal orientation of a standing target: of :meth:`standing_quats` the one nearest the start orientation ``q_init``
+        (the oracle turns the target upright on the carry from the lift to the pre-place, the smallest turn) among those at which
+        the drawn grasp approaches away from the robot (approach . stance forward >= 0); the four when no grasp is drawn yet. The
+        first of equal turns. Facts in ``self.standing``."""
+        cands = self.standing_quats()
+        grasp = self.sidecar.grasp_of(self.bindings.one("target").name)
+        fwd = manip.forward
+        ahead: List[Optional[float]] = []
+        for q in cands:
+            if grasp is None or grasp.eef_in_object is None:
+                ahead.append(None)
+                continue
+            a = G.rotate(q, C.quat_to_mat(G.t(grasp.eef_in_object[1]))[:, 2])
+            ahead.append(float(a[0] * fwd[0] + a[1] * fwd[1]))
+        turns = [math.degrees(G.quat_angle(q_init, q)) for q in cands]
+        pool = [k for k in range(len(cands)) if ahead[k] is None or ahead[k] >= -1e-6] or list(range(len(cands)))
+        k = min(pool, key=lambda i: turns[i])
+        self.standing = {"up_axis": self.up_axis(), "turn_deg": round(turns[k], 1), "approach_ahead": None if ahead[k] is None else round(ahead[k], 3),
+                         "turns_deg": [round(v, 1) for v in turns]}
+        return cands[k]
+
+    def pre_place_of(self, place: G.Pose) -> G.Pose:
+        """The pre-place of a place eef pose: ``PRE_DIST`` back along the approach; a standing target ``PRE_DIST`` straight above, so
+        the descent lowers it into its release over the opening (its grasp approaches it sideways there: along the approach the
+        target would come in over the rim)."""
+        if self.up_axis() is None:
+            return IK.pre_pose(place)
+        return G.t(place[0]) + th.tensor([0.0, 0.0, float(IK.PRE_DIST)]), G.t(place[1])
+
+    def check_goal_upright(self, draft: Draft):
+        """``SamplerV2.check_goal_upright``; a standing target: the angle of its up axis (:meth:`up_vector`) to the vertical after the
+        goal settle - the stock check follows the object's z axis, which a spin about the vertical turns -, up to the lean the partner
+        allows a target standing in it (``atan(footprint short side / height)`` of its rest extents), at least ``goal_tip_max_deg``."""
+        if self.up_axis() is None:
+            return super().check_goal_upright(draft)
+        tname = self.bindings.one("target").name
+        _, q_now = self.obj("target").get_position_orientation()
+        u_now = G.rotate(q_now.float(), self.up_vector())
+        tilt = math.degrees(math.acos(max(-1.0, min(1.0, float(u_now[2])))))
+        p_ext = TT.hull_extents(self.hull["partner"], self.rest["partner"])
+        lean = math.degrees(math.atan2(min(float(p_ext[0]), float(p_ext[1])), float(p_ext[2])))
+        max_deg = max(float(self.gen("goal_tip_max_deg", self.GOAL_TIP_MAX_DEG)), lean)
+        draft.summary["goal_tilt_deg"] = {tname: round(tilt, 2)}
+        draft.summary["goal_tilt_max_deg"] = round(max_deg, 2)
+        if tilt > max_deg:
+            self.counters["goal_tipped"] = self.counters.get("goal_tipped", 0) + 1
+            raise Reject("goal_tipped", f"{tname}: up axis {self.up_axis()} {tilt:.1f} deg off the vertical after the goal settle (> {max_deg:.0f})")
 
     # ------------------------------------------------------------------ goal (§6.11)
 
@@ -1258,13 +1349,18 @@ class IORSSmall(SamplerV2):
         ±finger half width along x, from the drawn grasp's ``eef_in_object``) clears the rim ``p_hull_w[:, 2].max()`` by
         ``release_clearance_m`` (default 0.02); ``drop_height_m`` stays the floor of the object's bottom above the rim.
         The target footprint at the release pose must lie within the opening (outer extents minus ``opening_margin_m``),
-        else ``Reject("does_not_fit_inside")``. Facts for the sidecar / summary in ``self.release``."""
+        else ``Reject("does_not_fit_inside")``. A standing target (:meth:`up_axis`) has its footprint centred on the container
+        instead of its origin: the sunflower's head, off its stem by 1.6 cm, passes the opening centred. Facts for the sidecar /
+        summary in ``self.release``."""
         tname = self.bindings.one("target").name
         centre, rim_z = self._container_volume(self.obj("partner"), p_pose)
         t_min = float(t_hull[:, 2].min())
         drop_floor = float(self.gen("drop_height_m", 0.005)) + contact_height_extra(self, "release")[0]  # A/B knob lift
         clearance = float(self.gen("release_clearance_m", RELEASE_CLEARANCE))
-        pos = th.tensor([float(centre[0]), float(centre[1]), rim_z + drop_floor - t_min])
+        xy = centre[:2]
+        if self.up_axis() is not None:
+            xy = xy - 0.5 * (t_hull[:, :2].min(dim=0).values + t_hull[:, :2].max(dim=0).values)
+        pos = th.tensor([float(xy[0]), float(xy[1]), rim_z + drop_floor - t_min])
         grasp = self.sidecar.grasp_of(tname)
         finger_low = None
         if grasp is not None and grasp.eef_in_object is not None:
@@ -1282,6 +1378,8 @@ class IORSSmall(SamplerV2):
                                                 f"pose leaves the opening {[round(float(v), 3) for v in (p_hi - p_lo)]} (margin {om:.3f})")
         self.release = {"place_kind": "drop", "rim_z": round(rim_z, 4), "drop_height_m": round(float(pos[2]) + t_min - rim_z, 4),
                         "finger_clearance_m": None if finger_low is None else round(finger_low - rim_z, 4), "release_clearance_m": clearance}
+        if self.standing is not None:
+            self.release["standing"] = dict(self.standing)
         return pos, t_quat
 
     def after_settle(self, draft: Draft):
@@ -1345,6 +1443,11 @@ class IORSSmall(SamplerV2):
                     log.info("%s: open pad on the support for %s and no library grasp clears it at the settled pose; kept", self.gp.alias, grasp.grasp_name)
             grasp.extras["open_pads_clear_of_support"] = clear
             draft.summary["open_pads_clear_of_support"] = clear
+        if self.up_axis() is not None:
+            # the standing goal's yaw follows the grasp's approach (:meth:`standing_goal_quat`): a grasp re-selected above gets it anew
+            goal = self.goal_pose(draft.object_poses[tname], (p.clone(), q.clone()))
+            draft.goal_poses[tname] = goal
+            self._set_target_goal(draft, tname, goal)
 
     def open_pads_clear_of_support(self, q: th.Tensor) -> bool:
         """Whether the robot at the grasp configuration ``q`` (fingers open as the sampler solves it) keeps its gripper
@@ -1545,7 +1648,7 @@ class IORSSmall(SamplerV2):
             # recorded goal is what the drop settled to. The gripper never reaches into the partner, so it is not ignored.
             rel_pos, rel_quat = draft.goal_poses[tname]
             place = IK.grasp_pose((G.t(rel_pos), G.t(rel_quat)), grasp.eef_in_object)
-            pre_place = IK.pre_pose(place)
+            pre_place = self.pre_place_of(place)
             ignore = self.support_objects()
             rim_z = float(self.release["rim_z"]) if getattr(self, "release", None) else None
             low = float(gripper_corners_world(place)[:, 2].min())
@@ -1620,7 +1723,7 @@ class IORSSmall(SamplerV2):
                     break
                 tried.append(chosen)
                 place = IK.grasp_pose((place_pos if self.relation != "inside" else G.t(draft.goal_poses[tname][0]), goal_quat), grasp.eef_in_object)
-                pre_place = IK.pre_pose(place)
+                pre_place = self.pre_place_of(place)
                 res = descent(pre_place, place)
                 if res.ok:
                     log.info("%s: the carried object hit the robot on the descent with the drawn grasp; grasp %s carries clear", self.gp.alias, chosen)

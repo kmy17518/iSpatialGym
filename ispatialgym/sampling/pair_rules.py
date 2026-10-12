@@ -17,7 +17,12 @@ sampling (``ground_isg`` writes it into ``roles.target.scale``), from the models
   protrusion rule (``(1 - f) * t_height > p_height``, ``f = max_protrusion_fraction``; the partner height bounds its depth).
   ``s = min((p_short - om) / t_short, (p_long - om) / t_long, p_height / ((1 - f) * t_height))``;
 * :func:`floor_scale` rounds the scale down to 0.01 (the fit still holds); below ``target_fit_scale_min`` (default
-  :data:`TARGET_FIT_SCALE_MIN`) a shrink is not a fix (a lying sunflower in a tube vase needs x0.41) and the model is withheld.
+  :data:`TARGET_FIT_SCALE_MIN`) a shrink is not a fix (a lying sunflower in a tube vase needs x0.44) and the model is withheld.
+
+**Standing target** (inside, owner 2026-10-11, inside#03): ``generation.target_up_axis`` names the model axis that points up when
+the target stands in its partner, per model in the wall targets' dict form (``{"sunflower/dkajbh": "+x"}``: stem end -> head;
+:func:`target_up_axis`). The fit check then measures the target standing on that axis (:func:`standing_quat_wxyz`) instead of
+its grasp key's rest, and ``iors_small`` stands it so at the goal; its start stays at the key's rest.
 
 **Handedness** (nextto, owner 2026-10-11): a mirror pair (left / right shoe) ends with the right one on the robot's right of the
 left one. :func:`handed_target_side` gives the side of the partner the target must end on; :func:`partner_side_for` the side
@@ -28,7 +33,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 #: Smallest uniform shrink applied (owner 2026-10-11 rule; ``generation.target_fit_scale_min`` overrides): a target that needs
 #: less than this to fit is withheld instead of shrunk.
@@ -36,6 +41,8 @@ TARGET_FIT_SCALE_MIN = 0.5
 #: Fit tiers of the sampler's §6.11 ontop / under pair check, in the order it tries them.
 FIT_TIERS = ("any_yaw", "aligned", "centred")
 HANDS = ("left", "right")
+#: Model axis names of ``generation.target_up_axis`` -> (axis index, sign).
+UP_AXES = {f"{s}{a}": (i, 1.0 if s == "+" else -1.0) for i, a in enumerate("xyz") for s in "+-"}
 
 
 @dataclass
@@ -69,6 +76,39 @@ def rest_extents(bbox: Sequence[float], scale: Optional[Sequence[float]] = None,
         return h
     R = _quat_wxyz_matrix(rest_quat_wxyz)
     return [sum(abs(R[i][j]) * h[j] for j in range(3)) for i in range(3)]
+
+
+def up_axis(name: Any) -> Tuple[int, float]:
+    """``(index, sign)`` of a model axis name (``"+x"``, ``"-z"``; a bare ``"x"`` is ``"+x"``); ValueError for anything else."""
+    s = str(name).strip().lower()
+    s = s if s[:1] in ("+", "-") else "+" + s
+    if s not in UP_AXES:
+        raise ValueError(f"{name!r} is not a model axis (+x / -x / +y / -y / +z / -z)")
+    return UP_AXES[s]
+
+
+def target_up_axis(value: Any, category: str, model: str) -> Optional[str]:
+    """The up axis ``generation.target_up_axis`` (``value``) gives ``category/model``: the per-model dict form (``"<category>/<model>"``,
+    then ``"<category>"``, then ``"default"``, as ``AlignmentWall.target_param`` reads the wall targets' ``front_axis`` / ``up_axis``)
+    or one value for every model; None when it names none. Normalised (``"x"`` -> ``"+x"``); ValueError for a name that is no axis."""
+    if isinstance(value, dict):
+        value = value.get(f"{category}/{model}", value.get(category, value.get("default")))
+    if value is None:
+        return None
+    i, sign = up_axis(value)
+    return ("+" if sign > 0 else "-") + "xyz"[i]
+
+
+def standing_quat_wxyz(axis: str) -> List[float]:
+    """A rotation (wxyz) turning the model axis ``axis`` onto world +z (90 deg about ``axis x z``; -z: half a turn about x): the
+    target standing on it. :func:`rest_extents` at it gives the standing footprint and, as the height, the axis's own extent."""
+    i, sign = up_axis(axis)
+    if i == 2:
+        return [1.0, 0.0, 0.0, 0.0] if sign > 0 else [0.0, 1.0, 0.0, 0.0]
+    u = [0.0, 0.0, 0.0]
+    u[i] = sign
+    c = math.sqrt(0.5)
+    return [c, u[1] * c, -u[0] * c, 0.0]
 
 
 def _sorted_xy(ext: Sequence[float]):

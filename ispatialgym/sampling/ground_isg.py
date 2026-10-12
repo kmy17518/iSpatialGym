@@ -18,7 +18,8 @@ every candidate) this module
    ``sampling/generation_defaults.py``, ``constraints`` (empty, except the soft ``missing_contacts_pending_B6``
    records while ``require/contacts.csv`` is header-only); IORS small scale (owner 2026-10-11, ``sampling/pair_rules.py``):
    a target bigger than its partner (ontop / under) or than the opening (inside) gets a uniform fit scale with a key tested at
-   it, else it is withheld (``generation.target_fit``); a nextto mirror pair gets ``generation.handedness``;
+   it, else it is withheld (``generation.target_fit``) - an inside target the entry's ``generation.target_up_axis`` names is
+   measured standing on that axis; a nextto mirror pair gets ``generation.handedness``;
 4. emits the **fallback aliases** of the primary (owner decision 2026-09-16 B; customs ``fallback_of`` /
    ``fallback_rank`` / ``fallback_kind`` / ``fallback_params``, the primary's ``fallbacks`` list, the same fields in
    ``problems.json``): large-scale IORS init surface (under: support -> the partner's own top -> floor; ontop: support
@@ -2227,7 +2228,9 @@ class Grounder:
         """Fit of target ``cat/m`` with every partner it can be drawn with (``pair_rules``; thresholds from ``gen``): ``status`` =
         ``fits`` / ``scaled`` (a key tested at the fit scale exists) / ``pending_scaled_grasps`` / ``below_floor`` / ``no_bbox``, the
         model's own key and scale (``base_key`` / ``base_scale``) and, when it does not fit as is, the ``record`` for
-        ``generation.target_fit``."""
+        ``generation.target_fit``. The target is measured at its key's rest - inside: standing on ``gen["target_up_axis"]`` when that
+        names an axis for the model (owner 2026-10-11, inside#03: the sampler stands it so at the goal; the record carries
+        ``up_axis``)."""
         subtask = iddl.subtask
         kind = TARGET_FIT_SUBTASKS[subtask]
         base_key, base = self._target_base(iddl, cat, m, rp)
@@ -2236,7 +2239,13 @@ class Grounder:
         if bbox is None:
             out["status"] = "no_bbox"
             return out
-        t_ext = PR.rest_extents(bbox, base, self.icl.key_rest.get(base_key) if base_key else None)
+        up = None
+        if kind == "inside":
+            try:
+                up = PR.target_up_axis(gen.get("target_up_axis"), cat, m)
+            except ValueError as e:
+                raise GroundingError(f"{subtask}: generation.target_up_axis of {cat}/{m}: {e}") from e
+        t_ext = PR.rest_extents(bbox, base, PR.standing_quat_wxyz(up) if up else (self.icl.key_rest.get(base_key) if base_key else None))
         worst = None
         for pc, pm in partners:
             pb = self.icl.model_bbox(subtask, "partner", pc, pm)
@@ -2256,7 +2265,7 @@ class Grounder:
         s = PR.floor_scale(fit.scale)
         floor = float(gen.get("target_fit_scale_min", PR.TARGET_FIT_SCALE_MIN))
         unit = base or [1.0, 1.0, 1.0]
-        rec: Dict[str, Any] = {"rule": kind, "scale": s, "partner": C.model_key(pc, pm), "limit": fit.limit, **fit.facts,
+        rec: Dict[str, Any] = {"rule": kind, "scale": s, "partner": C.model_key(pc, pm), "limit": fit.limit, **fit.facts, **({"up_axis": up} if up else {}),
                                "base_scale": base, "spawn_scale": [round(b * s, 4) for b in unit]}
         if s < floor - 1e-9:
             rec.update(status="below_floor", scale_min=floor)
@@ -2379,11 +2388,19 @@ class Grounder:
         """One report note per model of ``generation.target_fit`` of the aliases this run produced for ``subtask`` (final state)."""
         for alias in sorted({gp.alias for gp in self.grounded if gp.subtask == subtask}):
             entry = self.customs.entries.get(alias)
-            for key, rec in sorted(((entry.generation.get("target_fit") or {}) if entry is not None else {}).items()):
+            records = (entry.generation.get("target_fit") or {}) if entry is not None else {}
+            for key, rec in sorted(records.items()):
                 need = rec.get("needs")
                 what = {"scaled": f"key {rec.get('grasp_key')}", "below_floor": f"withheld, below target_fit_scale_min {rec.get('scale_min')}",
                         "pending_scaled_grasps": f"withheld, needs {(need or {}).get('pipeline')} grasps of {(need or {}).get('base_key')} at {(need or {}).get('scale')}"}
-                self.report.notes[subtask].append(f"{alias}: target fit {key} x{rec['scale']:.2f} ({rec['partner']}): {what.get(rec['status'], rec['status'])}")
+                standing = f" standing on {rec['up_axis']}" if rec.get("up_axis") else ""
+                self.report.notes[subtask].append(f"{alias}: target fit {key}{standing} x{rec['scale']:.2f} ({rec['partner']}): {what.get(rec['status'], rec['status'])}")
+            if entry is None or TARGET_FIT_SUBTASKS[subtask] != "inside" or entry.generation.get("target_up_axis") is None:
+                continue
+            for cat, m in self._whitelisted(entry, "target"):
+                up = PR.target_up_axis(entry.generation["target_up_axis"], cat, m)
+                if up and C.model_key(cat, m) not in records:
+                    self.report.notes[subtask].append(f"{alias}: target fit {C.model_key(cat, m)} standing on {up} (generation.target_up_axis): fits as is")
 
     @staticmethod
     def _orientation_equivalences(subtask: str, role: str, row: Dict[str, str]) -> Optional[List[str]]:
