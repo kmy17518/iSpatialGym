@@ -1,0 +1,37 @@
+(define (problem inter_object_relation_satisfaction-117)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor)
+
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#02/representative)
+    ; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c1: hand-made from this grounding - briefcase/lwbctq under desk_pfsjbc_0 from the floor of lobby_0; registry mode test
+    ; IORS - under (large-scale). The target starts on a support (a table near the partner, the floor beside it, or the
+    ; partner's own top) and ends on the floor under a large scene partner (bed, sofa, desk, breakfast table; roles/candidates.csv
+    ; kind scene) at a goal cell where an upward ray hits the partner above target height + 3 cm. Argument order: the
+    ; target is under the partner. When partner and support are the same scene object the BDDL declares it once.
+
+    (:objects
+        briefcase.n.01_1 - briefcase.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop briefcase.n.01_1 floor.n.01_1)
+        (not (under briefcase.n.01_1 desk.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (under ?briefcase.n.01_1 ?desk.n.01_1)
+            (not (grasped ?agent.n.01_1 ?briefcase.n.01_1))
+            (pose_settled ?briefcase.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?briefcase.n.01_1)
+    )
+)

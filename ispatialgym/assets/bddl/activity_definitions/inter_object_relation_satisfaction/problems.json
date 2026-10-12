@@ -1241,6 +1241,83 @@
    "pick": "inter_object_relation_satisfaction-touching#02~C5",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-countertop",
+   "id": 112,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c1)",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#01~c1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor",
+   "id": 113,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c2)",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#01~c2",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-mouse-desk-floor",
+   "id": 114,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows with the floor init as the pick's only support row, inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#02 c1)",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#02~c1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor",
+   "id": 115,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c1)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#03~c1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_place",
+   "id": 116,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c2)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#03~c2",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor",
+   "id": 117,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows with the floor init as the pick's only support row, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c1)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#02~c1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor",
+   "id": 118,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows with the floor init as the pick's only support row and desk_mdhelw_0 as its representative partner, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c2)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#02~c2",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }

@@ -32214,6 +32214,109 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-ontop_large_scale-mouse-desk-floor": {
+  "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+  "definition_id": 114,
+  "roles": {
+   "target": {
+    "category": "mouse",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "pljjtu",
+    "orientation_equivalences": {
+     "mouse/pljjtu": []
+    },
+    "grasp_keys": {
+     "mouse/pljjtu": "mouse__pljjtu__t"
+    }
+   },
+   "partner": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_upper": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "desk_iotfzl_0"
+     ],
+     "support": {
+      "room": "living_room_0"
+     },
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "mouse": [
+       "pljjtu"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "mouse": {
+       "eosngb": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.01,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#02 c1: mouse/pljjtu onto desk_iotfzl_0 from the floor of living_room_0; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-ontop_large_scale#02 on the sheet rows with the floor init as the pick's only support row (scratch sheet), with inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
+ },
  "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor": {
   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
   "definition_id": 16,
@@ -32528,6 +32631,239 @@
    "carry_path_margin_m": 0.03
   },
   "constraints": []
+ },
+ "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-countertop": {
+  "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+  "definition_id": 112,
+  "fallbacks": [
+   "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor"
+  ],
+  "roles": {
+   "target": {
+    "category": "soap_dispenser",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "zwudcz",
+    "orientation_equivalences": {
+     "soap_dispenser/zwudcz": [
+      "z4"
+     ]
+    },
+    "grasp_keys": {
+     "soap_dispenser/zwudcz": "soap_dispenser__zwudcz__t"
+    }
+   },
+   "partner": {
+    "category": "countertop",
+    "sampleable": false
+   },
+   "support": {
+    "category": "countertop",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "utility_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "countertop_fjkase_0"
+     ],
+     "support": [
+      "countertop_sjxber_0",
+      "countertop_ikwqer_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "countertop_sjxber_0",
+       "init": "ontop",
+       "top_z": 0.93,
+       "row": "inter_object_relation_satisfaction-ontop_large_scale#01~T2"
+      },
+      {
+       "name": "countertop_ikwqer_0",
+       "init": "ontop",
+       "top_z": 0.93,
+       "row": "inter_object_relation_satisfaction-ontop_large_scale#01~T1"
+      }
+     ],
+     "floor": {
+      "room": "utility_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "soap_dispenser": [
+       "zwudcz"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "soap_dispenser": {
+       "sinntg": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.01,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c1: soap_dispenser/zwudcz onto countertop_fjkase_0 from countertop_ikwqer_0 / countertop_sjxber_0 (the sampler draws one); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-ontop_large_scale#01~T1 on the sheet rows (scratch sheet), with inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
+ },
+ "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor": {
+  "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+  "definition_id": 113,
+  "roles": {
+   "target": {
+    "category": "soap_dispenser",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "zwudcz",
+    "orientation_equivalences": {
+     "soap_dispenser/zwudcz": [
+      "z4"
+     ]
+    },
+    "grasp_keys": {
+     "soap_dispenser/zwudcz": "soap_dispenser__zwudcz__t"
+    }
+   },
+   "partner": {
+    "category": "countertop",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "utility_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "countertop_fjkase_0"
+     ],
+     "support": {
+      "room": "utility_room_0"
+     },
+     "floor": {
+      "room": "utility_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "soap_dispenser": [
+       "zwudcz"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "soap_dispenser": {
+       "sinntg": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
+   "base_path_style": "face_travel",
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.01,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "carry_collision_margin_m": 0.01,
+   "_carry_margin_note": "2026-09-21 04:20: carried sweeps at 1 cm - the conditions of the demo of record 0920-014411 (the 4 cm default came with the sandal carry of 2026-09-20 15:45); at 4 cm every countertop C was skipped / its arrival sweep fails in the small utility room (0921-031852 / 035744) | 04:55: the carried DRIVE is checked at 3 cm (carry_path_margin_m; the transitions stay at 1 cm): 0921-040940 the untucked idle arm brushed wardrobe_pyuwgc_0 on the 0.54 m carry the 1 cm check had passed (left_arm_link5, 2 attempts) - a local path failing it retries on the eroded global map",
+   "carry_path_margin_m": 0.03,
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c2: soap_dispenser/zwudcz onto countertop_fjkase_0 from the floor of utility_room_0; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-ontop_large_scale#01~T5 on the sheet rows (scratch sheet), with inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
  },
  "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-bottom_cabinet": {
   "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
@@ -39108,6 +39444,228 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 117,
+  "roles": {
+   "target": {
+    "category": "briefcase",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "lwbctq",
+    "orientation_equivalences": {
+     "briefcase/lwbctq": []
+    },
+    "grasp_keys": {
+     "briefcase/lwbctq": "briefcase__lwbctq"
+    }
+   },
+   "partner": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "lobby_0"
+    ],
+    "bindings": {
+     "partner": [
+      "desk_pfsjbc_0"
+     ],
+     "support": {
+      "room": "lobby_0"
+     },
+     "floor": {
+      "room": "lobby_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "briefcase": [
+       "lwbctq"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "briefcase": {
+       "uquevd": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c1: briefcase/lwbctq under desk_pfsjbc_0 from the floor of lobby_0; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#02 on the sheet rows with the floor init as the pick's only support row (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
+ },
+ "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 118,
+  "roles": {
+   "target": {
+    "category": "briefcase",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "lwbctq",
+    "orientation_equivalences": {
+     "briefcase/lwbctq": []
+    },
+    "grasp_keys": {
+     "briefcase/lwbctq": "briefcase__lwbctq"
+    }
+   },
+   "partner": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_3"
+    ],
+    "bindings": {
+     "partner": [
+      "desk_mdhelw_0"
+     ],
+     "support": {
+      "room": "private_office_3"
+     },
+     "floor": {
+      "room": "private_office_3"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "briefcase": [
+       "lwbctq"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "briefcase": {
+       "uquevd": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c2: briefcase/lwbctq under desk_mdhelw_0 (the held-out desk) from the floor of private_office_3; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#02 on the sheet rows with the floor init as the pick's only support row and desk_mdhelw_0 as its representative partner (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
+ },
  "inter_object_relation_satisfaction-under_large_scale-marker-desk-desk": {
   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
   "definition_id": 76,
@@ -40329,6 +40887,224 @@
   },
   "constraints": [],
   "_note": "owner 2026-09-19 20:14: sandal under the breakfast table (the small-scale under/ontop support); hand-grounded probe, breakfast_table_rhjoby_0 has no B4 partner record (under-clearance by raycast in-process)"
+ },
+ "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 115,
+  "roles": {
+   "target": {
+    "category": "trash_can",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "jlawet",
+    "grasp_keys": {
+     "trash_can/jlawet": "trash_can__jlawet__t"
+    }
+   },
+   "partner": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_2"
+    ],
+    "bindings": {
+     "partner": [
+      "desk_mdhelw_1"
+     ],
+     "support": {
+      "room": "private_office_2"
+     },
+     "floor": {
+      "room": "private_office_2"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "trash_can": [
+       "jlawet"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "trash_can": {
+       "dnvpag": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c1: trash_can/jlawet under desk_mdhelw_1 from the floor of private_office_2, push-under; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#03 on the sheet rows (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
+ },
+ "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_place": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 116,
+  "roles": {
+   "target": {
+    "category": "trash_can",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "jlawet",
+    "grasp_keys": {
+     "trash_can/jlawet": "trash_can__jlawet__t"
+    }
+   },
+   "partner": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_2"
+    ],
+    "bindings": {
+     "partner": [
+      "desk_mdhelw_1"
+     ],
+     "support": {
+      "room": "private_office_2"
+     },
+     "floor": {
+      "room": "private_office_2"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "trash_can": [
+       "jlawet"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "trash_can": {
+       "dnvpag": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "under_mode": "place",
+   "under_axis_max_deg": 45.0,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0; under_mode place: the target is placed under the desk from the under-band (no floor push)"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c2: trash_can/jlawet under desk_mdhelw_1 from the floor of private_office_2, place-under (generation.under_mode place); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#03 on the sheet rows (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
  },
  "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar": {
   "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
