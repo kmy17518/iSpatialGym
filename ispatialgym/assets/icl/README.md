@@ -103,7 +103,11 @@ texture), `variation_geometry` (VB‑MOBJ / VB‑ISC: other geometry of the same
 partner / scene instance), `heldout` (generalization; **global per category** — the same model in every subtask, never
 drawn in any other role) — then `category, model, scene, name` (scene object), `joint`, `kind`, `grasp_key` (the
 pipeline key of the subtask), `scale`, `geometry_group` / `exact_group` (texture‑variant / duplicate ids from the
-reviews), `status`, `note`. `candidates_extra.csv` = candidate rows the icl did not have (`candidates.csv` columns +
+reviews), `status`, `note`. A support row's `note` names its surface: `init=<ontop|inside>; top_z=<m above the floor>`
+(`ground_isg.support_surface` -> the customs `bindings.support_surfaces` entry the sampler reads), `rooms=<room>[,<room>]`
+(the rooms of a support named only in the sheet) and, optionally, `neighbors=<scene object>[,<scene object>]` (owner
+2026-10-12 A4: the supports of the same scene this one touches, at any height - together one placement area for target and
+partner, `docs/instance_sampling_spec.md` §3.2; `neighbours=` is read too). `candidates_extra.csv` = candidate rows the icl did not have (`candidates.csv` columns +
 `plan`; `status = incomplete:<reason>`), merged by `ground_isg` until a survey validates them. The report lists per
 subtask which variation / generalization axes are unavailable and why, the slot‑availability table and the plan for
 the incomplete candidates. `ispatialgym/sampling/v1_bridge.py` (v1 bridge, formerly ground_isg.py) grounds the picks into

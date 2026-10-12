@@ -116,6 +116,9 @@ SUPPORT_TOP_SURFACE = {
     ("restaurant_diner", "stove_ykretu_0"),
     ("house_double_floor_upper", "bookcase_kdnyfh_0"),
 }
+#: Note key of a support row naming the supports it touches (owner 2026-10-12 A4, ``parse_neighbors``): the pair is one placement area
+#: for target and partner (``sampling/v2/neighbors.py``).
+NEIGHBORS_NOTE_RE = re.compile(r"\bneighbou?rs=([A-Za-z0-9_,]+)")
 #: Alias token suffix of a support the objects start inside (sheet note ``init=inside``): its BDDL starts them ``inside`` the
 #: support instead of ``ontop``, so its rows never share an alias (and a BDDL) with the ``ontop`` rows of the category.
 INSIDE_ALIAS_SUFFIX = "_inside"
@@ -279,11 +282,21 @@ def stable_index(key: str, n: int) -> int:
     return int(hashlib.sha256(key.encode("utf-8")).hexdigest(), 16) % int(n)
 
 
+def parse_neighbors(note: str, own: str = "") -> List[str]:
+    """The supports a support row's note pairs it with (owner 2026-10-12 A4: ``neighbors=<name>[,<name>]``, scene objects of the row's
+    scene; the spelling ``neighbours=`` is read too), in order, without duplicates or the row's own name."""
+    m = NEIGHBORS_NOTE_RE.search(note or "")
+    if not m:
+        return []
+    return [n for n in dict.fromkeys(x.strip() for x in m.group(1).split(",")) if n and n != own]
+
+
 def support_surface(row: Dict[str, str], label: str) -> Optional[Dict[str, Any]]:
     """The surface a support row of the selection names (note ``init=<ontop|inside>; top_z=<m above the floor> ...``) as the
     customs ``bindings.support_surfaces`` entry ``{"name", "init", "top_z", "row"}`` (``row`` = the combination label, which
-    tells a re-grounding which entry it replaces), ``"surface": "top"`` for :data:`SUPPORT_TOP_SURFACE`; None when the note
-    gives no ``top_z``. The sampler reads it (``tabletop.support_surface``)."""
+    tells a re-grounding which entry it replaces), ``"surface": "top"`` for :data:`SUPPORT_TOP_SURFACE`, ``"neighbors"`` for a row
+    whose note pairs the support with the supports it touches (:func:`parse_neighbors`); None when the note gives no ``top_z``. The
+    sampler reads it (``tabletop.support_surface``)."""
     note = row.get("note") or ""
     m = re.search(r"\btop_z=([0-9]*\.?[0-9]+)", note)
     if not m:
@@ -293,6 +306,9 @@ def support_surface(row: Dict[str, str], label: str) -> Optional[Dict[str, Any]]
     out: Dict[str, Any] = {"name": name, "init": init.group(1) if init else "ontop", "top_z": float(m.group(1)), "row": label}
     if (row.get("scene") or "", name) in SUPPORT_TOP_SURFACE:
         out.update({"surface": "top", "why": "owner 2026-10-11: the sheet height matches no surface of the support"})
+    neighbors = parse_neighbors(note, name)
+    if neighbors:
+        out["neighbors"] = neighbors
     return out
 
 

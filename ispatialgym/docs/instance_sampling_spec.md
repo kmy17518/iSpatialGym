@@ -200,7 +200,9 @@ One entry per alias. Scene-independent model pools are the icl's job; the custom
   category minus the models rejected by the iddl `:require` filters (blacklisted as `missing_grasps:<pipeline>`,
   `missing_contacts`, `missing_handle`) and minus models removed by a failed representative test (blacklisted with
   the reason); scene-dependent objects (supports, walls, scene articulated objects, big partners) are listed per
-  scene under `bindings`.
+  scene under `bindings`. Each support row of the representative sheet adds a `bindings.support_surfaces` entry
+  `{"name", "init", "top_z", "row"}` (+ `"surface": "top"` for the supports whose sheet height matches no surface, +
+  `"neighbors": [...]` for a support paired with the supports it touches, 3.2).
 - `generation.groups.<role>` for every group role: `size` (an integer or `[min, max]`, drawn per template) and
   `draw` — `unique` (pairwise distinct models, look-alike exclusions of section 3.12 on top; the default) or
   `same_model` (all members one model). Current values: `targets` `{size: 4, draw: same_model}` (block design),
@@ -257,6 +259,21 @@ footprint as `blocked_footprints` in the same structure.
   ≥ 0.12 m² (`support_small`), at least one edge with a free-floor run for the stances of section 4 (`no_free_edge`),
   in a room the robot can stand in. Chairs are never supports; a cubicle desk is one object with several tops, each
   top is a separate support entry. Small-scale articulation targets taller than 0.6 m use the floor (5.4).
+- **Neighbouring supports** (owner decision 2026-10-12 A4). A support may be paired with the support(s) it touches, at
+  any height: the pair is one placement area for target and partner. Declared on the support row of the representative
+  sheet (note key `neighbors=<scene object>[,<scene object>]`, objects of the row's scene; `neighbours=` is read too),
+  carried by `ground_isg` into the row's `support_surfaces` entry (2.3) and read by `tabletop.support_surface`
+  (`sampling/v2/neighbors.py`): the sampler's top is the union of the support's top and each neighbour's top (the same
+  raycast raster; a neighbour with fewer than 50 free cells, `generation.neighbor_min_free_cells`, is left out), every
+  top keeping its own height. A footprint lies on one top, or across a seam of tops whose heights differ by at most
+  `generation.neighbor_flush_tol_m` (1 cm), never across a step; an object rests at the height of the top under it (the
+  higher one across a flush seam). The robot stands at the support's own edges (4.2), each extended along its line over
+  the neighbour cells within 10 cm in front of it / 30 cm behind it (`generation.neighbor_edge_strip_m`), so the lateral
+  room of 4.4 counts a neighbour beside the support. Reach bands stay per support (4.1). The neighbours are ignored for
+  the final grasp / contact pose like the support (3.6), the sampler's `:init` check accepts `(ontop X support)` on any
+  of the tops, and a target that starts on a neighbour records it as `grasps[].grasp_from` (7). Interior surfaces (a
+  shelf, `init=inside`) are never united. A support without neighbours is sampled exactly as before (its own top, bands
+  and band keys).
 
 ### 3.3 Robot
 
@@ -397,8 +414,8 @@ Details kept from v1 that the checks depend on:
   configuration at the stance's trunk; the idle arm is untucked and collision-checked.
 - Pre-grasp / pre-contact = the pose moved 0.10 m back along −a (a = approach = eef +z). Handle grasps: eef origin =
   contact − 0.012·a. Push / brace contacts: pad centre on the contact point, eef origin = point − `CONTACT_CENTER_Z`·a.
-- "Support ignored for the grasp pose only": the support (table, tray floor, wall, mattress) is removed from the
-  collision world for the final grasp / contact pose and for nothing else; the target object is ignored for the
+- "Support ignored for the grasp pose only": the support (table, tray floor, wall, mattress; with its neighbouring
+  supports, 3.2) is removed from the collision world for the final grasp / contact pose and for nothing else; the target object is ignored for the
   final contact pose unless the rule says otherwise; every other object (partner, distractors, scene) stays.
 - Every arm the oracle will use (right, left, both) has its cuRobo embodiment; the arm rule of the task decides.
 
@@ -647,12 +664,14 @@ s = 0.45), for every trunk of the grid (3.3):
 
 Cache key: 3.10 (two factors). Not the base pose; the stand-off is not a dimension (a different stand-off only
 changes which cells fall on the top). Expected cost: 5–20 s per surviving trunk, 1–4 min cold per (support, object).
-`sample_isg` calls the function on a cache miss.
+`sample_isg` calls the function on a cache miss. Neighbouring supports (3.2): the band of the support and the band of each
+neighbour (same object, grasp key, scale; computed like any support's) are loaded, each read on its own top only.
 
 ### 4.2 Phase 1a — edge and stand-off
 
 Any edge of the top polygon (raycast raster), no preference; yaw = inward normal; s = 0.45 m from the top edge, plus
-the AABB overhang beyond it when ≥ 5 cm.
+the AABB overhang beyond it when ≥ 5 cm. Neighbouring supports (3.2): the support's own edges, each extended along its
+line over the neighbour cells beside it.
 
 ### 4.3 Phase 1b — init trunk height (tilt 0)
 
@@ -1626,6 +1645,8 @@ coffee tables do not; `under_clearance`), and the target's footprint fits betwee
 ```
 
 Only the blocks a task uses are present. `run_isg --mode oracle` requires the sidecar; the evaluator never reads it.
+`grasps[].grasp_from` (optional): the container or support the object starts in / on when it is not in the task scope (a
+neighbouring support, 3.2) - the oracle leaves it out of the collision world for the grasp poses like the support.
 
 The sidecar carries **facts, not an action list** (decision 2026-09-15): the sequence is the oracle's program for the
 alias (`oracle_primitives_design.md` §3.7, one function per row of its §6.2), expanded from these blocks by `run_isg`

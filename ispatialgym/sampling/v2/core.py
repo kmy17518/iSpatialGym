@@ -56,6 +56,7 @@ from ispatialgym.sampling.tro_writer import validate_and_write  # noqa: E402
 from ispatialgym.sampling.v2 import SAMPLER_VERSION  # noqa: E402
 from ispatialgym.sampling import predicates as PRED  # noqa: E402
 from ispatialgym.sampling.v2 import navigation as NAV  # noqa: E402
+from ispatialgym.sampling.v2 import neighbors as NB  # noqa: E402
 from ispatialgym.sampling.v2 import program_check as PC  # noqa: E402
 from ispatialgym.sampling.v2.ik import IKChecker  # noqa: E402
 from ispatialgym.sampling.v2.problem import GroundedProblem, RejectionLog, TemplateChoice, template_summary  # noqa: E402
@@ -305,12 +306,18 @@ class SamplerV2(TaskSampler):
         return []
 
     def support_objects(self) -> List[Any]:  # hook
-        """Objects ignored for the final grasp / contact pose only (§3.6): the bound support(s)."""
+        """Objects ignored for the final grasp / contact pose only (§3.6): the bound support(s) and the neighbouring supports the
+        template's top is united with (owner 2026-10-12 A4)."""
         out = []
         for role in ("support", "tray_source", "tray_dest", "wall"):
             if self.bindings.has(role):
                 out += [self.objects[b.name] for b in self.bindings.many(role)]
-        return out
+        return out + NB.neighbor_objects(self)
+
+    def _evaluate(self, predicate_cls, *names):
+        """``TaskSampler._evaluate`` with a support united with its neighbours standing for any of its tops in ``ontop``
+        (``neighbors.evaluate_on_tops``; identical without neighbours)."""
+        return NB.evaluate_on_tops(self, predicate_cls, [self.scope[n] for n in names], PRED.evaluate_predicate)
 
     def v1_role_aliases(self) -> Dict[str, str]:  # hook (facade only)
         """Extra v1 role names bound to v2 roles when the BDDL is rendered through ``bddl_writer`` (e.g. IORS small-scale:

@@ -82,6 +82,7 @@ from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling.v2 import navigation as NAV
+from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
@@ -426,12 +427,12 @@ class IORSLarge(SamplerV2):
         return self.bindings.one("partner").name
 
     def support_objects(self) -> List[Any]:
-        """The init surface when it is a piece of furniture (parking keep-away, grasp ignore); the floor is handled by
-        :meth:`grasp_ignore_objects` (its AABB would forbid every parking cell)."""
+        """The init surface when it is a piece of furniture (parking keep-away, grasp ignore) and the neighbouring supports its top
+        is united with; the floor is handled by :meth:`grasp_ignore_objects` (its AABB would forbid every parking cell)."""
         out = []
         if self.surface.get("obj") is not None:
             out.append(self.surface["obj"])
-        return out
+        return out + NB.neighbor_objects(self)
 
     def grasp_ignore_objects(self) -> List[Any]:
         """§5.6: the init surface ignored for the grasp pose only (the floor for the floor init)."""

@@ -45,6 +45,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import reach_bands as RB
+from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Pose, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
@@ -157,7 +158,8 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
     support top's, else the support top (rows marked ``surface: top`` always). On an interior surface the cells whose headroom
     is below ``height`` + :data:`INTERIOR_HEADROOM_MARGIN_M` count as occupied, and ``s.surface_z`` (the selection's height) makes
     the band lookups ask for the interior band (``ReachBands.load(..., surface_z=...)``); on the top ``s.surface_z`` is None.
-    The decision goes to ``template_facts["support_surface"]``."""
+    The decision goes to ``template_facts["support_surface"]``. A row naming ``neighbors`` (owner 2026-10-12 A4) gets the support
+    top united with theirs (``neighbors.union_top``; never an interior surface)."""
     spec = support_surface_spec(s, support)
     s.surface_z = None
     top, top_err = None, None
@@ -185,7 +187,7 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
             tf["support_surface"] = fact
         if top is None:
             _reject("support_small", f"{support.name}: no support top ({top_err})")
-        return top
+        return NB.union_top(s, support, top, spec, ignore=ignore)
     z_req = float(spec["top_z"])
     try:
         itop = s.world.support_interior(support, floor_z + z_req, resolution=float(s.gen("support_resolution", 0.02)),
@@ -204,7 +206,7 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
     tf = getattr(s, "template_facts", None)
     if isinstance(tf, dict):
         tf["support_surface"] = fact
-    return itop
+    return NB.union_top(s, support, itop, spec, ignore=ignore)
 
 
 #: upright shelf start (owner 2026-10-11 item 3, touching#03): the spine this far behind the shelf's front edge, the leaning edge
@@ -853,7 +855,7 @@ class BandSpec:
 def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[EdgeFrame] = None, force: bool = False) -> RB.ReachBands:
     """The reach band of the sampler's support and object (cached on ``s.bands``): ``ReachBands.load`` from the cache
     directories (§3.10), else computed in-process with ``BandComputer`` (the function the CLI runs) and written to
-    ``reach_bands.cache_root()``."""
+    ``reach_bands.cache_root()``. On a union top (neighbouring supports) each neighbour's band too: ``neighbors.NeighborBands``."""
     cached = getattr(s, "bands", None)
     if cached is not None and not force:
         return cached
@@ -872,15 +874,17 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
             _reject("missing_band", f"no interior reach band for {support} at surface_z {surface['surface_z']:.2f} ({spec.object}, {gkey})")
         log.info("reach band cache miss for %s / %s (%s): computing in-process", support, spec.object, gkey)
         bands = compute_bands(s, spec, top, edge)
-    s.bands = bands
-    return bands
+    s.bands = NB.with_neighbor_bands(s, bands, spec, top, compute_bands)
+    return s.bands
 
 
 def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, lattice: float = RB.LATTICE, out_dir: Optional[str] = None,
                   trunks: Optional[Sequence[Tuple[float, float]]] = None) -> RB.ReachBands:
     """§4.1 steps 1–4 in-process (``reach_bands.BandComputer``) at the band stance (edge midpoint, s = 0.45 + overhang) of
-    ``edge`` (default: the longest free edge), written as ``<cache>/<name>.npz/.json`` like the CLI."""
+    ``edge`` (default: the longest free edge), written as ``<cache>/<name>.npz/.json`` like the CLI. A union top's band is its
+    support's own (bands are per support)."""
     world, kit = s.world, s.kit
+    top = NB.own_top(top)
     support = world.obj(top.name)
     bc = RB.BandComputer(world, kit, arms=(spec.arm,), lattice=lattice)
     stance = bc.stance_at_edge(top, support, RB.STAND_OFF, edge.name if edge is not None else None)
@@ -1054,8 +1058,10 @@ def arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None, edge: Op
     """``arm``'s reach band for the sampler's support and object (cached on ``s.bands_by_arm``): ``bands`` (default
     :func:`ensure_bands`) when it is that arm's; else the arm's own band from the cache directories, else ``bands`` mirrored in
     memory (``ReachBands.mirrored``: never written, never computed in-process - a missing default-arm band is computed as
-    before and then mirrored). The choice goes to ``template_facts["arm_bands"]``."""
+    before and then mirrored). The choice goes to ``template_facts["arm_bands"]``. Neighbouring supports: each top's band for ``arm``."""
     base = bands if bands is not None else ensure_bands(s, spec, top=top, edge=edge)
+    if isinstance(base, NB.NeighborBands):
+        return base.for_arm(arm, lambda b: arm_band(s, arm, bands=b))
     if base.arm == arm:
         return base
     cache = s.__dict__.setdefault("bands_by_arm", {})
@@ -1121,7 +1127,10 @@ def band_kw(bands: Optional[RB.ReachBands], stance) -> Dict[str, Any]:
 
 def band_cells_world(bands: RB.ReachBands, stance: Stance, translate: Optional[float] = None, tilt: Optional[float] = None) -> th.Tensor:
     """The band cells of the grid trunk (same translate, nearest tilt; a multi-distance band's at the stance's stand-off) in the
-    world at ``stance`` (robot-relative cells, §4.5 step 2 "band shifted with the stand-off")."""
+    world at ``stance`` (robot-relative cells, §4.5 step 2 "band shifted with the stand-off"); neighbouring supports: each band's
+    cells on its own top."""
+    if isinstance(bands, NB.NeighborBands):
+        return bands.cells_world(lambda b: band_cells_world(b, stance, translate, tilt))
     tr = stance.translate if translate is None else translate
     ti = stance.tilt if tilt is None else tilt
     cells = bands.band(float(tr), float(ti), **band_kw(bands, stance))
@@ -1131,7 +1140,10 @@ def band_cells_world(bands: RB.ReachBands, stance: Stance, translate: Optional[f
 
 
 def band_union_cells(bands: RB.ReachBands, stance=None) -> th.Tensor:
-    """Every band cell over every trunk (base frame), deduplicated; a multi-distance band's at ``stance``'s stand-off."""
+    """Every band cell over every trunk (base frame), deduplicated; a multi-distance band's at ``stance``'s stand-off; neighbouring
+    supports: each band's cells that fall on its own top at ``stance``."""
+    if isinstance(bands, NB.NeighborBands):
+        return bands.union_cells(stance, lambda b: band_union_cells(b, stance))
     so = band_stand_off(bands, stance)
     cells_by_trunk = bands._maps(so)[0] if so is not None else bands.cells
     if not cells_by_trunk:
@@ -1166,7 +1178,10 @@ def workspace(s, bands: RB.ReachBands, stance: Stance, top, erosion: float = 0.0
 def store_feasible_set(bands: RB.ReachBands, stance: Stance, F: Sequence[Tuple[float, Any]], yaws: Sequence[float] = YAWS) -> None:
     """§4.6 step 1 / §3.10: store the feasible set F of the focus cell under (trunk, cell) in the band (``pairs`` +
     ``meta.feasible_sets``); an empty F removes the cell from the band. In-memory (and written back to the band's
-    ``.npz`` / ``.json`` when the band was loaded from or saved to a cache file)."""
+    ``.npz`` / ``.json`` when the band was loaded from or saved to a cache file). Neighbouring supports: the band of the top under
+    the focus."""
+    if isinstance(bands, NB.NeighborBands):
+        bands = bands.member_for(stance.focus[:2]) if stance.focus is not None else None
     if bands is None or stance.focus is None:
         return
     if bands.meta.get("stand_offs"):
@@ -1405,7 +1420,10 @@ def pitched_approach(pitch_deg: float, forward: th.Tensor) -> th.Tensor:
 
 def in_band(bands: Optional[RB.ReachBands], stance: Stance, xy, tol: float = CELL_TOLERANCE) -> Tuple[bool, Optional[np.ndarray]]:
     """Whether the world point ``xy`` lies within ``tol``·lattice of a cell of ``bands`` at the stance's trunk (same
-    translate, nearest tilt); returns ``(ok, nearest cell in base coordinates)``."""
+    translate, nearest tilt); returns ``(ok, nearest cell in base coordinates)``. Neighbouring supports: the band of the top under
+    ``xy``."""
+    if isinstance(bands, NB.NeighborBands):
+        bands = bands.member_for(xy)
     if bands is None:
         return False, None
     cells = bands.band(float(stance.translate), float(stance.tilt), **band_kw(bands, stance))
@@ -1917,7 +1935,7 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
         foci = focus_candidates(s, st, cam, cw) if focus_candidates is not None else [(c, None) for c in cw]
         angs = []
         for focus_xy, info in foci:
-            fz = float(focus_z) if focus_z is not None else float(top.z) + 0.5 * height
+            fz = float(focus_z) if focus_z is not None else NB.z_at(top, focus_xy) + 0.5 * height
             focus = th.tensor([float(focus_xy[0]), float(focus_xy[1]), fz])
             ang = cm.angle_off_axis(cam, focus)
             angs.append((float(ang), focus_xy))
@@ -2058,7 +2076,7 @@ def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_c
             continue
         foci = focus_candidates(s, st, cam, th.stack(keep)) if focus_candidates is not None else [(c, None) for c in keep]
         for focus_xy, info in foci:
-            fz = float(focus_z) if focus_z is not None else float(top.z) + 0.5 * height
+            fz = float(focus_z) if focus_z is not None else NB.z_at(top, focus_xy) + 0.5 * height
             focus = th.tensor([float(focus_xy[0]), float(focus_xy[1]), fz])
             ang = cm.angle_off_axis(cam, focus)
             if ang > w1:
@@ -2704,7 +2722,8 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     """§4.6 step 1: screen the 8 fixed yaws x ``grasps`` at the focus cell (12-seed IK from ``manip``, support ignored for
     the grasp pose only) -> feasible set F (stored in the band cache under (trunk, cell); empty F removes the cell);
     draw (yaw, grasp) uniformly from F, jitter ±22.5°, place the object within 5 cm of the focus with its footprint on
-    the top (``margin``; a tray floor passes ``top`` = the tray raster and ``support_z`` = its floor), derive grasp =
+    the top (``margin``; a tray floor passes ``top`` = the tray raster and ``support_z`` = its floor; on neighbouring supports at the
+    height of the top under the footprint, a start on a neighbour recorded as ``extras["grasp_from"]``), derive grasp =
     object pose ∘ T_obj→eef and pre-grasp 10 cm back, confirm both with the exact IK; next element of F without
     replacement on failure; ``Reject("grasp_unreachable")`` when F is exhausted. With ``generation.grasp_twins`` each drawn
     pinch may be recorded as its twin (:func:`pick_twin`; extras ``wrist_flip`` / ``twin_choice``). Returns the object pose
@@ -2749,7 +2768,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
         band_of[offered[0]] = bands or getattr(s, "bands", None)
 
     def pose_at(cell, yaw):
-        return object_pose_on(s, hull, rest_quat, cell, yaw, z)
+        return object_pose_on(s, hull, rest_quat, cell, yaw, z if support_z is not None else NB.z_at(top, cell))
 
     F_of: Dict[str, List[Tuple[float, Any]]] = {}
     for a in offered:
@@ -2783,15 +2802,17 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
             r, a = float(rng.uniform(0.0, focus_radius)), float(rng.uniform(0.0, 2 * math.pi))
             xy = th.tensor([float(fx[0]) + r * math.cos(a), float(fx[1]) + r * math.sin(a)])
             pose = pose_at(xy, yaw)
-            if not top.polygon_supported(s.world.footprint(hull, pose), margin=margin):
+            fp = s.world.footprint(hull, pose)
+            if not top.polygon_supported(fp, margin=margin):
                 fails["support"] += 1
                 continue
+            pose, z_here = (pose, z) if support_z is not None else NB.rest_on(top, pose, fp, NB.z_at(top, xy))
             eef = IK.grasp_pose(pose, eef_of(g))
             pre = IK.pre_pose(eef)
             res = s.ikc.exact([pre, eef], st_of[a0], a0, **exact_kw)
             g_rec, eef_in_object, pick, arm_c = g, eef_of(g), None, a0
             if (twins or len(arms_i) > 1) and getattr(g, "name", None):
-                pick = pick_twin(s, st_of[a0], a0, g, eef_in_object, eef, pre, res, exact_kw, support_z=z, where="phase3_target", arms=arms_i, stances=st_of,
+                pick = pick_twin(s, st_of[a0], a0, g, eef_in_object, eef, pre, res, exact_kw, support_z=z_here, where="phase3_target", arms=arms_i, stances=st_of,
                                  twins=twins)
                 g_rec, eef_in_object, eef, pre, res, arm_c = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res, pick.arm
                 for o in pick.facts["orient"]["options"]:
@@ -2809,6 +2830,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                 rec.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts})
             if len(offered) > 1 or arm_c != arm:
                 rec.extras["arm_bands"] = {a: band_facts(band_of.get(a)) for a in offered}
+            NB.note_grasp_from(top, fp, rec)
             if st_of[arm_c] is not manip:
                 adopt_arm(manip, st_of[arm_c])
             rec.stance = manip.name
@@ -2885,8 +2907,10 @@ def place_partner(s, rng, t_pose: Pose, t_hull: th.Tensor, p_hull: th.Tensor, p_
                   in_frame_margin: float = IN_FRAME_MARGIN, yaw: Optional[float] = None, n_tries: int = 40) -> Pose:
     """§4.6 step 2: the partner on ``side`` of the target (+1 = robot's left, −1 = right, None = random per try) along the
     edge at an edge-to-edge gap g ~ U(``gap_range``), same depth as the target, random yaw (or ``yaw``), footprint on the
-    top (``margin``), >= ``min_gap`` from the target, and — with ``cam`` — fully in frame. ``Reject("partner_placement")``."""
+    top (``margin``; on neighbouring supports at the height of the top under it), >= ``min_gap`` from the target, and — with ``cam``
+    — fully in frame. ``Reject("partner_placement")``."""
     top = _top(s, top)
+    on_top = z is None
     z = float(top.z) if z is None else float(z)
     t_fp = s.world.footprint(t_hull, t_pose)
     t_lat = (t_fp - stance.base_xy) @ stance.tangent
@@ -2906,6 +2930,8 @@ def place_partner(s, rng, t_pose: Pose, t_hull: th.Tensor, p_hull: th.Tensor, p_
         p_fp = s.world.footprint(p_hull, p_pose)
         if not top.polygon_supported(p_fp, margin=margin):
             continue
+        if on_top:
+            p_pose = NB.rest_on(top, p_pose, p_fp, z)[0]
         if _polygons_overlap(t_fp, p_fp, min_gap):
             continue
         if cam is not None and not in_frame(s, cam, hull_corners_world(p_hull, p_pose), in_frame_margin):
