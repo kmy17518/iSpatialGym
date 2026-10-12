@@ -672,6 +672,8 @@ class BlockDesign(SamplerV2):
             try:
                 return self._sample_with(rng, init, manip, int(k))
             except Reject as e:
+                if e.reason == "second_stance_needed":
+                    raise  # generation.block_single_stance: the attempt ends here (owner 2026-10-12 item 3)
                 errors.append(f"candidate {int(k)}: {e}")
                 log.info("%s: %s", self.gp.alias, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
@@ -960,8 +962,11 @@ class BlockDesign(SamplerV2):
         self._prev_end_q = None  # where the previous block's last tracked leg left the arm (28-D at its stance; the re-pose plan's start)
         for step, bi in enumerate(order):
             flipping = bool(plans[bi]["flips"])
-            cands = self._rank_stances(pool, current, poses[bi], place_goal[bi], flipping)
-            rec, st = self._block_program(rng, cands, names, poses, place_goal, plans, order, step, right, toward, table_yaw, current=current)
+            if step > 0 and bool(self.gen("block_single_stance", False)):
+                rec, st = self._single_stance_block(rng, current, names, poses, place_goal, plans, order, step, right, toward, table_yaw)
+            else:
+                cands = self._rank_stances(pool, current, poses[bi], place_goal[bi], flipping)
+                rec, st = self._block_program(rng, cands, names, poses, place_goal, plans, order, step, right, toward, table_yaw, current=current)
             records.append(rec)
             st2 = rec.pop("_regrasp_stance_obj", None)  # flip-in-place with the re-grasp from another stance
             used.append((st, st2))
@@ -1192,7 +1197,7 @@ class BlockDesign(SamplerV2):
 
         def score(st: Stance) -> Optional[float]:
             bp, bq = st.world_to_base(c_pick), st.world_to_base(c_place)
-            if flipping and (float(bp[1]) > FLIP_CELL_MAX_LATERAL or float(bp[0]) - float(st.stand_off if st.stand_off is not None else 0.35) < float(self.gen("flip_cell_min_edge_depth_m", FLIP_CELL_MIN_EDGE_DEPTH))):
+            if flipping and self._flip_zone_miss(st, c_pick) is not None:
                 return None
             # the slot enters as a soft term only: with the flip-in-place fallback the final place is a plain pitched place
             # that reaches slots near the centre line, so a slot left of the flip zone must not exclude the stance
@@ -1206,6 +1211,39 @@ class BlockDesign(SamplerV2):
         out = [st for _, st in ranked if st is not current]
         out = [current] + out if (score(current) is not None or not out) else out
         return out[: int(self.gen("max_stances_per_block", 9))]
+
+    def _flip_zone_miss(self, st: Stance, c_pick: th.Tensor) -> Optional[str]:
+        """Why a flipping block's cell (centre xy ``c_pick``) lies outside the flip zone of ``st`` - not right of
+        ``FLIP_CELL_MAX_LATERAL`` of its base, or less than ``generation.flip_cell_min_edge_depth_m`` in from the edge - or None."""
+        bp = st.world_to_base(c_pick)
+        if float(bp[1]) > FLIP_CELL_MAX_LATERAL:
+            return f"its flip cell lies at base lateral {float(bp[1]):+.2f} m, outside the flip zone (<= {FLIP_CELL_MAX_LATERAL:+.2f} m)"
+        edge_depth = float(bp[0]) - float(st.stand_off if st.stand_off is not None else 0.35)
+        min_depth = float(self.gen("flip_cell_min_edge_depth_m", FLIP_CELL_MIN_EDGE_DEPTH))
+        if edge_depth < min_depth:
+            return f"its flip cell lies {edge_depth:.2f} m in from the edge, outside the flip zone (>= {min_depth:.2f} m)"
+        return None
+
+    def _single_stance_block(self, rng, current: Stance, names: List[str], poses: Dict[int, TT.Pose], place_goal: Dict[int, TT.Pose],
+                             plans: Dict[int, Dict[str, Any]], order: List[int], step: int, right: th.Tensor, toward: th.Tensor,
+                             table_yaw: float) -> Tuple[Dict[str, Any], Stance]:
+        """``generation.block_single_stance`` (owner 2026-10-12 item 3), blocks after the first: the block is solved from the stance
+        the first block was solved from (``current``) and nowhere else. When its best stance is another one - a flipping block whose
+        cell lies outside that stance's flip zone (``_rank_stances`` would exclude it), or no chain passes from it - the attempt is
+        rejected at once with ``second_stance_needed`` naming the block and why, instead of planning the base move."""
+        bi = order[step]
+        kind = "flip" if plans[bi]["flips"] else "pick"
+        tag = f"block {names[bi]} ({kind}, placement {step + 1})"
+        if plans[bi]["flips"]:
+            why = self._flip_zone_miss(current, self._centre(poses[bi])[0][:2])
+            if why is not None:
+                raise Reject("second_stance_needed", f"{tag}: {why} of the first block's stance (trunk {current.translate:.2f}/{current.tilt:+.2f}, stand-off "
+                                                     f"{float(current.stand_off or 0.0):.2f}); generation.block_single_stance")
+        try:
+            return self._block_program(rng, [current], names, poses, place_goal, plans, order, step, right, toward, table_yaw, current=current)
+        except Reject as e:
+            raise Reject("second_stance_needed", f"{tag}: no chain from the first block's stance (trunk {current.translate:.2f}/{current.tilt:+.2f}, stand-off "
+                                                 f"{float(current.stand_off or 0.0):.2f}): {str(e)[:600]}; generation.block_single_stance")
 
     def _register_stances(self, init: Stance, manip: Stance, used: List[Stance], records: List[Dict[str, Any]], names: List[str], poses: Dict[int, TT.Pose],
                           goal_pose: Dict[int, TT.Pose], order: List[int], right: th.Tensor, toward: th.Tensor) -> List[str]:
@@ -1328,12 +1366,14 @@ class BlockDesign(SamplerV2):
 
         ``generation.repose_after_base_move`` (owner 2026-10-12 item 2): a stance other than ``current`` (where the previous block left
         the robot) is reached by a between-block base move; there the arm re-poses before the block's chain (``_repose_record``) and
-        the block's legs are tracked with the program check's acceptance (``_tracked_from``)."""
+        the block's legs are tracked with the program check's acceptance (``_tracked_from``). ``generation.block_single_stance``
+        (item 3): every block's legs are tracked that way, so a chain the program check would reject fails here, in seconds."""
         bi = order[step]
         reasons: List[str] = []
+        single = bool(self.gen("block_single_stance", False))
         for j, st in enumerate(cands):
             reposed = bool(self.gen("repose_after_base_move", False)) and step > 0 and current is not None and st is not current
-            self._oracle_tracking = reposed
+            self._oracle_tracking = reposed or single
             try:
                 rec = self._block_chain(rng, st, names, poses, goal_pose, plans, order, step, right, toward, table_yaw)
                 if reposed:
@@ -2167,7 +2207,9 @@ class BlockDesign(SamplerV2):
 
         leg2 = try_leg2(manip)
         st_leg2 = manip
-        if leg2 is None:
+        if leg2 is None and bool(self.gen("block_single_stance", False)):
+            diag.append(f"in-place {label1}: the re-grasp from another stance is not tried (generation.block_single_stance)")
+        elif leg2 is None:
             # the stances that already solved plain picks / places of this instance first (the non-flipping blocks' stance
             # reaches the goal grid by construction), then the pool ranked for this pick / place
             proven = [st for st in getattr(self, "_proven_stances", []) if st is not manip]

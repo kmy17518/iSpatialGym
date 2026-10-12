@@ -1731,6 +1731,16 @@ present (grasp → place(intermediate) → grasp → place). Braces are not atte
   the target is that grasp's pre-grasp and collision-free, and takes it as the pre-grasp witness, so the approach, lift,
   reorient, carry, place and retreat are tracked from it. Not re-posed: the first block, a re-grasp leg's travel inside one
   block, the flip-on-the-table prep chain (no recorded pre-grasp configuration: the stance fails).
+- **Single stance** (owner 2026‑10‑12 item 3; `generation.block_single_stance`, bool, default false). On: every block after
+  the first is solved from the stance the first block was solved from and from no other, and a flip-in-place re-grasp only
+  from its leg-1 stance. When a block's best stance is another one, the attempt is rejected at once — no further
+  manipulation candidate, no base move planned — with `second_stance_needed`, naming the block (instance, flip / pick,
+  placement number) and why: its flip cell lies outside that stance's flip zone (base lateral > −0.10 m, or less than
+  `flip_cell_min_edge_depth_m` in from the edge: the stance `_rank_stances` would skip), or no chain passes from that stance
+  (the chain's own reason). Only templates whose four blocks share one stance pass. Every block's tracked legs (the first
+  block's too) are accepted as the program check accepts them (as for a re-posed block above), so a chain the program check
+  would reject — a stall finished in another IK branch — fails at sampling and the attempt ends in seconds. With it, no
+  between-block base move is left for `repose_after_base_move` to act on.
 - **Brace points**: after each placement the oracle pushes the block left (row) and up (column) with the right hand
   while the closed left gripper braces the already-placed blocks (row-left / column-top): the left-arm brace poses at
   the goal grid (pre-contact + contact) are IK-checked from the manipulation stance and recorded.
