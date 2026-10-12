@@ -67,7 +67,9 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     # second base pose (``stances.attach`` + a carried path / holding transition); only when the joint placement has no
     # cell after that is the instance brace-less (``summary.brace: none``), so ``contacts.brace`` is optional here
     "configuration_matching-attachment": _TABLE + ("grasps",),
-    "alignment-world_vertical": _TABLE + ("contacts.push", "contacts.brace"),
+    # world vertical: ``contacts.brace`` is optional (owner 2026-10-11): a target without a low corner (round wall clock) records
+    # the push alone and the program is transition → push → retreat; every other target still records its brace
+    "alignment-world_vertical": _TABLE + ("contacts.push",),
     # axial is push-only (owner decision 2026-09-16 08:10): ``contacts.brace`` is recorded only when the joint two-arm
     # placement exists and is optional here; the oracle's push closure is the stop otherwise
     "alignment-axial": _TABLE + ("contacts.push",),

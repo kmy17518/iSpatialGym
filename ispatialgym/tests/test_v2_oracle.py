@@ -739,6 +739,7 @@ def test_wall_alignment_without_a_brace_is_push_only():
     sc = Sidecar.load(os.path.join(SIDECARS, "alignment-world_vertical.json"))
     with_brace = expand(sc.alias, sc)
     sc.contacts = replace(sc.contacts, brace=None)
+    assert not sc.has_block("contacts.brace") and sc.problems() == []  # the brace is optional in REQUIRED_BLOCKS
     acts = expand(sc.alias, sc)
     assert any(isinstance(a, QA_Brace) for a in with_brace) and not any(isinstance(a, QA_Brace) for a in acts)
     pushes = [a for a in acts if isinstance(a, Push)]

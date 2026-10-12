@@ -264,7 +264,7 @@ PROGRAM_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "configuration_matching-articulation_small_scale": ("stances.init", "stances.manipulation", "articulation"),
     # brace optional only without a joint cell after the second base pose (owner 2026-09-16 17:10 item 2; oracle program_attachment)
     "configuration_matching-attachment": ("stances.init", "stances.manipulation", "transitions", "grasps"),
-    "alignment-world_vertical": ("stances.init", "stances.manipulation", "contacts.push", "contacts.brace"),
+    "alignment-world_vertical": ("stances.init", "stances.manipulation", "contacts.push"),  # brace optional (owner 2026-10-11: round targets push alone)
     "alignment-axial": ("stances.init", "stances.manipulation", "transitions", "contacts.push"),  # brace optional (owner 2026-09-16 08:10; F6 9b03aa4)
     "inter_object_relation_satisfaction-ontop_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
     "inter_object_relation_satisfaction-under_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
