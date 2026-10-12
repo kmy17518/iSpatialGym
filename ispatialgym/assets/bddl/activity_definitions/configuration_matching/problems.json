@@ -901,6 +901,17 @@
    "pick": "configuration_matching-block_design#01",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet_push",
+   "id": 84,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of configuration_matching-5 with close_by_push, owner ~08:50 close_large#03 c2)",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#03",
+   "slot": "representative",
+   "mode": "test"
   }
  ],
  "unregistered": [

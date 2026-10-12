@@ -9569,6 +9569,125 @@
   },
   "constraints": []
  },
+ "configuration_matching-articulation_close_large_scale-bottom_cabinet_push": {
+  "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+  "definition_id": 84,
+  "roles": {
+   "target": {
+    "category": "bottom_cabinet",
+    "sampleable": false,
+    "require": {
+     "handle": true
+    },
+    "joint": {
+     "office_cubicles_right/bottom_cabinet_rvunhj_0": "j_link_2"
+    },
+    "handle_key": {
+     "office_cubicles_right/bottom_cabinet_rvunhj_0": "bottom_cabinet__rvunhj"
+    }
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "shared_office_0"
+    ],
+    "bindings": {
+     "target": [
+      "bottom_cabinet_rvunhj_0"
+     ],
+     "floor": {
+      "room": "shared_office_0"
+     }
+    },
+    "whitelist": {},
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.5,
+    0.95
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.015,
+    0.08
+   ],
+   "handle_row": "j_link_2#C",
+   "pinch_width_min_m": 0.006,
+   "_handle_row_note": "owner 2026-10-12 02:20: the door's bar j_link_2#C (8 mm thick, 0.28 m long, centre h 0.73 m, approached straight from the front) instead of the edge pinch j_link_2#F (39 mm, old sheet #01) - open from the shut door found no reachable edge stance in 576 attempts (the gripper would point sideways along the face with a finger behind the leaf) and close followed the edge only 11-63 % of the way shut; pinch_width_min_m 0.006 admits the 8 mm bar (the 15 mm default floor skipped it and the knobs; pinch_width_range_m is the small-scale sampler's key)",
+   "_close_by_push_note": "owner 2026-10-12 ~08:50: close_large#03's c2 - the leaf pushed shut room-door style (close_by_push: the hybrid follow is only the sampling gate, the room-door close policy; the program travels init -> manipulation and runs push_close with no grasp); c1 = configuration_matching-articulation_close_large_scale-bottom_cabinet (the hybrid follow with the handle)",
+   "follow_mode_override": "hybrid",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 120,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 5,
+    "lookahead_steps": 8,
+    "budget_s": 900.0
+   },
+   "close_by_push": true,
+   "direction": "close",
+   "prompt0": {
+    "beta_max_deg": 20.0,
+    "d_min_m": 0.5,
+    "d_max_m": 2.5,
+    "d_scan_max_m": 1.1
+   },
+   "lateral_range_m": {
+    "right": [
+     -0.1,
+     0.6
+    ],
+    "left": [
+     -0.6,
+     0.1
+    ]
+   },
+   "face_patch_half_width_m": 0.1,
+   "pinch_axis_vertical_threshold": 0.7,
+   "path_max_m": 3.0
+  },
+  "constraints": []
+ },
  "configuration_matching-articulation_close_large_scale-dishwasher": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
   "definition_id": 9,
