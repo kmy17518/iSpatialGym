@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import replace
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from ispatialgym.oracle.actions import (
     RETREAT_DIST,
@@ -437,6 +437,39 @@ def door_leaf_geometry(art) -> Dict[str, object]:
             "approach_closed": tuple(float(v) for v in closed.approach), "handle_z": float(closed.contact[2])}
 
 
+#: keys of an ``articulation.push_finish`` record the program and ``push_close`` read (sampler ``articulation_large.plan_push_finish``)
+PUSH_FINISH_KEYS = ("arm", "base_pose2d", "k_release", "q_from", "q_to", "hinge_world", "swing_sign", "contact", "normal")
+
+
+def push_finish_chunks(art) -> List[Dict[str, Any]]:
+    """The planned ``push_close`` chunks of a cabinet door's push finish (owner 2026-10-12 ~04:20; ``articulation.push_finish``,
+    one record): the hand follows the handle to ``articulation.follow_to`` (= the record's ``k_release``), lets go, and the closed
+    hand pushes the leaf from ``q_from`` = q(follow_to) to ``q_to`` with the recorded contact from the recorded stance."""
+    rec = (art.extra or {}).get("push_finish")
+    w = "articulation.push_finish"
+    if not isinstance(rec, dict):
+        raise SidecarError(f"{w}: expected a dict, got {type(rec).__name__}")
+    missing = [k for k in PUSH_FINISH_KEYS if rec.get(k) is None]
+    if missing:
+        raise SidecarError(f"{w}: missing {missing}")
+    if art.joint_type != "revolute":
+        raise SidecarError(f"{w}: a revolute door leaf only, got joint_type {art.joint_type!r}")
+    if rec["arm"] not in ARMS:
+        raise SidecarError(f"{w}.arm: unknown arm {rec['arm']!r}")
+    follow_to = (art.extra or {}).get("follow_to")
+    if follow_to is None or not 0.0 < float(follow_to) < 1.0:
+        raise SidecarError(f"{w}: articulation.follow_to must be recorded in (0, 1) (the release), got {follow_to!r}")
+    if abs(float(follow_to) - float(rec["k_release"])) > 1e-6 or abs(art.q_at(float(follow_to)) - float(rec["q_from"])) > 1e-4:
+        raise SidecarError(f"{w}: the push starts where the hand lets go - k_release {rec['k_release']} / q_from {rec['q_from']} vs follow_to {follow_to}")
+    if float(rec["swing_sign"]) not in (1.0, -1.0):
+        raise SidecarError(f"{w}.swing_sign: +1 or -1, got {rec['swing_sign']!r}")
+    for k, n in (("base_pose2d", 3), ("hinge_world", 3), ("normal", 3)):
+        if len(rec[k]) != n:
+            raise SidecarError(f"{w}.{k}: expected {n} numbers")
+    Pose.from_dict(rec["contact"], f"{w}.contact")
+    return [dict(rec)]
+
+
 def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Action]:
     """init → manipulation stance (transition) → grasp the handle at h(q_init) → move the joint: base_follow along the
     recorded b_k (``follow_mode`` base) or the arm along h(q_k) (``follow_mode`` arm), up to ``passive_from`` or q_goal
@@ -444,7 +477,12 @@ def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Act
 
     A **room door is closed by pushing its outer face** (owner decision B, 2026-09-20 20:19; ``articulation.door_class``
     ``room_door``): init → manipulation stance (path + transition) → ``push_close`` with the working arm — no grasp; the
-    leaf geometry from the recorded handle waypoints (:func:`door_leaf_geometry`)."""
+    leaf geometry from the recorded handle waypoints (:func:`door_leaf_geometry`).
+
+    A **cabinet door whose closing the arm follows only part of the way is pushed the rest of the way shut** (owner
+    2026-10-12 ~04:20; ``articulation.push_finish``, sampler ``generation.push_finish``): grasp → follow up to
+    ``articulation.follow_to`` → release → retreat → ``push_close`` with the planned chunk (:func:`push_finish_chunks`), judged on
+    the instance's joint tolerance."""
     art = sc.articulation
     if art is None:
         raise SidecarError("articulation: required for articulation tasks")
@@ -456,7 +494,13 @@ def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Act
         return _travel(sc, "init", "manipulation") + [push]
     grasp = Grasp(kind="handle", arm=arm, object=art.object, articulation=art)
     follow = BaseFollow(arm=arm, articulation=art, stance=sc.stance("manipulation"), grasp_action=grasp, direction=direction)
-    return _travel(sc, "init", "manipulation") + [grasp, follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]
+    actions = _travel(sc, "init", "manipulation") + [grasp, follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]
+    if direction == "close" and (art.extra or {}).get("push_finish") is not None:
+        chunks = push_finish_chunks(art)
+        follow_to = float((art.extra or {})["follow_to"])
+        actions.append(PushClose(arm=str(chunks[0]["arm"]), object=art.object, joint=art.joint, q_from=art.q_at(follow_to), q_lower=min(art.q_init, art.q_goal),
+                                 tol_span_rad=abs(art.q_goal - art.q_init), plan=chunks, drag_m=0.0, **door_leaf_geometry(art)))
+    return actions
 
 
 def _handle_arm(sc: Sidecar, brace) -> str:

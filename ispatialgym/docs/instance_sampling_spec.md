@@ -1089,6 +1089,46 @@ the office cabinet door `bottom_cabinet_rvunhj_0` / `j_link_2` (open / close #03
 `j_link_2#C` (0.28 m long, centre 0.73 m, approached from the front) with `pinch_width_min_m` 0.006 — its 39 mm edge
 pinch `#F` had no reachable stance from the shut door and the arm followed it only 11–63 % of a closing.
 
+**Close: a cabinet door's push finish (owner 2026‑10‑12 ~04:20).** Optional `generation.push_finish` (`true`, or a dict
+overriding the options below; absent = off, so room doors and every other alias are unchanged) serves the closing of a
+revolute `cabinet` door on a vertical hinge followed by the arm (A4). Without it a stance whose downward reach sweep
+(10° grid from q_init, see above) stops above the lower limit is rejected (`handle_unreachable`, "the rest needs a push
+on the leaf"); with it the hand holds the handle as far as the arm reaches, lets go, retreats, and the closed hand of the
+same arm pushes the leaf's outer face the rest of the way shut from the same manipulation stance:
+- **Release** k_rel = the fraction of the closing the sweep covered, floored to 1e‑4 (q_rel = q(k_rel) never lies past the
+  verified reach); k_rel = 0 (no handle progress) rejects. k_rel joins the waypoint fractions; the required handle
+  waypoints are those ≤ k_rel; `handle_reach` past it is recorded false without being solved.
+- **Contacts** on the closed leaf (hinge point and swing sign from the joint record, the outer face 12 mm behind a bar /
+  knob / reviewer contact — the handle convention —, the leaf box's front for an edge pinch): `insets_m` (0.15, 0.10,
+  0.22) from the free edge × `height_offsets_m` (−0.05, +0.05, −0.15) from the drawn handle grasp × `tilts_deg` (0, 20,
+  35: the approach turned from the face normal toward the free edge, i.e. toward the hinge-side stance; the fist still
+  moves along the arc) × `closings` (pads along the leaf — the bar pinch's wrist roll —, vertical), in that order; a
+  point closer than `min_radius_m` 0.10 to the hinge line, within `edge_margin_m` 0.05 of the leaf's top / bottom or
+  `handle_clear_m` 0.06 of the handle segment is left out. Fingertips on the face (`fingertip_eef`), pre-contact
+  `pre_m` 0.10 back along the approach.
+- **Checks**: one batched IK screen of every candidate at q_rel and at the band edge q_lower + `band_fraction` (0.5) × the
+  instance's §8 tolerance — it only orders them, survivors first —, then per candidate, at most `max_checks` (8): exact IK
+  of [pre-contact, contact] with the leaf posed at q_rel (the pre-contact in the full world, the approach and the
+  contact with the target removed, closed pads), then the arc about the hinge from q_rel to q_lower — else to the band
+  edge — at ≤ `arc_step_deg` (5°) spacing, tracked from the contact configuration by differential IK as the oracle's
+  `arm_along` tracks it (target removed: the fist presses the leaf). The first candidate that passes is the plan; none
+  rejects the stance (`push_unreachable`, the handle's fraction in the message).
+- **Record**: `articulation.follow_to` = k_rel and `articulation.push_finish` = `arm`, `stance` (`manipulation`),
+  `base_pose2d`, `k_release`, `q_from` (= q_rel), `q_to` (q_lower, or the band edge), `q_lower`, `handle_fraction`,
+  `push_fraction`, `reaches_goal`, `tolerance_rad`, `band_rad`, `hinge_world`, `swing_sign` (q turns the leaf about +z
+  by s·(q − q_closed)), `q_closed`, `contact` / `pre` (world eef poses at q_rel), `pre_m`, `approach`, `normal`, `arc_q`,
+  the candidate (`radius_m`, `inset_m`, `height_m`, `height_offset_m`, `tilt_deg`, `closing`), the leaf (`leaf_width_m`,
+  `face_offset_m`, `leaf_z`, `z_ref`), the IK witnesses `arm_q_pre` / `arm_q_contact`, `object_pose` and the screen counts;
+  the instance summary carries the same record.
+- **Program** (oracle F6 `program_articulation_large`): transition → grasp → `base_follow` up to q(follow_to) → release +
+  retreat → `push_close` with the planned chunk: the recorded contact turned with the leaf to its measured angle (and with
+  the object, if it moved), the pre-contact planned to the recorded arm witness with the cabinet present (then cuRobo's
+  branch, then the cabinet ignored), the guarded approach along the planned approach, one arc about the hinge to `q_to`
+  stopped once the leaf is closed or the trunk is pressed (unloaded), the fist back along its approach; no base drag; the
+  chunk repeated at most twice while it still gains; the base drives back to the planned stance only when it stands more
+  than 5 cm / 0.1 rad off it. The push is judged on the instance's tolerance; the evaluator's goal (the joint at q_lower
+  within the §8 tolerance) is unchanged. First use: close_large#03 (`bottom_cabinet_rvunhj_0` / `j_link_2`).
+
 ### 5.4 Prompt 2 — articulation, small-scale (open / close)
 
 Tabletop Phases 1–2 for stance and view (support = the fixed `support`, or the floor for objects taller than 0.6 m);

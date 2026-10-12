@@ -30,7 +30,7 @@ import torch as th
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
-from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow, Place, Reorient, Brace as QA_Brace
+from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, PushClose, BaseFollow, Place, Reorient, Brace as QA_Brace
 from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, RootWatch, SimState, apply_goal_override
 from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError, as_world_pose
 from ispatialgym.oracle.programs import expand
@@ -653,6 +653,208 @@ def test_push_close_leaf_frame_and_postcondition():
     assert EX.check_postcondition(push, St(0.9 * tol), {}, {}) is None
     assert EX.check_postcondition(push, St(0.5 * push.q_from), {}, {}) == "tolerance"
     assert EX.check_postcondition(push, St(0.95 * push.q_from), {}, {}) == "no_motion"
+
+
+# the push finish of the office cabinet door (close_large#03, rvunhj_0 / j_link_2): released at 0.148 rad, swing sign -1 (-z hinge),
+# the fist 0.248 m from the hinge line on the outer face, 5 cm below the bar
+_FINISH_HINGE = th.tensor([8.6734, -6.7254, 0.4969])
+_FINISH_Q = 0.148
+
+
+def _finish_plan(q_from: float = _FINISH_Q, q_to: float = 0.0) -> Dict[str, Any]:
+    turn = C.quat_from_axis_angle([0.0, 0.0, 1.0], -q_from)
+    n, d = C.quat_rotate(turn, th.tensor([1.0, 0.0, 0.0])), C.quat_rotate(turn, th.tensor([0.0, 1.0, 0.0]))
+    point = th.tensor([8.6734, -6.7254, 0.6811]) + 0.248 * d + 0.0086 * n
+    contact = C.fingertip_eef(point, -n, d, clearance=0.0)
+    return {"arm": "right", "stance": "manipulation", "base_pose2d": [9.265, -7.09, 2.12], "k_release": 0.855, "q_from": q_from, "q_to": q_to, "q_lower": 0.0,
+            "hinge_world": _FINISH_HINGE.tolist(), "swing_sign": -1.0, "contact": {"position": contact[0].tolist(), "orientation": contact[1].tolist()},
+            "normal": n.tolist(), "pre_m": 0.10, "arm_q_pre": [0.3] * 7, "object_pose": {"position": [8.4084, -6.3264, 0.7969], "orientation": [0.0, 0.0, 0.0, 1.0]}}
+
+
+def _finish_push(**kw):
+    return PushClose(arm="right", object="bottom_cabinet.n.01_1", joint="j_link_2", hinge_xy=(8.6734, -6.7254), handle_xy_closed=(8.6936, -6.3612),
+                     approach_closed=(-1.0, 0.0, 0.0), handle_radius_m=0.364, handle_z=0.7311, q_from=_FINISH_Q, q_lower=0.0, tol_span_rad=1.021,
+                     plan=[_finish_plan()], drag_m=0.0, **kw)
+
+
+def test_planned_push_turns_the_recorded_contact_with_the_leaf():
+    """A planned push-close chunk (a cabinet door's push finish): at the angle it was planned at, the recorded contact, its pre-contact
+    10 cm back along the approach and the arc to the landing (+angle about +z for swing sign -1); with the leaf 0.05 rad further
+    shut the same point of the leaf (turned about the hinge line, the approach with it) and 0.05 rad less to push; nothing left at or
+    past the landing; a moved object carries the record with it."""
+    plan = _finish_plan()
+    g = EX.planned_push(plan, _FINISH_Q)
+    assert th.allclose(g["contact"][0], th.tensor(plan["contact"]["position"]), atol=1e-6) and th.allclose(g["contact"][1], th.tensor(plan["contact"]["orientation"]), atol=1e-6)
+    assert th.allclose(g["pre"][0], g["contact"][0] - 0.10 * g["approach"], atol=1e-6) and th.allclose(g["approach"], -g["normal"], atol=1e-5)
+    assert g["remaining"] == pytest.approx(_FINISH_Q) and g["delta"] == pytest.approx(_FINISH_Q) and float(g["centre"][2]) == pytest.approx(float(g["contact"][0][2]))
+    g2 = EX.planned_push(plan, _FINISH_Q - 0.05)
+    r1, r2 = (g["contact"][0] - _FINISH_HINGE)[:2], (g2["contact"][0] - _FINISH_HINGE)[:2]
+    assert float(r2.norm()) == pytest.approx(float(r1.norm()), abs=1e-5)
+    assert C.wrap_angle(math.atan2(float(r2[1]), float(r2[0])) - math.atan2(float(r1[1]), float(r1[0]))) == pytest.approx(0.05, abs=1e-5)
+    assert C.quat_angle(g2["contact"][1], g["contact"][1]) == pytest.approx(0.05, abs=1e-4) and g2["remaining"] == pytest.approx(_FINISH_Q - 0.05)
+    assert th.allclose(g2["normal"], th.tensor([math.cos(_FINISH_Q - 0.05), -math.sin(_FINISH_Q - 0.05), 0.0]), atol=1e-5)
+    assert EX.planned_push(plan, -0.01)["remaining"] == 0.0 and EX.planned_push(plan, -0.01)["delta"] == 0.0
+    moved = (th.tensor([8.5084, -6.3264, 0.7969]), C.IDENTITY_QUAT.clone())
+    g3 = EX.planned_push(plan, _FINISH_Q, live=moved)
+    assert th.allclose(g3["contact"][0], g["contact"][0] + th.tensor([0.1, 0.0, 0.0]), atol=1e-5) and th.allclose(g3["centre"], g["centre"] + th.tensor([0.1, 0.0, 0.0]), atol=1e-5)
+
+
+def test_push_finish_postcondition_uses_the_instance_tolerance():
+    """A push finish is judged on the instance's span (``tol_span_rad``: max(0.05, 0.10 x 1.021 rad) = 0.102 rad), not on its own
+    0.148 rad push; ``no_motion`` stays relative to the push. Without ``tol_span_rad`` (a room door) the push's own span counts."""
+    class St:
+        def __init__(self, q):
+            self.q = q
+
+        def joint_position(self, name, joint):
+            return self.q
+
+    push = _finish_push()
+    assert EX.check_postcondition(push, St(0.09), {}, {}) is None
+    assert EX.check_postcondition(push, St(0.12), {}, {}) == "tolerance"
+    assert EX.check_postcondition(push, St(0.14), {}, {}) == "no_motion"
+    assert EX.check_postcondition(replace(push, tol_span_rad=None), St(0.09), {}, {}) == "tolerance"
+    lang = SimpleNamespace(language=SimpleNamespace(phrase=lambda o: "the cabinet"))
+    assert push.annotate(lang)[0] == "push the cabinet the rest of the way shut with the closed right hand on its outer face"
+    assert push.targets(None, None)["leaf"]["planned_chunks"] == 1
+
+
+class _FinishMotions:
+    """Stub motions of a planned push-close on a leaf about ``_FINISH_HINGE``: the guarded approach touches the face after ``gap``
+    steps (each further step shuts the leaf 0.01 rad), every arc waypoint shuts it by ``gain`` x the waypoint's turn about the hinge
+    (a hard stop at 0), the back-off leaves it."""
+
+    def __init__(self, q, gap=4, gain=1.0, base=(9.265, -7.09, 2.12)):
+        self.q, self.gap, self.gain, self.base = q, gap, gain, base
+        self.calls: List[Tuple] = []
+        self.arc_turns: List[float] = []
+        self.steps = 0
+        self.backend = SimpleNamespace(update_world=lambda **kw: None, q_full=lambda: th.zeros(28))
+        self.robot = SimpleNamespace(arm_control_idx={"right": th.arange(14, 21), "left": th.arange(7, 14)}, get_joint_positions=lambda: th.zeros(28))
+        self.state = SimpleNamespace(trunk_error=lambda: 0.0, arm_target={})
+        self.cfg = SimpleNamespace(diff_ik_soft_pos_tol_free=0.02)
+        self.eef = (th.zeros(3), C.IDENTITY_QUAT.clone())
+
+    def base_pose2d(self):
+        return self.base
+
+    def eef_pose(self, arm):
+        return self.eef
+
+    def _deflection(self, arm):
+        return None
+
+    def gripper(self, arm, close, **kw):
+        self.calls.append(("gripper", close))
+        yield th.zeros(23)
+
+    def arm_to(self, arm, pose=None, q=None, ignore_objects=(), q_hint=None, accept_other_branch=False, **kw):
+        self.calls.append(("arm_to", "witness" if q_hint is not None else "pose", len(ignore_objects)))
+        self.eef = as_world_pose(pose)
+        yield th.zeros(23)
+
+    def arm_along(self, arm, waypoints, loaded=False, partial=False, soft_pos_tol=None, **kw):
+        wps = [as_world_pose(w) for w in waypoints]
+        if partial:  # the arc about the hinge (closed by the caller once the leaf is shut)
+            self.arc_turns.append(0.0)
+            for w in wps:
+                a0 = math.atan2(float(self.eef[0][1] - _FINISH_HINGE[1]), float(self.eef[0][0] - _FINISH_HINGE[0]))
+                a1 = math.atan2(float(w[0][1] - _FINISH_HINGE[1]), float(w[0][0] - _FINISH_HINGE[0]))
+                self.arc_turns[-1] += C.wrap_angle(a1 - a0)
+                self.q[0] = max(0.0, self.q[0] - self.gain * abs(C.wrap_angle(a1 - a0)))
+                self.eef = w
+                yield th.zeros(23)
+            return
+        if soft_pos_tol is not None:  # the back-off along the fist's approach
+            self.calls.append(("back_off",))
+            self.steps = 0
+            self.eef = wps[-1]
+            yield th.zeros(23)
+            return
+        self.steps += 1  # a guarded-approach step
+        self.calls.append(("approach", round(float(th.linalg.norm(wps[-1][0] - self.eef[0])), 3)))
+        self.eef = wps[-1]
+        if self.steps > self.gap:
+            self.q[0] = max(0.0, self.q[0] - 0.01)
+        yield th.zeros(23)
+
+    def hold(self, steps=1):
+        for _ in range(int(steps)):
+            yield th.zeros(23)
+
+    def settle(self, max_steps=None, vel_tol=None):
+        yield th.zeros(23)
+
+    def unload(self, arms, steps=None, trunk=True):
+        if False:
+            yield th.zeros(23)
+        return {a: 0.0 for a in arms}
+
+
+def _run_finish(push, motions, q):
+    state = SimpleNamespace(joint_position=lambda o, j: float(q[0]), object=lambda n: SimpleNamespace(name="bottom_cabinet_rvunhj_0"),
+                            object_pose=lambda n: (th.tensor([8.4084, -6.3264, 0.7969]), C.IDENTITY_QUAT.clone()))
+    ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(), "hooks": {}}
+    list(EX.execute_push_close(push, motions, state, push.targets(None, None), ctx))
+    return ctx["push_close"], EX.check_postcondition(push, state, {}, ctx)
+
+
+class _OffStanceMotions(_FinishMotions):
+    """The base stands 13.5 cm off the planned stance: ``track_path`` drives it there; the arms-ready plan is recorded."""
+
+    def __init__(self, q):
+        super().__init__(q, base=(9.40, -7.09, 2.12))
+        self.driven: List[List[Tuple[float, ...]]] = []
+
+    def track_path(self, waypoints, **kw):
+        self.driven.append([tuple(w) for w in waypoints])
+        self.base = tuple(waypoints[-1])
+        yield th.zeros(23)
+
+    def arm_to(self, arm, pose=None, q=None, **kw):
+        if q is not None:
+            self.calls.append(("arm_to", "ready", 0))
+            yield th.zeros(23)
+            return
+        yield from super().arm_to(arm, pose=pose, **kw)
+
+
+def test_planned_push_close_replays_the_sampler_chunk(monkeypatch):
+    """``push_close`` with a plan (a cabinet door's push finish) from the planned stance: no drive (the base stands on it), the closed
+    fist planned to the pre-contact by the recorded arm witness with the cabinet present, the guarded approach along the planned
+    approach, one arc about the hinge that shuts the leaf (counter-clockwise for swing sign -1) and stops once it is closed, the fist
+    back along its approach; a leaf that lags the fist gets the chunk repeated (at most ``plan_repeats`` times, the witness only while
+    the leaf is near the planned angle) and is judged on the instance's tolerance; a base off the planned stance drives back first."""
+    q = [_FINISH_Q]
+    motions = _FinishMotions(q)
+    rep, verdict = _run_finish(_finish_push(), motions, q)
+    assert verdict is None and rep["closed"] and rep["planned"] == 1 and len(rep["chunks"]) == 1 and q[0] <= EX.CONFIG.push_close_stop_rad
+    chunk = rep["chunks"][0]
+    assert chunk["pre"] == "the recorded witness" and "stance" not in chunk and chunk["arc"].startswith("stopped: leaf closed")
+    assert motions.calls[0] == ("gripper", True) and motions.calls[1] == ("arm_to", "witness", 0)
+    assert [c for c in motions.calls if c[0] == "approach"] == [("approach", 0.02)] * 5 and motions.calls[-1] == ("back_off",)
+    assert len(motions.arc_turns) == 1 and motions.arc_turns[0] == pytest.approx(_FINISH_Q - 0.01, abs=1e-4)  # +: counter-clockwise
+    # the leaf follows the fist only partly: the chunk is repeated while it gains, at most twice, and the result is judged on 0.102 rad
+    q = [_FINISH_Q]
+    motions = _FinishMotions(q, gain=0.2)
+    rep, verdict = _run_finish(_finish_push(), motions, q)
+    assert [c["repeat"] for c in rep["chunks"]] == [False, True, True] and not rep["closed"] and verdict is None and 0.05 < q[0] < 0.07
+    assert all(a > b for a, b in zip([c["q_before_deg"] for c in rep["chunks"]], [c["q_settled_deg"] for c in rep["chunks"]]))
+    assert [c[1] for c in motions.calls if c[0] == "arm_to"] == ["witness", "witness", "pose"]  # 0.04 rad off the planned angle, then 0.07
+    # a plan that lands on the band edge (the arc to the limit was not trackable): pushed there once, not again for the last degree
+    q = [_FINISH_Q]
+    motions = _FinishMotions(q)
+    rep, verdict = _run_finish(replace(_finish_push(), plan=[_finish_plan(q_to=0.051)]), motions, q)
+    assert len(rep["chunks"]) == 2 and rep["chunks"][0]["arc"] == "complete" and rep["chunks"][1]["result"].startswith("the leaf is at the planned landing")
+    assert q[0] == pytest.approx(0.051, abs=2e-3) and verdict is None and len(motions.arc_turns) == 1 and not rep["closed"]
+    # the base stands off the planned stance: both arms ready, a drive back to it, then the chunk as planned
+    monkeypatch.setattr(EX, "posture_q", lambda robot, name, arm: th.zeros(7))
+    q = [_FINISH_Q]
+    motions = _OffStanceMotions(q)
+    rep, verdict = _run_finish(_finish_push(), motions, q)
+    assert len(motions.driven) == 1 and motions.driven[0] == [pytest.approx((9.265, -7.09, 2.12), abs=1e-5)]
+    assert rep["chunks"][0]["stance"] == [9.265, -7.09, 2.12] and verdict is None
+    assert motions.calls[:2] == [("arm_to", "ready", 0), ("gripper", True)]
 
 
 def test_postcondition_push_no_motion():

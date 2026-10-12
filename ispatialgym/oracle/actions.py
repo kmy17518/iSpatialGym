@@ -1222,6 +1222,12 @@ class PushClose(Action):
 
     targets: ``{"leaf": {"hinge_xy", "handle_radius_m", "q_from", "q_to"}}`` — geometry only: the push stances and
     contacts depend on where the leaf is at the start of each chunk, so none of them is an eef pose of the record.
+
+    ``plan`` (owner 2026-10-12 ~04:20, a cabinet door's push finish; ``programs.push_finish_chunks``): the sampler's chunks
+    (``articulation.push_finish``: stance base pose, fist contact at ``q_from``, hinge, swing sign, landing ``q_to``) replace the
+    stance search - the recorded contact turns with the leaf to its measured angle, the arc runs to ``q_to``, no base drag; the
+    last chunk is repeated ``plan_repeats`` times while it still gains. ``tol_span_rad``: the span the postcondition's §8
+    tolerance is taken from (None: ``|q_from − q_lower|``; the finish: the instance's ``|q_goal − q_init|``).
     """
 
     name: str = "push_close"
@@ -1246,6 +1252,9 @@ class PushClose(Action):
     max_chunks: int = 10
     drag_m: float = 0.20  # base drive along −m with the fist on the face when the arm's arc gains < 2°
     push_arms: Tuple[str, ...] = ("right", "left")
+    plan: Optional[List[Dict[str, Any]]] = None
+    plan_repeats: int = 2
+    tol_span_rad: Optional[float] = None
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
     TARGET_KEYS = ("leaf",)
 
@@ -1255,11 +1264,16 @@ class PushClose(Action):
         super().__post_init__()
 
     def targets(self, sidecar, state):
-        return {"leaf": {"hinge_xy": [float(v) for v in self.hinge_xy], "handle_radius_m": float(self.handle_radius_m), "q_from": float(self.q_from),
-                         "q_to": float(self.q_lower)}}
+        leaf = {"hinge_xy": [float(v) for v in self.hinge_xy], "handle_radius_m": float(self.handle_radius_m), "q_from": float(self.q_from), "q_to": float(self.q_lower)}
+        if self.plan:
+            leaf["planned_chunks"] = len(self.plan)
+        return {"leaf": leaf}
 
     def annotate(self, sidecar):
         obj = sidecar.language.phrase(self.object)
+        if self.plan:
+            fine = f"push {obj} the rest of the way shut with the closed {_hand(self.arm)} on its outer face"
+            return fine, f"{fine}: joint {self.joint} from {self.q_from:.2f} rad to {self.q_lower:.2f} rad ({_deg(abs(self.q_from - self.q_lower))}), in one arc about the hinge"
         fine = f"close {obj} by pushing its outer face with the closed hand"
         return fine, f"{fine}: joint {self.joint} from {self.q_from:.2f} rad to {self.q_lower:.2f} rad ({_deg(abs(self.q_from - self.q_lower))}), pushed in arcs of {self.chunk_deg:.0f}° about the hinge"
 

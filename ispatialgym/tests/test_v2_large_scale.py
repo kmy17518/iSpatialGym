@@ -422,6 +422,294 @@ def test_load_handle_takes_the_alias_bar_of_the_office_cabinet_door():
     assert AL.pinch_classes(h["pinch_axis"], h["kind"]) == ("fwd_pinch_h",)
 
 
+# the office cabinet door of close_large#03 (rvunhj_0 / j_link_2, office_cubicles_right; B4 record, instance frame): the leaf box,
+# the 8 mm vertical bar j_link_2#C 3.5 cm from the free edge, the hinge on the leaf's outer edge (the record's hinge is unusable)
+_RVUNHJ_POSE = (th.tensor([8.4084, -6.3264, 0.7969]), C.IDENTITY_QUAT.clone())
+_RVUNHJ_JOINT = {"type": "RevoluteJoint", "axis_dir_obj": [0.0, 0.0, -1.0], "hinge_point_obj": [0.265, -0.399, -0.3], "outward_normal": [1.0, 0.0, 0.0],
+                 "link_bbox_min": [0.259, -0.4039, -0.7954], "link_bbox_max": [0.2976, -0.0011, 0.2043], "lower": 0.0, "upper": 1.5708, "closed_q": 0.0}
+_RVUNHJ_BAR = {"kind": "bar", "contact": [0.2856, -0.0348, -0.0658], "pinch_axis": [0.0, -1.0, 0.0], "approach_dir": [-1.0, 0.0, 0.0], "width": 0.008, "length": 0.2765}
+
+
+def test_push_finish_switch_and_release_fractions():
+    """Owner 2026-10-12 ~04:20 (close_large#03): ``generation.push_finish`` turns the push finish on (off when absent), for the closing
+    of a revolute cabinet door on a vertical hinge that the arm follows; the hand lets go at the release fraction - floored so it never
+    lies past the reach the sweep verified -, which joins the recorded waypoints, and the handle is required up to it only."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    assert AL.push_finish_config(None) is None and AL.push_finish_config(False) is None and AL.push_finish_config({"enabled": False}) is None
+    assert AL.push_finish_config(True) == AL.PUSH_FINISH_DEFAULTS
+    cfg = AL.push_finish_config({"insets_m": [0.12], "max_checks": 3, "_note": "why"})
+    assert cfg["insets_m"] == [0.12] and cfg["max_checks"] == 3 and cfg["tilts_deg"] == AL.PUSH_FINISH_DEFAULTS["tilts_deg"] and "_note" not in cfg
+    for bad in ({"inset_m": 0.1}, {"closings": ["fist"]}, "yes", 1):
+        with pytest.raises(Reject) as e:
+            AL.push_finish_config(bad)
+        assert e.value.reason == "spec"
+    assert AL.push_finish_applies("close", "RevoluteJoint", "cabinet", "arm", True)
+    for args in (("open", "RevoluteJoint", "cabinet", "arm", True), ("close", "RevoluteJoint", "room_door", "hybrid", True),
+                 ("close", "PrismaticJoint", "drawer", "base", False), ("close", "RevoluteJoint", "cabinet", "hybrid", True),
+                 ("close", "RevoluteJoint", "cabinet", "arm", False)):  # the dishwasher's horizontal hinge
+        assert not AL.push_finish_applies(*args)
+    # the cabinet's best stance (artlarge03_bar c1_k0) followed the handle from 1.021 rad down to 0.148: released at 85.5 %
+    k = AL.release_fraction(1.021, 0.148, 0.0)
+    assert k == pytest.approx(0.855) and 1.021 + k * (0.0 - 1.021) >= 0.148 and (0.148 - 1.021) / (0.0 - 1.021) - k < 1e-4
+    assert AL.release_fraction(1.021, 1.021, 0.0) == 0.0 and AL.release_fraction(1.021, 0.0, 0.0) == 1.0 and AL.release_fraction(0.5, 0.25, 0.0) == 0.5
+    fr = AL.finish_fractions(AL.WAYPOINT_FRACTIONS, k)
+    assert fr == [0.25, 0.5, 0.75, pytest.approx(0.855), 1.0] and AL.fraction_key(fr[3]) == "0.855"
+    assert AL.finish_fractions(AL.WAYPOINT_FRACTIONS, 0.75) == [0.25, 0.5, 0.75, 1.0]
+    assert AL.finish_required(AL.required_fractions(None, fr), k) == [0.25, 0.5, 0.75, pytest.approx(0.855)]
+    assert AL.finish_required(AL.required_fractions(0.5, fr), k) == [0.25, 0.5]  # a passive swing-on before the release ends the hand's part there
+    assert AL.push_reaches_goal(0.0, 0.0, 0.05) and AL.push_reaches_goal(0.05, 0.0, 0.05) and not AL.push_reaches_goal(0.06, 0.0, 0.05)
+    assert AL.arc_values(0.148, 0.0, math.radians(5.0)) == [pytest.approx(0.074), 0.0]
+    arc = AL.arc_values(0.8, 0.0, math.radians(5.0))
+    assert len(arc) == 10 and arc[-1] == 0.0 and all(b < a for a, b in zip([0.8] + arc, arc))
+
+
+def test_push_finish_contacts_on_the_office_cabinet_leaf():
+    """The fist contacts on the office cabinet door: the closed leaf from the joint record (hinge on the outer edge, -z axis = swing
+    sign -1, the outer face 12 mm behind the bar contact), the candidates in their order (the room door's 15 cm inset and 5 cm drop
+    first), none on the bar or outside the leaf; a candidate's pose turns with the leaf about the hinge line, the fingertips on the
+    face, the approach into it (tilted toward the free edge when asked), the pads along the leaf or vertical."""
+    leaf = AL.closed_leaf(_RVUNHJ_POSE, _RVUNHJ_JOINT, _RVUNHJ_BAR)
+    hinge_y = -6.3264 - 0.399
+    assert leaf.s == -1.0 and th.allclose(leaf.n0, th.tensor([1.0, 0.0, 0.0])) and th.allclose(leaf.d0, th.tensor([0.0, 1.0, 0.0]))
+    assert leaf.width == pytest.approx(-0.0011 + 0.399, abs=1e-4) and leaf.face == pytest.approx(0.2856 - 0.265 - 0.012, abs=1e-4)
+    assert (leaf.z_lo, leaf.z_hi) == (pytest.approx(0.7969 - 0.7954, abs=1e-4), pytest.approx(0.7969 + 0.2043, abs=1e-4))
+    (r_a, z_a), (r_b, z_b) = leaf.coords(leaf.handle_a), leaf.coords(leaf.handle_b)
+    assert r_a == pytest.approx(0.3642, abs=1e-4) and r_b == pytest.approx(r_a) and sorted([z_a, z_b]) == [pytest.approx(0.7311 - 0.13825, abs=1e-4), pytest.approx(0.7311 + 0.13825, abs=1e-4)]
+    cfg = AL.push_finish_config(True)
+    cands = AL.push_finish_candidates(leaf, 0.7311, cfg)
+    assert len(cands) == 3 * 3 * 3 * 2
+    assert cands[0] == {"radius_m": pytest.approx(0.2479, abs=1e-4), "inset_m": 0.15, "z": pytest.approx(0.6811, abs=1e-4), "dz": -0.05, "tilt_deg": 0.0, "closing": "leaf"}
+    assert [(c["tilt_deg"], c["closing"]) for c in cands[:6]] == [(0.0, "leaf"), (0.0, "vertical"), (20.0, "leaf"), (20.0, "vertical"), (35.0, "leaf"), (35.0, "vertical")]
+    # a contact on the bar (3 cm from the free edge, within its height span) or above the leaf is left out; so is one at the leaf's bottom
+    assert AL.push_finish_candidates(leaf, 0.7311, dict(cfg, insets_m=(0.03,), height_offsets_m=(0.0, 0.40))) == []
+    low = AL.push_finish_candidates(leaf, 0.05, dict(cfg, insets_m=(0.15,), height_offsets_m=(0.0, 0.02, 0.10), tilts_deg=(0.0,), closings=("leaf",)))
+    assert [c["z"] for c in low] == [pytest.approx(0.07), pytest.approx(0.15)]
+    # closed: the fingertips on the outer face at the candidate's point, the approach straight into it, the pads along the leaf
+    c = cands[0]
+    pose, a, n = AL.push_contact_pose(leaf, c, 0.0)
+    tip = C.fingertip(pose)
+    assert th.allclose(tip, th.tensor([8.4084 + 0.265 + leaf.face, hinge_y + c["radius_m"], c["z"]]), atol=1e-4)
+    assert th.allclose(a, th.tensor([-1.0, 0.0, 0.0]), atol=1e-6) and th.allclose(C.approach_axis(pose[1]), a, atol=1e-5) and th.allclose(n, leaf.n0, atol=1e-6)
+    assert abs(float(C.closing_axis(pose[1])[1])) == pytest.approx(1.0, abs=1e-5)
+    # open 0.3 rad: the same point of the leaf turned about the hinge line by -0.3 rad (swing sign -1) toward the robot (+x)
+    pose3, a3, n3 = AL.push_contact_pose(leaf, c, 0.3)
+    r0, r3 = tip[:2] - leaf.hinge[:2], C.fingertip(pose3)[:2] - leaf.hinge[:2]
+    assert float(r3.norm()) == pytest.approx(float(r0.norm()), abs=1e-5)
+    assert C.wrap_angle(math.atan2(float(r3[1]), float(r3[0])) - math.atan2(float(r0[1]), float(r0[0]))) == pytest.approx(-0.3, abs=1e-5)
+    assert th.allclose(n3, th.tensor([math.cos(0.3), -math.sin(0.3), 0.0]), atol=1e-5) and th.allclose(a3, -n3, atol=1e-5)
+    assert float(C.fingertip(pose3)[0]) > float(tip[0]) + 0.05
+    # tilted 20 deg toward the free edge, vertical pads: the same point of the face
+    pt, at, _ = AL.push_contact_pose(leaf, dict(c, tilt_deg=20.0, closing="vertical"), 0.0)
+    assert math.degrees(math.acos(float(at @ th.tensor([-1.0, 0.0, 0.0])))) == pytest.approx(20.0, abs=1e-3) and float(at[1]) > 0.0
+    assert abs(float(C.closing_axis(pt[1])[2])) == pytest.approx(1.0, abs=1e-5) and th.allclose(C.fingertip(pt), tip, atol=1e-5)
+    # a hinge that is not vertical (a dishwasher's) has no closed leaf for this push
+    with pytest.raises(ValueError, match="not vertical"):
+        AL.closed_leaf(_RVUNHJ_POSE, dict(_RVUNHJ_JOINT, axis_dir_obj=[0.0, 1.0, 0.0]), _RVUNHJ_BAR)
+
+
+def test_close_that_stops_short_plans_a_push_finish_only_when_asked(monkeypatch):
+    """The close branch of the A4 reach (``goal_for_stance``): a stance whose arm follows the handle all the way down is accepted as
+    before; stopping short rejects it unless ``generation.push_finish`` is on - then the push is planned from the floored release and
+    returned with the reach facts; a stance without any handle progress, or whose push cannot be planned, is rejected with the
+    handle's fraction in the message."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    monkeypatch.setattr(AL.P0, "exact_contacts", lambda s, manip, contacts, ignore_combined=(): SimpleNamespace(ok=True, q=th.zeros(28), reason=""))
+    calls = []
+
+    class _AL(AL.ArticulationLarge):
+        target = SimpleNamespace(name="bottom_cabinet_rvunhj_0")
+
+        def __init__(self, q_low, cfg, plan):
+            self.direction, self.lower, self.upper, self.joint_name = "close", 0.0, 1.5708, "j_link_2"
+            self.gp = SimpleNamespace(alias="cabinet", gen=lambda k, d=None: d)
+            self.template_meta, self.push_finish_cfg, self._q_low, self._plan = {}, cfg, q_low, plan
+
+        def arm_reach_limit(self, manip, q_from, q_seed, q_to=None, refine=0):
+            return self._q_low, True
+
+        def _stance_key(self, manip):
+            return "d0.60_l+0.05_t0.00_-0.91_p+1"
+
+        def plan_push_finish(self, manip, q_init, q_rel, k_rel):
+            calls.append((q_init, q_rel, k_rel))
+            if isinstance(self._plan, Exception):
+                raise self._plan
+            return dict(self._plan, k_release=k_rel)
+
+    cfg = AL.push_finish_config(True)
+    q_goal, goal_set, info = _AL(0.0, cfg, {}).goal_for_stance(None, None, 1.021, None, None)
+    assert (q_goal, goal_set) == (0.0, [0.0]) and "push_finish" not in info and info["reachable_fraction"] == pytest.approx(1.0) and calls == []
+    with pytest.raises(Reject) as e:  # without the key: the rejection as before
+        _AL(0.148, None, {}).goal_for_stance(None, None, 1.021, None, None)
+    assert e.value.reason == "handle_unreachable" and "only down to 0.148 (fraction 0.86)" in str(e.value) and "not implemented" in str(e.value) and calls == []
+    q_goal, goal_set, info = _AL(0.148, cfg, {"q_to": 0.0}).goal_for_stance(None, None, 1.021, None, None)
+    assert (q_goal, goal_set) == (0.0, [0.0]) and info["push_finish"] == {"q_to": 0.0, "k_release": pytest.approx(0.855)} and info["q_reach"] == 0.148
+    assert calls[-1][0] == 1.021 and calls[-1][1] == pytest.approx(1.021 * (1.0 - 0.855)) and calls[-1][1] >= 0.148
+    with pytest.raises(Reject) as e:
+        _AL(1.021, cfg, {}).goal_for_stance(None, None, 1.021, None, None)
+    assert e.value.reason == "handle_unreachable" and "no handle phase" in str(e.value)
+    with pytest.raises(Reject) as e:
+        _AL(0.497, cfg, Reject("push_unreachable", "36 contact candidates, none passes")).goal_for_stance(None, None, 1.021, None, None)
+    assert e.value.reason == "push_unreachable" and "only down to 0.497 (fraction 0.51)" in str(e.value) and "the push finish fails: 36 contact candidates" in str(e.value)
+
+
+class _PushIK:
+    """Stub IK checker of ``plan_push_finish``: ``screen_ok(i, n)`` per screened pose, ``exact`` / ``continue_chain`` verdicts in call order."""
+
+    _pose_key = staticmethod(lambda pose: tuple(round(float(v), 3) for v in list(pose[0]) + list(pose[1])))
+
+    def __init__(self, screen_ok, exact_ok, chain_ok):
+        self.screen_ok, self.exact_ok, self.chain_ok = screen_ok, list(exact_ok), list(chain_ok)
+        self.solutions, self.exact_calls, self.chain_calls = {}, [], []
+
+    def screen(self, poses, stance, arm, ignore=(), fingers=None):
+        assert fingers == C.FINGER_CLOSED and len(ignore) == 1
+        return th.tensor([self.screen_ok(i, len(poses) // 2) for i in range(len(poses))])
+
+    def exact(self, poses, stance, arm, ignore_for_last=(), cache=True, fingers=None, approached=None, q_seed=None):
+        self.exact_calls.append(poses)
+        ok = self.exact_ok.pop(0) if self.exact_ok else True
+        if ok:
+            self.solutions[(arm, self._pose_key(poses[0]))] = th.full((28,), 0.2)
+        return SimpleNamespace(ok=ok, q=th.full((28,), 0.1) if ok else None, reason="" if ok else "exact IK failed at pose 2 of 2")
+
+    def continue_chain(self, q_start, waypoints, arm, ignore=()):
+        self.chain_calls.append(waypoints)
+        ok = self.chain_ok.pop(0) if self.chain_ok else True
+        return SimpleNamespace(ok=ok, q=q_start if ok else None, reason="" if ok else "approach_untrackable: chain tracking stalled")
+
+
+def _push_sampler(ikc):
+    class _AL(AL.ArticulationLarge):
+        target = SimpleNamespace(name="bottom_cabinet_rvunhj_0")
+
+        def __init__(self):
+            self.direction, self.lower, self.upper, self.joint_name, self.arm = "close", 0.0, 1.5708, "j_link_2", "right"
+            self.gp = SimpleNamespace(alias="cabinet", gen=lambda k, d=None: d)
+            self.jinfo, self.handle, self.pinch_sign, self.bar_offset = dict(_RVUNHJ_JOINT), dict(_RVUNHJ_BAR), 1.0, 0.0
+            self.push_finish_cfg, self.ikc, self.posed = AL.push_finish_config(True), ikc, []
+            self.kit = SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": th.arange(14, 21)}))
+
+        def obj_pose(self):
+            return _RVUNHJ_POSE[0].clone(), _RVUNHJ_POSE[1].clone()
+
+        def pose_joint(self, q):
+            self.posed.append(float(q))
+
+        def joint_value(self):
+            return 1.021
+
+        def _stance_key(self, manip):
+            return "d0.60_l+0.05_t0.00_-0.91_p+1"
+
+    return _AL()
+
+
+def test_push_finish_plan_checks_in_screen_order_and_records_the_chunk():
+    """``plan_push_finish`` on the office cabinet door with a stub IK checker: the batched screen (at the release and the band edge) only
+    orders the candidates - survivors first; each is checked as [pre, contact] with the leaf at the release, then the arc tracked from
+    the contact configuration to the lower limit, else to the band edge; the first that passes is recorded with what ``push_close``
+    replays (stance, contact / pre at the release, hinge, swing sign, landing, arm witnesses, the object's pose) and the leaf is put
+    back; when none passes the stance is rejected with the reasons."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    q_init, k = 1.021, 0.855
+    q_rel = q_init * (1.0 - k)
+    leaf = AL.closed_leaf(_RVUNHJ_POSE, _RVUNHJ_JOINT, _RVUNHJ_BAR)
+    cands = AL.push_finish_candidates(leaf, float(_push_sampler(None).h([q_rel])[0].contact[2]), AL.push_finish_config(True))
+    ikc = _PushIK(lambda i, n: cands[i % n]["tilt_deg"] == 20.0, exact_ok=[False, True], chain_ok=[False, True])  # the screen keeps the 20 deg tilts
+    al = _push_sampler(ikc)
+    manip = SimpleNamespace(base_pose2d=(9.265, -7.09, 2.12))
+    rec = al.plan_push_finish(manip, q_init, q_rel, k)
+    band = 0.5 * max(0.05, 0.10 * q_init)
+    # the first screened candidate fails its [pre, contact]; the second passes it, misses the arc to 0 and reaches the band edge
+    contact, a, normal = AL.push_contact_pose(leaf, cands[3], q_rel)
+    assert len(ikc.exact_calls) == 2 and len(ikc.chain_calls) == 2
+    assert th.allclose(ikc.exact_calls[1][1][0], contact[0], atol=1e-6) and th.allclose(ikc.exact_calls[1][0][0], C.pre_pose(contact, 0.10)[0], atol=1e-6)
+    assert th.allclose(ikc.chain_calls[1][-1][0], AL.push_contact_pose(leaf, cands[3], band)[0][0], atol=1e-6)
+    assert th.allclose(ikc.chain_calls[0][-1][0], AL.push_contact_pose(leaf, cands[3], 0.0)[0][0], atol=1e-6)
+    assert rec["arm"] == "right" and rec["stance"] == "manipulation" and rec["base_pose2d"] == [9.265, -7.09, 2.12]
+    assert (rec["k_release"], rec["q_from"], rec["q_to"], rec["q_lower"]) == (k, pytest.approx(q_rel), pytest.approx(band), 0.0)
+    assert rec["reaches_goal"] and rec["band_rad"] == pytest.approx(band, abs=1e-4) and rec["tolerance_rad"] == pytest.approx(2 * band, abs=1e-4)
+    assert rec["push_fraction"] == pytest.approx((q_rel - band) / q_init, abs=1e-4) and rec["handle_fraction"] == k
+    assert rec["swing_sign"] == -1.0 and rec["hinge_world"] == pytest.approx(leaf.hinge.tolist(), abs=1e-5) and rec["normal"] == pytest.approx(normal.tolist(), abs=1e-5)
+    assert rec["contact"]["position"] == pytest.approx(contact[0].tolist(), abs=1e-6) and rec["pre"]["position"] == pytest.approx(C.pre_pose(contact, 0.10)[0].tolist(), abs=1e-6)
+    assert (rec["tilt_deg"], rec["closing"], rec["inset_m"], rec["height_offset_m"]) == (20.0, "vertical", 0.15, -0.05) and rec["approach"] == pytest.approx(a.tolist(), abs=1e-5)
+    assert rec["arm_q_pre"] == [0.2] * 7 and rec["arm_q_contact"] == [0.1] * 7 and rec["arc_q"][-1] == pytest.approx(band, abs=1e-5)
+    assert rec["object_pose"] == {"position": pytest.approx([8.4084, -6.3264, 0.7969]), "orientation": [0.0, 0.0, 0.0, 1.0]}
+    assert rec["screen"] == {"candidates": 54, "passed": 18, "checked": 2}
+    assert al.posed[-1] == 1.021 and al.posed[:-1] == [pytest.approx(q_rel)] * 2  # the leaf at the release for [pre, contact], back at the end
+    # nothing passes: rejected after max_checks candidates, screen survivors first, with the reasons
+    ikc = _PushIK(lambda i, n: False, exact_ok=[False] * 8, chain_ok=[])
+    al = _push_sampler(ikc)
+    with pytest.raises(Reject) as e:
+        al.plan_push_finish(manip, q_init, q_rel, k)
+    assert e.value.reason == "push_unreachable" and "54 contact candidates (0 pass the screen" in str(e.value) and "8 checked" in str(e.value)
+    assert len(ikc.exact_calls) == 8 and "(unscreened)" in str(e.value) and al.posed[-1] == 1.021
+
+
+def test_push_finish_draft_records_the_release_and_expands_to_the_finish_program(monkeypatch):
+    """``_solve_from`` of a push-finish stance: the handle is solved only up to the release (the waypoints past it are recorded
+    unreachable, not solved), the release joins the waypoints, ``articulation.follow_to`` / ``push_finish`` are recorded - and the
+    articulation block the sampler writes expands (oracle F6) to grasp -> follow to the release -> release / retreat -> push_close
+    with the planned chunk."""
+    import json
+    import os
+
+    from ispatialgym.oracle.programs import expand
+    from ispatialgym.oracle.sidecar import Sidecar
+    from ispatialgym.sampling.v2.stances import SidecarDraft
+
+    monkeypatch.setattr(AL.P0, "exact_contacts", lambda s, manip, contacts, ignore_combined=(): SimpleNamespace(ok=True, q=th.zeros(28), reason=""))
+    monkeypatch.setattr(AL.P0, "connect", lambda s, a, b, max_m: None)
+    ikc = _PushIK(lambda i, n: True, exact_ok=[], chain_ok=[])
+    al = _push_sampler(ikc)
+    q_init, k = 1.021, 0.855
+    q_rel = q_init * (1.0 - k)
+    plan = al.plan_push_finish(SimpleNamespace(base_pose2d=(9.265, -7.09, 2.12)), q_init, q_rel, k)
+    ikc.exact_calls.clear()
+    joints = {"j_link_0": SimpleNamespace(lower_limit=0.0, is_revolute=True), "j_link_2": SimpleNamespace(lower_limit=0.0, is_revolute=True)}
+
+    class _Draft(type(al)):
+        target = SimpleNamespace(name="bottom_cabinet_rvunhj_0", category="bottom_cabinet", joints=joints, get_joint_positions=lambda: th.zeros(2))
+        tname = "door.n.01_1"
+
+        def stance_q(self, st):
+            return th.zeros(28)
+
+    al.__class__ = _Draft
+    al.mode, al.passive, al.door_class, al.hinge_side, al.stable = "arm", {}, "cabinet", "left", [0.785, 1.021]
+    al.joint_friction = al.counterbalance = None
+    al.sidecar = SidecarDraft("configuration_matching-articulation_close_large_scale-bottom_cabinet", "configuration_matching")
+    fr = AL.finish_fractions(AL.WAYPOINT_FRACTIONS, k)
+    wps = C.handle_waypoints(_RVUNHJ_BAR, _RVUNHJ_JOINT, [q_init] + [q for _, q in AL.waypoint_values(q_init, 0.0, fr)], obj_pose=_RVUNHJ_POSE)
+    required = AL.finish_required(AL.required_fractions(None, fr), k)
+    manip = Stance("manipulation", (9.265, -7.09, 2.12), 0.0, -0.91, arms=["right"])
+    init = Stance("init", (10.2, -7.6, 2.4), 0.0)
+    contact = P0.ContactSpec("handle", "right", wps[0].eef, wps[0].pre_grasp, classes=("fwd_pinch_h",))
+    reach = {"reachable_fraction": 0.855, "q_reach": 0.148, "goal_set": [0.0], "push_finish": plan}
+    d = al._solve_from(manip, init, q_init, 0.0, wps, required, contact, wps[0], goal_set=[0.0], reach_info=reach, fractions=fr)
+    assert len(ikc.exact_calls) == 4  # 0.25, 0.5, 0.75 and the release - not the closed pose the push reaches
+    art = al.sidecar.articulation
+    assert art["follow_to"] == k and art["push_finish"] == plan and art["required_fractions"] == ["0.25", "0.5", "0.75", "0.855"]
+    assert art["handle_reach"] == {"0.25": True, "0.5": True, "0.75": True, "0.855": True, "1.0": False} and set(art["waypoints"]) == {"0.0", "0.25", "0.5", "0.75", "0.855", "1.0"}
+    assert d.summary["handle_reach"] == art["handle_reach"] and d.articulation_targets["door.n.01_1"]["joints"]["j_link_2"]["position"] == 0.0
+    # the oracle reads the block: the close large-scale fixture's stances / travel, this articulation block
+    path = os.path.join(os.path.dirname(__file__), "data", "sidecar_variants", "configuration_matching-articulation_close_large_scale__room_door.json")
+    with open(path) as f:
+        raw = json.load(f)
+    raw["articulation"] = json.loads(json.dumps(al.sidecar.to_dict()["articulation"]))
+    sc = Sidecar.from_dict(raw)
+    assert sc.problems() == []
+    actions = expand(sc.alias, sc)
+    assert [x.name for x in actions] == ["navigate", "transition", "grasp", "base_follow", "retreat", "push_close"]
+    follow, push = actions[3], actions[5]
+    assert [key for _, key in follow.articulation.followed_fractions()] == ["0.25", "0.5", "0.75", "0.855"]
+    assert push.plan == [raw["articulation"]["push_finish"]] and push.q_from == pytest.approx(q_rel) and push.tol_span_rad == pytest.approx(q_init)
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # alignment (§5.5): frame, hang pose, contacts, brace ordering
 # ----------------------------------------------------------------------------------------------------------------

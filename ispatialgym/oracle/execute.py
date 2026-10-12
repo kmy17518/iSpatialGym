@@ -35,7 +35,8 @@ Behaviour per action (§3.6 / §6.1):
 * ``BaseFollow`` ``base_follow(b_k)`` with the arm locked, or ``arm_along(h(q_k))`` in arm mode; post: joint at
   ``q_goal`` (spec §8 tolerance) or ``passive_from`` reached.
 * ``PushClose``  per chunk: stance by backend IK → ``track_path`` → ``gripper(close)`` → ``arm_to(pre)`` → guarded
-  approach → ``arm_along(arc)`` → back off; post: joint within the spec §8 tolerance of the lower limit.
+  approach → ``arm_along(arc)`` → back off (a planned push, a cabinet door's push finish: the recorded stance and contact);
+  post: joint within the spec §8 tolerance of the lower limit.
 * ``Retreat``    ``gripper(open)`` (+ release / detach) when ``release`` → ``arm_along(retreat)``.
 
 Tolerance categories: an eef / base / trunk that did not reach its recorded target is ``execution`` (a motion did
@@ -364,6 +365,14 @@ class ExecuteConfig:
     #: torso_joint1 ended 4.2 deg behind its target and sprang forward at the back-off - the head lunged 78 mm
     push_close_stop_rad: float = 0.004
     push_close_stop_trunk_rad: float = math.radians(0.3)
+    #: owner 2026-10-12 ~04:20 (a cabinet door's push finish, ``PushClose.plan``): the base drives back to the planned stance only when it
+    #: stands farther than this from it (m / rad); the pre-contact is planned to the sampler's arm witness while the leaf is within
+    #: ``push_finish_hint_max_rad`` of the angle the chunk was planned at; a leaf within ``push_finish_landing_tol_rad`` of the planned
+    #: landing is not pushed again
+    push_finish_restance_m: float = 0.05
+    push_finish_restance_rad: float = 0.10
+    push_finish_hint_max_rad: float = 0.05
+    push_finish_landing_tol_rad: float = math.radians(1.0)
     #: ... a grasp approach stops once a finger presses the support the object rests on - the hand touches it and the trunk is bent
     #: ``grasp_support_stop_trunk_rad`` off its target - and is unloaded before the closure (brussels sprouts: a pinch of a 4.4 cm
     #: sphere aims the fingertips 24 mm below its bottom; the hand stopped on the table and pressed it up to 196 N, torso_joint1 0.8 deg,
@@ -4661,12 +4670,202 @@ def pushable_arc_from(motions: Motions, arm: str, base: Tuple[float, float, floa
     return n, q_pre
 
 
+def planned_push(plan: Dict[str, Any], q: float, live=None) -> Dict[str, Any]:
+    """A planned push-close chunk (``PushClose.plan``, sampler ``articulation_large.plan_push_finish``) with the leaf at joint value
+    ``q``: the recorded fist contact (planned with the leaf at ``q_from``) turned with the leaf about the vertical hinge line by
+    s·(q − q_from) - the same point of the leaf -, its pre-contact ``pre_m`` back along the approach, the approach (into the face),
+    the outer-face normal (horizontal, toward the robot), the arc centre (the hinge at the contact's height) and the signed angle
+    about +z that turns the leaf from ``q`` to the planned landing ``q_to`` (``remaining`` = how far, 0 once there). ``live`` = the
+    object's pose now: everything moves with the object when it moved since the record (``object_pose``)."""
+    s = float(plan["swing_sign"])
+    hinge = C.as_tensor(plan["hinge_world"]).reshape(-1)[:3].float()
+    p_c, q_c = (v.float() for v in as_world_pose(plan["contact"]))
+    normal = C.as_tensor(plan["normal"]).reshape(-1)[:3].float()
+    if live is not None and isinstance(plan.get("object_pose"), dict):
+        d_pos, d_quat = C.compose(as_world_pose(live), C.invert(as_world_pose(plan["object_pose"])))
+        hinge, p_c = C.quat_rotate(d_quat, hinge) + d_pos, C.quat_rotate(d_quat, p_c) + d_pos
+        q_c, normal = C.qmul(d_quat, q_c), C.quat_rotate(d_quat, normal)
+    turn = C.quat_from_axis_angle([0.0, 0.0, 1.0], s * (float(q) - float(plan["q_from"])))
+    centre = th.tensor([float(hinge[0]), float(hinge[1]), float(p_c[2])])
+    contact = (centre + C.quat_rotate(turn, p_c - centre), C.qmul(turn, q_c))
+    n = C.quat_rotate(turn, th.tensor([float(normal[0]), float(normal[1]), 0.0]))
+    remaining = max(float(q) - float(plan["q_to"]), 0.0)
+    return {"contact": contact, "pre": C.pre_pose(contact, float(plan.get("pre_m", 0.10))), "approach": C.approach_axis(contact[1]), "normal": C.unit(n),
+            "centre": centre, "remaining": remaining, "delta": -s * remaining}
+
+
+def _execute_push_close_planned(action: PushClose, motions: Motions, state, ctx) -> Iterator[th.Tensor]:
+    """A cabinet door's push finish (owner 2026-10-12 ~04:20): the hand has followed the handle as far as the arm reaches and let
+    go; the closed hand pushes the leaf's outer face the rest of the way shut with the stance and the contact the sampler planned
+    (``PushClose.plan``, :func:`planned_push`) - drive back to the planned stance only when the base stands off it, the pre-contact
+    planned to the sampler's arm witness (the object present; then cuRobo's branch; then the object ignored), the guarded approach
+    along the planned approach, the arc about the hinge to the planned landing (stopped once the leaf is closed or the trunk is
+    pressed, unloaded), the fist back along its approach; no base drag. The last chunk is repeated while it still gains."""
+    arm, name = action.arm, action.object
+    cfg = _cfg(ctx)
+    rep: Dict[str, Any] = {"chunks": [], "planned": len(action.plan or [])}
+    ctx["push_close"] = rep
+    _hook(ctx, "fov")(False)
+
+    def q_now() -> float:
+        return float(state.joint_position(name, action.joint))
+
+    def leaf_stop(trunk0: float) -> Optional[str]:
+        if q_now() - action.q_lower <= cfg.push_close_stop_rad:
+            return f"leaf closed (q {math.degrees(q_now()):.2f} deg)"
+        if motions.state.trunk_error() - trunk0 >= cfg.push_close_stop_trunk_rad:
+            return f"trunk pressed {math.degrees(motions.state.trunk_error()):.2f} deg off its target (q {math.degrees(q_now()):.2f} deg)"
+        return None
+
+    def live_pose():
+        try:
+            return as_world_pose(state.object_pose(name))
+        except Exception:  # noqa: BLE001 - no live pose (the test stubs): the record as it is
+            return None
+
+    obj = state.object(name)
+    robot = motions.robot
+    idx = robot.arm_control_idx[arm]
+    plans = [dict(p) for p in (action.plan or [])]
+    q0 = q_now()
+    rep["geometry"] = {"hinge_world": [round(float(v), 3) for v in plans[0]["hinge_world"]], "q_start_deg": round(math.degrees(q0), 2),
+                       "q_planned_from_deg": round(math.degrees(float(plans[0]["q_from"])), 2), "q_to_deg": [round(math.degrees(float(p["q_to"])), 2) for p in plans]}
+    motions.backend.update_world()
+    for attempt in range(len(plans) + max(0, int(action.plan_repeats))):
+        q = q_now()
+        if q - action.q_lower <= action.closed_tol_rad:
+            break
+        k = min(attempt, len(plans) - 1)
+        plan = plans[k]
+        g = planned_push(plan, q, live_pose())
+        rec: Dict[str, Any] = {"chunk": k, "repeat": attempt >= len(plans), "q_before_deg": round(math.degrees(q), 2), "contact": [round(float(v), 3) for v in g["contact"][0]],
+                               "delta_deg": round(math.degrees(g["remaining"]), 1)}
+        if g["remaining"] <= cfg.push_finish_landing_tol_rad:
+            rec["result"] = f"the leaf is at the planned landing ({math.degrees(float(plan['q_to'])):.1f} deg)"
+            rep["chunks"].append(rec)
+            break
+        target = as_pose2d(plan["base_pose2d"])
+        off_m, off_rad = _base_error(motions.base_pose2d(), target)
+        rec["stance_off"] = {"m": round(off_m, 3), "rad": round(off_rad, 3)}
+        log.info("push_close (planned chunk %d%s): leaf %.1f deg, %.1f deg to the planned landing; the base stands %.3f m / %.3f rad off the planned stance",
+                 k, ", repeated" if rec["repeat"] else "", math.degrees(q), math.degrees(g["remaining"]), off_m, off_rad)
+        if off_m > cfg.push_finish_restance_m or off_rad > cfg.push_finish_restance_rad:
+            yield from _arms_ready(motions, rec)
+            try:
+                yield from motions.track_path([target])
+                yield from motions.settle(max_steps=20)
+            except SkillError as e:
+                rec["result"] = f"drive to the planned stance failed: {e.message or e.reason}"
+                rep["chunks"].append(rec)
+                break
+            rec["stance"] = [round(v, 3) for v in target]
+        motions.backend.update_world()
+        yield from motions.gripper(arm, close=True)
+        tries: List[Tuple[str, Dict[str, Any]]] = []
+        if plan.get("arm_q_pre") is not None and abs(q - float(plan["q_from"])) <= cfg.push_finish_hint_max_rad:
+            hint = C.as_tensor(motions.backend.q_full()).reshape(-1).float().clone()
+            hint[idx] = C.as_tensor(plan["arm_q_pre"]).reshape(-1).float()
+            tries.append(("the recorded witness", {"q_hint": hint, "accept_other_branch": True}))
+        tries += [("the object present", {}), ("the object ignored", {"ignore_objects": [obj]})]
+        rec["pre"] = None
+        for how, kw in tries:
+            try:
+                yield from motions.arm_to(arm, pose=g["pre"], **kw)
+                rec["pre"] = how
+                break
+            except SkillError as e:
+                rec.setdefault("pre_failures", []).append(f"{how}: {(e.message or e.reason)[:140]}")
+        if rec["pre"] is None:
+            rec["result"] = "pre-contact unreachable"
+            rep["chunks"].append(rec)
+            log.warning("push_close (planned chunk %d): %s (%s)", k, rec["result"], rec.get("pre_failures"))
+            break
+        a = g["approach"]
+        found, travelled, how = yield from guarded_approach(motions, arm, a, q_now)
+        rec["approach"] = {"travelled_m": round(travelled, 3), "how": how}
+        if found is not None and "blocked" in how:
+            # contact evidence, as for a room door: a further 1 cm push must move the leaf, else the stall was the reach limit
+            q_a = q_now()
+            try:
+                eef = motions.eef_pose(arm)
+                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + 0.01 * a, C.as_tensor(eef[1]))], loaded=True)
+            except SkillError:
+                pass
+            yield from motions.hold(3)
+            moved = abs(q_now() - q_a) >= math.radians(0.3)
+            rec["approach"]["evidence"] = {"door_moved_deg": round(math.degrees(q_now() - q_a), 2), "contact": moved}
+            if not moved:
+                found = None
+                how = "stall at the reach limit (door did not move under a 1 cm push)"
+        if found is None:
+            rec["result"] = f"no contact ({how})"
+            rep["chunks"].append(rec)
+            log.warning("push_close (planned chunk %d): %s", k, rec["result"])
+            break
+        cpose = motions.eef_pose(arm)
+        cpose = (C.as_tensor(cpose[0]), C.as_tensor(cpose[1]))
+        g = planned_push(plan, q_now(), live_pose())  # the approach may have moved the leaf a little
+        why: List[Optional[str]] = [None]
+        trunk0 = motions.state.trunk_error()
+
+        def stop() -> bool:
+            why[0] = leaf_stop(trunk0)
+            return why[0] is not None
+
+        if g["remaining"] <= cfg.push_finish_landing_tol_rad:
+            rec["arc"] = "none (the approach brought the leaf to the planned landing)"
+        else:
+            n_exec = max(int(round(g["remaining"] / math.radians(2.0))), 1)
+            centre = th.tensor([float(g["centre"][0]), float(g["centre"][1]), float(cpose[0][2])])
+            arc = C.arc_waypoints(cpose, centre, th.tensor([0.0, 0.0, 1.0]), g["delta"], n=n_exec)
+            try:
+                stopped = yield from _until(motions.arm_along(arm, list(arc), loaded=True, partial=True), stop)
+                rec["arc"] = f"stopped: {why[0]}" if stopped else "complete"
+            except SkillError as e:
+                rec["arc"] = f"stopped: {e.message or e.reason}"
+            if why[0] is not None:
+                un = yield from motions.unload([arm])
+                rec["arc_unload_rad"] = {kk: round(v, 4) for kk, v in un.items()}
+        yield from motions.settle(max_steps=40)
+        q_after = q_now()
+        rec["q_after_deg"] = round(math.degrees(q_after), 2)
+        un = yield from motions.unload([arm])  # the fist leaves a leaf it may still press: nothing springs back when it goes
+        if any(v > 0.0 for v in un.values()):
+            rec["backoff_unload_rad"] = {kk: round(v, 4) for kk, v in un.items()}
+        try:  # off the face, back along the fist's approach, then let it settle
+            eef = motions.eef_pose(arm)
+            a_now = C.approach_axis(C.as_tensor(eef[1]))
+            yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - 0.10 * a_now, C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        except SkillError as e:
+            rec["back_off_failed"] = e.message or e.reason
+        yield from motions.settle(max_steps=40)
+        rec["q_settled_deg"] = round(math.degrees(q_now()), 2)
+        motions.state.arm_target[arm] = robot.get_joint_positions()[idx].clone().float()
+        rep["chunks"].append(rec)
+        log.info("push_close (planned chunk %d): door %.1f -> %.1f deg (settled %.1f), %s", k, math.degrees(q), math.degrees(q_after), math.degrees(q_now()), rec.get("arc"))
+        if q - q_now() < math.radians(0.5):
+            rec["result"] = "no progress"
+            break
+    q_end = q_now()
+    rep["final_q_deg"] = round(math.degrees(q_end), 2)
+    rep["closed"] = bool(q_end - action.q_lower <= action.closed_tol_rad)
+    rep["verdict"] = "closed by pushing" if rep["closed"] else f"stopped at {math.degrees(q_end):.1f} deg"
+    mon = ctx.get("monitors")
+    if mon is not None:
+        rep["contacts"] = [dict(e) for e in getattr(mon, "collision_events", [])[-40:]]
+    log.info("push_close (planned) done: %s (%d chunks); contacts %s", rep["verdict"], len(rep["chunks"]), rep.get("contacts"))
+
+
 def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     """Owner decision B (2026-09-20 20:19), sequential: per chunk - pick the stance on the +m side of the leaf by the
     backend's IK of the contact pose and the arc waypoints (front and side candidates, longest pushable arc wins), drive
     there (arms "ready"), then arm only: guarded approach along −m onto the outer face (a diff-IK stall counts as contact
     only if the door moves under a 1 cm further push), push along the arc about the hinge to the arm's limit (the base
-    drags along −m when the arc gains < 2°), back off; repeat until closed or a chunk gains nothing."""
+    drags along −m when the arc gains < 2°), back off; repeat until closed or a chunk gains nothing. A planned push (a
+    cabinet door's push finish, ``action.plan``) runs :func:`_execute_push_close_planned` instead."""
+    if action.plan:
+        yield from _execute_push_close_planned(action, motions, state, ctx)
+        return
     arm, name = action.arm, action.object
     cfg = _cfg(ctx)
     rep: Dict[str, Any] = {"chunks": []}
@@ -4856,12 +5055,14 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
 
 def post_push_close(action: PushClose, state, targets, ctx) -> Optional[str]:
     """Judged on the joint, as ``post_base_follow``: within the spec §8 tolerance of ``q_lower`` (revolute max(0.05 rad,
-    0.10·|Δq|)), ``no_motion`` below 10 % of the span, else ``tolerance``."""
+    0.10·|Δq|), Δq = ``tol_span_rad`` when recorded - a push finish is judged on the instance's span -, else the push's own),
+    ``no_motion`` below 10 % of the push's span, else ``tolerance``."""
     q = state.joint_position(action.object, action.joint)
     ctx["q"] = q
     span = abs(action.q_from - action.q_lower)
+    tol_span = abs(action.tol_span_rad) if action.tol_span_rad is not None else span
     closed = abs(q - action.q_lower)
-    if closed <= max(0.05, 0.10 * span):
+    if closed <= max(0.05, 0.10 * tol_span):
         return None
     return "no_motion" if span - closed < 0.10 * span else "tolerance"
 

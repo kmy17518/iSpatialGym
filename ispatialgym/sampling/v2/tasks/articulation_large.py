@@ -51,7 +51,7 @@ from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2.core import SamplerV2, register
-from ispatialgym.sampling.v2.stances import FaceFrame, Stance
+from ispatialgym.sampling.v2.stances import FaceFrame, Stance, pose_to_sidecar
 from ispatialgym.sampling.v2.tasks import articulation_hybrid as AH
 
 log = logging.getLogger("ispatialgym.sampling.v2")
@@ -503,6 +503,201 @@ def sane_hinge_point(jinfo: Dict[str, Any], measured: Optional[th.Tensor] = None
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# push finish of a cabinet door's closing (owner 2026-10-12 ~04:20, close_large#03)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: ``generation.push_finish`` (``true``, or a dict overriding these): the closing of a revolute cabinet door that the arm follows
+#: only part of the way from a stance is finished by the closed hand pushing the leaf's outer face the rest of the way shut
+#: (``programs.program_articulation_large`` -> grasp, follow to ``articulation.follow_to``, release, ``push_close`` with the planned
+#: chunk). Off when the key is absent.
+PUSH_FINISH_DEFAULTS: Dict[str, Any] = {
+    "insets_m": (0.15, 0.10, 0.22),  # contact distance from the free edge along the leaf (the room door's push_inset_m first)
+    "height_offsets_m": (-0.05, 0.05, -0.15),  # contact height relative to the handle grasp (the room door's 5 cm drop first)
+    "tilts_deg": (0.0, 20.0, 35.0),  # the fist's approach turned from the face normal toward the free edge (the hinge-side stance)
+    "closings": ("leaf", "vertical"),  # the pads close along the leaf (the bar pinch's wrist roll) or vertically (the room door's)
+    "min_radius_m": 0.10,  # the contact keeps this far from the hinge line
+    "edge_margin_m": 0.05,  # ... this far inside the leaf's top and bottom
+    "handle_clear_m": 0.06,  # ... and this far from the handle segment
+    "pre_m": 0.10,  # pre-contact distance back along the approach (the room door's push_pre_m)
+    "band_fraction": 0.5,  # the push ends within this fraction of the §8 tolerance of the lower limit
+    "arc_step_deg": 5.0,  # spacing of the checked arc poses
+    "max_checks": 8,  # candidates checked exactly after the batched screen
+}
+PUSH_CLOSINGS = ("leaf", "vertical")
+
+
+def push_finish_config(raw: Any) -> Optional[Dict[str, Any]]:
+    """``generation.push_finish`` -> its options (:data:`PUSH_FINISH_DEFAULTS` with the alias's overrides); None when off (absent,
+    ``false``, ``{"enabled": false}``). ``Reject("spec")`` for another type, an unknown key or an unknown closing."""
+    if raw is None or raw is False:
+        return None
+    if raw is True:
+        return dict(PUSH_FINISH_DEFAULTS)
+    if not isinstance(raw, dict):
+        raise Reject("spec", f"generation.push_finish: true / false or a dict of options, got {raw!r}")
+    if not raw.get("enabled", True):
+        return None
+    unknown = sorted(str(k) for k in raw if k != "enabled" and not str(k).startswith("_") and k not in PUSH_FINISH_DEFAULTS)
+    if unknown:
+        raise Reject("spec", f"generation.push_finish: unknown keys {unknown} (known: {sorted(PUSH_FINISH_DEFAULTS)})")
+    out = dict(PUSH_FINISH_DEFAULTS)
+    out.update({k: v for k, v in raw.items() if k in PUSH_FINISH_DEFAULTS})
+    bad = [c for c in out["closings"] if c not in PUSH_CLOSINGS]
+    if bad:
+        raise Reject("spec", f"generation.push_finish.closings: {bad} not in {list(PUSH_CLOSINGS)}")
+    return out
+
+
+def push_finish_applies(direction: str, joint_type: str, cls: str, mode: str, vertical_axis: bool) -> bool:
+    """Whether the push finish can serve a joint: the closing of a revolute ``cabinet`` door on a vertical hinge that the arm alone
+    follows (A4 ``follow_mode`` arm). A room door is pushed shut from its open angle (``push_close``), drawers and flaps keep the
+    handle all the way."""
+    kind = joint_type.lower()
+    return direction == "close" and "revolute" in kind and cls == "cabinet" and mode == "arm" and bool(vertical_axis)
+
+
+def release_fraction(q_init: float, q_reach: float, q_goal: float) -> float:
+    """The fraction of the joint motion ``q_init -> q_goal`` the hand covers when its reach ends at ``q_reach``, floored to 1e-4 so
+    the release never lies past the value the reach sweep verified; 0 = no handle progress, 1 = all of it."""
+    span = float(q_goal) - float(q_init)
+    if abs(span) < 1e-9:
+        return 1.0
+    frac = (float(q_reach) - float(q_init)) / span
+    return min(1.0, max(0.0, math.floor(frac * 1e4 + 1e-6) / 1e4))
+
+
+def finish_fractions(fractions: Sequence[float], k_release: float) -> List[float]:
+    """The recorded waypoint fractions of a push-finish instance: the standard ones plus the release fraction (where the hand lets
+    go), sorted, no duplicate within 1e-6."""
+    out = sorted(float(k) for k in fractions)
+    if all(abs(k - float(k_release)) > 1e-6 for k in out):
+        out = sorted(out + [float(k_release)])
+    return out
+
+
+def finish_required(required: Sequence[float], k_release: float) -> List[float]:
+    """The handle waypoints a push-finish instance requires: the required ones up to the release (the hand's part ends there)."""
+    return [float(k) for k in required if float(k) <= float(k_release) + 1e-9]
+
+
+def push_reaches_goal(q_to: float, q_lower: float, band: float) -> bool:
+    """The planned push ends within ``band`` of the closed (lower) limit."""
+    return float(q_to) - float(q_lower) <= float(band) + 1e-9
+
+
+def arc_values(q_from: float, q_to: float, step: float) -> List[float]:
+    """Joint values from ``q_from`` (excluded) to ``q_to`` (included) at most ``step`` apart."""
+    n = max(1, int(math.ceil(abs(float(q_to) - float(q_from)) / max(float(step), 1e-6) - 1e-9)))
+    return [float(q_from) + (float(q_to) - float(q_from)) * k / n for k in range(1, n + 1)]
+
+
+@dataclass
+class ClosedLeaf:
+    """The closed leaf of a door on a vertical hinge, world frame (push finish): ``hinge`` = a point of the hinge line, ``s`` = the
+    swing sign (joint value q turns the leaf about +z by s·(q − ``q_closed``)), ``n0`` = the outer-face normal and ``d0`` = the
+    direction from the hinge line toward the free edge (unit, horizontal), ``width`` = hinge line -> free edge, ``z_lo`` / ``z_hi``
+    = the leaf's height span, ``face`` = the outer face's offset along n0 from the hinge line, ``handle_a`` / ``handle_b`` = the
+    handle segment (a bar's ends; one point for a knob)."""
+
+    hinge: th.Tensor
+    s: float
+    n0: th.Tensor
+    d0: th.Tensor
+    width: float
+    z_lo: float
+    z_hi: float
+    face: float
+    handle_a: th.Tensor
+    handle_b: th.Tensor
+    q_closed: float = 0.0
+
+    def coords(self, p) -> Tuple[float, float]:
+        """(distance from the hinge line along d0, height) of a world point of the closed leaf."""
+        p = th.as_tensor(p, dtype=th.float32)
+        return float(th.dot((p - self.hinge)[:2], self.d0[:2])), float(p[2])
+
+
+def closed_leaf(obj_pose, jinfo: Dict[str, Any], handle: Dict[str, Any]) -> ClosedLeaf:
+    """The :class:`ClosedLeaf` of a revolute joint from its joint info (object frame, closed: ``hinge_point_obj``, ``axis_dir_obj``,
+    ``outward_normal``, ``link_bbox_min`` / ``link_bbox_max``, ``closed_q``) and handle (``contact``, ``kind``, a bar's ``length``)
+    at the object pose ``obj_pose``. The outer face lies ``HANDLE_EEF_OFFSET`` behind a bar / knob / reviewer contact (the convention:
+    the annotated contact is 12 mm off the face), on the box's front for an edge pinch; without a link box the leaf is the handle's
+    radius + 3.5 cm wide and ±0.25 m tall about it. ``ValueError`` for a hinge that is not vertical."""
+    p, q = (th.as_tensor(v, dtype=th.float32).reshape(-1) for v in obj_pose)
+    axis = C.unit(C.quat_rotate(q, jinfo.get("axis_dir_obj") or [0.0, 0.0, 1.0]))
+    if abs(float(axis[2])) < math.cos(math.radians(20.0)):
+        raise ValueError(f"the hinge axis {[round(float(v), 3) for v in axis]} is not vertical")
+    hinge = p + C.quat_rotate(q, jinfo["hinge_point_obj"])
+    n0 = C.quat_rotate(q, jinfo.get("outward_normal") or [1.0, 0.0, 0.0])
+    n0 = C.unit(th.tensor([float(n0[0]), float(n0[1]), 0.0]))
+    hc = p + C.quat_rotate(q, handle["contact"])
+    d0 = th.tensor([-float(n0[1]), float(n0[0]), 0.0])
+    if float(th.dot(d0[:2], (hc - hinge)[:2])) < 0.0:
+        d0 = -d0
+    kind = str(handle.get("kind") or "bar")
+    face_h = float(th.dot((hc - hinge)[:2], n0[:2])) - (C.HANDLE_EEF_OFFSET if kind in ("bar", "knob", "manual") else 0.0)
+    lo, hi = jinfo.get("link_bbox_min"), jinfo.get("link_bbox_max")
+    r_h = float(th.dot((hc - hinge)[:2], d0[:2]))
+    if lo is not None and hi is not None:
+        corners = G.aabb_corners(th.as_tensor(lo, dtype=th.float32), th.as_tensor(hi, dtype=th.float32))
+        cw = p + C.quat_rotate(q, corners)
+        rel = cw - hinge
+        width = float((rel[:, :2] @ d0[:2]).max())
+        along_n = rel[:, :2] @ n0[:2]
+        face = float(along_n.max()) if kind not in ("bar", "knob", "manual") else min(max(face_h, float(along_n.min())), float(along_n.max()))
+        z_lo, z_hi = float(cw[:, 2].min()), float(cw[:, 2].max())
+    else:
+        width, face, z_lo, z_hi = r_h + 0.035, face_h, float(hc[2]) - 0.25, float(hc[2]) + 0.25
+    half = 0.5 * float(handle.get("length") or 0.0) if kind == "bar" else 0.0
+    ax = C.quat_rotate(q, bar_axis(handle)) if half > 0.0 else th.zeros(3)
+    return ClosedLeaf(hinge=hinge, s=1.0 if float(axis[2]) > 0.0 else -1.0, n0=n0, d0=d0, width=width, z_lo=z_lo, z_hi=z_hi, face=face,
+                      handle_a=hc - half * ax, handle_b=hc + half * ax, q_closed=float(jinfo.get("closed_q", jinfo.get("lower", 0.0))))
+
+
+def _segment_distance_2d(p: Tuple[float, float], a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    ab = (b[0] - a[0], b[1] - a[1])
+    L2 = ab[0] ** 2 + ab[1] ** 2
+    t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2))
+    return math.hypot(p[0] - a[0] - t * ab[0], p[1] - a[1] - t * ab[1])
+
+
+def push_finish_candidates(leaf: ClosedLeaf, z_ref: float, cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The fist contacts on the closed leaf's outer face in the order they are tried: per inset from the free edge (``insets_m``),
+    per height offset from the handle grasp height ``z_ref`` (``height_offsets_m``), per approach tilt (``tilts_deg``), per closing
+    axis (``closings``). A point closer than ``min_radius_m`` to the hinge line, outside the leaf (``edge_margin_m`` inside its top /
+    bottom) or within ``handle_clear_m`` of the handle segment (in the face's (radius, height) plane) is left out."""
+    ha, hb = leaf.coords(leaf.handle_a), leaf.coords(leaf.handle_b)
+    out: List[Dict[str, Any]] = []
+    for inset in cfg["insets_m"]:
+        r = leaf.width - float(inset)
+        if r < float(cfg["min_radius_m"]):
+            continue
+        for dz in cfg["height_offsets_m"]:
+            z = float(z_ref) + float(dz)
+            if z < leaf.z_lo + float(cfg["edge_margin_m"]) or z > leaf.z_hi - float(cfg["edge_margin_m"]):
+                continue
+            if _segment_distance_2d((r, z), ha, hb) < float(cfg["handle_clear_m"]):
+                continue
+            for tilt in cfg["tilts_deg"]:
+                for closing in cfg["closings"]:
+                    out.append({"radius_m": round(r, 4), "inset_m": float(inset), "z": round(z, 4), "dz": float(dz), "tilt_deg": float(tilt), "closing": str(closing)})
+    return out
+
+
+def push_contact_pose(leaf: ClosedLeaf, cand: Dict[str, Any], q: float) -> Tuple[C.Pose, th.Tensor, th.Tensor]:
+    """``(fist eef pose, approach, outer-face normal)`` of a candidate with the leaf at joint value ``q``: the face point turned with
+    the leaf about the hinge line by s·(q − q_closed), the approach into the face turned ``tilt_deg`` toward the free edge, the
+    pads closing along the leaf or vertically, the fingertips on the point (``conventions.fingertip_eef``)."""
+    turn = C.quat_from_axis_angle([0.0, 0.0, 1.0], leaf.s * (float(q) - leaf.q_closed))
+    d, n = C.quat_rotate(turn, leaf.d0), C.quat_rotate(turn, leaf.n0)
+    point = th.tensor([float(leaf.hinge[0]), float(leaf.hinge[1]), float(cand["z"])]) + float(cand["radius_m"]) * d + leaf.face * n
+    t = math.radians(float(cand["tilt_deg"]))
+    a = C.unit(-math.cos(t) * n + math.sin(t) * d)
+    closing = d if cand["closing"] == "leaf" else th.tensor([0.0, 0.0, 1.0])
+    return C.fingertip_eef(point, a, closing, clearance=0.0), a, n
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # the task module
 # ----------------------------------------------------------------------------------------------------------------
 
@@ -540,6 +735,8 @@ class ArticulationLarge(SamplerV2):
         #: ``generation.joint_friction``: PhysX articulation joint friction applied to the moved joint (None = the asset's
         #: stock 0.2); recorded as a TRO ``constraints`` record the loader re-applies (as ``articulation_small``)
         self.joint_friction: Optional[float] = None
+        #: ``generation.push_finish`` options when the joint qualifies (:func:`push_finish_applies`), else None
+        self.push_finish_cfg: Optional[Dict[str, Any]] = None
 
     # ------------------------------------------------------------------ roles / bindings
 
@@ -883,6 +1080,14 @@ class ArticulationLarge(SamplerV2):
             if self.gp.gen("arm", "auto") not in ("left", "right"):
                 self.arm = arm_for_hinge_side(self.hinge_side)
             self.lam_range = hinge_side_lateral(self.hinge_side, lam_max)
+        # generation.push_finish (owner 2026-10-12 ~04:20): a closing the arm follows only part of the way is pushed shut
+        self.push_finish_cfg = None
+        if self.gp.gen("push_finish") is not None:
+            if push_finish_applies(self.direction, self.jinfo["type"], self.door_class, self.mode, axis_is_vertical(axis_world)):
+                self.push_finish_cfg = push_finish_config(self.gp.gen("push_finish"))
+            else:
+                log.info("%s: generation.push_finish ignored for %s/%s (%s, class %s, follow_mode %s): it serves the closing of a cabinet door on "
+                         "a vertical hinge", self.gp.alias, obj.name, self.joint_name, self.direction, self.door_class, self.mode)
         # the Phase-2 lattice check (prompt0.phase2_step1) re-postures the IDLE arm of the checker's default working arm
         # (A6) - with the generic default "right" a left-handed door (door_crtrpa_0 0919-031559: handle 0.38 m left of the
         # face centre -> arm left) had its survivors validated with the LEFT arm tucked as idle, and every draw of the
@@ -893,8 +1098,11 @@ class ArticulationLarge(SamplerV2):
                                     "passive_from": dict(self.passive), "face_normal": n.tolist(), "face_centre": Pc.tolist(), "P_manip": P_manip.tolist(),
                                     "handle_offset_left_m": off_left, "arm": self.arm, "follow_mode": self.mode, "axis_world": axis_world.tolist(),
                                     "door_class": self.door_class, "hinge_side": self.hinge_side, "lateral_range_m": list(self.lam_range)})
-        log.info("%s: %s/%s %s: class %s, S=%s, arm %s (handle %.2f m left of the face centre, hinge %s), follow_mode %s, Λ %s", self.gp.alias, obj.name,
-                 self.joint_name, self.direction, self.door_class, [round(s, 3) for s in self.stable], self.arm, off_left, self.hinge_side, self.mode, self.lam_range)
+        if self.push_finish_cfg is not None:
+            self.template_facts["push_finish"] = dict(self.push_finish_cfg)
+        log.info("%s: %s/%s %s: class %s, S=%s, arm %s (handle %.2f m left of the face centre, hinge %s), follow_mode %s, Λ %s%s", self.gp.alias, obj.name,
+                 self.joint_name, self.direction, self.door_class, [round(s, 3) for s in self.stable], self.arm, off_left, self.hinge_side, self.mode, self.lam_range,
+                 ", push finish on" if self.push_finish_cfg is not None else "")
 
     def stable_set(self) -> List[float]:
         """§5.3 stable set S: 7 fractions of ``open_fraction_range`` + the upper limit, each held 120 steps and kept when
@@ -1087,10 +1295,15 @@ class ArticulationLarge(SamplerV2):
                     q_goal_s = q_goal
                     if arm_mode:
                         q_goal_s, goal_set, reach_info = self.goal_for_stance(manip, init, q_init, contact_s, rng)
-                    wps = self.h([q_init] + [qk for _, qk in waypoint_values(q_init, q_goal_s, fractions)])
+                    # a push finish records its release as a waypoint and requires the handle only up to there
+                    push = reach_info.get("push_finish")
+                    fr_s = finish_fractions(fractions, push["k_release"]) if push else fractions
+                    wps = self.h([q_init] + [qk for _, qk in waypoint_values(q_init, q_goal_s, fr_s)])
                     pf = self.passive_for(q_init, q_goal_s)
-                    required = required_fractions(pf, fractions, self.gp.gen("require_goal_handle", "auto"))
-                    d = self._solve_from(manip, init, q_init, q_goal_s, wps, required, contact_s, h0s, goal_set=goal_set, reach_info=reach_info)
+                    required = required_fractions(pf, fr_s, self.gp.gen("require_goal_handle", "auto"))
+                    if push:
+                        required = finish_required(required, push["k_release"])
+                    d = self._solve_from(manip, init, q_init, q_goal_s, wps, required, contact_s, h0s, goal_set=goal_set, reach_info=reach_info, fractions=fr_s)
                 except Reject as e:
                     errors.append(f"pinch {sign:+.0f}: {e.reason}: {e}")
                     # a stance that got as far as a full hybrid follow (5 min) and then fell at step 6 was invisible until the
@@ -1298,8 +1511,18 @@ class ArticulationLarge(SamplerV2):
             info = {"reachable_fraction": frac, "q_reach": q_low, "goal_set": [float(self.lower)]}
             log.info("%s: stance %s follows %s from %.3f down to %.3f (fraction %.2f of the closing)", self.gp.alias, key, self.joint_name, q_init, q_low, frac)
             if q_low > self.lower + 1e-6:
-                raise Reject("handle_unreachable", f"closing from {q_init:.3f}: the arm follows the handle only down to {q_low:.3f} (fraction {frac:.2f}) from stance {key}; "
-                                                   f"the rest needs a push on the leaf (not implemented)")
+                short = f"closing from {q_init:.3f}: the arm follows the handle only down to {q_low:.3f} (fraction {frac:.2f}) from stance {key}"
+                if self.push_finish_cfg is None:
+                    raise Reject("handle_unreachable", f"{short}; the rest needs a push on the leaf (not implemented)")
+                # owner 2026-10-12 ~04:20: hold the handle as far as the arm reaches, release, push the leaf the rest of the way shut
+                k_rel = release_fraction(q_init, q_low, self.lower)
+                if k_rel <= 0.0:
+                    raise Reject("handle_unreachable", f"{short}: no handle phase to finish with a push")
+                q_rel = q_init + k_rel * (self.lower - q_init)
+                try:
+                    info["push_finish"] = self.plan_push_finish(manip, q_init, q_rel, k_rel)
+                except Reject as e:
+                    raise Reject(e.reason, f"{short}; the push finish fails: {str(e).split('] ', 1)[-1]}") from None
             return float(self.lower), [float(self.lower)], info
         # the boundary is refined by bisection and the usable reach stops ``reach_margin`` inside it (REACH_MARGIN: the
         # goal at the boundary itself left the drives saturated 7 mm short of the last handle pose)
@@ -1327,6 +1550,91 @@ class ArticulationLarge(SamplerV2):
         if q_init > q_reach + 1e-6:
             raise Reject("handle_unreachable", f"closing from {q_init:.3f} needs the arm to reach up to it; the limit from stance {key} is {q_reach:.3f}")
         return float(self.lower), goal_set, info
+
+    def plan_push_finish(self, manip: Stance, q_init: float, q_rel: float, k_rel: float) -> Dict[str, Any]:
+        """The push finish of a closing the hand follows from ``q_init`` only to ``q_rel`` (fraction ``k_rel``) from ``manip`` (owner
+        2026-10-12 ~04:20): a fist contact of the handle arm on the leaf's outer face, from the same stance. The candidates
+        (:func:`push_finish_candidates`) are screened in one batch at the release and at the band edge (the lower limit +
+        ``band_fraction`` × the §8 tolerance) - the screen only orders them - and checked in that order, at most ``max_checks``: the
+        exact IK of [pre-contact, contact] with the leaf at ``q_rel`` (the pre-contact in the full world, the approach and the contact
+        with the target out of it, closed pads), then the arc about the hinge to the lower limit - else to the band edge - tracked from
+        the contact configuration as the oracle's ``arm_along`` tracks it, the target out of the world (the fist presses the leaf).
+        Returns the ``articulation.push_finish`` record the oracle's ``push_close`` executes; ``Reject("push_unreachable")`` when no
+        candidate passes."""
+        cfg = self.push_finish_cfg or dict(PUSH_FINISH_DEFAULTS)
+        obj = self.target
+        if self.jinfo.get("hinge_point_obj") is None:
+            raise Reject("push_unreachable", f"{obj.name}/{self.joint_name}: no hinge point")
+        obj_pose = self.obj_pose()
+        try:
+            leaf = closed_leaf(obj_pose, self.jinfo, self.handle)
+        except ValueError as e:
+            raise Reject("push_unreachable", f"{obj.name}/{self.joint_name}: {e}") from None
+        tol = joint_tolerance(self.jinfo["type"], q_init - self.lower, dict(self.gp.gen("tolerances") or {}))
+        band = float(cfg["band_fraction"]) * tol
+        q_need = self.lower + band
+        z_ref = float(self.h([q_rel])[0].contact[2])  # the grasp height as drawn (bar offset, pinch sign)
+        geo = {"leaf_width_m": round(leaf.width, 4), "face_offset_m": round(leaf.face, 4), "leaf_z": [round(leaf.z_lo, 3), round(leaf.z_hi, 3)], "z_ref": round(z_ref, 3)}
+        cands = push_finish_candidates(leaf, z_ref, cfg)
+        if not cands:
+            raise Reject("push_unreachable", f"no contact on the leaf's outer face clears the hinge, the edges and the handle ({geo})")
+        n = len(cands)
+        ok = self.ikc.screen([push_contact_pose(leaf, c, q_rel)[0] for c in cands] + [push_contact_pose(leaf, c, q_need)[0] for c in cands], manip, self.arm,
+                             ignore=[obj], fingers=C.FINGER_CLOSED)
+        screened = [i for i in range(n) if bool(ok[i]) and bool(ok[n + i])]
+        order = (screened + [i for i in range(n) if i not in screened])[: int(cfg["max_checks"])]
+        step = math.radians(float(cfg["arc_step_deg"]))
+        pre_m = float(cfg["pre_m"])
+        idx = self.kit.robot.arm_control_idx[self.arm]
+        key = self._stance_key(manip)
+        q_now = self.joint_value()
+        fails: List[str] = []
+        checked = 0
+        try:
+            for i in order:
+                c = cands[i]
+                checked += 1
+                tag = f"r {c['radius_m']:.2f} z {c['z']:.2f} tilt {c['tilt_deg']:.0f} {c['closing']}{'' if i in screened else ' (unscreened)'}"
+                contact, a, normal = push_contact_pose(leaf, c, q_rel)
+                pre = C.pre_pose(contact, pre_m)
+                self.pose_joint(q_rel)
+                r = self.ikc.exact([pre, contact], manip, self.arm, ignore_for_last=[obj], cache=False, fingers=C.FINGER_CLOSED, approached=[obj])
+                if not r.ok:
+                    fails.append(f"{tag}: pre / contact: {r.reason}")
+                    continue
+                q_to, arc_q = None, []
+                for q_end in ([self.lower, q_need] if q_need > self.lower + 1e-6 else [self.lower]):
+                    arc_q = arc_values(q_rel, q_end, step)
+                    res = self.ikc.continue_chain(r.q, [contact] + [push_contact_pose(leaf, c, qq)[0] for qq in arc_q], self.arm, ignore=[obj])
+                    if res.ok:
+                        q_to = q_end
+                        break
+                    fails.append(f"{tag}: arc to {q_end:.3f}: {res.reason}")
+                if q_to is None:
+                    continue
+                q_pre = self.ikc.solutions.get((self.arm, self.ikc._pose_key(pre)))
+                p_o, q_o = obj_pose
+                rec = {"rule": "owner 2026-10-12 ~04:20: hold the handle as far as the arm reaches, release, push the leaf the rest of the way shut",
+                       "arm": self.arm, "stance": "manipulation", "base_pose2d": [float(v) for v in manip.base_pose2d],
+                       "k_release": float(k_rel), "q_from": float(q_rel), "q_to": float(q_to), "q_lower": float(self.lower),
+                       "handle_fraction": float(k_rel), "push_fraction": round((q_rel - q_to) / max(q_init - self.lower, 1e-9), 4),
+                       "reaches_goal": push_reaches_goal(q_to, self.lower, band), "tolerance_rad": round(tol, 4), "band_rad": round(band, 4),
+                       "hinge_world": [round(float(v), 5) for v in leaf.hinge.tolist()], "swing_sign": leaf.s, "q_closed": leaf.q_closed,
+                       "contact": pose_to_sidecar(contact), "pre": pose_to_sidecar(pre), "pre_m": pre_m,
+                       "approach": [round(float(v), 5) for v in a.tolist()], "normal": [round(float(v), 5) for v in normal.tolist()],
+                       "arc_q": [round(v, 5) for v in arc_q], "radius_m": c["radius_m"], "inset_m": c["inset_m"], "height_m": c["z"],
+                       "height_offset_m": c["dz"], "tilt_deg": c["tilt_deg"], "closing": c["closing"], **geo,
+                       "arm_q_pre": None if q_pre is None else [round(float(v), 5) for v in q_pre[idx].tolist()],
+                       "arm_q_contact": [round(float(v), 5) for v in r.q[idx].tolist()],
+                       "object_pose": {"position": [float(v) for v in p_o.tolist()], "orientation": [float(v) for v in q_o.tolist()]},
+                       "screen": {"candidates": n, "passed": len(screened), "checked": checked}}
+                log.info("%s: stance %s: push finish %s from %.3f to %.3f (handle fraction %.2f + push %.2f; band %.3f): %s arm, contact %s, %d arc poses",
+                         self.gp.alias, key, self.joint_name, q_rel, q_to, k_rel, rec["push_fraction"], band, self.arm, tag, len(arc_q))
+                return rec
+        finally:
+            self.pose_joint(q_now)
+        raise Reject("push_unreachable", f"{n} contact candidates ({len(screened)} pass the screen at the release {q_rel:.3f} and the band edge {q_need:.3f}), "
+                                         f"{len(order)} checked: " + " | ".join(fails[:4]))
 
     def arm_alone_follows(self, manip: Stance, q_init: float, q_goal: float, by_k: Dict[float, C.HandleWaypoint], required: List[float],
                           arm_reach: Dict[str, bool], arm_q: Dict[str, Optional[th.Tensor]]) -> Tuple[bool, str]:
@@ -1359,12 +1667,15 @@ class ArticulationLarge(SamplerV2):
         return True, ""
 
     def _solve_from(self, manip: Stance, init: Stance, q_init: float, q_goal: float, wps: List[C.HandleWaypoint], required: List[float],
-                    contact: P0.ContactSpec, h0: C.HandleWaypoint, goal_set: Optional[List[float]] = None, reach_info: Optional[Dict[str, Any]] = None) -> Draft:
+                    contact: P0.ContactSpec, h0: C.HandleWaypoint, goal_set: Optional[List[float]] = None, reach_info: Optional[Dict[str, Any]] = None,
+                    fractions: Optional[Sequence[float]] = None) -> Draft:
         """Steps 5–6 of §5.2 for one drawn manipulation stance plus the §5.3 base-follow feasibility; fills the sidecar
-        (``manipulation`` stance, transition, path, ``articulation``) and returns the draft."""
+        (``manipulation`` stance, transition, path, ``articulation``) and returns the draft. ``fractions`` = the waypoint fractions
+        of ``wps[1:]`` (default ``generation.waypoint_fractions``; a push finish adds its release)."""
         obj, tname = self.target, self.tname
         manip.arms = [self.arm]
         reach_info = dict(reach_info or {})
+        push = reach_info.get("push_finish")
         # step 5a: [pre-grasp, grasp] at q_init (target ignored for the grasp pose only)
         sol = P0.exact_contacts(self, manip, [contact], ignore_combined=[obj])
         if not sol.ok:
@@ -1372,12 +1683,17 @@ class ArticulationLarge(SamplerV2):
         q_star = sol.q
         # step 5b: arm-only IK of the grasp pose at every q_k with the world re-synced at q_k (target ignored for the
         # grasp poses) — the arm mode's waypoint check, and the oracle's secondary mode where the base follows
-        fractions = list(self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS))
+        fractions = list(fractions) if fractions is not None else list(self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS))
         by_k = {k: w for (k, _), w in zip(waypoint_values(q_init, q_goal, fractions), wps[1:])}
         arm_reach: Dict[str, bool] = {}
         arm_q: Dict[str, Optional[th.Tensor]] = {}
         try:
             for k in fractions:
+                if push is not None and k > float(push["k_release"]) + 1e-9:
+                    # past the release the push takes the joint on: the reach sweep ended before these (not solved)
+                    arm_reach[fraction_key(k)] = False
+                    arm_q[fraction_key(k)] = None
+                    continue
                 w = by_k[k]
                 self.pose_joint(w.q)
                 res = self.ikc.exact([w.eef], manip, self.arm, ignore_for_last=[obj], q_seed=q_star, cache=False)
@@ -1450,6 +1766,10 @@ class ArticulationLarge(SamplerV2):
                                      "joint_friction": self.joint_friction, "counterbalance": self.counterbalance}
         if follow_path is not None:
             self.sidecar.articulation["base_follow_path"] = follow_path
+        if push is not None:
+            # the hand's part ends at the release (``follow_to``); ``push_close`` takes the leaf on with the planned chunk
+            self.sidecar.articulation["follow_to"] = float(push["k_release"])
+            self.sidecar.articulation["push_finish"] = dict(push)
         self.sidecar.describe(tname, obj.category.replace("_", " "))
         # draft: joints only (nothing spawned), robot at the init stance, the moving link held while settling
         d = Draft()

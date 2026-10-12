@@ -9527,6 +9527,8 @@
    "handle_row": "j_link_2#C",
    "pinch_width_min_m": 0.006,
    "_handle_row_note": "owner 2026-10-12 02:20: the door's bar j_link_2#C (8 mm thick, 0.28 m long, centre h 0.73 m, approached straight from the front) instead of the edge pinch j_link_2#F (39 mm, old sheet #01) - open from the shut door found no reachable edge stance in 576 attempts (the gripper would point sideways along the face with a finger behind the leaf) and close followed the edge only 11-63 % of the way shut; pinch_width_min_m 0.006 admits the 8 mm bar (the 15 mm default floor skipped it and the knobs; pinch_width_range_m is the small-scale sampler's key)",
+   "push_finish": true,
+   "_push_finish_note": "owner 2026-10-12 ~04:20: the bar close still stops part-way (the arm follows the handle 31-92 % of the closing from the drawn stances, artlarge03_bar c1_k0 / c1_k1) - hold the handle as far as the arm reaches, release, and push the leaf's outer face the rest of the way shut with the closed hand from the same stance (sampler plan_push_finish -> articulation.follow_to + push_finish; oracle push_close with the planned chunk)",
    "direction": "close",
    "prompt0": {
     "beta_max_deg": 20.0,

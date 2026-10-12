@@ -1202,6 +1202,78 @@ def test_room_door_close_pushes_the_outer_face():
         expand(sc.alias, Sidecar.from_dict(d3))
 
 
+def _cabinet_push_finish(k=0.75):
+    """The close large-scale fixture's leaf as a cabinet door followed by the arm, with a push finish released at fraction ``k``
+    (``articulation.follow_to`` + the sampler's ``push_finish`` record; the contact a unit pose on the leaf)."""
+    with open(os.path.join(VARIANTS, "configuration_matching-articulation_close_large_scale__room_door.json")) as f:
+        d = json.load(f)
+    art = d["articulation"]
+    for key in ("base_follow", "base_follow_path"):
+        art.pop(key, None)
+    q_from = art["q_init"] + k * (art["q_goal"] - art["q_init"])
+    w = art["waypoints"]["0.75"]
+    art.update({"door_class": "cabinet", "follow_mode": "arm", "follow_to": k,
+                "push_finish": {"arm": "right", "stance": "manipulation", "base_pose2d": list(d["stances"]["manipulation"]["base_pose2d"]), "k_release": k,
+                                "q_from": q_from, "q_to": art["q_goal"], "q_lower": art["q_goal"], "hinge_world": [-6.8613, 5.2119, 1.0], "swing_sign": 1.0,
+                                "contact": {"position": list(w["contact"]), "orientation": [0.0, 0.0, 0.0, 1.0]}, "normal": [-float(v) for v in w["approach"]],
+                                "pre_m": 0.10, "arm_q_pre": [0.0] * 7}})
+    return d
+
+
+def test_cabinet_push_finish_program():
+    """Owner 2026-10-12 ~04:20 (close_large#03): a cabinet door whose closing the arm follows only part of the way
+    (``articulation.push_finish`` + ``follow_to``) is grasped, followed up to the release, released and retreated, then pushed the rest
+    of the way shut by ``push_close`` with the planned chunk (no stance search, no base drag), judged on the instance's joint tolerance;
+    the push carries no eef pose the program check would solve. The room door's push-close, a plain cabinet close and an open are
+    unchanged; a malformed record is a sidecar problem."""
+    from ispatialgym.oracle.programs import program_articulation_large
+    from ispatialgym.sampling.v2.program_check import iter_pose_targets
+
+    st = "configuration_matching-articulation_close_large_scale"
+    d = _cabinet_push_finish()
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == []
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == _WALL_IN + ["grasp", "base_follow", "retreat", "push_close"]
+    grasp, follow, retreat, push = actions[2:]
+    art = d["articulation"]
+    assert [key for _, key in follow.articulation.followed_fractions()] == ["0.25", "0.5", "0.75"] and retreat.after is follow and retreat.release is True
+    assert isinstance(push, A.PushClose) and (push.arm, push.arms, push.objects) == ("right", ("left", "right"), ("door.n.01_1",))
+    assert push.plan == [art["push_finish"]] and push.drag_m == 0.0 and push.q_from == pytest.approx(art["push_finish"]["q_from"])
+    assert (push.q_lower, push.tol_span_rad) == (pytest.approx(art["q_goal"]), pytest.approx(abs(art["q_goal"] - art["q_init"])))
+    targets = push.targets(sc, None)
+    assert set(targets) == {"leaf"} and targets["leaf"]["planned_chunks"] == 1 and list(iter_pose_targets(targets)) == []
+    fine, numbers = push.annotate(sc)
+    assert fine == "push the door the rest of the way shut with the closed right hand on its outer face" and numbers.startswith(fine)
+    assert "letting go there for the push that takes it on" in follow.annotate(sc)[1]
+    # the room door, a plain cabinet close and the open: as before
+    with open(os.path.join(VARIANTS, f"{st}__room_door.json")) as f:
+        room = Sidecar.from_dict(json.load(f))
+    assert [a.name for a in expand(room.alias, room)] == _WALL_IN + ["push_close"] and expand(room.alias, room)[-1].plan is None
+    plain = copy.deepcopy(d)
+    for key in ("push_finish", "follow_to"):
+        plain["articulation"].pop(key)
+    assert [a.name for a in expand(sc.alias, Sidecar.from_dict(plain))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+    assert [a.name for a in program_articulation_large(sc, direction="open")] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+    # the release as its own waypoint (the sampler records the exact reach fraction)
+    d2 = _cabinet_push_finish(0.8547)
+    d2["articulation"]["waypoints"]["0.8547"] = dict(d2["articulation"]["waypoints"]["0.75"])
+    d2["articulation"]["handle_reach"].update({"0.8547": True, "1.0": False})
+    sc2 = Sidecar.from_dict(d2)
+    assert sc2.problems() == [] and [k for _, k in expand(sc2.alias, sc2)[3].articulation.followed_fractions()] == ["0.25", "0.5", "0.75", "0.8547"]
+    # malformed records
+    for mutate, match in ((lambda a: a.pop("follow_to"), "follow_to must be recorded"),
+                          (lambda a: a["push_finish"].update(k_release=0.5), "the push starts where the hand lets go"),
+                          (lambda a: a["push_finish"].update(swing_sign=0.0), "swing_sign"),
+                          (lambda a: a["push_finish"].pop("contact"), "missing ['contact']"),
+                          (lambda a: a["push_finish"].update(arm="middle"), "unknown arm"),
+                          (lambda a: a.update(push_finish="planned"), "expected a dict")):
+        bad = _cabinet_push_finish()
+        mutate(bad["articulation"])
+        problems = Sidecar.from_dict(bad).problems()
+        assert any(match in p for p in problems), (match, problems)
+
+
 def test_attachment_second_base_pose_is_travelled_while_holding():
     """Owner decision 2026-09-16 17:10 item 2 (spec §6.8; tabletop ``58afae2``, core ``bd10c72``): when the attach pose
     and the brace are not both reachable from the grasp stance the sidecar records an ``attach`` stance reached with the
