@@ -432,6 +432,34 @@
    "fallback_of": "alignment-world_vertical-license_plate-walls",
    "fallback_rank": 1,
    "fallback_kind": "scale"
+  },
+  {
+   "alias": "alignment-axial-tablespoon_s070-breakfast_table",
+   "id": 36,
+   "grounded": "2026-10-11",
+   "by": "ground_isg 2.0.0",
+   "subtask": "alignment-axial",
+   "iddl": "alignment/axial.iddl",
+   "pick": "alignment-axial#05~T5",
+   "slot": "representative",
+   "mode": "representative",
+   "fallback_of": "alignment-axial-tablespoon-breakfast_table",
+   "fallback_rank": 1,
+   "fallback_kind": "scale"
+  },
+  {
+   "alias": "alignment-axial-tablespoon_s070-pedestal_table",
+   "id": 37,
+   "grounded": "2026-10-11",
+   "by": "ground_isg 2.0.0",
+   "subtask": "alignment-axial",
+   "iddl": "alignment/axial.iddl",
+   "pick": "alignment-axial#05~T4",
+   "slot": "representative",
+   "mode": "representative",
+   "fallback_of": "alignment-axial-tablespoon-pedestal_table",
+   "fallback_rank": 1,
+   "fallback_kind": "scale"
   }
  ]
 }

@@ -3595,6 +3595,9 @@
  "alignment-axial-tablespoon-breakfast_table": {
   "iddl": "alignment/axial.iddl",
   "definition_id": 24,
+  "fallbacks": [
+   "alignment-axial-tablespoon_s070-breakfast_table"
+  ],
   "roles": {
    "target": {
     "category": "tablespoon",
@@ -3602,7 +3605,10 @@
     "require": {
      "contacts": true
     },
-    "representative": "tqqwys"
+    "representative": "tqqwys",
+    "orientation_equivalences": {
+     "tablespoon/tqqwys": []
+    }
    },
    "support": {
     "category": "breakfast_table",
@@ -3633,11 +3639,16 @@
       "room": "kitchen_0"
      }
     },
-    "whitelist": {},
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
     "blacklist": {
      "target": {
       "tablespoon": {
-       "tqqwys": "ground_isg 2026-10-11: missing_frame",
        "ubuhoz": "ground_isg 2026-10-11: heldout"
       }
      }
@@ -3663,11 +3674,16 @@
       }
      ]
     },
-    "whitelist": {},
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
     "blacklist": {
      "target": {
       "tablespoon": {
-       "tqqwys": "ground_isg 2026-10-11: missing_frame",
        "ubuhoz": "ground_isg 2026-10-11: heldout"
       }
      }
@@ -3700,11 +3716,16 @@
       "room": "living_room_0"
      }
     },
-    "whitelist": {},
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
     "blacklist": {
      "target": {
       "tablespoon": {
-       "tqqwys": "ground_isg 2026-10-11: missing_frame",
        "ubuhoz": "ground_isg 2026-10-11: heldout"
       }
      }
@@ -3748,11 +3769,57 @@
     0.5
    ]
   },
-  "constraints": []
+  "constraints": [
+   {
+    "scope": {
+     "scene": "house_single_floor",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   },
+   {
+    "scope": {
+     "scene": "house_double_floor_lower",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   },
+   {
+    "scope": {
+     "scene": "Rs_int",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   }
+  ]
  },
  "alignment-axial-tablespoon-pedestal_table": {
   "iddl": "alignment/axial.iddl",
   "definition_id": 25,
+  "fallbacks": [
+   "alignment-axial-tablespoon_s070-pedestal_table"
+  ],
   "roles": {
    "target": {
     "category": "tablespoon",
@@ -3760,7 +3827,10 @@
     "require": {
      "contacts": true
     },
-    "representative": "tqqwys"
+    "representative": "tqqwys",
+    "orientation_equivalences": {
+     "tablespoon/tqqwys": []
+    }
    },
    "support": {
     "category": "pedestal_table",
@@ -3791,11 +3861,16 @@
       "room": "dining_room_0"
      }
     },
-    "whitelist": {},
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
     "blacklist": {
      "target": {
       "tablespoon": {
-       "tqqwys": "ground_isg 2026-10-11: missing_frame",
        "ubuhoz": "ground_isg 2026-10-11: heldout"
       }
      }
@@ -3839,7 +3914,377 @@
     0.5
    ]
   },
-  "constraints": []
+  "constraints": [
+   {
+    "scope": {
+     "scene": "restaurant_diner",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   }
+  ]
+ },
+ "alignment-axial-tablespoon_s070-breakfast_table": {
+  "iddl": "alignment/axial.iddl",
+  "definition_id": 36,
+  "fallback_of": "alignment-axial-tablespoon-breakfast_table",
+  "fallback_rank": 1,
+  "fallback_kind": "scale",
+  "fallback_params": {
+   "scale": 0.7,
+   "scale_source": "default_step"
+  },
+  "roles": {
+   "target": {
+    "category": "tablespoon",
+    "sampleable": true,
+    "require": {
+     "contacts": true
+    },
+    "representative": "tqqwys",
+    "scale": {
+     "tablespoon/tqqwys": 0.7,
+     "default": 0.7
+    },
+    "orientation_equivalences": {
+     "tablespoon/tqqwys": []
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_lower": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_xftrki_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_xftrki_0",
+       "init": "ontop",
+       "top_z": 0.68,
+       "row": "alignment-axial#05~T2"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "tablespoon": {
+       "ubuhoz": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   },
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     },
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "alignment-axial#05~T1"
+      }
+     ]
+    },
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "tablespoon": {
+       "ubuhoz": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   },
+   "Rs_int": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_skczfi_1",
+      "breakfast_table_skczfi_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_skczfi_1",
+       "init": "ontop",
+       "top_z": 0.76,
+       "row": "alignment-axial#05~T5"
+      },
+      {
+       "name": "breakfast_table_skczfi_0",
+       "init": "ontop",
+       "top_z": 0.76,
+       "row": "alignment-axial#05~T3"
+      }
+     ],
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "tablespoon": {
+       "ubuhoz": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "orientation": 0.1
+   },
+   "groups": {},
+   "path_buckets": null,
+   "deviation_range_deg": [
+    20.0,
+    70.0
+   ],
+   "hinge_sink_m": 0.001,
+   "hinge_drift_max": {
+    "position_m": 0.001,
+    "orientation_rad": 0.005,
+    "steps": 60
+   },
+   "edge_visibility": {
+    "points": 9,
+    "min_visible": 3,
+    "window_m": 0.3,
+    "in_frame_margin": 0.05
+   },
+   "scale_hint_steps": [
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5
+   ]
+  },
+  "constraints": [
+   {
+    "scope": {
+     "scene": "house_single_floor",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   },
+   {
+    "scope": {
+     "scene": "house_double_floor_lower",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   },
+   {
+    "scope": {
+     "scene": "Rs_int",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   }
+  ]
+ },
+ "alignment-axial-tablespoon_s070-pedestal_table": {
+  "iddl": "alignment/axial.iddl",
+  "definition_id": 37,
+  "fallback_of": "alignment-axial-tablespoon-pedestal_table",
+  "fallback_rank": 1,
+  "fallback_kind": "scale",
+  "fallback_params": {
+   "scale": 0.7,
+   "scale_source": "default_step"
+  },
+  "roles": {
+   "target": {
+    "category": "tablespoon",
+    "sampleable": true,
+    "require": {
+     "contacts": true
+    },
+    "representative": "tqqwys",
+    "scale": {
+     "tablespoon/tqqwys": 0.7,
+     "default": 0.7
+    },
+    "orientation_equivalences": {
+     "tablespoon/tqqwys": []
+    }
+   },
+   "support": {
+    "category": "pedestal_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "pedestal_table_nlfgwe_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "pedestal_table_nlfgwe_0",
+       "init": "ontop",
+       "top_z": 0.78,
+       "row": "alignment-axial#05~T4"
+      }
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "tqqwys"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "tablespoon": {
+       "ubuhoz": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "orientation": 0.1
+   },
+   "groups": {},
+   "path_buckets": null,
+   "deviation_range_deg": [
+    20.0,
+    70.0
+   ],
+   "hinge_sink_m": 0.001,
+   "hinge_drift_max": {
+    "position_m": 0.001,
+    "orientation_rad": 0.005,
+    "steps": 60
+   },
+   "edge_visibility": {
+    "points": 9,
+    "min_visible": 3,
+    "window_m": 0.3,
+    "in_frame_margin": 0.05
+   },
+   "scale_hint_steps": [
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5
+   ]
+  },
+  "constraints": [
+   {
+    "scope": {
+     "scene": "restaurant_diner",
+     "target": "tablespoon/tqqwys"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   }
+  ]
  },
  "alignment-world_vertical-license_plate-walls": {
   "iddl": "alignment/world_vertical.iddl",
@@ -36083,8 +36528,15 @@
      "grasps": "tabletop"
     },
     "representative": "hkvsep",
+    "scale": {
+     "spatula/hkvsep": [
+      0.76,
+      0.76,
+      0.76
+     ]
+    },
     "grasp_keys": {
-     "spatula/hkvsep": "spatula__hkvsep__t"
+     "spatula/hkvsep": "spatula__hkvsep__t076"
     }
    },
    "partner": {
@@ -36122,6 +36574,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "spatula": [
+       "hkvsep"
+      ]
+     },
      "partner": {
       "paper_sheet": [
        "uqbipw"
@@ -36131,7 +36588,6 @@
     "blacklist": {
      "target": {
       "spatula": {
-       "hkvsep": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.76 to fit paper_sheet/uqbipw)",
        "pxwpuw": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -36196,16 +36652,8 @@
       0.76,
       0.76
      ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "tabletop",
-      "base_key": "spatula__hkvsep__t",
-      "scale": [
-       0.76,
-       0.76,
-       0.76
-      ]
-     }
+     "status": "scaled",
+     "grasp_key": "spatula__hkvsep__t076"
     }
    }
   },
@@ -36222,8 +36670,15 @@
      "grasps": "tabletop"
     },
     "representative": "hkvsep",
+    "scale": {
+     "spatula/hkvsep": [
+      0.76,
+      0.76,
+      0.76
+     ]
+    },
     "grasp_keys": {
-     "spatula/hkvsep": "spatula__hkvsep__t"
+     "spatula/hkvsep": "spatula__hkvsep__t076"
     }
    },
    "partner": {
@@ -36261,6 +36716,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "spatula": [
+       "hkvsep"
+      ]
+     },
      "partner": {
       "paper_sheet": [
        "uqbipw"
@@ -36270,7 +36730,6 @@
     "blacklist": {
      "target": {
       "spatula": {
-       "hkvsep": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.76 to fit paper_sheet/uqbipw)",
        "pxwpuw": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -36335,16 +36794,8 @@
       0.76,
       0.76
      ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "tabletop",
-      "base_key": "spatula__hkvsep__t",
-      "scale": [
-       0.76,
-       0.76,
-       0.76
-      ]
-     }
+     "status": "scaled",
+     "grasp_key": "spatula__hkvsep__t076"
     }
    }
   },
@@ -36361,8 +36812,15 @@
      "grasps": "tabletop"
     },
     "representative": "hkvsep",
+    "scale": {
+     "spatula/hkvsep": [
+      0.76,
+      0.76,
+      0.76
+     ]
+    },
     "grasp_keys": {
-     "spatula/hkvsep": "spatula__hkvsep__t"
+     "spatula/hkvsep": "spatula__hkvsep__t076"
     }
    },
    "partner": {
@@ -36407,6 +36865,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "spatula": [
+       "hkvsep"
+      ]
+     },
      "partner": {
       "paper_sheet": [
        "uqbipw"
@@ -36416,7 +36879,6 @@
     "blacklist": {
      "target": {
       "spatula": {
-       "hkvsep": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.76 to fit paper_sheet/uqbipw)",
        "pxwpuw": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -36481,16 +36943,8 @@
       0.76,
       0.76
      ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "tabletop",
-      "base_key": "spatula__hkvsep__t",
-      "scale": [
-       0.76,
-       0.76,
-       0.76
-      ]
-     }
+     "status": "scaled",
+     "grasp_key": "spatula__hkvsep__t076"
     }
    }
   },
@@ -36507,8 +36961,15 @@
      "grasps": "tabletop"
     },
     "representative": "hkvsep",
+    "scale": {
+     "spatula/hkvsep": [
+      0.76,
+      0.76,
+      0.76
+     ]
+    },
     "grasp_keys": {
-     "spatula/hkvsep": "spatula__hkvsep__t"
+     "spatula/hkvsep": "spatula__hkvsep__t076"
     }
    },
    "partner": {
@@ -36546,6 +37007,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "spatula": [
+       "hkvsep"
+      ]
+     },
      "partner": {
       "paper_sheet": [
        "uqbipw"
@@ -36555,7 +37021,6 @@
     "blacklist": {
      "target": {
       "spatula": {
-       "hkvsep": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.76 to fit paper_sheet/uqbipw)",
        "pxwpuw": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -36620,16 +37085,8 @@
       0.76,
       0.76
      ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "tabletop",
-      "base_key": "spatula__hkvsep__t",
-      "scale": [
-       0.76,
-       0.76,
-       0.76
-      ]
-     }
+     "status": "scaled",
+     "grasp_key": "spatula__hkvsep__t076"
     }
    }
   },
