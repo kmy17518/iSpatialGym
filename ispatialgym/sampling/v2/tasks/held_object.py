@@ -503,6 +503,38 @@ def start_controller_targets(robot, state, arm: str) -> Dict[str, float]:
     return out
 
 
+@contextlib.contextmanager
+def assisted_grasp_paused(robot):
+    """OmniGibson's assisted grasp left alone for the enclosed physics steps (``Robot._disable_grasp_handling``): the weld and
+    the object in hand stay as they are, whatever the gripper's control. A joint teleport resets the controllers, so the next
+    step's gripper control is the teleported finger position; at the open limit (``FINGER_OPEN``, ``RobotKit.q_config``'s
+    default and so the goal configuration's fingers) that is "not applying grasp", and the stock release (the sampler does
+    not set the fork's pad-clear release) deletes the weld in that step."""
+    before = getattr(robot, "_disable_grasp_handling", False)
+    robot._disable_grasp_handling = True
+    try:
+        yield
+    finally:
+        robot._disable_grasp_handling = before
+
+
+def drop_weld(robot, arm: str) -> None:
+    """``arm``'s assisted grasp let go completely: the weld joint whenever ``_ag_obj_constraints`` still has one, also with no
+    object in hand, and the in-hand / release / grasp-window bookkeeping. ``Robot._load_state`` re-creates a saved weld but
+    keeps a release window that was running when the state was loaded; the window then clears ``_ag_obj_in_hand`` while the
+    joint stays, and a release that asks for the object in hand leaves the object welded to the hand for the next attempts."""
+    try:
+        if robot._ag_obj_constraints.get(arm) is not None:
+            robot.release_grasp_immediately(arm)
+    except Exception as e:  # noqa: BLE001
+        log.warning("assisted-grasp release of the %s arm failed: %r", arm, e)
+    robot._ag_obj_in_hand[arm] = None
+    robot._ag_release_counter[arm] = None
+    robot._ag_grasp_counter[arm] = None
+    if getattr(robot, "_ag_release_pending", None) is not None:
+        robot._ag_release_pending[arm] = None
+
+
 @dataclass
 class HoldSolution:
     """One arm's fixed hold at the template's parked base pose (``HeldObjectV2.solve_hold``): the configuration ``q`` (28-D) and
@@ -1044,11 +1076,7 @@ class HeldObjectV2(SamplerV2):
         self.kit.sync_world()
 
     def release(self):
-        try:
-            if self.robot._ag_obj_in_hand.get(self.arm) is not None:
-                self.robot.release_grasp_immediately(self.arm)
-        except Exception:
-            pass
+        drop_weld(self.robot, self.arm)
         state = ActionState(self.robot)
         state.hold_current()
         state.set_gripper(self.arm, close=False)
@@ -1086,45 +1114,49 @@ class HeldObjectV2(SamplerV2):
         """Goal = the robot at the goal arm configuration with the object in hand: whole object in view, visible
         fraction within bounds and every binary goal atom (``pose_reached``) true there. Joints and object pose are
         written together before the single physics step that refreshes link poses (a step with the fingers away from
-        the object would let the assisted-grasp joint yank it); ``grasped`` itself is not re-evaluated at the goal."""
+        the object would let the assisted-grasp joint yank it); the assisted grasp is paused until the restore
+        (:func:`assisted_grasp_paused`: the goal configuration's fingers are open, which would release the weld in that
+        step, and the restore would bring back a weld the robot forgets a few steps later); ``grasped`` itself is not
+        re-evaluated at the goal."""
         from omnigibson.object_states import PoseReached
 
         tname = self.target_name
         target = self.obj("target")
         state = self.world.snapshot()
         try:
-            q_goal = G.t(draft.extras["goal_robot_q"]).clone()
-            base_idx = [self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]
-            q_goal[base_idx] = self.robot.get_joint_positions()[base_idx]
-            goal = draft.goal_poses[tname]
-            self.robot.set_joint_positions(q_goal)
-            self.robot.set_joint_velocities(th.zeros_like(q_goal))
-            self.robot.keep_still()
-            target.set_position_orientation(G.t(goal[0]), G.t(goal[1]))
-            target.keep_still()
-            og.sim.step_physics()
-            self.robot.keep_still()
-            target.keep_still()
-            self.world.render(3)
-            cam = self.world.camera_pose()
-            obj_now = tuple(x.float() for x in target.get_position_orientation())
-            if not self.whole_in_frame(cam, obj_now):
-                raise Reject("goal_out_of_view", f"object leaves the image at the goal (obj {[round(float(v), 3) for v in obj_now[0]]})")
-            occ = self.self_occlusion(target)
-            min_vis = float(self.g("min_visible_fraction"))
-            if occ["visible_fraction"] < min_vis:
-                raise Reject("goal_self_occlusion", f"goal visible fraction {occ['visible_fraction']:.2f} < {min_vis}")
-            self.configure_targets(draft)
-            st = target.states[PoseReached]
-            if not bool(st.get_value()):
-                raise Reject("goal_infeasible", f"pose_reached false at the goal configuration (errors {st.get_error()})")
-            _, status = self.compiled.check_goal(self._evaluate)
-            report = self.goal_report(status)
-            failed = [c["bddl"] for c in report if not c["satisfied"] and "pose_settled" not in c["bddl"]]
-            if [f for f in failed if "grasped" not in f]:
-                raise Reject("goal_infeasible", f"unsatisfied at the goal configuration: {failed}")
-            draft.summary["goal_check"] = {"goal": report}
-            draft.summary["goal_visibility"] = occ
+            with assisted_grasp_paused(self.robot):
+                q_goal = G.t(draft.extras["goal_robot_q"]).clone()
+                base_idx = [self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]
+                q_goal[base_idx] = self.robot.get_joint_positions()[base_idx]
+                goal = draft.goal_poses[tname]
+                self.robot.set_joint_positions(q_goal)
+                self.robot.set_joint_velocities(th.zeros_like(q_goal))
+                self.robot.keep_still()
+                target.set_position_orientation(G.t(goal[0]), G.t(goal[1]))
+                target.keep_still()
+                og.sim.step_physics()
+                self.robot.keep_still()
+                target.keep_still()
+                self.world.render(3)
+                cam = self.world.camera_pose()
+                obj_now = tuple(x.float() for x in target.get_position_orientation())
+                if not self.whole_in_frame(cam, obj_now):
+                    raise Reject("goal_out_of_view", f"object leaves the image at the goal (obj {[round(float(v), 3) for v in obj_now[0]]})")
+                occ = self.self_occlusion(target)
+                min_vis = float(self.g("min_visible_fraction"))
+                if occ["visible_fraction"] < min_vis:
+                    raise Reject("goal_self_occlusion", f"goal visible fraction {occ['visible_fraction']:.2f} < {min_vis}")
+                self.configure_targets(draft)
+                st = target.states[PoseReached]
+                if not bool(st.get_value()):
+                    raise Reject("goal_infeasible", f"pose_reached false at the goal configuration (errors {st.get_error()})")
+                _, status = self.compiled.check_goal(self._evaluate)
+                report = self.goal_report(status)
+                failed = [c["bddl"] for c in report if not c["satisfied"] and "pose_settled" not in c["bddl"]]
+                if [f for f in failed if "grasped" not in f]:
+                    raise Reject("goal_infeasible", f"unsatisfied at the goal configuration: {failed}")
+                draft.summary["goal_check"] = {"goal": report}
+                draft.summary["goal_visibility"] = occ
         finally:
             self.world.restore(state)
             self.robot.keep_still()
