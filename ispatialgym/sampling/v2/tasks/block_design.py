@@ -247,7 +247,7 @@ class BlockDesign(SamplerV2):
                 # top beyond the caps and only the translate-0.95 trunks survive (blk_diag2 22:28: 2 survivors, both (0.95, 0 / -0.16),
                 # every pick pre-grasp out of reach from that height); the 30 deg loose class lets those trunks see regions at
                 # 0.55-0.70 m
-                angle_classes = (float(self.gen("phase2_tight_class_deg", 20.0)), float(self.gen("phase2_loose_class_deg", 30.0)))
+                angle_classes = TT.phase2_angle_classes(self)
                 cands = []
                 # owner 2026-09-19 (in-hand flip about the forward axis, see FLIP_DIRECTIONS): the manipulation stance is scanned
                 # at the init lateral AND shifted along the edge to the robot's LEFT (``generation.manip_lateral_shifts_m``): the

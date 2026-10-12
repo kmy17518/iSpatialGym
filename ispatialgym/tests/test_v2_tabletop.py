@@ -1270,3 +1270,19 @@ def test_upright_lean_and_mirrored_lean_orientations():
     lean = lambda p: float(p[p[:, 2] > 0.1][:, 1].mean() - p[p[:, 2] < -0.1][:, 1].mean())
     assert lean(p0) > 0.03 and lean(pm) < -0.03 and abs(lean(p0) + lean(pm)) < 1e-3
     assert abs(float(pm[:, 0].min()) - float(p0[:, 0].min())) < 1e-4  # the spine stays at the same depth
+
+
+def test_phase2_angle_classes_customs_then_subtask_default_then_global(monkeypatch):
+    from types import SimpleNamespace as NS
+
+    from ispatialgym.sampling import generation_defaults as GD
+
+    gen = {}
+    s = NS(subtask="inter_object_relation_satisfaction-inside", gen=lambda k, d=None: gen.get(k, d))
+    assert TT.phase2_angle_classes(s) == tuple(TT.ANGLE_CLASSES_DEG)
+    real = GD.defaults_for
+    monkeypatch.setattr(GD, "defaults_for", lambda st: {**real(st), "phase2_tight_class_deg": 8.0, "phase2_loose_class_deg": 20.0} if st == s.subtask else real(st))
+    assert TT.phase2_angle_classes(s) == (8.0, 20.0)
+    gen.update(phase2_tight_class_deg=25, phase2_loose_class_deg=60)
+    assert TT.phase2_angle_classes(s) == (25.0, 60.0)
+    assert TT.phase2_angle_classes(NS(subtask="no-such-subtask", gen=lambda k, d=None: d)) == tuple(TT.ANGLE_CLASSES_DEG)

@@ -476,7 +476,7 @@ class ArticulationSmall(SamplerV2):
                     focus_z = float(self.top.z) - float(self.hull.min(dim=0).values[2]) + float(self.handle["contact"][2])
                 cands = TT.phase2_manipulation_stance(self, init, w_a, target_height=H_max, in_frame_fn=self._target_in_frame, bands=self.bands, top=self.top,
                                                       stand_offs=tuple(self.g("stand_offs_m")), focus_z=focus_z,
-                                                      angle_classes_deg=(float(self.gen("phase2_tight_class_deg", 20.0)), float(self.gen("phase2_loose_class_deg", 30.0))))
+                                                      angle_classes_deg=TT.phase2_angle_classes(self))
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the target, handle and brace point in frame")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands

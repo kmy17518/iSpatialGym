@@ -407,7 +407,7 @@ class Attachment(SamplerV2):
                 deep = self.gen("phase2_class1_when_deep_m", None)
                 cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.t_role], self.rest[self.t_role]), target_height=self.height[self.t_role],
                                                       bands=bands, top=self.top,
-                                                      angle_classes_deg=(float(self.gen("phase2_tight_class_deg", 20.0)), float(self.gen("phase2_loose_class_deg", 30.0))),
+                                                      angle_classes_deg=TT.phase2_angle_classes(self),
                                                       class1_when_deep_m=None if deep is None else float(deep))
                 cands = [c for c in cands if len(TT.band_cells_world(self.attach_bands, c)) > 0]
                 if not cands:

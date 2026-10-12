@@ -575,7 +575,7 @@ class Disembedding(SamplerV2):
                 self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=bands) if len(self.segment_arms) > 1 else {}
                 cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT), target_height=self.height[self.src_role],
                                                       in_frame_fn=self._source_tray_in_frame, bands=bands, top=self.top, focus_z=self.top.z + self.src_floor.z_local,
-                                                      arm_bands=self.arm_bands)
+                                                      arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self))
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the source tray in frame")
                 self.edge, self.init_stance, self.manip_candidates = edge, init, cands

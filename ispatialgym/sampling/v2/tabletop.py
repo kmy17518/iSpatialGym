@@ -59,6 +59,23 @@ TRANSLATES = tuple(float(t) for t in RB.TRANSLATES)  # §3.3 grid (0.95 = deepes
 TILT_GRID = tuple(float(k) for k in RB.TILTS)  # §3.3 grid tilts of the bands
 N_TILT_SAMPLES = 7  # §4.5 "tilt continuous from 0 to the torso_joint3 limit": samples of the scan
 ANGLE_CLASSES_DEG = (20.0, 30.0)  # §4.5 step 3 (owner 2026-10-11: 8 / 20 left the target almost no spread)
+
+
+def phase2_angle_classes(s, default: Sequence[float] = ANGLE_CLASSES_DEG) -> Tuple[float, float]:
+    """Phase 2's (tight, loose) angle classes for sampler ``s``: ``generation.phase2_tight_class_deg`` / ``phase2_loose_class_deg``
+    of the alias's customs entry, else of its subtask's generation_defaults, else ``default`` - so a subtask's cone is set in
+    one place and an alias can still override it."""
+    from ispatialgym.sampling import generation_defaults as GD
+
+    try:
+        sub = GD.defaults_for(s.subtask)
+    except (KeyError, AttributeError):
+        sub = {}
+    out = []
+    for key, fallback in (("phase2_tight_class_deg", default[0]), ("phase2_loose_class_deg", default[1])):
+        v = s.gen(key, None)
+        out.append(float(v if v is not None else sub.get(key, fallback)))
+    return out[0], out[1]
 IN_FRAME_MARGIN = 0.05  # §3.4 "in frame (5 %)"
 FOCUS_RADIUS = 0.05  # §4.6 step 1: target within 5 cm of the focus
 YAW_JITTER = math.radians(22.5)  # §4.6 step 1

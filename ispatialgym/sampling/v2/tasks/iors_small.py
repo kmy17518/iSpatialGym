@@ -370,7 +370,7 @@ class IORSSmall(SamplerV2):
         # Phase 2: manipulation stance survivors of the best angle class (each with its focus)
         self.manip_candidates = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                                               target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top,
-                                                              arm_bands=self.arm_bands, **phase2_band)
+                                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), **phase2_band)
         if not self.manip_candidates:
             raise Reject("no_manipulation_stance", "Phase 2 left no survivor")
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
