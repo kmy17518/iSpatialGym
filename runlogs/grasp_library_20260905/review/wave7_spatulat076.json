@@ -1,0 +1,42 @@
+{
+ "batch": "wave7_spatulat076 (2026-10-11, grasp076 worker on strips/spatula__hkvsep__t076.png and 3x / 4x crops of its frames with review_prompt.md, not the reviewer pool)",
+ "models": [
+  {
+   "key": "spatula__hkvsep__t076",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch between head and wooden handle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, approach tilted along the handle"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, head just above the pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wooden handle root pinch at the neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wooden handle pinch below the neck"
+    }
+   ],
+   "object_note": "uniform x0.76 (scale [0.76, 0.76, 0.76]); no visible gap or penetration in the profile views"
+  }
+ ]
+}
