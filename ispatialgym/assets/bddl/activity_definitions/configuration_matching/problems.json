@@ -890,6 +890,17 @@
    "pick": "configuration_matching-attachment#03~T10",
    "slot": "representative",
    "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+   "id": 83,
+   "grounded": "2026-09-19",
+   "by": "hand-grounded (agent-blockflip, owner 21:47 option 2)",
+   "subtask": "configuration_matching-block_design",
+   "iddl": "configuration_matching/block_design.iddl",
+   "pick": "configuration_matching-block_design#01",
+   "slot": "representative",
+   "mode": "test"
   }
  ],
  "unregistered": [
