@@ -1164,6 +1164,83 @@
    "pick": "inter_object_relation_satisfaction-touching#04~T5",
    "slot": "representative",
    "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-countertop",
+   "id": 105,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02~B1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-breakfast_table",
+   "id": 106,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02~B2",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar",
+   "id": 107,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02~B3",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-commercial_kitchen_table",
+   "id": 108,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02~B4",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bookcase",
+   "id": 109,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02~B5",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-desk",
+   "id": 110,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant C)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02~C3",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-conference_table",
+   "id": 111,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant C)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02~C5",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }

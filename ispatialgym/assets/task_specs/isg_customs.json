@@ -35806,6 +35806,1068 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 107,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "bar",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "bar_udatjt_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "bar_udatjt_0",
+       "init": "ontop",
+       "top_z": 1.05,
+       "row": "inter_object_relation_satisfaction-touching#02~B3"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bar_udatjt_0 (row inter_object_relation_satisfaction-touching#02~B3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T3 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bookcase": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 109,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "bookcase",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "bookcase_jpdtvg_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "bookcase_jpdtvg_0",
+       "init": "ontop",
+       "top_z": 0.82,
+       "row": "inter_object_relation_satisfaction-touching#02~B5"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bookcase_jpdtvg_0 (row inter_object_relation_satisfaction-touching#02~B5); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T5 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-breakfast_table": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 106,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "inter_object_relation_satisfaction-touching#02~B2"
+      }
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on breakfast_table_rhjoby_0 (row inter_object_relation_satisfaction-touching#02~B2, = C2); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T2 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-commercial_kitchen_table": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 108,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "commercial_kitchen_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "commercial_kitchen_table_vxvtec_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "commercial_kitchen_table_vxvtec_0",
+       "init": "ontop",
+       "top_z": 0.87,
+       "row": "inter_object_relation_satisfaction-touching#02~B4"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on commercial_kitchen_table_vxvtec_0 (row inter_object_relation_satisfaction-touching#02~B4, = C4); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T4 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-conference_table": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 111,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "conference_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "meeting_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "conference_table_fpkmyw_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "conference_table_fpkmyw_0",
+       "init": "ontop",
+       "top_z": 0.67,
+       "row": "inter_object_relation_satisfaction-touching#02~C5"
+      }
+     ],
+     "floor": {
+      "room": "meeting_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 C: touching#02 variant C - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on conference_table_fpkmyw_0 (row inter_object_relation_satisfaction-touching#02~C5); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T7 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-countertop": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 105,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "countertop",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "countertop_kelzer_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "countertop_kelzer_0",
+       "init": "ontop",
+       "top_z": 0.89,
+       "row": "inter_object_relation_satisfaction-touching#02~B1"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on countertop_kelzer_0 (row inter_object_relation_satisfaction-touching#02~B1, = C1); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T1 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-desk": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 110,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_2"
+    ],
+    "bindings": {
+     "support": [
+      "desk_mdhelw_1"
+     ],
+     "support_surfaces": [
+      {
+       "name": "desk_mdhelw_1",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "inter_object_relation_satisfaction-touching#02~C3"
+      }
+     ],
+     "floor": {
+      "room": "private_office_2"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 C: touching#02 variant C - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on desk_mdhelw_1 (row inter_object_relation_satisfaction-touching#02~C3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T6 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
+ },
  "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-bottom_cabinet": {
   "iddl": "inter_object_relation_satisfaction/touching.iddl",
   "definition_id": 90,
