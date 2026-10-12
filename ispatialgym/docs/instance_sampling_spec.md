@@ -1532,6 +1532,10 @@ stays as above. The keys an alias sets are recorded in `template_facts.relaxatio
   A support that is in range but admits no stance A–C still rejects the template. A far support needs the B → C drive cap
   raised with it: `max_partner_geodesic` 10 gives max(10 + 1, 2 × 10) = 20 m; `floor_init.max_geodesic_m` defaults to
   `max_partner_geodesic`, so an alias raising the latter sets the former explicitly (3.0 keeps the floor cells near the partner).
+- Place-under (`under_mode` other than `"push"`, e.g. `"place"`; fix, no key): the oracle's place under the partner keeps the
+  partner in the planner's world and leaves out its support (the floor the object is set on) — it left out the partner and kept
+  the floor before; the sampler takes the floor mesh out of its stance / leg / program checks for every under variant (before:
+  push-under and floor inits only).
 
 ## 6. Per-task rules
 

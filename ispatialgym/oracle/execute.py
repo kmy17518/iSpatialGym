@@ -2260,7 +2260,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     # the FOV span opened at the pre-grasp stays open through the carry (rule (b)): no hook here
     on = []
     if getattr(action, "on", None) and not drop:  # a drop keeps its container in the collision world: it must not be touched
-        if action.relation in ("on", "into", "under") or action.kind == "attach":
+        if action.relation in ("on", "into") or action.kind == "attach":
             # owner 2026-09-26: a place ignores the partner it is set on / into / attached to - only that. The partner's own supports
             # (the table, the floor) came in through ``contact_supports`` whenever the partner was awake and reporting contacts: the
             # teacup's place ignored breakfast_table + floors in wave 3 (the transit had shoved the saucer awake), only the saucer in
@@ -2270,7 +2270,9 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             except Exception:  # noqa: BLE001
                 on = contact_ignores(state, action.on, extra=(action.on,))
         else:
-            on = contact_ignores(state, action.on)  # next to / touching: the partner stays an obstacle, only the shared support leaves
+            # next to / touching: the partner stays an obstacle, only the shared support leaves; under (the large-scale place-under,
+            # owner 2026-10-12 item 2c): the partner stays an obstacle above the hand, its support - the floor the object is set on - leaves
+            on = contact_ignores(state, action.on)
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
     if action.kind == "attach" and action.on:
         targets = _reaim_attach_targets(action, state, targets, ctx, cfg)

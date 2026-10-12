@@ -183,3 +183,49 @@ def test_init_support_fallback_floor_for_ontop_and_own_top_for_under(monkeypatch
     assert s.tried == [("support", "countertop_ikwqer_0")] and "fallback" not in s.template_facts["init_surface"] and s.init_fallback is None
     # the floor / own-top classes never fall back (they always have their one candidate)
     assert s.init_support_fallback("floor") is None and s.init_support_fallback("partner") is None
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# 2c: the place-under (generation.under_mode != "push") end to end
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_a_place_under_plans_around_the_partner_and_leaves_out_the_floor(tmp_path):
+    """The oracle's place ``under`` the partner (``program_iors_large``'s place-under: kind support, ``on`` = the partner) leaves the
+    partner's support - the floor the object is set on - out of the planner's world and keeps the partner; ``on`` / ``into`` places
+    still leave out the partner they are set on, only that."""
+    from dataclasses import replace
+
+    from ispatialgym.oracle.actions import Place
+    from ispatialgym.oracle.programs import expand
+    from ispatialgym.tests.test_v2_oracle import _place_goal, iors_world, make_executor, success_eval
+
+    ignored = {}
+    for relation in ("on", "under"):
+        sc, env = iors_world()
+        env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+        ex, motions, backend, _ = make_executor(env, sc, tmp_path / relation)
+        floor = SimpleNamespace(name="floors_x_0", category="floors")
+        ex.state.contact_supports = lambda name, margin=0.10, depth=2, _f=floor: [_f]
+        actions = [replace(a, relation=relation) if isinstance(a, Place) else a for a in expand(sc.alias, sc)]
+        result = ex.run_program(actions)
+        assert result["success"], result["verdict"]
+        ignored[relation] = ex.action_records[[a.name for a in actions].index("place")].notes["plan_ignored"]
+    assert ignored == {"on": ["plate_pkkgzc_0"], "under": ["floors_x_0"]}
+
+
+def test_every_under_variant_takes_the_floor_mesh_out():
+    class S:
+        _floor_relaxed = IL.IORSLarge._floor_relaxed
+
+        def __init__(self, relation, init_class):
+            self.relation, self.surface = relation, {"kind": init_class}
+            self.ikc = SimpleNamespace(ignoring=lambda objs: ("ignoring", [o.name for o in objs]))
+
+        def obj(self, role):
+            return SimpleNamespace(name="floors_x_0")
+
+    assert S("under", "support")._floor_relaxed() == ("ignoring", ["floors_x_0"])  # place-under from a support (before: the floor stayed)
+    assert S("under", "partner")._floor_relaxed() == ("ignoring", ["floors_x_0"])
+    assert S("ontop", "floor")._floor_relaxed() == ("ignoring", ["floors_x_0"])  # the floor init, as before
+    assert isinstance(S("ontop", "support")._floor_relaxed(), IL._NullContext)  # ontop from a support, as before

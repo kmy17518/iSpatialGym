@@ -2881,9 +2881,11 @@ class IORSLarge(SamplerV2):
     def _floor_relaxed(self):
         """Context: the floor object out of the collision world (the cuRobo ground slab stays) — the push-under stance C
         stands at the deep trunks, where the 1 cm margin against the floor mesh is what fails (see
-        :meth:`push_under_candidates`); applied to the core's stance / transition re-check and to the program check."""
+        :meth:`push_under_candidates`); applied to the core's stance / transition re-check and to the program check. Every under
+        variant: the place-under (``under_mode`` != "push") sets the object down on the floor from the floor band's crouch as well
+        (owner 2026-10-12 item 2c; before, only a floor-class init took the floor out for it)."""
         floor_class = (getattr(self, "surface", None) or {}).get("kind") == "floor"
-        return self.ikc.ignoring([self.obj("floor")]) if (self.push_under or floor_class) else _NullContext()
+        return self.ikc.ignoring([self.obj("floor")]) if (self.relation == "under" or floor_class) else _NullContext()
 
     def check_stances_with_objects(self, draft: Draft):
         with self._floor_relaxed():
