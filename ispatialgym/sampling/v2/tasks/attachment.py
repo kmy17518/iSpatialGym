@@ -1482,10 +1482,12 @@ class Attachment(SamplerV2):
             self.world.keep_still(self.objects.values())
 
     def after_goal_check(self, draft: Draft):
-        """The attach / pre-attach at the settled partner pose from the manipulation stance (male in hand)."""
+        """The attach / pre-attach at the settled partner pose (male in hand), from the stance the attach was recorded at: the
+        second base pose when the attach needed one (``grasp.extras["attach_stance"]``), else the manipulation stance."""
         tname, pname = self.tname, self.pname
         grasp = self.sidecar.grasp_of(tname)
         manip = self.sidecar.stance("manipulation")
+        manip = self.sidecar.stances.get(str(grasp.extras.get("attach_stance") or "manipulation")) or manip
         f_pose = draft.object_poses[pname]
         goal = self._attached_pose(f_pose)
         attach = IK.grasp_pose(goal, grasp.eef_in_object)
