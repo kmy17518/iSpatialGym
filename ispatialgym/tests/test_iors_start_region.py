@@ -296,3 +296,90 @@ def test_partner_gap_masks_frame_rule():
     m = TT.partner_gap_masks(s, 1.0, t_fp, 0.31, s.hull["partner"], C.IDENTITY_QUAT.clone(), s.init_stance, gs, top=s.top, cam=cam, m_end=0.10)
     assert set(m) == {"ends", "top", "frame"} and m["top"].all() and m["ends"].all()
     assert m["frame"][0] and not m["frame"][-1] and TT.longest_run(gs, m["frame"])[0] == pytest.approx(0.03)  # it leaves the image farther out
+
+
+# ---------------------------------------------------------------------------------------------------------------- A5 partner on a meta link
+
+
+def test_meta_link_world_points_object_frame_to_world():
+    """A5 (owner 2026-10-12): ``meta_links.base_link.<type>`` entries (object frame, as burner/mdanhg's heatsource block) at the object's
+    pose and scale."""
+    entries = {"0": [{"position": [-0.114, -0.254, 0.0075], "orientation": [0.0, 0.0, -0.7071, 0.7071]}],
+               "1": [{"position": [0.073, -0.254, 0.0054]}, {"position": [0.073, -0.150, 0.0054]}]}
+    root = (th.tensor([2.0, 1.0, 0.9]), G.quat_from_yaw(math.pi / 2))
+    pts = dict(TT.meta_link_world_points(entries, root, scale=[0.5, 0.5, 2.0]))
+    assert sorted(pts) == ["0", "1/0", "1/1"]
+    # x, y scaled by 0.5 then turned +90 deg about z: (x, y) -> (-y, x)
+    assert pts["0"].tolist() == pytest.approx([2.0 + 0.127, 1.0 - 0.057, 0.9 + 0.015], abs=1e-5)
+    assert pts["1/1"].tolist() == pytest.approx([2.0 + 0.075, 1.0 + 0.0365, 0.9 + 0.0108], abs=1e-5)
+
+
+def _meta_sampler(monkeypatch, points, **kw):
+    s = _sampler(gen={"partner_on_meta_link": "heatsource", **(kw.pop("gen", {}) or {})}, **kw)
+    monkeypatch.setattr(IS.IORSSmall, "meta_link_points", lambda self, link: [(n, th.tensor(p, dtype=th.float32)) for n, p in points] if link == "heatsource" else [])
+    return s
+
+
+#: burner spots on the synthetic table: A / B beside the foci row (x 1.31), C off the top, D on the top but 0.14 m deeper than the row, E on
+#: the top 5 cm from its end (the partner centred there overhangs it, as a pot's handle a stove)
+SPOTS = [("A", [1.31, 0.105, 0.76]), ("B", [1.31, -0.405, 0.76]), ("C", [1.31, 2.0, 0.76]), ("D", [1.45, 0.105, 0.76]), ("E", [1.31, 1.45, 0.76])]
+
+
+def test_meta_link_partner_start_region_follows_the_spots(monkeypatch):
+    s = _meta_sampler(monkeypatch, SPOTS)
+    kept = s.start_region(_candidates(s))
+    spots = s.template_facts["meta_link_spots"]
+    assert spots["link"] == "heatsource" and spots["usable"] == ["A", "B", "D", "E"]
+    assert [f["on_top"] for f in spots["spots"]] == [True, True, False, True, True]
+    reg = _regions(kept)
+    names = {round(float(c.focus[1]), 2): {sd: [s.meta_spots[k][0] for k in ks] for sd, ks in c.extras[IS.META_SPOTS].items()} for c in kept}
+    # A (lateral 0.105) is the partner left of the targets at -0.24 / -0.16 / -0.08 (gap 0.105 - y - 0.15), B (-0.405) right of -0.16 / -0.08
+    # (gap y + 0.255); D never beside the row (0.14 m deeper than w_p), C off the top, E too far from every focus
+    assert names == {-0.24: {"left": ["A"]}, -0.16: {"left": ["A"], "right": ["B"]}, -0.08: {"left": ["A"], "right": ["B"]}}
+    assert reg[-0.24]["left"] == pytest.approx([0.195, 0.195], abs=1e-4) and reg[-0.08]["right"] == pytest.approx([0.175, 0.175], abs=1e-4)
+    assert s.template_facts["start_region"]["meta_link"] == ["A", "B", "D", "E"] and s.region_sides == [1.0, -1.0]
+    # eval right: B's cells only; a spot off the band is not reachable for the place (λ >= -0.565: B moved to -0.60)
+    e = _meta_sampler(monkeypatch, SPOTS, gen={"partner_side": "right"})
+    assert sorted(_regions(e.start_region(_candidates(e)))) == [-0.16, -0.08]
+    far = _meta_sampler(monkeypatch, [("B", [1.31, -0.60, 0.76])], gen={"partner_side": "right"})
+    assert far.start_region(_candidates(far)) == [] and far.template_facts["meta_link_spots"]["usable"] == ["B"]
+    assert _sampler().meta_link() is None
+    with pytest.raises(Reject) as r:  # touching braces its partner beside the push: no meta-link spot
+        _meta_sampler(monkeypatch, SPOTS, relation="touching", pair={"g_NT": 0.05}).meta_link()
+    assert r.value.reason == "spec"
+
+
+def test_meta_link_partner_attempt_centres_the_partner_on_a_spot(monkeypatch):
+    s = _meta_sampler(monkeypatch, SPOTS)
+    manip, t_pose = _attempt(s, -0.16, -1.0)
+    t_fp = s.world.footprint(s.hull["target"], t_pose)
+    for seed in range(6):
+        p_pose = s.place_partner(np.random.default_rng(seed), t_pose, manip, None)
+        fp = s.world.footprint(s.hull["partner"], p_pose)
+        centre = 0.5 * (fp.max(dim=0).values + fp.min(dim=0).values)
+        assert centre.tolist() == pytest.approx([1.31, -0.405], abs=1e-4) and s.partner_draw["meta_link"] == "B"
+        assert 0.03 <= float(t_fp[:, 1].min() - fp[:, 1].max()) <= 0.23 and s.partner_draw["side"] == "right"
+    with pytest.raises(Reject) as e:  # the target drawn far from the spot: the gap leaves the range
+        s.place_partner(np.random.default_rng(0), (th.tensor([1.31, 0.16, 0.753]), C.IDENTITY_QUAT.clone()), manip, None)
+    assert e.value.reason == "partner_placement" and "lateral gap" in str(e.value)
+
+
+def test_meta_link_points_from_the_loaded_prims_else_the_model_metadata(monkeypatch):
+    import os
+
+    from omnigibson.utils.asset_utils import get_dataset_path
+
+    s = _sampler()
+    link = types.SimpleNamespace(is_meta_link=True, meta_link_type="heatsource", meta_link_id="left", get_position_orientation=lambda: (th.tensor([1.0, 2.0, 0.9]), None))
+    other = types.SimpleNamespace(is_meta_link=False)
+    obj = types.SimpleNamespace(links={"meta": link, "base_link": other}, category="burner", model="mdanhg", scale=th.ones(3),
+                                get_position_orientation=lambda: (th.zeros(3), C.IDENTITY_QUAT.clone()))
+    monkeypatch.setattr(IS.IORSSmall, "support", property(lambda self: obj))
+    (name, p), = s.meta_link_points("heatsource")
+    assert name == "left" and p.tolist() == pytest.approx([1.0, 2.0, 0.9])
+    obj.links = {"base_link": other}
+    for category, model, n in (("burner", "mdanhg", 5), ("stove", "ykretu", 6)):  # the owner's counts (misc/metadata.json)
+        if not os.path.exists(os.path.join(get_dataset_path("behavior-1k-assets"), "objects", category, model, "misc", "metadata.json")):
+            pytest.skip("no behavior-1k-assets dataset")
+        obj.category, obj.model = category, model
+        assert len(s.meta_link_points("heatsource")) == n

@@ -3085,6 +3085,47 @@ def partner_pose_why(s, t_fp: th.Tensor, p_hull: th.Tensor, p_pose: Pose, *, top
     return None
 
 
+def meta_link_world_points(entries: Dict[str, Any], root_pose: Pose, scale=None) -> List[Tuple[str, th.Tensor]]:
+    """A5 (owner 2026-10-12): the ``meta_links.<link>.<type>`` block of an object's ``misc/metadata.json`` (``{id: [{"position": [x, y, z],
+    ...}, ...]}`` in the object frame) as ``[(id, world xyz)]`` at the object's root pose and ``scale`` (several entries of one id:
+    ``id/k``)."""
+    s = _t([1.0, 1.0, 1.0] if scale is None else scale).float().reshape(3)
+    root = (_t(root_pose[0]).float(), _t(root_pose[1]).float())
+    out = []
+    for mid, subs in entries.items():
+        subs = subs if isinstance(subs, list) else [subs]
+        for k, e in enumerate(subs):
+            p = C.transform_points(root, (_t(e["position"]).float() * s)[None])[0]
+            out.append((str(mid) if len(subs) == 1 else f"{mid}/{k}", p))
+    return out
+
+
+def meta_spot_gaps(side: float, t_centre: Tuple[float, float], w_t: float, spots: Sequence[Tuple[float, float]], w_p: float, gap_range: Sequence[float], *,
+                   ends: Optional[Tuple[float, float]] = None, m_end: float = 0.0) -> List[Tuple[int, float]]:
+    """A5 (owner 2026-10-12): the spots (depth, lateral; stance frame) where a partner of half extent ``w_p``, centred there, stands on
+    ``side`` (+1 = the robot's left) of a target of half extent ``w_t`` centred at ``t_centre`` (depth, lateral): beside it (the spot's depth
+    within ``w_p`` of the target's), the lateral edge-to-edge gap in ``gap_range``, the target's footprint ``m_end`` inside ``ends``.
+    ``[(spot index, gap)]``."""
+    depth_t, lat_t = float(t_centre[0]), float(t_centre[1])
+    if ends is not None and not (float(ends[0]) + m_end - 1e-9 <= lat_t - w_t and lat_t + w_t <= float(ends[1]) - m_end + 1e-9):
+        return []
+    out = []
+    for k, (depth, lat) in enumerate(spots):
+        g = float(side) * (float(lat) - lat_t) - w_t - w_p
+        if abs(float(depth) - depth_t) <= w_p and float(gap_range[0]) - 1e-9 <= g <= float(gap_range[1]) + 1e-9:
+            out.append((k, g))
+    return out
+
+
+def pose_centred_on(s, hull: th.Tensor, quat, xy, *, top=None) -> Pose:
+    """The object at ``quat`` with the centre of its footprint's bounding box at world ``xy``, standing on the top (§3.2: z = top + bottom
+    offset + 3 mm)."""
+    top = _top(s, top)
+    fp = s.world.footprint(hull, (th.zeros(3), _t(quat))).float()
+    c = 0.5 * (fp.max(dim=0).values + fp.min(dim=0).values)
+    return th.tensor([float(xy[0]) - float(c[0]), float(xy[1]) - float(c[1]), float(top.z) + s.world.bottom_offset(hull, quat) + Z_OFFSET]), _t(quat)
+
+
 def place_partner(s, rng, t_pose: Pose, t_hull: th.Tensor, p_hull: th.Tensor, p_rest, stance: Stance, side: Optional[float], gap_range: Sequence[float], *,
                   top=None, cam: Optional[Pose] = None, z: Optional[float] = None, margin: float = SUPPORT_MARGIN, min_gap: float = MIN_GAP,
                   in_frame_margin: float = IN_FRAME_MARGIN, yaw: Optional[float] = None, n_tries: int = 40) -> Pose:
@@ -3346,5 +3387,5 @@ __all__ = [
     "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "posed_in_hand",
     "placement_stance", "facade_v1_spec",
     "side_name", "in_start_region", "gap_grid", "longest_run", "lateral_gap_masks", "polygons_supported", "partner_origin_xy", "partner_gap_masks",
-    "gap_masks_why", "partner_pose_at", "partner_pose_why",
+    "gap_masks_why", "partner_pose_at", "partner_pose_why", "meta_link_world_points", "meta_spot_gaps", "pose_centred_on",
 ]

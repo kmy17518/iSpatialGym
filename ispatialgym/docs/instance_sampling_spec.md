@@ -858,6 +858,19 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      replaces the 40 blind tries of a random gap; the shelf layout (touching, §6.11) keeps its partner leaning against
      the opposite board. Recorded: `template_facts.start_region` (edge, L, L_min, lateral, cells and candidates per
      side, gap range, failed lateral draws) and the instance's `partner_draw` (side, gap, intervals).
+   - **Partner on a meta link** (owner decision 2026‑10‑12, A5; `generation.partner_on_meta_link: "<type>"`, e.g.
+     `"heatsource"` for a pot on a burner / stove; not for touching). The partner is centred (its footprint's bounding
+     box) on one of the support's meta links of that type — the loaded object's meta-link prims, else
+     `misc/metadata.json` `meta_links.base_link.<type>` (object frame → world at the support's pose and scale;
+     burner/mdanhg has 5 heatsource entries, stove/ykretu 6) — whose position is on the top (a free cell) with the
+     partner centred there fully in the init image; the partner may overhang the top there (a pot's handle off the
+     stove: the settle and the validation judge it). The start region follows from those spots: a focus is a start for
+     a side when a spot lies beside it on that side (the spot's depth within w_p of the focus) at a lateral gap of
+     [g_min, D_p], the target's footprint m_end from the edge's ends and the spot meeting the reach rule; the candidate
+     keeps its spots per side (`meta_link_spots`). The attempt draws one of them and a random partner yaw (16 per spot)
+     and checks, at the drawn target pose, the lateral gap, the reach rule of the segment's arm, the 3 cm clearance and
+     the frame. Recorded: `template_facts.meta_link_spots` (every meta link with `on_top` / `in_frame`) and
+     `partner_draw.meta_link`.
 3. **Distractors** (disembedding) on the source tray, each ≥ x from the target along the drawn grasp's pinch axis,
    x = (open width 0.10 − pinch width of the drawn grasp)/2 + 0.01 (`Grasp.pad_clearance` + margin), so the grasp
    stays possible with the distractors placed; they may occlude the target up to **30 %** of its visible area

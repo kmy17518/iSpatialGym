@@ -6,7 +6,8 @@ adds the §6.11 rules only: pair admissibility per template, the start region an
 (A1, owner 2026-10-12: the side is fixed before the target is placed - ``partner_side`` for eval -, the target starts on a cell
 whose partner fits at some gap of its interval), the goal pose per relation, the place / pre-place IK from the manipulation
 stance after the goal settled, the touching push + brace, the constraints it learned. Every number comes from the customs
-``generation`` block (D1 ``generation_defaults``): ``table_end_margin_m``, ``start_region_lateral_draws``,
+``generation`` block (D1 ``generation_defaults``): ``table_end_margin_m``, ``start_region_lateral_draws``, ``partner_on_meta_link``
+(A5: the partner centred on one of the support's meta links of that type, e.g. a burner's ``heatsource``),
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
 (inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
@@ -159,6 +160,8 @@ PARTNER_YAW_DRAWS = 16
 BAND_DEPTH_WINDOW_M = 0.12
 #: A1: extras key of a Phase-2 candidate: ``{"left" | "right": [arm, ...]}``, the arms whose band meets the side's reach rule there
 REGION_ARMS = "start_region_arms"
+#: A5: extras key of a Phase-2 candidate: ``{"left" | "right": [spot index, ...]}``, the meta-link spots the partner may take there
+META_SPOTS = "meta_link_spots"
 
 
 def partner_sides(relation: str, handed: Optional[Dict[str, str]] = None) -> List[float]:
@@ -263,6 +266,7 @@ class IORSSmall(SamplerV2):
         self.region_sides: List[float] = []  # A1: the partner sides whose start region has a cell (sample_template)
         self.region_side: Optional[float] = None  # A1: the partner side of the current attempt (+1 = the robot's left of the target)
         self.partner_draw: Optional[Dict[str, Any]] = None  # A1: the drawn partner's side, gap and the gap interval it came from
+        self.meta_spots: Optional[List[Tuple[str, th.Tensor]]] = None  # A5: (meta link, world xy) the partner may be centred on
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -356,6 +360,7 @@ class IORSSmall(SamplerV2):
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair
         self.template_facts["partner_sides"] = [TT.side_name(sd) for sd in self.template_sides()]  # A1: Reject("partner_side") before any phase
+        self.template_facts["partner_on_meta_link"] = self.meta_link()
         H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
         self.top = TT.support_surface(self, self.support, height=H_max)
         if int(self.top.free.sum()) < 50:
@@ -794,6 +799,68 @@ class IORSSmall(SamplerV2):
         (a0, b0), (a1, b1) = (footprint_laterals(self.world.footprint(self.hull["partner"], (th.zeros(3), q)), self.init_stance.tangent) for q in (q0, q1))
         return [q0] if abs((b0 - a0) - (b1 - a1)) < 0.01 else [q0, q1]
 
+    def meta_link_points(self, link: str) -> List[Tuple[str, th.Tensor]]:
+        """A5: the support's meta links of type ``link`` as ``(id, world xyz)`` - its loaded meta-link prims, else ``meta_links.base_link.<link>``
+        of its model's ``misc/metadata.json`` (object frame) at its pose and scale (``tabletop.meta_link_world_points``)."""
+        import json
+        import os
+
+        from omnigibson.utils.asset_utils import get_dataset_path
+
+        obj = self.support
+        pts = [(str(lk.meta_link_id), G.t(lk.get_position_orientation()[0]).float()) for lk in obj.links.values() if lk.is_meta_link and lk.meta_link_type == link]
+        if pts:
+            return pts
+        with open(os.path.join(get_dataset_path("behavior-1k-assets"), "objects", obj.category, obj.model, "misc", "metadata.json")) as f:
+            entries = ((json.load(f).get("meta_links") or {}).get("base_link") or {}).get(link) or {}
+        return TT.meta_link_world_points(entries, obj.get_position_orientation(), obj.scale)
+
+    def meta_link(self) -> Optional[str]:
+        """A5 (owner 2026-10-12): ``generation.partner_on_meta_link``, the meta-link type the partner is centred on (e.g. ``"heatsource"``),
+        None without it; ``Reject("spec")`` for touching (its partner is braced beside the push)."""
+        link = self.gen("partner_on_meta_link")
+        if link and self.relation == "touching":
+            raise Reject("spec", f"{self.gp.alias}: generation.partner_on_meta_link is for ontop / under / inside / nextto (touching braces its partner)")
+        return str(link) if link else None
+
+    def find_meta_spots(self, cam: Optional[G.Pose]) -> Optional[List[Tuple[str, th.Tensor]]]:
+        """A5: the support's meta links of the :meth:`meta_link` type (:meth:`meta_link_points`) whose position is on the top (a free cell;
+        the partner centred there may overhang it - a pot's handle off the stove, the settle and the validation judge it) with the partner
+        centred there fully in the init image (in either edge-aligned orientation) - ``(id, world xy)``; None without the key. Every meta
+        link with its verdict goes to ``template_facts["meta_link_spots"]``."""
+        link = self.meta_link()
+        if link is None:
+            return None
+        spots, facts = [], []
+        quats = self.edge_partner_quats()
+        for mid, p in self.meta_link_points(link):
+            poses = [TT.pose_centred_on(self, self.hull["partner"], q, p[:2], top=self.top) for q in quats]
+            on_top = self.top.contains(p[:2])
+            in_frame = cam is None or any(TT.in_frame(self, cam, TT.hull_corners_world(self.hull["partner"], pose)) for pose in poses)
+            facts.append({"id": mid, "xy": [round(float(p[0]), 4), round(float(p[1]), 4)], "on_top": on_top, "in_frame": in_frame})
+            if on_top and in_frame:
+                spots.append((mid, p[:2].clone()))
+        self.template_facts["meta_link_spots"] = {"link": link, "spots": facts, "usable": [mid for mid, _ in spots]}
+        return spots
+
+    def meta_spot_region(self, c: Stance, side: float, w_t: float, gap_range: Tuple[float, float], reach: Optional[str],
+                         band: Optional[Tuple[float, float]]) -> Tuple[Optional[Tuple[float, float]], List[int]]:
+        """A5 start region of candidate ``c`` on ``side``: the spots of ``meta_spots`` beside the target's focus at a gap of ``gap_range``
+        (``tabletop.meta_spot_gaps``, the target's footprint ``table_end_margin_m`` from the edge's ends) whose partner centre meets the reach
+        rule (``reach`` / ``band`` of :meth:`band_rule`, as for a drawn gap) - ``((min gap, max gap), spot indices)``, ``(None, [])`` when none."""
+        depth, t_c = c.local(c.focus[:2])
+        w_p = TT.half_extent(self.hull["partner"], self.rest["partner"])
+        mid = float((self.edge.mid - c.base_xy) @ c.tangent)
+        ends = (mid - 0.5 * float(self.edge.length), mid + 0.5 * float(self.edge.length))
+        ok = []
+        for k, g in TT.meta_spot_gaps(side, (depth, t_c), w_t, [c.local(xy) for _, xy in self.meta_spots], w_p, gap_range, ends=ends, m_end=self.table_end_margin):
+            if reach is None or TT.lateral_gap_masks([g], side, (t_c - w_t, t_c + w_t), (-w_p, w_p), band=band, reach=reach, t_origin=t_c,
+                                                     place_gap=self.place_gap())["reach"][0]:
+                ok.append((k, g))
+        if not ok:
+            return None, []
+        return (min(g for _, g in ok), max(g for _, g in ok)), [k for k, _ in ok]
+
     def start_region(self, cands: Sequence[Stance]) -> List[Stance]:
         """A1 step 2 at the template, after Phase 2: the candidates whose focus is a valid target start for a partner side the template may
         draw (:meth:`template_sides`) - some gap of [g_min, D_p] puts the partner (a) on the top with both footprints at least
@@ -801,13 +868,15 @@ class IORSSmall(SamplerV2):
         the band of an arm that may make the segment there; the target nominally a ``w_t`` square at the focus, the partner in either
         edge-aligned orientation (:meth:`edge_partner_quats`). Each survivor's ``extras["start_region"]`` holds the gap interval per side and
         ``extras["start_region_arms"]`` the arms that meet (c) per side; ``region_sides`` the sides with a cell; the region's size goes to
-        ``template_facts["start_region"]``."""
+        ``template_facts["start_region"]``. With ``partner_on_meta_link`` (A5) the partner stands on a meta-link spot (:meth:`find_meta_spots`)
+        and the region follows from those spots (:meth:`meta_spot_region`; the candidate's spots per side in ``extras["meta_link_spots"]``)."""
         allowed = partner_sides(self.relation, (self.pair or {}).get("handedness"))
         assigned = self.assigned_side()
         sides = [assigned] if assigned is not None else allowed
         g_lo, g_hi = self.gap_range()
         gs = TT.gap_grid(g_lo, g_hi)
         cam = self.camera_pose_at(self.init_stance)
+        self.meta_spots = self.find_meta_spots(cam)
         w_t = TT.half_extent(self.hull["target"], self.rest["target"])
         place_gap = self.place_gap()
         quats = [(q, footprint_laterals(self.world.footprint(self.hull["partner"], (th.zeros(3), q)), self.init_stance.tangent)) for q in self.edge_partner_quats()]
@@ -825,23 +894,36 @@ class IORSSmall(SamplerV2):
             region: Dict[str, List[float]] = {}
             arms: Dict[str, List[str]] = {}
             for sd in sides:
-                ok = np.zeros(len(gs), dtype=bool)
-                for arm, (reach, band) in rules.items():
-                    ok_arm = np.zeros(len(gs), dtype=bool)
-                    for qi, (q, p_lat) in enumerate(quats):
-                        key = (fkey, sd, qi)
-                        if key not in focus_masks:
-                            masks = TT.partner_gap_masks(self, sd, t_fp, depth, self.hull["partner"], q, c, gs, top=self.top, cam=cam, margin=self.margin_support,
-                                                         m_end=self.table_end_margin)
-                            focus_masks[key] = np.logical_and.reduce([np.ones(len(gs), dtype=bool)] + list(masks.values()))
-                        m = focus_masks[key]
-                        if reach is not None:
-                            m = m & TT.lateral_gap_masks(gs, sd, (t_c - w_t, t_c + w_t), p_lat, band=band, reach=reach, t_origin=t_c, place_gap=place_gap)["reach"]
-                        ok_arm |= m
-                    if ok_arm.any():
-                        arms.setdefault(TT.side_name(sd), []).append(arm)
-                    ok |= ok_arm
-                run = TT.longest_run(gs, ok)
+                if self.meta_spots is not None:
+                    runs, spots = [], set()
+                    for arm, (reach, band) in rules.items():
+                        run_arm, idx = self.meta_spot_region(c, sd, w_t, (g_lo, g_hi), reach, band)
+                        if idx:
+                            arms.setdefault(TT.side_name(sd), []).append(arm)
+                            runs.append(run_arm)
+                            spots |= set(idx)
+                    run = (min(r[0] for r in runs), max(r[1] for r in runs)) if runs else None
+                    if spots:
+                        c.extras.setdefault(META_SPOTS, {})[TT.side_name(sd)] = sorted(spots)
+                else:
+                    ok = np.zeros(len(gs), dtype=bool)
+                    for arm, (reach, band) in rules.items():
+                        ok_arm = np.zeros(len(gs), dtype=bool)
+                        for qi, (q, p_lat) in enumerate(quats):
+                            key = (fkey, sd, qi)
+                            if key not in focus_masks:
+                                masks = TT.partner_gap_masks(self, sd, t_fp, depth, self.hull["partner"], q, c, gs, top=self.top, cam=cam,
+                                                             margin=self.margin_support, m_end=self.table_end_margin)
+                                focus_masks[key] = np.logical_and.reduce([np.ones(len(gs), dtype=bool)] + list(masks.values()))
+                            m = focus_masks[key]
+                            if reach is not None:
+                                m = m & TT.lateral_gap_masks(gs, sd, (t_c - w_t, t_c + w_t), p_lat, band=band, reach=reach, t_origin=t_c,
+                                                             place_gap=place_gap)["reach"]
+                            ok_arm |= m
+                        if ok_arm.any():
+                            arms.setdefault(TT.side_name(sd), []).append(arm)
+                        ok |= ok_arm
+                    run = TT.longest_run(gs, ok)
                 if run is not None:
                     region[TT.side_name(sd)] = [round(run[0], 4), round(run[1], 4)]
                     cells[sd].add(tuple(c.extras.get("_position") or fkey))
@@ -859,7 +941,8 @@ class IORSSmall(SamplerV2):
             "assigned": None if assigned is None else TT.side_name(assigned), "sides": [TT.side_name(sd) for sd in sides],
             "drawn_sides": [TT.side_name(sd) for sd in self.region_sides], "gap_range_m": [round(g_lo, 4), round(g_hi, 4)], "phase2_candidates": len(cands),
             "cells": {TT.side_name(sd): len(cells[sd]) for sd in sides}, "candidates": {TT.side_name(sd): n_cands[sd] for sd in sides},
-            "gap_m": {TT.side_name(sd): ([round(min(gaps[sd]), 4), round(max(gaps[sd]), 4)] if gaps[sd] else None) for sd in sides}}
+            "gap_m": {TT.side_name(sd): ([round(min(gaps[sd]), 4), round(max(gaps[sd]), 4)] if gaps[sd] else None) for sd in sides},
+            "meta_link": None if self.meta_spots is None else [mid for mid, _ in self.meta_spots]}
         log.info("%s: start region on edge %s (L %.2f, lateral %+.2f): %s of %d Phase-2 candidates", self.gp.alias, self.edge.name, self.edge.length,
                  self.init_stance.lateral, ", ".join(f"{TT.side_name(sd)} {len(cells[sd])} cells ({n_cands[sd]} candidates)" for sd in sides), len(cands))
         return out
@@ -1099,19 +1182,61 @@ class IORSSmall(SamplerV2):
                              "yaw_deg": round(math.degrees(yaw), 1), "cell_interval_m": (manip.extras.get(TT.START_REGION) or {}).get(TT.side_name(side))}
         return pose, ""
 
+    def draw_meta_partner_pose(self, rng: np.random.Generator, side: float, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
+        """A5 (owner 2026-10-12): the partner centred on one of the candidate's meta-link spots for ``side`` (drawn uniformly) at a random yaw,
+        checked at the drawn target pose - on ``side`` of it at a lateral gap of the gap range, the reach rule with the band of the segment's
+        arm (:meth:`band_rule`), at least ``footprint_gap_min_m`` from the target, fully in the init image (the spot is on the top,
+        :meth:`find_meta_spots`). Up to ``PARTNER_YAW_DRAWS`` yaws per spot; ``Reject("partner_placement")`` when none passes."""
+        g_lo, g_hi = self.gap_range()
+        t_fp = self.world.footprint(self.hull["target"], t_pose)
+        t_lo, t_hi = footprint_laterals(t_fp - manip.base_xy, manip.tangent)
+        _, t_c = manip.local(t_pose[0])
+        reach, band = self.band_rule(manip, float(manip.world_to_base(t_pose[0][:2])[0]), (manip.working_arms or self.segment_arms)[:1])
+        misses: List[str] = []
+        spots = (manip.extras.get(META_SPOTS) or {}).get(TT.side_name(side), [])
+        for k in rng.permutation(len(spots)):
+            mid, xy = self.meta_spots[spots[int(k)]]
+            for _ in range(PARTNER_YAW_DRAWS):
+                yaw = float(rng.uniform(-math.pi, math.pi))
+                pose = TT.pose_centred_on(self, self.hull["partner"], G.qmul(G.quat_from_yaw(yaw), G.t(self.rest["partner"])), xy, top=self.top)
+                p_fp = self.world.footprint(self.hull["partner"], pose)
+                p_lo, p_hi = footprint_laterals(p_fp - manip.base_xy, manip.tangent)
+                g = p_lo - t_hi if side > 0 else t_lo - p_hi
+                if not g_lo <= g <= g_hi:
+                    why = f"lateral gap {g:.3f} outside [{g_lo:.2f}, {g_hi:.2f}]"
+                elif reach is not None and not TT.lateral_gap_masks([g], side, (t_lo, t_hi), (0.0, p_hi - p_lo), band=band, reach=reach, t_origin=t_c,
+                                                                    place_gap=self.place_gap())["reach"][0]:
+                    why = f"no band lateral of the {(manip.working_arms or self.segment_arms)[0]} arm for the partner"
+                elif TT.polygon_gap(t_fp, p_fp) < self.gap_min:
+                    why = f"partner closer than {self.gap_min:.2f} m to the target"
+                elif cam is not None and not TT.in_frame(self, cam, TT.hull_corners_world(self.hull["partner"], pose)):
+                    why = "partner not in the init image"
+                else:
+                    why = ""
+                if why:
+                    misses.append(f"spot {mid} yaw {math.degrees(yaw):+.0f}: {why}")
+                    continue
+                self.partner_draw = {"side": TT.side_name(side), "gap_m": round(g, 4), "meta_link": mid, "yaw_deg": round(math.degrees(yaw), 1),
+                                     "cell_interval_m": (manip.extras.get(TT.START_REGION) or {}).get(TT.side_name(side))}
+                return pose
+        raise Reject("partner_placement", f"no meta-link spot of {len(spots)} takes the partner on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
+
     def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
         """§4.6 step 2 with the A1 start region (owner 2026-10-12): the partner on the attempt's side (``region_side``, fixed before the target
         was placed; touching the robot's left) at a gap of the start region's interval re-evaluated at the drawn target pose
         (:meth:`draw_partner_pose`: on the top, both footprints ``table_end_margin_m`` from the edge's ends, in the init image, and the reach
         rule cut to the band of the manipulation trunk - §4.1 / principle 3, the place pose of §6.11 needs its goal in the band).
         ``PARTNER_YAW_DRAWS`` random partner yaws, then the two edge-aligned ones (:meth:`edge_partner_quats`); ``Reject("partner_placement")``
-        when none admits a gap. The shelf layout keeps its partner leaning against the opposite board."""
+        when none admits a gap. The shelf layout keeps its partner leaning against the opposite board; with ``partner_on_meta_link`` (A5) it
+        stands on a meta-link spot (:meth:`draw_meta_partner_pose`)."""
         self.partner_draw = None
         if self.shelf_partner_pose is not None:
             self._brace_gate = {"ok": False, "why": "shelf (owner 2026-10-11): the side board holds the partner, no brace"}
             return self.shelf_partner_pose
         side = self.region_side if self.region_side is not None else self.template_sides()[0]
         misses: List[str] = []
+        if self.meta_spots is not None:
+            return self.draw_meta_partner_pose(rng, side, t_pose, manip, cam)
         if self.relation != "touching":
             # random yaws, then the two edge-aligned footprints the start region was computed with (a tight top admits little else)
             yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip)
