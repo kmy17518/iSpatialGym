@@ -571,7 +571,7 @@ class AlignmentWall(SamplerV2):
         cams = P0.camera_poses(self, [st for st, _ in reach])
         classed = []
         for (st, ok), cam in zip(reach, cams):
-            pts = th.stack([geo["C"], geo.get("E_push", geo["E_low"])] + [ok[0]["B"]] * bool(ok))  # the pushed end in frame
+            pts = th.stack([geo["C"], geo.get("E_push", geo["E_low"])] + ([ok[0]["B"]] if ok else []))  # the pushed end in frame
             if not P0.in_frame(self, cam, pts):
                 continue
             ang = P0.axis_angle(self, cam, geo["C"])

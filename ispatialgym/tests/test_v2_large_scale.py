@@ -9,6 +9,7 @@ live world."""
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -565,6 +566,28 @@ def test_wall_round_target_pushes_the_level_axis_end_without_brace():
     for deg in (AW.MAX_DEVIATION_DEG, -AW.MAX_DEVIATION_DEG, 15.0):
         geo = S.contacts_for(spot, math.radians(deg))
         assert not geo["no_corner"] and geo["braces"]
+
+
+def test_wall_screen_keeps_push_only_stances_of_a_round_target(monkeypatch):
+    """Phase 2 steps 2-3 for the disc: a stance whose push reaches survives without any brace (the 85d54c41 sim check raised
+    IndexError on the missing brace point); a box without a reachable brace still has none."""
+    reach = SimpleNamespace(volume_ok=lambda rv, st, bz: True)
+    monkeypatch.setattr(P0, "reach_volume", lambda: None)
+    monkeypatch.setattr(P0, "base_z", lambda s: 0.0)
+    monkeypatch.setattr(P0, "camera_poses", lambda s, sts: [None] * len(sts))
+    monkeypatch.setattr(P0, "in_frame", lambda s, cam, pts: len(pts) >= 2)
+    monkeypatch.setattr(P0, "axis_angle", lambda s, cam, c: 0.05)
+    monkeypatch.setattr(P0, "angle_class", lambda ang: 0)
+    monkeypatch.setattr(P0, "best_class", lambda classed: [st for st, _ in classed])
+    S, spot = _disc_stub()
+    S.contact_specs = lambda geo: (reach, [])
+    cands = [SimpleNamespace(extras={}, focus=None) for _ in range(3)]
+    stats = {}
+    out = S.screen(cands, S.contacts_for(spot, math.radians(-20.0)), stats)
+    assert len(out) == 3 and all(st.extras["brace_kinds"] == [] and st.extras["class_pool"] == "best" for st in out) and stats["step3_visible"] == 3
+    B, spot_b, _ = _wall_stub()
+    B.contact_specs = lambda geo: (reach, [])
+    assert B.screen([SimpleNamespace(extras={}, focus=None)], B.contacts_for(spot_b, math.radians(-20.0))) == []
 
 
 def test_brace_order():
