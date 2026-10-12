@@ -934,6 +934,17 @@
    "pick": "configuration_matching-attachment#04~T5",
    "slot": "representative",
    "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-block_design-block_4-breakfast_table_board_single",
+   "id": 87,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of configuration_matching-83 with block_single_stance, owner ~15:25 block_design#01 attempt 3)",
+   "subtask": "configuration_matching-block_design",
+   "iddl": "configuration_matching/block_design.iddl",
+   "pick": "configuration_matching-block_design#01",
+   "slot": "representative",
+   "mode": "test"
   }
  ],
  "unregistered": [

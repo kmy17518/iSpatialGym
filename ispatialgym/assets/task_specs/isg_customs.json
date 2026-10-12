@@ -18054,6 +18054,185 @@
   },
   "constraints": []
  },
+ "configuration_matching-block_design-block_4-breakfast_table_board_single": {
+  "iddl": "configuration_matching/block_design.iddl",
+  "definition_id": 87,
+  "roles": {
+   "targets": {
+    "category": "toy_dice",
+    "sampleable": true,
+    "representative": "isgblk",
+    "dataset": "ispatialgym-assets"
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   },
+   "board": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "isgboard",
+    "dataset": "ispatialgym-assets"
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "configuration_matching-block_design#01"
+      }
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "targets": {
+      "toy_dice": [
+       "isgblk"
+      ]
+     },
+     "board": {
+      "tray": [
+       "isgboard"
+      ]
+     }
+    },
+    "blacklist": {
+     "targets": {
+      "toy_dice": {
+       "bjrxkj": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.01,
+    "position_edge_fraction": 0.4,
+    "orientation": 0.15
+   },
+   "groups": {
+    "targets": {
+     "size": 4,
+     "draw": "same_model",
+     "members": {
+      "toy_dice": 4
+     }
+    }
+   },
+   "path_buckets": null,
+   "grid": [
+    2,
+    2
+   ],
+   "patterns": {
+    "test_rbbr": [
+     "red",
+     "blue",
+     "blue",
+     "red"
+    ]
+   },
+   "block_gap_m": 0.006,
+   "block_pack_tail": false,
+   "block_brace_push": false,
+   "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
+   "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
+   "scatter_min_gap_m": 0.03,
+   "region_spacing_extra_m": 0.03,
+   "region_extra_cells": 2,
+   "region_in_frame_margin": 0.08,
+   "goal_face_visible_fraction": 0.5,
+   "yaw_align_max_deg": 1.0,
+   "_yaw_align_note": "owner 2026-09-19 first demo: 1 deg = the blocks start table-aligned (+-0.5 deg), the yaw-align snaps to 0 (yaw_align_snap_deg) so no yaw-align orbit runs in hand (pod runs 0919-140558 / 151544: the anchor's 11-22 deg yaw-align on a pitched pinch failed the oracle's differential IK twice - joint jump 0.23 rad, then a 14 mm stall - from the branch the grasp left the arm in; the flippers already run at flip_yaw_jitter_max_deg 0)",
+   "cube_grasp_tilts_deg": [
+    0.0,
+    30.0,
+    45.0,
+    60.0
+   ],
+   "flip_tilt_deg": 45.0,
+   "orientation_equivalences": null,
+   "block_no_flip": true,
+   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream). 2026-09-19: with the repeated-colour pattern two blocks flip in hand regardless (distinct up faces) - see flip_directions",
+   "_block_gap_note": "owner D-006 default A (Slack, unanswered at 21:00 PDT 2026-09-16): 6 mm gaps so the last 2x2 block passes the finger-clearance gate (4c66d53a); B (push-only tail for 1 mm gaps) stays the end-state question",
+   "flip_directions": [
+    "right"
+   ],
+   "manip_lateral_shifts_m": [
+    0.35,
+    0.45,
+    0.25
+   ],
+   "flip_yaw_jitter_max_deg": 0.0,
+   "_flip_yaw_jitter_note": "0 for the first demo: the flip class sits on joint 6 / 7 limits and the exact chain that passes in the probe (block axes aligned with the table) fails with a 5 deg yaw-align stage (pod run 0919-052744)",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_witness_residual_note": "pod run 0919-100626 attempt 1: the whole 4-block program passed the check up to a place witness 3.6 mm short after polishing (2 mm default) - the oracle's descent finish closes that; the touching / articulation aliases run at 15 mm",
+   "_flip_note": "owner 2026-09-19: in-hand flip = 90 deg wrist roll about the pinch axis (steep side pick -> near-top-down place). Probe /tmp/blkflip: only the flip about the FORWARD axis (goal face toward the robot's right, hand from the block's right leaning left 60-70 deg, camera up) passes the whole chain, at cells 0.55-0.70 m ahead and 0.15-0.35 m right of the base; the manipulation stance is scanned 0.25-0.45 m left of the init lateral so the flipping blocks (right of it) lie left of the init camera and their right face is visible; per-block stances along the edge (paths + transitions). Joint-limit margin relaxed as for touching (owner 2026-09-18 01:01) with the witness-residual reach check: the flip class's wrist roll sits near joint 7's limit",
+   "release_above_surface_m": 0.023,
+   "_board_note": "owner 2026-09-20 22:39 / 22:50 / 23:00 (option 2 follow-up): a tight-fit PUZZLE board (tray/isgboard, assets/objects/block_board, drop test v5): four chamfered pockets seat the 25.4 mm cubes without pushing (seat 27.4 mm, walls 6 mm vertical then a 50-deg outer chamfer 10 x 12 mm, 4 mm dividers 10 mm tall with a roof to a 12 mm apex, pitch 31.4 mm -> seated blocks 4 mm apart; friction 0.25 with min combine baked into the USD). Goal slots = the pocket centres; the release aims board_release_bias_m toward each pocket's outer corner, block bottom release_above_surface_m over the pocket floor; no loose grid, no packing tail. The old spacious board (9 cm pocket + wall pushes, runs 47-76) is retired.",
+   "board_base_xy_candidates": [
+    [
+     0.46,
+     -0.02
+    ],
+    [
+     0.44,
+     -0.1
+    ],
+    [
+     0.48,
+     0.04
+    ],
+    [
+     0.52,
+     -0.06
+    ],
+    [
+     0.6,
+     0.05
+    ]
+   ],
+   "_board_position_note": "board at base (0.46, -0.02) in front of the robot: right of the grid it blocks the flip approaches (0920-000135), left of the centre line the right arm cannot reach the slots (0920-030951); cells within board_cell_margin_m 0.06 of the footprint are dropped (a 45-deg pitched pick 4.5 cm from the rim collided, 0920-021543)",
+   "board_cell_margin_m": 0.06,
+   "pitch45_max_depth_m": 0.62,
+   "_pitch45_note": "0920-182445: the first grasp (a 45-deg pitched pick at the 0.80 m cell) brushed the table edge with right_arm_link5 during cuRobo's transit -> no 45-deg picks beyond 0.62 m base depth",
+   "board_release_bias_m": 0.0035,
+   "place_margin_m": 0.0,
+   "board_finger_clear_m": 0.002,
+   "_release_note": "release_above_surface_m 0.023 = rim top 0.018 + 0.005 over the pocket floor; drop test v5 (model/isgboard/drop_test*.json): 50/50 seated at 4 and 5 mm over the rim (+-6 mm per axis / diagonal, yaw +-2), 46/50 at 7 mm (inward 6 mm leans on the divider), outward 10 mm lands on the rim by design (tolerance = chamfer 10 + clearance 1 - bias 3.5)",
+   "_accepted_note": "ACCEPTED 2026-09-21 07:06 PDT: run 0921-050358 (pod blockflip-r) success, 0 collisions, 33 actions without a push, all four ontop(block, board), seat errors <= 1.0 mm / yaw <= 0.17 deg; the lateral travel between the tilted flip stances drives back >= travel_back_min_m and straightens first (runs 77 / 78 brushed the table edge with torso_link2 during that drive)",
+   "travel_straighten_tilt": -0.05,
+   "travel_back_min_m": 0.1,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-12 ~03:30 (4b): split cone (variant C) off - the board alias runs the reconcile cone, Phase 2 with tight 20 / loose 30 deg (set here: the subtask's defaults are C's 8 / 20)",
+   "phase2_tight_class_deg": 20.0,
+   "phase2_loose_class_deg": 30.0,
+   "repose_after_base_move": true,
+   "block_single_stance": true,
+   "_block_single_stance_note": "owner 2026-10-12 ~15:25: block_design#01's attempt 3 - re-pose after a between-block base move plus one stance for every block (generation.block_single_stance: a block whose best stance is another one rejects the attempt as second_stance_needed); attempt 2 runs configuration_matching-block_design-block_4-breakfast_table_board (re-pose only)"
+  },
+  "constraints": []
+ },
  "configuration_matching-block_design-block_4-coffee_table": {
   "iddl": "configuration_matching/block_design.iddl",
   "definition_id": 7,
