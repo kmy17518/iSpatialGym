@@ -329,7 +329,10 @@ class SamplerV2(TaskSampler):
         self.sample_template()
 
     def sample(self, rng: np.random.Generator) -> Draft:
+        from ispatialgym.sampling.v2 import tabletop as TT
+
         self.sidecar.reset_instance()
+        TT.split_cone_draw(self, rng)
         draft = self.sample_instance(rng)
         if draft.robot_q is None and "init" in self.sidecar.stances:
             st = self.sidecar.stance("init")
@@ -838,6 +841,56 @@ class SamplerV2(TaskSampler):
             raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0, extra_max=extra)} is swept collision-free")
         tr.holding = carried or tr.holding  # ``transitions[].holding``: the bddl instance carried through (attachment's second base pose)
         return self.sidecar.add_transition(tr)
+
+    def record_stance_travel(self, frm: Stance, to: Stance) -> Transition:
+        """The empty-handed move init -> manipulation: :meth:`record_transition`, unless ``to`` comes from the split cone
+        (``tabletop.phase2_split_cone``): then the records of the pair are replaced by the transition when both stances share the edge
+        lateral, else by the move along the edge of :meth:`record_edge_travel`, and ``to.extras["init_travel"]`` records the move.
+        Returns the (arrival) transition."""
+        if "_position" not in to.extras:
+            return self.record_transition(frm, to)
+        self.drop_travel_records(frm.name, to.name)
+        lateral = float(th.dot(to.base_xy - frm.base_xy, frm.tangent))
+        path, dep = None, None
+        if abs(lateral) < 0.02:
+            tr = self.record_transition(frm, to)
+        else:
+            path, dep, tr = self.record_edge_travel(frm, to)
+        to.extras["init_travel"] = {"lateral_m": round(lateral, 4), "base_m": round(float(th.linalg.norm(to.base_xy - frm.base_xy)), 4),
+                                    "path_m": None if path is None else round(float(path.length_m), 4),
+                                    "departure_stand_off_m": None if dep is None else round(float(dep.stand_off), 4), "transition_stand_off_m": round(float(tr.stand_off), 4)}
+        return tr
+
+    def record_edge_travel(self, frm: Stance, to: Stance) -> Tuple[PathRecord, Optional[Transition], Transition]:
+        """An empty-handed move along the edge, as block design's ``_travel_between``: when either trunk bows forward (tilt <=
+        ``travel_straighten_tilt``) the departure transition first - drive back at least ``travel_back_min_m`` beyond ``frm``'s
+        stand-off (0921-023009: a lateral drive 0.35 m from the edge brushed it), sweep to the travel trunk (``frm``'s translate, else
+        ``travel_trunk_translate``, tilt 0) - then the path at that trunk and the arrival transition; otherwise, or when that fails, the
+        §3.7 path to the drive-back pose plus the transition (``prompt0.connect``). Returns (path, departure or None, arrival)."""
+        from ispatialgym.sampling.v2 import prompt0 as P0
+        from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+        max_len = float(self.gen("stance_path_max_m", 3.0))
+        tilt_limit = float(self.gen("travel_straighten_tilt", -0.05))
+        if float(frm.tilt) <= tilt_limit or float(to.tilt) <= tilt_limit:
+            back_min = float(frm.stand_off or 0.0) + float(self.gen("travel_back_min_m", 0.10))
+            for travel in ((float(frm.translate), 0.0), (float(self.gen("travel_trunk_translate", 0.95)), 0.0)):
+                try:
+                    dep = self.record_departure_transition(frm, to, travel, min_standoff=back_min)
+                    r, l, _ = stance_arm_vectors(self.kit, to)  # the departure sweep puts the arms in the arriving stance's posture
+                    path = self.record_path(frm, to, trunk=travel, arm_q={"right": r, "left": l}, start_pose2d=NAV.departure_pose(frm, dep.stand_off),
+                                            max_length_m=max_len)
+                    return path, dep, self.record_transition(frm, to, trunk_from=travel)
+                except Reject as e:
+                    log.info("%s: travel %s -> %s at trunk %.2f/%+.2f after the drive-back: %s", self.gp.alias, frm.name, to.name, travel[0], travel[1], e)
+                    self.drop_travel_records(frm.name, to.name)
+        path, tr = P0.connect(self, frm, to, path_max_m=max_len)
+        return path, None, tr
+
+    def drop_travel_records(self, frm: str, to: str) -> None:
+        """Remove the paths / transitions (arrival and departure) recorded from stance ``frm`` to ``to``."""
+        self.sidecar.paths[:] = [p for p in self.sidecar.paths if not (str(p.frm) == frm and str(p.to) == to)]
+        self.sidecar.transitions[:] = [t for t in self.sidecar.transitions if not (str(t.frm) == frm and str(t.to) == to)]
 
     def record_departure_transition(self, frm: Stance, to: Stance, travel_trunk: Tuple[float, float], carried: Optional[str] = None,
                                     arm: Optional[str] = None, arm_q: Optional[Dict[str, th.Tensor]] = None, min_standoff: Optional[float] = None) -> Transition:

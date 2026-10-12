@@ -253,15 +253,17 @@ class BlockDesign(SamplerV2):
                 # at the init lateral AND shifted along the edge to the robot's LEFT (``generation.manip_lateral_shifts_m``): the
                 # flipping blocks lie 0.15-0.35 m right of the manipulation base for the right arm's flip class and, seen from
                 # the unshifted init camera, left of its centre line - the only way their right-facing goal face is visible
-                for shift in self._manip_lateral_shifts(init):
+                # the split cone (generation.phase2_split_cone) searches the shifts along the edge itself, from the unshifted init
+                split = TT.split_cone_opts(self)
+                for shift in (self._manip_lateral_shifts(init) if split is None else [0.0]):
                     init_k = init if abs(shift) < 1e-9 else self._shifted_along_edge(init, shift, "init")
                     if init_k is None:
                         continue
                     ck = TT.phase2_manipulation_stance(self, init_k, 0.5 * self.edge, target_height=self.edge, focus_candidates=self._regions, in_frame_fn=self._region_in_frame,
                                                        bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge,
-                                                       angle_classes_deg=angle_classes)
+                                                       angle_classes_deg=angle_classes, split_cone=split)
                     for c in ck:
-                        c.extras["lateral_shift_m"] = float(shift)
+                        c.extras.setdefault("lateral_shift_m", float(shift))
                     cands += ck
                 if not cands:
                     raise Reject("no_manipulation_stance", f"Phase 2 left no region survivor ({getattr(self, '_regions_too_deep', 0)} regions dropped: init cells beyond "

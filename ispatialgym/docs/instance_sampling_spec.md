@@ -725,6 +725,22 @@ limit (same edge and lateral as the init stance):
    `manipulation_stance = {stand_off, translate, tilt, focus, base_pose2d}`.
 5. Transition check init → manipulation (3.8); on failure take the next survivor.
 
+*Split cone (opt-in per subtask, `generation.phase2_split_cone`; owner 2026‑10‑11, cone A/B variant C):* one cone for the
+start image, one for the work. The object's start position is a band cell of at least one candidate work stance that lies
+within `init_view_class_deg` (default 20°, else 30°) of the INIT camera's optical axis with the target box in frame from the
+init stance; positions are deduplicated to the band lattice in the init stance's frame and drawn uniformly, one per attempt.
+The work stance is searched along the edge (`phase2_lateral_shifts_m`, default 0, ±0.10, ±0.20, ±0.30 m — attachment's second
+base pose) × stand-off × translate × tilt as above, keeping stances where the drawn position is a band cell, within
+`phase2_tight_class_deg` (else `phase2_loose_class_deg`) of the work camera's axis with the box in frame, whole‑body
+collision‑free; the position's best class goes to the task, whose own order applies among those stances. A work stance off the
+init lateral is reached as block design's stances are: when either trunk bows forward, a departure transition first (drive
+back ≥ `travel_back_min_m` = 0.10 m beyond the init stand‑off, trunk upright), the §3.7 path, then the 3.8 arrival transition;
+otherwise (or when that fails) the §3.7 path to the drive‑back pose plus the transition (`prompt0.connect`). Everything after
+(partner / attach / left‑band placement, braces, exact checks) is unchanged. The sidecar's manipulation stance records
+`init_view_angle` / `init_view_class`, `axis_angle` / `angle_class`, `lateral_shift_m` and `init_travel` (`lateral_m`, `base_m`,
+`path_m`, `departure_stand_off_m`, `transition_stand_off_m`). Implemented for the tasks that call tabletop Phase 2 at the
+template: IORS small, disembedding, attachment, block design (its own travel), axial alignment, small articulation.
+
 ### 4.6 Phase 3 — sample objects
 
 **Joint two‑arm placement (A1).** For a two‑arm task (axial stop edge, attachment partner brace, block row / column

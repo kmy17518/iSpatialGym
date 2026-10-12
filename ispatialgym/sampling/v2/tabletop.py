@@ -59,6 +59,8 @@ TRANSLATES = tuple(float(t) for t in RB.TRANSLATES)  # §3.3 grid (0.95 = deepes
 TILT_GRID = tuple(float(k) for k in RB.TILTS)  # §3.3 grid tilts of the bands
 N_TILT_SAMPLES = 7  # §4.5 "tilt continuous from 0 to the torso_joint3 limit": samples of the scan
 ANGLE_CLASSES_DEG = (20.0, 30.0)  # §4.5 step 3 (owner 2026-10-11: 8 / 20 left the target almost no spread)
+SPLIT_INIT_VIEW_CLASSES_DEG = (20.0, 30.0)  # split cone (generation.phase2_split_cone): the start position's classes at the init view
+SPLIT_LATERAL_SHIFTS = (0.0, 0.10, -0.10, 0.20, -0.20, 0.30, -0.30)  # split cone: work-stance shifts along the edge (attachment's second base pose)
 
 
 def phase2_angle_classes(s, default: Sequence[float] = ANGLE_CLASSES_DEG) -> Tuple[float, float]:
@@ -76,6 +78,8 @@ def phase2_angle_classes(s, default: Sequence[float] = ANGLE_CLASSES_DEG) -> Tup
         v = s.gen(key, None)
         out.append(float(v if v is not None else sub.get(key, fallback)))
     return out[0], out[1]
+
+
 IN_FRAME_MARGIN = 0.05  # §3.4 "in frame (5 %)"
 FOCUS_RADIUS = 0.05  # §4.6 step 1: target within 5 cm of the focus
 YAW_JITTER = math.radians(22.5)  # §4.6 step 1
@@ -1824,7 +1828,7 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
                                angle_classes_deg: Sequence[float] = ANGLE_CLASSES_DEG, margin: float = IN_FRAME_MARGIN, bands: Optional[RB.ReachBands] = None,
                                class1_when_deep_m: Optional[float] = None,
                                top=None, erosion_extra: float = 0.02, focus_z: Optional[float] = None, order: Optional[str] = None,
-                               arm_bands: Optional[Dict[str, RB.ReachBands]] = None) -> List[Stance]:
+                               arm_bands: Optional[Dict[str, RB.ReachBands]] = None, split_cone: Optional[Dict[str, Any]] = None) -> List[Stance]:
     """§4.5: scan stand-off {0.35, 0.45, 0.55} x translate {0, …, 0.95} x tilt (0 → torso_joint3 limit, ``n_tilts`` samples)
     at the init edge and lateral; (1) whole-body collision check without objects; (2) band = the grid trunk with the
     same translate and nearest tilt, focus candidates = its cells inside the top eroded by ``target_half_extent`` +
@@ -1842,7 +1846,14 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     ``arm_bands`` (owner 2026-09-27, first-demo v2.2: ``{arm: band}`` of every arm offered for the segment, the default arm first):
     the focus candidates are the cells of every offered arm's band (the other arm's band a mirror when it has no band of its
     own), each survivor records in ``extras["focus_arms"]`` the arms whose band covers its focus, and ``order="reach"`` ranks by
-    whichever of those arms reaches better - so stances that suit the other arm reach the orientation chooser."""
+    whichever of those arms reaches better - so stances that suit the other arm reach the orientation chooser.
+
+    ``split_cone`` (:func:`split_cone_opts`, opt-in ``generation.phase2_split_cone``): :func:`phase2_split_cone` instead - the
+    start position in a wide cone of the init view, the work stance in its own cone with a search along the edge."""
+    if split_cone is not None:
+        return phase2_split_cone(s, init, target_half_extent, target_height=target_height, in_frame_fn=in_frame_fn, focus_candidates=focus_candidates,
+                                 stand_offs=stand_offs, translates=translates, n_tilts=n_tilts, margin=margin, bands=bands,
+                                 class1_when_deep_m=class1_when_deep_m, top=top, erosion_extra=erosion_extra, focus_z=focus_z, arm_bands=arm_bands, **split_cone)
     top = _top(s, top)
     bands = bands or ensure_bands(s, top=top, edge=init.edge)
     arm_bands = {a: b for a, b in (arm_bands or {}).items() if b is not None}
@@ -1937,6 +1948,175 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     if order == "reach" and out:
         out = sorted(out, key=lambda c: -min(round(best_reach_margin(s, c, c.focus, c.extras.get("focus_arms") or ("right",))[0] / 0.05) * 0.05, 0.30))
     return out
+
+
+def split_cone_opts(s) -> Optional[Dict[str, Any]]:
+    """Owner 2026-10-11 (cone A/B variant C), opt-in per subtask with ``generation.phase2_split_cone``: the keyword arguments of
+    :func:`phase2_split_cone` - the start position's classes at the init view (``init_view_class_deg``), the work stance's shifts
+    along the edge (``phase2_lateral_shifts_m``) and its classes (``phase2_tight_class_deg`` / ``phase2_loose_class_deg``) - or None
+    (off: Phase 2 as before)."""
+    if not s.gen("phase2_split_cone", False):
+        return None
+    iv = s.gen("init_view_class_deg", None) or SPLIT_INIT_VIEW_CLASSES_DEG
+    return {"init_view_classes_deg": (float(iv[0]), float(iv[1])),
+            "lateral_shifts": tuple(float(v) for v in (s.gen("phase2_lateral_shifts_m", None) or SPLIT_LATERAL_SHIFTS)),
+            "work_classes_deg": (float(s.gen("phase2_tight_class_deg", ANGLE_CLASSES_DEG[0])), float(s.gen("phase2_loose_class_deg", ANGLE_CLASSES_DEG[1])))}
+
+
+def stance_cameras(s, stances: Sequence[Stance]) -> List[Pose]:
+    """Head-camera poses at ``stances`` through the kit's batched FK (as Phase 2)."""
+    return list(s.kit.camera_poses_batch(th.stack([s.stance_q(c) for c in stances])))
+
+
+def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_classes_deg: Sequence[float], lateral_shifts: Sequence[float],
+                      work_classes_deg: Sequence[float], target_height: Optional[float] = None, in_frame_fn: Optional[Callable[..., bool]] = None,
+                      focus_candidates: Optional[Callable[..., List[Tuple[th.Tensor, Any]]]] = None, stand_offs: Sequence[float] = STAND_OFFS,
+                      translates: Sequence[float] = TRANSLATES, n_tilts: int = N_TILT_SAMPLES, margin: float = IN_FRAME_MARGIN,
+                      bands: Optional[RB.ReachBands] = None, class1_when_deep_m: Optional[float] = None, top=None, erosion_extra: float = 0.02,
+                      focus_z: Optional[float] = None, arm_bands: Optional[Dict[str, RB.ReachBands]] = None) -> List[Stance]:
+    """Owner 2026-10-11 (cone A/B variant C): Phase 2 with one cone for the start image and one for the work. Work stances = the init
+    stance shifted along the edge by ``lateral_shifts`` x stand-off x translate x tilt (the §4.5 scan), on free floor and whole-body
+    collision-free; their band cells inside the eroded top (``focus_candidates`` / ``in_frame_fn`` / ``arm_bands`` as in Phase 2) are
+    the possible start positions. A (work stance, position) pair survives when the position lies within ``init_view_classes_deg[1]`` of
+    the INIT camera's optical axis with the target box in frame from the init stance, and within ``work_classes_deg[1]`` of the work
+    camera's axis with the box in frame from there. Each survivor carries ``axis_angle`` / ``angle_class`` (work camera),
+    ``init_view_angle`` / ``init_view_class``, ``lateral_shift_m`` and ``_position`` (the position snapped to the band lattice in the
+    init stance's base frame). Every survivor is returned; :func:`split_cone_draw` draws a position per attempt and hands the task that
+    position's work stances of the best class."""
+    top = _top(s, top)
+    bands = bands or ensure_bands(s, top=top, edge=init.edge)
+    arm_bands = {a: b for a, b in (arm_bands or {}).items() if b is not None}
+    if len(arm_bands) < 2:
+        arm_bands = {}
+    fk = camera_fk(s)
+    height = float(target_height) if target_height is not None else 2.0 * float(target_half_extent)
+    erosion = float(target_half_extent) + float(erosion_extra)
+    lattice = float(bands.meta.get("lattice", RB.LATTICE))
+    iv0, iv1 = (math.radians(float(v)) for v in init_view_classes_deg)
+    w0, w1 = (math.radians(float(v)) for v in work_classes_deg)
+    cands: List[Stance] = []
+    for shift in lateral_shifts:
+        for so in stand_offs:
+            base = init.shifted(stand_off=float(so), lateral=float(init.lateral) + float(shift), name="manipulation")
+            if not s.kit.trav_free(base.base_xy):
+                continue
+            base.extras["lateral_shift_m"] = float(shift)
+            for tr in translates:
+                for ti in tilt_scan(fk, float(tr), n_tilts):
+                    cands.append(base.with_trunk(float(tr), float(ti), "manipulation"))
+    if cands:
+        free = s.ikc.stances_collision_free(cands)
+        cands = [c for c, f in zip(cands, free.tolist()) if f]
+    if not cands:
+        log.info("phase 2 (split cone): no work stance on free floor and collision-free over the lateral shifts %s", list(lateral_shifts))
+        return []
+    cams = stance_cameras(s, cands)
+    cam0 = stance_cameras(s, [init])[0]
+    cm = s.world.camera_model
+
+    def boxed(stance, cam, focus, info) -> bool:
+        return bool(in_frame_fn(s, stance, cam, focus, info) if in_frame_fn is not None
+                    else default_in_frame(s, stance, cam, focus, info, float(target_half_extent), height, margin))
+
+    seen: Dict[Tuple[float, float], Tuple[float, bool]] = {}  # position (mm) -> (init-view angle, admitted at the init view)
+    out: List[Stance] = []
+    n_pairs = 0
+    for st, cam in zip(cands, cams):
+        cell_arms: Dict[Tuple[float, float], List[str]] = {}
+        if arm_bands:
+            cells_l = []
+            for a, b in arm_bands.items():
+                for c in band_cells_world(b, st):
+                    k = (round(float(c[0]), 3), round(float(c[1]), 3))
+                    if k not in cell_arms:
+                        cell_arms[k] = []
+                        cells_l.append(c)
+                    cell_arms[k].append(a)
+            cells = th.stack(cells_l) if cells_l else th.zeros(0, 2)
+        else:
+            cells = band_cells_world(bands, st)
+        keep = [c for c in cells if top.contains(c, erosion)]
+        if not keep:
+            continue
+        foci = focus_candidates(s, st, cam, th.stack(keep)) if focus_candidates is not None else [(c, None) for c in keep]
+        for focus_xy, info in foci:
+            fz = float(focus_z) if focus_z is not None else float(top.z) + 0.5 * height
+            focus = th.tensor([float(focus_xy[0]), float(focus_xy[1]), fz])
+            ang = cm.angle_off_axis(cam, focus)
+            if ang > w1:
+                continue
+            # the init view depends on the position alone, except through a hook's per-stance region (block design)
+            key = (round(float(focus[0]), 3), round(float(focus[1]), 3)) if info is None else None
+            if key is None or key not in seen:
+                a0 = cm.angle_off_axis(cam0, focus)
+                view = (a0, a0 <= iv1 and boxed(init, cam0, focus, info))
+                if key is not None:
+                    seen[key] = view
+            else:
+                view = seen[key]
+            a0, ok0 = view
+            if not ok0:
+                continue
+            n_pairs += 1
+            if not boxed(st, cam, focus, info):
+                continue
+            c = st.with_trunk(st.translate, st.tilt, "manipulation")
+            c.focus = focus
+            fb = init.world_to_base(focus[:2])
+            c.extras.update({"axis_angle": ang, "angle_class": 0 if ang <= w0 else 1, "focus_info": info, "init_view_angle": a0,
+                             "init_view_class": 0 if a0 <= iv0 else 1,
+                             "_position": (int(math.floor(float(fb[0]) / lattice + 0.5)), int(math.floor(float(fb[1]) / lattice + 0.5)))})
+            if arm_bands:
+                c.extras["focus_arms"] = list(cell_arms.get((round(float(focus_xy[0]), 3), round(float(focus_xy[1]), 3)), [next(iter(arm_bands))]))
+            out.append(c)
+    s._split_cone_class1_deep = class1_when_deep_m
+    log.info("phase 2 (split cone): %d work stances collision-free over the lateral shifts %s, %d (stance, position) pairs within %.0f° of the work camera "
+             "and %.0f° of the init camera, %d survivors at %d positions (%d within %.0f° of the init view)", len(cands), list(lateral_shifts), n_pairs,
+             math.degrees(w1), math.degrees(iv1), len(out), len({c.extras["_position"] for c in out}),
+             len({c.extras["_position"] for c in out if c.extras["init_view_class"] == 0}), math.degrees(iv0))
+    return out
+
+
+def split_cone_positions(cands: Sequence[Stance], class1_when_deep_m: Optional[float] = None) -> Dict[Tuple[int, int], List[Stance]]:
+    """Variant C: position -> its work stances of the best class (the tight class, else the loose; D-009 B: the loose-class stances
+    admitted too when every tight-class focus lies deeper than ``class1_when_deep_m`` base-forward), over the positions of the best
+    init-view class."""
+    tier = 0 if any(c.extras["init_view_class"] == 0 for c in cands) else 1
+    by_pos: Dict[Tuple[int, int], List[Stance]] = {}
+    for c in cands:
+        if c.extras["init_view_class"] <= tier:
+            by_pos.setdefault(tuple(c.extras["_position"]), []).append(c)
+    out: Dict[Tuple[int, int], List[Stance]] = {}
+    for key, cs in by_pos.items():
+        c0 = [c for c in cs if c.extras["angle_class"] == 0]
+        best = c0 or cs
+        if class1_when_deep_m is not None and c0 and len(c0) < len(cs):
+            if min(float(c.world_to_base(c.focus[:2])[0]) for c in c0) > float(class1_when_deep_m):
+                best = c0 + [c for c in cs if c.extras["angle_class"] != 0]
+        out[key] = best
+    return out
+
+
+def split_cone_draw(s, rng: np.random.Generator) -> None:
+    """Variant C, once per attempt (``SamplerV2.sample``): the object's start position drawn uniformly among the positions of the best
+    init-view class that still have a work stance after the task's own filters (``s.manip_candidates`` as ``sample_template`` left
+    them), and that position's work stances of the best class made the task's candidates for this attempt (the task's own order
+    applies among them). A no-op that leaves ``rng`` untouched unless the split cone is on. A task's memory of failed candidates by
+    index (attachment's ``_candidate_rejects``) starts empty with each position."""
+    if not s.gen("phase2_split_cone", False):
+        return
+    pool = getattr(s, "_split_cone_pool", None)
+    if pool is None:
+        cands = list(getattr(s, "manip_candidates", None) or [])
+        if not cands or "_position" not in cands[0].extras:
+            return
+        pool = s._split_cone_pool = split_cone_positions(cands, getattr(s, "_split_cone_class1_deep", None))
+    if not pool:
+        return
+    keys = sorted(pool)
+    s.manip_candidates = list(pool[keys[int(rng.integers(len(keys)))]])
+    if hasattr(s, "_candidate_rejects"):
+        s._candidate_rejects = {}
 
 
 def reach_margin(s, stance: Stance, point_world, arm: str = "right") -> float:

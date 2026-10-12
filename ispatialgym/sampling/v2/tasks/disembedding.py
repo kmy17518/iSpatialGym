@@ -575,7 +575,7 @@ class Disembedding(SamplerV2):
                 self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=bands) if len(self.segment_arms) > 1 else {}
                 cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT), target_height=self.height[self.src_role],
                                                       in_frame_fn=self._source_tray_in_frame, bands=bands, top=self.top, focus_z=self.top.z + self.src_floor.z_local,
-                                                      arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self))
+                                                      arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self))
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the source tray in frame")
                 self.edge, self.init_stance, self.manip_candidates = edge, init, cands
@@ -693,7 +693,7 @@ class Disembedding(SamplerV2):
         support = self.obj("support")
         src, tgt = self.obj(self.src_role), self.obj("target")
         # §4.5 step 5: transition init -> manipulation
-        self.record_transition(init, manip)
+        self.record_stance_travel(init, manip)
         # source tray at the focus, aligned with the edge (§4.6 step 1, disembedding)
         s_pose = self._tray_pose_centred(self.src_role, self.src_floor, manip, manip.focus[:2])
         if not self.top.polygon_supported(self.world.footprint(self.hull[self.src_role], s_pose), margin=TT.SUPPORT_MARGIN):
@@ -718,7 +718,7 @@ class Disembedding(SamplerV2):
                                          arms=arms_here, arm_bands=self.arm_bands or None, fixed=fixed)
         if grasp.arm != default:
             self.sidecar.transitions.clear()
-            self.record_transition(init, manip)  # the other arm idles now
+            self.record_stance_travel(init, manip)  # the other arm idles now
         # the segment's later contacts; when they fail with the chosen arm, the whole segment is retried with the other arm if its grasp
         # passed too (owner 2026-09-27: the fallback spans the segment)
         tried: List[str] = []
@@ -738,7 +738,7 @@ class Disembedding(SamplerV2):
                 d = Draft()
                 self.sidecar.transitions.clear()
                 self.sidecar.paths.clear()
-                self.record_transition(init, manip)
+                self.record_stance_travel(init, manip)
                 for o in self.world.spawned.values():
                     if o.name not in (src.name, tgt.name):
                         self.world.park(o, list(self.world.spawned).index(o.name))
@@ -1128,7 +1128,7 @@ class Disembedding(SamplerV2):
         TT.adopt_arm(manip, st_m)
         TT.adopt_arm(place_st, st_p)
         self.sidecar.transitions[:] = [t for t in self.sidecar.transitions if not (t.frm == init.name and t.to == manip.name)]
-        self.record_transition(init, manip)
+        self.record_stance_travel(init, manip)
         self.sidecar.paths[:] = [p for p in self.sidecar.paths if not (p.frm == manip.name and p.to == place_st.name)]
         with TT.posed_in_hand(self, arm, self.obj("target"), grasp.eef_in_object):
             self.record_path(manip, place_st, carried=self.tname, arm=arm, edge_slide=bool(self.g("carry_edge_slide")),

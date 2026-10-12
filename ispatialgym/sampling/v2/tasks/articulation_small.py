@@ -476,7 +476,7 @@ class ArticulationSmall(SamplerV2):
                     focus_z = float(self.top.z) - float(self.hull.min(dim=0).values[2]) + float(self.handle["contact"][2])
                 cands = TT.phase2_manipulation_stance(self, init, w_a, target_height=H_max, in_frame_fn=self._target_in_frame, bands=self.bands, top=self.top,
                                                       stand_offs=tuple(self.g("stand_offs_m")), focus_z=focus_z,
-                                                      angle_classes_deg=TT.phase2_angle_classes(self))
+                                                      angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self))
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the target, handle and brace point in frame")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
@@ -1311,7 +1311,7 @@ class ArticulationSmall(SamplerV2):
                 manip = manip2
             chosen, brace_state = (None, None, None, r_h.q), "none"
             log.info("%s: BRACE_OPTIONAL handle-only instance (%s; %d stances tried)", self.gp.alias, "brace search off" if not brace_search else "no brace passed", len(tried_stances))
-        self.record_transition(init, manip)
+        self.record_stance_travel(init, manip)
         kind, b_pre, b_contact, q_both = chosen
         if self.handle_only_band and kind is not None:
             brace_extras["pose_class"] = kind
@@ -1816,7 +1816,7 @@ class ArticulationSmall(SamplerV2):
             stance.extras.update({"second_stance": True, "lateral_shift": float(shifts[0]), "stand_off_shift": float(shifts[1]), "trunk_from": [float(manip.translate), float(manip.tilt)]})
         stance.name = "manipulation"
         wp_at(q0)
-        self.record_transition(init, stance)
+        self.record_stance_travel(init, stance)
         stances: List[Stance] = [stance]
         records: List[Any] = []
         braces: List[Any] = []
@@ -2667,7 +2667,7 @@ class ArticulationSmall(SamplerV2):
             raise Reject("gripper_not_in_frame", "v4 main pinch eef pose outside the manipulation image (5 %)")
         manip.name = "manipulation"
         manip.arms = sorted({main_arm, lever_arm})
-        self.record_transition(init, manip)
+        self.record_stance_travel(init, manip)
         TT.whole_body_check_at(self, [init, manip], {tname: pose}, require=True, reason="stance_collision")
         # records
         tol_o = min(self._joint_tol(self.q_goal - self.q_init), 0.5 * angle)
@@ -2834,7 +2834,7 @@ class ArticulationSmall(SamplerV2):
         m1.arms = list(arms_all)
         m2.arms = list(arms_all)
         self._set_named_joint(target, other, q0o)  # the flaps as the robot meets them: the other flap closed (pressed only while a fist is on it)
-        tr1 = self.record_transition(init, m1)
+        tr1 = self.record_stance_travel(init, m1)
         # diagnostic (0919-224439: settle_validate rejects this very transition): the validator's call right here
         from ispatialgym.sampling.v2 import navigation as NAVD
         chk = NAVD.transition(self.kit, init, m1, min_standoff=tr1.stand_off, path_end_standoff=self.path_end_standoff(init, m1))

@@ -193,7 +193,7 @@ class AlignmentAxial(SamplerV2):
                 if init is None:
                     raise Reject("edge_not_visible", "the front edge is not visible from the init stance at 8 lateral draws")
                 cands = TT.phase2_manipulation_stance(self, init, w_diag, target_height=ez, bands=bands, top=self.top, focus_z=self.top.z + 0.5 * ez,
-                                                      angle_classes_deg=TT.phase2_angle_classes(self))
+                                                      angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self))
                 cands = [c for c in cands if self._edge_visible_points(c, self.camera_pose_at(c), c.local(c.focus[:2])[1], None) >= int(ev.get("min_visible", 3))]
                 if not cands:
                     raise Reject("edge_not_visible", "no Phase-2 survivor sees the front edge")
@@ -284,7 +284,7 @@ class AlignmentAxial(SamplerV2):
         draft = Draft()
         tname = self.tname
         target, support = self.obj("target"), self.obj("support")
-        self.record_transition(init, manip)
+        self.record_stance_travel(init, manip)
         yaw_goal = self._aligned_yaw(manip)
         cam_init = self.camera_pose_at(init)
         ev = self.g("edge_visibility") or {}

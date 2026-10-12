@@ -370,7 +370,7 @@ class IORSSmall(SamplerV2):
         # Phase 2: manipulation stance survivors of the best angle class (each with its focus)
         self.manip_candidates = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                                               target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top,
-                                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), **phase2_band)
+                                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), **phase2_band)
         if not self.manip_candidates:
             raise Reject("no_manipulation_stance", "Phase 2 left no survivor")
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
@@ -716,7 +716,7 @@ class IORSSmall(SamplerV2):
             try:
                 # §4.5 step 5: transition init -> manipulation
                 self.sidecar.transitions.clear()
-                self.record_transition(init, manip)
+                self.record_stance_travel(init, manip)
                 # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation); the upright shelf start is
                 # fixed, its grasp confirmed with nothing ignored (the board above and the side walls are obstacles at the grasp pose)
                 if self.shelf_pose is not None:
@@ -726,7 +726,7 @@ class IORSSmall(SamplerV2):
                     t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
                 if grasp.arm != default:
                     self.sidecar.transitions.clear()
-                    self.record_transition(init, manip)  # the other arm idles now
+                    self.record_stance_travel(init, manip)  # the other arm idles now
                 self.apply_height_extra_to_grasp(grasp, t_pose, manip)  # A/B knob generation.contact_height_extra_m (0 = no-op)
                 # the segment's later contacts; when they fail with the chosen arm, the whole segment is retried with the other arm if
                 # its grasp passed too (owner 2026-09-27: the fallback spans the segment)
@@ -748,7 +748,7 @@ class IORSSmall(SamplerV2):
                             raise
                         grasp = g2
                         self.sidecar.transitions.clear()
-                        self.record_transition(init, manip)
+                        self.record_stance_travel(init, manip)
                         self.apply_height_extra_to_grasp(grasp, t_pose, manip)
                 # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
                 grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
@@ -1483,7 +1483,7 @@ class IORSSmall(SamplerV2):
             return f"no collision-free idle posture of the {TT.RB.other_arm(arm)} arm with the {arm} arm working"
         TT.adopt_arm(manip, st)
         self.sidecar.transitions[:] = [t for t in self.sidecar.transitions if not (t.frm == init.name and t.to == manip.name)]
-        self.record_transition(init, manip)
+        self.record_stance_travel(init, manip)
         return None
 
     def refine_targets_from_goal(self, draft: Draft):
