@@ -1497,6 +1497,64 @@ def test_axial_hinge_anchor_below_the_top_on_the_com_axis_and_the_target_stays(m
     assert s.obj("target").moves == []
 
 
+def test_axial_hinge_resistance_only_when_the_alias_sets_the_keys(monkeypatch):
+    """Owner 2026-10-12 (alignment-axial#05, the tablespoon turned 0.022 rad on its frictionless table hinge while settling): an
+    axial alias whose own generation sets the world-vertical resistance keys gets the wall's friction / damping with the inertia
+    about the vertical axis (I_z = m (long² + short²) / 12 over the footprint), passed to ``create_hinge`` and carried by the
+    TRO hinge record the oracle / evaluator re-create (the loader's brake floor leaves it unchanged); without the keys the hinge
+    stays frictionless and its record unchanged. The axial generation defaults have none of the keys, so a re-grounding adds them
+    to no other alias."""
+    from ispatialgym.sampling import constraints as K
+    from ispatialgym.sampling import generation_defaults as GD
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.tasks.base import Draft
+
+    wv = {"hinge_stop_decel_rad_s2": 10.0, "hinge_viscous_tau_s": 0.02, "hinge_brake_omega_rad_s": 0.0025}
+    AX, s = _axial_sampler(wv)
+    assert set(AX.HINGE_RESISTANCE_KEYS) == set(wv) and not set(wv) & set(GD.defaults_for("alignment-axial"))
+    i_z = 0.06 * (0.20**2 + 0.04**2) / 12
+    res = s.hinge_resistance()
+    assert res == K.hinge_resistance(0.06, (0.20, 0.04)) and res["inertia_kgm2"] == pytest.approx(i_z)
+    assert res["friction"] == pytest.approx(10.0 * i_z) and res["damping"] == pytest.approx(10.0 * i_z / 0.0025)
+    assert _axial_sampler({})[1].hinge_resistance() is None and _axial_sampler({"hinge_sink_m": 0.001})[1].hinge_resistance() is None
+    stiff = _axial_sampler({"hinge_stop_decel_rad_s2": 40.0})[1].hinge_resistance()  # the keys it leaves out: the world-vertical defaults
+    assert stiff["friction"] == pytest.approx(40.0 * i_z) and stiff["damping"] == pytest.approx(40.0 * i_z / 0.0025) and stiff["viscous_tau_s"] == 0.02
+    with pytest.raises(Reject) as e:
+        _axial_sampler(wv, mass=0.0)[1].hinge_resistance()
+    assert e.value.reason == "spec"
+
+    made = []
+
+    def fake_create_hinge(child, anchor, axis, parent_link=None, friction=None, damping=None, facts=None):
+        made.append({"friction": friction, "damping": damping, "facts": facts})
+        return K.Hinge(f"/World/{child.name}/isg_hinge", child.name, "table", parent_link.body_name, G.t(anchor), G.t(axis), friction=friction, damping=damping,
+                       facts=dict(facts or {}))
+
+    monkeypatch.setattr(AX, "create_hinge", fake_create_hinge)
+    monkeypatch.setattr(AX, "og", SimpleNamespace(sim=SimpleNamespace(step_physics=lambda: None)))
+    for gen, resisted in ((wv, True), ({}, False)):
+        _, s = _axial_sampler(gen, turn_rad=0.001)
+        d = Draft()
+        d.summary["yaw_goal"] = 0.9
+        s.after_settle(d)
+        rec = d.extras["constraints"][0]
+        assert rec["type"] == "revolute" and rec["axis"] == pytest.approx([0.0, 0.0, 1.0]) and rec["parent"] == "support.n.01_1"
+        if resisted:
+            assert made[-1]["friction"] == pytest.approx(res["friction"]) and made[-1]["damping"] == pytest.approx(res["damping"])
+            assert rec["friction"] == pytest.approx(res["friction"]) and rec["damping"] == pytest.approx(res["damping"]) and "clamp(" in rec["drive"]
+            assert rec["resistance_facts"]["inertia_kgm2"] == pytest.approx(i_z) and rec["resistance_facts"]["extents_perp_m"] == pytest.approx([0.20, 0.04])
+            assert K.hinge_brake_damping(rec["friction"], rec["damping"]) == pytest.approx(rec["damping"])  # the loader applies the record as is
+            assert d.summary["hinge"]["friction_nm"] == pytest.approx(res["friction"])
+        else:
+            assert made[-1] == {"friction": None, "damping": None, "facts": None}
+            assert "friction" not in rec and "damping" not in rec and "drive" not in rec and "hinge" not in d.summary
+    _, s = _axial_sampler(wv, turn_rad=0.02)  # the 60-step check still rejects a hinge that turns beyond 0.005 rad
+    with pytest.raises(Reject) as e:
+        s.after_settle(Draft())
+    assert e.value.reason == "hinge_drift" and "0.0200 rad" in str(e.value)
+
+
 def test_counterbalance_switches_gravity_off_on_the_leaf_assembly_and_damps_the_joint():
     """Owner decision 2026-09-19 (articulation_open_large_scale): a horizontal-axis appliance door is spring-balanced -
     gravity off on every link of the leaf assembly (the moving link and the links fixed to it), viscous damping on the

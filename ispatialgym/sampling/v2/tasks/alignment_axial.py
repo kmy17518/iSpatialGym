@@ -17,7 +17,8 @@ right band and stop point in the left contact band at the same trunk, the blade 
 with the push arm locked; owner decision 2026-09-16 08:10: axial is push-only otherwise — the oracle's push closure is
 the stop, ``summary.brace = "present" | "none"``); every right-hand push pose IK-feasible. After settling a vertical hinge through the COM (parent = support;
 the target stays at its settled pose, the anchor lies on the COM's vertical axis ``hinge_sink_m`` = 1 mm below the support top) is installed
-and recorded as a TRO constraint (drift ≤ 1 mm / 0.005 rad over 60 steps).
+and recorded as a TRO constraint (drift ≤ 1 mm / 0.005 rad over 60 steps); it is frictionless
+unless the alias's generation sets the world-vertical resistance keys (``hinge_resistance``).
 Goal: position unchanged, orientation = long axis parallel to the front edge, front toward the robot (tolerance
 0.10 rad, equivalences from the customs entry). Sidecar: ``init`` / ``manipulation`` stances (arms right + left),
 the transition, ``contacts.push`` (pre, init, mid, goal, direction, distance) and ``contacts.brace`` (``stop_edge``).
@@ -35,7 +36,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import generation_defaults as GD
-from ispatialgym.sampling.constraints import Hinge, create_hinge, remove_hinge
+from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, Hinge, create_hinge, hinge_resistance, remove_hinge
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import pose_target
@@ -61,6 +62,9 @@ THIN_TARGET_HEIGHT = 0.04  # below this height the stop brace tries the top-down
 BRACE_CELL_TOL = 1.0
 END_INSET = 0.03  # the pushed end lies this far inside the object's long-axis extremity
 BAND_TOLERANCE = 0.5  # an end is "inside the band" within this fraction of the lattice of a band cell
+#: the world-vertical hinge resistance keys (``alignment_wall.hinge_resistance``): an axial alias whose own ``generation`` sets any
+#: of them gets the resisted hinge (``AlignmentAxial.hinge_resistance``), every other axial alias keeps the frictionless one
+HINGE_RESISTANCE_KEYS = ("hinge_stop_decel_rad_s2", "hinge_viscous_tau_s", "hinge_brake_omega_rad_s")
 
 
 def _axis(name: str) -> th.Tensor:
@@ -675,32 +679,56 @@ class AlignmentAxial(SamplerV2):
         remove_hinge(self.hinge)
         self.hinge = None
 
+    def hinge_resistance(self) -> Optional[Dict[str, Any]]:
+        """§6.10 hinge friction / damping (owner 2026-10-12, alignment-axial#05: the tablespoon turned 0.022 rad on its
+        frictionless hinge while settling). None - the frictionless hinge - unless the alias's own ``generation`` sets one of
+        :data:`HINGE_RESISTANCE_KEYS` (``generation_defaults`` has none for the axial; a key the alias leaves out takes the world
+        vertical's default). Then the wall's helper :func:`ispatialgym.sampling.constraints.hinge_resistance` with the inertia
+        about the vertical hinge axis: the spawned target's mass over its footprint (the template's long × short extents)."""
+        keys = {k: self.gen(k) for k in HINGE_RESISTANCE_KEYS}
+        if all(v is None for v in keys.values()):
+            return None
+        mass = float(self.obj("target").mass)
+        if not (mass > 0):
+            raise Reject("spec", f"{self.tname}: the spawned target reports mass {mass} (the hinge resistance needs its inertia)")
+        decel, tau, omega = (float(d if keys[k] is None else keys[k]) for k, d in zip(HINGE_RESISTANCE_KEYS, (HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, HINGE_BRAKE_OMEGA_RAD_S)))
+        return hinge_resistance(mass, (self.extents["long"], self.extents["short"]), decel=decel, tau=tau, omega_brake=omega)
+
     def hinge_anchor(self, pose: TT.Pose) -> th.Tensor:
         """§6.10 hinge anchor of the target at ``pose``: on the vertical axis through its COM, ``hinge_sink_m`` below the support top."""
         com = self._com_world(pose)
         return th.tensor([float(com[0]), float(com[1]), float(self.top.z) - float(self.g("hinge_sink_m"))])
 
     def after_settle(self, draft: Draft):
-        """Install the hinge on the settled target (anchor: :meth:`hinge_anchor`), require drift <= 1 mm / 0.005 rad over 60
-        steps, record the TRO constraint and the goal pose (rotation about the COM to the aligned yaw). The target is not
-        moved (owner 2026-10-12, alignment-axial#05: lowered ``hinge_sink_m`` into the support and hinged at its COM, the
-        tablespoon popped back up tilted 0.015-0.024 rad and failed the drift check)."""
+        """Install the hinge on the settled target (anchor: :meth:`hinge_anchor`; friction / damping from :meth:`hinge_resistance`),
+        require drift <= 1 mm / 0.005 rad over 60 steps, record the TRO constraint and the goal pose (rotation about the COM to
+        the aligned yaw). The target is not moved (owner 2026-10-12, alignment-axial#05: lowered ``hinge_sink_m`` into the
+        support and hinged at its COM, the tablespoon popped back up tilted 0.015-0.024 rad and failed the drift check)."""
         target, support = self.obj("target"), self.obj("support")
         tname = self.tname
         self._clear_hinge()
         target.keep_still()
         p, q = target.get_position_orientation()
         anchor = self.hinge_anchor((p.float(), q.float()))
-        self.hinge = create_hinge(target, anchor, th.tensor([0.0, 0.0, 1.0]), parent_link=support.root_link)
+        res = self.hinge_resistance()
+        self.hinge = create_hinge(target, anchor, th.tensor([0.0, 0.0, 1.0]), parent_link=support.root_link, friction=None if res is None else res["friction"],
+                                  damping=None if res is None else res["damping"],
+                                  facts=None if res is None else {k: v for k, v in res.items() if k not in ("friction", "damping")})
         target.keep_still()
         og.sim.step_physics()
         drift = self.g("hinge_drift_max") or {}
         p0, q0 = target.get_position_orientation()
         self.world.step_physics(int(drift.get("steps", 60)), still=[self.robot])
         p1, q1 = target.get_position_orientation()
-        if float(th.linalg.norm(p1 - p0)) > float(drift.get("position_m", 0.001)) or C.quat_angle(q1, q0) > float(drift.get("orientation_rad", 0.005)):
-            raise Reject("hinge_drift", f"target drifted {float(th.linalg.norm(p1 - p0)) * 1000:.1f} mm / {C.quat_angle(q1, q0):.4f} rad with the hinge")
+        moved, turned = float(th.linalg.norm(p1 - p0)), C.quat_angle(q1, q0)
+        if res is not None:
+            log.info("%s: hinge friction %.4g N·m, damping %.4g N·m·s/rad (I_z %.4g kg·m², %.4g kg): drifted %.1f mm / %.4f rad over %d steps", self.gp.alias,
+                     res["friction"], res["damping"], res["inertia_kgm2"], res["mass_kg"], moved * 1000, turned, int(drift.get("steps", 60)))
+        if moved > float(drift.get("position_m", 0.001)) or turned > float(drift.get("orientation_rad", 0.005)):
+            raise Reject("hinge_drift", f"target drifted {moved * 1000:.1f} mm / {turned:.4f} rad with the hinge")
         draft.extras["constraints"] = [self.hinge.to_tro(tname, self.bindings.one("support").name)]
+        if res is not None:
+            draft.summary["hinge"] = {"friction_nm": res["friction"], "damping_nms_per_rad": res["damping"], "inertia_kgm2": res["inertia_kgm2"], "mass_kg": res["mass_kg"]}
         draft.object_poses[tname] = (p1.clone(), q1.clone())
         yaw_goal = draft.summary["yaw_goal"]
         q_goal = C.quat_from_yaw(yaw_goal)

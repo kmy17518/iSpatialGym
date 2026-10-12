@@ -14,7 +14,8 @@ applies them through a ``UsdPhysics.DriveAPI`` angular drive on the joint (stiff
 implicit force-limited damped spring gives torque = clamp(−damping · ω, ±friction) — Coulomb friction above
 ω = friction / damping, viscous creep below it. ``physxJoint:jointFriction`` is not used: it applies to articulation
 joints only and the hinge is a plain joint (``excludeFromArticulation``). The sampler sets both from the target's
-inertia about the hinge axis (:func:`hinge_resistance`); the axial table hinge records neither (unchanged).
+inertia about the hinge axis (:func:`hinge_resistance`); the axial table hinge records them only when its alias sets the
+resistance keys (``AlignmentAxial.hinge_resistance``, owner 2026-10-12), else neither (frictionless).
 
 **Brake** (2026-09-22, alignment-world_vertical 0922-180242): below ω = friction / damping the drive is a plain damper,
 so any residual torque - the anchor a millimetre off the true centre of mass under gravity (0.009 N·m on the 2.25 kg
@@ -297,7 +298,7 @@ def create_hinge(child_obj, anchor_world, axis_world, parent_link=None, name: st
 
     ``parent_link``: a link (RigidPrim) of the parent object; None anchors to the world frame. ``friction`` (N·m) /
     ``damping`` (N·m·s/rad): the hinge resistance of the record (:func:`apply_hinge_drive`); both None = the frictionless
-    hinge (the axial table hinge).
+    hinge (the axial table hinge of an alias without the resistance keys).
     """
     anchor = G.t(anchor_world)
     axis = G.t(axis_world)

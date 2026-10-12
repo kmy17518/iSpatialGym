@@ -618,7 +618,8 @@ The sampler only guarantees what the loader can reproduce. Beyond the BEHAVIOR o
 
 - `constraints` — the COM hinges of the alignment tasks (revolute joint parent = support root link or wall, child =
   target, anchor and axis as recorded) are re-created **with the recorded hinge resistance** (§7: `friction` /
-  `damping` of the wall hinge as the joint's angular drive; absent = frictionless, the axial table hinge); the wall
+  `damping` of the wall hinge, or of an axial hinge whose alias sets the resistance keys (6.10), as the joint's angular
+  drive; absent = frictionless, the other axial table hinges); the wall
   hinge's anchor is the COM, the table hinge's lies on the COM's vertical axis `hinge_sink_m` = 1 mm below the support
   top so the object cannot rock (6.10; an instance written before 2026‑10‑12 keeps its recorded anchor, the COM of a
   target lowered 1 mm into the support, and is not re-sampled); a hinge that is missing at evaluation is a loader error,
@@ -1696,7 +1697,13 @@ COM (TRO constraint, parent = support) installed after settling, its anchor on t
 `generation.hinge_sink_m` = 1 mm below the support top so the object cannot rock — the target stays at its settled pose
 (owner 2026‑10‑12, alignment-axial#05: lowered 1 mm into the support and hinged at its COM, the tablespoon popped back
 up tilted 0.015–0.024 rad and failed the drift check) — drift ≤ 1 mm / 0.005 rad over the 60-step check; the record's
-`anchor_position` is that anchor (§3.14); push contact = the long-axis end inside the band,
+`anchor_position` is that anchor (§3.14). The hinge is frictionless unless the alias's own
+`generation` sets the world-vertical resistance keys (`hinge_stop_decel_rad_s2` / `hinge_viscous_tau_s` /
+`hinge_brake_omega_rad_s`, §7; `generation_defaults` sets none for the axial, a key the alias leaves out takes the
+world-vertical default; owner 2026‑10‑12: the alignment-axial#05 tablespoon turned 0.022 rad on its frictionless hinge
+while settling): then friction / damping come from the same helper with the inertia about the vertical axis,
+I_z = m (long² + short²) / 12 over the target's footprint, and the constraint record carries them, so the oracle and the
+evaluator re-create the same hinge. Push contact = the long-axis end inside the band,
 generic top-down push pose, arc waypoints at δ/2 and the goal (3.9); **stop edge** for the other arm = the target's
 edge (left or right, depending on the spin direction to the goal) that protrudes most along that direction at the
 goal orientation, braced with the closed left gripper: pre-contact + contact IK at the manipulation stance, combined
@@ -1834,7 +1841,9 @@ exponential creep). The loader applies them as a `UsdPhysics.DriveAPI` angular d
 velocity 0, `damping` per deg/s = damping · π/180, `maxForce` = friction): PhysX's implicit force-limited damped
 spring gives torque = clamp(−damping · ω, ±friction) — recorded verbatim in `drive`; `physxJoint:jointFriction` is not
 usable (articulation joints only; the hinge is a plain joint). `resistance_facts` = the mass, extents and inertia the
-values came from. The axial table hinge (6.10) records neither key: frictionless as before.
+values came from. The axial table hinge (6.10) records neither key — frictionless as before — unless its alias sets
+the resistance keys in its own `generation` (owner 2026‑10‑12, the tablespoon aliases): then both, by the same formulas
+with I_z = m (long² + short²) / 12 of the target's footprint.
 
 ## 8. Error tolerances
 
