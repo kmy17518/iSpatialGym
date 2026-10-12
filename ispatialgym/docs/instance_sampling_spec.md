@@ -617,9 +617,11 @@ The sampler only guarantees what the loader can reproduce. Beyond the BEHAVIOR o
 `load_tro_instance` restores, after **every** `scene.reset()`:
 
 - `constraints` — the COM hinges of the alignment tasks (revolute joint parent = support root link or wall, child =
-  target, anchor = COM, axis as recorded) are re-created **with the recorded hinge resistance** (§7: `friction` /
-  `damping` of the wall hinge as the joint's angular drive; absent = frictionless, the axial table hinge); the table
-  hinge sits 1 mm below the top so the object cannot rock; a hinge that is missing at evaluation is a loader error,
+  target, anchor and axis as recorded) are re-created **with the recorded hinge resistance** (§7: `friction` /
+  `damping` of the wall hinge as the joint's angular drive; absent = frictionless, the axial table hinge); the wall
+  hinge's anchor is the COM, the table hinge's lies on the COM's vertical axis `hinge_sink_m` = 1 mm below the support
+  top so the object cannot rock (6.10; an instance written before 2026‑10‑12 keeps its recorded anchor, the COM of a
+  target lowered 1 mm into the support, and is not re-sampled); a hinge that is missing at evaluation is a loader error,
   not a free-spinning object. The same list carries the other physics the sampler probed with: `joint_friction` /
   `counterbalance` (articulation) and `mass` (`{"type": "mass", "object", "mass_kg"}`, owner decision 2026‑09‑25,
   disembedding: the trays get `generation.tray_mass_kg` = 2 kg — at their 0.4–0.6 kg category mass under 1 kg bottles
@@ -1626,8 +1628,11 @@ default. (World horizontal — the level goal of an elongated wall item — was 
 ### 6.10 Alignment — axial
 
 Tabletop sections 4.2–4.6 with the axial rules: target yaw = aligned yaw ± U(20°, 70°); a vertical hinge through the
-COM (TRO constraint, parent = support) installed after settling, its anchor sunk 1 mm below the top so the object
-cannot rock, drift ≤ 1 mm / 0.005 rad over the 60-step check; push contact = the long-axis end inside the band,
+COM (TRO constraint, parent = support) installed after settling, its anchor on the COM's vertical axis
+`generation.hinge_sink_m` = 1 mm below the support top so the object cannot rock — the target stays at its settled pose
+(owner 2026‑10‑12, alignment-axial#05: lowered 1 mm into the support and hinged at its COM, the tablespoon popped back
+up tilted 0.015–0.024 rad and failed the drift check) — drift ≤ 1 mm / 0.005 rad over the 60-step check; the record's
+`anchor_position` is that anchor (§3.14); push contact = the long-axis end inside the band,
 generic top-down push pose, arc waypoints at δ/2 and the goal (3.9); **stop edge** for the other arm = the target's
 edge (left or right, depending on the spin direction to the goal) that protrudes most along that direction at the
 goal orientation, braced with the closed left gripper: pre-contact + contact IK at the manipulation stance, combined

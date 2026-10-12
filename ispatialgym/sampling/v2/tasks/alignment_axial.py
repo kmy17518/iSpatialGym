@@ -15,8 +15,9 @@ end of the long axis inside the band with its top-down push pose confirmed by th
 the **stop edge** braced by the closed left gripper **when the joint two-arm placement exists** (push point in the
 right band and stop point in the left contact band at the same trunk, the blade clear of the target's sweep, two-arm IK
 with the push arm locked; owner decision 2026-09-16 08:10: axial is push-only otherwise — the oracle's push closure is
-the stop, ``summary.brace = "present" | "none"``); every right-hand push pose IK-feasible. After settling a vertical hinge through the COM (parent = support,
-anchor 1 mm below the top) is installed and recorded as a TRO constraint (drift ≤ 1 mm / 0.005 rad over 60 steps).
+the stop, ``summary.brace = "present" | "none"``); every right-hand push pose IK-feasible. After settling a vertical hinge through the COM (parent = support;
+the target stays at its settled pose, the anchor lies on the COM's vertical axis ``hinge_sink_m`` = 1 mm below the support top) is installed
+and recorded as a TRO constraint (drift ≤ 1 mm / 0.005 rad over 60 steps).
 Goal: position unchanged, orientation = long axis parallel to the front edge, front toward the robot (tolerance
 0.10 rad, equivalences from the customs entry). Sidecar: ``init`` / ``manipulation`` stances (arms right + left),
 the transition, ``contacts.push`` (pre, init, mid, goal, direction, distance) and ``contacts.brace`` (``stop_edge``).
@@ -674,17 +675,22 @@ class AlignmentAxial(SamplerV2):
         remove_hinge(self.hinge)
         self.hinge = None
 
+    def hinge_anchor(self, pose: TT.Pose) -> th.Tensor:
+        """§6.10 hinge anchor of the target at ``pose``: on the vertical axis through its COM, ``hinge_sink_m`` below the support top."""
+        com = self._com_world(pose)
+        return th.tensor([float(com[0]), float(com[1]), float(self.top.z) - float(self.g("hinge_sink_m"))])
+
     def after_settle(self, draft: Draft):
-        """Install the hinge at the settled COM (anchor 1 mm below the top), require drift <= 1 mm / 0.005 rad over 60
-        steps, record the TRO constraint and the goal pose (rotation about the COM to the aligned yaw)."""
+        """Install the hinge on the settled target (anchor: :meth:`hinge_anchor`), require drift <= 1 mm / 0.005 rad over 60
+        steps, record the TRO constraint and the goal pose (rotation about the COM to the aligned yaw). The target is not
+        moved (owner 2026-10-12, alignment-axial#05: lowered ``hinge_sink_m`` into the support and hinged at its COM, the
+        tablespoon popped back up tilted 0.015-0.024 rad and failed the drift check)."""
         target, support = self.obj("target"), self.obj("support")
         tname = self.tname
         self._clear_hinge()
-        sink = float(self.g("hinge_sink_m"))
-        p, q = target.get_position_orientation()
-        target.set_position_orientation(p - th.tensor([0.0, 0.0, sink]), q)
         target.keep_still()
-        anchor = self._com_world((target.get_position_orientation()[0].float(), q.float()))
+        p, q = target.get_position_orientation()
+        anchor = self.hinge_anchor((p.float(), q.float()))
         self.hinge = create_hinge(target, anchor, th.tensor([0.0, 0.0, 1.0]), parent_link=support.root_link)
         target.keep_still()
         og.sim.step_physics()

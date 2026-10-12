@@ -873,6 +873,90 @@ def test_wall_hinge_resistance_record():
     assert K.apply_hinge_drive.__doc__ and "π / 180" in K.apply_hinge_drive.__doc__
 
 
+def _axial_sampler(gen, mass=0.06, turn_rad=0.0):
+    """An ``AlignmentAxial`` without a simulator: ``gen`` as the alias's own generation, a 0.20 × 0.04 m footprint of ``mass`` kg
+    resting on a support top at z 0.75 (its COM off the root origin) that turns ``turn_rad`` about the vertical axis through its
+    COM over the drift check's physics steps; the target keeps every ``set_position_orientation`` call in ``moves``."""
+    from ispatialgym.sampling import generation_defaults as GD
+
+    AX = pytest.importorskip("ispatialgym.sampling.v2.tasks.alignment_axial")
+    s = object.__new__(AX.AlignmentAxial)
+    pose = {"p": th.tensor([1.0, 0.5, 0.758]), "q": C.quat_from_yaw(0.4)}
+    moves = []
+
+    def set_pose(p, q):
+        moves.append((th.as_tensor(p).clone(), th.as_tensor(q).clone()))
+        pose.update(p=moves[-1][0], q=moves[-1][1])
+
+    def turn(n, still=None):
+        com, dq = pose["p"] + C.quat_rotate(pose["q"], s.com_local), C.quat_from_yaw(turn_rad)
+        pose.update(p=com + C.quat_rotate(dq, pose["p"] - com), q=C.qmul(dq, pose["q"]))
+
+    target = SimpleNamespace(name="tablespoon", mass=mass, moves=moves, keep_still=lambda: None, get_position_orientation=lambda: (pose["p"].clone(), pose["q"].clone()),
+                             set_position_orientation=set_pose)
+    objs = {"target": target, "support": SimpleNamespace(root_link=SimpleNamespace(prim_path="/World/table/base_link", body_name="base_link"))}
+    s.spec, s.defaults, s.obj = SimpleNamespace(generation=dict(gen)), GD.defaults_for(AX.SUBTASK), objs.get
+    s.gp = SimpleNamespace(alias="alignment-axial-tablespoon-breakfast_table")
+    s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name=f"{role}.n.01_1"))
+    s.top, s.extents = SimpleNamespace(z=0.75), {"long": 0.20, "short": 0.04, "height": 0.02, "w_diag": 0.102}
+    s.com_local, s.hinge, s.robot = th.tensor([0.03, -0.01, 0.004]), None, None
+    s.world = SimpleNamespace(step_physics=turn)
+    return AX, s
+
+
+def test_axial_hinge_anchor_below_the_top_on_the_com_axis_and_the_target_stays(monkeypatch):
+    """Owner 2026-10-12 (alignment-axial#05, spec 6.10): ``after_settle`` leaves the target at its settled pose (lowered
+    ``hinge_sink_m`` into the support and hinged at its COM, the tablespoon popped back up tilted and failed the drift check) and
+    anchors the hinge on the vertical axis through the COM, ``hinge_sink_m`` below the support top (the default 1 mm or the
+    alias's own value); the TRO record carries that anchor and the loader re-creates the hinge there as recorded; the 60-step
+    drift check still rejects a target that turns."""
+    from ispatialgym.oracle import run_isg as R
+    from ispatialgym.sampling import constraints as K
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.tasks.base import Draft
+
+    made = []
+
+    def fake_create_hinge(child, anchor, axis, parent_link=None, friction=None, damping=None, facts=None):
+        made.append(G.t(anchor).clone())
+        return K.Hinge(f"/World/{child.name}/isg_hinge", child.name, "table", parent_link.body_name, G.t(anchor), G.t(axis), friction=friction, damping=damping)
+
+    AX = pytest.importorskip("ispatialgym.sampling.v2.tasks.alignment_axial")
+    monkeypatch.setattr(AX, "create_hinge", fake_create_hinge)
+    monkeypatch.setattr(AX, "og", SimpleNamespace(sim=SimpleNamespace(step_physics=lambda: None)))
+    assert AX.GD.defaults_for(AX.SUBTASK)["hinge_sink_m"] == 0.001
+    for gen, depth in (({}, 0.001), ({"hinge_sink_m": 0.0}, 0.0), ({"hinge_sink_m": 0.003}, 0.003)):
+        _, s = _axial_sampler(gen)
+        target = s.obj("target")
+        p, q = target.get_position_orientation()
+        com = p + C.quat_rotate(q, s.com_local)
+        d = Draft()
+        d.summary["yaw_goal"] = 0.9
+        s.after_settle(d)
+        assert target.moves == []  # not lowered into the support, not moved at all
+        assert th.allclose(d.object_poses["target.n.01_1"][0], p) and th.allclose(d.object_poses["target.n.01_1"][1], q)
+        anchor = [float(com[0]), float(com[1]), 0.75 - depth]
+        assert made[-1].tolist() == pytest.approx(anchor, abs=1e-6)
+        rec = d.extras["constraints"][0]
+        assert rec["anchor_position"] == pytest.approx(anchor, abs=1e-6) and rec["axis"] == pytest.approx([0.0, 0.0, 1.0]) and rec["parent"] == "support.n.01_1"
+        p_g, q_g = d.goal_poses["target.n.01_1"]  # the goal turns the target about the same vertical COM axis
+        assert (p_g + C.quat_rotate(q_g, s.com_local)).tolist() == pytest.approx(com.tolist(), abs=1e-6)
+    # the loader re-creates the hinge at the recorded anchor (a record written before 2026-10-12 keeps its anchor at the COM)
+    loader = object.__new__(R.InstanceLoader)
+    loader.physical = {"target.n.01_1": target, "support.n.01_1": SimpleNamespace(root_link_name="base_link", links={"base_link": "table_base_link"})}
+    monkeypatch.setattr(K, "create_hinge", lambda child, anchor, axis, parent_link=None, friction=None, damping=None: (child, anchor, axis, parent_link, friction))
+    for r in (rec, dict(rec, anchor_position=com.tolist())):
+        child, anchor, axis, link, friction = loader._create_hinge(r)
+        assert child is target and link == "table_base_link" and friction is None
+        assert anchor.tolist() == pytest.approx(r["anchor_position"]) and axis.tolist() == pytest.approx([0.0, 0.0, 1.0])
+    _, s = _axial_sampler({}, turn_rad=0.02)  # the drift check still rejects a target that turns on its hinge
+    with pytest.raises(Reject) as e:
+        s.after_settle(Draft())
+    assert e.value.reason == "hinge_drift" and "0.0200 rad" in str(e.value)
+    assert s.obj("target").moves == []
+
+
 def test_counterbalance_switches_gravity_off_on_the_leaf_assembly_and_damps_the_joint():
     """Owner decision 2026-09-19 (articulation_open_large_scale): a horizontal-axis appliance door is spring-balanced -
     gravity off on every link of the leaf assembly (the moving link and the links fixed to it), viscous damping on the

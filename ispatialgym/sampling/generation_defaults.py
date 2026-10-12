@@ -405,7 +405,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {},
         "path_buckets": None,
         "deviation_range_deg": [20.0, 70.0],  # §6.10 target yaw = aligned yaw ± U(20°, 70°)
-        "hinge_sink_m": 0.001,  # §6.10 hinge anchor sunk 1 mm below the top
+        "hinge_sink_m": 0.001,  # §6.10 hinge anchor 1 mm below the support top, on the COM's vertical axis (the target is not moved)
         "hinge_drift_max": {"position_m": 0.001, "orientation_rad": 0.005, "steps": 60},  # §6.10 drift ≤ 1 mm / 0.005 rad over 60 steps
         "edge_visibility": {"points": 9, "min_visible": 3, "window_m": 0.30, "in_frame_margin": 0.05},  # §6.10 reference edge visible
         "scale_hint_steps": [0.9, 0.8, 0.7, 0.6, 0.5],  # §5.5 / §6.10 diagnostic scale pass
