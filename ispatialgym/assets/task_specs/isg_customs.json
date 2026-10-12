@@ -18049,7 +18049,8 @@
    "phase2_split_cone": false,
    "_phase2_split_cone_note": "owner 2026-10-12 ~03:30 (4b): split cone (variant C) off - the board alias runs the reconcile cone, Phase 2 with tight 20 / loose 30 deg (set here: the subtask's defaults are C's 8 / 20)",
    "phase2_tight_class_deg": 20.0,
-   "phase2_loose_class_deg": 30.0
+   "phase2_loose_class_deg": 30.0,
+   "repose_after_base_move": true
   },
   "constraints": []
  },
