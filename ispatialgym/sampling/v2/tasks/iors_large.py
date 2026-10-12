@@ -3,7 +3,7 @@
 Roles: ``target`` (spawned, library grasps), fixed ``partner`` (bed, sofa, desk, breakfast table, countertop), fixed
 ``support`` (the **init surface**: a support object within ``max_partner_geodesic`` of the partner, the partner's own
 top — under only — or the floor beside the partner; the class is an explicit choice of the alias / bindings, never a
-runtime fallback), ``floor``. Three recorded stances: **A** init (tabletop Phase 1 at the support + the partner
+runtime fallback unless the alias sets ``generation.init_support_fallback``: owner 2026-10-12 item 2b), ``floor``. Three recorded stances: **A** init (tabletop Phase 1 at the support + the partner
 visible: ≥ 4 of its 8 AABB corners and its centre in frame), **B** manipulation (tabletop Phase 2 at the support, band
 from the reach bands), **C** placement (base square to the partner edge nearest the init pose, stand-off {0.35, 0.45,
 0.55}, lateral along the edge, trunk from the band; ontop: goal cell = the band cell inside the partner's top face
@@ -261,7 +261,7 @@ def under_admissible(clearance_at_goal: float, target_height: float, extra: floa
 
 #: owner 2026-10-12 item 2 (large-scale eval picks): generation keys that relax a rule of this module; unset (None / False) keeps the
 #: rule as before. The keys an alias sets are recorded in ``template_facts["relaxations"]``.
-RELAXATION_KEYS = ("partner_view_min_points",)
+RELAXATION_KEYS = ("partner_view_min_points", "init_support_max_geodesic_m", "init_support_fallback")
 
 
 def enough_in_view(inside, min_points: Optional[int] = None) -> bool:
@@ -483,20 +483,55 @@ class IORSLarge(SamplerV2):
             return kind, [self.obj("floor")]
         if kind == "partner":
             return kind, [self.partner]
+        # owner 2026-10-12 item 2b: ``generation.init_support_max_geodesic_m`` drops a support, named or by category, whose geodesic to
+        # the partner is None or larger (unset: named supports are taken as bound, category ones within ``max_partner_geodesic_m``);
+        # ``self.support_drops`` = {name: why} for the fallback's reason
+        cap = self.gp.gen("init_support_max_geodesic_m")
+        self.support_drops: Dict[str, str] = {}
         names = [n for n in req if isinstance(n, str)] if isinstance(req, list) else []
         if names:
-            return kind, [self.world.obj(n) for n in names]
+            if cap is None:
+                return kind, [self.world.obj(n) for n in names]
+            out = []
+            for n in names:
+                try:
+                    o = self.world.obj(n)
+                except KeyError:
+                    self.support_drops[n] = "missing from the scene"
+                    continue
+                if self._support_near_partner(o, float(cap)):
+                    out.append(o)
+            self.template_facts["init_support_dropped"] = dict(self.support_drops)
+            return kind, out
         cats = list((req or {}).get("category", SUPPORT_CATEGORIES)) if isinstance(req, dict) or req is None else list(SUPPORT_CATEGORIES)
         rooms = set(self.world.rooms or [])
         cands = [o for o in self.world.scene.objects if o.category in cats and o.name in self.world.scene_object_names and (not rooms or set(o.in_rooms or []) & rooms)]
         cands = [o for o in cands if o is not self.partner]
-        max_geo = self.num("max_partner_geodesic_m", 3.0)
-        out = []
-        for o in sorted(cands, key=lambda o: o.name):
-            dist = self.geodesic_between(o, self.partner)
-            if dist is not None and dist <= max_geo:
-                out.append(o)
+        max_geo = self.num("max_partner_geodesic_m", 3.0) if cap is None else float(cap)
+        out = [o for o in sorted(cands, key=lambda o: o.name) if self._support_near_partner(o, max_geo)]
+        if not cands:
+            self.support_drops["category"] = f"no {cats} object in the rooms {sorted(rooms)}"
+        if cap is not None:
+            self.template_facts["init_support_dropped"] = dict(self.support_drops)
         return kind, out
+
+    def _support_near_partner(self, o, max_geo: float) -> bool:
+        """The support's geodesic to the partner exists and is ≤ ``max_geo`` (else noted in ``self.support_drops``)."""
+        dist = self.geodesic_between(o, self.partner)
+        if dist is not None and dist <= max_geo:
+            return True
+        self.support_drops[o.name] = "no geodesic to the partner" if dist is None else f"geodesic {dist:.2f} m > {max_geo:.2f} m"
+        return False
+
+    def init_support_fallback(self, kind: str) -> Optional[Dict[str, Any]]:
+        """Owner 2026-10-12 item 2b (``generation.init_support_fallback``, default off: A5's "no runtime class switching"): when no support
+        is left (too far, missing from the scene, none of the category), ontop falls back to the floor init and under to the partner's own
+        top. Returns ``{from, to, reason}`` (recorded as ``template_facts.init_surface.fallback``) or None."""
+        if kind != "support" or not bool(self.gp.gen("init_support_fallback", False)):
+            return None
+        drops = getattr(self, "support_drops", {}) or {}
+        reason = "; ".join(f"{n}: {why}" for n, why in drops.items()) or "no support candidate"
+        return {"from": "support", "to": "floor" if self.relation == "ontop" else "partner", "reason": reason}
 
     def near_side_point(self, obj, toward_xy, off: float = 0.5) -> th.Tensor:
         """A point 0.5 m outside the AABB side of ``obj`` that faces ``toward_xy`` (geodesic anchor)."""
@@ -537,6 +572,12 @@ class IORSLarge(SamplerV2):
         self.floor_z = float(self.obj("floor").aabb[1][2])
         self.prepare_partner()
         kind, cands = self.surface_candidates()
+        self.init_fallback = self.init_support_fallback(kind) if not cands else None
+        if self.init_fallback is not None:
+            log.info("%s: no init support left (%s): the %s init instead (generation.init_support_fallback)", self.gp.alias, self.init_fallback["reason"],
+                     self.init_fallback["to"])
+            kind = self.init_fallback["to"]
+            cands = [self.obj("floor")] if kind == "floor" else [self.partner]
         if not cands:
             raise Reject("no_init_surface", f"{self.gp.alias}: no candidate of the init-surface class {kind!r}")
         rng = np.random.default_rng(self.ctx.base_seed)
@@ -554,7 +595,8 @@ class IORSLarge(SamplerV2):
                 self.alias_role("support", self.bindings.one("partner"))
             else:
                 self.bind_scene_object("support", cand)
-            self.template_facts["init_surface"] = {"class": kind, "name": cand.name, "tried": len(errors) + 1}
+            self.template_facts["init_surface"] = {"class": kind, "name": cand.name, "tried": len(errors) + 1,
+                                                   **({"fallback": self.init_fallback} if self.init_fallback is not None else {})}
             return
         raise Reject("no_init_surface", f"{self.gp.alias}: no {kind} candidate admits stances A–C: " + "; ".join(errors[-3:]))
 
@@ -2133,7 +2175,9 @@ class IORSLarge(SamplerV2):
                     leg_ab = self.record_leg_a_b(init, manip)
                 focus_xy = self.surface["c_t"] if kind == "floor" else manip.focus[:2]
                 d, leg_ab = self._couple_segment(rng, init, manip, by_arm, focus_xy, z_init, leg_ab)
-                d.summary.update({"relation": self.relation, "init_surface": {"class": kind, "name": None if kind == "floor" else self.surface["obj"].name},
+                fallback = getattr(self, "init_fallback", None)
+                d.summary.update({"relation": self.relation, "init_surface": {"class": kind, "name": None if kind == "floor" else self.surface["obj"].name,
+                                                                              **({"fallback": fallback} if fallback is not None else {})},
                                   "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip),
                                   "legs": {"A_B": leg_ab, "B_C": getattr(self, "_leg_bc", None)}})
                 return d

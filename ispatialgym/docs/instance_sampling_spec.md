@@ -1524,6 +1524,14 @@ stays as above. The keys an alias sets are recorded in `template_facts.relaxatio
   its points are inside the image with the 5 % margin (every point when the region has fewer) — stance A's goal region (ontop:
   5 top-patch + 3 bottom-edge points; under: the 3 edge points, tabletop and floor init) and the place-under stance C's
   near-edge line (2 points).
+- `init_support_max_geodesic_m` (float, default unset = named supports as bound, category supports within
+  `max_partner_geodesic`): a support, named or by category, whose geodesic to the partner is None or larger is dropped.
+- `init_support_fallback` (bool, default false = A5's no runtime class switching): when no support is left (too far,
+  missing from the scene, none of the category) ontop falls back to the floor init and under to the partner's own top;
+  recorded as `template_facts.init_surface.fallback = {from, to, reason}` (and in the instance summary's `init_surface`).
+  A support that is in range but admits no stance A–C still rejects the template. A far support needs the B → C drive cap
+  raised with it: `max_partner_geodesic` 10 gives max(10 + 1, 2 × 10) = 20 m; `floor_init.max_geodesic_m` defaults to
+  `max_partner_geodesic`, so an alias raising the latter sets the former explicitly (3.0 keeps the floor cells near the partner).
 
 ## 6. Per-task rules
 
