@@ -1071,7 +1071,11 @@ within 15–80 mm after scaling). Single arm; the object holds itself, no brace 
   the program check verifies every pose as a witness and checks the retreat from the path's end. The rigid eef→base
   sweep is no longer used for revolute furniture doors (the pilot: the base orbits the hinge at ≈ 1 m through 55–110°
   into the kitchen). Record `door_class`, `hinge_side`, `follow_mode ∈ {arm, base, hybrid}`, `goal_set`, `q_reach`,
-  `base_follow` (base / hybrid), `base_follow_path` (hybrid).
+  `base_follow` (base / hybrid), `base_follow_path` (hybrid). *Owner decision 2026‑10‑12 (~08:50):* open_large#03's
+  bottom cabinet (bottom_cabinet_rvunhj_0 / j_link_2) is the first bottom cabinet on the hybrid follow, with the dishwasher
+  open alias's `hybrid_follow` block (sequential policy): the arm‑only follow from one hinge‑side stance reached only
+  0.013–0.057 rad of its 0.785–1.571 rad goal, the 10 cm release retreat failing IK or nearing an arm joint limit past
+  0.13–0.22 rad.
 - **Phase 3**: nothing is spawned. Joints at q_init, `settle_free = []`, the moving link held at q_init during
   settling; after settling the joint may not have drifted > ½ tolerance; `articulation_targets` = every non-fixed joint
   at its init value except the chosen one at q_goal, tolerance per type; then the pipeline (`:init` true, binary goal

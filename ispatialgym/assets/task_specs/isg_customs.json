@@ -12099,6 +12099,20 @@
    "handle_row": "j_link_2#C",
    "pinch_width_min_m": 0.006,
    "_handle_row_note": "owner 2026-10-12 02:20: the door's bar j_link_2#C (8 mm thick, 0.28 m long, centre h 0.73 m, approached straight from the front) instead of the edge pinch j_link_2#F (39 mm, old sheet #01) - open from the shut door found no reachable edge stance in 576 attempts (the gripper would point sideways along the face with a finger behind the leaf) and close followed the edge only 11-63 % of the way shut; pinch_width_min_m 0.006 admits the 8 mm bar (the 15 mm default floor skipped it and the knobs; pinch_width_range_m is the small-scale sampler's key)",
+   "_follow_mode_note": "owner 2026-10-12 ~08:50: the hybrid follow with the dishwasher open alias's hybrid_follow block (sequential) - the arm-only cabinet follow from one hinge-side stance reached 0.013-0.057 rad over 151 stances (c1_k0 / c1_k1: the 10 cm release retreat fails IK or puts right_arm_joint2 / joint7 within 30-45 mrad of a limit at 0.13-0.22 rad) against a goal of 0.785-1.571 rad",
+   "follow_mode_override": "hybrid",
+   "hybrid_follow": {
+    "hard_margin_rad": 0.025,
+    "lattice_radius_m": 0.8,
+    "yaw_extra_deg": 45.0,
+    "max_ik_per_step": 90,
+    "reach_fraction": 0.85,
+    "base_move_policy": "lookahead",
+    "lookahead_candidates": 4,
+    "lookahead_steps": 6,
+    "budget_s": 2700.0,
+    "policy": "sequential"
+   },
    "direction": "open",
    "prompt0": {
     "beta_max_deg": 20.0,
