@@ -2,6 +2,7 @@
 witness is not planned first - the pre-pose is planned straight to with the witness, the supports present (the skip branch's call);
 the bare standoff only when that plan fails before the robot moved (``reach_pre_pose``). ``contact_route_goal`` predicts the same
 transit end. Every other situation (no supports, none near, clear of them, a standoff that tracks, no witness) runs as before.
+Item 7c: the program check applies the same decision to a push pre-contact (``program_check.push_pre_standoff``).
 """
 from __future__ import annotations
 
@@ -212,3 +213,109 @@ def test_contact_route_goal_follows_the_same_rule():
     m = _Motions(track=True)
     goal, label = EX.contact_route_goal(m, state, ARM, contact, q_ctx, EX.ExecuteConfig())
     assert th.allclose(goal[IDX[ARM]], wit[IDX[ARM]]) and "clear of its supports" in label and m.ik_calls == 0
+
+
+# ------------------------------------------------------------------------------------------------ 7c: the program check
+
+
+class _PcSampler:
+    """The sampler surface ``push_pre_standoff`` touches. ``track``: the standoff leg tracks from the witness. ``free``: the witness is
+    collision-free with the supports present. ``refine``: arm-joint offset of the IK refinement of the pre-contact (None = no IK).
+    ``bare``: the standoff pose has an IK solution."""
+
+    def __init__(self, track=False, free=False, refine=None, bare=False):
+        self.calls: List[Any] = []
+        self.ignored: List[List[str]] = [[]]
+        sampler = self
+
+        def solve_ik_path(emb, waypoints, q_start=None, **kw):
+            sampler.calls.append(("track", emb, [w[M.EEF_LINK[ARM]] for w in waypoints], q_start.clone(), kw))
+            ok = track
+            return SimpleNamespace(success=ok, q_traj=th.stack([q_start]) if ok else None, status="ok" if ok else "differential IK did not converge at waypoint 2/8")
+
+        def ik(pose, q_seed, arm="right"):
+            standoff = float(th.as_tensor(pose[0])[2]) > DESK_TOP + 0.12
+            sampler.calls.append(("ik", "standoff" if standoff else "pre", list(sampler.ignored[-1])))
+            if standoff:
+                return q_seed.clone() if bare else None
+            if refine is None:
+                return None
+            q = q_seed.clone()
+            q[IDX[arm][0]] += refine
+            return q
+
+        class _Ign:
+            def __init__(self, objs):
+                self.objs = [getattr(o, "name", o) for o in objs]
+
+            def __enter__(self):
+                sampler.ignored.append(self.objs)
+
+            def __exit__(self, *exc):
+                sampler.ignored.pop()
+
+        def collision_free_at(q, pose, arm, ignore=()):
+            sampler.calls.append(("free", [getattr(o, "name", o) for o in ignore]))
+            return free
+
+        self.kit = SimpleNamespace(robot=SimpleNamespace(arm_control_idx=IDX), backend=SimpleNamespace(solve_ik_path=solve_ik_path), ik=ik,
+                                   _ensure_synced=lambda: None)
+        self.ikc = SimpleNamespace(collision_free_at=collision_free_at, ignoring=_Ign, _collision_blame=lambda q, ign, margin=0.0: "collides with desk_ohjotf_0")
+
+
+def _pc(sampler, height=0.072):
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    pre = _pre(height)
+    return PC.push_pre_standoff(sampler, ARM, _witness(), (th.tensor(pre.position), th.tensor(pre.orientation)), [_desk()], [_Support("paperback_book_0", [0.4, 0.4, 0.75], [0.6, 0.6, 0.95])])
+
+
+def test_program_check_push_pre_standoff_mirrors_the_oracles_decision():
+    from ispatialgym.sampling.v2.ik import IKResult
+
+    # no support near / clear of the supports: nothing is solved (accepted as before)
+    s = _PcSampler()
+    ok, why, rep = _pc(s, height=0.20)
+    assert ok and rep == {} and s.calls == []
+    ok, why, rep = _pc(s, height=0.09)
+    assert ok and rep["branch"] == "skipped" and s.calls == []
+    # the standoff tracks from the witness: the oracle's leg (8 cm straight up in 1 cm steps from the witness, no collision check)
+    s = _PcSampler(track=True)
+    ok, why, rep = _pc(s)
+    assert ok and rep == {"clearance_m": pytest.approx(0.072, abs=1e-3), "branch": "witness"} and [c[0] for c in s.calls] == ["track"]
+    _, emb, dense, q_start, kw = s.calls[0]
+    assert emb == "right_arm" and len(dense) == 8 and th.allclose(q_start, _witness()) and kw["check_collisions"] is False
+    assert th.allclose(th.as_tensor(dense[-1][0]), th.tensor([0.5, 0.5, DESK_TOP + 0.072 + 0.08]), atol=1e-5)
+    assert kw["soft_pos_tol"] == MotionsConfig().diff_ik_soft_pos_tol_free
+    # it does not track: straight to the pre-contact with the witness, the supports present (only the pushed object removed)
+    s = _PcSampler(free=True)
+    ok, why, rep = _pc(s)
+    assert ok and rep["branch"] == "direct" and s.calls[1] == ("free", ["paperback_book_0"]) and len(s.calls) == 2
+    # the witness collides there: its IK refinement within the oracle's witness_refine_max_jump is the goal instead
+    s = _PcSampler(refine=0.3)
+    ok, why, rep = _pc(s)
+    assert ok and rep["branch"] == "direct" and rep["refined_jump_rad"] == pytest.approx(0.3) and s.calls[2] == ("ik", "pre", ["paperback_book_0"])
+    # a refinement in another branch does not count; the bare standoff (an IK solution of its pose, supports present) does
+    s = _PcSampler(refine=1.5, bare=True)
+    ok, why, rep = _pc(s)
+    assert ok and rep["branch"] == "planner" and s.calls[-1] == ("ik", "standoff", ["paperback_book_0"])
+    # neither: rejected as approach_untrackable (c3_k0: the standoff out of reach, the bare standoff with no IK solution)
+    s = _PcSampler()
+    ok, why, rep = _pc(s)
+    assert not ok and "branch" not in rep and why.startswith("approach_untrackable: push pre-contact 0.072 m from its supports")
+    assert "collides with desk_ohjotf_0" in why and "waypoint 2/8" in why and IKResult(False, None, why, 1).code == "approach_untrackable"
+
+
+def test_program_check_models_the_pre_contact_the_oracle_keeps_its_witness_for():
+    """``execute_push`` lowers a straight push's pre-contact to ``push_pre_dist_m`` and drops its witness; an arc push, a pitched blade
+    class and a pre-contact already that close keep the recorded one."""
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    q = th.tensor(QUAT)
+    init = (th.tensor([0.5, 0.5, 0.80]), q)  # the approach axis of the identity quaternion is world +z
+    far, near = (th.tensor([0.5, 0.5, 0.70]), q), (th.tensor([0.5, 0.5, 0.76]), q)
+    straight = SimpleNamespace(mid=None, extra={})
+    assert not PC.push_keeps_recorded_pre(straight, far, init) and PC.push_keeps_recorded_pre(straight, near, init)
+    assert PC.push_keeps_recorded_pre(SimpleNamespace(mid=object(), extra={}), far, init)
+    assert PC.push_keeps_recorded_pre(SimpleNamespace(mid=None, extra={"pose_class": "push_blade_45"}), far, init)
+    assert not PC.push_keeps_recorded_pre(SimpleNamespace(mid=None, extra={"pose_class": "push_blade_15"}), far, init)

@@ -378,7 +378,16 @@ stands closer than `pre_pose_standoff_skip_m` (8 cm) to the supports left out fo
 witness's IK branch when the standoff tracks from the witness. When it does not, the pre-pose is planned straight to with
 the witness, the supports present (the call of a pre-pose already 8 cm clear); the bare standoff pose is planned only when
 that plan fails before the robot moved (`execute.reach_pre_pose`; axial#02 c3_k0: the paperback's pre-contact 7.2 cm above
-the desk, ~1 cm of the rise reachable at the stance, the bare standoff unreachable).
+the desk, ~1 cm of the rise reachable at the stance, the bare standoff unreachable). The program check applies the same
+decision to a push pre-contact the oracle reaches with its recorded witness (an arc push, a pitched blade, a pre-contact
+within `push_pre_dist_m` of the first contact; owner 2026‑10‑12 item 7c, `program_check.push_pre_standoff`), with the
+supports of `support_objects()`: accepted when the standoff tracks from the witness (the oracle's densification and
+differential-IK settings), else when the witness — or its IK refinement within `witness_refine_max_jump` — is collision-free
+with only the pushed object removed (the straight plan), else when the standoff pose has an IK solution with the supports
+present; rejected `approach_untrackable` when none holds. The pre witness records `standoff: {clearance_m, branch}`.
+Not modelled: an articulated push, a lever slide, a push with the other arm locked at its brace (the oracle relaxes that
+arm's start collisions), a straight push whose pre-contact the oracle lowers (no witness: the bare standoff as before);
+`ISG_PUSH_STANDOFF_CHECK=off` switches the check off.
 
 **One chain, as the oracle runs it** (owner 2026-09-24). The targets of an action are checked in the order the arm
 moves through them, and every leg leaves from the configuration the arm is actually in: a chain whose first pose is

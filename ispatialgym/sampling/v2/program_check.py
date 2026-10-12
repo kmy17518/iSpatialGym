@@ -251,6 +251,93 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
                    f"({end_gap * 1000:.0f} mm short; {r_leg.status[:160]})"), rep
 
 
+def push_keeps_recorded_pre(contact, pre_pose, first_contact_pose) -> bool:
+    """Whether the oracle reaches a push's RECORDED pre-contact with its witness (``execute_push``): an arc push (``mid``), a pitched
+    blade class (``push_blade_30`` and steeper) or a recorded pre-contact within ``push_pre_dist_m`` + 5 mm of the first contact pose
+    along the approach. A straight push's longer pre-contact is lowered to ``push_pre_dist_m`` and planned without a witness."""
+    from ispatialgym.oracle import execute as E
+    from ispatialgym.robot import conventions as C
+
+    cfg = E.ExecuteConfig()
+    if getattr(contact, "mid", None) is not None or cfg.push_pre_dist_m is None:
+        return True
+    cls = str((getattr(contact, "extra", None) or {}).get("pose_class") or "")
+    try:
+        if cls.startswith("push_blade_") and float(cls[len("push_blade_"):].rstrip("-")) >= 30.0:
+            return True
+    except ValueError:
+        pass
+    p_pre, q_pre = th.as_tensor(pre_pose[0]).float(), th.as_tensor(pre_pose[1]).float()
+    along = float(th.dot(th.as_tensor(first_contact_pose[0]).float() - p_pre, C.approach_axis(q_pre)))
+    return along <= cfg.push_pre_dist_m + 0.005
+
+
+def push_pre_standoff(sampler, arm: str, q_pre: th.Tensor, pre_pose, supports: Sequence[Any], through: Sequence[Any]) -> Tuple[bool, str, Dict[str, Any]]:
+    """The oracle's reach of a push pre-contact next to its supports (``execute.reach_pre_pose``, owner 2026-10-12 item 7c; axial#02
+    c3_k0 passed this check and failed the demo there). A pre-contact closer than ``pre_pose_standoff_skip_m`` to the supports (their
+    AABBs, ``escape_direction`` / ``support_clearance``) goes through the standoff ``pre_pose_standoff_m`` off them when the standoff
+    tracks from the witness ``q_pre`` (``standoff_configuration``: the oracle's densification and differential-IK settings, no
+    collision check). When it does not, the oracle plans straight to the pre-contact with the witness, the supports present: accepted
+    when the witness - or its IK refinement within ``witness_refine_max_jump`` (``Motions.arm_to``) - is collision-free with only
+    ``through`` removed. Else the bare standoff: accepted when its pose has an IK solution with the supports present. Neither ->
+    ``approach_untrackable``. Returns ``(ok, why, report)``; ``report["branch"]`` is the oracle's branch (witness / direct / planner)."""
+    import math
+
+    from ispatialgym.oracle import execute as E
+    from ispatialgym.oracle import motions as MO
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.robot import conventions as C
+
+    ecfg, mcfg = E.ExecuteConfig(), MO.MotionsConfig()
+    rep: Dict[str, Any] = {}
+    pre = (th.as_tensor(pre_pose[0]).float(), th.as_tensor(pre_pose[1]).float())
+    n = E.escape_direction(None, pre, supports)
+    if n is None:
+        return True, "no support near the pre-contact", rep
+    clearance = E.support_clearance(None, pre, supports)
+    rep["clearance_m"] = None if clearance is None else round(clearance, 4)
+    if clearance is not None and clearance >= ecfg.pre_pose_standoff_skip_m:
+        rep["branch"] = "skipped"
+        return True, f"the pre-contact stands {clearance:.3f} m clear of its supports (planned directly)", rep
+    kit = sampler.kit
+    frame, idx = M.EEF_LINK[arm], kit.robot.arm_control_idx[arm]
+    q_w = th.as_tensor(q_pre).reshape(-1).float().clone()
+    standoff = (pre[0] + n * ecfg.pre_pose_standoff_m, pre[1])
+    kit._ensure_synced()
+    n_d = max(1, int(math.ceil(float(th.linalg.norm(standoff[0] - pre[0])) / mcfg.cartesian_step)))
+    dense = [tuple(w) for w in C.line_waypoints(pre, standoff, n_d)]
+    res = kit.backend.solve_ik_path(f"{arm}_arm", [{frame: w} for w in dense], q_start=q_w, pos_tol=mcfg.diff_ik_pos_tol, rot_tol=mcfg.diff_ik_rot_tol,
+                                    max_iters=mcfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=mcfg.diff_ik_soft_pos_tol_free)
+    if res.success and res.q_traj is not None and len(res.q_traj) > 0:
+        rep["branch"] = "witness"
+        return True, f"the {ecfg.pre_pose_standoff_m:.2f} m standoff tracks from the pre-contact witness", rep
+    rep["standoff"] = str(res.status)[:160]
+    if sampler.ikc.collision_free_at(q_w, pre, arm, ignore=list(through)):
+        rep["branch"] = "direct"
+        return True, "the standoff does not track from the witness; the witness is a collision-free goal with the supports present", rep
+    with sampler.ikc.ignoring(list(through)):
+        q_ik = kit.ik(pre, q_w, arm=arm)
+    if q_ik is not None:
+        jump = float(th.max(th.abs(th.as_tensor(q_ik).reshape(-1).float()[idx] - q_w[idx])))
+        rep["refined_jump_rad"] = round(jump, 3)
+        if jump <= mcfg.witness_refine_max_jump:
+            rep["branch"] = "direct"
+            return True, f"the standoff does not track from the witness; its IK refinement ({jump:.2f} rad) is a collision-free goal with the supports present", rep
+    with sampler.ikc.ignoring(list(through)):
+        q_s = kit.ik(standoff, q_w, arm=arm)
+    if q_s is not None:
+        rep["branch"] = "planner"
+        return True, "the standoff does not track from the witness and the witness collides with the supports present; the bare standoff has an IK solution", rep
+    try:
+        blame = sampler.ikc._collision_blame(q_w, list(through))
+    except Exception as e:  # noqa: BLE001 - diagnostic only
+        blame = f"no blame ({e!r})"[:120]
+    return False, (f"approach_untrackable: push pre-contact {clearance:.3f} m from its supports - the {ecfg.pre_pose_standoff_m:.2f} m standoff does not track "
+                   f"from the witness ({rep['standoff'][:100]}), the witness is no collision-free goal with the supports present ({blame[:120]}"
+                   + (f"; its IK refinement lies {rep['refined_jump_rad']:.2f} rad away" if "refined_jump_rad" in rep else "")
+                   + ") and the standoff pose has no IK solution"), rep
+
+
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 #: which sidecar blocks each subtask's program consumes (oracle doc §6.2; used by the stub and as a sanity list)
@@ -1975,6 +2062,25 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     motion_ends.insert(0, q_pol.clone())  # the arm is here after this chain: the next chain of the action leaves from it
                     if q_start is not None:
                         witnesses[key]["branch"] = "tracked from the arm's configuration"
+        if name == "push" and "pre" in single_q and not locked and os.environ.get("ISG_PUSH_STANDOFF_CHECK", "on").lower() not in ("off", "0", "false"):
+            # owner 2026-10-12 (item 7c): the oracle's standoff decision at a push pre-contact it reaches with the recorded witness - not
+            # an articulated push (its moving links leave the world instead) or a lever slide (no transit); a pack push has no separate
+            # pre-contact. With another arm locked at its contact the oracle relaxes that arm's start collisions (not modelled here)
+            c_ = getattr(action, "contact", None)
+            extra_ = getattr(c_, "extra", None) or {}
+            pre_poses = next((p_ for k_, p_ in pose_targets if k_ == "pre"), None)
+            wp_poses = next((p_ for k_, p_ in pose_targets if k_ == "waypoints"), None)
+            if (pre_poses and wp_poses and not isinstance(extra_.get("articulation"), dict) and not extra_.get("approach_is_slide")
+                    and push_keeps_recorded_pre(c_, pre_poses[0], wp_poses[0])):
+                sup_ = list(sampler.support_objects())
+                through_ = [o for o in list(ignore_all) + list(ignore_last) if not any(o is s for s in sup_)]
+                ok_s, why_s, rep_s = push_pre_standoff(sampler, arm, single_q["pre"], pre_poses[0], sup_, through_)
+                if rep_s:
+                    log.info("program check: push pre-contact of %s: %s %s", getattr(c_, "object", None), why_s[:200], rep_s)
+                    if "pre" in witnesses:
+                        witnesses["pre"]["standoff"] = {k_: v_ for k_, v_ in rep_s.items() if k_ in ("clearance_m", "branch")}
+                if not ok_s:
+                    raise Reject("approach_untrackable", f"pre: {why_s} ({where})", action=name)
         # base poses: a transition's drive-back pose is visited with the departing trunk (arrival) and the arriving trunk
         # (after the sweep), the drive-in pose with the arriving trunk only; a path's goal with the stance trunk
         checks: List[Tuple[Tuple[float, float, float], Tuple[float, float]]] = []
