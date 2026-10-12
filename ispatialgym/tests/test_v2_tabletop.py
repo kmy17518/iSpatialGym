@@ -571,6 +571,27 @@ def test_disembedding_destination_side_comes_before_the_margins():
     assert GD.defaults_for("disembedding")["destination_side"] is None and "destination_side" in MI.EVAL_ONLY_GENERATION_KEYS
 
 
+def test_disembedding_eval_aliases_split_the_destination_side_half_and_half():
+    """Owner 2026-10-12 (A2a): every disembedding alias of the customs names its destination side, one side per pick (a pick's
+    aliases share the target category), five picks each: the six picks with an accepted instance keep the side measured on it
+    (#04 #05 #07 #09 #10 left, #08 right), the four open ones (#01 #02 #03 #06) take the right."""
+    import json
+    import os
+
+    from ispatialgym import ASSETS_ROOT
+
+    with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
+        customs = json.load(f)
+    by_target: dict = {}
+    for alias, entry in customs.items():
+        if alias.startswith("disembedding-"):
+            by_target.setdefault(alias.split("-")[1], set()).add(entry["generation"].get("destination_side"))
+    assert len(by_target) == 10 and all(len(s) == 1 for s in by_target.values()), by_target
+    side = {t: next(iter(s)) for t, s in by_target.items()}
+    assert sorted(t for t, v in side.items() if v == "right") == ["box_of_shampoo", "carton_of_milk", "jigsaw_puzzle_piece", "pencil_case", "video_game"]
+    assert sorted(t for t, v in side.items() if v == "left") == ["beaker", "bottle_of_milk", "cellulose_tape", "tablefork", "toy_dice"]
+
+
 def test_phase3_target_fixed_pose_screens_and_places_only_that_pose(monkeypatch):
     """A fixed-layout target (the embedded figure's): F is screened at the given (xy, yaw) only, the object lands exactly there (no
     jitter, no offset from the focus) and F stays out of the band."""

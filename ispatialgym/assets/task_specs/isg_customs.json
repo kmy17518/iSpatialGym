@@ -18257,7 +18257,8 @@
      "water_glass/elwfms"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -18483,7 +18484,8 @@
      "water_glass/cdteyb"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -18687,7 +18689,8 @@
      "soda_cup/gnzegv"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -18895,7 +18898,8 @@
     ],
     "dropped": []
    },
-   "distractor_pose": "lying"
+   "distractor_pose": "lying",
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -19098,7 +19102,8 @@
     ],
     "dropped": []
    },
-   "distractor_pose": "lying"
+   "distractor_pose": "lying",
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -19313,7 +19318,8 @@
     ],
     "dropped": []
    },
-   "distractor_pose": "lying"
+   "distractor_pose": "lying",
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -19516,7 +19522,8 @@
     ],
     "dropped": []
    },
-   "distractor_pose": "lying"
+   "distractor_pose": "lying",
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -19885,7 +19892,8 @@
      "box_of_tissues/zutrxn"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -20102,7 +20110,8 @@
      "box_of_tissues/uglbjc"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -20319,7 +20328,8 @@
      "box_of_tissues/zutrxn"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -20531,7 +20541,8 @@
     ],
     "dropped": []
    },
-   "distractor_pose": "standing"
+   "distractor_pose": "standing",
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -20846,7 +20857,8 @@
     ],
     "dropped": []
    },
-   "distractor_pose": "standing"
+   "distractor_pose": "standing",
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -21054,7 +21066,8 @@
     ],
     "dropped": []
    },
-   "distractor_pose": "standing"
+   "distractor_pose": "standing",
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -21258,7 +21271,8 @@
      "cap/clhquh"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -21466,7 +21480,8 @@
      "cap/ciopwh"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -21734,7 +21749,8 @@
      "coaster/arjpcz"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -21940,7 +21956,8 @@
      "cap/clhquh"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -22094,7 +22111,8 @@
      "jigsaw_puzzle_piece/isgefc",
      "jigsaw_puzzle_piece/isgefd"
     ]
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -22248,7 +22266,8 @@
      "jigsaw_puzzle_piece/isgefc",
      "jigsaw_puzzle_piece/isgefd"
     ]
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -22448,7 +22467,8 @@
      "jigsaw_puzzle_piece/isgefc",
      "jigsaw_puzzle_piece/isgefd"
     ]
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -22602,7 +22622,8 @@
      "jigsaw_puzzle_piece/isgefc",
      "jigsaw_puzzle_piece/isgefd"
     ]
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -22797,7 +22818,8 @@
      "pen/gzrbrx"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -23061,7 +23083,8 @@
      "pen/gqwdor"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -23257,7 +23280,8 @@
      "ruler/ckywbx"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -23537,7 +23561,8 @@
      "tablespoon/tqqwys"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -23749,7 +23774,8 @@
      "tablespoon/tqqwys"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -23967,7 +23993,8 @@
      "teaspoon/eilfij"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -24184,7 +24211,8 @@
      "teaspoon/vgbcmo"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -24388,7 +24416,8 @@
      "toy_figure/acymin"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -24592,7 +24621,8 @@
      "toy_figure/acymin"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -24864,7 +24894,8 @@
      "toy_figure/acymin"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -25068,7 +25099,8 @@
      "toy_figure/acymin"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "left"
   },
   "constraints": []
  },
@@ -25272,7 +25304,8 @@
      "board_game/frgdqh"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -25544,7 +25577,8 @@
      "board_game/eoywpy"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
@@ -25816,7 +25850,8 @@
      "board_game/eoywpy"
     ],
     "dropped": []
-   }
+   },
+   "destination_side": "right"
   },
   "constraints": []
  },
