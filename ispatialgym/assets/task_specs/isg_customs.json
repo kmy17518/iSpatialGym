@@ -16434,47 +16434,10 @@
        "name": "bar_udatjt_0",
        "init": "ontop",
        "top_z": 1.05,
-       "row": "configuration_matching-attachment#04~T3"
-      }
-     ],
-     "floor": {
-      "room": "kitchen_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "lid": [
-       "pbmsji"
-      ]
-     },
-     "partner": {
-      "stockpot": [
-       "oshwps"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "lid": {
-       "ppkjuy": "ground_isg 2026-10-12: heldout"
-      }
-     }
-    }
-   },
-   "house_double_floor_lower": {
-    "rooms": [
-     "kitchen_0"
-    ],
-    "bindings": {
-     "support": [
-      "bar_egwapq_0"
-     ],
-     "support_surfaces": [
-      {
-       "name": "bar_egwapq_0",
-       "init": "ontop",
-       "top_z": 0.89,
-       "row": "configuration_matching-attachment#04~T5"
+       "row": "configuration_matching-attachment#04~T3",
+       "edges": [
+        "+u"
+       ]
       }
      ],
      "floor": {
@@ -16556,7 +16519,169 @@
    "phase2_split_fallback_classes_deg": [
     20.0,
     30.0
-   ]
+   ],
+   "carry_over_partner_m": [
+    0.2,
+    0.12,
+    0.06
+   ],
+   "_carry_over_partner_note": "owner 2026-10-12 attachment#04 3b: after the lift the lid rises straight up until its lowest point is 0.20 m above the pot's top (else 0.12 / 0.06 m), then the in-hand turn runs to the pre-attach: the straight carry from a 5-12 cm lift clipped the rim (12 rejections at 05:10-06:10)"
+  },
+  "constraints": []
+ },
+ "configuration_matching-attachment-lid-stockpot-breakfast_table": {
+  "iddl": "configuration_matching/attachment.iddl",
+  "definition_id": 85,
+  "roles": {
+   "target": {
+    "category": "lid",
+    "sampleable": true,
+    "require": {
+     "grasps": "attachment"
+    },
+    "representative": "pbmsji",
+    "scale": {
+     "lid/pbmsji": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
+    "orientation_equivalences": {
+     "lid/pbmsji": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "lid/pbmsji": "lid__pbmsji__s065"
+    }
+   },
+   "partner": {
+    "category": "stockpot",
+    "sampleable": true,
+    "representative": "oshwps",
+    "scale": {
+     "stockpot/oshwps": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
+    "orientation_equivalences": {
+     "stockpot/oshwps": []
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "configuration_matching-attachment#04~T1"
+      }
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "lid": [
+       "pbmsji"
+      ]
+     },
+     "partner": {
+      "stockpot": [
+       "oshwps"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "lid": {
+       "ppkjuy": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.01,
+    "orientation": 0.15
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_gap_min_m": 0.04,
+   "partner_centre_distance_min_m": 0.08,
+   "pre_attach_back_m": 0.1,
+   "reorientation_waypoints": 3,
+   "symmetry_slab_m": 0.005,
+   "symmetry_match_fraction": 0.9,
+   "grasp_metalink_clearance_m": 0.01,
+   "brace_search": false,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "witness_residual_pre_m": 0.015,
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "carry_over_partner_m": [
+    0.2,
+    0.12,
+    0.06
+   ],
+   "_carry_over_partner_note": "owner 2026-10-12 attachment#04 3b: after the lift the lid rises straight up until its lowest point is 0.20 m above the pot's top (else 0.12 / 0.06 m), then the in-hand turn runs to the pre-attach: the straight carry from a 5-12 cm lift clipped the rim (12 rejections at 05:10-06:10)"
   },
   "constraints": []
  },
@@ -16706,13 +16831,20 @@
    "phase2_split_fallback_classes_deg": [
     20.0,
     30.0
-   ]
+   ],
+   "carry_over_partner_m": [
+    0.2,
+    0.12,
+    0.06
+   ],
+   "_carry_over_partner_note": "owner 2026-10-12 attachment#04 3b: after the lift the lid rises straight up until its lowest point is 0.20 m above the pot's top (else 0.12 / 0.06 m), then the in-hand turn runs to the pre-attach: the straight carry from a 5-12 cm lift clipped the rim (12 rejections at 05:10-06:10)"
   },
   "constraints": []
  },
  "configuration_matching-attachment-lid-stockpot-countertop": {
   "iddl": "configuration_matching/attachment.iddl",
   "definition_id": 22,
+  "superseded_by": "configuration_matching-attachment-lid-stockpot-desk",
   "roles": {
    "target": {
     "category": "lid",
@@ -16864,6 +16996,170 @@
     20.0,
     30.0
    ]
+  },
+  "constraints": []
+ },
+ "configuration_matching-attachment-lid-stockpot-desk": {
+  "iddl": "configuration_matching/attachment.iddl",
+  "definition_id": 86,
+  "roles": {
+   "target": {
+    "category": "lid",
+    "sampleable": true,
+    "require": {
+     "grasps": "attachment"
+    },
+    "representative": "pbmsji",
+    "scale": {
+     "lid/pbmsji": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
+    "orientation_equivalences": {
+     "lid/pbmsji": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "lid/pbmsji": "lid__pbmsji__s065"
+    }
+   },
+   "partner": {
+    "category": "stockpot",
+    "sampleable": true,
+    "representative": "oshwps",
+    "scale": {
+     "stockpot/oshwps": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
+    "orientation_equivalences": {
+     "stockpot/oshwps": []
+    }
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_1",
+     "private_office_2"
+    ],
+    "bindings": {
+     "support": [
+      "desk_mdhelw_3",
+      "desk_mdhelw_1"
+     ],
+     "support_surfaces": [
+      {
+       "name": "desk_mdhelw_3",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "configuration_matching-attachment#04~T5"
+      },
+      {
+       "name": "desk_mdhelw_1",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "configuration_matching-attachment#04~T2"
+      }
+     ],
+     "floor": {
+      "room": "private_office_1"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "lid": [
+       "pbmsji"
+      ]
+     },
+     "partner": {
+      "stockpot": [
+       "oshwps"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "lid": {
+       "ppkjuy": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.01,
+    "orientation": 0.15
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_gap_min_m": 0.04,
+   "partner_centre_distance_min_m": 0.08,
+   "pre_attach_back_m": 0.1,
+   "reorientation_waypoints": 3,
+   "symmetry_slab_m": 0.005,
+   "symmetry_match_fraction": 0.9,
+   "grasp_metalink_clearance_m": 0.01,
+   "brace_search": false,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "witness_residual_pre_m": 0.015,
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "carry_over_partner_m": [
+    0.2,
+    0.12,
+    0.06
+   ],
+   "_carry_over_partner_note": "owner 2026-10-12 attachment#04 3b: after the lift the lid rises straight up until its lowest point is 0.20 m above the pot's top (else 0.12 / 0.06 m), then the in-hand turn runs to the pre-attach: the straight carry from a 5-12 cm lift clipped the rim (12 rejections at 05:10-06:10)"
   },
   "constraints": []
  },

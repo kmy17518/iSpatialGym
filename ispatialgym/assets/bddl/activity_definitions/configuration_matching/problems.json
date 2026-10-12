@@ -232,7 +232,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "configuration_matching-attachment",
    "iddl": "configuration_matching/attachment.iddl",
-   "pick": "configuration_matching-attachment#04~T5",
+   "pick": "configuration_matching-attachment#04~T3",
    "slot": "representative",
    "mode": "representative"
   },
@@ -912,6 +912,28 @@
    "pick": "configuration_matching-articulation_close_large_scale#03",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "configuration_matching-attachment-lid-stockpot-breakfast_table",
+   "id": 85,
+   "grounded": "2026-10-12",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#04~T1",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-lid-stockpot-desk",
+   "id": 86,
+   "grounded": "2026-10-12",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#04~T5",
+   "slot": "representative",
+   "mode": "representative"
   }
  ],
  "unregistered": [
