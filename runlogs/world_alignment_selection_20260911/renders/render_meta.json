@@ -5949,5 +5949,44 @@
   "category": "windshield",
   "model": "mdfijk",
   "error": "RuntimeError('no visual mesh')"
+ },
+ "tablespoon__tqqwys": {
+  "category": "tablespoon",
+  "model": "tqqwys",
+  "bbox": [
+   0.1767,
+   0.0573,
+   0.0274
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tablespoon__pltxjb": {
+  "category": "tablespoon",
+  "model": "pltxjb",
+  "bbox": [
+   0.1576,
+   0.0442,
+   0.0218
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tablespoon__ubuhoz": {
+  "category": "tablespoon",
+  "model": "ubuhoz",
+  "bbox": [
+   0.1237,
+   0.0258,
+   0.015
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
  }
 }

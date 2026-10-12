@@ -82,3 +82,18 @@ Per-room evidence: `results/<scene>__<room>.json`. Outcome (2026-09-12): 54 indo
 `scripts/update_selection_csv.py` rewrites the three world-alignment blocks of `task_object_selection.csv` and
 regenerates the xlsx / html with the shared renderer (`runlogs/table_selection_20260911/scripts/update_selection_csv.py`,
 legend additions in `select/legend_extra.json`).
+
+## Addendum 2026-10-11: tablespoon (alignment-axial#05)
+
+The new sheet (`ispatialgym/assets/icl/roles/representatives.csv`, owner 2026-10-10) makes `tablespoon/tqqwys` the
+alignment-axial#05 target (variation_geometry `pltxjb`, held-out `ubuhoz`), a category this selection never reviewed.
+Same renderer and contract: `scripts/render_models.py` unchanged (four canonical-frame views per model; run in an env
+with `pxr` + `pyrender` on USDs decrypted beforehand), `review/tablespoon.json` (wa0 scores; V as the grasp-library
+review of the same models gave it), the three models appended to `renders/render_meta.json`. `frying_pan/jpzusm` was
+re-rendered as the reference (handle at -x, reviewed front -x; its `render_meta.json` entry came out identical).
+Frame of all three: long axis `x`, bowl at -x with its opening toward +z, handle toward +x, so `front_axis` = `+x` =
+the handle end (the frying pans' rule: the handle faces the robot); `rest_ok`: the canonical pose (+z up) rests on the
+bowl back and the handle end. Cross-checked on the meshes (surface profile along x): bowl 5.7 / 4.4 / 2.6 cm wide at
+-x, handle 0.8-2.1 / 1.3-2.1 / 0.6-1.2 cm wide toward +x (tqqwys / pltxjb / ubuhoz), the bowl's centre 4-7 mm below its
+rim. The icl rows are `alignment-axial / target` in `roles/candidates.csv` (`frame_front +x`, `frame_up +z`,
+`frame_long x`). No contact rows: `require/contacts.csv` stays header-only (B6), as for every alignment target.
