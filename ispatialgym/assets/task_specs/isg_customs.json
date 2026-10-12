@@ -17597,7 +17597,11 @@
    "_release_note": "release_above_surface_m 0.023 = rim top 0.018 + 0.005 over the pocket floor; drop test v5 (model/isgboard/drop_test*.json): 50/50 seated at 4 and 5 mm over the rim (+-6 mm per axis / diagonal, yaw +-2), 46/50 at 7 mm (inward 6 mm leans on the divider), outward 10 mm lands on the rim by design (tolerance = chamfer 10 + clearance 1 - bias 3.5)",
    "_accepted_note": "ACCEPTED 2026-09-21 07:06 PDT: run 0921-050358 (pod blockflip-r) success, 0 collisions, 33 actions without a push, all four ontop(block, board), seat errors <= 1.0 mm / yaw <= 0.17 deg; the lateral travel between the tilted flip stances drives back >= travel_back_min_m and straightens first (runs 77 / 78 brushed the table edge with torso_link2 during that drive)",
    "travel_straighten_tilt": -0.05,
-   "travel_back_min_m": 0.1
+   "travel_back_min_m": 0.1,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-12 ~03:30 (4b): split cone (variant C) off - the board alias runs the reconcile cone, Phase 2 with tight 20 / loose 30 deg (set here: the subtask's defaults are C's 8 / 20)",
+   "phase2_tight_class_deg": 20.0,
+   "phase2_loose_class_deg": 30.0
   },
   "constraints": []
  },
