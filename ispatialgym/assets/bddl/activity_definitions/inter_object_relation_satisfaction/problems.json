@@ -1318,6 +1318,28 @@
    "pick": "inter_object_relation_satisfaction-under_large_scale#02~c2",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table",
+   "id": 119,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (bddl_from_iddl.render of touching_large_scale.iddl; owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c1)",
+   "subtask": "inter_object_relation_satisfaction-touching_large_scale",
+   "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-touching_large_scale#03~c1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-floor",
+   "id": 120,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (bddl_from_iddl.render of touching_large_scale.iddl; owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c2)",
+   "subtask": "inter_object_relation_satisfaction-touching_large_scale",
+   "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-touching_large_scale#03~c2",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }

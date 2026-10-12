@@ -39223,6 +39223,220 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table": {
+  "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
+  "definition_id": 119,
+  "roles": {
+   "target": {
+    "category": "storage_box",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "eicujj",
+    "orientation_equivalences": {
+     "storage_box/eicujj": []
+    },
+    "grasp_keys": {
+     "storage_box/eicujj": "storage_box__eicujj__t"
+    }
+   },
+   "partner": {
+    "category": "bookcase",
+    "sampleable": false
+   },
+   "support": {
+    "category": "coffee_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_upper": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "bookcase_otwukr_1"
+     ],
+     "support": [
+      "coffee_table_osroux_0"
+     ],
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "storage_box": [
+       "eicujj"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "storage_box": {
+       "aqdbdu": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "touching_goal_gap_m": 0.002,
+   "partner_view_min_points": 1,
+   "_iors_large_touching_note": "owner 2026-10-12 ~16:05 touching_large#03: touching_goal_gap_m 0.002 (the goal 2 mm short of the bookcase's face, the goal check nudges it to contact; the code default, written out); partner_view_min_points 1 (iors_large relaxation 2a: stance A sees at least one of the bookcase's three nearest bottom-edge points)"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c1 (sheet ~T2): the tray storage_box/eicujj starts on coffee_table_osroux_0 (top 0.36 m); partner bookcase_otwukr_1 (house_double_floor_upper/living_room_0), the target ends on the floor touching its face nearest the init (dropped in front of it and pushed along the floor, iors_large_touching); hand-made (the subtask has no roles/candidates.csv rows for the grounder), registry mode test, so a re-ground leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-floor": {
+  "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
+  "definition_id": 120,
+  "roles": {
+   "target": {
+    "category": "storage_box",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "eicujj",
+    "orientation_equivalences": {
+     "storage_box/eicujj": []
+    },
+    "grasp_keys": {
+     "storage_box/eicujj": "storage_box__eicujj__t"
+    }
+   },
+   "partner": {
+    "category": "bookcase",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_upper": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "bookcase_otwukr_1"
+     ],
+     "support": {
+      "room": "living_room_0"
+     },
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "storage_box": [
+       "eicujj"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "storage_box": {
+       "aqdbdu": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "touching_goal_gap_m": 0.002,
+   "partner_view_min_points": 1,
+   "_iors_large_touching_note": "owner 2026-10-12 ~16:05 touching_large#03: touching_goal_gap_m 0.002 (the goal 2 mm short of the bookcase's face, the goal check nudges it to contact; the code default, written out); partner_view_min_points 1 (iors_large relaxation 2a: stance A sees at least one of the bookcase's three nearest bottom-edge points)"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c2 (sheet ~T5): the tray storage_box/eicujj starts on the floor of living_room_0; partner bookcase_otwukr_1 (house_double_floor_upper/living_room_0), the target ends on the floor touching its face nearest the init (dropped in front of it and pushed along the floor, iors_large_touching); hand-made (the subtask has no roles/candidates.csv rows for the grounder), registry mode test, so a re-ground leaves it alone"
+ },
  "inter_object_relation_satisfaction-under_large_scale-apple-desk-desk": {
   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
   "definition_id": 79,
