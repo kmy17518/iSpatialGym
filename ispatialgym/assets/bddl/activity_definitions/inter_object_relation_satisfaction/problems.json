@@ -198,7 +198,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
    "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
-   "pick": "inter_object_relation_satisfaction-ontop_small_scale#03~T1",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#03~T3",
    "slot": "representative",
    "mode": "representative"
   },
@@ -209,7 +209,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
    "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
-   "pick": "inter_object_relation_satisfaction-ontop_small_scale#03~T1",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#03~T3",
    "slot": "representative",
    "mode": "representative",
    "fallback_of": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-countertop",

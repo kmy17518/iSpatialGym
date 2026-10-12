@@ -30186,13 +30186,13 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout",
-       "ofargb": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
+       "feqemg": "ground_isg 2026-10-12: heldout",
+       "ofargb": "ground_isg 2026-10-12: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -30227,13 +30227,13 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout",
-       "ofargb": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
+       "feqemg": "ground_isg 2026-10-12: heldout",
+       "ofargb": "ground_isg 2026-10-12: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -30299,7 +30299,28 @@
       ]
      }
     }
-   }
+   },
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: superseded by inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-bottom_cabinet - inter_object_relation_satisfaction-ontop_small_scale#03 runs on bar_soap/utgixp: bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -30364,13 +30385,54 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout",
-       "ofargb": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
+       "feqemg": "ground_isg 2026-10-12: heldout",
+       "ofargb": "ground_isg 2026-10-12: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   },
+   "house_single_floor": {
+    "rooms": [
+     "utility_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "countertop_ikwqer_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "countertop_ikwqer_0",
+       "init": "ontop",
+       "top_z": 0.93,
+       "row": "inter_object_relation_satisfaction-ontop_small_scale#03~T3"
+      }
+     ],
+     "floor": {
+      "room": "utility_room_0"
+     }
+    },
+    "whitelist": {
+     "partner": {
+      "soap_dish": [
+       "slksbk"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "bar_soap": {
+       "feqemg": "ground_isg 2026-10-12: heldout",
+       "ofargb": "ground_isg 2026-10-12: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
+      }
+     },
+     "partner": {
+      "soap_dish": {
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -30436,7 +30498,28 @@
       ]
      }
     }
-   }
+   },
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: superseded by inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-countertop - inter_object_relation_satisfaction-ontop_small_scale#03 runs on bar_soap/utgixp: bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -30501,13 +30584,13 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout",
-       "ofargb": "ground_isg 2026-10-11: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
+       "feqemg": "ground_isg 2026-10-12: heldout",
+       "ofargb": "ground_isg 2026-10-12: pending_scaled_grasps:tabletop (x0.70 to fit soap_dish/slksbk)"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -30573,7 +30656,28 @@
       ]
      }
     }
-   }
+   },
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: superseded by inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf - inter_object_relation_satisfaction-ontop_small_scale#03 runs on bar_soap/utgixp: bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -30779,12 +30883,12 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout"
+       "feqemg": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -30824,12 +30928,12 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout"
+       "feqemg": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -30863,7 +30967,28 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: replaces inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-bottom_cabinet as the inter_object_relation_satisfaction-ontop_small_scale#03 candidate alias - the representative bar_soap/ofargb was replaced by bar_soap/utgixp, the grounder's next-model fallback ({\"model\": \"utgixp\", \"primary_model\": \"ofargb\", \"slot\": \"variation_geometry\"}): bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -30932,12 +31057,57 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout"
+       "feqemg": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   },
+   "house_single_floor": {
+    "rooms": [
+     "utility_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "countertop_ikwqer_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "countertop_ikwqer_0",
+       "init": "ontop",
+       "top_z": 0.93,
+       "row": "inter_object_relation_satisfaction-ontop_small_scale#03~T3"
+      }
+     ],
+     "floor": {
+      "room": "utility_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "bar_soap": [
+       "utgixp"
+      ]
+     },
+     "partner": {
+      "soap_dish": [
+       "slksbk"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "bar_soap": {
+       "feqemg": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "soap_dish": {
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -30971,7 +31141,28 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: replaces inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-countertop as the inter_object_relation_satisfaction-ontop_small_scale#03 candidate alias - the representative bar_soap/ofargb was replaced by bar_soap/utgixp, the grounder's next-model fallback ({\"model\": \"utgixp\", \"primary_model\": \"ofargb\", \"slot\": \"variation_geometry\"}): bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -31040,12 +31231,12 @@
     "blacklist": {
      "target": {
       "bar_soap": {
-       "feqemg": "ground_isg 2026-10-11: heldout"
+       "feqemg": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "soap_dish": {
-       "ownvqj": "ground_isg 2026-10-11: heldout"
+       "ownvqj": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -31079,7 +31270,28 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: replaces inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-shelf as the inter_object_relation_satisfaction-ontop_small_scale#03 candidate alias - the representative bar_soap/ofargb was replaced by bar_soap/utgixp, the grounder's next-model fallback ({\"model\": \"utgixp\", \"primary_model\": \"ofargb\", \"slot\": \"variation_geometry\"}): bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
