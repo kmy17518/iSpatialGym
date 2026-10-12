@@ -72,6 +72,63 @@ def test_detour_failure_rules():
     assert CR.detour_failure(2.4, 2.0, 5.0, 0.3) is None
 
 
+def test_detour_threshold_follows_the_path_bucket():
+    """Owner 2026-10-11 ~21:20: min_detour 0.30 / 0.20 / 0.15 m for the 3 / 5 / 10 m buckets (keyed by the bucket's upper bound),
+    min_detour_m for a bucket without an entry."""
+    by = CR.MIN_DETOUR_M_BY_BUCKET
+    assert [CR.bucket_min_detour(hi, 0.3, by) for hi in (3.0, 5.0, 10.0)] == [0.30, 0.20, 0.15]
+    assert CR.bucket_min_detour(7.0, 0.3, by) == 0.3 and CR.bucket_min_detour(5.0, 0.3, None) == 0.3
+    assert CR.detour_failure(2.25, 2.0, 3.0, 0.3, by) == "short_detour" and CR.detour_failure(2.31, 2.0, 3.0, 0.3, by) is None
+    assert CR.detour_failure(4.18, 4.0, 5.0, 0.3, by) == "short_detour" and CR.detour_failure(4.22, 4.0, 5.0, 0.3, by) is None
+    assert CR.detour_failure(8.14, 8.0, 10.0, 0.3, by) == "short_detour" and CR.detour_failure(8.16, 8.0, 10.0, 0.3, by) is None
+    assert CR.detour_failure(8.16, 8.0, 10.0, 0.3) == "short_detour"  # without the table: the old 0.3 m everywhere
+
+
+def test_wide_berth_falls_back_to_the_default_footprint():
+    """Owner 2026-10-11 ~21:20: the cell is planned with the obstacle grown by one more navigation-map clearance first; a
+    path-dependent failure of that (here: the grown footprint disconnects the map) retries the same cell with the default 2 cm
+    footprint, a short detour does not (it would only shrink); factor 1 is the default alone."""
+    assert CR.nav_clearance_m(0.53, 0.1) == pytest.approx(0.3) and CR.nav_clearance_m(0.6, 0.05) == pytest.approx(0.3)
+    tries = CR.berth_tries(0.02, 0.3, 2.0)
+    assert [t[0] for t in tries] == ["wide", "default"] and tries[0][1] == pytest.approx(0.32) and tries[1][1] == 0.02
+    assert CR.berth_tries(0.02, 0.3, 1.0) == [("default", 0.02)]
+    calls = []
+
+    def disconnected_when_wide(label, m):
+        calls.append(label)
+        return ("disconnected" if label == "wide" else None), {"margin": m}
+
+    assert CR.first_admissible_berth(tries, disconnected_when_wide) == ("default", 0.02, None, {"margin": 0.02}, "disconnected") and calls == ["wide", "default"]
+    label, m, why, payload, wide_failure = CR.first_admissible_berth(tries, lambda label, m: (("short_detour" if label == "wide" else None), {"margin": m}))
+    assert (label, why, wide_failure, payload["margin"]) == (None, "short_detour", None, pytest.approx(0.32))
+    assert CR.first_admissible_berth(tries, lambda label, m: (None, {"margin": m}))[:3] == ("wide", pytest.approx(0.32), None)
+    assert CR.first_admissible_berth(tries, lambda label, m: ("view", {"margin": m}))[:3] == (None, 0.02, "view")
+
+
+def test_recorded_footprint_is_the_one_the_path_was_planned_with():
+    """The cell's record carries the footprints of the growth its path was planned with (the wide berth, or the default after a
+    fallback), each placed obstacle keeping its own growth; the settled footprints are rebuilt from the same margins."""
+    S = object.__new__(CR.CameraRelocalizationV2)
+    boxes = {"hamper_1": (th.tensor([1.0, 2.0, 0.0]), th.tensor([1.4, 2.5, 0.6])), "taboret_1": (th.tensor([3.0, 1.0, 0.0]), th.tensor([3.3, 1.3, 0.5]))}
+    S.obstacle_aabb = lambda n, p: boxes[n]
+    poses = {n: (th.zeros(3), C.IDENTITY_QUAT.clone()) for n in boxes}
+    width = lambda poly: (poly[1][0] - poly[0][0], poly[2][1] - poly[1][1])  # noqa: E731
+
+    def plan(fail_wide):
+        def p(label, m):
+            fps = S.footprints_of(poses, {"taboret_1": 0.02, "hamper_1": m}, 0.02)
+            return ("disconnected" if (fail_wide and label == "wide") else None), {"footprints": fps}
+        return p
+
+    tries = CR.berth_tries(0.02, 0.3, 2.0)
+    for fail_wide, grown in ((False, 0.32), (True, 0.02)):
+        label, m, why, out, _ = CR.first_admissible_berth(tries, plan(fail_wide))
+        hamper, taboret = out["footprints"]["block"]
+        assert why is None and m == pytest.approx(grown)
+        assert width(hamper) == (pytest.approx(0.4 + 2 * grown), pytest.approx(0.5 + 2 * grown)) and width(taboret) == (pytest.approx(0.34), pytest.approx(0.34))
+        assert out["footprints"] == S.footprints_of(poses, {"hamper_1": m, "taboret_1": 0.02}, 0.02)  # what after_settle rebuilds
+
+
 def test_path_yaws_follow_the_next_segment():
     pts = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (1.0, 1.0)]
     yaws = CR.path_yaws(pts, final_yaw=0.7)

@@ -178,7 +178,11 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
             "preferred_height_range_m": [0.20, 1.10],  # §6.2 preferred
             "settle_steps": 60,  # §6.2 stands stably (settled 60 steps)
             "settle_drift_max_m": 0.005,  # §6.2 drift ≤ 5 mm
-            "min_detour_m": 0.3,  # §6.2 blocked-map path ≥ 0.3 m longer than the free path
+            "min_detour_m": 0.3,  # §6.2 blocked-map path ≥ 0.3 m longer than the free path (fallback of the per-bucket threshold)
+            # owner 2026-10-11 ~21:20: the minimum detour per path bucket (keyed by its upper bound in m) and the wide berth around
+            # the obstacle (clearance_factor x the navigation map's clearance; the default footprint when that path fails)
+            "min_detour_m_by_bucket": {"3": 0.30, "5": 0.20, "10": 0.15},
+            "clearance_factor": 2.0,
             "min_corridor_width_m": 0.75,  # §6.2 corridor keeps ≥ 0.75 m of free width on one side
             "in_frame_margin": 0.05,  # §6.2 inside the head camera's frame (5 %) at some pose along the new path
         },

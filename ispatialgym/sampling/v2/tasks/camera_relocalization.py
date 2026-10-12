@@ -58,7 +58,7 @@ import logging
 import math
 import os
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -101,6 +101,14 @@ OBSTACLE_MAX_CELLS = 8
 OBSTACLE_MAX_TILT_RAD = 0.05
 #: footprint growth of ``blocked_footprints`` (the 2 cm the chair variant's ``freed_footprints`` use, §3.1)
 FOOTPRINT_MARGIN_M = 0.02
+#: Owner 2026-10-11 ~21:20: an obstacle cell is planned first with this many times the navigation map's clearance around the
+#: obstacle (generation ``obstacle.clearance_factor``); walls and doorways keep the normal erosion
+CLEARANCE_FACTOR = 2.0
+#: Owner 2026-10-11 ~21:20: ``obstacle.min_detour_m`` per path bucket, keyed by the bucket's upper bound in m
+#: (``obstacle.min_detour_m_by_bucket``): on long open-floor paths the planner's swerve around an obstacle adds well under 0.3 m
+MIN_DETOUR_M_BY_BUCKET = {"3": 0.30, "5": 0.20, "10": 0.15}
+#: path-dependent failures of the wide berth that are retried with the default footprint (a short detour is not: it only shrinks)
+WIDE_BERTH_RETRY = ("disconnected", "too_long", "corridor", "view", "path_collision", "collision_init", "collision_goal")
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -192,16 +200,57 @@ def path_cells(rng, n_points: int, max_cells: int) -> List[int]:
     return [idx[int(i)] for i in perm[:max_cells]]
 
 
-def detour_failure(geo_blocked: Optional[float], geo_free: float, bucket_hi: float, min_detour_m: float) -> Optional[str]:
-    """Why a blocked-map path is inadmissible (§6.2): ``disconnected`` / ``short_detour`` / ``too_long`` (leaves the
-    bucket), None when it is."""
+def bucket_min_detour(bucket_hi: float, min_detour_m: float, by_bucket: Optional[Dict[str, float]] = None) -> float:
+    """The minimum detour of the bucket ``(lo, bucket_hi]``: its entry of ``obstacle.min_detour_m_by_bucket`` (keyed by the upper
+    bound in m), else ``min_detour_m``."""
+    for k, v in (by_bucket or {}).items():
+        if abs(float(k) - float(bucket_hi)) < 1e-6:
+            return float(v)
+    return float(min_detour_m)
+
+
+def detour_failure(geo_blocked: Optional[float], geo_free: float, bucket_hi: float, min_detour_m: float,
+                   by_bucket: Optional[Dict[str, float]] = None) -> Optional[str]:
+    """Why a blocked-map path is inadmissible (§6.2): ``disconnected`` / ``short_detour`` (shorter than the bucket's
+    :func:`bucket_min_detour`) / ``too_long`` (leaves the bucket), None when it is."""
     if geo_blocked is None:
         return "disconnected"
-    if float(geo_blocked) - float(geo_free) < float(min_detour_m):
+    if float(geo_blocked) - float(geo_free) < bucket_min_detour(bucket_hi, min_detour_m, by_bucket):
         return "short_detour"
     if float(geo_blocked) > float(bucket_hi):
         return "too_long"
     return None
+
+
+def nav_clearance_m(radius_m: float, resolution: float) -> float:
+    """The clearance an OmniGibson navigation map keeps from a blocked cell: ``TraversableMap._erode_trav_map`` erodes with a
+    square kernel of side ceil(radius / resolution) cells (radius = half the chassis diagonal + 0.2 m), half that side on each
+    side of the cell."""
+    return math.ceil(float(radius_m) / float(resolution)) * float(resolution) / 2.0
+
+
+def berth_tries(base_margin: float, clearance_m: float, factor: float) -> List[Tuple[str, float]]:
+    """The footprint growths an obstacle cell is planned with, in order: the wide berth - the base margin plus (factor - 1)
+    clearances, so that the clearance around the obstacle is ``factor`` times the map's - then the default footprint; the
+    default alone when factor <= 1."""
+    wide = float(base_margin) + max(0.0, float(factor) - 1.0) * float(clearance_m)
+    return [("wide", wide), ("default", float(base_margin))] if wide > float(base_margin) + 1e-9 else [("default", float(base_margin))]
+
+
+def first_admissible_berth(tries: Sequence[Tuple[str, float]], plan: Callable[[str, float], Tuple[Optional[str], Any]]):
+    """Run ``plan(label, margin) -> (why, payload)`` over ``tries`` (:func:`berth_tries`): ``(label, margin, None, payload,
+    wide_failure)`` for the first admissible growth. A path-dependent failure of the wide berth (``WIDE_BERTH_RETRY``) retries
+    the default footprint; any other failure, or the default's, ends the cell: ``(None, margin, why, payload, wide_failure)``."""
+    wide_failure, why, payload, m = None, None, None, float(tries[-1][1])
+    for label, m in tries:
+        why, payload = plan(label, m)
+        if why is None:
+            return label, m, None, payload, wide_failure
+        if label == "wide" and why in WIDE_BERTH_RETRY:
+            wide_failure = why
+            continue
+        break
+    return None, m, why, payload, wide_failure
 
 
 def divergence_index(path_before: Sequence[Sequence[float]], path_after: Sequence[Sequence[float]], tol: float) -> int:
@@ -711,6 +760,16 @@ class CameraRelocalizationV2(SamplerV2):
     def footprints(self, poses: Dict[str, G.Pose], margin: float) -> Dict[str, List]:
         return SV.blocked_footprints([self.obstacle_aabb(n, p) for n, p in poses.items()], margin)
 
+    def footprints_of(self, poses: Dict[str, G.Pose], margins: Dict[str, float], default: float) -> Dict[str, List]:
+        """``blocked_footprints`` with each obstacle grown by its own margin (the growth its path was planned with: the wide
+        berth or the default), ``default`` for an obstacle without one."""
+        return {"free": [], "block": [SV.aabb_footprint(*self.obstacle_aabb(n, p), float(margins.get(n, default))) for n, p in poses.items()]}
+
+    def nav_clearance(self) -> float:
+        """The clearance (m) the kit's navigation map keeps from an obstacle (:func:`nav_clearance_m` for this robot and map)."""
+        radius = float(th.norm(self.kit.robot.reset_joint_pos_aabb_extent[:2])) / 2.0 + 0.2
+        return nav_clearance_m(radius, float(self.world.scene.trav_map.map_resolution))
+
     def blocked_cells(self, footprints: Dict[str, List]) -> set:
         trav = self.world.scene.trav_map
         out = set()
@@ -837,11 +896,13 @@ class CameraRelocalizationV2(SamplerV2):
         return None
 
     def try_obstacle_cell(self, name: str, xy, yaw: float, direction: th.Tensor, placed: Dict[str, G.Pose], base0, q0, base1, q1, geo_before: float,
-                          bucket_hi: float, P: Dict[str, Any], trunk: Tuple[float, float], path_before: Optional[th.Tensor] = None):
+                          bucket_hi: float, P: Dict[str, Any], trunk: Tuple[float, float], path_before: Optional[th.Tensor] = None,
+                          margins: Optional[Dict[str, float]] = None):
         """One placement candidate: (record, None) on success (the obstacle stands settled in the world), (None,
-        failure tag) otherwise (parked again). Geometric filters, settle, one A* on the blocked map, corridor, the view
-        before the departure from ``path_before`` (the shortest path without this obstacle), the recorded path's
-        whole-body check, init / goal collision checks with the obstacle."""
+        failure tag) otherwise (parked again). Geometric filters, settle, the corridor on the physical footprint, then per
+        footprint growth (:func:`berth_tries`: the wide berth, else the default) one A* on the blocked map, the view before
+        the departure from ``path_before`` (the shortest path without this obstacle), the recorded path's whole-body check,
+        init / goal collision checks with the obstacle. ``margins``: the growth each placed obstacle was accepted with."""
         xy = G.t(xy)[:2]
         geom = self.obst_geom[name]
         margin = float(P.get("footprint_margin_m", FOOTPRINT_MARGIN_M))
@@ -868,40 +929,51 @@ class CameraRelocalizationV2(SamplerV2):
             self.park_obstacle(name)
             return None, "unstable"
         pose = (p1.clone(), r1.clone())
-        fps = self.footprints({**placed, name: pose}, margin)
-        rec_path = None
-        sched = None
-        with self.blocked_map(fps) as blocked:
-            path_b, geo_b = self.kit.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
-            corridor = self.corridor_widths(blocked, pose[0][:2], direction)
-            why = detour_failure(geo_b, geo_before, bucket_hi, float(P["min_detour_m"]))
-            hits: List[int] = []
-            if why is None and max(corridor) < float(P["min_corridor_width_m"]):
-                why = "corridor"
+        poses = {**placed, name: pose}
+        margins = dict(margins or {})
+        # the corridor rule on the physical footprint (owner ~21:20), whatever growth the path is planned with
+        with self.blocked_map(self.footprints_of(poses, {**margins, name: margin}, margin)) as physical:
+            corridor = self.corridor_widths(physical, pose[0][:2], direction)
+
+        def plan_with(label: str, m: float):
+            """The blocked-map path, its checks and record with this obstacle's footprint grown by ``m`` (the others by theirs)."""
+            out: Dict[str, Any] = {"footprints": self.footprints_of(poses, {**margins, name: m}, margin), "path": None, "geodesic_m": None,
+                                   "path_record": None, "schedule": None, "view_indices": []}
+            with self.blocked_map(out["footprints"]):
+                path_b, geo_b = self.kit.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
+                out.update(path=path_b, geodesic_m=geo_b)
+                why = detour_failure(geo_b, geo_before, bucket_hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET))
+                if why is None and max(corridor) < float(P["min_corridor_width_m"]):
+                    why = "corridor"
+                if why is None:
+                    # the obstacle must be seen before the robot departs from the path it would have taken without it, at the
+                    # poses the oracle drives (the shortcut + schedule on the blocked eroded map: inside ``blocked_map``)
+                    plan = self.path_schedule(path_b, base0, base1)
+                    out["schedule"] = plan[1]
+                    out["view_indices"] = self.view_indices(plan[1], path_b, G.aabb_corners(*self.obstacle_aabb(name, pose)), float(P["in_frame_margin"]),
+                                                            path_before=path_before)
+                    if not out["view_indices"]:
+                        why = "view"
+                if why is None:
+                    self.kit.sync_world()  # the obstacle enters the collision world
+                    out["path_record"] = self.build_path_record(path_b, base0, base1, trunk, plan=plan)  # the bucket bound: detour_failure, on geo_b
+                    if out["path_record"] is None:
+                        why = "path_collision"
             if why is None:
-                # the obstacle must be seen before the robot departs from the path it would have taken without it, at the
-                # poses the oracle drives (the shortcut + schedule on the blocked eroded map: inside ``blocked_map``)
-                plan = self.path_schedule(path_b, base0, base1)
-                sched = plan[1]
-                hits = self.view_indices(sched, path_b, G.aabb_corners(*self.obstacle_aabb(name, pose)), float(P["in_frame_margin"]), path_before=path_before)
-                if not hits:
-                    why = "view"
-            if why is None:
-                self.kit.sync_world()  # the obstacle enters the collision world
-                rec_path = self.build_path_record(path_b, base0, base1, trunk, plan=plan)  # the bucket bound: detour_failure, on geo_b
-                if rec_path is None:
-                    why = "path_collision"
-        if why is None:
-            qs = th.stack([q0, q1])
-            free = self.kit.collision_free(qs, margin=float(self.g("collision_margin_m"))).tolist()
-            if not all(free):
-                why = "collision_init" if not free[0] else "collision_goal"
+                free = self.kit.collision_free(th.stack([q0, q1]), margin=float(self.g("collision_margin_m"))).tolist()
+                if not all(free):
+                    why = "collision_init" if not free[0] else "collision_goal"
+            return why, out
+
+        tries = berth_tries(margin, self.nav_clearance(), float(P.get("clearance_factor", CLEARANCE_FACTOR)))
+        label, m, why, out, wide_failure = first_admissible_berth(tries, plan_with)
         if why is not None:
             self.park_obstacle(name)
             self.kit.sync_world()
             return None, why
-        return {"pose": pose, "path": path_b, "geodesic_m": float(geo_b), "corridor_m": corridor, "view_indices": hits, "yaw": yaw, "settle_drift_m": drift,
-                "settle_tilt_rad": tilt, "path_record": rec_path, "schedule": sched, "footprints": fps}, None
+        return {"pose": pose, "path": out["path"], "geodesic_m": float(out["geodesic_m"]), "corridor_m": corridor, "view_indices": out["view_indices"], "yaw": yaw,
+                "settle_drift_m": drift, "settle_tilt_rad": tilt, "path_record": out["path_record"], "schedule": out["schedule"], "footprints": out["footprints"],
+                "clearance": label, "footprint_margin_m": float(m), "wide_failure": wide_failure}, None
 
     def place_obstacles(self, d: Draft, rng, base0, q0, cam0: G.Pose, base1, q1, cam1: G.Pose, path_free: th.Tensor, geo_free: float, free_rec: PathRecord,
                         lo: float, hi: float):
@@ -918,6 +990,7 @@ class CameraRelocalizationV2(SamplerV2):
         poses: Dict[str, G.Pose] = {}
         placements: Dict[str, Dict[str, Any]] = {}
         ref_paths: Dict[str, th.Tensor] = {}  # per obstacle: the shortest path before it was placed (the view rule's reference)
+        margins: Dict[str, float] = {}  # per obstacle: the footprint growth its accepted path was planned with
         cur_path, cur_geo = path_free, geo_free
         last: Optional[Dict[str, Any]] = None
         fails: Dict[str, int] = {}
@@ -929,7 +1002,8 @@ class CameraRelocalizationV2(SamplerV2):
                 xy = cur_path[idx]
                 yaw = float(rng.uniform(-math.pi, math.pi))
                 direction = cur_path[min(idx + 1, len(cur_path) - 1)] - cur_path[max(idx - 1, 0)]
-                rec, why = self.try_obstacle_cell(name, xy, yaw, direction, poses, base0, q0, base1, q1, cur_geo, hi, P, trunk, path_before=cur_path)
+                rec, why = self.try_obstacle_cell(name, xy, yaw, direction, poses, base0, q0, base1, q1, cur_geo, hi, P, trunk, path_before=cur_path,
+                                                  margins=margins)
                 if rec is None:
                     fails[why] = fails.get(why, 0) + 1
                     continue
@@ -939,10 +1013,13 @@ class CameraRelocalizationV2(SamplerV2):
                 raise Reject("obstacle", f"no cell of the shortest path admits {name} ({n_tried} cells tried: {fails}; free path {geo_free:.2f} m, {len(cur_path)} waypoints)")
             poses[name] = placed["pose"]
             ref_paths[name] = cur_path
+            margins[name] = placed["footprint_margin_m"]
             corners = G.aabb_corners(*self.obstacle_aabb(name, placed["pose"]))
             placements[name] = {"position": [round(float(v), 4) for v in placed["pose"][0]], "orientation": [round(float(v), 5) for v in placed["pose"][1]],
                                 "yaw": placed["yaw"], "corridor_m": placed["corridor_m"], "settle_drift_m": round(placed["settle_drift_m"], 4),
                                 "settle_tilt_rad": round(placed["settle_tilt_rad"], 4), "detour_m": round(placed["geodesic_m"] - cur_geo, 3),
+                                "clearance": placed["clearance"], "footprint_margin_m": round(placed["footprint_margin_m"], 3),
+                                "wide_berth_failure": placed["wide_failure"],
                                 "in_view_at_init": self.frustum_ok(cam0, corners, float(P["in_frame_margin"])),
                                 "in_view_at_goal": self.frustum_ok(cam1, corners, float(P["in_frame_margin"]))}
             cur_path, cur_geo, last = placed["path"], placed["geodesic_m"], placed
@@ -962,11 +1039,14 @@ class CameraRelocalizationV2(SamplerV2):
             d.object_poses[name] = pose
         d.settle_free = list(names)
         d.extras["blocked_footprints"] = fps
+        d.extras["obstacle_footprint_margins"] = dict(margins)
         d.extras["obstacle_planned_poses"] = {n: (p[0].clone(), p[1].clone()) for n, p in poses.items()}
         d.extras["obstacle_path"] = (cur_path, cur_geo)
         d.extras["obstacle_ref_paths"] = ref_paths
         d.summary.update({"geodesic_blocked_m": cur_geo, "path_length_m": rec_path.length_m, "free_path_length_m": free_rec.length_m,
                           "obstacles": {"placements": placements, "cells_tried": n_tried, "cell_failures": fails, "free_geodesic_m": float(geo_free),
+                                        "clearance_factor": float(P.get("clearance_factor", CLEARANCE_FACTOR)), "nav_clearance_m": round(self.nav_clearance(), 3),
+                                        "min_detour_m": bucket_min_detour(hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET)),
                                         "blocked_geodesic_m": float(cur_geo), "detour_m": float(cur_geo) - float(geo_free), "n_waypoints_blocked": int(len(cur_path)),
                                         "path_free": [[round(float(v), 3) for v in p] for p in path_free], **view}})
         self.sidecar.goal["blocked_footprints"] = fps
@@ -989,7 +1069,8 @@ class CameraRelocalizationV2(SamplerV2):
             drift, tilt = float(th.linalg.norm(G.t(p)[:2] - p0[:2])), G.quat_angle(r, r0)
             if drift > float(P["settle_drift_max_m"]) or tilt > OBSTACLE_MAX_TILT_RAD:
                 raise Reject("obstacle", f"{name} moved {drift * 1000:.1f} mm / {tilt:.3f} rad during the settle")
-        fps = self.footprints(draft.object_poses, margin)
+        # the settled footprints keep the growth each obstacle's path was planned with (the recorded footprint = the planned one)
+        fps = self.footprints_of(draft.object_poses, draft.extras.get("obstacle_footprint_margins") or {}, margin)
         base1 = draft.extras["goal_base_pose2d"]
         ref_paths = draft.extras["obstacle_ref_paths"]
         if self.blocked_cells(fps) != self.blocked_cells(draft.extras["blocked_footprints"]):
@@ -997,7 +1078,7 @@ class CameraRelocalizationV2(SamplerV2):
             hi = draft.extras["bucket"]["hi_m"]
             with self.blocked_map(fps):
                 path_b, geo_b = self.kit.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
-                why = detour_failure(geo_b, float(draft.summary["geodesic_m"]), hi, float(P["min_detour_m"]))
+                why = detour_failure(geo_b, float(draft.summary["geodesic_m"]), hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET))
                 if why:
                     raise Reject("obstacle", f"blocked-map path after the settle {why}")
                 self.kit.sync_world()
