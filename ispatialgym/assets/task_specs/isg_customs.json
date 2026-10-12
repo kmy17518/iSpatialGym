@@ -26628,7 +26628,7 @@
     },
     "representative": "dkajbh",
     "grasp_keys": {
-     "sunflower/dkajbh": "sunflower__dkajbh"
+     "sunflower/dkajbh": "sunflower__dkajbh__r50"
     }
    },
    "partner": {
@@ -26679,6 +26679,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "sunflower": [
+       "dkajbh"
+      ]
+     },
      "partner": {
       "vase": [
        "gopbrh"
@@ -26688,7 +26693,6 @@
     "blacklist": {
      "target": {
       "sunflower": {
-       "dkajbh": "ground_isg 2026-10-11: pending_scaled_grasps:insert (x0.44 to fit vase/gopbrh)",
        "urpskm": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -26727,43 +26731,29 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.44,
-   "target_fit": {
-    "sunflower/dkajbh": {
-     "rule": "inside",
-     "scale": 0.44,
-     "partner": "vase/gopbrh",
-     "limit": "opening_long_side",
-     "target_footprint_m": [
-      0.0792,
-      0.192
-     ],
-     "opening_m": [
-      0.0852,
-      0.0852
-     ],
-     "target_height_m": 0.0645,
-     "partner_height_m": 0.163,
-     "opening_margin_m": 0.01,
-     "max_protrusion_fraction": 0.5,
-     "base_scale": null,
-     "spawn_scale": [
-      0.44,
-      0.44,
-      0.44
-     ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "insert",
-      "base_key": "sunflower__dkajbh",
-      "scale": [
-       0.44,
-       0.44,
-       0.44
-      ]
-     }
-    }
-   }
+   "target_up_axis": {
+    "sunflower/dkajbh": "+x"
+   },
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ]
   },
   "constraints": []
  },
@@ -26779,7 +26769,7 @@
     },
     "representative": "dkajbh",
     "grasp_keys": {
-     "sunflower/dkajbh": "sunflower__dkajbh"
+     "sunflower/dkajbh": "sunflower__dkajbh__r50"
     }
    },
    "partner": {
@@ -26822,6 +26812,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "sunflower": [
+       "dkajbh"
+      ]
+     },
      "partner": {
       "vase": [
        "gopbrh"
@@ -26831,7 +26826,6 @@
     "blacklist": {
      "target": {
       "sunflower": {
-       "dkajbh": "ground_isg 2026-10-11: pending_scaled_grasps:insert (x0.44 to fit vase/gopbrh)",
        "urpskm": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -26870,43 +26864,29 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.44,
-   "target_fit": {
-    "sunflower/dkajbh": {
-     "rule": "inside",
-     "scale": 0.44,
-     "partner": "vase/gopbrh",
-     "limit": "opening_long_side",
-     "target_footprint_m": [
-      0.0792,
-      0.192
-     ],
-     "opening_m": [
-      0.0852,
-      0.0852
-     ],
-     "target_height_m": 0.0645,
-     "partner_height_m": 0.163,
-     "opening_margin_m": 0.01,
-     "max_protrusion_fraction": 0.5,
-     "base_scale": null,
-     "spawn_scale": [
-      0.44,
-      0.44,
-      0.44
-     ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "insert",
-      "base_key": "sunflower__dkajbh",
-      "scale": [
-       0.44,
-       0.44,
-       0.44
-      ]
-     }
-    }
-   }
+   "target_up_axis": {
+    "sunflower/dkajbh": "+x"
+   },
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ]
   },
   "constraints": []
  },
@@ -26922,7 +26902,7 @@
     },
     "representative": "dkajbh",
     "grasp_keys": {
-     "sunflower/dkajbh": "sunflower__dkajbh"
+     "sunflower/dkajbh": "sunflower__dkajbh__r50"
     }
    },
    "partner": {
@@ -26965,6 +26945,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "sunflower": [
+       "dkajbh"
+      ]
+     },
      "partner": {
       "vase": [
        "gopbrh"
@@ -26974,7 +26959,6 @@
     "blacklist": {
      "target": {
       "sunflower": {
-       "dkajbh": "ground_isg 2026-10-11: pending_scaled_grasps:insert (x0.44 to fit vase/gopbrh)",
        "urpskm": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -27013,43 +26997,29 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.44,
-   "target_fit": {
-    "sunflower/dkajbh": {
-     "rule": "inside",
-     "scale": 0.44,
-     "partner": "vase/gopbrh",
-     "limit": "opening_long_side",
-     "target_footprint_m": [
-      0.0792,
-      0.192
-     ],
-     "opening_m": [
-      0.0852,
-      0.0852
-     ],
-     "target_height_m": 0.0645,
-     "partner_height_m": 0.163,
-     "opening_margin_m": 0.01,
-     "max_protrusion_fraction": 0.5,
-     "base_scale": null,
-     "spawn_scale": [
-      0.44,
-      0.44,
-      0.44
-     ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "insert",
-      "base_key": "sunflower__dkajbh",
-      "scale": [
-       0.44,
-       0.44,
-       0.44
-      ]
-     }
-    }
-   }
+   "target_up_axis": {
+    "sunflower/dkajbh": "+x"
+   },
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ]
   },
   "constraints": []
  },
@@ -27065,7 +27035,7 @@
     },
     "representative": "dkajbh",
     "grasp_keys": {
-     "sunflower/dkajbh": "sunflower__dkajbh"
+     "sunflower/dkajbh": "sunflower__dkajbh__r50"
     }
    },
    "partner": {
@@ -27108,6 +27078,11 @@
      }
     },
     "whitelist": {
+     "target": {
+      "sunflower": [
+       "dkajbh"
+      ]
+     },
      "partner": {
       "vase": [
        "gopbrh"
@@ -27117,7 +27092,6 @@
     "blacklist": {
      "target": {
       "sunflower": {
-       "dkajbh": "ground_isg 2026-10-11: pending_scaled_grasps:insert (x0.44 to fit vase/gopbrh)",
        "urpskm": "ground_isg 2026-10-11: heldout"
       }
      },
@@ -27156,43 +27130,29 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.44,
-   "target_fit": {
-    "sunflower/dkajbh": {
-     "rule": "inside",
-     "scale": 0.44,
-     "partner": "vase/gopbrh",
-     "limit": "opening_long_side",
-     "target_footprint_m": [
-      0.0792,
-      0.192
-     ],
-     "opening_m": [
-      0.0852,
-      0.0852
-     ],
-     "target_height_m": 0.0645,
-     "partner_height_m": 0.163,
-     "opening_margin_m": 0.01,
-     "max_protrusion_fraction": 0.5,
-     "base_scale": null,
-     "spawn_scale": [
-      0.44,
-      0.44,
-      0.44
-     ],
-     "status": "pending_scaled_grasps",
-     "needs": {
-      "pipeline": "insert",
-      "base_key": "sunflower__dkajbh",
-      "scale": [
-       0.44,
-       0.44,
-       0.44
-      ]
-     }
-    }
-   }
+   "target_up_axis": {
+    "sunflower/dkajbh": "+x"
+   },
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ]
   },
   "constraints": []
  },
