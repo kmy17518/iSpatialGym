@@ -3130,7 +3130,13 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "remove_objects": {
+    "hotel_suite_large": [
+     "ottoman_hnmndv_1"
+    ]
+   },
+   "_remove_objects_note": "2026-10-12 owner item B8 (s3 alignment-axial#02, desk_ohjotf_0): keeping 1 m from this desk, navigation.park_pose parks the robot at (0.70, 0.00) with its chassis 6.5 cm into ottoman_hnmndv_1 (base_link and a rear wheel in contact); the 5 park steps that start every attempt launch the ottoman at 0.7 m/s, it ends 13-17 cm away and settle_validate rejects the attempt (scene_disturbed). Untouched it stays put (0.0 mm over 10 s); parking armchair_hfydou_0 or not changes neither the park cell nor the push. Removed as a scene variant like the chairs near a table."
   },
   "constraints": [
    {
@@ -3545,7 +3551,13 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "remove_objects": {
+    "hotel_suite_large": [
+     "ottoman_hnmndv_1"
+    ]
+   },
+   "_remove_objects_note": "2026-10-12 owner item B8 (s3 alignment-axial#02, desk_ohjotf_0): keeping 1 m from this desk, navigation.park_pose parks the robot at (0.70, 0.00) with its chassis 6.5 cm into ottoman_hnmndv_1 (base_link and a rear wheel in contact); the 5 park steps that start every attempt launch the ottoman at 0.7 m/s, it ends 13-17 cm away and settle_validate rejects the attempt (scene_disturbed). Untouched it stays put (0.0 mm over 10 s); parking armchair_hfydou_0 or not changes neither the park cell nor the push. Removed as a scene variant like the chairs near a table."
   },
   "constraints": [
    {
