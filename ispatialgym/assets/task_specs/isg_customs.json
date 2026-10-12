@@ -19671,9 +19671,249 @@
   },
   "constraints": []
  },
+ "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-bar": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 38,
+  "roles": {
+   "target": {
+    "category": "box_of_shampoo",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "bclpiq",
+    "orientation_equivalences": {
+     "box_of_shampoo/bclpiq": []
+    },
+    "grasp_keys": {
+     "box_of_shampoo/bclpiq": "box_of_shampoo__bclpiq"
+    }
+   },
+   "distractors": {
+    "category": [
+     "box_of_shampoo",
+     "box_of_sanitary_napkins",
+     "box_of_tissues"
+    ],
+    "sampleable": true
+   },
+   "support": {
+    "category": "bar",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "bar_udatjt_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "bar_udatjt_0",
+       "init": "ontop",
+       "top_z": 1.05,
+       "row": "disembedding#02~T4"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_shampoo": [
+       "bclpiq"
+      ]
+     },
+     "distractors": {
+      "box_of_shampoo": [
+       "nijidu"
+      ],
+      "box_of_sanitary_napkins": [
+       "acaivd",
+       "arqcyu",
+       "humkqw",
+       "mxdefq",
+       "skltgp",
+       "tkrzkb",
+       "ykpeja",
+       "zqinib"
+      ],
+      "box_of_tissues": [
+       "ntbrtz",
+       "uglbjc",
+       "zutrxn"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "distractors": {
+      "box_of_sanitary_napkins": {
+       "cmnpuv": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_tissues": {
+       "xwstls": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "box_of_shampoo": 1,
+      "box_of_sanitary_napkins": 1,
+      "box_of_tissues": 1
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "destination_side": "right",
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "fixed_layout_yaw_step_deg": 22.5,
+   "distractor_budget": {
+    "tray": "tray/uekqey",
+    "tray_scale": 1.0,
+    "tray_floor_m2": 0.1673,
+    "budget_fraction": 0.85,
+    "pad_clearance_m": 0.0223,
+    "footprint_rule": "rectangle",
+    "pose": "canonical",
+    "source": "representatives.csv same_category / other_category rows",
+    "draw_rule": {
+     "size_max": 3,
+     "same_category_max": 2,
+     "other_category_max": 1,
+     "lookalike_group_max": 1
+    },
+    "count_rule": "every admissible draw fits",
+    "model_footprints_m2": {
+     "box_of_shampoo/nijidu": 0.0137,
+     "box_of_sanitary_napkins/tkrzkb": 0.0156,
+     "box_of_sanitary_napkins/acaivd": 0.016,
+     "box_of_sanitary_napkins/zqinib": 0.0169,
+     "box_of_sanitary_napkins/arqcyu": 0.0169,
+     "box_of_sanitary_napkins/humkqw": 0.016,
+     "box_of_sanitary_napkins/skltgp": 0.0162,
+     "box_of_sanitary_napkins/ykpeja": 0.0162,
+     "box_of_sanitary_napkins/mxdefq": 0.0128,
+     "box_of_tissues/uglbjc": 0.026,
+     "box_of_tissues/zutrxn": 0.026,
+     "box_of_tissues/ntbrtz": 0.026
+    },
+    "n_draws": 24,
+    "worst_draw_m2": 0.0565,
+    "used_m2": 0.0565,
+    "n_distractors": 3,
+    "draw": [
+     "box_of_shampoo/nijidu",
+     "box_of_sanitary_napkins/acaivd",
+     "box_of_tissues/ntbrtz"
+    ],
+    "dropped": []
+   }
+  },
+  "constraints": []
+ },
  "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-bottom_cabinet": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 6,
+  "superseded_by": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-commercial_kitchen_table",
   "roles": {
    "target": {
     "category": "box_of_shampoo",
@@ -20041,6 +20281,484 @@
   },
   "constraints": []
  },
+ "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-commercial_kitchen_table": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 39,
+  "roles": {
+   "target": {
+    "category": "box_of_shampoo",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "bclpiq",
+    "orientation_equivalences": {
+     "box_of_shampoo/bclpiq": []
+    },
+    "grasp_keys": {
+     "box_of_shampoo/bclpiq": "box_of_shampoo__bclpiq"
+    }
+   },
+   "distractors": {
+    "category": [
+     "box_of_shampoo",
+     "box_of_sanitary_napkins",
+     "box_of_tissues"
+    ],
+    "sampleable": true
+   },
+   "support": {
+    "category": "commercial_kitchen_table",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "commercial_kitchen_table_vxvtec_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "commercial_kitchen_table_vxvtec_0",
+       "init": "ontop",
+       "top_z": 0.87,
+       "row": "disembedding#02~T5"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_shampoo": [
+       "bclpiq"
+      ]
+     },
+     "distractors": {
+      "box_of_shampoo": [
+       "nijidu"
+      ],
+      "box_of_sanitary_napkins": [
+       "acaivd",
+       "arqcyu",
+       "humkqw",
+       "mxdefq",
+       "skltgp",
+       "tkrzkb",
+       "ykpeja",
+       "zqinib"
+      ],
+      "box_of_tissues": [
+       "ntbrtz",
+       "uglbjc",
+       "zutrxn"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "distractors": {
+      "box_of_sanitary_napkins": {
+       "cmnpuv": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_tissues": {
+       "xwstls": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "box_of_shampoo": 1,
+      "box_of_sanitary_napkins": 1,
+      "box_of_tissues": 1
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "destination_side": "right",
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "fixed_layout_yaw_step_deg": 22.5,
+   "distractor_budget": {
+    "tray": "tray/uekqey",
+    "tray_scale": 1.0,
+    "tray_floor_m2": 0.1673,
+    "budget_fraction": 0.85,
+    "pad_clearance_m": 0.0223,
+    "footprint_rule": "rectangle",
+    "pose": "canonical",
+    "source": "representatives.csv same_category / other_category rows",
+    "draw_rule": {
+     "size_max": 3,
+     "same_category_max": 2,
+     "other_category_max": 1,
+     "lookalike_group_max": 1
+    },
+    "count_rule": "every admissible draw fits",
+    "model_footprints_m2": {
+     "box_of_shampoo/nijidu": 0.0137,
+     "box_of_sanitary_napkins/tkrzkb": 0.0156,
+     "box_of_sanitary_napkins/acaivd": 0.016,
+     "box_of_sanitary_napkins/zqinib": 0.0169,
+     "box_of_sanitary_napkins/arqcyu": 0.0169,
+     "box_of_sanitary_napkins/humkqw": 0.016,
+     "box_of_sanitary_napkins/skltgp": 0.0162,
+     "box_of_sanitary_napkins/ykpeja": 0.0162,
+     "box_of_sanitary_napkins/mxdefq": 0.0128,
+     "box_of_tissues/uglbjc": 0.026,
+     "box_of_tissues/zutrxn": 0.026,
+     "box_of_tissues/ntbrtz": 0.026
+    },
+    "n_draws": 24,
+    "worst_draw_m2": 0.0565,
+    "used_m2": 0.0565,
+    "n_distractors": 3,
+    "draw": [
+     "box_of_shampoo/nijidu",
+     "box_of_sanitary_napkins/ykpeja",
+     "box_of_tissues/ntbrtz"
+    ],
+    "dropped": []
+   }
+  },
+  "constraints": []
+ },
+ "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-conference_table": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 37,
+  "roles": {
+   "target": {
+    "category": "box_of_shampoo",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "bclpiq",
+    "orientation_equivalences": {
+     "box_of_shampoo/bclpiq": []
+    },
+    "grasp_keys": {
+     "box_of_shampoo/bclpiq": "box_of_shampoo__bclpiq"
+    }
+   },
+   "distractors": {
+    "category": [
+     "box_of_shampoo",
+     "box_of_sanitary_napkins",
+     "box_of_tissues"
+    ],
+    "sampleable": true
+   },
+   "support": {
+    "category": "conference_table",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "meeting_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "conference_table_fpkmyw_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "conference_table_fpkmyw_0",
+       "init": "ontop",
+       "top_z": 0.67,
+       "row": "disembedding#02~T2"
+      }
+     ],
+     "floor": {
+      "room": "meeting_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_shampoo": [
+       "bclpiq"
+      ]
+     },
+     "distractors": {
+      "box_of_shampoo": [
+       "nijidu"
+      ],
+      "box_of_sanitary_napkins": [
+       "acaivd",
+       "arqcyu",
+       "humkqw",
+       "mxdefq",
+       "skltgp",
+       "tkrzkb",
+       "ykpeja",
+       "zqinib"
+      ],
+      "box_of_tissues": [
+       "ntbrtz",
+       "uglbjc",
+       "zutrxn"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "distractors": {
+      "box_of_sanitary_napkins": {
+       "cmnpuv": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_tissues": {
+       "xwstls": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "box_of_shampoo": 1,
+      "box_of_sanitary_napkins": 1,
+      "box_of_tissues": 1
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "destination_side": "right",
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "fixed_layout_yaw_step_deg": 22.5,
+   "distractor_budget": {
+    "tray": "tray/uekqey",
+    "tray_scale": 1.0,
+    "tray_floor_m2": 0.1673,
+    "budget_fraction": 0.85,
+    "pad_clearance_m": 0.0223,
+    "footprint_rule": "rectangle",
+    "pose": "canonical",
+    "source": "representatives.csv same_category / other_category rows",
+    "draw_rule": {
+     "size_max": 3,
+     "same_category_max": 2,
+     "other_category_max": 1,
+     "lookalike_group_max": 1
+    },
+    "count_rule": "every admissible draw fits",
+    "model_footprints_m2": {
+     "box_of_shampoo/nijidu": 0.0137,
+     "box_of_sanitary_napkins/tkrzkb": 0.0156,
+     "box_of_sanitary_napkins/acaivd": 0.016,
+     "box_of_sanitary_napkins/zqinib": 0.0169,
+     "box_of_sanitary_napkins/arqcyu": 0.0169,
+     "box_of_sanitary_napkins/humkqw": 0.016,
+     "box_of_sanitary_napkins/skltgp": 0.0162,
+     "box_of_sanitary_napkins/ykpeja": 0.0162,
+     "box_of_sanitary_napkins/mxdefq": 0.0128,
+     "box_of_tissues/uglbjc": 0.026,
+     "box_of_tissues/zutrxn": 0.026,
+     "box_of_tissues/ntbrtz": 0.026
+    },
+    "n_draws": 24,
+    "worst_draw_m2": 0.0565,
+    "used_m2": 0.0565,
+    "n_distractors": 3,
+    "draw": [
+     "box_of_shampoo/nijidu",
+     "box_of_sanitary_napkins/tkrzkb",
+     "box_of_tissues/uglbjc"
+    ],
+    "dropped": []
+   }
+  },
+  "constraints": []
+ },
  "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-countertop": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 5,
@@ -20086,24 +20804,24 @@
    }
   },
   "scenes": {
-   "office_cubicles_right": {
+   "house_single_floor": {
     "rooms": [
-     "bathroom_0"
+     "utility_room_0"
     ],
     "bindings": {
      "support": [
-      "countertop_zkhelh_0"
+      "countertop_fjkase_0"
      ],
      "support_surfaces": [
       {
-       "name": "countertop_zkhelh_0",
+       "name": "countertop_fjkase_0",
        "init": "ontop",
-       "top_z": 0.78,
-       "row": "disembedding#02~T1"
+       "top_z": 0.92,
+       "row": "disembedding#02~T3"
       }
      ],
      "floor": {
-      "room": "bathroom_0"
+      "room": "utility_room_0"
      }
     },
     "whitelist": {
@@ -20146,18 +20864,18 @@
     "blacklist": {
      "target": {
       "box_of_shampoo": {
-       "tzghev": "ground_isg 2026-10-11: heldout"
+       "tzghev": "ground_isg 2026-10-12: heldout"
       }
      },
      "distractors": {
       "box_of_sanitary_napkins": {
-       "cmnpuv": "ground_isg 2026-10-11: heldout"
+       "cmnpuv": "ground_isg 2026-10-12: heldout"
       },
       "box_of_shampoo": {
-       "tzghev": "ground_isg 2026-10-11: heldout"
+       "tzghev": "ground_isg 2026-10-12: heldout"
       },
       "box_of_tissues": {
-       "xwstls": "ground_isg 2026-10-11: heldout"
+       "xwstls": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -20255,13 +20973,274 @@
     ],
     "dropped": []
    },
-   "destination_side": "right"
+   "destination_side": "right",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "fixed_layout_yaw_step_deg": 22.5
+  },
+  "constraints": []
+ },
+ "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-desk": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 36,
+  "roles": {
+   "target": {
+    "category": "box_of_shampoo",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "bclpiq",
+    "orientation_equivalences": {
+     "box_of_shampoo/bclpiq": []
+    },
+    "grasp_keys": {
+     "box_of_shampoo/bclpiq": "box_of_shampoo__bclpiq"
+    }
+   },
+   "distractors": {
+    "category": [
+     "box_of_shampoo",
+     "box_of_sanitary_napkins",
+     "box_of_tissues"
+    ],
+    "sampleable": true
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_2"
+    ],
+    "bindings": {
+     "support": [
+      "desk_mdhelw_1"
+     ],
+     "support_surfaces": [
+      {
+       "name": "desk_mdhelw_1",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "disembedding#02~T1"
+      }
+     ],
+     "floor": {
+      "room": "private_office_2"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_shampoo": [
+       "bclpiq"
+      ]
+     },
+     "distractors": {
+      "box_of_shampoo": [
+       "nijidu"
+      ],
+      "box_of_sanitary_napkins": [
+       "acaivd",
+       "arqcyu",
+       "humkqw",
+       "mxdefq",
+       "skltgp",
+       "tkrzkb",
+       "ykpeja",
+       "zqinib"
+      ],
+      "box_of_tissues": [
+       "ntbrtz",
+       "uglbjc",
+       "zutrxn"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "distractors": {
+      "box_of_sanitary_napkins": {
+       "cmnpuv": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_shampoo": {
+       "tzghev": "ground_isg 2026-10-12: heldout"
+      },
+      "box_of_tissues": {
+       "xwstls": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "box_of_shampoo": 1,
+      "box_of_sanitary_napkins": 1,
+      "box_of_tissues": 1
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "destination_side": "right",
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "fixed_layout_yaw_step_deg": 22.5,
+   "distractor_budget": {
+    "tray": "tray/uekqey",
+    "tray_scale": 1.0,
+    "tray_floor_m2": 0.1673,
+    "budget_fraction": 0.85,
+    "pad_clearance_m": 0.0223,
+    "footprint_rule": "rectangle",
+    "pose": "canonical",
+    "source": "representatives.csv same_category / other_category rows",
+    "draw_rule": {
+     "size_max": 3,
+     "same_category_max": 2,
+     "other_category_max": 1,
+     "lookalike_group_max": 1
+    },
+    "count_rule": "every admissible draw fits",
+    "model_footprints_m2": {
+     "box_of_shampoo/nijidu": 0.0137,
+     "box_of_sanitary_napkins/tkrzkb": 0.0156,
+     "box_of_sanitary_napkins/acaivd": 0.016,
+     "box_of_sanitary_napkins/zqinib": 0.0169,
+     "box_of_sanitary_napkins/arqcyu": 0.0169,
+     "box_of_sanitary_napkins/humkqw": 0.016,
+     "box_of_sanitary_napkins/skltgp": 0.0162,
+     "box_of_sanitary_napkins/ykpeja": 0.0162,
+     "box_of_sanitary_napkins/mxdefq": 0.0128,
+     "box_of_tissues/uglbjc": 0.026,
+     "box_of_tissues/zutrxn": 0.026,
+     "box_of_tissues/ntbrtz": 0.026
+    },
+    "n_draws": 24,
+    "worst_draw_m2": 0.0565,
+    "used_m2": 0.0565,
+    "n_distractors": 3,
+    "draw": [
+     "box_of_shampoo/nijidu",
+     "box_of_sanitary_napkins/skltgp",
+     "box_of_tissues/ntbrtz"
+    ],
+    "dropped": []
+   }
   },
   "constraints": []
  },
  "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-shelf": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 7,
+  "superseded_by": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-bar",
   "roles": {
    "target": {
     "category": "box_of_shampoo",
@@ -20477,6 +21456,224 @@
   },
   "constraints": []
  },
+ "disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_soy_milk_1_carton_of_soy_milk_1-commercial_kitchen_table": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 41,
+  "roles": {
+   "target": {
+    "category": "carton_of_milk",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "kszoro",
+    "orientation_equivalences": {
+     "carton_of_milk/kszoro": []
+    },
+    "grasp_keys": {
+     "carton_of_milk/kszoro": "carton_of_milk__kszoro"
+    }
+   },
+   "distractors": {
+    "category": [
+     "bottle_of_coconut_milk",
+     "bottle_of_soy_milk",
+     "carton_of_soy_milk"
+    ],
+    "sampleable": true
+   },
+   "support": {
+    "category": "commercial_kitchen_table",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "commercial_kitchen_table_vxvtec_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "commercial_kitchen_table_vxvtec_0",
+       "init": "ontop",
+       "top_z": 0.87,
+       "row": "disembedding#06~T1"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "carton_of_milk": [
+       "kszoro"
+      ]
+     },
+     "distractors": {
+      "bottle_of_coconut_milk": [
+       "idenxg"
+      ],
+      "bottle_of_soy_milk": [
+       "mcjlhs"
+      ],
+      "carton_of_soy_milk": [
+       "orgyvw"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "carton_of_milk": {
+       "atyqub": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "bottle_of_coconut_milk": 1,
+      "bottle_of_soy_milk": 1,
+      "carton_of_soy_milk": 1
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "destination_side": "right",
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "fixed_layout_yaw_step_deg": 22.5,
+   "distractor_budget": {
+    "tray": "tray/uekqey",
+    "tray_scale": 1.0,
+    "tray_floor_m2": 0.1673,
+    "budget_fraction": 0.85,
+    "pad_clearance_m": 0.0079,
+    "footprint_rule": "rectangle",
+    "pose": "standing",
+    "source": "representatives.csv same_category / other_category rows",
+    "draw_rule": {
+     "size_max": 3,
+     "same_category_max": 2,
+     "other_category_max": 1,
+     "lookalike_group_max": 1
+    },
+    "count_rule": "every admissible draw fits",
+    "model_footprints_m2": {
+     "carton_of_milk/kklgxk": 0.005,
+     "bottle_of_milk/mrejrs": 0.004,
+     "bottle_of_milk/ddvsgl": 0.0055,
+     "bottle_of_milk/qsnnbp": 0.0069,
+     "bottle_of_milk/utfsmp": 0.0055,
+     "bottle_of_milk/debqen": 0.0054,
+     "bottle_of_coconut_milk/idenxg": 0.0134,
+     "bottle_of_soy_milk/mcjlhs": 0.0068,
+     "carton_of_soy_milk/orgyvw": 0.0124,
+     "box_of_almond_milk/oiiqwq": 0.0079
+    },
+    "n_draws": 60,
+    "worst_draw_m2": 0.0337,
+    "used_m2": 0.0337,
+    "n_distractors": 3,
+    "draw": [
+     "bottle_of_coconut_milk/idenxg",
+     "bottle_of_soy_milk/mcjlhs",
+     "carton_of_soy_milk/orgyvw"
+    ],
+    "dropped": []
+   },
+   "distractor_pose": "standing"
+  },
+  "constraints": []
+ },
  "disembedding-carton_of_milk-bottle_of_milk_1_bottle_of_coconut_milk_1_bottle_of_soy_milk_1-countertop": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 18,
@@ -20524,14 +21721,22 @@
   "scenes": {
    "house_single_floor": {
     "rooms": [
+     "utility_room_0",
      "kitchen_0"
     ],
     "bindings": {
      "support": [
+      "countertop_ikwqer_0",
       "countertop_kelzer_0",
       "countertop_kelker_0"
      ],
      "support_surfaces": [
+      {
+       "name": "countertop_ikwqer_0",
+       "init": "ontop",
+       "top_z": 0.93,
+       "row": "disembedding#06~T4"
+      },
       {
        "name": "countertop_kelzer_0",
        "init": "ontop",
@@ -20546,7 +21751,7 @@
       }
      ],
      "floor": {
-      "room": "kitchen_0"
+      "room": "utility_room_0"
      }
     },
     "whitelist": {
@@ -20584,12 +21789,12 @@
     "blacklist": {
      "target": {
       "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
+       "atyqub": "ground_isg 2026-10-12: heldout"
       }
      },
      "distractors": {
       "bottle_of_milk": {
-       "czblzn": "ground_isg 2026-10-11: heldout"
+       "czblzn": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -20686,7 +21891,28 @@
     "dropped": []
    },
    "distractor_pose": "standing",
-   "destination_side": "right"
+   "destination_side": "right",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "fixed_layout_yaw_step_deg": 22.5
   },
   "constraints": []
  },
@@ -20735,67 +21961,6 @@
    }
   },
   "scenes": {
-   "house_double_floor_lower": {
-    "rooms": [
-     "kitchen_0"
-    ],
-    "bindings": {
-     "support": [
-      "breakfast_table_xftrki_0"
-     ],
-     "support_surfaces": [
-      {
-       "name": "breakfast_table_xftrki_0",
-       "init": "ontop",
-       "top_z": 0.68,
-       "row": "disembedding#06~T3"
-      }
-     ],
-     "floor": {
-      "room": "kitchen_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "carton_of_milk": [
-       "kszoro"
-      ]
-     },
-     "distractors": {
-      "carton_of_milk": [
-       "kklgxk"
-      ],
-      "bottle_of_coconut_milk": [
-       "idenxg"
-      ],
-      "carton_of_soy_milk": [
-       "orgyvw"
-      ]
-     },
-     "source": {
-      "tray": [
-       "uekqey"
-      ]
-     },
-     "destination": {
-      "tray": [
-       "hvlfig"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
-      }
-     },
-     "distractors": {
-      "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
-      }
-     }
-    }
-   },
    "house_single_floor": {
     "rooms": [
      "dining_room_0"
@@ -20803,6 +21968,14 @@
     "bindings": {
      "support": [
       "breakfast_table_rhjoby_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "disembedding#06~T3"
+      }
      ],
      "floor": {
       "room": "dining_room_0"
@@ -20839,73 +22012,12 @@
     "blacklist": {
      "target": {
       "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
+       "atyqub": "ground_isg 2026-10-12: heldout"
       }
      },
      "distractors": {
       "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
-      }
-     }
-    }
-   },
-   "Rs_int": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "breakfast_table_skczfi_1"
-     ],
-     "support_surfaces": [
-      {
-       "name": "breakfast_table_skczfi_1",
-       "init": "ontop",
-       "top_z": 0.76,
-       "row": "disembedding#06~T5"
-      }
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "carton_of_milk": [
-       "kszoro"
-      ]
-     },
-     "distractors": {
-      "carton_of_milk": [
-       "kklgxk"
-      ],
-      "bottle_of_coconut_milk": [
-       "idenxg"
-      ],
-      "carton_of_soy_milk": [
-       "orgyvw"
-      ]
-     },
-     "source": {
-      "tray": [
-       "uekqey"
-      ]
-     },
-     "destination": {
-      "tray": [
-       "hvlfig"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
-      }
-     },
-     "distractors": {
-      "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
+       "atyqub": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -21002,7 +22114,28 @@
     "dropped": []
    },
    "distractor_pose": "standing",
-   "destination_side": "right"
+   "destination_side": "right",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "fixed_layout_yaw_step_deg": 22.5
   },
   "constraints": []
  },
@@ -21051,20 +22184,20 @@
    }
   },
   "scenes": {
-   "house_double_floor_lower": {
+   "house_single_floor": {
     "rooms": [
      "kitchen_0"
     ],
     "bindings": {
      "support": [
-      "bar_byvbuc_0"
+      "bar_udatjt_0"
      ],
      "support_surfaces": [
       {
-       "name": "bar_byvbuc_0",
+       "name": "bar_udatjt_0",
        "init": "ontop",
-       "top_z": 0.89,
-       "row": "disembedding#06~T4"
+       "top_z": 1.05,
+       "row": "disembedding#06~T2"
       }
      ],
      "floor": {
@@ -21106,15 +22239,15 @@
     "blacklist": {
      "target": {
       "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
+       "atyqub": "ground_isg 2026-10-12: heldout"
       }
      },
      "distractors": {
       "bottle_of_milk": {
-       "czblzn": "ground_isg 2026-10-11: heldout"
+       "czblzn": "ground_isg 2026-10-12: heldout"
       },
       "carton_of_milk": {
-       "atyqub": "ground_isg 2026-10-11: heldout"
+       "atyqub": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -21211,7 +22344,28 @@
     "dropped": []
    },
    "distractor_pose": "standing",
-   "destination_side": "right"
+   "destination_side": "right",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "fixed_layout_yaw_step_deg": 22.5
   },
   "constraints": []
  },
@@ -25251,6 +26405,7 @@
  "disembedding-video_game-video_game_2_board_game_1-bottom_cabinet": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 8,
+  "superseded_by": "disembedding-video_game-video_game_2_board_game_1-desk",
   "roles": {
    "target": {
     "category": "video_game",
@@ -25456,6 +26611,7 @@
  "disembedding-video_game-video_game_2_board_game_1-coffee_table": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 10,
+  "superseded_by": "disembedding-video_game-video_game_2_board_game_1-desk",
   "roles": {
    "target": {
     "category": "video_game",
@@ -25726,6 +26882,232 @@
   },
   "constraints": []
  },
+ "disembedding-video_game-video_game_2_board_game_1-conference_table": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 40,
+  "roles": {
+   "target": {
+    "category": "video_game",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "ceaxsd",
+    "orientation_equivalences": {
+     "video_game/ceaxsd": []
+    },
+    "grasp_keys": {
+     "video_game/ceaxsd": "video_game__ceaxsd"
+    }
+   },
+   "distractors": {
+    "category": [
+     "video_game",
+     "board_game"
+    ],
+    "sampleable": true
+   },
+   "support": {
+    "category": "conference_table",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "meeting_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "conference_table_fpkmyw_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "conference_table_fpkmyw_0",
+       "init": "ontop",
+       "top_z": 0.67,
+       "row": "disembedding#03~T2"
+      }
+     ],
+     "floor": {
+      "room": "meeting_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "video_game": [
+       "ceaxsd"
+      ]
+     },
+     "distractors": {
+      "video_game": [
+       "apjpos",
+       "ckugyi",
+       "pujfzk",
+       "qsyyql",
+       "quzjuo",
+       "rzaxlj"
+      ],
+      "board_game": [
+       "eoywpy",
+       "frgdqh",
+       "fzyuip"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "video_game": {
+       "lfdpse": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "distractors": {
+      "board_game": {
+       "iqfvfl": "ground_isg 2026-10-12: heldout"
+      },
+      "video_game": {
+       "lfdpse": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "video_game": 2,
+      "board_game": 1
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "destination_side": "right",
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "fixed_layout_yaw_step_deg": 22.5,
+   "distractor_budget": {
+    "tray": "tray/uekqey",
+    "tray_scale": 1.0,
+    "tray_floor_m2": 0.1673,
+    "budget_fraction": 0.85,
+    "pad_clearance_m": 0.0,
+    "footprint_rule": "rectangle",
+    "pose": "canonical",
+    "source": "representatives.csv same_category / other_category rows",
+    "draw_rule": {
+     "size_max": 3,
+     "same_category_max": 2,
+     "other_category_max": 1,
+     "lookalike_group_max": 1
+    },
+    "count_rule": "every admissible draw fits",
+    "model_footprints_m2": {
+     "video_game/apjpos": 0.0052,
+     "video_game/ckugyi": 0.004,
+     "video_game/pujfzk": 0.0043,
+     "video_game/quzjuo": 0.0039,
+     "video_game/qsyyql": 0.0016,
+     "video_game/rzaxlj": 0.001,
+     "board_game/eoywpy": 0.0296,
+     "board_game/frgdqh": 0.0264,
+     "board_game/fzyuip": 0.0216
+    },
+    "n_draws": 39,
+    "worst_draw_m2": 0.0392,
+    "used_m2": 0.0392,
+    "n_distractors": 3,
+    "draw": [
+     "video_game/pujfzk",
+     "video_game/qsyyql",
+     "board_game/eoywpy"
+    ],
+    "dropped": []
+   }
+  },
+  "constraints": []
+ },
  "disembedding-video_game-video_game_2_board_game_1-desk": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 9,
@@ -25770,92 +27152,48 @@
    }
   },
   "scenes": {
-   "house_single_floor": {
+   "office_cubicles_right": {
     "rooms": [
-     "childs_room_1"
+     "private_office_0",
+     "private_office_3",
+     "private_office_1",
+     "private_office_2"
     ],
     "bindings": {
      "support": [
-      "desk_bhkhxo_0"
+      "desk_mdhelw_2",
+      "desk_mdhelw_0",
+      "desk_mdhelw_3",
+      "desk_mdhelw_1"
      ],
      "support_surfaces": [
       {
-       "name": "desk_bhkhxo_0",
+       "name": "desk_mdhelw_2",
        "init": "ontop",
-       "top_z": 0.77,
-       "row": "disembedding#03~T2"
-      }
-     ],
-     "floor": {
-      "room": "childs_room_1"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "video_game": [
-       "ceaxsd"
-      ]
-     },
-     "distractors": {
-      "video_game": [
-       "apjpos",
-       "ckugyi",
-       "pujfzk",
-       "qsyyql",
-       "quzjuo",
-       "rzaxlj"
-      ],
-      "board_game": [
-       "eoywpy",
-       "frgdqh",
-       "fzyuip"
-      ]
-     },
-     "source": {
-      "tray": [
-       "uekqey"
-      ]
-     },
-     "destination": {
-      "tray": [
-       "hvlfig"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "video_game": {
-       "lfdpse": "ground_isg 2026-10-11: heldout"
-      }
-     },
-     "distractors": {
-      "board_game": {
-       "iqfvfl": "ground_isg 2026-10-11: heldout"
+       "top_z": 0.79,
+       "row": "disembedding#03~T5"
       },
-      "video_game": {
-       "lfdpse": "ground_isg 2026-10-11: heldout"
-      }
-     }
-    }
-   },
-   "house_double_floor_upper": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "desk_iotfzl_0"
-     ],
-     "support_surfaces": [
       {
-       "name": "desk_iotfzl_0",
+       "name": "desk_mdhelw_0",
        "init": "ontop",
-       "top_z": 0.74,
+       "top_z": 0.79,
+       "row": "disembedding#03~T4"
+      },
+      {
+       "name": "desk_mdhelw_3",
+       "init": "ontop",
+       "top_z": 0.79,
        "row": "disembedding#03~T3"
+      },
+      {
+       "name": "desk_mdhelw_1",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "disembedding#03~T1"
       }
      ],
      "floor": {
-      "room": "living_room_0"
+      "room": "private_office_0"
      }
     },
     "whitelist": {
@@ -25893,15 +27231,15 @@
     "blacklist": {
      "target": {
       "video_game": {
-       "lfdpse": "ground_isg 2026-10-11: heldout"
+       "lfdpse": "ground_isg 2026-10-12: heldout"
       }
      },
      "distractors": {
       "board_game": {
-       "iqfvfl": "ground_isg 2026-10-11: heldout"
+       "iqfvfl": "ground_isg 2026-10-12: heldout"
       },
       "video_game": {
-       "lfdpse": "ground_isg 2026-10-11: heldout"
+       "lfdpse": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -25995,7 +27333,28 @@
     ],
     "dropped": []
    },
-   "destination_side": "right"
+   "destination_side": "right",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "fixed_layout_yaw_step_deg": 22.5
   },
   "constraints": []
  },
