@@ -1670,9 +1670,19 @@ def all_in_frame(s, cam_pose: Pose, items: Sequence[Tuple[str, th.Tensor, Pose]]
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def row_edges(s, top) -> List[str]:
+    """The edges the selection's support row keeps for the stance (the ``support_surfaces`` entry's ``edges``, sheet note ``edges=``,
+    ``ground_isg.parse_edges``); [] = every edge."""
+    try:
+        spec = support_surface_spec(s, getattr(top, "name", top))
+    except AttributeError:  # a sampler without a selection
+        return []
+    return [str(e) for e in (spec or {}).get("edges") or []]
+
+
 def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[EdgeFrame, Stance]]:
     """Every edge of the top (random order with ``rng``) with its stance at ``stand_off`` + overhang (>= 5 cm), trunk
-    (0.5, 0) — before the floor / collision checks of Phase 1a."""
+    (0.5, 0) — before the floor / collision checks of Phase 1a. A support row naming ``edges`` (:func:`row_edges`) keeps only those."""
     support = s.world.obj(top.name)
     lo, hi = support.aabb
     aabb_xy = th.tensor([[float(lo[0] if sx == 0 else hi[0]), float(lo[1] if sy == 0 else hi[1])] for sx in (0, 1) for sy in (0, 1)])
@@ -1680,6 +1690,10 @@ def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[Ed
     open_edges = list(getattr(top, "open_edges", None) or [])
     if open_edges:  # an interior surface is reached through the open sides of its compartment only
         edges = [e for e in edges if e[0] in open_edges]
+    keep = row_edges(s, top)
+    if keep:
+        log.info("phase 1a: the support row keeps edge(s) %s of %s", keep, [e[0] for e in edges])
+        edges = [e for e in edges if e[0] in keep]
     order = [int(i) for i in rng.permutation(len(edges))] if rng is not None else list(range(len(edges)))
     out = []
     for i in order:

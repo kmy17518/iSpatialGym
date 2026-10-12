@@ -486,7 +486,8 @@ class GroundedProblem:
         ``"floor"`` and keeps its block. Whitelist / blacklist are copies; ``_candidate`` records the selection and the template ids
         carry its tag (:meth:`support_tag`); the entry's own block is what the source customs file gets back (:meth:`save_customs`).
         Returns the candidate record (``template_meta.candidate``; ``neighbors`` when the entry pairs the support with the supports it
-        touches); ``GroundingError`` when the scene, the support or the row is not in the block."""
+        touches, ``edges`` when it keeps only some edges of the top); ``GroundingError`` when the scene, the support or the row is not
+        in the block."""
         if "support" not in self.roles:
             raise GroundingError(f"{self.alias}: no support role to select (roles {sorted(self.roles)})")
         own = self.scene_overrides[scene] if scene in self.scene_overrides else self.entry["scenes"].get(scene)
@@ -540,6 +541,8 @@ class GroundedProblem:
                "floor_room": floor_room, "tag": support if not resolved else f"{support}-{support_row_tag(resolved)}"}
         if (surface or {}).get("neighbors"):
             rec["neighbors"] = list(surface["neighbors"])
+        if (surface or {}).get("edges"):
+            rec["edges"] = list(surface["edges"])
         blk = {k: copy.deepcopy(v) for k, v in own.items() if k not in ("rooms", "bindings")}
         blk.update({"rooms": new_rooms, "bindings": b, "_candidate": {**rec, "note": note or f"support {support}"}})
         if scene not in self.scene_overrides:

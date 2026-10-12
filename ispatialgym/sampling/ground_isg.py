@@ -119,6 +119,9 @@ SUPPORT_TOP_SURFACE = {
 #: Note key of a support row naming the supports it touches (owner 2026-10-12 A4, ``parse_neighbors``): the pair is one placement area
 #: for target and partner (``sampling/v2/neighbors.py``).
 NEIGHBORS_NOTE_RE = re.compile(r"\bneighbou?rs=([A-Za-z0-9_,]+)")
+#: Note key of a support row keeping only some edges of the top for the robot's stance (owner 2026-10-12 attachment#04 3a: bar_udatjt_0's
+#: long +u edge, not its 1.14 m ends; ``parse_edges``): ``tabletop.edge_frames`` offers no other edge.
+EDGES_NOTE_RE = re.compile(r"\bedges=([+-][uv](?:,[+-][uv])*)\b")
 #: Alias token suffix of a support the objects start inside (sheet note ``init=inside``): its BDDL starts them ``inside`` the
 #: support instead of ``ontop``, so its rows never share an alias (and a BDDL) with the ``ontop`` rows of the category.
 INSIDE_ALIAS_SUFFIX = "_inside"
@@ -291,12 +294,20 @@ def parse_neighbors(note: str, own: str = "") -> List[str]:
     return [n for n in dict.fromkeys(x.strip() for x in m.group(1).split(",")) if n and n != own]
 
 
+def parse_edges(note: str) -> List[str]:
+    """The top edges a support row's note keeps for the robot's stance (``edges=<+u|-u|+v|-v>[,...]``, the names of
+    ``SupportTop.edges``), in order, without duplicates; [] = every edge."""
+    m = EDGES_NOTE_RE.search(note or "")
+    return list(dict.fromkeys(m.group(1).split(","))) if m else []
+
+
 def support_surface(row: Dict[str, str], label: str) -> Optional[Dict[str, Any]]:
     """The surface a support row of the selection names (note ``init=<ontop|inside>; top_z=<m above the floor> ...``) as the
     customs ``bindings.support_surfaces`` entry ``{"name", "init", "top_z", "row"}`` (``row`` = the combination label, which
     tells a re-grounding which entry it replaces), ``"surface": "top"`` for :data:`SUPPORT_TOP_SURFACE`, ``"neighbors"`` for a row
-    whose note pairs the support with the supports it touches (:func:`parse_neighbors`); None when the note gives no ``top_z``. The
-    sampler reads it (``tabletop.support_surface``)."""
+    whose note pairs the support with the supports it touches (:func:`parse_neighbors`), ``"edges"`` for a row that keeps only some
+    edges of the top for the stance (:func:`parse_edges`); None when the note gives no ``top_z``. The sampler reads it
+    (``tabletop.support_surface``, ``tabletop.edge_frames``)."""
     note = row.get("note") or ""
     m = re.search(r"\btop_z=([0-9]*\.?[0-9]+)", note)
     if not m:
@@ -309,6 +320,9 @@ def support_surface(row: Dict[str, str], label: str) -> Optional[Dict[str, Any]]
     neighbors = parse_neighbors(note, name)
     if neighbors:
         out["neighbors"] = neighbors
+    edges = parse_edges(note)
+    if edges:
+        out["edges"] = edges
     return out
 
 

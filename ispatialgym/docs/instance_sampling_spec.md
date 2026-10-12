@@ -202,7 +202,8 @@ One entry per alias. Scene-independent model pools are the icl's job; the custom
   the reason); scene-dependent objects (supports, walls, scene articulated objects, big partners) are listed per
   scene under `bindings`. Each support row of the representative sheet adds a `bindings.support_surfaces` entry
   `{"name", "init", "top_z", "row"}` (+ `"surface": "top"` for the supports whose sheet height matches no surface, +
-  `"neighbors": [...]` for a support paired with the supports it touches, 3.2).
+  `"neighbors": [...]` for a support paired with the supports it touches, 3.2, + `"edges": [...]` for a row that keeps only
+  some edges of the top for the stance, 4.2).
 - `generation.groups.<role>` for every group role: `size` (an integer or `[min, max]`, drawn per template) and
   `draw` — `unique` (pairwise distinct models, look-alike exclusions of section 3.12 on top; the default) or
   `same_model` (all members one model). Current values: `targets` `{size: 4, draw: same_model}` (block design),
@@ -728,7 +729,10 @@ world (`reach_bands --collision sdf-grid`) stays a CLI opt‑in.
 
 Any edge of the top polygon (raycast raster), no preference; yaw = inward normal; s = 0.45 m from the top edge, plus
 the AABB overhang beyond it when ≥ 5 cm. Neighbouring supports (3.2): the support's own edges, each extended along its
-line over the neighbour cells beside it.
+line over the neighbour cells beside it. *Owner decision 2026‑10‑12 (attachment#04 3a):* a support row may keep only some
+edges for the stance — sheet note key `edges=<+u|-u|+v|-v>[,…]` (the names of the raster's sides), carried by `ground_isg`
+into the row's `support_surfaces` entry and the candidate record (`template_meta.candidate.edges`); Phase 1a then offers
+only those (`bar_udatjt_0`: its 2.98 m `+u` edge, not its 1.14 m ends). A row without the key keeps every edge.
 
 ### 4.3 Phase 1b — init trunk height (tilt 0)
 
