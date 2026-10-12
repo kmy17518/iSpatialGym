@@ -1050,7 +1050,7 @@ def program_iors_large_touching(sc: Sidecar) -> List[Action]:
     """IORS touching, large-scale (``program_iors_large`` with relation ``touching``): the program of the touching mode, written
     with that mode; until then a sidecar of the subtask has no program. The target ends touching the partner (``touching`` read
     in the epilogue)."""
-    raise NotImplementedError("relation_not_implemented: IORS large-scale 'touching' has no oracle program yet")
+    return _iors_large_touching_program(sc)
 
 
 def program_iors_large_nextto(sc: Sidecar) -> List[Action]:
@@ -1110,6 +1110,39 @@ def program_iors_touching(sc: Sidecar) -> List[Action]:
         p = Push(contact=push, base_yaw=base_yaw, follow=g.place_on)
         return head + [p, Retreat(arm=push.arm, object=push.object, after=p)]
     return head + _brace_push_retreat(sc, brace, push, base_yaw, follow_braced=True)
+
+
+def _iors_large_touching_program(sc: Sidecar) -> List[Action]:
+    """IORS touching, large-scale (:func:`program_iors_large_touching`; owner 2026-10-12 ~16:05): the push-under chain against the
+    partner's face - init A → manipulation B (transition) → grasp → lift → [carry pose] → navigate_to the drop stance C with the
+    object → place(drop on the floor in front of the face) → retreat → [the deep push stance: trunk-only transition] → push along the
+    floor → retreat. ``contacts.push`` (``kind: "push_touching"``) names the ``partner``: the push may touch it (``touches``, no
+    ``avoid``) and follows it (``Push.follow``: the pad stops when the target reaches its goal, the touching pose - ``execute_push``'s
+    stop rule - moved with the partner if the partner moved); ``touching`` is read in the epilogue."""
+    g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
+    if sc.path("manipulation", "placement") is None:
+        raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
+    if str(g.extra.get("place_kind") or "support") != "drop":
+        raise SidecarError("grasps[0].place_kind: IORS touching (large-scale) drops the target on the floor before the push ('drop')")
+    push = sc.contacts.push if sc.contacts is not None else None
+    if push is None or push.kind != "push_touching":
+        raise SidecarError("contacts.push: a record with kind 'push_touching' is required (IORS touching, large-scale)")
+    if push.object != g.object:
+        raise SidecarError(f"contacts.push.object {push.object!r} is not the dropped target {g.object!r}")
+    if push.arm != g.arm:
+        raise SidecarError(f"contacts.push.arm {push.arm!r} differs from the grasp arm {g.arm!r} (the same closed gripper pushes)")
+    partner = push.extra.get("partner")
+    if not isinstance(partner, str) or not partner:
+        raise SidecarError("contacts.push.partner: the instance the target is pushed against is required (IORS touching, large-scale)")
+    grasp, lift = _pick(g)
+    carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)] if g.waypoints else []
+    head = _travel(sc, "init", "manipulation") + [grasp, lift] + carry + _travel(sc, "manipulation", "placement", carried=g.object)
+    place = Place(kind="drop", arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on, relation=_IORS_RELATION_WORDS["touching"])
+    push_stance = "push" if "push" in sc.stances else "placement"
+    base_yaw = sc.stance(push_stance).base_pose2d[2]
+    p = Push(contact=push, base_yaw=base_yaw, touches=tuple(n for n in (g.place_on, partner) if n), follow=partner)
+    to_push = _travel(sc, "placement", "push") if push_stance == "push" else []
+    return head + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)] + to_push + [p, Retreat(arm=push.arm, object=push.object, after=p)]
 
 
 # ----------------------------------------------------------------------------------------------------------------

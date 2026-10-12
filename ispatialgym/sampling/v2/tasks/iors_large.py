@@ -3029,7 +3029,8 @@ class IORSLarge(SamplerV2):
         """``touching`` (``...-touching_large_scale``): the hook of the touching mode - it returns the mode's class (:meth:`_adopt_mode`),
         imported from the mode's own module inside this method. Until the mode lands every template of the subtask is rejected with
         ``relation_not_implemented``."""
-        raise Reject("relation_not_implemented", "IORS large-scale 'touching' is registered; its sampler mode is not implemented yet")
+        from ispatialgym.sampling.v2.tasks import iors_large_touching as M
+        return M.TouchingMode
 
     def _sample_nextto(self) -> type:
         """``nextto`` (``...-nextto_large_scale``): the hook of the nextto mode - it returns the mode's class (:meth:`_adopt_mode`),

@@ -1037,8 +1037,9 @@ class Push(Action):
 
     @property
     def kind(self) -> str:
-        """``contacts.push.kind``: ``"push"`` (default) or ``"push_under"`` (the floor-level push of IORS under, spec
-        §5.6 owner decision 2026-09-16 item 7)."""
+        """``contacts.push.kind``: ``"push"`` (default), ``"push_under"`` (the floor-level push of IORS under, spec
+        §5.6 owner decision 2026-09-16 item 7) or ``"push_touching"`` (the floor-level push of IORS touching against the
+        partner's face, owner 2026-10-12)."""
         return str(self.contact.extra.get("kind") or "push")
 
     def targets(self, sidecar, state):
@@ -1059,6 +1060,12 @@ class Push(Action):
             under = f" under {sidecar.language.phrase(partner)}" if partner else ""
             fine = f"push {obj} along the floor{under} with the closed {_hand(c.arm)}"
             numbers = f"push {obj} {_cm(c.distance_m)} {word} along the floor{under} with the closed {_hand(c.arm)} from {_xyz(c.init.position)}"
+            return fine, numbers
+        if self.kind == "push_touching":
+            partner = c.extra.get("partner")
+            until = f" until it touches {sidecar.language.phrase(partner)}" if partner else ""
+            fine = f"push {obj} along the floor{until} with the closed {_hand(c.arm)}"
+            numbers = f"push {obj} {_cm(c.distance_m)} {word} along the floor{until} with the closed {_hand(c.arm)} from {_xyz(c.init.position)}"
             return fine, numbers
         arc = " along the recorded arc" if c.mid is not None else ""
         fine = f"push {obj} {word} with the closed {_hand(c.arm)}"

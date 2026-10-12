@@ -3322,18 +3322,21 @@ def test_locked_joint_transform_is_exact_under_tf32():
         th.backends.cuda.matmul.allow_tf32 = prev
 
 
-def test_push_under_retreat_leaves_the_floor_straight_up():
+@pytest.mark.parametrize("kind", ["push_under", "push_touching"])
+def test_push_under_retreat_leaves_the_floor_straight_up(kind):
     """2026-09-21 (the wobble at the end of the push in 0921-021333 / 021337): the radial contact escape of a retreat after a
     push combined the partner (the table the object went under is in the contact's support list) and the floor into a
     diagonal escape normal and projected the back-off perpendicular to it - 10 cm back AND 7 cm down, the fingertips into
     the floor, the arm pressing it for ~100 steps while the base rocked. A floor blade (``contacts.push.kind ==
-    "push_under"``) now leaves straight up along its own approach axis: every waypoint of the executed leg is at or above
-    the hand, the last one at the recorded pre pose, and the escape is recorded as skipped."""
+    "push_under"``, or the large-scale touching push ``"push_touching"``) now leaves straight up along its own approach axis:
+    every waypoint of the executed leg is at or above the hand, the last one at the recorded pre pose, and the escape is
+    recorded as skipped."""
     sc = Sidecar.load(os.path.join(VARIANTS, "inter_object_relation_satisfaction-under_large_scale__push_under.json"))
     actions = expand(sc.alias, sc)
     push = [a for a in actions if isinstance(a, Push)][0]
+    push.contact.extra["kind"] = kind
     retreat = [a for a in actions[actions.index(push) + 1:] if a.name == "retreat"][0]
-    assert retreat.after is push and push.kind == "push_under"
+    assert retreat.after is push and push.kind == kind
     goal = th.tensor(push.contact.goal.position, dtype=th.float32)
     here = goal - th.tensor([0.0, 0.0, 0.0])  # the blade sits at the recorded goal after the push
     table = FakeObject("breakfast_table_x_0", [float(goal[0]), float(goal[1]) + 0.6, 0.4], category="breakfast_table", extent=(1.2, 1.2, 0.8))
@@ -3365,7 +3368,7 @@ def test_push_under_retreat_leaves_the_floor_straight_up():
     ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(), "witnesses": {}, "hooks": {}}
     targets = retreat.targets(sc, state)
     list(EX.execute_retreat(retreat, StubMotions(), state, targets, ctx))
-    assert ctx.get("retreat_escape", {}).get("skipped", "").startswith("push_under")
+    assert ctx.get("retreat_escape", {}).get("skipped", "").startswith(kind)
     assert legs, "the retreat leg was not executed"
     leg = legs[-1]
     z0 = float(here[2])

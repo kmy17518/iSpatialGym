@@ -86,10 +86,21 @@ def test_grounder_skips_the_picks_of_a_subtask_without_candidates_rows():
         assert {why.split(":")[0] for _, why in g.report.skipped.get(st, [])} <= {"no_candidates"}
 
 
+def _mode_landed(relation: str) -> bool:
+    """The relation's mode has landed: its hook returns the mode class instead of rejecting (its program and sampler are tested with it)."""
+    try:
+        getattr(IL.IORSLarge, IL.MODE_HOOKS[relation])(_bare(relation))
+    except Reject:
+        return False
+    return True
+
+
 def test_programs_route_each_relation_to_its_own_branch():
     for rel, st in NEW.items():
         fn, kwargs = P.program_for(st)
         assert fn is P.program_iors_large and kwargs == {"relation": rel}
+        if _mode_landed(rel):
+            continue
         with pytest.raises(NotImplementedError, match=f"relation_not_implemented: IORS large-scale '{rel}'"):
             fn(None, **kwargs)
 
@@ -111,6 +122,8 @@ def _floor_bound(self):
 
 @pytest.mark.parametrize("relation", sorted(NEW))
 def test_sampler_hook_rejects_relation_not_implemented(relation, monkeypatch):
+    if _mode_landed(relation):
+        pytest.skip(f"the {relation} mode has landed")
     monkeypatch.setattr(IL.IORSLarge, "bind_floor_v2", _floor_bound)
     s = _bare(relation)
     with pytest.raises(Reject, match=f"'{relation}'") as e:

@@ -3236,14 +3236,14 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             ctx["retreat_slide_first"] = {"held_by": other, "link": hold.get("link"), "slide_m": float(action.distance), "lift_m": float(action.lift_first_m)}
     else:
         held_press = bool(after_x.get("straight_retreat"))  # a push-close segment: the fist leaves the tip straight back (no radial slide on the link)
-    if after_x.get("kind") == "push_under":
-        # a FLOOR blade (IORS push-under) leaves along its own approach axis - straight UP to the recorded pre pose (the default leg
-        # already in ``targets``). The radial escape below combined the partner (the table the object went under is in the
-        # contact's support list) and the floor into a diagonal escape normal (back + up) and projected the back-off
+    if after_x.get("kind") in ("push_under", "push_touching"):
+        # a FLOOR blade (IORS push-under / large-scale touching) leaves along its own approach axis - straight UP to the recorded pre
+        # pose (the default leg already in ``targets``). The radial escape below combined the partner (the table the object went
+        # under is in the contact's support list) and the floor into a diagonal escape normal (back + up) and projected the back-off
         # perpendicular to it: 10 cm back AND 7 cm DOWN, the fingertips into the floor within 0.4 s, the arm pressing the
         # floor for ~100 steps and rocking the base 0.4-0.9 deg (0921-021333 / 021337: the wobble at the end of the push)
         held_press = True
-        ctx["retreat_escape"] = {"skipped": "push_under: straight up along -a"}
+        ctx["retreat_escape"] = {"skipped": f"{after_x.get('kind')}: straight up along -a"}
     if isinstance(getattr(action, "after", None), (Brace, Push)) and cfg.contact_retreat_escape_m > 0 and not held_press:
         # rush 2026-09-17: a pad leaving a contact first moves straight away from the supports (the wall normal / up from a
         # table: escape_direction, as the pre-pose standoff) before the leg to the recorded clear pose - that single
@@ -4044,6 +4044,32 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     ctx["push_residual"]["final"] = final
     p_now = C.as_tensor(state.object_pose(obj)[0]).float()
     ctx["push_object_drift_m"] = float(th.linalg.norm(p_now - C.as_tensor(pose0[0]).float()))
+    ctx["push_stop"] = push_stop_facts(action, state, ctx, p_now, final)
+
+
+def push_stop_facts(action: Push, state, ctx: Dict[str, Any], p_now, final) -> Dict[str, Any]:
+    """Where a push left its object (owner 2026-10-12, IORS touching large-scale: "where the push stopped and how far the partner
+    moved"): ``stop`` = ``goal_reached`` (a pad leg stopped at the goal, ``ctx["push_stopped"]``) or ``leg_end``, the object's
+    position and residual after the back-off, and for a following push (``Push.follow``) the followed instance's displacement since
+    the program start (planar ``moved_m``, ``moved_z_m``)."""
+    rec: Dict[str, Any] = {"stop": "goal_reached" if ctx.get("push_stopped") else "leg_end", "legs_stopped": ctx.get("push_stopped") or [],
+                           "object_position": [round(float(v), 4) for v in C.as_tensor(p_now).reshape(-1)[:3].tolist()],
+                           "residual_final": None if final is None else round(float(final), 4)}
+    follow = getattr(action, "follow", None)
+    if follow:
+        getter = getattr(state, "init_pose", None)
+        try:
+            init = getter(follow) if getter is not None else None
+            live = state.object_pose(follow) if init is not None else None
+        except Exception:  # noqa: BLE001
+            init = live = None
+        if init is not None and live is not None:
+            d = as_world_pose(live)[0].float() - as_world_pose(init)[0].float()
+            rec["follow"] = {"name": follow, "moved_m": round(float(th.linalg.norm(d[:2])), 4), "moved_z_m": round(float(d[2]), 4)}
+    moved = rec.get("follow")
+    log.info("push(%s): stopped (%s) with the object at %s, residual %s%s", action.contact.object, rec["stop"], rec["object_position"], rec["residual_final"],
+             f"; {moved['name']} moved {1000 * moved['moved_m']:.1f} mm since the program start" if moved else "")
+    return rec
 
 
 def post_push(action: Push, state, targets, ctx) -> Optional[str]:
@@ -5354,5 +5380,5 @@ __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
     "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "contact_ignores", "escape_direction", "reach_pre_pose", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
-    "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry",
+    "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry", "push_stop_facts",
 ]

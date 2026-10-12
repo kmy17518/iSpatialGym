@@ -1511,6 +1511,21 @@ the partner; `under` is read in the epilogue. `[pilot]`: a floor‑level push is
 (shoulder ≥ 0.79 m at the deepest collision‑free crouch, arm 0.79 m); ground‑like objects with footprints > 15 m²
 (the garden lawn) no longer block floor cells.
 
+**Touching (large‑scale; owner 2026‑10‑12 ~16:05, `iors_large_touching.TouchingMode`).** The push‑under chain aimed at the
+partner's face nearest the init pose (the nearest face that admits a stance C; `placement_pool_edges` pools them). Per lane
+along the face (centred, 0.10 m apart, the goal footprint within the face's ends) horizontal rays at ¼ / ½ / 0.9 of the target's
+height and across its width find the partner surface the target meets first (≤ 0.10 m behind the AABB edge; no partner hit,
+another object first or a deeper cavity → the lane is not used). Goal cell = the target's front `touching_goal_gap_m` (2 mm,
+≤ 5 mm) short of that face, the front taken at the goal orientation (per yaw), the footprint outside the partner and clear of
+every other object; drop cell = half‑extent + 0.10 m back from the face. Stance C, drop, trunks and the push chain as push‑under
+(side stances 0.45 / 0.55 m off the face; the floor mesh out of the stance / program checks for any init surface; the
+`init_support_fallback` goes to the floor init); the chain's partner is the target's stopping contact, never the hand's. Recorded as
+`contacts.push` with `kind: push_touching`, `relation: touching`, `partner`, `face_point`, `face_offset_m`, `gap_m`. Goal check:
+the settled target nudged 1 mm at a time (`nudge_m`, ≤ `max_nudges` 25) along the push until `touching(target, partner)` holds;
+the TRO goal is that pose. Program (`program_iors_large_touching`): `… → place(drop) → retreat → [push stance] → push → retreat`,
+the push may touch floor and partner and follows the partner (`Push.follow`: the pad stops when the target reaches its goal);
+`touching` is read in the epilogue; the executor records where the push stopped and how far the partner moved (`push_stop`).
+
 **Objects.** Target at B's focus cell (± 5 cm, footprint on the init surface with 2 cm margin; floor init: at c_t)
 with the drawn yaw; no small partner. Goal pose: ontop → target root at the goal cell, init orientation, z = partner
 face + bottom offset + 1 cm, feasibility by drop + settle, `OnTop(target, partner)` true; under → target at the goal

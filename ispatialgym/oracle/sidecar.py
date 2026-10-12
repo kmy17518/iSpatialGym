@@ -523,8 +523,9 @@ class PushContact:
 
     @property
     def kind(self) -> str:
-        """``"push"`` (default) or ``"push_under"`` — the straight floor-level push of IORS under from the placement
-        stance (extras ``partner``, ``drop_cell``, ``goal_cell``, ``push_height_m``, ...)."""
+        """``"push"`` (default), ``"push_under"`` — the straight floor-level push of IORS under from the placement
+        stance (extras ``partner``, ``drop_cell``, ``goal_cell``, ``push_height_m``, ...) — or ``"push_touching"``, the same
+        push of IORS touching (large-scale) against the partner's face (extras + ``relation``, ``face_point``, ``gap_m``)."""
         return str(self.extra.get("kind") or "push")
 
 

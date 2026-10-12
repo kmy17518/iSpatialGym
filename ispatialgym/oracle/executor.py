@@ -534,6 +534,9 @@ NOTE_KEYS = NOTE_KEYS + ("interior_support",)
 #: owner 2026-10-12 (A2b): the parts / distractors a grasp may touch - on the source tray after the grasp / lift, how far they and the
 #: target moved
 NOTE_KEYS = NOTE_KEYS + ("may_touch",)
+#: owner 2026-10-12 (IORS touching large-scale): where a push stopped (goal reached / leg end, the object's position, the residual) and
+#: how far a followed partner moved (execute.push_stop_facts)
+NOTE_KEYS = NOTE_KEYS + ("push_stop",)
 
 
 @dataclass
