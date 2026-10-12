@@ -1363,6 +1363,56 @@ def test_wall_hinge_resistance_record():
     assert K.apply_hinge_drive.__doc__ and "π / 180" in K.apply_hinge_drive.__doc__
 
 
+def test_hinge_joint_frames_are_written_in_the_scaled_body_frames(monkeypatch):
+    """Brake probe 2026-10-12 (alignment-axial#02): PhysX scales a joint's local positions by each body's USD scale, so
+    ``create_hinge`` divides them by the body's world scale (``body_scale``: the product of ``xformOp:scale`` over the prim and
+    its ancestors) - written unscaled, the paperback (scale 1, 1, 2.5) hinged 11 mm below its root jumped 16.6 mm off the desk.
+    The joint point PhysX computes on either body (body pose · (scale ⊙ local position)) is the anchor; the record keeps it."""
+    from ispatialgym.sampling import constraints as K
+
+    class Prim:
+        def __init__(self, path, scale, parent):
+            self.path, self.scale, self.parent = path, scale, parent
+
+        def IsValid(self):
+            return True
+
+        def IsPseudoRoot(self):
+            return self.path == "/"
+
+        def GetAttribute(self, name):
+            return SimpleNamespace(IsValid=lambda: name == "xformOp:scale" and self.scale is not None, Get=lambda: self.scale)
+
+        def GetParent(self):
+            return self.parent
+
+    root = Prim("/", None, None)
+    scene = Prim("/World/scene_0", (1.0, 1.0, 1.0), Prim("/World", None, root))
+    book = Prim("/World/scene_0/book", (1.0, 1.0, 2.5), scene)
+    desk = Prim("/World/scene_0/desk", (1.2, 0.9, 1.05), scene)
+    prims = {p.path: p for p in (Prim("/World/scene_0/book/base_link", (1.0, 1.0, 1.0), book), Prim("/World/scene_0/desk/base_link", None, desk))}
+    monkeypatch.setattr(K, "og", SimpleNamespace(sim=SimpleNamespace(stage=SimpleNamespace(GetPrimAtPath=prims.get))))
+    assert K.body_scale("/World/scene_0/book/base_link").tolist() == pytest.approx([1.0, 1.0, 2.5])
+    assert K.body_scale("/World/scene_0/desk/base_link").tolist() == pytest.approx([1.2, 0.9, 1.05])
+
+    made = {}
+    monkeypatch.setattr(K, "create_joint", lambda **kw: made.update(kw))
+    monkeypatch.setattr(K, "apply_hinge_drive", lambda *a, **k: {})
+    book_pose, desk_pose = (th.tensor([0.012, -4.634, 0.6893]), C.quat_from_yaw(0.9)), (th.tensor([0.1, -4.5, 0.35]), C.quat_from_yaw(0.3))
+    child = SimpleNamespace(name="book", prim_path="/World/scene_0/book",
+                            root_link=SimpleNamespace(prim_path="/World/scene_0/book/base_link", get_position_orientation=lambda: book_pose))
+    desk_link = SimpleNamespace(prim_path="/World/scene_0/desk/base_link", body_name="base_link", get_position_orientation=lambda: desk_pose)
+    anchor = th.tensor([0.0135, -4.631, 0.67825])  # on the COM axis 1 mm below the desk top: 11 mm below the book's root
+    h = K.create_hinge(child, anchor, th.tensor([0.0, 0.0, 1.0]), parent_link=desk_link)
+    assert made["body0"] == desk_link.prim_path and made["body1"] == child.root_link.prim_path
+    for (p, q), key, scale in ((book_pose, "joint_frame_in_child_frame_pos", (1.0, 1.0, 2.5)), (desk_pose, "joint_frame_in_parent_frame_pos", (1.2, 0.9, 1.05))):
+        assert (p + C.quat_rotate(q, made[key] * th.tensor(scale))).tolist() == pytest.approx(anchor.tolist(), abs=1e-6)
+    assert float(made["joint_frame_in_child_frame_pos"][2]) == pytest.approx(-0.01105 / 2.5, abs=1e-6)  # unscaled it would sit 16.6 mm too low
+    assert h.anchor.tolist() == pytest.approx(anchor.tolist()) and h.to_tro("book.n.01_1", "desk.n.01_1")["anchor_position"] == pytest.approx(anchor.tolist())
+    K.create_hinge(child, anchor, th.tensor([0.0, 0.0, 1.0]))  # anchored to the world: the parent frame is the world point itself
+    assert made["body0"] is None and made["joint_frame_in_parent_frame_pos"].tolist() == pytest.approx(anchor.tolist())
+
+
 def _axial_sampler(gen, mass=0.06, turn_rad=0.0):
     """An ``AlignmentAxial`` without a simulator: ``gen`` as the alias's own generation, a 0.20 × 0.04 m footprint of ``mass`` kg
     resting on a support top at z 0.75 (its COM off the root origin) that turns ``turn_rad`` about the vertical axis through its

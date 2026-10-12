@@ -2,7 +2,8 @@
 
 A hinge is a PhysX ``RevoluteJoint`` between a parent rigid body (support / wall link, or the world when ``parent``
 is None) and the object's root link, anchored at a world point with a world axis. The joint frame's X axis is the
-rotation axis (PhysX default ``physics:axis = "X"``). Joints are USD prims, not part of ``og.sim.dump_state``; the
+rotation axis (PhysX default ``physics:axis = "X"``); its local positions are divided by each body's world scale
+(:func:`body_scale`), which PhysX applies to them. Joints are USD prims, not part of ``og.sim.dump_state``; the
 sampler creates them for its own checks and the loader recreates them after every reset.
 
 **Hinge friction / damping** (owner decision 2026‑09‑16 22:05, spec §7): a wall hinge sits at the target's COM, so
@@ -276,6 +277,20 @@ def apply_joint_brake(joint, spec) -> Dict[str, Any]:
     return out
 
 
+def body_scale(prim_path: str) -> th.Tensor:
+    """World scale of the rigid body at ``prim_path``: the product of the ``xformOp:scale`` of the prim and its ancestors (an
+    object's scale sits on its own prim, its links carry 1). PhysX applies it to a joint's local positions on that body."""
+    scale = th.ones(3)
+    prim = og.sim.stage.GetPrimAtPath(prim_path)
+    while prim and prim.IsValid() and not prim.IsPseudoRoot():
+        attr = prim.GetAttribute("xformOp:scale")
+        value = attr.Get() if attr and attr.IsValid() else None
+        if value is not None:
+            scale = scale * th.tensor([float(v) for v in value], dtype=th.float32)
+        prim = prim.GetParent()
+    return scale
+
+
 def create_hinge(child_obj, anchor_world, axis_world, parent_link=None, name: str = "isg_hinge", friction: Optional[float] = None,
                  damping: Optional[float] = None, facts: Optional[Dict[str, Any]] = None) -> Hinge:
     """Create a revolute joint holding ``child_obj``'s root at ``anchor_world`` and letting it rotate about ``axis_world``.
@@ -299,6 +314,12 @@ def create_hinge(child_obj, anchor_world, axis_world, parent_link=None, name: st
     else:
         p0, q0 = anchor, q_j
         body0 = None
+    # PhysX scales the joint's local positions by each body's USD scale: written unscaled, a scaled target hinged off its root
+    # jumped (scale - 1) x that offset when the joint was created (brake probe 2026-10-12: alignment-axial#02's paperback,
+    # scale (1, 1, 2.5), anchor 11 mm below its root -> 16.6 mm off the desk)
+    p1 = p1 / body_scale(child_obj.root_link.prim_path)
+    if body0 is not None:
+        p0 = p0 / body_scale(body0)
     prim_path = f"{child_obj.prim_path}/{name}"
     create_joint(
         prim_path=prim_path,
