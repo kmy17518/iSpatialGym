@@ -1837,6 +1837,20 @@ is on the robot's left; the oracle places the target at the nextto position and 
 right hand while the closed left gripper braces the partner's far (left) side: the push contact on the target's right
 face, its direction and distance, and the brace pre-contact + contact (left arm) are IK-checked and recorded.
 
+**Carry height (owner decision 2026‑10‑12, item 4A).** The lift after the grasp (`grasps[0].carry_height`) puts the target's
+bottom (on the table at init) `generation.carry_clearance_m` (0.03 m) above what the carry passes over, per
+`generation.carry_clears`: `partner` — the partner's top (ontop / under / inside / nextto, unchanged); `table` — the table
+only; `auto` (touching's default) — the table, unless the carried drive to the touching push stance (the base moves along
+the edge with the box held at its lift configuration) sweeps the box's footprint within `carry_clearance_m` of the
+partner's footprint, then the partner's top (`summary.carry_lift`). Touching sets the box down beside the partner, so
+the lift needs no partner clearance (touching#02 c2_k0: 7 of 11 attempts failed only the 0.27 m lift), but its push
+stance moved the base 13–17 cm toward the partner there — farther than the start gap in most draws — and a box carried
+3 cm above the table would be driven into the partner. The shelf layout keeps `shelf_carry_height_m`. When the lift has
+no configuration at the manipulation stance, the attempt is rejected as `lift_unreachable` before the carried drive is
+swept (item 7d: swept with the untucked hand instead, the box stood inside the table and the failure read
+`path_collision`). `generation.touching_place_gap_m` (unset: the nextto gap g_NT − 1 cm) sets the box down that far from
+the partner, so that the opening fingers clear it at the release; the push covers the measured gap.
+
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 
 - ontop / under(small): the partner's top face admits the target footprint with ≥ 1 cm margin — tier `any_yaw`

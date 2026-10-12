@@ -151,6 +151,12 @@ FINGER_HALF_WIDTH = 0.012
 #: touching#03 shelf layout: the lift of the target before it is slid along the board to the partner's side (it never passes over
 #: the partner); 5 mm under the headroom the interior raster keeps above the tallest book at every free cell
 SHELF_CARRY_HEIGHT_M = TT.INTERIOR_HEADROOM_MARGIN_M - 0.005
+#: owner 2026-10-12 item 4A: the lifted target's bottom (on the table at init) clears what the carry passes over by this much
+#: (``generation.carry_clearance_m``)
+CARRY_CLEARANCE_M = 0.03
+#: 4A: ``generation.carry_clears`` - the partner's top ("partner"), only the table ("table"), or the table unless the carried drive to
+#: the touching push stance takes the box over the partner ("auto"); default "auto" for touching, "partner" for the other relations
+CARRY_CLEARS = ("partner", "table", "auto")
 #: A1 start region (owner 2026-10-12): Phase-1c lateral draws of the template before it is rejected when no partner side the template
 #: may draw has a start cell (``generation.start_region_lateral_draws``)
 START_REGION_LATERAL_DRAWS = 4
@@ -297,6 +303,21 @@ class IORSSmall(SamplerV2):
     def goal_drop(self) -> float:
         return float(self.gen("goal_drop_m", 0.01))
 
+    def carry_rule(self) -> str:
+        """What the carry clears (owner 2026-10-12 item 4A): ``generation.carry_clears`` of :data:`CARRY_CLEARS`; default "auto" for
+        touching - the box is set down beside the partner, not over it (touching#02 c2_k0: 7 of 11 attempts failed only the 0.27 m
+        lift) -, "partner" for the other relations."""
+        rule = str(self.gen("carry_clears", "auto" if self.relation == "touching" else "partner"))
+        if rule not in CARRY_CLEARS:
+            raise Reject("spec", f"{self.gp.alias}: generation.carry_clears must be one of {list(CARRY_CLEARS)}, got {rule!r}")
+        return rule
+
+    def carry_height_over(self, partner: bool) -> float:
+        """The lift above the grasp pose (the target's bottom on the table at init) that clears by ``carry_clearance_m`` the partner's
+        top (``partner``), else only the table."""
+        c = float(self.gen("carry_clearance_m", CARRY_CLEARANCE_M))
+        return max(c, TT.height_of(self.hull["partner"], self.rest["partner"]) + c) if partner else c
+
     # ------------------------------------------------------------------ roles
 
     def v1_role_aliases(self) -> Dict[str, str]:
@@ -366,6 +387,7 @@ class IORSSmall(SamplerV2):
             self.rest["partner"] = TT.upright_lean_quat(self.hull["partner"], -self.shelf_start["lean_side"], self.shelf_start["lean_deg"])
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair
+        self.template_facts["carry_clears"] = self.carry_rule()  # 4A: Reject("spec") before any phase
         self.template_facts["partner_sides"] = [TT.side_name(sd) for sd in self.template_sides()]  # A1: Reject("partner_side") before any phase
         self.template_facts["partner_on_meta_link"] = self.meta_link()
         H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
@@ -1049,12 +1071,16 @@ class IORSSmall(SamplerV2):
                         self.sidecar.transitions.clear()
                         self.record_stance_travel(init, manip)
                         self.apply_height_extra_to_grasp(grasp, t_pose, manip)
-                # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
-                grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
+                # carry height (4A, :meth:`carry_rule`): the target (bottom at the table at init) clears the partner's top by carry_clearance_m on
+                # the way; touching only the table (set down beside the partner; "auto": raised by the push stance when its drive passes over it)
+                carry_rule = self.carry_rule()
+                grasp.carry_height = self.carry_height_over(carry_rule == "partner")
                 if self.shelf_start is not None:
                     # the shelf layout slides the book along the board to the partner's side: it clears the board, not the partner
                     # (a lift by the partner's height runs into the board above; the lift check ignores the support)
                     grasp.carry_height = float(self.gen("shelf_carry_height_m", SHELF_CARRY_HEIGHT_M))
+                    carry_rule = "shelf"
+                d.summary["carry_lift"] = {"rule": carry_rule, "height_m": round(float(grasp.carry_height), 4)}
                 d.object_poses[tname] = t_pose
                 d.object_poses[pname] = p_pose
                 d.robot_q = self.stance_q(init)
@@ -1149,7 +1175,10 @@ class IORSSmall(SamplerV2):
     def place_gap(self) -> float:
         """AABB gap between target and partner at the *place* position: nextto ``g_NT - 0.01`` (the predicate holds below
         g_NT); touching = the same nextto position — the oracle program places there and the push closes the gap to
-        contact (``push_distance``)."""
+        contact (``push_distance``) —, or ``generation.touching_place_gap_m`` when set (owner 2026-10-12 item 4: set down farther
+        from the partner so that the opening fingers clear it at the release; the push covers the longer distance)."""
+        if self.relation == "touching" and self.gen("touching_place_gap_m") is not None:
+            return max(0.0, float(self.gen("touching_place_gap_m")))
         return max(0.0, float(self.pair.get("g_NT", 0.03)) - 0.01)
 
     def push_margin(self) -> float:
@@ -2260,8 +2289,9 @@ class IORSSmall(SamplerV2):
 
     def push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord) -> Optional[Stance]:
         """Record the ``push`` stance of ``push_stance_for``: whole-body check with the objects at the place, the path
-        manipulation -> push carried (the box posed in the hand per the grasp record; ``paths[].carried``), the brace gate
-        and the goal observation stance re-evaluated there. ``Reject(stance_collision | no_path | path_collision)``."""
+        manipulation -> push carried (the box posed in the hand per the grasp record at its lift configuration; ``paths[].carried``),
+        the brace gate and the goal observation stance re-evaluated there. ``Reject(stance_collision | lift_unreachable | no_path |
+        path_collision)``."""
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         place_pos = getattr(self, "_touching_place_pos", None)
         if place_pos is None:
@@ -2312,15 +2342,20 @@ class IORSSmall(SamplerV2):
             self.obj("target").keep_still()
         self.sidecar.add_stance(st)
         self.kit.sync_world()
+        if self.shelf_start is None and self.carry_rule() == "auto":
+            self.auto_carry_height(draft, grasp, manip, st, p_pose)
         # the drive is swept with the arm at the LIFT configuration (the box carry_height above the grasp, as the oracle drives
         # it), not the stance's untucked arms - the box posed in the untucked hand stands inside the table (0918-165104)
         lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             r_lift = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
-        arm_q = None
-        if r_lift.ok and r_lift.q is not None:
-            idx = self.kit.robot.arm_control_idx
-            arm_q = {"right": r_lift.q[idx["right"]].clone(), "left": r_lift.q[idx["left"]].clone()}
+        if not r_lift.ok or r_lift.q is None:
+            # owner 2026-10-12 item 7d: swept with the untucked hand instead, the box stood inside the table and the lift failure read
+            # as path_collision (touching#02 c2_k0 attempt 7)
+            raise Reject("lift_unreachable", f"lift ({grasp.carry_height:.2f} m above the grasp) has no configuration at the {manip.name} stance for the carried "
+                                             f"drive to the push stance: {r_lift.reason}")
+        idx = self.kit.robot.arm_control_idx
+        arm_q = {"right": r_lift.q[idx["right"]].clone(), "left": r_lift.q[idx["left"]].clone()}
         path = self.record_path(manip, st, carried=tname, arm=grasp.arm, arm_q=arm_q)  # Reject(no_path | path_collision) fails the attempt
         st.carried = tname
         st.extras["path_length_m"] = getattr(path, "length_m", None)
@@ -2331,6 +2366,27 @@ class IORSSmall(SamplerV2):
         log.info("%s: push stance recorded %+.3f m along the edge (path %.2f m, box in hand)", self.gp.alias, st.extras["lateral_shift_m"],
                  float(st.extras["path_length_m"] or 0.0))
         return st
+
+    def drive_partner_gap(self, t_pose: G.Pose, p_pose: G.Pose, frm: Stance, to: Stance) -> float:
+        """4A: the clearance (m) between the partner's footprint and the target's, swept along the base move ``frm`` -> ``to`` with the box
+        held rigidly in the hand (the push stance keeps the yaw: a translation), the target from ``t_pose``."""
+        t_fp = self.world.footprint(self.hull["target"], t_pose)
+        move = (G.t(to.base_xy) - G.t(frm.base_xy)).float()
+        swept = G.convex_hull_2d(th.cat([t_fp, t_fp + move[None, :]]))
+        return TT.polygon_gap(swept, self.world.footprint(self.hull["partner"], p_pose))
+
+    def auto_carry_height(self, draft: Draft, grasp: GraspRecord, manip: Stance, st: Stance, p_pose: G.Pose) -> None:
+        """4A ``carry_clears: "auto"``: the carry clears only the table unless the carried drive manipulation -> ``st`` takes the box within
+        ``carry_clearance_m`` of the partner's footprint - the base moves toward the partner by the push stance's shift (13-17 cm in
+        touching#02), farther than the start gap in most of its draws -, then it clears the partner's top as before. The verdict goes to
+        ``summary.carry_lift``."""
+        tname = self.bindings.one("target").name
+        gap = self.drive_partner_gap(draft.object_poses[tname], p_pose, manip, st)
+        over = gap < float(self.gen("carry_clearance_m", CARRY_CLEARANCE_M))
+        grasp.carry_height = self.carry_height_over(over)
+        draft.summary["carry_lift"] = {"rule": "auto", "clears": "partner" if over else "table", "drive_gap_m": round(gap, 4), "height_m": round(float(grasp.carry_height), 4)}
+        if over:
+            log.info("%s: the carried drive to the push stance passes %.3f m from the partner: the lift clears its top (%.2f m)", self.gp.alias, gap, grasp.carry_height)
 
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
