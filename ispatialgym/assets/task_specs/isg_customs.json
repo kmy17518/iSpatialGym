@@ -8660,7 +8660,7 @@
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
    },
-   "requested_bucket_m": 3.0
+   "requested_bucket_m": 5.0
   },
   "constraints": []
  },
@@ -8896,7 +8896,7 @@
     "min_corridor_width_m": 0.75,
     "in_frame_margin": 0.05
    },
-   "requested_bucket_m": 3.0
+   "requested_bucket_m": 5.0
   },
   "constraints": []
  },
@@ -9441,7 +9441,7 @@
     "trunk": 0.5,
     "arms": "untucked"
    },
-   "requested_bucket_m": 5.0
+   "requested_bucket_m": 3.0
   },
   "constraints": []
  },
