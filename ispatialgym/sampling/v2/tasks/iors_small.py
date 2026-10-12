@@ -7,7 +7,8 @@ adds the §6.11 rules only: pair admissibility per template, the start region an
 whose partner fits at some gap of its interval), the goal pose per relation, the place / pre-place IK from the manipulation
 stance after the goal settled, the touching push + brace, the constraints it learned. Every number comes from the customs
 ``generation`` block (D1 ``generation_defaults``): ``table_end_margin_m``, ``start_region_lateral_draws``, ``partner_on_meta_link``
-(A5: the partner centred on one of the support's meta links of that type, e.g. a burner's ``heatsource``),
+(A5: the partner centred on one of the support's meta links of that type, e.g. a burner's ``heatsource``), ``start_region_on_neighbors``
+(with ``partner_on_meta_link``: the target starts on a neighbouring support's top, A4),
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
 (inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
@@ -33,6 +34,7 @@ from ispatialgym.sampling.sim_utils import PARK_POSITION, Reject, SupportTop
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, TemplateExhausted, annotate_height_extra, contact_height_extra, register, requested_height_extra
@@ -439,6 +441,7 @@ class IORSSmall(SamplerV2):
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{self.support.name}: too little free top")
         self.target_tremble_screen()  # 7g: before the bands and the stances
+        nb_top = self.neighbor_start_top()  # start_region_on_neighbors (rejected here without a neighbour top): Phase 2's foci on its cells
         margins = self.lateral_margins()
         rng_t = np.random.default_rng(self.ctx.base_seed)
         errors: List[str] = []
@@ -511,7 +514,7 @@ class IORSSmall(SamplerV2):
                     break
                 self.init_stance.name = "init"
             cands = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
-                                                  target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top,
+                                                  target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
                                                   arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
                                                   **phase2_band)
             phase2_any = phase2_any or bool(cands)
@@ -574,11 +577,12 @@ class IORSSmall(SamplerV2):
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
+        nb_top = self.neighbor_start_top()  # start_region_on_neighbors: the target is drawn on the neighbours' cells
         last = None
         for i, gs in enumerate(tiers):
             try:
                 t_pose, grasp = TT.phase3_target(self, manip, rng, gs, self.hull["target"], self.rest["target"], self.support_objects(),
-                                                 top=self.top, scale_key=self.choice.models["target"].scale, arms=arms,
+                                                 top=self.top if nb_top is None else nb_top, scale_key=self.choice.models["target"].scale, arms=arms,
                                                  arm_bands=getattr(self, "arm_bands", None) or None)
                 if i > 0:
                     log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.alias, grasp.grasp_name)
@@ -953,6 +957,20 @@ class IORSSmall(SamplerV2):
             raise Reject("spec", f"{self.gp.alias}: generation.partner_on_meta_link is for ontop / under / inside / nextto (touching braces its partner)")
         return str(link) if link else None
 
+    def neighbor_start_top(self) -> Optional["NB.UnionTop"]:
+        """Owner 2026-10-12 (ontop_small#02 6d), ``generation.start_region_on_neighbors``: the partner stands on a meta link of the support
+        (:meth:`meta_link`) and the target starts on a neighbouring support's top (A4) - the union top with the support's own cells taken
+        out (``UnionTop.neighbors_only``), on which Phase 2 takes its foci, the start region keeps them and Phase 3 draws the target. None
+        without the key; ``Reject("spec")`` without ``partner_on_meta_link``, ``Reject("no_start_region")`` when no neighbour top is united
+        with the support."""
+        if not self.gen("start_region_on_neighbors", False):
+            return None
+        if self.meta_link() is None:
+            raise Reject("spec", f"{self.gp.alias}: generation.start_region_on_neighbors needs generation.partner_on_meta_link (the partner on the support)")
+        if not isinstance(self.top, NB.UnionTop):
+            raise Reject("no_start_region", f"{self.top.name}: generation.start_region_on_neighbors, but no neighbour top is united with the support")
+        return self.top.neighbors_only()
+
     def find_meta_spots(self, cam: Optional[G.Pose]) -> Optional[List[Tuple[str, th.Tensor]]]:
         """A5: the support's meta links of the :meth:`meta_link` type (:meth:`meta_link_points`) whose position is on the top (a free cell;
         the partner centred there may overhang it - a pot's handle off the stove, the settle and the validation judge it) with the partner
@@ -999,7 +1017,9 @@ class IORSSmall(SamplerV2):
         edge-aligned orientation (:meth:`edge_partner_quats`). Each survivor's ``extras["start_region"]`` holds the gap interval per side and
         ``extras["start_region_arms"]`` the arms that meet (c) per side; ``region_sides`` the sides with a cell; the region's size goes to
         ``template_facts["start_region"]``. With ``partner_on_meta_link`` (A5) the partner stands on a meta-link spot (:meth:`find_meta_spots`)
-        and the region follows from those spots (:meth:`meta_spot_region`; the candidate's spots per side in ``extras["meta_link_spots"]``)."""
+        and the region follows from those spots (:meth:`meta_spot_region`; the candidate's spots per side in ``extras["meta_link_spots"]``);
+        with ``start_region_on_neighbors`` too, only the foci whose Phase-2 footprint (``w_t`` + 0.02 around them) lies on a neighbour's top
+        (:meth:`neighbor_start_top`)."""
         allowed = self.admitted_sides()
         assigned = self.assigned_side()
         sides = [assigned] if assigned is not None else allowed
@@ -1008,6 +1028,8 @@ class IORSSmall(SamplerV2):
         cam = self.camera_pose_at(self.init_stance)
         self.meta_spots = self.find_meta_spots(cam)
         w_t = TT.half_extent(self.hull["target"], self.rest["target"])
+        on_nb = self.neighbor_start_top()
+        n_off = 0
         place_gap = self.place_gap()
         quats = [(q, footprint_laterals(self.world.footprint(self.hull["partner"], (th.zeros(3), q)), self.init_stance.tangent)) for q in self.edge_partner_quats()]
         focus_masks: Dict[Tuple, np.ndarray] = {}  # (focus, side, orientation) -> the rules of the focus alone: ends, top, frame
@@ -1016,6 +1038,9 @@ class IORSSmall(SamplerV2):
         gaps: Dict[float, List[float]] = {sd: [] for sd in sides}
         out: List[Stance] = []
         for c in cands:
+            if on_nb is not None and not on_nb.contains(c.focus[:2], w_t + 0.02):  # Phase 2's focus rule, on the neighbours' cells
+                n_off += 1
+                continue
             depth, t_c = c.local(c.focus[:2])
             t_fp = th.stack([c.world(depth + dd, t_c + dl) for dd in (-w_t, w_t) for dl in (-w_t, w_t)])
             # the reach rule per arm that may make the segment here: the attempt offers the arms whose band admits the drawn side
@@ -1075,6 +1100,10 @@ class IORSSmall(SamplerV2):
             "meta_link": None if self.meta_spots is None else [mid for mid, _ in self.meta_spots]}
         log.info("%s: start region on edge %s (L %.2f, lateral %+.2f): %s of %d Phase-2 candidates", self.gp.alias, self.edge.name, self.edge.length,
                  self.init_stance.lateral, ", ".join(f"{TT.side_name(sd)} {len(cells[sd])} cells ({n_cands[sd]} candidates)" for sd in sides), len(cands))
+        if on_nb is not None:
+            names = [m.name for m in on_nb.members[1:]]
+            self.template_facts["start_region"].update({"on_neighbors": names, "off_neighbors": n_off})
+            log.info("%s: start_region_on_neighbors: %d of %d Phase-2 candidates have their focus off the neighbour tops %s", self.gp.alias, n_off, len(cands), names)
         return out
 
     def draw_partner_side(self, rng: np.random.Generator) -> float:

@@ -272,7 +272,8 @@ footprint as `blocked_footprints` in the same structure.
   the neighbour cells within 10 cm in front of it / 30 cm behind it (`generation.neighbor_edge_strip_m`), so the lateral
   room of 4.4 counts a neighbour beside the support. Reach bands stay per support (4.1). The neighbours are ignored for
   the final grasp / contact pose like the support (3.6), the sampler's `:init` check accepts `(ontop X support)` on any
-  of the tops, and a target that starts on a neighbour records it as `grasps[].grasp_from` (7). Interior surfaces (a
+  of the tops, and a target that starts on a neighbour records it as `grasps[].grasp_from` (7; with
+  `generation.start_region_on_neighbors` the IORS target always starts there, 4.6 step 2). Interior surfaces (a
   shelf, `init=inside`) are never united. A support without neighbours is sampled exactly as before (its own top, bands
   and band keys).
 
@@ -952,6 +953,14 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      and checks, at the drawn target pose, the lateral gap, the reach rule of the segment's arm, the 3 cm clearance and
      the frame. Recorded: `template_facts.meta_link_spots` (every meta link with `on_top` / `in_frame`) and
      `partner_draw.meta_link`.
+   - **Target on a neighbouring top** (owner decision 2026‑10‑12, ontop_small#02 item 6d;
+     `generation.start_region_on_neighbors: true`, only with `partner_on_meta_link`). The partner stands on a meta link of
+     the support and the target starts on the top of a neighbouring support (3.2): Phase 2 takes its foci on the
+     neighbours' cells only (the union top with the support's own cells taken out, the usual w_t + 0.02 erosion), the
+     start region above keeps those foci, and step 1 draws the target there (footprint on neighbour cells,
+     `grasps[].grasp_from` = the neighbour, 7). A support with no neighbour top united to it rejects the template
+     (`no_start_region`); the key without `partner_on_meta_link` is a spec error. Recorded:
+     `template_facts.start_region.on_neighbors` / `off_neighbors`. Aliases without the key are sampled as before.
 3. **Distractors** (disembedding) on the source tray, footprints ≥ 1 cm from each other and from the target, within
    `tray_budget` (6.4); they may occlude the target up to **30 %** of its visible area (segmentation render, distractors
    visible vs hidden); no other occlusion bucket exists. *Owner decision 2026‑10‑12 (A2b):* no spacing along the drawn

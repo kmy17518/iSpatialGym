@@ -25,7 +25,7 @@ from __future__ import annotations
 import itertools
 import logging
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import torch as th
@@ -137,6 +137,11 @@ class UnionTop:
     def own(self):
         """The support's own top."""
         return self.members[0]
+
+    def neighbors_only(self) -> "UnionTop":
+        """The same union with the support's own cells taken out of ``mask`` (``member``, the members and their heights unchanged): a
+        footprint it supports lies on neighbour tops only (``generation.start_region_on_neighbors``: the target starts on a neighbour)."""
+        return replace(self, mask=self.mask & (self.member > 0))
 
     @property
     def free(self) -> th.Tensor:

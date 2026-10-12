@@ -157,6 +157,21 @@ def test_rest_on_and_grasp_from_follow_the_top_under_the_footprint():
     assert rec.extras == {"grasp_from": B}
 
 
+def test_neighbors_only_keeps_the_neighbour_cells_heights_and_tops():
+    """``generation.start_region_on_neighbors`` (ontop_small#02 6d): the union with the support's own cells taken out - a footprint
+    lies on the neighbour, never on the support or across the seam, even a flush one; heights and grasp_from as on the union."""
+    a, b = _pair(0.905)
+    u = NB.UnionTop.build([a, b])
+    mask0 = u.mask.clone()
+    n = u.neighbors_only()
+    assert isinstance(n, NB.UnionTop) and n.name == A and n.z == 0.90 and n.members == u.members and th.equal(n.member, u.member)
+    assert th.equal(n.free, u.free & (u.member == 1)) and int(n.free.sum()) == int(b.free.sum()) and th.equal(u.mask, mask0)  # the union untouched
+    assert n.polygon_supported(_square(0.60, 0.30)) and not n.polygon_supported(_square(0.20, 0.30)) and not n.polygon_supported(_square(0.40, 0.30))
+    assert u.polygon_supported(_square(0.40, 0.30))  # the union itself still takes the flush seam
+    assert n.contains([0.60, 0.30], 0.05) and not n.contains([0.20, 0.30]) and not n.contains([0.42, 0.30], 0.05)
+    assert n.z_at([0.6, 0.3]) == 0.905 and n.z_at([0.2, 0.3]) == 0.90 and NB.grasp_from(n, _square(0.60, 0.30)) == B
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # tabletop.support_surface -> union_top
 # ----------------------------------------------------------------------------------------------------------------

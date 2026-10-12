@@ -16,6 +16,7 @@ from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.geometry import CameraModel
 from ispatialgym.sampling.sim_utils import Reject, SupportTop
+from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 from ispatialgym.sampling.v2.tasks import iors_small as IS
@@ -405,3 +406,69 @@ def test_meta_link_points_from_the_loaded_prims_else_the_model_metadata(monkeypa
             pytest.skip("no behavior-1k-assets dataset")
         obj.category, obj.model = category, model
         assert len(s.meta_link_points("heatsource")) == n
+
+
+# ---------------------------------------------------------------------------------------------------------------- 6d target on a neighbour
+
+
+def _union_sampler(monkeypatch, points, gen=None):
+    """The synthetic table cut between y = 0.02 and 0.04: the support (y >= 0.04, 0.75 m, the burner the partner stands on) and a
+    neighbour (y <= 0.02, 2 cm lower: not flush), one union top; the band widened to λ in [-0.565, 0.565] so that both spots pass the
+    reach rule."""
+    s = _meta_sampler(monkeypatch, points, gen=gen)
+    xs = th.arange(1.0, 1.6 + 1e-6, 0.02)
+
+    def top(name, ys, z):
+        return SupportTop(name, xs, ys, th.ones(len(xs), len(ys), dtype=th.bool), th.zeros(len(xs), len(ys), dtype=th.bool), z, 0.0)
+
+    s.top = NB.UnionTop.build([top("burner_x_0", th.arange(0.04, 1.5 + 1e-6, 0.02), 0.75), top("bar_x_0", th.arange(-1.5, 0.02 + 1e-6, 0.02), 0.73)])
+    s.bands = _Band(-0.565, 0.565)
+    return s
+
+
+#: the partner's spots on the support: A beside the foci -0.24 / -0.16 / -0.08 (on the neighbour), F beside 0.0 / 0.08 (on the support
+#: or across the seam)
+UNION_SPOTS = [("A", [1.31, 0.105, 0.76]), ("F", [1.31, 0.305, 0.76])]
+
+
+def test_start_region_on_neighbors_keeps_the_foci_on_the_neighbour_top(monkeypatch):
+    """Owner 2026-10-12 (ontop_small#02 6d): with ``start_region_on_neighbors`` the A5 start region keeps only the foci whose Phase-2
+    footprint (w_t + 0.02 around them) lies on a neighbour's cells; without the key the same union gives A5's region unchanged."""
+    plain = _union_sampler(monkeypatch, UNION_SPOTS)
+    names = lambda kept, s: {round(float(c.focus[1]), 2): sorted(s.meta_spots[k][0] for ks in c.extras[IS.META_SPOTS].values() for k in ks) for c in kept}
+    assert names(plain.start_region(_candidates(plain)), plain) == {-0.24: ["A"], -0.16: ["A"], -0.08: ["A"], 0.0: ["F"], 0.08: ["F"]}
+    assert "on_neighbors" not in plain.template_facts["start_region"] and plain.neighbor_start_top() is None
+    s = _union_sampler(monkeypatch, UNION_SPOTS, gen={"start_region_on_neighbors": True})
+    kept = s.start_region(_candidates(s))
+    assert names(kept, s) == {-0.24: ["A"], -0.16: ["A"], -0.08: ["A"]} and s.region_sides == [1.0]
+    assert _regions(kept)[-0.08]["left"] == pytest.approx([0.035, 0.035], abs=1e-4)  # A's region itself is A5's
+    facts = s.template_facts["start_region"]
+    assert facts["on_neighbors"] == ["bar_x_0"] and facts["off_neighbors"] == 3 and facts["cells"] == {"left": 3, "right": 0}  # 0.0, 0.08, 0.16 off
+    assert s.template_facts["meta_link_spots"]["usable"] == ["A", "F"]  # the spots stay on the support
+
+
+def test_start_region_on_neighbors_draws_the_target_on_the_neighbour_and_needs_one(monkeypatch):
+    s = _union_sampler(monkeypatch, UNION_SPOTS, gen={"start_region_on_neighbors": True})
+    nb = s.neighbor_start_top()
+    assert isinstance(nb, NB.UnionTop) and th.equal(nb.free, s.top.free & (s.top.member == 1))
+    # Phase 3 (the target's draw) gets that top; without the key the union
+    seen = []
+    monkeypatch.setattr(TT, "phase3_target", lambda self, manip, rng, gs, *a, top=None, **k: seen.append(top) or ("pose", "grasp"))
+    s.grasps = s.grasps_flush = ["g"]
+    s.support_objects = lambda: []
+    s.choice = types.SimpleNamespace(models={"target": types.SimpleNamespace(scale=None)})
+    assert s.phase3_two_tier(None, np.random.default_rng(0)) == ("pose", "grasp")
+    assert isinstance(seen[0], NB.UnionTop) and th.equal(seen[0].free, nb.free) and seen[0].z_at([1.3, -0.3]) == 0.73
+    plain = _union_sampler(monkeypatch, UNION_SPOTS)
+    plain.grasps = plain.grasps_flush = ["g"]
+    plain.support_objects, plain.choice = s.support_objects, s.choice
+    plain.phase3_two_tier(None, np.random.default_rng(0))
+    assert seen[1] is plain.top
+    # the key needs the partner on a meta link, and a support whose top is united with a neighbour's
+    with pytest.raises(Reject) as r:
+        _union_sampler(monkeypatch, UNION_SPOTS, gen={"start_region_on_neighbors": True, "partner_on_meta_link": None}).neighbor_start_top()
+    assert r.value.reason == "spec"
+    lone = _meta_sampler(monkeypatch, UNION_SPOTS, gen={"start_region_on_neighbors": True})
+    with pytest.raises(Reject) as r:
+        lone.start_region(_candidates(lone))
+    assert r.value.reason == "no_start_region" and "no neighbour top" in str(r.value)
