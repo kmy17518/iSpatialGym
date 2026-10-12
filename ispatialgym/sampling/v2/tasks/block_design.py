@@ -263,7 +263,10 @@ class BlockDesign(SamplerV2):
                                                        bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge,
                                                        angle_classes_deg=angle_classes, split_cone=split)
                     for c in ck:
-                        c.extras.setdefault("lateral_shift_m", float(shift))
+                        # a split-cone survivor keeps its own shift; the plain Phase 2's stances copy init_k's extras, whose
+                        # lateral_shift_m may be the flip-room move of the init itself
+                        if "_position" not in c.extras:
+                            c.extras["lateral_shift_m"] = float(shift)
                     cands += ck
                 if not cands:
                     raise Reject("no_manipulation_stance", f"Phase 2 left no region survivor ({getattr(self, '_regions_too_deep', 0)} regions dropped: init cells beyond "

@@ -284,3 +284,57 @@ def test_split_cone_without_a_pair_falls_back_to_the_plain_phase2(monkeypatch):
         none = _phase2(s, init, top, rb, split)
         fb = _phase2(s, init, top, rb, {**split, "fallback_classes_deg": (20.0, 30.0)})
     assert none == [] and plain and [_key(c) for c in fb] == [_key(c) for c in plain]
+
+
+def test_block_design_candidates_record_their_shift_from_the_init(monkeypatch):
+    """Block design's manipulation candidates record how far along the edge they stand from the init (``lateral_shift_m``, the
+    flip candidates' ranking): a plain Phase 2 candidate (split cone off, or its fallback) the scan's shift, as before the split cone
+    (434bce60), although its stance copies the init's extras - an init moved for the flip room carries that move as its own
+    ``lateral_shift_m``; a split-cone survivor its own shift."""
+    from ispatialgym.sampling.v2.tasks import block_design as BD
+
+    edge = EdgeFrame.from_edge("+x", th.tensor([1.0, 0.0]), th.tensor([-1.0, 0.0]), 1.6)
+    # the init drawn 0.05 m inside its upper lateral bound: the 0.35 m manipulation shift needs it moved 0.30 m right first
+    drawn = Stance("init", (0.55, 0.0, 0.0), 0.5, 0.0, 0.45, edge).shifted(lateral=0.45)
+    drawn.extras["lateral_bounds"] = [-0.5, 0.5]
+    fallback = []
+
+    def phase2(s, init_k, half, split_cone=None, **kw):
+        plain = [init_k.with_trunk(0.5, tilt, "manipulation") for tilt in (0.0, -0.3)]
+        if split_cone is None or fallback:
+            return plain
+        c = init_k.shifted(lateral=init_k.lateral + 0.2, name="manipulation")
+        c.extras.update({"lateral_shift_m": 0.2, "_position": (8, 3), "init_view_class": 0, "angle_class": 0})
+        return [c]
+
+    monkeypatch.setattr(TT, "edge_candidates", lambda s, top, rng: iter([(edge, None)]))
+    monkeypatch.setattr(TT, "ensure_bands", lambda *a, **k: SimpleNamespace(path=None))
+    monkeypatch.setattr(TT, "left_band_compute", lambda: False)
+    monkeypatch.setattr(TT, "load_left_contact_band", lambda *a, **k: None)
+    monkeypatch.setattr(TT, "phase1b_init_trunk", lambda s, st, h, **k: drawn.with_trunk(drawn.translate, drawn.tilt))
+    monkeypatch.setattr(TT, "phase1c_lateral", lambda s, init, margins, rng, **k: init)
+    monkeypatch.setattr(TT, "phase2_manipulation_stance", phase2)
+
+    def sample(gen):
+        s = object.__new__(BD.BlockDesign)
+        corners = th.tensor([[x, y, z] for x in (-0.0127, 0.0127) for y in (-0.0127, 0.0127) for z in (0.0, 0.0254)])
+        s.spec = SimpleNamespace(generation={"patterns": {"test_rbbr": ["red", "blue", "blue", "red"]}, "block_no_flip": True, "flip_directions": ["right"],
+                                             "manip_lateral_shifts_m": [0.35, 0.45, 0.25], **gen})
+        s.subtask, s.defaults, s.variant, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), None, "targets"
+        s.gp = SimpleNamespace(alias="configuration_matching-block_design-block_4-breakfast_table_board")
+        s.ctx = SimpleNamespace(base_seed=0)
+        s.kit = SimpleNamespace(trav_free=lambda xy: True)
+        s.world = SimpleNamespace(local_hull=lambda obj: corners)
+        s.choice = SimpleNamespace(groups={"targets": [SimpleNamespace(dataset="none", category="toy_dice", model="isgblk", scale=None)]})
+        s.objs = lambda role: [object()] * 4
+        s.obj = lambda role: SimpleNamespace(name="breakfast_table_rhjoby_0")
+        s.support_top = lambda support: SimpleNamespace(free=th.ones(64, dtype=th.bool), z=0.81, to_json=lambda: {})
+        s.template_facts, s.faces, s.bands, s.left_bands, s.init_stance, s.manip_candidates = {}, dict(BD.DEFAULT_FACES), None, None, None, []
+        BD.BlockDesign.sample_template(s)
+        assert s.init_stance.extras["lateral_shift_m"] == pytest.approx(-0.30) and s.init_stance.lateral == pytest.approx(0.15)
+        return [(round(float(c.extras["lateral_shift_m"]), 6), round(float(c.lateral - s.init_stance.lateral), 6)) for c in s.manip_candidates]
+
+    assert sorted(set(sample({"phase2_split_cone": False}))) == [(0.0, 0.0), (0.25, 0.25), (0.35, 0.35)]
+    assert sample({}) == [(0.2, 0.2)]  # the split cone from the subtask's defaults: the survivor's own shift
+    fallback.append(True)
+    assert sorted(set(sample({}))) == [(0.0, 0.0)]  # its plain fallback stands at the init
