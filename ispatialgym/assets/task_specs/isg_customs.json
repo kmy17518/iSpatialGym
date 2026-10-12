@@ -3749,7 +3749,7 @@
     20.0,
     70.0
    ],
-   "hinge_sink_m": 0.001,
+   "hinge_sink_m": 0.0,
    "hinge_drift_max": {
     "position_m": 0.001,
     "orientation_rad": 0.005,
@@ -3894,7 +3894,7 @@
     20.0,
     70.0
    ],
-   "hinge_sink_m": 0.001,
+   "hinge_sink_m": 0.0,
    "hinge_drift_max": {
     "position_m": 0.001,
     "orientation_rad": 0.005,
@@ -4096,7 +4096,7 @@
     20.0,
     70.0
    ],
-   "hinge_sink_m": 0.001,
+   "hinge_sink_m": 0.0,
    "hinge_drift_max": {
     "position_m": 0.001,
     "orientation_rad": 0.005,
@@ -4249,7 +4249,7 @@
     20.0,
     70.0
    ],
-   "hinge_sink_m": 0.001,
+   "hinge_sink_m": 0.0,
    "hinge_drift_max": {
     "position_m": 0.001,
     "orientation_rad": 0.005,
