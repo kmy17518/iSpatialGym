@@ -1117,7 +1117,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "inter_object_relation_satisfaction-touching",
    "iddl": "inter_object_relation_satisfaction/touching.iddl",
-   "pick": "inter_object_relation_satisfaction-touching#04~T4",
+   "pick": "inter_object_relation_satisfaction-touching#04~T2",
    "slot": "representative",
    "mode": "representative"
   },
@@ -1125,6 +1125,39 @@
    "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-washer",
    "id": 101,
    "grounded": "2026-10-11",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#04~T5",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-commercial_kitchen_table",
+   "id": 102,
+   "grounded": "2026-10-12",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#04~T3",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table",
+   "id": 103,
+   "grounded": "2026-10-12",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#04~T4",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-desk",
+   "id": 104,
+   "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
    "subtask": "inter_object_relation_satisfaction-touching",
    "iddl": "inter_object_relation_satisfaction/touching.iddl",
