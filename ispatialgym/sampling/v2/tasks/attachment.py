@@ -31,7 +31,7 @@ import math
 import os
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -61,6 +61,10 @@ SUBTASK = "configuration_matching-attachment"
 #: PARTNER_EXACT_CAP of them, the attempt stops at ATTEMPT_BUDGET_S (``generation.attempt_budget_s`` overrides)
 ATTEMPT_BUDGET_S = 360.0  # the second base pose search (owner 17:10) adds up to SECOND_BASE_MAX_TRIES attach evaluations
 PARTNER_EXACT_CAP = 6
+#: the attach-band cells nearest the focus that a stance offers the partner (``_attach_and_brace``; the template's ``_partner_room``)
+PARTNER_CELLS_TRIED = 40
+#: partner yaws ``_partner_room`` tries per cell (the instance draws one uniformly)
+PARTNER_ROOM_YAWS = 8
 #: §6.8 second base pose: lateral shifts of the grasp stance along the edge (m, + = robot's left) tried in this order
 SECOND_BASE_LATERALS = (0.10, -0.10, 0.20, -0.20, 0.30, -0.30)
 SECOND_BASE_MAX_TRIES = 6
@@ -432,9 +436,7 @@ class Attachment(SamplerV2):
                                                       bands=bands, top=self.top,
                                                       angle_classes_deg=TT.phase2_angle_classes(self),
                                                       class1_when_deep_m=None if deep is None else float(deep), split_cone=TT.split_cone_opts(self))
-                cands = [c for c in cands if len(TT.band_cells_world(self.attach_bands, c)) > 0]
-                if not cands:
-                    raise Reject("no_manipulation_stance", "Phase 2 left no survivor with attach-reach cells")
+                cands = self._with_partner_room(cands, edge)
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
                 break
             except Reject as e:
@@ -516,6 +518,117 @@ class Attachment(SamplerV2):
                 out.append([float(x) for x in C.quat_from_axis_angle(axis, step)])
         return out
 
+    def _with_partner_room(self, cands: List[Stance], edge: EdgeFrame) -> List[Stance]:
+        """Phase 2's survivors at ``edge`` that leave the partner a cell (:meth:`_partner_room`; facts in ``template_facts.partner_room``),
+        with separate rejections (owner 2026-10-12, 7h) for a Phase 2 that found nothing and for survivors none of which keeps a cell."""
+        if not cands:
+            raise Reject("no_manipulation_stance", "Phase 2 found no (stance, focus) pair: no focus within the camera cones with the target "
+                                                   "in frame (the phase 2 log lines)")
+        kept, room = self._partner_room(cands)
+        self.template_facts.setdefault("partner_room", {})[edge.name] = room
+        if not kept:
+            raise Reject("no_partner_cell", f"Phase 2 left {len(cands)} survivors, none with a partner cell on the free top at the required "
+                                            f"gap from the focus ({json.dumps(room)})")
+        return kept
+
+    def _partner_room(self, cands: List[Stance]) -> Tuple[List[Stance], Dict[str, Any]]:
+        """The Phase-2 survivors that leave the partner a cell an attempt can use (owner 2026-10-12, attachment 7h): from the survivor's
+        stance or one of its second base poses (:meth:`_second_base_stances`), among the ``PARTNER_CELLS_TRIED`` attach-band cells
+        nearest the focus (the cells :meth:`_attach_and_brace` tries), one where the partner's footprint at one of
+        ``PARTNER_ROOM_YAWS`` yaws lies on free cells of the top (``SupportTop.polygon_supported``'s rule with ``TT.SUPPORT_MARGIN``)
+        at least ``partner_gap_min_m`` from the male's footprint and ``partner_centre_distance_min_m`` from its centre - the male
+        anywhere within ``TT.FOCUS_RADIUS`` of the focus (Phase 3 step 1), its footprint the disc of its rest outline's radius. Before,
+        a survivor needed one attach-band cell anywhere at its trunk: on a top whose free cells give the partner no room near any
+        focus (a drop-in sink, a cooktop) the template passed and every attempt failed (attachment#04 2026-10-12, countertop_kelzer_0
+        / countertop_kelker_0: 31 / 21 attempts over ~24 min each). Returns ``(kept, facts)``; ``facts`` counts the dropped survivors
+        by the furthest test they reached (``no_cells`` / ``support`` / ``gap``)."""
+        from ispatialgym.sampling import geometry as G
+
+        top = self.top
+        gap_min, d_min = float(self.g("partner_gap_min_m")), float(self.g("partner_centre_distance_min_m"))
+        slack = float(TT.FOCUS_RADIUS)
+        rest_xy = C.transform_points((th.zeros(3), TT._t(self.rest[self.t_role])), TT._t(self.hull[self.t_role]))[:, :2]
+        r_m = float(th.linalg.norm(rest_xy, dim=1).max())
+        polys = []  # the partner's footprint about its root at each yaw (convex, CCW)
+        for k in range(PARTNER_ROOM_YAWS):
+            q = C.quat_from_yaw(2.0 * math.pi * k / PARTNER_ROOM_YAWS)
+            polys.append(G.convex_hull_2d(C.transform_points((th.zeros(3), q), TT._t(self.hull[self.p_role]))[:, :2]).numpy().astype(np.float64))
+        n_v = max(len(p) for p in polys)
+        fp = np.stack([np.concatenate([p, np.repeat(p[:1], n_v - len(p), axis=0)]) for p in polys])  # (K, V, 2), padded with the first vertex
+        centroid = np.stack([p.mean(axis=0) for p in polys])  # (K, 2): polygon_supported's centroid (the unpadded vertices)
+        m = float(TT.SUPPORT_MARGIN)
+        offsets = np.array([[0.0, 0.0], [m, 0.0], [-m, 0.0], [0.0, m], [0.0, -m], [m, m], [-m, -m], [m, -m], [-m, m]])  # SupportTop.contains
+        free = top.free.numpy()
+        x0, y0, res = float(top.xs[0]), float(top.ys[0]), float(top.resolution)
+
+        def on_free(p: np.ndarray) -> np.ndarray:
+            i, j = np.rint((p[..., 0] - x0) / res).astype(np.int64), np.rint((p[..., 1] - y0) / res).astype(np.int64)
+            inside = (i >= 0) & (j >= 0) & (i < free.shape[0]) & (j < free.shape[1])
+            out = np.zeros(i.shape, dtype=bool)
+            out[inside] = free[i[inside], j[inside]]
+            return out
+
+        cells_of: Dict[Tuple[float, ...], np.ndarray] = {}
+        supported_at: Dict[Tuple[float, float], np.ndarray] = {}
+
+        def stance_cells(st: Stance) -> np.ndarray:
+            key = (round(float(st.base_pose2d[0]), 4), round(float(st.base_pose2d[1]), 4), round(float(st.base_pose2d[2]), 5), float(st.translate), float(st.tilt))
+            if key not in cells_of:
+                cells_of[key] = TT.band_cells_world(self.attach_bands, st).numpy().astype(np.float64).reshape(-1, 2)
+            return cells_of[key]
+
+        def supported(cells: np.ndarray) -> np.ndarray:
+            keys = [(round(float(x), 4), round(float(y), 4)) for x, y in cells]
+            todo = [i for i, k in enumerate(keys) if k not in supported_at]
+            if todo:
+                c = cells[todo]
+                ok = on_free(c[:, None, None, None, :] + fp[None, :, :, None, :] + offsets[None, None, None, :, :]).all(axis=(2, 3))
+                ok &= on_free(c[:, None, :] + centroid[None, :, :])
+                for i, row in zip(todo, ok):
+                    supported_at[keys[i]] = row
+            return np.stack([supported_at[k] for k in keys])  # (n, K)
+
+        def focus_gap(cells: np.ndarray, f: np.ndarray) -> np.ndarray:
+            """Distance from the focus to each partner footprint (0 inside), (n, K)."""
+            s0 = cells[:, None, None, :] + fp[None, :, :, :]
+            e = np.roll(s0, -1, axis=2) - s0
+            d = f[None, None, None, :] - s0
+            t = np.clip((d * e).sum(-1) / np.maximum((e * e).sum(-1), 1e-12), 0.0, 1.0)
+            dist = np.linalg.norm(d - t[..., None] * e, axis=-1).min(axis=2)
+            inside = ((e[..., 0] * d[..., 1] - e[..., 1] * d[..., 0]) >= 0.0).all(axis=2)
+            return np.where(inside, 0.0, dist)
+
+        rank = {"no_cells": 0, "support": 1, "gap": 2}
+        kept: List[Stance] = []
+        dropped = {k: 0 for k in rank}
+        for c in cands:
+            f = c.focus[:2].numpy().astype(np.float64)
+            reached = "no_cells"
+            for st in [c] + [s for _, _, s in self._second_base_stances(c)]:
+                cells = stance_cells(st)
+                if not len(cells):
+                    continue
+                dist = np.linalg.norm(cells - f, axis=1)
+                near = np.argsort(dist, kind="stable")[:PARTNER_CELLS_TRIED]
+                sup = supported(cells[near])
+                if not sup.any():
+                    reached = max(reached, "support", key=rank.get)
+                    continue
+                ok = sup & (focus_gap(cells[near], f) - r_m + slack >= gap_min) & (dist[near] + slack >= d_min)[:, None]
+                if ok.any():
+                    reached = None
+                    break
+                reached = "gap"
+            if reached is None:
+                kept.append(c)
+            else:
+                dropped[reached] += 1
+        facts = {"survivors": len(cands), "kept": len(kept), "dropped": dropped, "male_radius_m": round(r_m, 4), "yaws": PARTNER_ROOM_YAWS,
+                 "cells_tried": PARTNER_CELLS_TRIED}
+        log.info("%s: partner room: %d of %d Phase-2 survivors leave the partner a cell on the free top at the required gap (dropped %s)",
+                 self.gp.alias, len(kept), len(cands), dropped)
+        return kept, facts
+
     # ------------------------------------------------------------------ geometry
 
     def _attached_pose(self, female_pose: TT.Pose) -> TT.Pose:
@@ -535,17 +648,26 @@ class Attachment(SamplerV2):
         45 phase-2 survivors, the same 6 best-scored stances tried in all 8 attempts - candidates 6 / 21 / 36 rejected 20 times over
         for the attach pose outside the manipulation image, no transition, the lift without IK - and 39 stances never looked at):
         every rejection a candidate collected in an earlier attempt of this template adds ``CANDIDATE_REJECT_PENALTY``, so the next
-        attempt's window of six moves on to stances the score alone never admits."""
+        attempt's window of six moves on to stances the score alone never admits. The rejections are keyed by the candidate itself
+        (:meth:`_candidate_key`), not its index: the split cone hands each attempt one start position's stances (owner 2026-10-12, 7h:
+        the memory is kept across positions, so a position drawn again continues where it left off)."""
         order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
 
         def score(k: int) -> float:
             c = self.manip_candidates[k]
             depth = float(c.world_to_base(c.focus[:2])[0]) if c.focus is not None else FOCUS_DEPTH_PREFERRED
             trunk_pen = min(abs(float(c.translate) - t0) + abs(float(c.tilt) - i0) for t0, i0 in GOOD_TRUNKS)
-            return max(0.0, depth - FOCUS_DEPTH_PREFERRED) + 0.3 * trunk_pen + CANDIDATE_REJECT_PENALTY * rejects.get(k, 0)
+            return max(0.0, depth - FOCUS_DEPTH_PREFERRED) + 0.3 * trunk_pen + CANDIDATE_REJECT_PENALTY * rejects.get(Attachment._candidate_key(c), 0)
 
         order.sort(key=score)
         return order
+
+    @staticmethod
+    def _candidate_key(c: Stance) -> Tuple[Any, ...]:
+        """A manipulation candidate in the reject memory: its focus, stand-off, lateral and trunk (the same after the split cone's
+        per-attempt draw replaced ``manip_candidates``)."""
+        focus = (round(float(c.focus[0]), 3), round(float(c.focus[1]), 3)) if c.focus is not None else None
+        return (focus, round(float(c.stand_off or 0.0), 3), round(float(c.lateral), 3), round(float(c.translate), 3), round(float(c.tilt), 4))
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
@@ -573,7 +695,8 @@ class Attachment(SamplerV2):
             try:
                 return self._sample_with(rng, init, manip, int(k))
             except Reject as e:
-                rejects[int(k)] = rejects.get(int(k), 0) + 1
+                key = self._candidate_key(cand)
+                rejects[key] = rejects.get(key, 0) + 1
                 errors.append(f"candidate {int(k)}: {e}")
                 log.info("%s: %s", self.gp.alias, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
@@ -1202,7 +1325,7 @@ class Attachment(SamplerV2):
         perm = [int(i) for i in rng.permutation(len(cells))]
         perm.sort(key=lambda i: float(th.linalg.norm(cells[i] - focus_xy)))
         geo: List[Tuple[Any, ...]] = []
-        for i in perm[:40]:
+        for i in perm[:PARTNER_CELLS_TRIED]:
             xy = cells[int(i)]
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
                 fails["distance"] += 1
@@ -1369,31 +1492,37 @@ class Attachment(SamplerV2):
         male = self.obj(self.t_role)
         tried, skipped = 0, {"no_floor": 0, "stance_collision": 0}
         what = "attach + brace" if brace else "the one-arm attach"
-        for dlat in SECOND_BASE_LATERALS:
-            for trunk in ((manip.translate, manip.tilt), (0.5, 0.0), (0.25, -0.3)):
-                if tried >= SECOND_BASE_MAX_TRIES:
-                    log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.alias, tried, what, skipped)
-                    return None, manip
-                self._check_deadline()
-                st = manip.shifted(lateral=manip.lateral + dlat, name="attach").with_trunk(trunk[0], trunk[1], "attach")
-                st.focus = manip.focus
-                st.arms = ["right"]
-                if not self.kit.trav_free(st.base_xy):
-                    skipped["no_floor"] += 1
-                    continue
-                male.set_position_orientation(*m_pose)
-                male.keep_still()
-                self.kit.sync_world()
-                if not self.ikc.stance_collision_free(st):
-                    skipped["stance_collision"] += 1
-                    continue
-                tried += 1
-                att = self._attach_and_brace(rng, manip, st, m_pose, grasp, cam_init, require_joint=require_joint, brace=brace)
-                if att is not None:
-                    log.info("%s: second base pose: lateral %+.2f, trunk (%.2f, %+.2f) reaches %s", self.gp.alias, dlat, trunk[0], trunk[1], what)
-                    return att, st
+        for dlat, trunk, st in self._second_base_stances(manip):
+            if tried >= SECOND_BASE_MAX_TRIES:
+                log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.alias, tried, what, skipped)
+                return None, manip
+            self._check_deadline()
+            st.focus = manip.focus
+            st.arms = ["right"]
+            if not self.kit.trav_free(st.base_xy):
+                skipped["no_floor"] += 1
+                continue
+            male.set_position_orientation(*m_pose)
+            male.keep_still()
+            self.kit.sync_world()
+            if not self.ikc.stance_collision_free(st):
+                skipped["stance_collision"] += 1
+                continue
+            tried += 1
+            att = self._attach_and_brace(rng, manip, st, m_pose, grasp, cam_init, require_joint=require_joint, brace=brace)
+            if att is not None:
+                log.info("%s: second base pose: lateral %+.2f, trunk (%.2f, %+.2f) reaches %s", self.gp.alias, dlat, trunk[0], trunk[1], what)
+                return att, st
         log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.alias, tried, what, skipped)
         return None, manip
+
+    @staticmethod
+    def _second_base_stances(manip: Stance) -> Iterator[Tuple[float, Tuple[float, float], Stance]]:
+        """The §6.8 second base poses in the order :meth:`_second_base_pose` tries them: ``(lateral shift, trunk, stance)``, the grasp
+        stance shifted along the edge by ``SECOND_BASE_LATERALS`` with its trunk kept or moved to an arm-friendly grid trunk."""
+        for dlat in SECOND_BASE_LATERALS:
+            for trunk in ((manip.translate, manip.tilt), (0.5, 0.0), (0.25, -0.3)):
+                yield dlat, trunk, manip.shifted(lateral=manip.lateral + dlat, name="attach").with_trunk(trunk[0], trunk[1], "attach")
 
     def _partner_brace_point(self, f_pose: TT.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:
         """Brace face of the partner: the face opposite to the insertion direction (the face the insertion pushes

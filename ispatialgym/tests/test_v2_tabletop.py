@@ -1376,18 +1376,20 @@ def test_rejected_manipulation_candidates_move_down_the_order_in_later_attempts(
     from ispatialgym.sampling.v2.tasks import attachment as A
 
     def cand(depth, translate=0.5, tilt=-0.45):
-        return SimpleNamespace(focus=th.tensor([depth, 0.0, 0.8]), translate=translate, tilt=tilt, world_to_base=lambda xy: th.tensor([float(xy[0]), 0.0]))
+        return SimpleNamespace(focus=th.tensor([depth, 0.0, 0.8]), translate=translate, tilt=tilt, stand_off=0.45, lateral=0.0,
+                               world_to_base=lambda xy: th.tensor([float(xy[0]), 0.0]))
 
     s = SimpleNamespace(manip_candidates=[cand(0.60), cand(0.61), cand(0.62), cand(0.70), cand(0.75), cand(0.80), cand(0.85), cand(0.90), cand(0.95)])
+    key = lambda k: A.Attachment._candidate_key(s.manip_candidates[k])  # noqa: E731
     rng = np.random.default_rng(0)
     first = A.Attachment._candidate_order(s, rng, {})
     assert set(first[:3]) == {0, 1, 2} and first[3:6] == [3, 4, 5]  # the arm-friendly depths first (ties by the draw), then by depth
-    rejects = {k: 1 for k in first[:6]}  # every stance of the first window was rejected
+    rejects = {key(k): 1 for k in first[:6]}  # every stance of the first window was rejected
     second = A.Attachment._candidate_order(s, np.random.default_rng(1), rejects)
     assert second[:3] == [6, 7, 8], second  # the untried stances come first now
     assert set(second[3:6]) == {0, 1, 2}  # the rejected ones follow in their own preference order
     twice = dict(rejects)
-    twice[6] = 2
+    twice[key(6)] = 2
     third = A.Attachment._candidate_order(s, np.random.default_rng(2), twice)
     assert third[:2] == [7, 8] and third[-1] == 6, third  # two rejections rank below one
 

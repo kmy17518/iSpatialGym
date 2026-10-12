@@ -2189,8 +2189,9 @@ def split_cone_draw(s, rng: np.random.Generator) -> None:
     """Variant C, once per attempt (``SamplerV2.sample``): the object's start position drawn uniformly among the positions of the best
     init-view class that still have a work stance after the task's own filters (``s.manip_candidates`` as ``sample_template`` left
     them), and that position's work stances of the best class made the task's candidates for this attempt (the task's own order
-    applies among them). A no-op that leaves ``rng`` untouched unless the split cone is on. A task's memory of failed candidates by
-    index (attachment's ``_candidate_rejects``) starts empty with each position. With ``s.region_side`` (IORS, A1: the partner side
+    applies among them). A no-op that leaves ``rng`` untouched unless the split cone is on. A task's memory of failed candidates
+    (attachment's ``_candidate_rejects``, keyed by the candidate) is kept across positions (owner 2026-10-12, attachment 7h: a
+    position drawn again tries the stances it has not failed with yet). With ``s.region_side`` (IORS, A1: the partner side
     the attempt drew before the target is placed) the positions come from that side's pool (:func:`split_cone_positions` with the
     side), each pool built once from the candidates ``sample_template`` left."""
     if not phase2_gen(s, "phase2_split_cone", False):
@@ -2212,8 +2213,6 @@ def split_cone_draw(s, rng: np.random.Generator) -> None:
         return
     keys = sorted(pool)
     s.manip_candidates = list(pool[keys[int(rng.integers(len(keys)))]])
-    if hasattr(s, "_candidate_rejects"):
-        s._candidate_rejects = {}
 
 
 def reach_margin(s, stance: Stance, point_world, arm: str = "right") -> float:

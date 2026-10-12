@@ -1781,6 +1781,18 @@ stance camera's image (the program check's fingertip rule) is not tried. The ora
 `grasps[].extras.carry_over` records the clearance, the partner's top and the rise. The other attachment aliases (lid–teapot,
 cork, cap) keep the straight carry.
 
+*Partner room at the template (owner decision 2026‑10‑12, attachment 7h).* A Phase‑2 survivor needed one attach‑band cell
+anywhere at its trunk, so a top whose free cells leave the partner no room near any focus (a drop‑in sink, a cooktop) passed the
+template and failed every attempt at `partner_placement` (attachment#04 on `countertop_kelzer_0` / `countertop_kelker_0`: 31 / 21
+attempts, ~24 min each). Now a survivor is kept only when, from its stance or one of its second base poses, one of the 40
+attach‑band cells nearest the focus (the cells an attempt tries) takes the partner's footprint at one of 8 yaws on free cells of
+the top (§3.2, 2 cm margin) at least `partner_gap_min_m` from the male's footprint (the disc of its rest outline, anywhere within
+the 5 cm focus radius) and `partner_centre_distance_min_m` from its centre; such a top now fails at the template, right after
+Phase 2 (`template_facts.partner_room`). The rejections are separate: `no_manipulation_stance` "Phase 2 found no (stance, focus)
+pair" and `no_partner_cell` "Phase 2 left N survivors, none with a partner cell ...". The attempts' memory of rejected
+manipulation candidates is keyed by the candidate (focus, stand‑off, lateral, trunk) and kept across the split cone's per‑attempt
+position draws (§4.5): a position drawn again tries the stances it has not failed with yet.
+
 
 Init per section 4 with: partner (female) upright on a cell of the attach-reach band, target (male) at the focus with
 the attachment pipeline's library grasps. Goal: partner unchanged; target attached at
