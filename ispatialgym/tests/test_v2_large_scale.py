@@ -355,6 +355,73 @@ def test_icl_handle_rows_scene_instance(tmp_path):
     assert [r.kind for r in AL.rank_handle_rows(rows)][0] == "bar"
 
 
+def test_alias_handle_row_and_pinch_width_floor():
+    """Owner 2026-10-12 02:20 (open / close_large#03, office cabinet door rvunhj_0 / j_link_2): ``generation.handle_row`` takes
+    the named row before the ranking and ``generation.pinch_width_min_m`` lowers the 15 mm floor; with neither the 8 mm bar
+    and the 7 mm knobs fall through to the 39 mm edge pinch, as before."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    a, p = [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]
+    rec_bar = AL.HandleRow("bar", [0.2856, -0.0348, -0.0658], p, a, 0.008, "record:bar")
+    rec_knob = AL.HandleRow("knob", [0.2826, -0.0355, 0.0535], p, a, 0.007, "record:knob")
+    bar = AL.HandleRow("bar", [0.2856, -0.0348, -0.0658], p, a, 0.008, "bottom_cabinet__rvunhj:j_link_2#C")
+    knob_b = AL.HandleRow("knob", [0.2826, -0.0355, 0.0535], p, a, 0.007, "bottom_cabinet__rvunhj:j_link_2#B")
+    edge = AL.HandleRow("edge", [0.262, -0.0352, -0.1119], [1.0, 0.0, 0.0], [-0.9999, -0.0122, 0.0], 0.0386, "bottom_cabinet__rvunhj:j_link_2#F", verdict="edge")
+    blocked = AL.HandleRow("edge", [0.26, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.0386, "bottom_cabinet__rvunhj:j_link_2#F2", verdict="edge_blocked")
+    rows = [rec_bar, rec_knob, bar, knob_b, edge, blocked]
+    row, ranked = AL.pick_handle_row(rows)  # the defaults: 15-80 mm, the ranking
+    assert row is edge and ranked == AL.rank_handle_rows(rows)
+    row, _ = AL.pick_handle_row(rows, width_range=(0.006, 0.080))  # the floor alone: the ranking's first row (a bar) now fits
+    assert row.kind == "bar"
+    for name, want in (("j_link_2#C", bar), ("bottom_cabinet__rvunhj:j_link_2#C", bar), ("j_link_2#B", knob_b), ("record:bar", rec_bar), ("j_link_2#F", edge)):
+        row, ranked = AL.pick_handle_row(rows, name, (0.006, 0.080))
+        assert row is want and ranked[0] is want and sorted(map(id, ranked)) == sorted(map(id, AL.rank_handle_rows(rows)))
+    with pytest.raises(Reject) as e:  # a named row below the floor is rejected, never swapped for the edge pinch
+        AL.pick_handle_row(rows, "j_link_2#C", AL.PINCH_WIDTH_RANGE, where="bottom_cabinet_rvunhj_0/j_link_2")
+    assert e.value.reason == "missing_handle" and "8 mm outside [15.0, 80.0] mm" in str(e.value)
+    for name in ("j_link_2#Z", "j_link_2#F2", "j_link_0#C"):  # unknown / not admissible (edge_blocked) / another joint's row
+        with pytest.raises(Reject) as e:
+            AL.pick_handle_row(rows, name, (0.006, 0.080))
+        assert e.value.reason == "spec"
+    with pytest.raises(Reject) as e:
+        AL.pick_handle_row([rec_bar, rec_knob, bar, knob_b])  # nothing inside 15-80 mm and no edge
+    assert e.value.reason == "missing_handle" and "8 mm outside [15.0, 80.0] mm" in str(e.value)
+    with pytest.raises(Reject):
+        AL.pick_handle_row(rows, None, (0.09, 0.08))
+    assert AL.handle_row_matches(bar, " j_link_2#C ") and not AL.handle_row_matches(bar, "") and not AL.handle_row_matches(bar, "j_link_2#c")
+
+
+def test_load_handle_takes_the_alias_bar_of_the_office_cabinet_door():
+    """The recorded office cabinet door (B4 inventory + icl rows, instance frame): by default the edge pinch j_link_2#F; with
+    ``handle_row: j_link_2#C`` and ``pinch_width_min_m: 0.006`` the 8 mm vertical bar (h 0.73 m, approached from the front)
+    keeps its grasp slide along its 0.28 m length (the length from the record's bar) and the template facts name the row."""
+    gen = {"joint": "j_link_2", "handle_key": "bottom_cabinet__rvunhj"}
+
+    def sampler():
+        al = AL.ArticulationLarge.__new__(AL.ArticulationLarge)
+        al.gp = SimpleNamespace(alias="cabinet", entry={"roles": {}}, gen=lambda k, d=None: gen.get(k, d))
+        al.target_role, al.world, al.template_facts = "target", SimpleNamespace(scene_model="office_cubicles_right"), {}
+        return al
+
+    obj = SimpleNamespace(name="bottom_cabinet_rvunhj_0", category="bottom_cabinet", model="rvunhj", scale=[1.6025, 1.5341, 1.7222], links={},
+                          joints={"j_link_2": SimpleNamespace(is_revolute=True, lower_limit=0.0, upper_limit=1.5708)})
+    al = sampler()
+    al.load_handle(obj)
+    assert al.handle["kind"] == "edge" and al.template_facts["handle"]["row"] == "bottom_cabinet__rvunhj:j_link_2#F"
+    assert "handle_row" not in al.template_facts["handle"] and "pinch_width_range_mm" not in al.template_facts["handle"]
+    gen.update({"handle_row": "j_link_2#C", "pinch_width_min_m": 0.006})
+    al = sampler()
+    al.load_handle(obj)
+    h, facts = al.handle, al.template_facts["handle"]
+    assert facts["row"] == "bottom_cabinet__rvunhj:j_link_2#C" and facts["kind"] == "bar" and facts["width_mm"] == 8.0
+    assert facts["handle_row"] == "j_link_2#C" and facts["pinch_width_range_mm"] == [6.0, 80.0]
+    assert h["contact"] == pytest.approx([0.2856, -0.0348, -0.0658]) and h["pinch_axis"] == pytest.approx([0.0, -1.0, 0.0])
+    assert h["approach_dir"] == pytest.approx([-1.0, 0.0, 0.0]) and "approach_dir_recorded" not in h  # straight from the front, no edge repair
+    assert h["length"] == pytest.approx(0.2765)
+    assert AL.bar_axis(h) == pytest.approx([0.0, 0.0, 1.0]) and AL.bar_offsets(h) == [0.0, 0.078, -0.078]  # the slide along the vertical bar
+    assert AL.pinch_classes(h["pinch_axis"], h["kind"]) == ("fwd_pinch_h",)
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # alignment (§5.5): frame, hang pose, contacts, brace ordering
 # ----------------------------------------------------------------------------------------------------------------

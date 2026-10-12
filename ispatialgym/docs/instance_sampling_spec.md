@@ -1055,6 +1055,19 @@ same 1.2 cm eef offset and 10 cm pre-grasp; `edge_blocked` rows are not admissib
 instance) is rescaled by the instance's per-axis scale before use and its `width_m` re-checked against the 15–80 mm
 pinch range. Rows with verdict `skip` or `ungraspable` exclude the joint.
 
+**The alias's handle row and pinch floor (owner 2026‑10‑12 02:20).** Two optional `generation` keys of the large-scale
+aliases; unset, the rules above apply unchanged. `handle_row` names the pinch of the bound joint — an icl
+`require/handles.csv` row name (`"j_link_2#C"`) or a candidate's full source (`"<key>:<name>"`, `"record:bar"`; also
+accepted as `roles.target.handle_row`, keyed like `joint`) — and is taken before the ranking (reviewer's choice → bar →
+knob → reviewer pinch → edge pinch); a name that no admissible row of the joint carries rejects the template (`spec`), a
+named row outside the pinch range rejects it (`missing_handle`) instead of falling through to the next row.
+`pinch_width_min_m` (default 0.015) is the lower bound of the pinch range (the upper bound stays 80 mm; the 15–80 mm
+`pinch_width_range_m` is read by the small-scale sampler only). A named bar keeps the grasp slide along its length (offsets
+0, ± ½ and ± 1 × (length / 2 − 6 cm), steps below 4 cm dropped; the length from the annotation record's bar). First use:
+the office cabinet door `bottom_cabinet_rvunhj_0` / `j_link_2` (open / close #03) takes its 8 mm vertical bar
+`j_link_2#C` (0.28 m long, centre 0.73 m, approached from the front) with `pinch_width_min_m` 0.006 — its 39 mm edge
+pinch `#F` had no reachable stance from the shut door and the arm followed it only 11–63 % of a closing.
+
 ### 5.4 Prompt 2 — articulation, small-scale (open / close)
 
 Tabletop Phases 1–2 for stance and view (support = the fixed `support`, or the floor for objects taller than 0.6 m);

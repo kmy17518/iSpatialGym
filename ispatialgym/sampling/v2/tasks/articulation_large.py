@@ -357,6 +357,47 @@ def joint_excluded(rows: Sequence[HandleRow]) -> bool:
     return any(r.verdict in ("skip", "ungraspable") for r in rows) and not rank_handle_rows(rows)
 
 
+def handle_row_matches(row: HandleRow, name: str) -> bool:
+    """``generation.handle_row`` names a candidate by its source (``<key>:j_link_2#C``, ``record:bar``) or by the icl row
+    name alone (``j_link_2#C``)."""
+    name = str(name).strip()
+    return bool(name) and (row.source == name or row.source.split(":", 1)[-1] == name)
+
+
+def pick_handle_row(rows: Sequence[HandleRow], name: Optional[str] = None, width_range: Sequence[float] = PINCH_WIDTH_RANGE,
+                    where: str = "", sources: str = "") -> Tuple[HandleRow, List[HandleRow]]:
+    """The pinch of a joint among its candidate rows -> ``(row, ranked rows)``. Without ``name``: the first row of
+    :func:`rank_handle_rows`, or the next ranked row inside ``width_range`` when its width is outside (a row without a
+    width passes). With ``name`` (``generation.handle_row``, owner 2026-10-12 02:20): that row before the ranking, its
+    width checked against ``width_range`` with no fall-back to another row. ``Reject("spec")`` for a name no admissible
+    row carries, ``Reject("missing_handle")`` when no row qualifies (``where`` / ``sources`` name the joint and the files)."""
+    lo, hi = float(width_range[0]), float(width_range[1])
+    if not 0.0 <= lo <= hi:
+        raise Reject("spec", f"{where}: pinch width range {[1000 * w for w in (lo, hi)]} mm is empty")
+    ranked = rank_handle_rows(rows)
+
+    def fits(r: HandleRow) -> bool:
+        return r.width is None or lo <= float(r.width) <= hi
+
+    if name:
+        named = [r for r in ranked if handle_row_matches(r, name)]
+        if not named:
+            raise Reject("spec", f"{where}: handle_row {name!r} is none of the admissible rows {[r.source for r in ranked]}")
+        row = named[0]
+        if not fits(row):
+            raise Reject("missing_handle", f"{where}: handle_row {row.source} pinch width {1000 * float(row.width):.0f} mm outside {[1000 * w for w in (lo, hi)]} mm")
+        return row, [row] + [r for r in ranked if r is not row]
+    if not ranked:
+        raise Reject("missing_handle", f"{where}: no bar / knob / edge / reviewer pinch in {sources}")
+    if fits(ranked[0]):
+        return ranked[0], ranked
+    # the reviewer's / record's next pinch inside the range, if any
+    alt = [r for r in ranked[1:] if fits(r)]
+    if not alt:
+        raise Reject("missing_handle", f"{where}: pinch width {1000 * float(ranked[0].width):.0f} mm outside {[1000 * w for w in (lo, hi)]} mm")
+    return alt[0], ranked
+
+
 def icl_handle_rows(key: str, joint: str, scene: Optional[str], instance: Optional[str], path: str = HANDLES_CSV,
                     instance_scale: Optional[Sequence[float]] = None) -> List[HandleRow]:
     """icl ``require/handles.csv`` rows of ``(key, joint)``: rows measured on this scene instance (``scene`` /
@@ -581,7 +622,8 @@ class ArticulationLarge(SamplerV2):
         return None, None, ""
 
     def load_handle(self, obj):
-        """The joint (``roles.target.joint``), its handle (§5.3 rules incl. the icl rows) and the joint info in the
+        """The joint (``roles.target.joint``), its handle (§5.3 rules incl. the icl rows; ``generation.handle_row`` names
+        the row, ``generation.pinch_width_min_m`` the width floor: :func:`pick_handle_row`) and the joint info in the
         instance frame; ``Reject("missing_handle")`` when the joint has no admissible pinch."""
         key = self.role_option("handle_key") or f"{obj.category}__{obj.model}"
         joint_name = self.role_option("joint")
@@ -609,19 +651,13 @@ class ArticulationLarge(SamplerV2):
         rows += icl_handle_rows(key, joint_name, self.world.scene_model, obj.name, instance_scale=None if frame == "instance" else scale.tolist())
         if joint_excluded(rows):
             raise Reject("missing_handle", f"{obj.name}/{joint_name}: icl verdict skip / ungraspable and no admissible pinch")
-        ranked = rank_handle_rows(rows)
-        if not ranked:
-            raise Reject("missing_handle", f"{obj.name}/{joint_name}: no bar / knob / edge / reviewer pinch in {path and os.path.relpath(path, REPO_ROOT)} or {HANDLES_CSV}")
-        row = ranked[0]
+        # generation.handle_row / pinch_width_min_m (owner 2026-10-12 02:20): the alias's own handle row and width floor
+        named = self.role_option("handle_row")
+        width_range = (float(self.gp.gen("pinch_width_min_m", PINCH_WIDTH_RANGE[0])), PINCH_WIDTH_RANGE[1])
+        row, ranked = pick_handle_row(rows, named, width_range, where=f"{obj.name}/{joint_name}",
+                                      sources=f"{path and os.path.relpath(path, REPO_ROOT)} or {HANDLES_CSV}")
         handle = row.as_handle()
         width = handle.get("width")
-        if width is not None and not (PINCH_WIDTH_RANGE[0] <= float(width) <= PINCH_WIDTH_RANGE[1]):
-            # the reviewer's / record's next pinch inside the range, if any
-            alt = [r for r in ranked[1:] if r.width is None or PINCH_WIDTH_RANGE[0] <= float(r.width) <= PINCH_WIDTH_RANGE[1]]
-            if alt:
-                row, handle = alt[0], alt[0].as_handle()
-            else:
-                raise Reject("missing_handle", f"{obj.name}/{joint_name}: pinch width {1000 * float(width):.0f} mm outside {[1000 * w for w in PINCH_WIDTH_RANGE]} mm")
         # bar length (instance frame) for the grasp slide along the bar (§5.3 bars: any point along the bar is a pinch)
         for hrec in (jinfo.get("handles") or []):
             if hrec.get("kind") == handle.get("kind") and hrec.get("length") is not None:
@@ -644,11 +680,16 @@ class ArticulationLarge(SamplerV2):
         self.joint_name, self.joint, self.handle, self.jinfo, self.handle_rows = joint_name, jt, handle, jinfo, ranked
         self.lower, self.upper = float(jt.lower_limit), float(jt.upper_limit)
         self.template_facts["handle"] = {"source": path and os.path.relpath(path, REPO_ROOT), "frame": frame, "row": row.source, "kind": row.kind,
-                                         "width_mm": None if width is None else round(1000 * float(handle.get("width") or width), 1),
+                                         "width_mm": None if width is None else round(1000 * float(width), 1),
                                          "contact_obj": handle["contact"], "pinch_axis_obj": handle["pinch_axis"], "approach_dir_obj": handle["approach_dir"],
                                          "joint": joint_name, "type": jinfo["type"], "axis_dir_obj": jinfo["axis_dir_obj"], "hinge_point_obj": jinfo["hinge_point_obj"],
                                          "instance_scale": scale.tolist(), "n_rows": len(ranked)}
-        log.info("%s: handle of %s/%s from %s (%s): %s", self.gp.alias, obj.name, joint_name, self.template_facts["handle"]["source"], row.source, handle)
+        if named:
+            self.template_facts["handle"]["handle_row"] = str(named)
+        if width_range[0] != PINCH_WIDTH_RANGE[0]:
+            self.template_facts["handle"]["pinch_width_range_mm"] = [round(1000 * w, 1) for w in width_range]
+        log.info("%s: handle of %s/%s from %s (%s%s): %s", self.gp.alias, obj.name, joint_name, self.template_facts["handle"]["source"], row.source,
+                 ", generation.handle_row" if named else "", handle)
 
     def _hinge_from_prim(self, obj, joint_name: str) -> Optional[th.Tensor]:
         try:
