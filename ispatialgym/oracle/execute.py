@@ -1912,6 +1912,28 @@ def _into_witness_posture(motions: Motions, targets, ctx, arm: str) -> Iterator[
     rec["result"] = "moved into the witness posture"
 
 
+def repose_arm(action: Grasp, motions: Motions, ctx) -> Iterator[th.Tensor]:
+    """``Grasp.repose`` (block design after a between-block base move, owner 2026-10-12 item 2): the working arm's planned joint-space
+    move (cuRobo, the world present: the blocks, the board, the table) from where the travel left it to the recorded pre-grasp
+    configuration - the configuration the program check tracked the block's legs from. A plan that fails before the robot moved is
+    planned again (``MotionsConfig.witness_plan_retries`` rounds, as a joint-space plan to a witness). ``ctx["repose"]`` records it."""
+    rp = action.repose
+    arm = action.arm
+    q7 = C.as_tensor(list(rp["q"])).reshape(-1).float()
+    rounds = 1 + int(getattr(getattr(motions, "cfg", None), "witness_plan_retries", 0))
+    for k in range(rounds):
+        moved = [0]
+        try:
+            yield from _counted(motions.arm_to(arm, q={arm: q7}), moved)
+        except SkillError as e:
+            if moved[0] or e.reason != "plan_failed" or k == rounds - 1:
+                raise
+            log.info("grasp(%s): the re-pose plan failed (%s) - planning it again", arm, e.message[:120])
+            continue
+        ctx["repose"] = {"target": rp.get("target"), "from_stance": rp.get("from_stance"), "rounds": k + 1}
+        return
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
@@ -1958,6 +1980,8 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     if pre_touch:
         ctx["plan_ignored"] = list(ctx["plan_ignored"]) + [getattr(o, "name", str(o)) for o in pre_touch]
     with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
+        if action.repose is not None:
+            yield from repose_arm(action, motions, ctx)
         yield from _grasp_transit(action, motions, state, targets, ctx, arm, list(ignored_supports) + pre_touch, ignore_links)
         yield from _into_witness_posture(motions, targets, ctx, arm)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)

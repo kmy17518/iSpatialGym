@@ -1714,6 +1714,23 @@ present (grasp → place(intermediate) → grasp → place). Braces are not atte
   place) pairs with the 12-seed IK from the manipulation stance with the already-placed blocks (in placement order) in
   the collision world, confirms with the 32-seed IK, and records per block: face pair, tilt pair, ψ, a, sign, place
   order, pick / place eef poses.
+- **Re-pose after a between-block base move** (owner 2026‑10‑12 item 2; `generation.repose_after_base_move`, bool, default
+  false = the 2026‑09‑24 rule everywhere: the travel is driven with the arm where the previous motion left it and the next
+  grasp's transit plans to its IK-solved pre-grasp witness). On: a block solved at a stance other than the one the previous
+  block left the robot at (block 2 onward; the travel is a path and / or a transition) records `blocks[k].repose = {arm,
+  target: "pre_grasp", q: [7 joints], pose: its pre_pick, from_stance, planned_from}` — the pre-grasp configuration of its
+  first grasp, the configuration its approach was tracked from, in the IK branch whose legs reach the place. The sampler
+  checks it in the world before the pick (the blocks placed so far at their slots, the others at init, the board and the
+  table present): it reaches `pre_pick`, is collision-free, and cuRobo plans a joint-space path to it from where the previous
+  block's last leg left the arm (put on the new stance; the stance posture when that collides there); otherwise the stance
+  fails (`repose_unplannable`) and the next candidate is tried. That block's tracked legs (pick to place, a flip-in-place's
+  re-grasp leg included) are accepted as the program check accepts them: the oracle's soft waypoint tolerances and iteration
+  budget, a stall finished only within 0.6 rad of where it stalled. The program puts the record on the block's first grasp
+  (`Grasp.repose`); the oracle plans and runs the joint-space move from where the travel left the arm before the grasp's
+  transit; the program check plans it from where its travel replay left the arm (`repose_unplannable` otherwise), checks that
+  the target is that grasp's pre-grasp and collision-free, and takes it as the pre-grasp witness, so the approach, lift,
+  reorient, carry, place and retreat are tracked from it. Not re-posed: the first block, a re-grasp leg's travel inside one
+  block, the flip-on-the-table prep chain (no recorded pre-grasp configuration: the stance fails).
 - **Brace points**: after each placement the oracle pushes the block left (row) and up (column) with the right hand
   while the closed left gripper braces the already-placed blocks (row-left / column-top): the left-arm brace poses at
   the goal grid (pre-contact + contact) are IK-checked from the manipulation stance and recorded.

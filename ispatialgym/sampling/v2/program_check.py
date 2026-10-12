@@ -918,6 +918,7 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
                                                 q_end_prev=q_end_prev, held_since_init=tracker.carried is not None and tracker.carried_arm is None)
             end_q = witnesses.pop("__arm_end_q__", None)
             partial_leg = witnesses.pop("__partial__", None)
+            repose_note = witnesses.pop("__repose__", None)
             tracker.after(action, witnesses, sampler)
             tracker.note_arm_end(action, end_q)
             _carry_joint_state(action)
@@ -927,6 +928,8 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
                 entry["locked_arms"] = sorted(locked)  # the other arm(s) held at their contact configuration while these poses were solved
             if partial_leg is not None:
                 entry["partial_leg"] = partial_leg
+            if repose_note is not None:
+                entry["repose"] = repose_note
             report["actions"].append(entry)
     finally:
         tracker.restore_moved(sampler)  # block records advanced through the program go back to their init poses (the TRO is written from the live world)
@@ -1484,6 +1487,55 @@ _END_KEY = {"grasp": "grasp", "lift": "lift", "reorient": "waypoints", "place": 
 RETREAT_PARTIAL_ACCEPT_M = 0.04
 #: the oracle's ``ExecuteConfig.retreat_limit_margin_rad``: a Retreat action's leg keeps this far from the joint limits
 RETREAT_LIMIT_MARGIN_RAD = 0.05
+#: the joint-space re-pose of a block grasp after a base move (``Grasp.repose``) is planned as the oracle plans it (``execute.repose_arm``:
+#: 1 + ``MotionsConfig.witness_plan_retries`` rounds of ``MotionsConfig.plan_attempts`` attempts)
+REPOSE_PLAN_ROUNDS = 5
+REPOSE_PLAN_ATTEMPTS = 4
+
+
+def check_repose(sampler, stance: Stance, arm: str, repose: Dict[str, Any], pre_pose, q_from: Optional[th.Tensor], fingers: Optional[float] = None,
+                 where: str = "") -> Tuple[th.Tensor, Dict[str, Any]]:
+    """Block design after a between-block base move (``Grasp.repose``, owner 2026-10-12 item 2): the recorded re-pose of the grasp's arm
+    is validated and planned as the oracle runs it. The target - the stance's configuration with the arm at ``repose["q"]`` - must be
+    this grasp's pre-grasp (the recorded pose matches ``pre_pose`` and the configuration reaches it) and collision-free in the world the
+    program leaves (the blocks advanced, the board, the table), and cuRobo must plan a joint-space path to it from ``q_from`` (where the
+    travel left the arm, on this stance; the stance posture when the travel re-posed it). Returns ``(target configuration, note)``;
+    ``Reject`` otherwise. The grasp's pre-grasp witness is the target (the chain is tracked from it)."""
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.sim_utils import Reject
+
+    idx = sampler.kit.robot.arm_control_idx[arm]
+    q_goal = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+    q_goal[idx] = th.as_tensor([float(v) for v in repose["q"]], dtype=th.float32)
+    rp = repose["pose"]  # programs.block_repose: an F6 Pose
+    rp_pose = (th.tensor([float(v) for v in rp.position], dtype=th.float32), th.tensor([float(v) for v in rp.orientation], dtype=th.float32))
+    pre = (G.t(pre_pose[0]).float(), G.t(pre_pose[1]).float())
+    if not _same_pose(rp_pose, pre, pos_tol=sampler.ikc.WITNESS_POS_TOL, ang_tol=sampler.ikc.WITNESS_ANG_TOL):
+        raise Reject("program_check_failed", f"repose: the recorded pre-grasp {[round(float(v), 3) for v in rp_pose[0].tolist()]} is not this grasp's pre-grasp "
+                                             f"{[round(float(v), 3) for v in pre[0].tolist()]} ({where})", action="grasp")
+    if not sampler.ikc.reaches(q_goal, pre, arm):
+        raise Reject("program_check_failed", f"repose: the recorded configuration misses the pre-grasp pose ({where})", action="grasp")
+    if not bool(sampler.kit.collision_free(q_goal, margin=0.0)[0]):
+        raise Reject("program_check_failed", f"repose: the recorded configuration collides ({sampler.ikc._collision_blame(q_goal, [])}; {where})", action="grasp")
+    q_start = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+    label = "the stance posture"
+    if q_from is not None:
+        q_start[idx] = th.as_tensor(q_from, dtype=th.float32)[idx]
+        label = "where the travel left the arm"
+    res = None
+    rounds = 0
+    for rounds in range(1, REPOSE_PLAN_ROUNDS + 1):
+        res = sampler.kit.backend.plan_joint(f"{arm}_arm", q_goal, q_start=q_start, max_attempts=REPOSE_PLAN_ATTEMPTS, sync_world=False)
+        if res.success:
+            break
+    if res is None or not res.success:
+        raise Reject("repose_unplannable", f"repose: no joint-space plan from {label} to the recorded pre-grasp configuration in {rounds} rounds "
+                                           f"({getattr(res, 'status', '?')}; {where})", action="grasp")
+    note = {"target": repose.get("target"), "from_stance": repose.get("from_stance"), "planned_from": label, "rounds": rounds,
+            "joint_distance_rad": round(float(th.max(th.abs(q_goal[idx] - q_start[idx]))), 3)}
+    log.info("program check: grasp re-poses from %s to the recorded pre-grasp configuration after the base move from %s (%d rounds, max joint change %.2f rad)",
+             label, repose.get("from_stance"), rounds, note["joint_distance_rad"])
+    return q_goal, note
 
 
 def _same_pose(a, b, pos_tol: float = 0.002, ang_tol: float = 0.01) -> bool:
@@ -1844,6 +1896,15 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         if out_of_frame is not None:
             raise Reject("gripper_not_in_frame", f"{name}.{out_of_frame['key']}[{out_of_frame['index']}/{out_of_frame['n']}]: the fingertip point projects outside the stance "
                                                  f"camera's image (5 %): u={out_of_frame['u']}, v={out_of_frame['v']}, depth={out_of_frame['depth_m']} m ({where})", action=name)
+    repose_q: Optional[th.Tensor] = None
+    repose_note: Optional[Dict[str, Any]] = None
+    if name == "grasp" and getattr(action, "repose", None) is not None:
+        # block design after a base move (``Grasp.repose``): the recorded re-pose planned from where the travel left the arm; its target
+        # is the pre-grasp witness, so the approach and the legs after it are tracked in the branch the sampler tracked them in
+        pre_l = next((p_ for k_, p_ in pose_targets if k_ == "pre_grasp"), None)
+        if not pre_l:
+            raise Reject("program_check_failed", f"repose: the grasp has no pre_grasp target ({where})", action=name)
+        repose_q, repose_note = check_repose(sampler, stance, arm, action.repose, pre_l[0], q_end_prev, fingers=fingers, where=where)
     motion_ends: List[th.Tensor] = []  # tracked chain ends of this action, most recent first
     single_q: Dict[str, th.Tensor] = {}  # single-pose key -> its witness configuration (this frame)
     partial: Optional[Dict[str, Any]] = None
@@ -1873,6 +1934,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     # the end of a chain checked just before (the place after the descent): the arm is there, no re-solve
                     res = IKResult(True, q_end_here.clone(), "chain end", 1)
                     chain_notes[key] = "end of the tracked chain"
+                elif repose_q is not None and key == "pre_grasp":
+                    res = IKResult(True, repose_q.clone(), "re-pose target", 1)
+                    chain_notes[key] = f"the recorded re-pose target, planned from {repose_note['planned_from']}"
                 else:
                     # a single end pose (``grasp``, ``place``, ``contact``) is the end of its approach: the approached object is
                     # removed for it as along the tracked chain (owner A) - with it in the world the open pads straddling the
@@ -2159,4 +2223,6 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         witnesses["__arm_end_q__"] = end_q_raw  # popped by ``run`` (not a recorded witness)
     if partial is not None:
         witnesses["__partial__"] = partial  # popped by ``run``: a Retreat leg accepted short, as the oracle accepts it
+    if repose_note is not None:
+        witnesses["__repose__"] = repose_note  # popped by ``run``: the re-pose planned before the grasp
     return n, witnesses

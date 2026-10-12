@@ -290,7 +290,7 @@ def table_flip_record(b) -> Optional[Dict[str, object]]:
     for key in ("face_pair", "tilt_pick_deg", "yaw_deg", "pick"):
         if key not in rg:
             raise SidecarError(f"{where}.regrasp.{key}: required")
-    extra = {k: v for k, v in (b.extra or {}).items() if k != "table_flip"}
+    extra = {k: v for k, v in (b.extra or {}).items() if k not in ("table_flip", "repose")}
     # the re-grasp's own pinch depth (its tip clearance) replaces leg 1's; the yaw-align is done (leg 2 keeps the orientation)
     for key in ("tip_clearance_m", "grasp_class", "stance"):
         if rg.get(key) is not None:
@@ -305,6 +305,39 @@ def table_flip_record(b) -> Optional[Dict[str, object]]:
             # "flip in place, then move" (owner 2026-09-19): leg 1 turns the block in hand before the set-down; the 2026-09-16
             # flip-on-the-table record (no in-hand reorient, the turn happens through the re-grasp) leaves the flag unset
             "in_hand_flip": bool(raw.get("in_hand_flip", False))}
+
+
+#: ``blocks[k].repose.target`` values: the recorded pre-grasp configuration of the block's first grasp
+REPOSE_TARGETS = ("pre_grasp",)
+
+
+def block_repose(b, arm: str, moved_from: Optional[str]) -> Optional[Dict[str, Any]]:
+    """The re-pose before a block's first grasp (``blocks[k].repose``, sampler ``generation.repose_after_base_move``, owner 2026-10-12
+    item 2): after the between-block base move from ``moved_from`` to the block's stance the working arm makes a planned joint-space
+    move to the recorded configuration ``q`` - the pre-grasp of this grasp in the IK branch the sampler tracked the block's legs in -
+    before the grasp's transit, and the program check tracks the chain from it. Returns ``{"arm", "target", "q": [7 floats], "pose":
+    Pose (the pre-grasp), "from_stance"}``, None without the record. A record without a base move before the block, for another arm,
+    from another stance or malformed is a sidecar error."""
+    raw = (getattr(b, "extra", None) or {}).get("repose")
+    if raw is None:
+        return None
+    where = f"blocks[{b.order}].repose"
+    if not isinstance(raw, dict):
+        raise SidecarError(f"{where}: expected an object, got {type(raw).__name__}")
+    if moved_from is None:
+        raise SidecarError(f"{where}: recorded, but no base move precedes the block (it works from the stance the robot stands at)")
+    if raw.get("target") not in REPOSE_TARGETS:
+        raise SidecarError(f"{where}.target: one of {REPOSE_TARGETS}, got {raw.get('target')!r}")
+    if raw.get("arm", arm) != arm:
+        raise SidecarError(f"{where}.arm: the block's working arm is {arm!r}, the re-pose is recorded for {raw.get('arm')!r}")
+    if raw.get("from_stance") is not None and raw["from_stance"] != moved_from:
+        raise SidecarError(f"{where}.from_stance: recorded {raw['from_stance']!r}, the program arrives from {moved_from!r}")
+    q = raw.get("q")
+    if not isinstance(q, (list, tuple)) or len(q) != 7 or not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)) for v in q):
+        raise SidecarError(f"{where}.q: 7 finite joint values expected, got {q!r}")
+    if "pose" not in raw:
+        raise SidecarError(f"{where}.pose: required (the pre-grasp pose the configuration reaches)")
+    return {"arm": arm, "target": str(raw["target"]), "q": [float(v) for v in q], "pose": Pose.from_dict(raw["pose"], f"{where}.pose"), "from_stance": moved_from}
 
 
 def program_block_design(sc: Sidecar) -> List[Action]:
@@ -333,19 +366,24 @@ def program_block_design(sc: Sidecar) -> List[Action]:
     **Per-block stances** (owner 2026-09-19: the robot may move between blocks for IK feasibility): a block whose record
     names a ``stance`` other than the one the robot stands at is preceded by the recorded travel (path and / or
     transition, hands empty) from the current stance to it; the first block's stance defaults to ``manipulation``. The
-    working arm and the base yaw of the brace / push tail are those of the block's own stance."""
+    working arm and the base yaw of the brace / push tail are those of the block's own stance.
+
+    **Re-pose after a between-block base move** (owner 2026-10-12 item 2, ``blocks[k].repose``): the block's first grasp carries the
+    recorded joint-space re-pose (:func:`block_repose`, ``Grasp.repose``)."""
     if not sc.blocks:
         raise SidecarError("blocks: required for block design")
     current = "manipulation"
     actions = _travel(sc, "init", current)
     for b in sorted(sc.blocks, key=lambda blk: blk.order):
         wanted = str((b.extra or {}).get("stance") or "manipulation")
+        moved_from = None
         if wanted != current:
             actions += _travel(sc, current, wanted)
+            moved_from = current
             current = wanted
         arm = _block_working_arm(sc, current)
         base_yaw = sc.stance(current).base_pose2d[2]
-        grasp = Grasp(kind="cube", arm=arm, object=b.instance, block=b)
+        grasp = Grasp(kind="cube", arm=arm, object=b.instance, block=b, repose=block_repose(b, arm, moved_from))
         lift = Lift(arm=arm, object=b.instance, carry_height=b.carry_height, after=grasp)
         actions += [grasp, lift]
         last: Action = lift

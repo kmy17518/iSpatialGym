@@ -510,6 +510,7 @@ NOTE_KEYS = NOTE_KEYS + ("inhand_reaim",)
 #: room door push-close: the per-chunk record of execute.execute_push_close
 NOTE_KEYS = NOTE_KEYS + ("push_close",)
 NOTE_KEYS = NOTE_KEYS + ("protection",)  # oracle.protection (owner 2026-09-26): the transits of the action and their protected objects
+NOTE_KEYS = NOTE_KEYS + ("repose",)  # block design: the joint-space re-pose before a grasp after a base move (execute.repose_arm)
 NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial 0926-061151): a failed retreat leg replaced by a planned transit
 NOTE_KEYS = NOTE_KEYS + ("ag_joint_type",)  # the assisted-grasp joint a handle grasp got (the task's rule for links behind a movable joint)
 NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, carton lever): the lever fist slides out before it lifts
@@ -1295,6 +1296,10 @@ class Executor:
             # a push / brace acts through the arm's posture around its obstacles (sandal 0927-030120 replayed with the arm kept: the push
             # under the table from the other branch turned the sandal 49 deg): its recorded arm posture stays
             return {"index": j, "name": acts[j].name, "object": None, "chain": [], "why": f"the arm's next contact is a {acts[j].name}, not a grasp"}
+        if getattr(acts[j], "repose", None) is not None:
+            # block design after a base move: the grasp re-poses the arm to its recorded pre-grasp configuration (``Grasp.repose``) - its
+            # witnesses stay the program check's, no branch kept from the travel replaces them
+            return {"index": j, "name": acts[j].name, "object": None, "chain": [], "why": "the arm's next grasp re-poses it to its recorded pre-grasp configuration"}
         chain: List[Dict[str, Any]] = []
         k = j
         while k < len(acts) and not isinstance(acts[k], (Transition, Navigate)):

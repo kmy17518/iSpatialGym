@@ -638,6 +638,10 @@ class Grasp(Action):
     #: instances the grasp may touch besides the grasped object (QA whitelist): ``grasps[].may_touch`` (disembedding's parts and
     #: distractors, owner 2026-10-12 A2b)
     touches: Tuple[str, ...] = ()
+    #: block design after a between-block base move (``programs.block_repose``): ``{"arm", "target": "pre_grasp", "q": [7], "pose": Pose,
+    #: "from_stance"}`` - the arm first makes a planned joint-space move to ``q`` (this grasp's recorded pre-grasp configuration), then
+    #: the transit; None = the transit from wherever the arm is
+    repose: Optional[Dict[str, Any]] = None
     TARGET_KEYS = ("pre_grasp", "grasp", "approach")
 
     def __post_init__(self):

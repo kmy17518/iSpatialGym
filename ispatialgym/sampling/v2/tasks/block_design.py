@@ -46,7 +46,7 @@ from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
 from ispatialgym.sampling.v2.navigation import attached
-from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance, pose_to_sidecar
+from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance, pose_from_sidecar, pose_to_sidecar
 
 from omnigibson.utils.asset_utils import get_dataset_path  # noqa: E402
 
@@ -69,6 +69,11 @@ RETREAT_DIST_M = 0.10 + 0.05
 #: QA collision monitor fails a grasp on any arm-table contact (demo 0919-164732: ``right_arm_link5`` brushed the table for 2 steps
 #: in a 45 deg pitched pinch every margin-0 check had passed); the wrist links 6 / 7 and the hand work close to the table by design
 ARM_CLEAR_LINKS = ("right_arm_link1", "right_arm_link2", "right_arm_link3", "right_arm_link4", "right_arm_link5")
+#: the re-pose after a between-block base move (``generation.repose_after_base_move``): rounds of cuRobo joint-space planning to the
+#: pre-grasp configuration, and the clearance the previous block's end configuration needs at the new stance to be the plan's start
+#: (the program check's travel sweeps keep the arm as left at 1 cm, ``program_check.DEPARTURE_SWEEP_MARGIN``)
+REPOSE_PLAN_ROUNDS = 3
+REPOSE_START_MARGIN = 0.01
 REGION_RADIUS = 0.20
 #: owner 2026-09-16 10:47 ladder: block regions 0.5–0.6 m ahead of the base first, the pitched 30° / 45° picks as the primary
 #: class for every block (straight down last), the pinch 1 mm above the table so the pads get more than ~1 cm of face
@@ -850,14 +855,16 @@ class BlockDesign(SamplerV2):
         records = []
         used: List[Stance] = []  # the stance the robot stands at after every placed block, in placement order
         current = manip
+        self._prev_end_q = None  # where the previous block's last tracked leg left the arm (28-D at its stance; the re-pose plan's start)
         for step, bi in enumerate(order):
             flipping = bool(plans[bi]["flips"])
             cands = self._rank_stances(pool, current, poses[bi], place_goal[bi], flipping)
-            rec, st = self._block_program(rng, cands, names, poses, place_goal, plans, order, step, right, toward, table_yaw)
+            rec, st = self._block_program(rng, cands, names, poses, place_goal, plans, order, step, right, toward, table_yaw, current=current)
             records.append(rec)
             st2 = rec.pop("_regrasp_stance_obj", None)  # flip-in-place with the re-grasp from another stance
             used.append((st, st2))
             current = st2 if st2 is not None else st
+            self._prev_end_q = getattr(self, "_chain_end_q", None)
             for s_ in (st, st2):
                 if s_ is not None and all(s_ is not p_ for p_ in self._proven_stances):
                     self._proven_stances.append(s_)
@@ -918,6 +925,9 @@ class BlockDesign(SamplerV2):
                           "block_stances": {rec["instance"]: rec.get("stance") for rec in records}, "stances_used": names_of,
                           "manipulation_lateral_shift_m": manip.extras.get("lateral_shift_m", 0.0),
                           "flip_classes": {rec["instance"]: rec.get("flip_class") for rec in records if rec.get("flip_class")}})
+        reposes = {rec["instance"]: f"{rec['repose'].get('from_stance')} -> {rec.get('stance')} ({rec['repose'].get('planned_from')})" for rec in records if isinstance(rec.get("repose"), dict)}
+        if reposes:
+            d.summary["block_reposes"] = reposes
         return d
 
     # -- per-block stances (owner 2026-09-19) -----------------------------------------------------------------------
@@ -1149,6 +1159,13 @@ class BlockDesign(SamplerV2):
         prev_world: Optional[Dict[str, TT.Pose]] = None
         for step, (st1, st2) in enumerate(used):
             legs = [(st1, world_at(step, False))] + ([(st2, world_at(step, True))] if (st2 is not None and st2 is not st1) else [])
+            rp = records[step].get("repose")
+            if isinstance(rp, dict):
+                if prev is None or st1 is prev:
+                    log.warning("%s: block %d recorded a re-pose but no base move precedes it: dropped", self.gp.alias, step)
+                    records[step].pop("repose")
+                else:
+                    rp["from_stance"] = prev.name
             for st, world_before in legs:
                 if prev is not None and st is not prev and not self.sidecar_has_travel(prev.name, st.name):
                     self._teleport(world_before)
@@ -1203,17 +1220,27 @@ class BlockDesign(SamplerV2):
         return out
 
     def _block_program(self, rng, cands: List[Stance], names: List[str], poses: Dict[int, TT.Pose], goal_pose: Dict[int, TT.Pose], plans: Dict[int, Dict[str, Any]],
-                       order: List[int], step: int, right: th.Tensor, toward: th.Tensor, table_yaw: float) -> Tuple[Dict[str, Any], Stance]:
+                       order: List[int], step: int, right: th.Tensor, toward: th.Tensor, table_yaw: float, current: Optional[Stance] = None) -> Tuple[Dict[str, Any], Stance]:
         """§6.5 for one block over its candidate stances (owner 2026-09-19, ``_rank_stances``): the first stance whose whole
-        chain passes (``_block_chain``) wins; ``Reject`` with every stance's reason otherwise. Returns ``(record, stance)``."""
+        chain passes (``_block_chain``) wins; ``Reject`` with every stance's reason otherwise. Returns ``(record, stance)``.
+
+        ``generation.repose_after_base_move`` (owner 2026-10-12 item 2): a stance other than ``current`` (where the previous block left
+        the robot) is reached by a between-block base move; there the arm re-poses before the block's chain (``_repose_record``) and
+        the block's legs are tracked with the program check's acceptance (``_tracked_from``)."""
         bi = order[step]
         reasons: List[str] = []
         for j, st in enumerate(cands):
+            reposed = bool(self.gen("repose_after_base_move", False)) and step > 0 and current is not None and st is not current
+            self._oracle_tracking = reposed
             try:
                 rec = self._block_chain(rng, st, names, poses, goal_pose, plans, order, step, right, toward, table_yaw)
+                if reposed:
+                    rec["repose"] = self._repose_record(st, rec, names, poses, goal_pose, order, step)
             except Reject as e:
                 reasons.append(f"stance {j} ({st.extras.get('block_stance_shift_m', 0.0):+.2f} m, so {st.stand_off}, trunk {st.translate:.2f}/{st.tilt:+.2f}): [{e.reason}] {str(e)[:160]}")
                 continue
+            finally:
+                self._oracle_tracking = False
             b_cell = st.world_to_base(self._centre(poses[bi])[0][:2])
             b_slot = st.world_to_base(self._centre(goal_pose[bi])[0][:2])
             log.info("%s: block %s (%s) solved from stance %d of %d (shift %+.2f m, stand-off %.2f, trunk %.2f/%+.2f; cell base (%.2f, %+.2f), slot base (%.2f, %+.2f)) with %s",
@@ -1223,6 +1250,45 @@ class BlockDesign(SamplerV2):
         kind = "flip" if plans[bi]["flips"] else "pick"
         raise Reject("place_unreachable" if any("place_unreachable" in r for r in reasons) else "grasp_unreachable",
                      f"block {names[bi]} ({kind}): no stance of {len(cands)} passes its chain: " + " | ".join(reasons[:4]))
+
+    def _repose_record(self, st: Stance, rec: Dict[str, Any], names: List[str], poses: Dict[int, TT.Pose], goal_pose: Dict[int, TT.Pose], order: List[int],
+                       step: int) -> Dict[str, Any]:
+        """The re-pose before a block's chain at a stance reached by a between-block base move (``generation.repose_after_base_move``,
+        owner 2026-10-12 item 2): a planned joint-space move of the working arm to the pre-grasp configuration of the block's first
+        grasp - the configuration its approach was tracked from, in the IK branch whose legs reach the place (``_chain_pre_q``).
+        Checked in the world before the pick (the blocks placed so far at their slots, the others at init, the board and the table
+        present): the configuration reaches the recorded ``pre_pick``, is collision-free, and cuRobo plans a joint-space path to it
+        from where the previous block's last tracked leg left the arm (put on this stance; the stance posture when that start
+        collides here). ``Reject("repose_unplannable")`` otherwise. The program check plans the move again from where its travel
+        leaves the arm; the oracle executes it (``Grasp.repose``)."""
+        bi = order[step]
+        q7 = getattr(self, "_chain_pre_q", None)
+        pre = pose_from_sidecar(rec.get("pre_pick")) if isinstance(rec.get("pre_pick"), dict) else None
+        if q7 is None or pre is None:
+            raise Reject("repose_unplannable", f"block {names[bi]}: the {rec.get('flip_mode') or 'direct'} chain left no pre-grasp configuration to re-pose to")
+        self._teleport({names[o]: (goal_pose[o] if j < step else poses[o]) for j, o in enumerate(order)})
+        q_goal = self.ikc.q_locked(st, right_arm=th.tensor(q7, dtype=th.float32))
+        if not self.ikc.reaches(q_goal, pre, "right"):
+            raise Reject("repose_unplannable", f"block {names[bi]}: the pre-grasp configuration misses the recorded pre-grasp pose")
+        if not bool(self.kit.collision_free(q_goal, margin=0.0)[0]):
+            raise Reject("repose_unplannable", f"block {names[bi]}: the pre-grasp configuration collides with the world at the stance")
+        start, label = self.ikc.q_locked(st), "stance posture"
+        prev = getattr(self, "_prev_end_q", None)
+        if prev is not None:
+            q_prev = self.ikc.q_locked(st, right_arm=TT._t(prev)[self.kit.robot.arm_control_idx["right"]])
+            if bool(self.kit.collision_free(q_prev, margin=REPOSE_START_MARGIN)[0]):
+                start, label = q_prev, "previous block's end"
+        res = None
+        for _ in range(REPOSE_PLAN_ROUNDS):
+            res = self.kit.backend.plan_joint("right_arm", q_goal, q_start=start, max_attempts=4, sync_world=False)
+            if res.success:
+                break
+        if res is None or not res.success:
+            raise Reject("repose_unplannable", f"block {names[bi]}: no joint-space plan from the {label} to the pre-grasp configuration "
+                                               f"({getattr(res, 'status', '?')})")
+        log.info("%s: block %s re-poses after the base move: joint-space plan from the %s to its pre-grasp configuration (%d waypoints)",
+                 self.gp.alias, names[bi], label, len(res.q_traj))
+        return {"arm": "right", "target": "pre_grasp", "q": [round(float(v), 5) for v in q7], "pose": rec["pre_pick"], "planned_from": label}
 
     def _flip_classes(self, block, pick_pose: TT.Pose, place_pose: TT.Pose, plan: Dict[str, Any], table_yaw: float) -> List[Tuple[Any, ...]]:
         """Cube grasp classes of a flipping block (owner 2026-09-19): the pinch across the face pair parallel to the flip axis,
@@ -1359,8 +1425,16 @@ class BlockDesign(SamplerV2):
         # descent, retreat) are finished by arm_to from a stall below ExecuteConfig.free_leg_finish_max_stall (3 cm; the descent
         # 1.5 cm), so a stall there passes here as it does in the oracle
         soft = None if hard else float(self.gen("tracked_soft_stall_m", 0.015))
+        kw: Dict[str, Any] = {}
+        if getattr(self, "_oracle_tracking", False):
+            # a re-posed block (``_block_program``): the program check's continuation acceptance (``IKChecker.continue_chain``) - the
+            # oracle's soft waypoint tolerances and iteration budget, a stall finished only within FINISH_MAX_EXCURSION of where it
+            # stalled. Without the bound a stall was finished in another IK branch (c1_k4 2026-10-12: the re-grasp's carry at
+            # manipulation_4, whose finish the program check found 3.19 rad away)
+            kw = {"finish_max_excursion": self.ikc.FINISH_MAX_EXCURSION, "soft_pos_tol": self.ikc.ORACLE_SOFT_POS_TOL,
+                  "soft_rot_tol": self.ikc.ORACLE_SOFT_ROT_TOL, "max_iters": self.ikc.ORACLE_DIFF_IK_MAX_ITERS}
         return self.ikc.track_chain(q_from, poses, "right", ignore=list(ignore), ignore_end=list(ignore_end), soft_stall_m=soft,
-                                    clear_links=ARM_CLEAR_LINKS, clear_margin=float(self.gen("arm_link_margin_m", 0.012)))
+                                    clear_links=ARM_CLEAR_LINKS, clear_margin=float(self.gen("arm_link_margin_m", 0.012)), **kw)
 
     def _approach_clear(self, pre: TT.Pose, end: TT.Pose, ignore: List[Any]) -> Optional[str]:
         """The straight approach ``pre -> end`` tracked from the pre pose's remembered solution with the arm links kept clear of the
@@ -1408,6 +1482,9 @@ class BlockDesign(SamplerV2):
         support = self.obj("support")
         plan = plans[bi]
         self._chosen_pick_q = None  # the pick configuration of the chain chosen below (recorded for the program check's grasp seed)
+        # the right arm's joints at the chosen chain's first pre-grasp (its approach was tracked from them) and the configuration its
+        # last tracked leg ends in: the re-pose target of a block after a base move and the next re-pose plan's start (``_repose_record``)
+        self._chain_pre_q = self._chain_end_q = None
         theta = float(self.g("flip_tilt_deg"))
         # world for the pick: blocks placed so far at their slots, the others (incl. this one) at init
         world_poses = {names[o]: (goal_pose[o] if j < step else poses[o]) for j, o in enumerate(order)}
@@ -1556,6 +1633,7 @@ class BlockDesign(SamplerV2):
             if not res.ok:
                 diag.append(f"{label}: pick exact {res.reason}")
                 continue
+            q_pre = self.ikc.solutions.get(("right", self.ikc._pose_key(pre_pick)))
             bad = self._arm_clear(res.q) or self._approach_clear(pre_pick, g_pick.eef, [support, block])
             if bad is not None:
                 diag.append(f"{label}: pick: {bad}")
@@ -1618,6 +1696,7 @@ class BlockDesign(SamplerV2):
                         continue
             chosen = (label, pair, g_pick, place_margin_pose, pre_pick, pre_place, wps, clearance, lam)
             self._chosen_pick_q = self._arm_q_list(res.q)
+            self._chain_pre_q, self._chain_end_q = self._arm_q_list(q_pre), q_end
             break
         if chosen is None and plan["flips"] and bool(self.gen("flip_in_place_fallback", True)):
             # owner 2026-09-19 "flip in place, then move": the in-hand flip's place LEFT of the pick cell (the goal grid hangs at
@@ -1777,6 +1856,7 @@ class BlockDesign(SamplerV2):
             if not res.ok:
                 diag.append(f"in-place {label}: pick exact {res.reason}")
                 continue
+            q_pre1 = self.ikc.solutions.get(("right", self.ikc._pose_key(pre_pick)))
             bad = self._arm_clear(res.q) or self._approach_clear(pre_pick, g.eef, [support, block])
             if bad is not None:
                 diag.append(f"in-place {label}: pick: {bad}")
@@ -1828,6 +1908,7 @@ class BlockDesign(SamplerV2):
                         continue
             leg1 = (label, pair, g, place1, pre_place1, wps, clearance, lam, own_xy, own_goal)
             self._leg1_pick_q = self._arm_q_list(res.q)
+            self._chain_pre_q = self._arm_q_list(q_pre1)
             # --- leg 2 for this set-down: pitched re-grasp of the turned block, place at the slot -------------------------
             # from the leg-1 stance first, then from the pool stances ranked for this pick / place (the slot near the centre
             # line is easiest from the stance the non-flipping blocks used); the program travels there with empty hands
@@ -1837,6 +1918,7 @@ class BlockDesign(SamplerV2):
                 break
             spots_failed_leg2.add(si)
             leg1 = None
+            self._chain_pre_q = None
             self._teleport(world_poses)
         if leg1 is None or leg2 is None:
             return None
@@ -1977,6 +2059,7 @@ class BlockDesign(SamplerV2):
                             diag.append(f"{tag} {label2}: carry + place + retreat from the lift {why}")
                             continue
                 self._leg2_pick_q = self._arm_q_list(res.q)
+                self._chain_end_q = q_end2
                 return (label2, pair2, g2, place2m, pre_pick2, pre_place2, clr2)
             return None
 
