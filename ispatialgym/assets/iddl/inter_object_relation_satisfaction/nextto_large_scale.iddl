@@ -1,0 +1,26 @@
+; IORS - nextto (large-scale). The target is a floor-standing spawned object (its support is the floor) and ends next to a
+; large scene partner (a copy of ontop_large_scale with the goal predicate nextto; registered 2026-10-12, the sampler mode
+; comes next).
+(define (iddl inter_object_relation_satisfaction-nextto_large_scale)
+    (:family inter_object_relation_satisfaction)
+    (:alias inter_object_relation_satisfaction-nextto_large_scale-{target}-{partner}-{support})
+    (:require
+        (grasps target tabletop)
+    )
+    (:init
+        (ontop target support)
+        (not (nextto target partner))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (nextto ?target ?partner)
+            (not (grasped ?agent ?target))
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+    )
+)

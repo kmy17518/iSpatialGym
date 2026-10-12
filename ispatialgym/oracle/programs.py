@@ -998,7 +998,13 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     object is dropped on the floor outside the partner's footprint edge and pushed under it with the closed gripper
     along the recorded straight floor push ``contacts.push`` (``kind: "push_under"``, from stance C): ``… → place(drop)
     → retreat → push → retreat``. The push may touch the floor and the target, never the partner; ``under`` is read in
-    the epilogue after the push."""
+    the epilogue after the push.
+
+    inside / touching / nextto (registered 2026-10-12 ahead of their modes): each relation's own program,
+    :func:`program_iors_large_inside` / :func:`program_iors_large_touching` / :func:`program_iors_large_nextto`."""
+    mode = {"inside": program_iors_large_inside, "touching": program_iors_large_touching, "nextto": program_iors_large_nextto}.get(relation)
+    if mode is not None:
+        return mode(sc)
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     if sc.path("manipulation", "placement") is None:
         raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
@@ -1031,6 +1037,27 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     p = Push(contact=push, base_yaw=base_yaw, touches=(g.place_on,) if g.place_on else (), avoid=avoid)
     to_push = _travel(sc, "placement", "push") if push_stance == "push" else []
     return head + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)] + to_push + [p, Retreat(arm=push.arm, object=push.object, after=p)]
+
+
+def program_iors_large_inside(sc: Sidecar) -> List[Action]:
+    """IORS inside, large-scale (``program_iors_large`` with relation ``inside``): the program of the inside mode, written with
+    that mode; until then a sidecar of the subtask has no program. The target ends inside the partner (``inside`` read in the
+    epilogue)."""
+    raise NotImplementedError("relation_not_implemented: IORS large-scale 'inside' has no oracle program yet")
+
+
+def program_iors_large_touching(sc: Sidecar) -> List[Action]:
+    """IORS touching, large-scale (``program_iors_large`` with relation ``touching``): the program of the touching mode, written
+    with that mode; until then a sidecar of the subtask has no program. The target ends touching the partner (``touching`` read
+    in the epilogue)."""
+    raise NotImplementedError("relation_not_implemented: IORS large-scale 'touching' has no oracle program yet")
+
+
+def program_iors_large_nextto(sc: Sidecar) -> List[Action]:
+    """IORS nextto, large-scale (``program_iors_large`` with relation ``nextto``): the program of the nextto mode, written with
+    that mode; until then a sidecar of the subtask has no program. The target ends next to the partner (``nextto`` read in the
+    epilogue)."""
+    raise NotImplementedError("relation_not_implemented: IORS large-scale 'nextto' has no oracle program yet")
 
 
 def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:
@@ -1105,6 +1132,9 @@ PROGRAMS: Dict[str, Tuple[Callable[..., List[Action]], Dict[str, object]]] = {
     "alignment-axial": (program_alignment_axial, {}),
     "inter_object_relation_satisfaction-ontop_large_scale": (program_iors_large, {"relation": "ontop"}),
     "inter_object_relation_satisfaction-under_large_scale": (program_iors_large, {"relation": "under"}),
+    "inter_object_relation_satisfaction-inside_large_scale": (program_iors_large, {"relation": "inside"}),
+    "inter_object_relation_satisfaction-touching_large_scale": (program_iors_large, {"relation": "touching"}),
+    "inter_object_relation_satisfaction-nextto_large_scale": (program_iors_large, {"relation": "nextto"}),
     "inter_object_relation_satisfaction-ontop_small_scale": (program_iors_small, {"relation": "ontop"}),
     "inter_object_relation_satisfaction-under_small_scale": (program_iors_small, {"relation": "under"}),
     "inter_object_relation_satisfaction-inside": (program_iors_small, {"relation": "inside"}),

@@ -364,6 +364,12 @@ PROGRAM_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "inter_object_relation_satisfaction-touching": ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.push"),  # brace optional (owner 2026-09-16 17:10; same rule as axial)
     "inter_object_relation_satisfaction-ontop_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths"),
     "inter_object_relation_satisfaction-under_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths"),
+    # registered 2026-10-12 ahead of their modes (each mode may adjust its list): inside as ontop; touching as ontop + the push record
+    # of under's push-under; nextto has no grasp (the base pushes the floor-standing target)
+    "inter_object_relation_satisfaction-inside_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths"),
+    "inter_object_relation_satisfaction-touching_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths",
+                                                                "contacts.push"),
+    "inter_object_relation_satisfaction-nextto_large_scale": ("stances.init", "stances.manipulation", "transitions", "paths"),
 }
 
 
@@ -384,6 +390,8 @@ def _expand():
 
 
 def subtask_blocks(subtask: str) -> Tuple[str, ...]:
+    if subtask in PROGRAM_BLOCKS:  # ``...-inside_large_scale`` also starts with ``...-inside``
+        return PROGRAM_BLOCKS[subtask]
     for k, v in PROGRAM_BLOCKS.items():
         if subtask == k or subtask.startswith(k):
             return v

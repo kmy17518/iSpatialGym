@@ -69,6 +69,9 @@ V1_KEY = {
     f"{IORS}-inside": (f"{IORS}-2", "inter_object_relation_satisfaction/inside.iddl"),
     f"{IORS}-nextto": (f"{IORS}-3", "inter_object_relation_satisfaction/nextto.iddl"),
     f"{IORS}-touching": (f"{IORS}-4", "inter_object_relation_satisfaction/touching.iddl"),
+    f"{IORS}-inside_large_scale": (f"{IORS}-2", "inter_object_relation_satisfaction/inside_large_scale.iddl"),
+    f"{IORS}-nextto_large_scale": (f"{IORS}-3", "inter_object_relation_satisfaction/nextto_large_scale.iddl"),
+    f"{IORS}-touching_large_scale": (f"{IORS}-4", "inter_object_relation_satisfaction/touching_large_scale.iddl"),
 }
 #: relative sampling cost (job ordering on the fleet)
 WEIGHT = {"camera_relocalization-standard": 1.5, "camera_relocalization-obstructed": 2.5, "object_scaling": 1.0, "mental_rotation": 1.0,

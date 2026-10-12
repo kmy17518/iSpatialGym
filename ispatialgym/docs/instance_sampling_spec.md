@@ -1413,6 +1413,14 @@ breakfast_table — filtered per target height class by the under-clearance rule
 library grasps), fixed `partner`, fixed `support` (the init surface), `floor`. Three recorded stances: **A** init pose
 and **B** manipulation stance at the init surface, **C** placement stance at the partner.
 
+**inside / touching / nextto (registered 2026‑10‑12; their modes come next).** `inter_object_relation_satisfaction-
+inside_large_scale` / `-touching_large_scale` / `-nextto_large_scale` are registered with `IORSLarge` (relation `inside` /
+`touching` / `nextto`) wherever ontop / under are: iddls copied from `ontop_large_scale` with the goal `(inside | touching |
+nextto ?target ?partner)`, a copy of ontop's `generation` defaults (touching: `goal_drop_m` 0.003, the floor as under), the
+init-surface chain support → floor (nextto: the target is a floor-standing spawned object, its init surface is the floor),
+the oracle program `program_iors_large` with the relation. The sampler mode and the program of each relation come next;
+until its mode lands the relation's hook rejects every template with `relation_not_implemented`.
+
 **Init surface** — an explicit choice of `ground_isg` (it is in the alias), never a runtime fallback. Selection order
 (owner decision 2026‑09‑16, A5; minimise floor inits): under — (a) a support object whose near AABB side lies within
 `max_partner_geodesic` (3.0 m, eroded map) of the partner's near AABB side → (b) **the partner's own top** ("take it

@@ -75,6 +75,9 @@ SUBTASK_FAMILY = {
     "inter_object_relation_satisfaction-touching": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),
     "inter_object_relation_satisfaction-ontop_large_scale": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),
     "inter_object_relation_satisfaction-under_large_scale": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),
+    "inter_object_relation_satisfaction-inside_large_scale": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),
+    "inter_object_relation_satisfaction-touching_large_scale": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),
+    "inter_object_relation_satisfaction-nextto_large_scale": ("inter_object_relation_satisfaction", "inter_object_relation_satisfaction"),
 }
 
 

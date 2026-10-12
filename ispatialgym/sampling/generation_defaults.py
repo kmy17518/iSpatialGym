@@ -513,6 +513,53 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "target_max_height_m": 0.20,  # A9 filler: under targets ≤ 0.20 m (representatives_report.md)
         "argument_order": ["target", "partner"],  # iddl: (under ?target ?partner) — the target ends under the partner
     },
+    # inside / touching / nextto large-scale (registered 2026-10-12 ahead of their modes): copies of ontop_large's block; each mode's
+    # own keys come with its patch
+    "inter_object_relation_satisfaction-inside_large_scale": {
+        **COMMON,
+        "tolerances": dict(TOLERANCES_MEASURED),  # §8
+        "groups": {},
+        "path_buckets": None,
+        "max_partner_geodesic_m": 3.0,  # §5.6 [pilot] init support within 3.0 m geodesic of the partner
+        "path_max_extra_m": 1.0,  # §3.7 / §5.6 B -> C path ≤ max_partner_geodesic + 1 m
+        "goal_cell_margin_m": 0.05,  # §5.6 / §6.12 placement face eroded by half-extent + 0.05
+        "goal_drop_m": 0.01,  # §5.6 z = partner face + bottom offset + 1 cm
+        "partner_corners_in_frame_min": 4,  # §5.6 ≥ 4 of the partner's 8 AABB corners in frame at stance A
+        "floor_init": {"distance_range_m": [0.6, 1.5], "cell_m": 0.02, "clearance_m": 0.02, "max_geodesic_m": 3.0},  # §5.6
+        "stand_offs_m": [0.35, 0.45, 0.55],  # §5.6 stance C
+        "partner_moved_max_m": 0.005,  # §5.6 partner unchanged during the goal settle (≤ 5 mm)
+        "target_max_height_m": 0.35,  # as ontop
+    },
+    "inter_object_relation_satisfaction-touching_large_scale": {
+        **COMMON,
+        "tolerances": dict(TOLERANCES_MEASURED),  # §8
+        "groups": {},
+        "path_buckets": None,
+        "max_partner_geodesic_m": 3.0,  # §5.6 [pilot]
+        "path_max_extra_m": 1.0,  # §3.7 / §5.6
+        "goal_cell_margin_m": 0.05,  # §5.6
+        "goal_drop_m": 0.003,  # as under: the target ends on the floor (floor push), z = floor + bottom offset + 3 mm
+        "partner_corners_in_frame_min": 4,  # §5.6
+        "floor_init": {"distance_range_m": [0.6, 1.5], "cell_m": 0.02, "clearance_m": 0.02, "max_geodesic_m": 3.0},  # §5.6
+        "stand_offs_m": [0.35, 0.45, 0.55],  # §5.6
+        "partner_moved_max_m": 0.005,  # §5.6
+        "target_max_height_m": 0.35,  # as ontop
+    },
+    "inter_object_relation_satisfaction-nextto_large_scale": {
+        **COMMON,
+        "tolerances": dict(TOLERANCES_MEASURED),  # §8
+        "groups": {},
+        "path_buckets": None,
+        "max_partner_geodesic_m": 3.0,  # §5.6 [pilot]
+        "path_max_extra_m": 1.0,  # §3.7 / §5.6
+        "goal_cell_margin_m": 0.05,  # §5.6
+        "goal_drop_m": 0.01,  # §5.6
+        "partner_corners_in_frame_min": 4,  # §5.6
+        "floor_init": {"distance_range_m": [0.6, 1.5], "cell_m": 0.02, "clearance_m": 0.02, "max_geodesic_m": 3.0},  # §5.6
+        "stand_offs_m": [0.35, 0.45, 0.55],  # §5.6
+        "partner_moved_max_m": 0.005,  # §5.6
+        "target_max_height_m": 0.35,  # as ontop (read by no code today; a floor-standing nextto target is taller)
+    },
 }
 
 #: Group roles whose members are drawn (``generation.groups.<role>``), per subtask (kind ``group`` in the icl).

@@ -91,8 +91,15 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 RELATION_OF_SUBTASK = {
     "inter_object_relation_satisfaction-ontop_large_scale": "ontop",
     "inter_object_relation_satisfaction-under_large_scale": "under",
+    "inter_object_relation_satisfaction-inside_large_scale": "inside",
+    "inter_object_relation_satisfaction-touching_large_scale": "touching",
+    "inter_object_relation_satisfaction-nextto_large_scale": "nextto",
 }
 V1_DEFINITION_ID = {"ontop": 0, "under": 1}
+#: relations registered ahead of their modes (owner 2026-10-12): relation -> its hook, which ``bind_scene_roles`` (the first stage of the
+#: template setup) calls before any of the ontop / under flow; the hook returns the relation's mode class (:meth:`IORSLarge._adopt_mode`)
+#: and rejects until the mode lands
+MODE_HOOKS = {"inside": "_sample_inside", "touching": "_sample_touching", "nextto": "_sample_nextto"}
 #: scene categories a fixed partner may bind to (B4 ``PARTNER_CATEGORIES``)
 PARTNER_CATEGORIES = ("bed", "sofa", "couch", "desk", "breakfast_table", "countertop")
 SUPPORT_CATEGORIES = ("breakfast_table", "desk", "coffee_table", "conference_table", "pedestal_table", "countertop", "bar", "nightstand", "console_table",
@@ -392,10 +399,12 @@ class SegmentArms:
 
 @register(*RELATION_OF_SUBTASK)
 class IORSLarge(SamplerV2):
+    relation_mode: Optional[type] = None  # the relation's mode class once adopted (inside / touching / nextto)
+
     def __init__(self, ctx):
         super().__init__(ctx)
         self.relation = RELATION_OF_SUBTASK[self.subtask]
-        if self.gp.bddl is None:
+        if self.gp.bddl is None and self.relation in V1_DEFINITION_ID:
             self.definition_id = V1_DEFINITION_ID[self.relation]
         self.hull: Optional[th.Tensor] = None
         self.rest: th.Tensor = G.IDENTITY_QUAT.clone()
@@ -411,6 +420,9 @@ class IORSLarge(SamplerV2):
     # ------------------------------------------------------------------ roles
 
     def bind_scene_roles(self):
+        if self.relation in MODE_HOOKS and self.relation_mode is None:
+            self._adopt_mode(getattr(self, MODE_HOOKS[self.relation])())
+            return self.bind_scene_roles()  # the mode's own, else the ontop / under flow from here on with the mode's overrides
         self.bind_floor_v2()
         req = self.choice.bindings.get("partner")
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
@@ -2996,3 +3008,31 @@ class IORSLarge(SamplerV2):
         return [{"scope": {"scene": self.scene, "partner": self.partner.name, "target": f"{c.category}/{c.model}"}, "type": "placement",
                  "edge": place.edge.name if place.edge else None, "stand_off": place.stand_off, "lateral": place.lateral, "trunk": [place.translate, round(place.tilt, 3)],
                  "goal_cell": draft.summary.get("goal_cell"), "grasp": [round(g.yaw, 2), g.grasp_name], "hard": False}]
+
+    # ------------------------------------------------------------------ inside / touching / nextto (registered 2026-10-12, modes next)
+
+    def _adopt_mode(self, mode: type) -> None:
+        """The relation's mode takes over: ``mode`` (the class its hook returns, from the mode's own module, written like an IORSLarge
+        subclass or mixin; not ``@register``-ed) goes in front of this sampler's class, so every method it defines (``bind_scene_roles``,
+        ``prepare_bindings``, ``sample_template``, ``sample_instance``, ``goal``, ``after_goal_check``, ... or a helper of the ontop / under
+        flow) replaces IORSLarge's, which ``super()`` still reaches."""
+        self.relation_mode = mode
+        self.__class__ = type(f"{type(self).__name__}_{mode.__name__}", (mode, type(self)), {})
+
+    def _sample_inside(self) -> type:
+        """``inside`` (``...-inside_large_scale``): the hook of the inside mode - it returns the mode's class (:meth:`_adopt_mode`),
+        imported from the mode's own module inside this method. Until the mode lands every template of the subtask is rejected with
+        ``relation_not_implemented``."""
+        raise Reject("relation_not_implemented", "IORS large-scale 'inside' is registered; its sampler mode is not implemented yet")
+
+    def _sample_touching(self) -> type:
+        """``touching`` (``...-touching_large_scale``): the hook of the touching mode - it returns the mode's class (:meth:`_adopt_mode`),
+        imported from the mode's own module inside this method. Until the mode lands every template of the subtask is rejected with
+        ``relation_not_implemented``."""
+        raise Reject("relation_not_implemented", "IORS large-scale 'touching' is registered; its sampler mode is not implemented yet")
+
+    def _sample_nextto(self) -> type:
+        """``nextto`` (``...-nextto_large_scale``): the hook of the nextto mode - it returns the mode's class (:meth:`_adopt_mode`),
+        imported from the mode's own module inside this method. Until the mode lands every template of the subtask is rejected with
+        ``relation_not_implemented``."""
+        raise Reject("relation_not_implemented", "IORS large-scale 'nextto' is registered; its sampler mode is not implemented yet")

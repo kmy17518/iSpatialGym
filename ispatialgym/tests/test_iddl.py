@@ -1,4 +1,4 @@
-"""The iddl parser (``sampling/iddl.py``) on the 20 shipped files and on malformed input (no simulator)."""
+"""The iddl parser (``sampling/iddl.py``) on the 23 shipped files and on malformed input (no simulator)."""
 
 import os
 
@@ -30,11 +30,14 @@ EXPECTED = {
     "inter_object_relation_satisfaction-touching": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-ontop_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-under_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
+    "inter_object_relation_satisfaction-inside_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
+    "inter_object_relation_satisfaction-touching_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
+    "inter_object_relation_satisfaction-nextto_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
 }
 
 
-def test_all_20_files_load_keyed_by_subtask_id():
-    assert len(IDDLS) == 20
+def test_all_23_files_load_keyed_by_subtask_id():
+    assert len(IDDLS) == 23
     assert set(IDDLS) == set(EXPECTED)
     for subtask, iddl in IDDLS.items():
         assert iddl.subtask == subtask

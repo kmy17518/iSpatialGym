@@ -158,6 +158,10 @@ PENDING_CONTACTS_REASON = "missing_contacts_pending_B6"
 INIT_SURFACE_FALLBACK_SUBTASKS = {
     "inter_object_relation_satisfaction-under_large_scale": ("partner", "floor"),
     "inter_object_relation_satisfaction-ontop_large_scale": ("floor",),
+    "inter_object_relation_satisfaction-inside_large_scale": ("floor",),
+    "inter_object_relation_satisfaction-touching_large_scale": ("floor",),
+    # the target is a floor-standing spawned object: its init surface is the floor, nothing comes after it
+    "inter_object_relation_satisfaction-nextto_large_scale": ("floor",),
 }
 SCALE_FALLBACK_SUBTASKS = ("alignment-world_vertical", "alignment-axial")
 #: Scale fallbacks that shrink the target's height only, never the whole model (owner 2026-10-11: "if alignment axial paperback
@@ -1032,7 +1036,7 @@ class Grounder:
         out: List[Combination] = []
         if not picks:
             # no object pick (camera_relocalization-standard): one combination from the room rows
-            if not iddl.roles or all(self.icl.kind_of(subtask, r) == "scene" for r in iddl.roles):
+            if not iddl.roles or (self._has_candidates(iddl) and all(self.icl.kind_of(subtask, r) == "scene" for r in iddl.roles)):
                 try:
                     out.append(self._build(iddl, f"{subtask}#00", "representative", {}))
                 except Skip as s:
@@ -1125,8 +1129,15 @@ class Grounder:
         return out
 
     # -- building one combination ------------------------------------------------------------------------------------
+    def _has_candidates(self, iddl: I.IDDL) -> bool:
+        """False for a subtask with roles but not one row in roles/candidates.csv (registered ahead of its data: IORS large-scale inside /
+        touching / nextto, 2026-10-12): its picks are skipped, while a role without rows of a subtask that has rows stays an error."""
+        return not iddl.roles or any(self.icl.has_role(iddl.subtask, r) for r in iddl.roles)
+
     def _build(self, iddl: I.IDDL, pick: str, slot: str, rows: Dict[str, Dict[str, str]]) -> Combination:
         subtask = iddl.subtask
+        if not self._has_candidates(iddl):
+            raise Skip("no_candidates", f"{subtask}: no rows in roles/candidates.csv yet (registered ahead of its data)")
         comb = Combination(subtask, pick, slot, {}, selection=dict(rows))
         for role in iddl.roles:
             kind = self.icl.kind_of(subtask, role)

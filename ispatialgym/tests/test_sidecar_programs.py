@@ -144,6 +144,12 @@ def fixture_path(subtask):
     return os.path.join(DATA, f"{subtask}.json")
 
 
+#: registered 2026-10-12 ahead of their modes: a subtask among them gets its fixture and expected sequence with its mode
+MODES_PENDING = ("inter_object_relation_satisfaction-inside_large_scale", "inter_object_relation_satisfaction-touching_large_scale",
+                 "inter_object_relation_satisfaction-nextto_large_scale")
+FIXTURE_SUBTASKS = tuple(s for s in SUBTASKS if os.path.exists(fixture_path(s)))
+
+
 def load(subtask) -> Sidecar:
     return Sidecar.load(fixture_path(subtask))
 
@@ -169,18 +175,19 @@ class StubState:
 
 def test_fixture_set_covers_every_subtask():
     files = {os.path.basename(p)[: -len(".json")] for p in glob.glob(os.path.join(DATA, "*.json"))}
-    assert files == set(SUBTASKS)
-    assert len(SUBTASKS) == 20
+    assert files == set(FIXTURE_SUBTASKS)
+    assert set(SUBTASKS) - files <= set(MODES_PENDING)
+    assert len(SUBTASKS) == 23
 
 
 def test_subtask_registry_is_consistent():
     assert set(alias_templates()) == set(SUBTASKS) == set(PROGRAMS) == set(REQUIRED_BLOCKS)
-    assert set(EXPECTED_SEQUENCE) == set(SUBTASKS)
+    assert set(EXPECTED_SEQUENCE) == set(FIXTURE_SUBTASKS)
     # 14 rows of §6.2 -> 13 program functions (camera relocalization standard / obstructed share one with a flag)
     assert len({fn for fn, _ in PROGRAMS.values()}) == 13
 
 
-@pytest.mark.parametrize("subtask", SUBTASKS)
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_sidecar_loads_and_validates(subtask):
     sc = load(subtask)
     assert sc.schema == "isg-oracle-v1"
@@ -192,7 +199,7 @@ def test_sidecar_loads_and_validates(subtask):
         assert sc.has_block(block), block
 
 
-@pytest.mark.parametrize("subtask", SUBTASKS)
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_sidecar_round_trips(subtask, tmp_path):
     sc = load(subtask)
     d = sc.to_dict()
@@ -214,7 +221,8 @@ def test_sidecar_round_trips(subtask, tmp_path):
 
 def test_subtask_of_alias():
     for subtask in SUBTASKS:
-        assert subtask_of_alias(load(subtask).alias) == subtask
+        if subtask in FIXTURE_SUBTASKS:
+            assert subtask_of_alias(load(subtask).alias) == subtask
         _family, template = alias_templates()[subtask]
         assert subtask_of_alias(template) == subtask
     assert subtask_of_alias("configuration_matching-block_design-block_4-breakfast_table") == "configuration_matching-block_design"
@@ -241,7 +249,7 @@ def test_verify_tro(tmp_path):
 # ----------------------------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("subtask", SUBTASKS)
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_expand_returns_the_expected_sequence(subtask):
     sc = load(subtask)
     actions = expand(sc.alias, sc)
@@ -250,7 +258,7 @@ def test_expand_returns_the_expected_sequence(subtask):
     assert [a.name for a in expand(alias_templates()[subtask][1], sc)] == EXPECTED_SEQUENCE[subtask]
 
 
-@pytest.mark.parametrize("subtask", SUBTASKS)
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_actions_follow_the_contract(subtask):
     sc = load(subtask)
     actions = expand(sc.alias, sc)
@@ -538,7 +546,7 @@ def test_iors_place_kinds_and_relations():
 # ----------------------------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("subtask", SUBTASKS)
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_annotate_returns_two_texts_with_display_names(subtask):
     sc = load(subtask)
     for action in expand(sc.alias, sc):
@@ -622,7 +630,7 @@ def _check_value(key, value, where):
 
 
 @needs_conventions
-@pytest.mark.parametrize("subtask", SUBTASKS)
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_targets_keys_and_shapes(subtask):
     sc = load(subtask)
     state = StubState()

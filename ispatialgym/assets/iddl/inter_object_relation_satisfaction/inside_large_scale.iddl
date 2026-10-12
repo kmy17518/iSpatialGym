@@ -1,0 +1,27 @@
+; IORS - inside (large-scale). The target starts on a support (a table near the partner, or the floor beside it - an
+; explicit support choice made by ground_isg, never a runtime fallback) and ends inside a large scene partner (a copy of
+; ontop_large_scale with the goal predicate inside; registered 2026-10-12, the sampler mode comes next). Three recorded
+; stances: init A, manipulation B, placement C.
+(define (iddl inter_object_relation_satisfaction-inside_large_scale)
+    (:family inter_object_relation_satisfaction)
+    (:alias inter_object_relation_satisfaction-inside_large_scale-{target}-{partner}-{support})
+    (:require
+        (grasps target tabletop)
+    )
+    (:init
+        (ontop target support)
+        (not (inside target partner))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (inside ?target ?partner)
+            (not (grasped ?agent ?target))
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+    )
+)
