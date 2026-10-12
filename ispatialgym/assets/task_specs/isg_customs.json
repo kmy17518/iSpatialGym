@@ -34557,9 +34557,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "ppykkp",
+    "representative": "lcebsq",
     "grasp_keys": {
-     "steak/ppykkp": "steak__ppykkp__t"
+     "steak/ppykkp": "steak__ppykkp__t",
+     "steak/lcebsq": "steak__lcebsq__t"
     }
    },
    "partner": {
@@ -34589,7 +34590,10 @@
        "name": "burner_mdanhg_0",
        "init": "ontop",
        "top_z": 0.91,
-       "row": "inter_object_relation_satisfaction-ontop_small_scale#02~T3"
+       "row": "inter_object_relation_satisfaction-ontop_small_scale#02~T3",
+       "neighbors": [
+        "bar_byvbuc_0"
+       ]
       }
      ],
      "floor": {
@@ -34599,7 +34603,7 @@
     "whitelist": {
      "target": {
       "steak": [
-       "ppykkp"
+       "lcebsq"
       ]
      },
      "partner": {
@@ -34611,12 +34615,13 @@
     "blacklist": {
      "target": {
       "steak": {
-       "akoxpw": "ground_isg 2026-10-11: heldout"
+       "akoxpw": "ground_isg 2026-10-12: heldout",
+       "ppykkp": "pilot 2026-10-12: owner item 6a - the target is steak/lcebsq; ppykkp stood its 2.8 cm steak on the 13 cm edge and fell flat while settling"
       }
      },
      "partner": {
       "frying_pan": {
-       "aewpzn": "ground_isg 2026-10-11: heldout"
+       "aewpzn": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -34650,7 +34655,30 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1,
+   "partner_on_meta_link": "heatsource",
+   "start_region_on_neighbors": true
   },
   "constraints": []
  },
@@ -34664,9 +34692,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "ppykkp",
+    "representative": "lcebsq",
     "grasp_keys": {
-     "steak/ppykkp": "steak__ppykkp__t"
+     "steak/ppykkp": "steak__ppykkp__t",
+     "steak/lcebsq": "steak__lcebsq__t"
     }
    },
    "partner": {
@@ -34706,7 +34735,7 @@
     "whitelist": {
      "target": {
       "steak": [
-       "ppykkp"
+       "lcebsq"
       ]
      },
      "partner": {
@@ -34718,12 +34747,13 @@
     "blacklist": {
      "target": {
       "steak": {
-       "akoxpw": "ground_isg 2026-10-11: heldout"
+       "akoxpw": "ground_isg 2026-10-12: heldout",
+       "ppykkp": "pilot 2026-10-12: owner item 6a - the target is steak/lcebsq; ppykkp stood its 2.8 cm steak on the 13 cm edge and fell flat while settling"
       }
      },
      "partner": {
       "frying_pan": {
-       "aewpzn": "ground_isg 2026-10-11: heldout"
+       "aewpzn": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -34757,7 +34787,28 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -34771,9 +34822,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "ppykkp",
+    "representative": "lcebsq",
     "grasp_keys": {
-     "steak/ppykkp": "steak__ppykkp__t"
+     "steak/ppykkp": "steak__ppykkp__t",
+     "steak/lcebsq": "steak__lcebsq__t"
     }
    },
    "partner": {
@@ -34803,7 +34855,10 @@
        "name": "countertop_kelker_0",
        "init": "ontop",
        "top_z": 0.89,
-       "row": "inter_object_relation_satisfaction-ontop_small_scale#02~T1"
+       "row": "inter_object_relation_satisfaction-ontop_small_scale#02~T1",
+       "neighbors": [
+        "countertop_kelzer_0"
+       ]
       }
      ],
      "floor": {
@@ -34813,7 +34868,7 @@
     "whitelist": {
      "target": {
       "steak": [
-       "ppykkp"
+       "lcebsq"
       ]
      },
      "partner": {
@@ -34825,12 +34880,13 @@
     "blacklist": {
      "target": {
       "steak": {
-       "akoxpw": "ground_isg 2026-10-11: heldout"
+       "akoxpw": "ground_isg 2026-10-12: heldout",
+       "ppykkp": "pilot 2026-10-12: owner item 6a - the target is steak/lcebsq; ppykkp stood its 2.8 cm steak on the 13 cm edge and fell flat while settling"
       }
      },
      "partner": {
       "frying_pan": {
-       "aewpzn": "ground_isg 2026-10-11: heldout"
+       "aewpzn": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -34864,7 +34920,28 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -34878,9 +34955,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "ppykkp",
+    "representative": "lcebsq",
     "grasp_keys": {
-     "steak/ppykkp": "steak__ppykkp__t"
+     "steak/ppykkp": "steak__ppykkp__t",
+     "steak/lcebsq": "steak__lcebsq__t"
     }
    },
    "partner": {
@@ -34912,7 +34990,10 @@
        "top_z": 0.88,
        "row": "inter_object_relation_satisfaction-ontop_small_scale#02~T5",
        "surface": "top",
-       "why": "owner 2026-10-11: the sheet height matches no surface of the support"
+       "why": "owner 2026-10-11: the sheet height matches no surface of the support",
+       "neighbors": [
+        "flat_top_grill_wchhzh_0"
+       ]
       }
      ],
      "floor": {
@@ -34922,7 +35003,7 @@
     "whitelist": {
      "target": {
       "steak": [
-       "ppykkp"
+       "lcebsq"
       ]
      },
      "partner": {
@@ -34934,12 +35015,13 @@
     "blacklist": {
      "target": {
       "steak": {
-       "akoxpw": "ground_isg 2026-10-11: heldout"
+       "akoxpw": "ground_isg 2026-10-12: heldout",
+       "ppykkp": "pilot 2026-10-12: owner item 6a - the target is steak/lcebsq; ppykkp stood its 2.8 cm steak on the 13 cm edge and fell flat while settling"
       }
      },
      "partner": {
       "frying_pan": {
-       "aewpzn": "ground_isg 2026-10-11: heldout"
+       "aewpzn": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -34973,7 +35055,30 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1,
+   "partner_on_meta_link": "heatsource",
+   "start_region_on_neighbors": true
   },
   "constraints": []
  },
@@ -34987,9 +35092,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "ppykkp",
+    "representative": "lcebsq",
     "grasp_keys": {
-     "steak/ppykkp": "steak__ppykkp__t"
+     "steak/ppykkp": "steak__ppykkp__t",
+     "steak/lcebsq": "steak__lcebsq__t"
     }
    },
    "partner": {
@@ -35021,7 +35127,10 @@
        "top_z": 0.9,
        "row": "inter_object_relation_satisfaction-ontop_small_scale#02~T4",
        "surface": "top",
-       "why": "owner 2026-10-11: the sheet height matches no surface of the support"
+       "why": "owner 2026-10-11: the sheet height matches no surface of the support",
+       "neighbors": [
+        "flat_top_grill_wchhzh_0"
+       ]
       }
      ],
      "floor": {
@@ -35031,7 +35140,7 @@
     "whitelist": {
      "target": {
       "steak": [
-       "ppykkp"
+       "lcebsq"
       ]
      },
      "partner": {
@@ -35043,12 +35152,13 @@
     "blacklist": {
      "target": {
       "steak": {
-       "akoxpw": "ground_isg 2026-10-11: heldout"
+       "akoxpw": "ground_isg 2026-10-12: heldout",
+       "ppykkp": "pilot 2026-10-12: owner item 6a - the target is steak/lcebsq; ppykkp stood its 2.8 cm steak on the 13 cm edge and fell flat while settling"
       }
      },
      "partner": {
       "frying_pan": {
-       "aewpzn": "ground_isg 2026-10-11: heldout"
+       "aewpzn": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -35082,7 +35192,30 @@
     "centred"
    ],
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1,
+   "partner_on_meta_link": "heatsource",
+   "start_region_on_neighbors": true
   },
   "constraints": []
  },
