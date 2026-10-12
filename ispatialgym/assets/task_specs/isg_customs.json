@@ -11154,6 +11154,8 @@
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
    "focus_at_handle": true,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 60.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -11314,6 +11316,8 @@
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
    "focus_at_handle": true,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 60.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -11474,6 +11478,8 @@
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
    "focus_at_handle": true,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 60.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -11634,6 +11640,8 @@
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
    "focus_at_handle": true,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 60.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -11794,6 +11802,8 @@
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
    "focus_at_handle": true,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 60.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -11943,6 +11953,8 @@
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
    "focus_at_handle": true,
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 60.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -13628,6 +13640,8 @@
      "lower_limit_rad": -0.55
     }
    },
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 40.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -13890,6 +13904,8 @@
      "lower_limit_rad": -0.55
     }
    },
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 40.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -14152,6 +14168,8 @@
      "lower_limit_rad": -0.55
     }
    },
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 40.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -14414,6 +14432,8 @@
      "lower_limit_rad": -0.55
     }
    },
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 40.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -14676,6 +14696,8 @@
      "lower_limit_rad": -0.55
     }
    },
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 40.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
@@ -14924,6 +14946,8 @@
      "lower_limit_rad": -0.55
     }
    },
+   "phase2_split_cone": false,
+   "_phase2_split_cone_note": "owner 2026-10-11 ~19:30: split cone (variant C) off - the carton runs exactly the successful first-demo program (Phase 2 with this alias's own tight / loose classes)",
    "phase2_loose_class_deg": 40.0,
    "phase2_tight_class_deg": 8.0,
    "_phase2_tight_note": "owner 2026-10-11: the tabletop Phase-2 classes went from 8 / 20 to 20 / 30 deg; this alias's hand-tuned loose class keeps the 8 deg tight class",
