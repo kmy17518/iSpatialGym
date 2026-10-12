@@ -15671,7 +15671,7 @@
     "blacklist": {
      "target": {
       "cork": {
-       "uyceta": "ground_isg 2026-10-11: heldout"
+       "uyceta": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -15710,7 +15710,27 @@
     "target_pos_m": 0.002,
     "target_rot_rad": 0.02
    },
-   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ]
   },
   "constraints": []
  },
@@ -15788,7 +15808,7 @@
     "blacklist": {
      "target": {
       "cork": {
-       "uyceta": "ground_isg 2026-10-11: heldout"
+       "uyceta": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -15827,7 +15847,27 @@
     "target_pos_m": 0.002,
     "target_rot_rad": 0.02
    },
-   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ]
   },
   "constraints": []
  },
@@ -15912,7 +15952,7 @@
     "blacklist": {
      "target": {
       "cork": {
-       "uyceta": "ground_isg 2026-10-11: heldout"
+       "uyceta": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -15953,7 +15993,7 @@
     "blacklist": {
      "target": {
       "cork": {
-       "uyceta": "ground_isg 2026-10-11: heldout"
+       "uyceta": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -15992,7 +16032,183 @@
     "target_pos_m": 0.002,
     "target_rot_rad": 0.02
    },
-   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ]
+  },
+  "constraints": []
+ },
+ "configuration_matching-attachment-cork-wine_bottle-desk": {
+  "iddl": "configuration_matching/attachment.iddl",
+  "definition_id": 82,
+  "roles": {
+   "target": {
+    "category": "cork",
+    "sampleable": true,
+    "require": {
+     "grasps": "attachment"
+    },
+    "representative": "ncxgpe",
+    "orientation_equivalences": {
+     "cork/ncxgpe": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "cork/ncxgpe": "cork__ncxgpe"
+    }
+   },
+   "partner": {
+    "category": "wine_bottle",
+    "sampleable": true,
+    "representative": "inkqch",
+    "orientation_equivalences": {
+     "wine_bottle/inkqch": [
+      "zinf"
+     ]
+    }
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_2",
+     "private_office_3",
+     "lobby_0",
+     "private_office_1",
+     "private_office_0"
+    ],
+    "bindings": {
+     "support": [
+      "desk_mdhelw_1",
+      "desk_mdhelw_0",
+      "desk_pfsjbc_0",
+      "desk_mdhelw_3",
+      "desk_mdhelw_2"
+     ],
+     "support_surfaces": [
+      {
+       "name": "desk_mdhelw_1",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "configuration_matching-attachment#03~T10"
+      },
+      {
+       "name": "desk_mdhelw_0",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "configuration_matching-attachment#03~T9"
+      },
+      {
+       "name": "desk_pfsjbc_0",
+       "init": "ontop",
+       "top_z": 0.77,
+       "row": "configuration_matching-attachment#03~T8"
+      },
+      {
+       "name": "desk_mdhelw_3",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "configuration_matching-attachment#03~T7"
+      },
+      {
+       "name": "desk_mdhelw_2",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "configuration_matching-attachment#03~T6"
+      }
+     ],
+     "floor": {
+      "room": "private_office_2"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "cork": [
+       "ncxgpe"
+      ]
+     },
+     "partner": {
+      "wine_bottle": [
+       "inkqch"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "cork": {
+       "uyceta": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.01,
+    "orientation": 0.15
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_gap_min_m": 0.04,
+   "partner_centre_distance_min_m": 0.08,
+   "pre_attach_back_m": 0.1,
+   "reorientation_waypoints": 3,
+   "symmetry_slab_m": 0.005,
+   "symmetry_match_fraction": 0.9,
+   "grasp_metalink_clearance_m": 0.01
   },
   "constraints": []
  },

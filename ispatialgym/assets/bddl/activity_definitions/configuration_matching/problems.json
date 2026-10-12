@@ -879,6 +879,17 @@
    "pick": "configuration_matching-articulation_close_large_scale#03",
    "slot": "representative",
    "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-cork-wine_bottle-desk",
+   "id": 82,
+   "grounded": "2026-10-12",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#03~T10",
+   "slot": "representative",
+   "mode": "representative"
   }
  ],
  "unregistered": [
