@@ -1,0 +1,48 @@
+{
+ "batch": "wave7_lidpbmsjis065 (2026-10-12, lid065 grasp worker on strips/lid__pbmsji__s065.png (rows 1-5) and the six grasps' V1 / V2 / V3 / wrist frames with 3x pad crops and 4x knob crops (scratch_lid065/review_crops, review_crops_x5), review_prompt.md, not the reviewer pool; frames = the oracle's closure held under gravity)",
+ "models": [
+  {
+   "key": "lid__pbmsji__s065",
+   "n_rows": 6,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down knob pinch at its widest ring, centred; rim free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinch, 10 deg tilt, centred; rim free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinch, 22 deg tilt, centred; lid hangs tilted, rim free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "near top-down knob pinch at the widest ring; rim free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinch, 10 deg tilt, centred; rim free"
+    },
+    {
+     "rank": 6,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinch, 24 deg tilt, centred; lid hangs tilted, rim free"
+    }
+   ],
+   "object_note": "x0.65; fingers 28-30 mm on the 56 mm knob, fingertips above the dome; ~2 px seam: knob hull wider than visual"
+  }
+ ]
+}

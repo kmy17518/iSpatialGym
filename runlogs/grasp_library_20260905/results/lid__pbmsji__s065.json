@@ -1,0 +1,552 @@
+{
+ "task": "configuration_matching",
+ "subtask": "configuration_matching-attachment",
+ "pick": "configuration_matching-attachment#04",
+ "slot": "representative",
+ "category": "lid",
+ "model": "pbmsji",
+ "key": "lid__pbmsji__s065",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.3388137512207031,
+  0.3388137512207031,
+  0.1097373104095459
+ ],
+ "ready": true,
+ "dataset": "behavior-1k-assets",
+ "base_key": "lid__pbmsji__a",
+ "scale": [
+  0.65,
+  0.65,
+  0.65
+ ],
+ "scale_rule": "uniform_pair_fit",
+ "bbox_scaled": [
+  0.2202,
+  0.2202,
+  0.0713
+ ],
+ "finger_clear": {
+  "hulls": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/finger_hulls_eef.json",
+  "margin_m": 0.001,
+  "n_sweep": 9,
+  "squeeze_m": 0.0015,
+  "spacing_m": 0.0015,
+  "retreat_step_m": 0.0025
+ },
+ "two_finger": {
+  "center_tol_m": 0.003,
+  "min_pad_cover": 0.0,
+  "tilt_bins": [
+   [
+    0,
+    8
+   ],
+   [
+    8,
+    22
+   ],
+   [
+    22,
+    40.01
+   ]
+  ],
+  "top_k": 12
+ },
+ "n_cand": 48000,
+ "n_orient": 48,
+ "n_need": 6,
+ "provenance": {
+  "decision": "owner 2026-10-12 (attachment#04 lid/pbmsji -> stockpot/oshwps): scale x0.65 for both (lid ~22 cm, pot ~23 x 29 x 14 cm, knob pinch ~56 mm), each one's attachment point scaling with its object; a. a new attachment grasp set for lid/pbmsji at [0.65, 0.65, 0.65], same pipeline as spatula__hkvsep__t076 / sunflower__dkajbh__r50, rows carrying the scale, verified in sim, own commit",
+  "isg_commit": "d94b7900",
+  "b1k_commit": "6a6194600",
+  "scripts": "isg_home/eval85/scratch_lid065/scripts = scratch_beerB6/scripts (runlogs/grasp_library_20260905/scripts + multi_hit / two_finger / the oracle-closure AG test) with cluster paths, plus: gen_candidates.py - the lid side rule of the base key lid__pbmsji__a (grasp_newsheet gen_candidates_ts.py: a lid mates with its rim, no contact below the CoM; the meta-link side test rejects every knob pinch, grasp_newsheet slurm/gen_candidates_a1_local.log), attachment meta-link points scaled with the object (metadata.json is unit scale; the export's sim meta-link pose agrees to 1e-6 m), the knob / rim retreat's bookkeeping (s = the retreat the stored pose has; it added every failed step and dropped candidates at TIP_MAX early), finger_clear (the real finger blades - dump_finger_hulls.py, the shipped finger meshes as r1pro_model.finger_hulls_eef - swept from fully open to the pads' first touch minus the 1.5 mm contact hold, 9 openings, clear of every collision piece but the pinched one by >= 1 mm, else retreat 2.5 mm along the approach while the contact stays within TIP_MAX); export_meshes_batch.py records the scaled meta-link poses",
+  "pipeline": "a1 / attachment_free = the pipeline and constraint of the base key lid__pbmsji__a (grasps:attachment; attachment.py loads library grasps of kinds attachment / tabletop); multi_hit off: the knob is one solid convex collision piece, the candidate sets with and without it are identical (explore/runs v0-v3); two_finger: centred pinches (pads' first touch within 3 mm), width = the pads' span, picks spread over tilt bins 0-8 / 8-22 / 22-40 deg (no height dedup: every knob pinch is at the same height)",
+  "why_finger_clear": "the gripper does not scale with the lid: on the 37 mm knob (widest 56-61 mm at 28-38 mm above the lid origin, dome top 11 mm) the base pipeline's candidates at 0.65 put the closed fingers 0.6-2.2 mm inside the glass dome (5 of 7; explore/finger_clear.py), where the unit-scale key's grasps clear it by 1.2-15.6 mm. Round 1 (job 17822646, glib_r1 / glib_all_r1) filtered with the gripper's collision spheres: all 12 attached and held, but the finger blades still reached 0.3-1.4 mm into the dome on 3 of 12 (blade_check.py: grasp_5 closed -1.4, grasp_6 closed -0.9, grasp_2 open -0.3), and the sampler's hull pinch width (dome points between the pads, sampler_pinch_width.py) pre-shapes most grasps fully open, so the check covers every opening from open to closed",
+  "closure": "GLIB_CLOSURE=oracle (scripts/ag_validate_render.py of scratch_beerB6): each candidate closed twice from the same placement. Record = the demo controller's closure (pre-shape to width / 2 + 10 mm = 37.3-38.8 mm per finger, smooth command ramped 2.25 mm per step, held 1 mm inside the contact once both pads touch): all 6 reached two-pad contact after 4 ramp steps, attached at step 14 and held 30 steps under gravity; fingers 28.7-29.9 / 27.6-28.9 mm (pads' span 53.3-55.8 mm on pinch widths of 54.7-57.6 mm), off-centre 0.4-0.5 mm, placement push 0, lid shift at attach 0.1-0.2 mm (grasp_1 4.7 mm). Stock step close (step_close): all attached at step 12 and held, but finger 1 stayed at its open limit (fingers 50 / 5.8-8.8 mm, knob shoved 19.6-21.3 mm: the one_finger picture of the base key's rows)",
+  "jobs": {
+   "17822646": "round 1 (glib_r1 / glib_all_r1): export at [0.65, 0.65, 0.65] + cands with finger_clear on the gripper's collision spheres + AG of the first 6 and of all 12: all attached and held two-finger, but blade_check.py (the finger blades of the shipped meshes) put the blades 0.3-1.4 mm into the glass dome on 3 of 12 -> round 2",
+   "17822841": "this file: cands with finger_clear on the finger blades swept from open to closed (mesh = 17822646's export) + AG (oracle closure as the record, step close kept) in rank order until 6 held (6 tested); exploration pass glib_all: all 12 candidates, 12 attached at step 14-15 and held two-finger (fingers 28.7-29.9 / 27.3-28.9 mm)"
+  },
+  "cpu_recheck": "blade_check.py (independent of the generator: finger blades, every collision piece but the knob, 0.75 mm samples) on the 6 kept: closed at the pads' first touch +1.0..+4.2 mm, library pre-shape +1.5..+4.7 mm, the attachment sampler's pre-shape (its hull pinch width, sampler_pinch_width.py: 38.6-50 mm per finger) +2.1..+5.1 mm, fully open +2.1..+6.9 mm",
+  "review": "review/wave7_lidpbmsjis065.json (6 ok)",
+  "patch_base": "patch against a511b880; d94b7900..a511b880 changes nothing under ispatialgym/oracle, ispatialgym/robot, runlogs/, scripts/, grasp_library.py, ground_isg.py, attachment.py or require/ (Behavior-1K 6a6194600 in both), so this test stands for a511b880"
+ },
+ "candidates_meta": {
+  "object": {
+   "category": "lid",
+   "model": "pbmsji"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 48000,
+   "n_tilt": 901,
+   "n_width_antipodal": 264,
+   "n_table": 255,
+   "n_collision": 152,
+   "n_finger_clear": 152,
+   "n_sweep": 148,
+   "n_two_finger": 145,
+   "n_lever": 145,
+   "attach_points": [
+    [
+     -0.0009,
+     -0.0,
+     0.0081
+    ]
+   ],
+   "n_attachment_free": 145,
+   "n_selected": 12,
+   "com": [
+    -0.0014,
+    -0.0006,
+    -0.0107
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "side_rule": "lid: contact at or above the CoM (the rim is the mating side), attachment-point clearance >= 1 cm",
+  "scale": [
+   0.65,
+   0.65,
+   0.65
+  ],
+  "job_options": {
+   "two_finger": {
+    "center_tol_m": 0.003,
+    "min_pad_cover": 0.0,
+    "tilt_bins": [
+     [
+      0,
+      8
+     ],
+     [
+      8,
+      22
+     ],
+     [
+      22,
+      40.01
+     ]
+    ],
+    "top_k": 12
+   },
+   "finger_clear": {
+    "hulls": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/finger_hulls_eef.json",
+    "margin_m": 0.001,
+    "n_sweep": 9,
+    "squeeze_m": 0.0015,
+    "spacing_m": 0.0015,
+    "retreat_step_m": 0.0025
+   }
+  }
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0299,
+    0.0289
+   ],
+   "score": 12.8654,
+   "meta": {
+    "com_perp": 0.00217,
+    "width": 0.05764,
+    "antipodal": 0.95694,
+    "coverage": 1.0,
+    "clearance": 0.00874,
+    "tilt_deg": 0.35243,
+    "width_ray": 0.05694,
+    "pad_offset": 0.00055,
+    "pad_cover": 0.25,
+    "retreat": 0.01,
+    "finger_clear_sweep": 0.00261,
+    "finger_clear_closed": 0.00261,
+    "attach_dist": 0.04893,
+    "attach_side": -2.38383
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g0_wrist.png"
+   },
+   "shift_at_attach_m": 0.0002,
+   "pads_span_m": 0.0558,
+   "off_centre_m": 0.0005,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0388,
+    "ramp_steps": 4,
+    "touch_q": [
+     0.03,
+     0.0299
+    ],
+    "contact_hold_q": 0.0289,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0088
+    ],
+    "shift_at_attach_m": 0.0196,
+    "pads_span_m": 0.0558,
+    "off_centre_m": 0.0206,
+    "two_finger": false
+   },
+   "t_s": 22.55
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0288,
+    0.028
+   ],
+   "score": 12.7915,
+   "meta": {
+    "com_perp": 0.00198,
+    "width": 0.05533,
+    "antipodal": 0.93344,
+    "coverage": 1.0,
+    "clearance": 0.00795,
+    "tilt_deg": 9.75245,
+    "width_ray": 0.05645,
+    "pad_offset": -0.00056,
+    "pad_cover": 0.33333,
+    "retreat": 0.01,
+    "finger_clear_sweep": 0.00316,
+    "finger_clear_closed": 0.00316,
+    "attach_dist": 0.04839,
+    "attach_side": -2.49199
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g1_wrist.png"
+   },
+   "shift_at_attach_m": 0.0047,
+   "pads_span_m": 0.0538,
+   "off_centre_m": 0.0004,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0377,
+    "ramp_steps": 4,
+    "touch_q": [
+     0.0292,
+     0.0288
+    ],
+    "contact_hold_q": 0.028,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0067
+    ],
+    "shift_at_attach_m": 0.0196,
+    "pads_span_m": 0.0537,
+    "off_centre_m": 0.0216,
+    "two_finger": false
+   },
+   "t_s": 11.18
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0287,
+    0.0276
+   ],
+   "score": 11.6026,
+   "meta": {
+    "com_perp": 0.00531,
+    "width": 0.05469,
+    "antipodal": 0.98103,
+    "coverage": 1.0,
+    "clearance": 0.00396,
+    "tilt_deg": 22.0126,
+    "width_ray": 0.05413,
+    "pad_offset": 0.00028,
+    "pad_cover": 0.16667,
+    "retreat": 0.0225,
+    "finger_clear_sweep": 0.0021,
+    "finger_clear_closed": 0.00423,
+    "attach_dist": 0.04478,
+    "attach_side": -2.25395
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g2_wrist.png"
+   },
+   "shift_at_attach_m": 0.0002,
+   "pads_span_m": 0.0533,
+   "off_centre_m": 0.0005,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0373,
+    "ramp_steps": 4,
+    "touch_q": [
+     0.0287,
+     0.0284
+    ],
+    "contact_hold_q": 0.0276,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0058
+    ],
+    "shift_at_attach_m": 0.0213,
+    "pads_span_m": 0.0528,
+    "off_centre_m": 0.0221,
+    "two_finger": false
+   },
+   "t_s": 11.02
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0293,
+    0.0284
+   ],
+   "score": 12.7668,
+   "meta": {
+    "com_perp": 0.00106,
+    "width": 0.05643,
+    "antipodal": 0.97512,
+    "coverage": 1.0,
+    "clearance": 0.00582,
+    "tilt_deg": 4.00665,
+    "width_ray": 0.05647,
+    "pad_offset": -2e-05,
+    "pad_cover": 0.25,
+    "retreat": 0.0075,
+    "finger_clear_sweep": 0.00104,
+    "finger_clear_closed": 0.00104,
+    "attach_dist": 0.04794,
+    "attach_side": -2.52455
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g3_wrist.png"
+   },
+   "shift_at_attach_m": 0.0002,
+   "pads_span_m": 0.0547,
+   "off_centre_m": 0.0005,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0382,
+    "ramp_steps": 4,
+    "touch_q": [
+     0.0294,
+     0.0293
+    ],
+    "contact_hold_q": 0.0284,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0074
+    ],
+    "shift_at_attach_m": 0.0207,
+    "pads_span_m": 0.0544,
+    "off_centre_m": 0.0213,
+    "two_finger": false
+   },
+   "t_s": 10.85
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0293,
+    0.0283
+   ],
+   "score": 12.5016,
+   "meta": {
+    "com_perp": 0.00464,
+    "width": 0.05627,
+    "antipodal": 0.97512,
+    "coverage": 1.0,
+    "clearance": 0.00714,
+    "tilt_deg": 9.79845,
+    "width_ray": 0.05654,
+    "pad_offset": -0.00013,
+    "pad_cover": 0.25,
+    "retreat": 0.01,
+    "finger_clear_sweep": 0.00232,
+    "finger_clear_closed": 0.00232,
+    "attach_dist": 0.04816,
+    "attach_side": -2.45643
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g4_wrist.png"
+   },
+   "shift_at_attach_m": 0.0002,
+   "pads_span_m": 0.0546,
+   "off_centre_m": 0.0005,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0381,
+    "ramp_steps": 4,
+    "touch_q": [
+     0.0293,
+     0.0292
+    ],
+    "contact_hold_q": 0.0283,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0074
+    ],
+    "shift_at_attach_m": 0.0207,
+    "pads_span_m": 0.0544,
+    "off_centre_m": 0.0213,
+    "two_finger": false
+   },
+   "t_s": 11.15
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0293,
+    0.0282
+   ],
+   "score": 11.5343,
+   "meta": {
+    "com_perp": 0.01567,
+    "width": 0.05611,
+    "antipodal": 0.97512,
+    "coverage": 1.0,
+    "clearance": 0.00835,
+    "tilt_deg": 24.35056,
+    "width_ray": 0.05654,
+    "pad_offset": -0.00022,
+    "pad_cover": 0.25,
+    "retreat": 0.01,
+    "finger_clear_sweep": 0.00267,
+    "finger_clear_closed": 0.00267,
+    "attach_dist": 0.04849,
+    "attach_side": -2.45643
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g5_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g5_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g5_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_lid065/glib/frames/lid__pbmsji__s065/g5_wrist.png"
+   },
+   "shift_at_attach_m": 0.0001,
+   "pads_span_m": 0.0545,
+   "off_centre_m": 0.0005,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0381,
+    "ramp_steps": 4,
+    "touch_q": [
+     0.0293,
+     0.0291
+    ],
+    "contact_hold_q": 0.0282,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 12,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.05,
+     0.0074
+    ],
+    "shift_at_attach_m": 0.0206,
+    "pads_span_m": 0.0544,
+    "off_centre_m": 0.0213,
+    "two_finger": false
+   },
+   "t_s": 11.45
+  }
+ ],
+ "n_valid": 6,
+ "error": null,
+ "ag_closure": "oracle: per candidate the stock step close first (step_close), then the record: pre-shape to width / 2 + 10 mm, the smooth command ramped 2.25 mm per step, held 1 mm inside the contact once both pads touch (Motions.gripper), attach, 30 steps under gravity",
+ "t_model_s": 84.6
+}
