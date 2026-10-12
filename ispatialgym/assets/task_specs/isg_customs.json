@@ -16229,19 +16229,33 @@
      "grasps": "attachment"
     },
     "representative": "pbmsji",
+    "scale": {
+     "lid/pbmsji": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
     "orientation_equivalences": {
      "lid/pbmsji": [
       "zinf"
      ]
     },
     "grasp_keys": {
-     "lid/pbmsji": "lid__pbmsji__a"
+     "lid/pbmsji": "lid__pbmsji__s065"
     }
    },
    "partner": {
     "category": "stockpot",
     "sampleable": true,
     "representative": "oshwps",
+    "scale": {
+     "stockpot/oshwps": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
     "orientation_equivalences": {
      "stockpot/oshwps": []
     }
@@ -16290,7 +16304,7 @@
     "blacklist": {
      "target": {
       "lid": {
-       "ppkjuy": "ground_isg 2026-10-11: heldout"
+       "ppkjuy": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -16330,7 +16344,7 @@
     "blacklist": {
      "target": {
       "lid": {
-       "ppkjuy": "ground_isg 2026-10-11: heldout"
+       "ppkjuy": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -16370,7 +16384,27 @@
     "target_pos_m": 0.002,
     "target_rot_rad": 0.02
    },
-   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ]
   },
   "constraints": []
  },
@@ -16385,19 +16419,33 @@
      "grasps": "attachment"
     },
     "representative": "pbmsji",
+    "scale": {
+     "lid/pbmsji": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
     "orientation_equivalences": {
      "lid/pbmsji": [
       "zinf"
      ]
     },
     "grasp_keys": {
-     "lid/pbmsji": "lid__pbmsji__a"
+     "lid/pbmsji": "lid__pbmsji__s065"
     }
    },
    "partner": {
     "category": "stockpot",
     "sampleable": true,
     "representative": "oshwps",
+    "scale": {
+     "stockpot/oshwps": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
     "orientation_equivalences": {
      "stockpot/oshwps": []
     }
@@ -16446,7 +16494,7 @@
     "blacklist": {
      "target": {
       "lid": {
-       "ppkjuy": "ground_isg 2026-10-11: heldout"
+       "ppkjuy": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -16486,7 +16534,27 @@
     "target_pos_m": 0.002,
     "target_rot_rad": 0.02
    },
-   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ]
   },
   "constraints": []
  },
@@ -16501,19 +16569,33 @@
      "grasps": "attachment"
     },
     "representative": "pbmsji",
+    "scale": {
+     "lid/pbmsji": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
     "orientation_equivalences": {
      "lid/pbmsji": [
       "zinf"
      ]
     },
     "grasp_keys": {
-     "lid/pbmsji": "lid__pbmsji__a"
+     "lid/pbmsji": "lid__pbmsji__s065"
     }
    },
    "partner": {
     "category": "stockpot",
     "sampleable": true,
     "representative": "oshwps",
+    "scale": {
+     "stockpot/oshwps": [
+      0.65,
+      0.65,
+      0.65
+     ]
+    },
     "orientation_equivalences": {
      "stockpot/oshwps": []
     }
@@ -16569,7 +16651,7 @@
     "blacklist": {
      "target": {
       "lid": {
-       "ppkjuy": "ground_isg 2026-10-11: heldout"
+       "ppkjuy": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -16609,7 +16691,27 @@
     "target_pos_m": 0.002,
     "target_rot_rad": 0.02
    },
-   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ]
   },
   "constraints": []
  },
