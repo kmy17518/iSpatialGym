@@ -339,7 +339,8 @@ class ExecuteConfig:
     #: program start (m): the touching goal is contact with it
     push_goal_follow_min_m: float = 0.001
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
-    #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
+    #: support, planned with the support present, then a straight leg (``reach_pre_pose``); a standoff that does not track from
+    #: the pre-pose witness: the pre-pose is planned directly with the witness first (owner 2026-10-12)
     pre_pose_standoff_m: float = 0.08
     #: (owner 2026-09-18 12:42) no standoff when the pre-pose is already this clear of every support (m): planned directly
     pre_pose_standoff_skip_m: float = 0.08
@@ -684,6 +685,16 @@ def support_clearance(state, pose, objects: Sequence[Any]) -> Optional[float]:
     return best
 
 
+def _counted(gen: Iterator[th.Tensor], n: List[int]) -> Iterator[th.Tensor]:
+    """``gen``'s actions, counted in ``n[0]`` (did a motion that raised move the robot first?)."""
+    try:
+        for a in gen:
+            n[0] += 1
+            yield a
+    finally:
+        gen.close()
+
+
 def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any], cfg: "ExecuteConfig",
                    ignore_links: Sequence[Any] = (), accept_other_branch: bool = False) -> Iterator[th.Tensor]:
     """Reach a contact pre-pose that the sampler checked with its supports ignored (a wall / table 2 cm from the
@@ -691,6 +702,9 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
     ``pre + standoff · n`` (``n`` away from the supports) with the supports present — a trajopt with the wall ignored
     planned the hand *through* the wall region and the arm jammed against it (1.39 rad joint error on the painting
     push) — then a straight ``arm_along`` closes the standoff. ``through`` (the pushed target) is ignored for both.
+    A standoff that does not track from the witness ``q_hint`` (owner 2026-10-12, axial#02) is not planned first: the pre-pose
+    is planned straight to with the witness, the supports present (the skip branch's call); the bare standoff only when that
+    plan fails before the robot moved. ``ctx["pre_pose_standoff"]["branch"]``: witness / direct / planner.
     ``accept_other_branch``: passed to ``Motions.arm_to`` for the planned legs to the pre-pose (a push, owner 2026-09-26)."""
     if not supports:
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links), accept_other_branch=accept_other_branch)
@@ -715,7 +729,8 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
         return
     p, q = as_world_pose(pre)
     standoff = (p + n * cfg.pre_pose_standoff_m, q)
-    ctx["pre_pose_standoff"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": cfg.pre_pose_standoff_m}
+    ctx["pre_pose_standoff"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": cfg.pre_pose_standoff_m,
+                                **({"clearance_m": round(clearance, 3)} if clearance is not None else {})}
     q_standoff = standoff_configuration(motions, arm, pre, standoff, q_hint) if q_hint is not None else None
     if q_standoff is not None:
         # the standoff in the **witness's IK branch**: differential IK from the recorded pre-pose witness back along the
@@ -724,6 +739,25 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
         ctx["pre_pose_standoff"]["branch"] = "witness"
         yield from motions.arm_to(arm, q=q_standoff, ignore_objects=list(through), ignore_links=list(ignore_links))
     else:
+        if q_hint is not None:
+            # owner 2026-10-12 (axial#02 c3_k0: the push pre-contact 7.2 cm above the desk, right_arm_joint4 0.05 rad from its limit -
+            # ~1 cm of the 8 cm rise reachable there, the bare standoff failed IK): a standoff the witness cannot track to may be
+            # out of this stance's reach; the witness itself is the sampler's validated pre-pose configuration
+            ctx["pre_pose_standoff"]["branch"] = "direct"
+            log.warning("reach_pre_pose(%s): the standoff does not track from the witness - planning straight to the pre-pose with the witness, supports present", arm)
+            moved = [0]
+            try:
+                yield from _counted(motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links),
+                                                   accept_other_branch=accept_other_branch), moved)
+            except SkillError as e:
+                if moved[0] or e.reason != "plan_failed":
+                    raise
+                log.warning("reach_pre_pose(%s): the direct plan to the pre-pose failed before the robot moved (%s) - planning the bare standoff", arm, e.message[:120])
+                ctx["pre_pose_standoff"]["direct_failed"] = e.message[:160]
+            else:
+                if getattr(motions, "last_relaxed_links", None):
+                    ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
+                return
         ctx["pre_pose_standoff"]["branch"] = "planner"
         yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(through), ignore_links=list(ignore_links))
     if getattr(motions, "last_relaxed_links", None):
@@ -783,7 +817,8 @@ def reach_via_standoff(motions: Motions, arm: str, pre, distance: float, q_hint,
 def standoff_configuration(motions: Motions, arm: str, pre, standoff, q_hint) -> Optional[th.Tensor]:
     """The joint configuration (28-D) of ``standoff`` in the branch of the pre-pose witness ``q_hint``: differential IK
     from the witness along the straight leg pre -> standoff (no collision check: the leg is the one the hand will
-    retrace). None when the backend cannot track it (the caller plans the pose instead)."""
+    retrace). None when the backend cannot track it (``reach_pre_pose`` then plans the pre-pose with the witness first,
+    ``reach_via_standoff`` the standoff pose)."""
     backend = getattr(motions, "backend", None)
     solve = getattr(backend, "solve_ik_path", None)
     if solve is None:
@@ -799,11 +834,11 @@ def standoff_configuration(motions: Motions, arm: str, pre, standoff, q_hint) ->
         res = solve(f"{arm}_arm", [{frame: wp} for wp in dense], q_start=q0, pos_tol=motions.cfg.diff_ik_pos_tol, rot_tol=motions.cfg.diff_ik_rot_tol,
                     max_iters=motions.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
         if not res.success or res.q_traj is None or len(res.q_traj) == 0:
-            log.warning("standoff configuration from the witness not trackable (%s): planning the standoff pose instead", res.status)
+            log.warning("standoff configuration from the witness not trackable (%s)", res.status)
             return None
         return C.as_tensor(res.q_traj[-1]).reshape(-1).float()
     except Exception as e:  # noqa: BLE001
-        log.warning("standoff configuration from the witness failed (%r): planning the standoff pose instead", e)
+        log.warning("standoff configuration from the witness failed (%r)", e)
         return None
 
 
@@ -1089,7 +1124,8 @@ def _joint_line(q_from: th.Tensor, q_to: th.Tensor, idx, step: float = 0.05) -> 
 def contact_route_goal(motions: Motions, state, arm: str, contact: Dict[str, Any], q_ctx: th.Tensor, cfg: "ExecuteConfig") -> Tuple[th.Tensor, str]:
     """Where a free arm's transit to its brace / push pre-pose ends (``reach_pre_pose``'s rule) with the robot at ``q_ctx``: the standoff
     ``pre_pose_standoff_m`` off the supports in the branch of the contact's first witness when the pre-pose sits closer than
-    ``pre_pose_standoff_skip_m`` to them, else that witness. Differential IK only (deterministic); ``(28-D q, label)``."""
+    ``pre_pose_standoff_skip_m`` to them and the standoff tracks from that witness, else that witness (a standoff that does not
+    track: the transit is planned straight to the pre-pose with the witness). Differential IK only (deterministic); ``(28-D q, label)``."""
     w = contact["witnesses"]
     key = "pre" if "pre" in w else sorted(w)[0]
     idx = motions.robot.arm_control_idx[arm]
@@ -1109,7 +1145,7 @@ def contact_route_goal(motions: Motions, state, arm: str, contact: Dict[str, Any
                                         rot_tol=motions.cfg.diff_ik_rot_tol, max_iters=motions.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False,
                                         soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
     if not res.success or res.q_traj is None or len(res.q_traj) == 0:
-        return q_w, f"the {contact['name']}'s {key} witness (its standoff does not track)"
+        return q_w, f"the {contact['name']}'s {key} witness (its standoff does not track: planned straight to the pre-pose)"
     return C.as_tensor(res.q_traj[-1]).reshape(-1).float(), f"the {contact['name']}'s standoff in the {key} witness's branch"
 
 

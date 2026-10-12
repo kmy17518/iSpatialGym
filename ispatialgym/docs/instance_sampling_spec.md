@@ -372,6 +372,14 @@ expansion on written instances, each stance rebuilt with the arm joint values th
 hold did not). Trajectories *between* key poses are not checked here: the oracle plans them at run
 time (oracle doc §3.9).
 
+**Contact pre-poses near a support** (owner 2026‑10‑12, axial#02). The oracle reaches a push / brace / grasp pre-pose that
+stands closer than `pre_pose_standoff_skip_m` (8 cm) to the supports left out for its contact through a standoff
+`pre_pose_standoff_m` (8 cm) away from them, planned with the supports present, then a straight leg — in the recorded
+witness's IK branch when the standoff tracks from the witness. When it does not, the pre-pose is planned straight to with
+the witness, the supports present (the call of a pre-pose already 8 cm clear); the bare standoff pose is planned only when
+that plan fails before the robot moved (`execute.reach_pre_pose`; axial#02 c3_k0: the paperback's pre-contact 7.2 cm above
+the desk, ~1 cm of the rise reachable at the stance, the bare standoff unreachable).
+
 **One chain, as the oracle runs it** (owner 2026-09-24). The targets of an action are checked in the order the arm
 moves through them, and every leg leaves from the configuration the arm is actually in: a chain whose first pose is
 where the previous motion left the arm (the retreat off the place configuration, the lift off the grasp, a `Retreat`
