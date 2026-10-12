@@ -261,7 +261,7 @@ def under_admissible(clearance_at_goal: float, target_height: float, extra: floa
 
 #: owner 2026-10-12 item 2 (large-scale eval picks): generation keys that relax a rule of this module; unset (None / False) keeps the
 #: rule as before. The keys an alias sets are recorded in ``template_facts["relaxations"]``.
-RELAXATION_KEYS = ("partner_view_min_points", "init_support_max_geodesic_m", "init_support_fallback")
+RELAXATION_KEYS = ("partner_view_min_points", "init_support_max_geodesic_m", "init_support_fallback", "under_axis_max_deg")
 
 
 def enough_in_view(inside, min_points: Optional[int] = None) -> bool:
@@ -1518,7 +1518,11 @@ class IORSLarge(SamplerV2):
                     continue
                 focus = th.tensor([gc[0], gc[1], self.floor_z + self.place["height"] / 2])
                 ang = P0.axis_angle(self, cam, focus)
-                k = 1 if ang <= math.radians(P0.AXIS_LOOSE_DEG) else None
+                # ``generation.under_axis_max_deg`` (owner 2026-10-12 item 2c; default the 20° above): the under band's crouched head
+                # hangs over the edge like the push-under's (45° there)
+                cone_u = self.gp.gen("under_axis_max_deg")
+                st.extras["axis_angle_deg"] = math.degrees(ang)
+                k = 1 if ang <= math.radians(float(P0.AXIS_LOOSE_DEG if cone_u is None else cone_u)) else None
             if k is None:
                 continue
             st.focus = focus

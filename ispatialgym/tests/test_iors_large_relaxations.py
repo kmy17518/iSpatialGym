@@ -229,3 +229,44 @@ def test_every_under_variant_takes_the_floor_mesh_out():
     assert S("under", "partner")._floor_relaxed() == ("ignoring", ["floors_x_0"])
     assert S("ontop", "floor")._floor_relaxed() == ("ignoring", ["floors_x_0"])  # the floor init, as before
     assert isinstance(S("ontop", "support")._floor_relaxed(), IL._NullContext)  # ontop from a support, as before
+
+
+class _PlaceUnderStub:
+    """The place-under stance C search (:meth:`IORSLarge._placement_candidates_at`, ``under_mode`` "place") on a 1.2 x 0.6 m desk with
+    no band (every grid trunk), every base free, the near-edge line in view: only the optical-axis cone decides."""
+
+    _placement_candidates_at = IL.IORSLarge._placement_candidates_at
+    band_cells_world = IL.IORSLarge.band_cells_world
+
+    def __init__(self, **gen):
+        self.gp = _GP(alias="inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor", under_mode="place", **gen)
+        self.relation, self.seg_arm, self.push_under, self.floor_z = "under", "right", False, 0.0
+        self.partner = SimpleNamespace(name="desk_mdhelw_1", aabb=(th.tensor([0.0, 0.0, 0.0]), th.tensor([1.2, 0.6, 0.75])))
+        self.place = {"half": 0.15, "height": 0.28, "cells": th.tensor([[0.6, 0.3]])}
+        self.kit = SimpleNamespace(trav_free=lambda xy, eroded=False: True)
+        self.world = SimpleNamespace(rooms=None)
+        self.template_facts = {}
+
+    def band(self, kind, support_obj=None, under_partner=None, arm=None):
+        return None
+
+    def partner_points_in_view(self, cam, points):
+        return True
+
+    def debug_placement_visibility(self, cands, cams, edge, init_xy):
+        pass
+
+
+def test_place_under_stance_c_axis_cone_key(monkeypatch):
+    import math
+
+    monkeypatch.setattr(IL.P0, "body_free", lambda s, cands, **kw: th.ones(len(cands), dtype=th.bool))
+    monkeypatch.setattr(IL.P0, "camera_poses", lambda s, cands: [(th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0]))] * len(cands))
+    monkeypatch.setattr(IL.P0, "axis_angle", lambda s, cam, point: math.radians(30.0))  # the hidden goal cell 30° off the optical axis
+    edge = next(e for e in IL.aabb_edges([0.0, 0.0, 0.0], [1.2, 0.6, 0.75]) if e.name == "-y")
+    assert _PlaceUnderStub()._placement_candidates_at(edge, (0.6, -1.0)) == []  # default: within 20°, as before
+    out = _PlaceUnderStub(under_axis_max_deg=45.0)._placement_candidates_at(edge, (0.6, -1.0))
+    assert out and all(st.extras["angle_class"] == 1 and st.extras["axis_angle_deg"] == pytest.approx(30.0) for st in out)
+    assert all(st.extras["goal_cell"] == pytest.approx([0.6, 0.3]) for st in out)
+    assert _PlaceUnderStub(under_axis_max_deg=25.0)._placement_candidates_at(edge, (0.6, -1.0)) == []
+    assert "under_axis_max_deg" in IL.RELAXATION_KEYS

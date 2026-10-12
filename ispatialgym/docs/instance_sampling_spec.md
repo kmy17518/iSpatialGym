@@ -1536,6 +1536,8 @@ stays as above. The keys an alias sets are recorded in `template_facts.relaxatio
   partner in the planner's world and leaves out its support (the floor the object is set on) — it left out the partner and kept
   the floor before; the sampler takes the floor mesh out of its stance / leg / program checks for every under variant (before:
   push-under and floor inits only).
+- `under_axis_max_deg` (float, default unset = 20°): the place-under stance C's optical-axis cone to the hidden goal cell (the
+  under band's crouched head hangs over the edge as the push-under's does, 45° there); recorded as `axis_angle_deg`.
 
 ## 6. Per-task rules
 
