@@ -84,6 +84,26 @@ def test_margins_other_rows():
         TT.lateral_margins({"w_t": 0.1}, -0.1, 0.1, 1.0, 1.0)
 
 
+def test_margins_disembedding_charge_the_destination_side_only():
+    """Owner 2026-10-12 (A2a): the destination side keeps b + lateral_margin + 0.02, the other side holds only the source tray:
+    max(0, λ on that side) + half its length along the edge + 0.02."""
+    row = {"kind": "disembedding", "lateral_margin": 0.437, "source_half_length": 0.2825}
+    m_R, m_L, info = TT.lateral_margins(dict(row, destination_side="right"), -0.80, 0.08, b=0.66, R_img=0.66)
+    assert m_R == pytest.approx(0.66 + 0.437 + 0.02) and m_L == pytest.approx(0.08 + 0.2825 + 0.02)
+    assert info["destination_side"] == "right" and info["source_half_length"] == pytest.approx(0.2825)
+    m_R, m_L, _ = TT.lateral_margins(dict(row, destination_side="left"), -0.80, 0.08, b=0.66, R_img=0.66)
+    assert m_L == pytest.approx(0.66 + 0.437 + 0.02) and m_R == pytest.approx(0.80 + 0.2825 + 0.02)
+    _, m_L, _ = TT.lateral_margins(dict(row, destination_side="right"), -0.56, -0.16, 0.62, 0.62)
+    assert m_L == pytest.approx(0.2825 + 0.02)  # a band right of the centre line leaves the left side the tray's half length
+    # the shelf of disembedding#02 c4 (edge 1.70 m, λ [-0.80, 0.00], b 0.66; edge_too_short at 2.24 m on 2026-10-11) fits with the
+    # destination on the right, not on the left
+    for side, fits in (("right", True), ("left", False)):
+        m_R, m_L, _ = TT.lateral_margins(dict(row, destination_side=side), -0.80, 0.0, 0.6614, 0.6614)
+        assert (TT.lateral_bounds(1.70, m_R, m_L) is not None) == fits
+    with pytest.raises(ValueError):
+        TT.lateral_margins(dict(row, destination_side="front"), -0.1, 0.1, 0.5, 0.5)
+
+
 def test_lateral_bounds_skips_short_edges():
     assert TT.lateral_bounds(1.6, 0.5, 0.6) == (pytest.approx(-0.3), pytest.approx(0.2))
     assert TT.lateral_bounds(0.9, 0.5, 0.6) is None  # m_R + m_L > L
@@ -525,6 +545,30 @@ def test_disembedding_figure_frame_and_layout_origins():
                                           "isgefb": {"origin_in_tray_m": [0.0, 0.0, 0.006]}, "other": {"role": "context"}}})
     assert origins == {"isgefa": (-0.03065, 0.057516), "isgefb": (0.0, 0.0)}
     assert D.FIXED_LAYOUT_RELEASE_GAP_M == pytest.approx(0.0005)
+
+
+def test_disembedding_destination_side_comes_before_the_margins():
+    """Owner 2026-10-12 (A2a): eval aliases name the side (``generation.destination_side``), train draws it from the template seed;
+    multiply_isg --split train drops the eval key and the default is the draw."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling import generation_defaults as GD
+    from ispatialgym.sampling import multiply_isg as MI
+    from ispatialgym.sampling.sim_utils import Reject
+
+    D = _disembedding()
+
+    def sampler(value):
+        return SimpleNamespace(g=lambda k: value if k == "destination_side" else None, gp=SimpleNamespace(alias="disembedding-x"), template_facts={})
+
+    s = sampler("Right")
+    assert D.Disembedding._destination_side(s, np.random.default_rng(0)) == "right"
+    assert s.template_facts["destination_side"] == {"side": "right", "source": "generation.destination_side"}
+    drawn = [D.Disembedding._destination_side(sampler(None), np.random.default_rng(seed)) for seed in range(16)]
+    assert set(drawn) == {"left", "right"} and drawn == [D.Disembedding._destination_side(sampler(None), np.random.default_rng(seed)) for seed in range(16)]
+    with pytest.raises(Reject):
+        D.Disembedding._destination_side(sampler("front"), np.random.default_rng(0))
+    assert GD.defaults_for("disembedding")["destination_side"] is None and "destination_side" in MI.EVAL_ONLY_GENERATION_KEYS
 
 
 def test_phase3_target_fixed_pose_screens_and_places_only_that_pose(monkeypatch):

@@ -5,12 +5,14 @@ Roles: ``target`` (grasped, tabletop pipeline), ``source`` / ``destination`` (th
 them ``tray_source`` / ``tray_dest``), ``distractors`` (group, §3.12 rule 1 pools), scene ``support``, ``floor``.
 
 Template (``sample_template``): hulls / rest orientations / heights, the target's library grasps, the trays' inner
-floors (rasters in the tray frame), the reach band of the target at the tray-floor height (``BandSpec``), Phases 1a
-(any edge) / 1b (H_max = tallest of target, distractors, trays) / 1c (row ``disembedding``: m = b + 0.437 + 0.02) and
-Phase 2 with the source tray (centred on the focus, long axis along the edge) as the in-frame body.
+floors (rasters in the tray frame), the reach band of the target at the tray-floor height (``BandSpec``), the destination
+side (``generation.destination_side``, else drawn from the template seed), Phases 1a (any edge) / 1b (H_max = tallest of
+target, distractors, trays) / 1c (row ``disembedding``: m = b + 0.437 + 0.02 on the destination side, |λ| + half the source
+tray's length along the edge + 0.02 on the other) and Phase 2 with the source tray (centred on the focus, long axis along the
+edge) as the in-frame body.
 
 Instance (``sample_instance``): a Phase-2 survivor + transition; source tray at the focus; the target inside it from
-the feasible set F (footprint on the tray floor, 0.5 cm); the destination tray on a random side at the lateral
+the feasible set F (footprint on the tray floor, 0.5 cm); the destination tray on the template's side at the lateral
 position where exactly 4 cm of it is inside the init image (>= 4 cm from the source tray, footprint on the top);
 distractors on the source floor >= x from the target along the drawn grasp's pinch axis (x = pad_clearance + 0.01),
 footprints grown by their pad clearance <= ``tray_budget`` of the floor, each at its rest orientation - the target's pose when
@@ -406,6 +408,7 @@ class Disembedding(SamplerV2):
         self.placed_key: Optional[str] = None  # band key of the stance-relative source tray (item 9)
         self.release_surface_z: Optional[float] = None  # raycast surface under the destination goal (owner item 3)
         self.layout: Optional[Dict[str, Tuple[float, float]]] = None  # fixed layout: bddl instance -> figure-frame (x, y)
+        self.dest_side: Optional[float] = None  # the destination tray's side (sample_template): +1 the robot's left, -1 its right
 
     # ------------------------------------------------------------------ parameters (§2.3: numbers from generation)
 
@@ -594,14 +597,18 @@ class Disembedding(SamplerV2):
                                      z_support=self.top.z + self.src_floor.z_local + self.world.bottom_offset(self.hull[self.src_role], C.IDENTITY_QUAT),
                                      height=self.height["target"])
         H_max = max(self.height.values())
-        margins = {"kind": "disembedding", "lateral_margin": float(self.g("lateral_margin_m")), "safety": 0.02, "H_max": H_max}
         rng = np.random.default_rng(self.ctx.base_seed)
+        side = self._destination_side(rng)
+        self.dest_side = 1.0 if side == "left" else -1.0
+        # the source tray's half length along the edge: its longer footprint side, the axis ``_tray_yaw`` lays along the edge
+        margins = {"kind": "disembedding", "lateral_margin": float(self.g("lateral_margin_m")), "safety": 0.02, "H_max": H_max,
+                   "destination_side": side, "source_half_length": TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT)}
         errors = []
         # §4.2 has no preference among the edges and §4.4 checks floor + collision per lateral position (Phase 1c), so
         # every edge with a free-floor run in front of it is tried (a third of its 10 cm lateral raster at s = 0.45 on
         # free floor, as the IORS reference task does) instead of ``edge_candidates``, which drops an edge when its
         # *midpoint* stance alone is blocked: on breakfast_table_rhjoby_0 that is the 2.9 m edge — the only one long
-        # enough for the disembedding margins (m_R + m_L ≈ 2.26 m) — whose midpoint sits on a 0.4 m patch the scene
+        # enough for the two-sided disembedding margins of the time (m_R + m_L ≈ 2.26 m) — whose midpoint sits on a 0.4 m patch the scene
         # variant leaves blocked in the traversability map (baked chair footprint wider than the freed bbox)
         for edge, st in TT.edge_frames(self, self.top, rng):
             lats = th.linspace(-edge.length / 2 + 0.1, edge.length / 2 - 0.1, max(2, int(edge.length / 0.1))).tolist()
@@ -636,6 +643,19 @@ class Disembedding(SamplerV2):
                                     "band": getattr(self.bands, "path", None), "placed_key": self.placed_key, "source_tray_scale": src_scale,
                                     "src_floor_cells": self.src_floor.n_cells, "dst_floor_cells": self.dst_floor.n_cells,
                                     "H_max": H_max, "distractors": [b.name for b in self.bindings.many("distractors")], "segment_arms": list(self.segment_arms)})
+
+    def _destination_side(self, rng) -> str:
+        """Owner 2026-10-12 (A2a): the destination tray's side, chosen before the Phase-1c margins - ``generation.destination_side``
+        ("left" / "right", the eval aliases' assignment), else drawn from the template's ``rng`` (train)."""
+        want = self.g("destination_side")
+        if want is None:
+            side, source = ("left" if rng.random() < 0.5 else "right"), "drawn"
+        elif str(want).lower() in ("left", "right"):
+            side, source = str(want).lower(), "generation.destination_side"
+        else:
+            raise Reject("spec", f"{self.gp.alias}: generation.destination_side must be 'left' or 'right', got {want!r}")
+        self.template_facts["destination_side"] = {"side": side, "source": source}
+        return side
 
     def _tray_yaw(self, key: str, stance: Stance) -> float:
         """Yaw putting the tray's longer footprint axis along the front edge (stance tangent)."""
@@ -798,7 +818,7 @@ class Disembedding(SamplerV2):
         support = self.obj("support")
         dst, tgt = self.obj(self.dst_role), self.obj("target")
         grasp.place_on = dname
-        # destination tray: random side, exactly 4 cm inside the init image, >= 4 cm from the source tray, footprint on the top
+        # destination tray: the template's side, exactly 4 cm inside the init image, >= 4 cm from the source tray, footprint on the top
         cam_init = self.camera_pose_at(init)
         d_pose, side, dest_diag = self._place_destination(rng, init, manip, cam_init, s_pose)
         dst_w = self.dst_floor.at(d_pose)
@@ -912,10 +932,11 @@ class Disembedding(SamplerV2):
         return pos, quat
 
     def _place_destination(self, rng, init: Stance, manip: Stance, cam, s_pose: TT.Pose):
-        """§4.6 (disembedding): destination on the left or right (random), aligned with the edge and the source tray (same
-        depth), at the lateral position where exactly ``destination_visible_width_m`` of it is inside the init image
-        (bisected on the camera projection of the point that far inside its inner edge), >= 4 cm from the source tray,
-        footprint on the top. Returns (pose, side, diagnostics); ``Reject("destination_placement")``."""
+        """§4.6 (disembedding): destination on the template's side (``dest_side``: only that side has the destination's Phase-1c
+        margin, owner 2026-10-12 A2a), aligned with the edge and the source tray (same depth), at the lateral position where
+        exactly ``destination_visible_width_m`` of it is inside the init image (bisected on the camera projection of the point
+        that far inside its inner edge), >= 4 cm from the source tray, footprint on the top. Returns (pose, side, diagnostics);
+        ``Reject("destination_placement")``."""
         top, cm = self.top, self.world.camera_model
         key = self.dst_role
         yaw_d = self._tray_yaw(key, manip)
@@ -928,7 +949,7 @@ class Disembedding(SamplerV2):
         w = float(self.g("destination_visible_width_m"))
         gap_min = float(self.g("destination_gap_min_m"))
         top_z_d = top.z + self.world.bottom_offset(self.hull[key], quat) + TT.height_of(self.hull[key], quat)
-        sides = [1.0, -1.0] if rng.random() < 0.5 else [-1.0, 1.0]
+        sides = [self.dest_side]
         diag: Dict[str, Any] = {}
 
         def pose_at(lat):

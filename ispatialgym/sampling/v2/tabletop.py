@@ -394,7 +394,9 @@ def lateral_margins(margins: Dict[str, Any], lam_min: float, lam_max: float, b: 
         attachment:        |λ_min| + max(w_target, w_partner) + 0.02 / max(0, λ_max) + max(w_target, w_partner) + 0.02
         axial:             |λ_min| + w_diag + 0.02 / max(0, λ_max) + w_diag + 0.02,  w_diag = ½√(long² + short²)
         block_design:      |λ_min| + edge/2 + (edge + 0.001) + 0.02 / max(0, λ_max) + edge/2 + 0.02   (0.0125 + 0.026 + 0.02 for the 2.5 cm cube)
-        disembedding:      b + lateral_margin + 0.02 on both sides (lateral_margin = 0.437 [pilot])
+        disembedding:      the ``destination_side`` b + lateral_margin + 0.02 (lateral_margin = 0.437 [pilot]), the other side only the
+                           source tray: |λ_min| (right) / max(0, λ_max) (left) + ``source_half_length`` + 0.02 (owner 2026-10-12 A2a);
+                           without ``destination_side`` both sides b + lateral_margin + 0.02
         articulation_small (§5.4): |λ_min| + w_a + 0.02 / max(0, λ_max) + w_a + 0.02
     """
     kind = margins.get("kind") or ("iors" if "relation" in margins else None)
@@ -438,6 +440,16 @@ def lateral_margins(margins: Dict[str, Any], lam_min: float, lam_max: float, b: 
     elif kind == "disembedding":
         lm = float(margins.get("lateral_margin", 0.437))
         m_R = m_L = float(b) + lm + safety
+        side = margins.get("destination_side")
+        if side is not None:
+            if side not in ("left", "right"):
+                raise ValueError(f"disembedding margins: destination_side must be 'left' or 'right', got {side!r}")
+            half = float(margins["source_half_length"])
+            info.update({"destination_side": side, "source_half_length": half})
+            if side == "right":
+                m_L = left + half + safety
+            else:
+                m_R = right + half + safety
     elif kind == "articulation_small":
         w_a = float(margins["w_a"])
         m_R, m_L = right + w_a + safety, left + w_a + safety

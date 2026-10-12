@@ -276,6 +276,10 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "destination_gap_min_m": 0.04,  # §4.6 ≥ 4 cm from the source tray
         "destination_floor_visible_fraction": 0.30,  # §6.4 destination floor ≥ 30 % unoccluded in the confirmation render
         "lateral_margin_m": 0.437,  # §4.4 [pilot] the two fixed trays' half lengths along the edge + gap
+        # owner 2026-10-12 (A2a): the side of the destination tray, chosen before the margins - only that side keeps the §4.4
+        # destination margin, the other one needs room for the source tray alone. Eval instances: "left" / "right" per alias in
+        # the customs (dropped for train by multiply_isg); None: drawn per template from its seed
+        "destination_side": None,
         "carry_height_extra_m": 0.03,  # §4.7 lift ≥ tallest distractor + tray rim + 3 cm above the source floor
         # owner 2026-09-24: the carry manipulation -> placement is the §3.7 edge slide (body facing the table, lateral slide
         # along the edge, drive back / in when the stand-offs differ; the grid path's turn-drive-turn only as the fallback)

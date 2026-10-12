@@ -32,7 +32,7 @@ Train policy (owner 2026-10-11)::
 * no distance rule among train instances (the eval 1 m separation does not apply to them);
 * camera relocalization: the path buckets fill by the sampler's deficit draw in the train template (``--path-buckets`` /
   ``generation.path_buckets``); object scaling: the start and goal depths are drawn as the sampler draws them (toward or away
-  at random);
+  at random); disembedding: the destination side is drawn per template (the eval aliases' ``destination_side`` is dropped);
 * object scaling / mental rotation: every train instance draws its own (scene, room), ``draw_scene_room("train", alias, g)``
   for train instance g, and goes to the template of that scene / room with the eval template's models;
   ``--keep-template-scene`` keeps the eval template's scene and room. The draw picks one room among the eligible rooms of all
@@ -70,8 +70,9 @@ from ispatialgym.sampling.v2.problem import GroundedProblem, TemplateChoice, new
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 
-#: customs generation keys that only steer eval instances (dropped for --split train; IORS small ``partner_side``: train draws the side)
-EVAL_ONLY_GENERATION_KEYS = ("requested_bucket_m", "requested_direction", "start_depth_band", "partner_side")
+#: customs generation keys that only steer eval instances (dropped for --split train; IORS small ``partner_side``: train draws the side;
+#: disembedding ``destination_side``: train draws it per template)
+EVAL_ONLY_GENERATION_KEYS = ("requested_bucket_m", "requested_direction", "start_depth_band", "partner_side", "destination_side")
 
 
 def parse_path_buckets(text: Optional[str]) -> Optional[List[Dict[str, Any]]]:
@@ -276,7 +277,7 @@ def main_train(args) -> int:
             gp.generation["path_buckets"] = buckets
         # the eval-only draws of the customs entry (owner 2026-10-11): the eval camera bucket and object-scaling direction / start
         # band; train fills the buckets by the deficit draw and draws the direction at random (IORS small, owner 2026-10-12: the
-        # partner side among the sides with a start cell)
+        # partner side among the sides with a start cell; disembedding: the destination side per template)
         for k in EVAL_ONLY_GENERATION_KEYS:
             gp.generation.pop(k, None)
         choice = choice_for_template(gp, meta)

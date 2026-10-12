@@ -745,10 +745,15 @@ border at the source-tray depth) and R_img (surface distance from the target to 
    | attachment | \|λ_min\| + max(w_target, w_partner) + 0.02 | max(0, λ_max) + max(w_target, w_partner) + 0.02 |
    | axial alignment | \|λ_min\| + w_diag + 0.02, w_diag = ½√(long² + short²) | max(0, λ_max) + w_diag + 0.02 |
    | block design | \|λ_min\| + 0.0125 + 0.026 + 0.02 | max(0, λ_max) + 0.0125 + 0.02 |
-   | disembedding | b + 0.437 + 0.02 | b + 0.437 + 0.02 |
+   | disembedding, destination on the right | b + 0.437 + 0.02 | max(0, λ_max) + h_s + 0.02 |
+   | disembedding, destination on the left | \|λ_min\| + h_s + 0.02 | b + 0.437 + 0.02 |
 
    (block design: half edge + one pitch to the robot's right of the anchor; disembedding: 0.437 = the two fixed trays'
-   half lengths along the edge + gap, recompute if the trays change.)
+   half lengths along the edge + gap, recompute if the trays change; h_s = half the source tray's length along the edge.)
+   *Owner decision 2026‑10‑12 (A2a):* the destination side is chosen first — eval: `generation.destination_side` of the
+   alias (`left` / `right`, half of the 10 eval picks each), train: drawn per template from its seed (`multiply_isg
+   --split train` drops the eval key) — and only that side keeps the destination margin; the other side needs room for
+   the source tray alone. Until then both sides carried b + 0.437 + 0.02 and short edges failed `edge_too_short`.
 
    *IORS small (owner decision 2026‑10‑12, A1).* The row was |λ_min| + w_t + D_p + 2·w_p + 0.02 per side: the top had to
    hold the whole reach band plus the largest gap and the partner on both sides, so short supports failed `no_free_edge`
@@ -830,7 +835,7 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    failure draw the next element of F without replacement; reject the attempt when F is exhausted. Record
    `(yaw, grasp_key, grasp_name)` and both eef poses.
    - *Disembedding*: source tray at the focus, aligned with the edge; target inside it (yaw as above, footprint on
-     the tray floor, 0.5 cm margin). Destination tray on the left or right (random), aligned with the edge and the
+     the tray floor, 0.5 cm margin). Destination tray on the template's destination side (4.4, A2a), aligned with the edge and the
      source tray (same depth), at the lateral position where exactly 4 cm of it is inside the **init** image (border
      at tray depth = camera-frame depth × tan 49.6°, confirmed by one segmentation render), ≥ 4 cm from the source
      tray, footprint on the top.
