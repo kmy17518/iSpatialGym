@@ -1,0 +1,112 @@
+<?xml version="1.0" ?>
+<robot name="isgefb">
+    <link name="base_link">
+        <inertial>
+            <origin xyz="0.00580293135 -0.00974164774 0.00999999978" rpy="0 0 0" />
+            <mass value="0.172752089" />
+            <inertia ixx="0.000765581582" ixy="-1.78004059e-05" ixz="-6.96486076e-21" iyy="0.000820631145" iyz="-8.35783291e-20" izz="0.00157469592" />
+        </inertial>
+        <visual name="visual">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/visual.obj" scale="1 1 1" />
+            </geometry>
+        </visual>
+        <collision name="border_top">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/border_top.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="border_bottom">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/border_bottom.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="border_left">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/border_left.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="border_right">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/border_right.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="A_outside_E">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/A_outside_E.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="A_outside_G">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/A_outside_G.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="B_outside_E">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/B_outside_E.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="B_outside_G">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/B_outside_G.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="C_outside_E">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/C_outside_E.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="C_outside_G">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/C_outside_G.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="D_outside_E">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/D_outside_E.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="D_outside_C">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/D_outside_C.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="E_outside_C">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/E_outside_C.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="F_outside_E">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/F_outside_E.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="G_outside_C">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/G_outside_C.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+        <collision name="H_outside_E">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="meshes/collision/H_outside_E.obj" scale="1 1 1" />
+            </geometry>
+        </collision>
+    </link>
+</robot>

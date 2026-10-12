@@ -1,0 +1,10 @@
+{
+  "status": "passed",
+  "dataset_name": "ispatialgym-assets",
+  "category": "jigsaw_puzzle_piece",
+  "model": "isgefd",
+  "source_urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/embedded_figure/model/isgefd/isgefd.urdf",
+  "processed_urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/embedded_figure/model/isgefd/isgefd_with_meta_links.urdf",
+  "usd": "/home/minyeongk/Desktop/projects/ispatialgym/Behavior-1K/datasets/ispatialgym-assets/objects/jigsaw_puzzle_piece/isgefd/usd/isgefd.usd",
+  "usd_size_bytes": 10541
+}

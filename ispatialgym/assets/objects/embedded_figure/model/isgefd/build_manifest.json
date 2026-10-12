@@ -1,0 +1,69 @@
+{
+  "category": "jigsaw_puzzle_piece",
+  "model": "isgefd",
+  "kind": "embedded_figure_part",
+  "figure": "EFT item 11 (context 011a.png, target 011.png), made of its lines only",
+  "role": "context_inner_B",
+  "role_note": "the piece of line B inside the target triangle (loose)",
+  "bar_width_m": 0.012,
+  "height_m": 0.02,
+  "mass_kg": 0.003262,
+  "volume_m3": 7.74726e-06,
+  "density_kg_m3": 421.0,
+  "finish": "matte black paint",
+  "pieces": {
+    "B_inside": [
+      [
+        0.006,
+        0.017873
+      ],
+      [
+        -0.006,
+        0.01094
+      ],
+      [
+        -0.006,
+        -0.017873
+      ],
+      [
+        0.006,
+        -0.017873
+      ]
+    ]
+  },
+  "origin_in_figure_m": [
+    -0.017335,
+    0.051505,
+    0.0
+  ],
+  "com_m": [
+    0.000215,
+    -0.001671,
+    0.01
+  ],
+  "inertia_about_com_kg_m2": [
+    [
+      3.98459e-07,
+      -1.12629e-08,
+      2.72065e-24
+    ],
+    [
+      -1.12629e-08,
+      1.47709e-07,
+      -4.35304e-23
+    ],
+    [
+      2.72065e-24,
+      -4.35304e-23,
+      3.28728e-07
+    ]
+  ],
+  "bbox_m": [
+    0.012,
+    0.035747,
+    0.02
+  ],
+  "frame": "part frame = figure frame shifted to the part's bounding-box centre; bottom at z = 0; +y up the drawing",
+  "collision": "1 convex prisms (the clipped bar pieces)",
+  "urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/embedded_figure/model/isgefd/isgefd.urdf"
+}
