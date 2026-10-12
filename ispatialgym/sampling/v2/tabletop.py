@@ -216,6 +216,9 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
 #: this far from the side board before the settle (gravity closes the gap, the book is never held up artificially)
 SHELF_SPINE_BEHIND_EDGE_M = 0.02
 SHELF_WALL_GAP_M = 0.002
+#: a side-board ray hit nearer than this to the ray's start is the body the ray starts in (the edge midpoint inside a divider of a
+#: multi-bay compartment), not a board face - ``SimWorld.support_interior`` drops such hits of its rays the same way
+SHELF_RAY_MIN_HIT_M = 1e-3
 
 
 def upright_shelf_facts(grasp_key: Optional[str], rest_quat) -> Optional[Dict[str, Any]]:
@@ -243,12 +246,16 @@ def upright_shelf_facts(grasp_key: Optional[str], rest_quat) -> Optional[Dict[st
 def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, support) -> Tuple[Optional[float], Dict[str, Any]]:
     """Lateral position (m along ``edge.tangent`` from ``edge.mid``, + = the robot's left) of the inner face of the support's side
     board on the robot's ``side``: a horizontal ray at height ``z``, ``depth`` behind the edge line, from the edge midpoint outward.
-    None when it meets nothing or another object first."""
+    None when it meets nothing, another object first (a room wall behind a plank), or a body it starts in (a hit within
+    :data:`SHELF_RAY_MIN_HIT_M` of the start: the midpoint inside a divider)."""
     start = edge.mid + edge.inward * float(depth)
     end = start + edge.tangent * float(side) * (0.5 * float(edge.length) + 0.30)
     h = s.world.raycast(th.tensor([[float(start[0]), float(start[1]), float(z)]]), th.tensor([[float(end[0]), float(end[1]), float(z)]]))[0]
     paths = tuple(str(l.prim_path) for l in support.links.values())
     fact = {"hit": bool(h.get("hit")), "body": h.get("rigidBody"), "distance": h.get("distance")}
+    if h.get("hit") and float(h.get("distance", 1.0)) < SHELF_RAY_MIN_HIT_M:
+        fact["why"] = "the ray starts inside the body it hits"
+        return None, fact
     if not h.get("hit") or not str(h.get("rigidBody", "")).startswith(paths):
         return None, fact
     return float(side) * float(h["distance"]), fact

@@ -506,3 +506,43 @@ def test_shelf_pose_facts_keep_the_lean_sign():
         assert IS.IORSSmall.shelf_push_sign(s) == -sign
         s.shelf_push_sign = lambda s=s: IS.IORSSmall.shelf_push_sign(s)
         assert IS.IORSSmall.shelf_push_arm(s) == arm
+
+
+def test_the_side_board_ray_takes_only_a_face_of_the_supports_own_body():
+    """tabletop.shelf_wall_lateral (s3 touching#03 c1 / c2 / c8): the ray's first hit must be the support's own body at least
+    SHELF_RAY_MIN_HIT_M from the ray's start - a board face 0.30 m out gives +-0.30 m; a miss, a room wall behind the planks (c1 / c2)
+    and a hit at distance 0 (c8: the edge midpoint inside a divider, the ray starts in it) give no board, and the leaning start is
+    rejected (shelf_wall) instead of standing the book in the divider."""
+    from ispatialgym.sampling.sim_utils import Reject, SupportTop
+    from ispatialgym.sampling.v2 import tabletop as TT
+    from ispatialgym.tests.test_v2_tabletop import BU_REST_XYZW
+
+    edge = EdgeFrame("-v", th.tensor([0.0, 0.01]), th.tensor([0.0, 1.0]), 0.58)  # the robot faces +y: its left is -x
+    support = SimpleNamespace(name="bookcase_x_0", links={"base_link": SimpleNamespace(prim_path="/World/bookcase_x_0/base_link")})
+    board = "/World/bookcase_x_0/base_link/collisions/x__base_link__collision__3"
+    hits = {"board": {"hit": True, "rigidBody": board, "distance": 0.30}, "miss": {"hit": False},
+            "wall": {"hit": True, "rigidBody": "/World/scene_0/walls_abc_0/base_link", "distance": 0.12},
+            "inside": {"hit": True, "rigidBody": board, "distance": 0.0}, "near": {"hit": True, "rigidBody": board, "distance": 0.0004}}
+    rays = []
+
+    def sampler(case):
+        def raycast(starts, ends):
+            rays.append((starts.clone(), ends.clone()))
+            return [dict(hits[case])]
+        return SimpleNamespace(world=SimpleNamespace(raycast=raycast, hull_at=_hull_at))
+
+    for side in (1.0, -1.0):
+        rays.clear()
+        lat, fact = TT.shelf_wall_lateral(sampler("board"), edge, 0.12, 0.9, side, support)
+        assert lat == pytest.approx(side * 0.30) and fact == {"hit": True, "body": board, "distance": 0.30}
+        (start, end), = rays  # one horizontal ray from the edge midpoint 0.12 m in, outward along the side's tangent (-x = left)
+        assert th.allclose(start, th.tensor([[0.0, 0.13, 0.9]])) and th.allclose(end, th.tensor([[-side * 0.59, 0.13, 0.9]]))
+    for case in ("miss", "wall", "inside", "near"):
+        lat, fact = TT.shelf_wall_lateral(sampler(case), edge, 0.12, 0.9, 1.0, support)
+        assert lat is None, case
+        assert ("starts inside" in fact.get("why", "")) == (case in ("inside", "near")), case
+    xs, ys = th.arange(-0.29, 0.30, 0.02), th.arange(0.01, 0.30, 0.02)
+    top = SupportTop("bookcase_x_0", xs, ys, th.ones(len(xs), len(ys), dtype=th.bool), th.zeros(len(xs), len(ys), dtype=th.bool), 0.81, 0.0)
+    with pytest.raises(Reject) as e:
+        TT.shelf_lean_pose(sampler("inside"), _book_hull(), th.tensor(BU_REST_XYZW), top, edge, support, 1.0)
+    assert e.value.reason == "shelf_wall" and "starts inside" in str(e.value)

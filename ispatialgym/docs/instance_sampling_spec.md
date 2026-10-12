@@ -1890,6 +1890,17 @@ swept (item 7d: swept with the untucked hand instead, the box stood inside the t
 `path_collision`). `generation.touching_place_gap_m` (unset: the nextto gap g_NT − 1 cm) sets the box down that far from
 the partner, so that the opening fingers clear it at the release; the push covers the measured gap.
 
+**Touching, shelf layout** (owner 2026‑10‑11, touching#03: a target on an `upright_shelf` grasp key, e.g.
+`hardback__acbrnv__bu`, 15° lean, on an interior shelf). No drawn position: the target stands on its bottom edge, spine
+2 cm behind the board's front edge, its top leaning against the side board its rest orientation leans to; the partner
+leans the same angle against the opposite board. Each board is found by one horizontal ray at 0.8 × the book's height,
+from the edge midpoint outward along the edge; its first hit must be the support's own body at least 1 mm from the ray's
+start. A miss, another body first (a room wall behind planks) or a hit at distance 0 (the midpoint inside a divider of a
+multi‑bay compartment, which the ray starts in) is no board: `shelf_wall`. Between the two books ≥
+`generation.shelf_free_span_min_m` (0.15 m) must stay free (`shelf_width`). The arm on the target's side grasps, places it
+beside the partner and pushes it toward the partner; nothing braces the partner. Goal: the target leans against the
+partner, its start lean mirrored.
+
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 
 - ontop / under(small): the partner's top face admits the target footprint with ≥ 1 cm margin — tier `any_yaw`
