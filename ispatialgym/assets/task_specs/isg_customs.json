@@ -6153,10 +6153,10 @@
    "brace_offset_m": 0.005,
    "brace_clearance_m": 0.02,
    "brace_kinds": [
+    "below_high",
     "above_low",
     "side_high"
    ],
-   "push_end": "high",
    "template_filter_deviation_deg": 25.0,
    "scale_hint_steps": [
     0.9,
