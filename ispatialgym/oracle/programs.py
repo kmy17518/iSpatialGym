@@ -471,6 +471,61 @@ def push_finish_chunks(art) -> List[Dict[str, Any]]:
     return [dict(rec)]
 
 
+#: ``articulation.push_close`` keys the program passes to ``PushClose`` for a cabinet door pushed shut room-door style (sampler
+#: ``articulation_large.close_by_push_record``); a room door records none and keeps the ``PushClose`` defaults
+PUSH_CLOSE_OPTIONS = ("push_inset_m", "push_height_drop_m", "chunk_deg", "drag_m", "contact_clearance_m", "leaf_width_m", "face_offset_m", "handle_standoff_m")
+
+
+def close_by_push(art) -> bool:
+    """Whether the record closes a cabinet door room-door style (``articulation.close_by_push``, sampler ``generation.close_by_push``):
+    ``true``; ``false`` / absent = as before; anything else is a sidecar error."""
+    v = (art.extra or {}).get("close_by_push")
+    if v is None or v is False:
+        return False
+    if v is not True:
+        raise SidecarError(f"articulation.close_by_push: true or false, got {v!r}")
+    return True
+
+
+def push_close_options(art, geo: Dict[str, object]) -> Dict[str, float]:
+    """The ``PushClose`` options of a cabinet door pushed shut room-door style (``articulation.push_close``): the push's knobs and the
+    leaf the sampler measured (:data:`PUSH_CLOSE_OPTIONS`), plus ``q_closed`` = the lower limit (the closed waypoint's joint value).
+    The recorded hinge and swing sign must agree with the handle waypoints' (``geo`` = :func:`door_leaf_geometry`): the hinge within
+    3 cm, the sign of the turn that swings the outer face toward the robot as the joint opens."""
+    rec = (art.extra or {}).get("push_close")
+    w = "articulation.push_close"
+    if not isinstance(rec, dict):
+        raise SidecarError(f"{w}: expected a dict (articulation.close_by_push), got {type(rec).__name__}")
+    missing = [k for k in PUSH_CLOSE_OPTIONS + ("swing_sign", "hinge_world") if rec.get(k) is None]
+    if missing:
+        raise SidecarError(f"{w}: missing {missing}")
+
+    def number(v) -> bool:
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+    bad = [k for k in PUSH_CLOSE_OPTIONS + ("swing_sign",) if not number(rec[k])]
+    if not isinstance(rec["hinge_world"], (list, tuple)) or len(rec["hinge_world"]) != 3 or not all(number(v) for v in rec["hinge_world"]):
+        bad.append("hinge_world (3)")
+    if bad:
+        raise SidecarError(f"{w}: {bad} must be numbers")
+    opts = {k: float(rec[k]) for k in PUSH_CLOSE_OPTIONS}
+    r = float(geo["handle_radius_m"])
+    if not (0.0 < opts["push_inset_m"] < opts["leaf_width_m"] and 0.0 < opts["chunk_deg"] <= 90.0 and opts["drag_m"] >= 0.0 and 0.0 <= opts["contact_clearance_m"] < 0.10
+            and 0.0 <= opts["handle_standoff_m"] < r):
+        raise SidecarError(f"{w}: out of range - 0 < push_inset_m < leaf_width_m, 0 < chunk_deg <= 90, drag_m >= 0, 0 <= contact_clearance_m < 0.10, "
+                           f"0 <= handle_standoff_m < the handle radius {r:.3f}: {opts}")
+    hx, hy = geo["hinge_xy"]
+    hinge = rec["hinge_world"]
+    if math.hypot(float(hinge[0]) - hx, float(hinge[1]) - hy) > 0.03:
+        raise SidecarError(f"{w}.hinge_world: {hinge!r} is not the hinge of the handle waypoints ({hx:.3f}, {hy:.3f})")
+    (cx, cy), (ax, ay) = geo["handle_xy_closed"], geo["approach_closed"][:2]
+    s = 1.0 if (-(cy - hy)) * (-ax) + (cx - hx) * (-ay) > 0.0 else -1.0  # execute.leaf_frame's rule: hinge -> handle turned +90 deg, dotted with -approach
+    if float(rec["swing_sign"]) != s:
+        raise SidecarError(f"{w}.swing_sign: {rec['swing_sign']!r}, the handle waypoints swing the leaf with {s:+.0f}")
+    opts["q_closed"] = min(art.q_init, art.q_goal)
+    return opts
+
+
 def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Action]:
     """init → manipulation stance (transition) → grasp the handle at h(q_init) → move the joint: base_follow along the
     recorded b_k (``follow_mode`` base) or the arm along h(q_k) (``follow_mode`` arm), up to ``passive_from`` or q_goal
@@ -483,15 +538,29 @@ def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Act
     A **cabinet door whose closing the arm follows only part of the way is pushed the rest of the way shut** (owner
     2026-10-12 ~04:20; ``articulation.push_finish``, sampler ``generation.push_finish``): grasp → follow up to
     ``articulation.follow_to`` → release → retreat → ``push_close`` with the planned chunk (:func:`push_finish_chunks`), judged on
-    the instance's joint tolerance."""
+    the instance's joint tolerance.
+
+    A **cabinet door closed room-door style** (owner 2026-10-12; ``articulation.close_by_push``, sampler
+    ``generation.close_by_push``) takes the room door's branch, with the leaf and the push knobs the sampler recorded
+    (``articulation.push_close``, :func:`push_close_options`)."""
     art = sc.articulation
     if art is None:
         raise SidecarError("articulation: required for articulation tasks")
     arm = _working_arm(sc)
-    if direction == "close" and (art.extra or {}).get("door_class") == ROOM_DOOR_CLASS:
+    pushed = close_by_push(art)
+    if pushed:
+        if direction != "close":
+            raise SidecarError(f"articulation.close_by_push: a close pushes the leaf shut, the alias is a {direction!r}")
+        if art.joint_type != "revolute":
+            raise SidecarError(f"articulation.joint_type: a door leaf pushed shut is revolute, got {art.joint_type!r}")
+        if (art.extra or {}).get("push_finish") is not None:
+            raise SidecarError("articulation: close_by_push (no grasp) and push_finish (grasp, then a push) exclude each other")
+    if direction == "close" and ((art.extra or {}).get("door_class") == ROOM_DOOR_CLASS or pushed):
         if art.joint_type != "revolute":
             raise SidecarError(f"articulation.joint_type: a room door leaf is revolute, got {art.joint_type!r}")
-        push = PushClose(arm=arm, object=art.object, joint=art.joint, q_from=art.q_init, q_lower=min(art.q_init, art.q_goal), **door_leaf_geometry(art))
+        geo = door_leaf_geometry(art)
+        opts = push_close_options(art, geo) if pushed else {}
+        push = PushClose(arm=arm, object=art.object, joint=art.joint, q_from=art.q_init, q_lower=min(art.q_init, art.q_goal), **geo, **opts)
         return _travel(sc, "init", "manipulation") + [push]
     grasp = Grasp(kind="handle", arm=arm, object=art.object, articulation=art)
     follow = BaseFollow(arm=arm, articulation=art, stance=sc.stance("manipulation"), grasp_action=grasp, direction=direction)

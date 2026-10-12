@@ -1295,6 +1295,89 @@ def test_cabinet_push_finish_program():
         assert any(match in p for p in problems), (match, problems)
 
 
+def test_room_door_push_close_program_is_unchanged():
+    """The room door's push-close (no ``close_by_push``) is what it was before the cabinet's room-door style close (values of 388fe4a2):
+    the leaf geometry from the handle waypoints, every ``PushClose`` field, the targets and the annotation; the cabinet leaf options
+    stay at their room-door defaults."""
+    from ispatialgym.oracle.programs import door_leaf_geometry
+
+    with open(os.path.join(VARIANTS, "configuration_matching-articulation_close_large_scale__room_door.json")) as f:
+        sc = Sidecar.from_dict(json.load(f))
+    assert door_leaf_geometry(sc.articulation) == {"hinge_xy": (-6.861306703398571, 5.211934738096777), "handle_radius_m": 0.7964860434373733,
+                                                   "handle_xy_closed": (-6.827795, 4.416154), "approach_closed": (-0.999872, -0.015978, -1e-05), "handle_z": 1.036606}
+    push = expand(sc.alias, sc)[-1]
+    assert {k: getattr(push, k) for k in ("arm", "object", "joint", "hinge_xy", "handle_xy_closed", "approach_closed", "handle_radius_m", "handle_z", "q_from", "q_lower",
+                                          "leaf_link", "push_inset_m", "push_height_drop_m", "hook_gap_m", "push_pre_m", "chunk_deg", "push_n", "closed_tol_rad",
+                                          "max_chunks", "drag_m", "push_arms", "plan", "plan_repeats", "tol_span_rad")} == {
+        "arm": "right", "object": "door.n.01_1", "joint": "j_leaf", "hinge_xy": (-6.861306703398571, 5.211934738096777), "handle_xy_closed": (-6.827795, 4.416154),
+        "approach_closed": (-0.999872, -0.015978, -1e-05), "handle_radius_m": 0.7964860434373733, "handle_z": 1.036606, "q_from": 0.858809, "q_lower": 0.0,
+        "leaf_link": "leaf", "push_inset_m": 0.15, "push_height_drop_m": 0.05, "hook_gap_m": 0.035, "push_pre_m": 0.1, "chunk_deg": 20.0, "push_n": 5,
+        "closed_tol_rad": 0.05, "max_chunks": 10, "drag_m": 0.2, "push_arms": ("right", "left"), "plan": None, "plan_repeats": 2, "tol_span_rad": None}
+    assert (push.leaf_width_m, push.face_offset_m, push.handle_standoff_m, push.q_closed) == (None, None, None, 0.0)
+    assert push.targets(sc, None) == {"leaf": {"hinge_xy": [-6.861306703398571, 5.211934738096777], "handle_radius_m": 0.7964860434373733, "q_from": 0.858809, "q_to": 0.0}}
+    assert push.annotate(sc)[1] == "close the door by pushing its outer face with the closed hand: joint j_leaf from 0.86 rad to 0.00 rad (49°), pushed in arcs of 20° about the hinge"
+
+
+def _cabinet_close_by_push():
+    """The close large-scale fixture's leaf as a cabinet door closed room-door style: ``articulation.close_by_push`` and the sampler's
+    ``push_close`` record (knobs + the leaf; the fixture's hinge and its +1 swing), the recorded hybrid follow kept as the gate."""
+    with open(os.path.join(VARIANTS, "configuration_matching-articulation_close_large_scale__room_door.json")) as f:
+        d = json.load(f)
+    d["articulation"].update({"door_class": "cabinet", "close_by_push": True,
+                              "push_close": {"push_inset_m": 0.15, "push_height_drop_m": 0.05, "chunk_deg": 45.0, "drag_m": 0.08, "contact_clearance_m": 0.0307,
+                                             "leaf_width_m": 0.80, "face_offset_m": 0.02, "handle_standoff_m": 0.055, "leaf_z": [0.0, 2.2], "swing_sign": 1.0,
+                                             "hinge_world": [-6.8613, 5.2119, 1.0]}})
+    return d
+
+
+def test_cabinet_close_by_push_takes_the_room_door_branch():
+    """Owner 2026-10-12 (close_large#03 c2): a cabinet close recorded with ``articulation.close_by_push`` is pushed shut room-door style -
+    travel to the manipulation stance, ``push_close`` with no grasp, the leaf geometry from the handle waypoints (as the room door's)
+    and the recorded leaf / knobs as ``PushClose`` options (``q_closed`` = the lower limit); no eef pose for the program check.
+    ``false`` is the grasp program as before; a malformed record, a push finish alongside or an open is a sidecar problem."""
+    from ispatialgym.oracle.programs import PUSH_CLOSE_OPTIONS, program_articulation_large
+    from ispatialgym.sampling.v2.program_check import iter_pose_targets
+
+    st = "configuration_matching-articulation_close_large_scale"
+    d = _cabinet_close_by_push()
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == []
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == _WALL_IN + ["push_close"]
+    push, art = actions[-1], d["articulation"]
+    assert isinstance(push, A.PushClose) and push.plan is None and (push.arm, push.arms) == ("right", ("left", "right"))
+    assert {k: getattr(push, k) for k in PUSH_CLOSE_OPTIONS} == {k: art["push_close"][k] for k in PUSH_CLOSE_OPTIONS}
+    assert (push.q_from, push.q_lower, push.q_closed) == (pytest.approx(art["q_init"]), pytest.approx(art["q_goal"]), pytest.approx(min(art["q_init"], art["q_goal"])))
+    with open(os.path.join(VARIANTS, f"{st}__room_door.json")) as f:
+        room = Sidecar.from_dict(json.load(f))
+    door = expand(room.alias, room)[-1]
+    assert [getattr(push, k) for k in ("hinge_xy", "handle_radius_m", "handle_xy_closed", "approach_closed", "handle_z")] == \
+        [getattr(door, k) for k in ("hinge_xy", "handle_radius_m", "handle_xy_closed", "approach_closed", "handle_z")]
+    assert list(iter_pose_targets(push.targets(sc, None))) == [] and push.annotate(sc)[1].endswith("pushed in arcs of 45° about the hinge")
+    plain = copy.deepcopy(d)
+    plain["articulation"]["close_by_push"] = False
+    assert [a.name for a in expand(sc.alias, Sidecar.from_dict(plain))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+    with pytest.raises(SidecarError, match="a close pushes the leaf shut"):
+        program_articulation_large(sc, direction="open")
+    for mutate, match in ((lambda a: a.update(close_by_push="yes"), "true or false"),
+                          (lambda a: a.pop("push_close"), "expected a dict"),
+                          (lambda a: a["push_close"].pop("leaf_width_m"), "missing ['leaf_width_m']"),
+                          (lambda a: a["push_close"].update(chunk_deg="wide"), "must be numbers"),
+                          (lambda a: a["push_close"].update(swing_sign="minus"), "['swing_sign'] must be numbers"),
+                          (lambda a: a["push_close"].update(hinge_world=[-6.86, "x", 1.0]), "['hinge_world (3)'] must be numbers"),
+                          (lambda a: a["push_close"].update(push_inset_m=0.9), "out of range"),
+                          (lambda a: a["push_close"].update(handle_standoff_m=0.9), "out of range"),
+                          (lambda a: a["push_close"].update(contact_clearance_m=0.12), "out of range"),
+                          (lambda a: a["push_close"].update(swing_sign=-1.0), "the handle waypoints swing the leaf with +1"),
+                          (lambda a: a["push_close"].update(hinge_world=[-6.80, 5.2119, 1.0]), "is not the hinge of the handle waypoints"),
+                          (lambda a: a.update(push_finish={"arm": "right"}, follow_to=0.75), "exclude each other"),
+                          (lambda a: a.update(joint_type="prismatic"), "a door leaf pushed shut is revolute")):
+        bad = _cabinet_close_by_push()
+        mutate(bad["articulation"])
+        problems = Sidecar.from_dict(bad).problems()
+        assert any(match in p for p in problems), (match, problems)
+
+
 def test_attachment_second_base_pose_is_travelled_while_holding():
     """Owner decision 2026-09-16 17:10 item 2 (spec §6.8; tabletop ``58afae2``, core ``bd10c72``): when the attach pose
     and the brace are not both reachable from the grasp stance the sidecar records an ``attach`` stance reached with the

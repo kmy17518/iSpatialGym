@@ -1006,6 +1006,61 @@ def test_room_door_push_close_counts_progress_in_the_joint_for_either_swing_sign
     assert len(rep["chunks"]) == 1 and "base_drag" in rep["chunks"][0] and rep["chunks"][0]["result"] == "no progress" and verdict == "no_motion"
 
 
+def test_room_door_push_close_execution_is_unchanged(monkeypatch):
+    """The room door's push-close (the close fixture's door, +1, no cabinet leaf options) runs as it did before the cabinet's room-door
+    style close (values of 388fe4a2 on the same stub): the leaf geometry report, each chunk's contact, free edge, stance and landing."""
+    sc = Sidecar.load(os.path.join(VARIANTS, "configuration_matching-articulation_close_large_scale__room_door.json"))
+    push = expand(sc.alias, sc)[-1]
+    q = [push.q_from]
+    motions = _RoomPushMotions(q, push.hinge_xy, 1.0)
+    rep, verdict = _run_room_push(push, motions, q, monkeypatch)
+    assert rep["geometry"] == {"hinge_xy": [-6.861306703398571, 5.211934738096777], "leaf_width_m": 0.829, "thickness_m": 0.04, "q_start_deg": 49.21}
+    assert [(c["q_before_deg"], c["q_after_deg"], c["stance"], c["contact"]) for c in rep["chunks"]] == [
+        (49.21, 28.63, [-5.95, 5.198, -2.316], [-6.348, 4.766, 0.987]), (28.63, 8.06, [-6.013, 4.879, -2.675], [-6.538, 4.614, 0.987]),
+        (8.06, 0.0, [-6.184, 4.602, -3.034], [-6.768, 4.539, 0.987])]
+    assert rep["chunks"][0]["free_edge_xy"] == [-6.252, 4.65] and verdict is None and rep["closed"]
+
+
+def _cabinet_push(**kw) -> PushClose:
+    """``push_close`` of the office cabinet door (close_large#03, swing sign -1) closed room-door style, as ``program_articulation_large``
+    builds it from the handle waypoints and the sampler's leaf record (``articulation.push_close``)."""
+    opts = dict(leaf_width_m=0.3979, face_offset_m=0.0086, handle_standoff_m=0.0206, chunk_deg=45.0, drag_m=0.08, q_closed=0.0, contact_clearance_m=0.0307)
+    opts.update(kw)
+    return PushClose(arm="right", object="bottom_cabinet.n.01_1", joint="j_link_2", hinge_xy=(8.6734, -6.7254), handle_xy_closed=(8.694, -6.3612),
+                     approach_closed=(-1.0, 0.0, 0.0), handle_radius_m=0.3648, handle_z=0.7311, q_from=1.021, q_lower=0.0, **opts)
+
+
+def test_cabinet_push_close_pushes_the_measured_leaf(monkeypatch):
+    """A cabinet door closed room-door style (owner 2026-10-12): with the recorded leaf (width 0.398 m, outer face 8.6 mm and bar contact
+    20.6 mm in front of the hinge line) the push pose has its fingertips on the outer face (the pad centre 3.07 cm in front of it),
+    0.248 m from the hinge line and 5 cm below the bar grasp, turned with the leaf (swing sign -1) - the room door's estimate on the
+    same leaf (a lever 6 cm off the face, half a 4 cm leaf, the pad centre on the face) put the pad centre 1.5 cm inside the leaf.
+    45 deg arcs close it from 58.5 deg in two chunks, counter-clockwise; an arc that gains < 2 deg drags the base 8 cm."""
+    q0 = 1.021
+    d1 = th.tensor([math.sin(q0), math.cos(q0)])  # the leaf at q0: the closed leaf (+y from the hinge) turned about +z by -q0
+    m1 = th.tensor([math.cos(q0), -math.sin(q0)])  # its outer-face normal
+    hinge = th.tensor([8.6734, -6.7254])
+    q = [q0]
+    motions = _RoomPushMotions(q, (8.6734, -6.7254), -1.0)
+    rep, verdict = _run_room_push(_cabinet_push(), motions, q, monkeypatch)
+    assert verdict is None and rep["closed"] and len(rep["chunks"]) == 2 and not any("base_drag" in c for c in rep["chunks"])
+    assert all(t > 0.0 for t in motions.arc_turns) and rep["chunks"][0]["delta_deg"] == 45.0 and rep["chunks"][0]["q_after_deg"] == pytest.approx(12.93, abs=0.02)
+    assert rep["geometry"]["leaf_width_m"] == 0.398 and rep["geometry"]["face_offset_m"] == 0.0086 and rep["geometry"]["swing_sign"] == -1.0
+    c = th.tensor(rep["chunks"][0]["contact"][:2]) - hinge
+    tips = float(c @ m1) - (C.FINGERTIP_LENGTH - C.CONTACT_CENTER_Z)  # the fingertips' offset along the outer normal
+    assert tips == pytest.approx(0.0086, abs=1.5e-3) and float(c @ d1) == pytest.approx(0.2479, abs=1.5e-3) and rep["chunks"][0]["contact"][2] == 0.681
+    q = [q0]
+    room_est = _cabinet_push(leaf_width_m=None, face_offset_m=None, handle_standoff_m=None, contact_clearance_m=0.0)
+    rep_room, _ = _run_room_push(room_est, _RoomPushMotions(q, (8.6734, -6.7254), -1.0), q, monkeypatch)
+    c_room = th.tensor(rep_room["chunks"][0]["contact"][:2]) - hinge
+    assert float(c_room @ m1) < 0.0086 - 0.010 and "face_offset_m" not in rep_room["geometry"]
+    # the leaf lags the fist (1.35 deg of the 45 deg arc): the base drags 8 cm toward the leaf
+    q = [q0]
+    motions = _RoomPushMotions(q, (8.6734, -6.7254), -1.0, gain=0.03)
+    rep, _ = _run_room_push(_cabinet_push(max_chunks=1), motions, q, monkeypatch)
+    assert rep["chunks"][0]["base_drag"] == "0.08 m toward the frame"
+
+
 def test_postcondition_push_no_motion():
     sc = Sidecar.load(os.path.join(SIDECARS, "alignment-axial.json"))
     push = [a for a in expand(sc.alias, sc) if isinstance(a, Push)][0]

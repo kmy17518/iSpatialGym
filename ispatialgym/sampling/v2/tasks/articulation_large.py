@@ -167,17 +167,17 @@ def follow_mode_by_class(cls: str, joint_type: str, axis_world) -> str:
     return follow_mode(joint_type, axis_world)
 
 
-def base_follow_policy(configured: Any, direction: str, cls: str) -> str:
+def base_follow_policy(configured: Any, direction: str, cls: str, pushed: bool = False) -> str:
     """Policy of a hybrid follow that has to move the base (the arm alone cannot do it from the stance): the alias's
     ``generation.hybrid_follow.policy`` when it names one; else ``sequential`` - pull with the arm, move the base with the
     door stationary and the hand off the handle, pull again (owner 2026-09-27, dishwasher close 0926-065206: arm -> base ->
     arm as the open large-scale aliases, never the base driving while the hand pulls / pushes the door) - wherever the
-    oracle drives the recorded follow with the hand on the handle. A room door's close is pushed shut instead
-    (``programs.program_articulation_large`` -> ``push_close``): its follow is a sampling gate only and keeps the knob's
-    default."""
+    oracle drives the recorded follow with the hand on the handle. A room door's close - and a cabinet door's close with
+    ``generation.close_by_push`` (``pushed``) - is pushed shut instead (``programs.program_articulation_large`` ->
+    ``push_close``): its follow is a sampling gate only and keeps the knob's default."""
     if configured:
         return str(configured)
-    if direction == "close" and cls == "room_door":
+    if direction == "close" and (cls == "room_door" or pushed):
         return str(AH.DEFAULTS["policy"])
     return "sequential"
 
@@ -698,6 +698,70 @@ def push_contact_pose(leaf: ClosedLeaf, cand: Dict[str, Any], q: float) -> Tuple
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# a cabinet door's close pushed shut room-door style (owner 2026-10-12, close_large#03)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: ``generation.close_by_push`` (``true``, or a dict overriding these): the closing of a revolute cabinet door on a vertical hinge is
+#: pushed shut as a room door's is - no grasp: the program drives init -> manipulation and ``push_close`` pushes the leaf's outer face
+#: in arcs about the hinge from a stance it picks per chunk (``programs.program_articulation_large``); the follow the sampler checks
+#: is a sampling gate only (the room door's close policy, :func:`base_follow_policy`). The values are ``push_close`` options
+#: (``PushClose`` fields), recorded in ``articulation.push_close`` with the leaf they act on (:func:`close_by_push_record`). Off when
+#: the key is absent.
+CLOSE_BY_PUSH_DEFAULTS: Dict[str, Any] = {
+    "push_inset_m": 0.15,  # contact distance from the free edge (the room door's: 0.25 m from the hinge line of a 0.40 m leaf)
+    "push_height_drop_m": 0.05,  # contact below the closed handle (the room door's)
+    "chunk_deg": 45.0,  # arc per chunk: 0.20 m of fist travel at a 0.25 m contact radius (a room door's 20 deg at ~0.68 m: 0.24 m)
+    "drag_m": 0.08,  # base drag toward the leaf when an arc gains < 2 deg: ~18 deg at 0.25 m (the room door's 0.20 m at ~0.68 m: ~17 deg)
+    # the contact point this far in front of the measured outer face: the push pose puts the pad centre on it, so 3.07 cm puts the
+    # fingertips on the face (the push finish's convention) instead of 3 cm into the leaf the stance search's IK sees (room door: 0)
+    "contact_clearance_m": round(C.FINGERTIP_LENGTH - C.CONTACT_CENTER_Z, 4),
+}
+
+
+def close_by_push_config(raw: Any) -> Optional[Dict[str, float]]:
+    """``generation.close_by_push`` -> its options (:data:`CLOSE_BY_PUSH_DEFAULTS` with the alias's overrides); None when off (absent,
+    ``false``, ``{"enabled": false}``). ``Reject("spec")`` for another type, an unknown key or a value out of range."""
+    if raw is None or raw is False:
+        return None
+    if raw is True:
+        return dict(CLOSE_BY_PUSH_DEFAULTS)
+    if not isinstance(raw, dict):
+        raise Reject("spec", f"generation.close_by_push: true / false or a dict of options, got {raw!r}")
+    if not raw.get("enabled", True):
+        return None
+    unknown = sorted(str(k) for k in raw if k != "enabled" and not str(k).startswith("_") and k not in CLOSE_BY_PUSH_DEFAULTS)
+    if unknown:
+        raise Reject("spec", f"generation.close_by_push: unknown keys {unknown} (known: {sorted(CLOSE_BY_PUSH_DEFAULTS)})")
+    out = dict(CLOSE_BY_PUSH_DEFAULTS)
+    out.update({k: v for k, v in raw.items() if k in CLOSE_BY_PUSH_DEFAULTS})
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in out.values()):
+        raise Reject("spec", f"generation.close_by_push: numbers expected, got {out}")
+    out = {k: float(v) for k, v in out.items()}
+    if not (out["push_inset_m"] > 0.0 and 0.0 < out["chunk_deg"] <= 90.0 and out["drag_m"] >= 0.0 and 0.0 <= out["contact_clearance_m"] < 0.10):
+        raise Reject("spec", f"generation.close_by_push: push_inset_m > 0, chunk_deg in (0, 90], drag_m >= 0 and contact_clearance_m in [0, 0.10), got {out}")
+    return out
+
+
+def close_by_push_applies(direction: str, joint_type: str, cls: str, vertical_axis: bool) -> bool:
+    """Whether ``generation.close_by_push`` can serve a joint: the closing of a revolute ``cabinet`` door on a vertical hinge (the room
+    door's ``push_close`` turns the leaf about a vertical hinge line; a room door is pushed shut anyway)."""
+    return direction == "close" and "revolute" in joint_type.lower() and cls == "cabinet" and bool(vertical_axis)
+
+
+def close_by_push_record(leaf: ClosedLeaf, cfg: Dict[str, float]) -> Dict[str, Any]:
+    """``articulation.push_close`` of a cabinet door pushed shut room-door style: the push's options (``cfg``) and the closed leaf they
+    act on (:func:`closed_leaf`) - ``leaf_width_m`` (hinge line -> free edge), ``face_offset_m`` (the outer face in front of the hinge
+    line), ``handle_standoff_m`` (the handle contact in front of the hinge line: the hinge -> handle direction turned back by
+    atan(standoff / radius) runs along the leaf), ``leaf_z`` (its height span), ``swing_sign`` and ``hinge_world`` (the joint record's;
+    the program checks both against the handle waypoints)."""
+    hc = 0.5 * (leaf.handle_a + leaf.handle_b)
+    standoff = float(th.dot((hc - leaf.hinge)[:2], leaf.n0[:2]))
+    return {**{k: float(v) for k, v in cfg.items()}, "leaf_width_m": round(float(leaf.width), 4), "face_offset_m": round(float(leaf.face), 4),
+            "handle_standoff_m": round(standoff, 4), "leaf_z": [round(float(leaf.z_lo), 4), round(float(leaf.z_hi), 4)], "swing_sign": float(leaf.s),
+            "hinge_world": [round(float(v), 4) for v in leaf.hinge.tolist()]}
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # the task module
 # ----------------------------------------------------------------------------------------------------------------
 
@@ -705,6 +769,9 @@ def push_contact_pose(leaf: ClosedLeaf, cand: Dict[str, Any], q: float) -> Tuple
 @register(*SUBTASKS)
 class ArticulationLarge(SamplerV2):
     """One class for open and close; the direction comes from the subtask id (``generation.direction`` agrees)."""
+
+    #: ``generation.close_by_push`` options when the joint qualifies (:func:`close_by_push_applies`), else None
+    close_by_push_cfg: Optional[Dict[str, float]] = None
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -1080,9 +1147,21 @@ class ArticulationLarge(SamplerV2):
             if self.gp.gen("arm", "auto") not in ("left", "right"):
                 self.arm = arm_for_hinge_side(self.hinge_side)
             self.lam_range = hinge_side_lateral(self.hinge_side, lam_max)
+        # generation.close_by_push (owner 2026-10-12): the whole closing pushed shut room-door style, the follow a sampling gate
+        self.close_by_push_cfg = None
+        if self.gp.gen("close_by_push") is not None:
+            cfg = close_by_push_config(self.gp.gen("close_by_push"))
+            if cfg is not None and close_by_push_applies(self.direction, self.jinfo["type"], self.door_class, axis_is_vertical(axis_world)) \
+                    and self.jinfo.get("hinge_point_obj") is not None:
+                self.close_by_push_cfg = cfg
+            elif cfg is not None:
+                log.info("%s: generation.close_by_push ignored for %s/%s (%s, class %s): it serves the closing of a revolute cabinet door on "
+                         "a vertical hinge", self.gp.alias, obj.name, self.joint_name, self.direction, self.door_class)
         # generation.push_finish (owner 2026-10-12 ~04:20): a closing the arm follows only part of the way is pushed shut
         self.push_finish_cfg = None
-        if self.gp.gen("push_finish") is not None:
+        if self.gp.gen("push_finish") is not None and self.close_by_push_cfg is not None:
+            log.info("%s: generation.push_finish ignored for %s/%s: generation.close_by_push pushes the whole closing", self.gp.alias, obj.name, self.joint_name)
+        elif self.gp.gen("push_finish") is not None:
             if push_finish_applies(self.direction, self.jinfo["type"], self.door_class, self.mode, axis_is_vertical(axis_world)):
                 self.push_finish_cfg = push_finish_config(self.gp.gen("push_finish"))
             else:
@@ -1100,9 +1179,11 @@ class ArticulationLarge(SamplerV2):
                                     "door_class": self.door_class, "hinge_side": self.hinge_side, "lateral_range_m": list(self.lam_range)})
         if self.push_finish_cfg is not None:
             self.template_facts["push_finish"] = dict(self.push_finish_cfg)
+        if self.close_by_push_cfg is not None:
+            self.template_facts["close_by_push"] = dict(self.close_by_push_cfg)
         log.info("%s: %s/%s %s: class %s, S=%s, arm %s (handle %.2f m left of the face centre, hinge %s), follow_mode %s, Λ %s%s", self.gp.alias, obj.name,
                  self.joint_name, self.direction, self.door_class, [round(s, 3) for s in self.stable], self.arm, off_left, self.hinge_side, self.mode, self.lam_range,
-                 ", push finish on" if self.push_finish_cfg is not None else "")
+                 ", push finish on" if self.push_finish_cfg is not None else (", close by push on" if self.close_by_push_cfg is not None else ""))
 
     def stable_set(self) -> List[float]:
         """§5.3 stable set S: 7 fractions of ``open_fraction_range`` + the upper limit, each held 120 steps and kept when
@@ -1721,7 +1802,8 @@ class ArticulationLarge(SamplerV2):
         if mode in ("base", "hybrid"):
             try:
                 if mode == "hybrid":
-                    policy = base_follow_policy((self.gp.gen("hybrid_follow") or {}).get("policy"), self.direction, self.door_class)
+                    policy = base_follow_policy((self.gp.gen("hybrid_follow") or {}).get("policy"), self.direction, self.door_class,
+                                                pushed=self.close_by_push_cfg is not None)
                     log.info("%s: stance %s: the follow needs the base (%s) -> %s follow search", self.gp.alias, self._stance_key(manip), (arm_alone or {}).get("why_not"), policy)
                     hp = AH.search_follow_path(self, manip, q_star, h0, q_init, q_goal, fractions, required, fraction_key, policy=policy)
                     base_follow, follow_path = hp.base_follow, hp.to_sidecar(bool(self.gp.gen("hybrid_follow_record_eef", True)))
@@ -1770,6 +1852,12 @@ class ArticulationLarge(SamplerV2):
             # the hand's part ends at the release (``follow_to``); ``push_close`` takes the leaf on with the planned chunk
             self.sidecar.articulation["follow_to"] = float(push["k_release"])
             self.sidecar.articulation["push_finish"] = dict(push)
+        push_close = None
+        if self.close_by_push_cfg is not None:
+            # no grasp: ``push_close`` pushes the leaf shut from q_init as a room door's (the follow above was the sampling gate)
+            push_close = close_by_push_record(closed_leaf(self.obj_pose(), self.jinfo, self.handle), self.close_by_push_cfg)
+            self.sidecar.articulation["close_by_push"] = True
+            self.sidecar.articulation["push_close"] = push_close
         self.sidecar.describe(tname, obj.category.replace("_", " "))
         # draft: joints only (nothing spawned), robot at the init stance, the moving link held while settling
         d = Draft()
@@ -1812,6 +1900,9 @@ class ArticulationLarge(SamplerV2):
         d.summary["arm_alone_follow"] = arm_alone
         if follow_path is not None:
             d.summary["hybrid_follow"] = dict(follow_path.get("stats") or {})
+        if push_close is not None:
+            d.summary["close_by_push"] = True
+            d.summary["push_close"] = dict(push_close)
         return d
 
     def _base_follow(self, manip: Stance, q_star: th.Tensor, h0: C.HandleWaypoint, by_k: Dict[float, C.HandleWaypoint], required: List[float],

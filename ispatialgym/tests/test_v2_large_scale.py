@@ -710,6 +710,123 @@ def test_push_finish_draft_records_the_release_and_expands_to_the_finish_program
     assert push.plan == [raw["articulation"]["push_finish"]] and push.q_from == pytest.approx(q_rel) and push.tol_span_rad == pytest.approx(q_init)
 
 
+def test_close_by_push_switch_policy_and_leaf_record():
+    """Owner 2026-10-12 (close_large#03 c2): ``generation.close_by_push`` (off when absent) serves the closing of a revolute cabinet door
+    on a vertical hinge; with it the hybrid follow is the room door's sampling gate (the knob's default policy, not ``sequential``); the
+    record carries the push's knobs and the leaf they act on - for the office cabinet door the 0.398 m box width, the outer face 8.6 mm
+    and the bar contact 20.6 mm in front of the hinge line, the -z hinge's swing sign -1."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    assert AL.close_by_push_config(None) is None and AL.close_by_push_config(False) is None and AL.close_by_push_config({"enabled": False}) is None
+    assert AL.close_by_push_config(True) == AL.CLOSE_BY_PUSH_DEFAULTS == {"push_inset_m": 0.15, "push_height_drop_m": 0.05, "chunk_deg": 45.0, "drag_m": 0.08,
+                                                                          "contact_clearance_m": 0.0307}
+    assert AL.CLOSE_BY_PUSH_DEFAULTS["contact_clearance_m"] == pytest.approx(C.FINGERTIP_LENGTH - C.CONTACT_CENTER_Z, abs=1e-4)  # the fingertips on the face
+    cfg = AL.close_by_push_config({"chunk_deg": 30, "_note": "why"})
+    assert cfg == dict(AL.CLOSE_BY_PUSH_DEFAULTS, chunk_deg=30.0) and isinstance(cfg["chunk_deg"], float)
+    for bad in ({"chunk": 30}, {"chunk_deg": 120.0}, {"push_inset_m": 0.0}, {"drag_m": -0.1}, {"drag_m": "far"}, {"chunk_deg": True}, {"contact_clearance_m": 0.2},
+                "yes", 1):
+        with pytest.raises(Reject) as e:
+            AL.close_by_push_config(bad)
+        assert e.value.reason == "spec"
+    assert AL.close_by_push_applies("close", "RevoluteJoint", "cabinet", True)
+    for args in (("open", "RevoluteJoint", "cabinet", True), ("close", "RevoluteJoint", "room_door", True), ("close", "PrismaticJoint", "drawer", False),
+                 ("close", "RevoluteJoint", "cabinet", False)):  # the dishwasher's horizontal hinge
+        assert not AL.close_by_push_applies(*args)
+    assert AL.base_follow_policy(None, "close", "cabinet", pushed=True) == AL.AH.DEFAULTS["policy"] == "hybrid"
+    assert AL.base_follow_policy(None, "close", "cabinet") == "sequential" and AL.base_follow_policy(None, "open", "cabinet", pushed=True) == "sequential"
+    assert AL.base_follow_policy("sequential", "close", "cabinet", pushed=True) == "sequential"  # an explicit customs policy still wins
+    leaf = AL.closed_leaf(_RVUNHJ_POSE, _RVUNHJ_JOINT, _RVUNHJ_BAR)
+    rec = AL.close_by_push_record(leaf, AL.close_by_push_config(True))
+    assert {k: rec[k] for k in AL.CLOSE_BY_PUSH_DEFAULTS} == AL.CLOSE_BY_PUSH_DEFAULTS
+    assert (rec["leaf_width_m"], rec["face_offset_m"], rec["handle_standoff_m"]) == (pytest.approx(0.3979, abs=1e-4), pytest.approx(0.0086, abs=1e-4), pytest.approx(0.0206, abs=1e-4))
+    assert rec["leaf_z"] == [pytest.approx(0.0015, abs=1e-4), pytest.approx(1.0012, abs=1e-4)] and rec["swing_sign"] == -1.0
+    assert rec["hinge_world"] == pytest.approx([8.6734, -6.7254, 0.4969], abs=1e-4)
+    # the room door's push on this leaf: contact 0.25 m from the hinge line (0.11 m from the bar), 5 cm below the bar grasp - on the leaf
+    r = rec["leaf_width_m"] - rec["push_inset_m"]
+    z = 0.7311 - rec["push_height_drop_m"]
+    assert 0.10 < r < leaf.coords(leaf.handle_a)[0] - 0.10 and rec["leaf_z"][0] + 0.05 < z < rec["leaf_z"][1] - 0.05
+
+
+def test_close_by_push_draft_records_the_flag_and_expands_to_the_room_door_program(monkeypatch):
+    """``_solve_from`` of a cabinet close with ``generation.close_by_push``: the hybrid follow search runs with the room door's close
+    policy (without the key: ``sequential``) and stays a sampling gate; the articulation block and the summary record
+    ``close_by_push`` and the ``push_close`` leaf record - and the block expands (oracle F6) to the room door's program: travel to the
+    manipulation stance, then ``push_close`` with no grasp, the cabinet's leaf and knobs. Without the key: grasp -> follow -> retreat."""
+    import json
+    import os
+
+    from ispatialgym.oracle.programs import expand
+    from ispatialgym.oracle.sidecar import Sidecar
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2.stances import SidecarDraft
+
+    monkeypatch.setattr(AL.P0, "exact_contacts", lambda s, manip, contacts, ignore_combined=(): SimpleNamespace(ok=True, q=th.zeros(28), reason=""))
+    monkeypatch.setattr(AL.P0, "connect", lambda s, a, b, max_m: None)
+    policies = []
+
+    def search(s, manip, q_star, h0, q_init, q_goal, fractions, required, fraction_key, policy=None):
+        policies.append(policy)
+        raise Reject("base_follow_infeasible", "stub: no hybrid path")
+
+    monkeypatch.setattr(AL.AH, "search_follow_path", search)
+    joints = {"j_link_0": SimpleNamespace(lower_limit=0.0, is_revolute=True), "j_link_2": SimpleNamespace(lower_limit=0.0, is_revolute=True)}
+    path = os.path.join(os.path.dirname(__file__), "data", "sidecar_variants", "configuration_matching-articulation_close_large_scale__room_door.json")
+    q_init = 1.021
+    fr = list(AL.WAYPOINT_FRACTIONS)
+    wps = C.handle_waypoints(_RVUNHJ_BAR, _RVUNHJ_JOINT, [q_init] + [q for _, q in AL.waypoint_values(q_init, 0.0, fr)], obj_pose=_RVUNHJ_POSE)
+    required = AL.required_fractions(None, fr)
+
+    def solve(cfg):
+        al = _push_sampler(_PushIK(lambda i, n: True, exact_ok=[], chain_ok=[]))
+
+        class _Draft(type(al)):
+            target = SimpleNamespace(name="bottom_cabinet_rvunhj_0", category="bottom_cabinet", joints=joints, get_joint_positions=lambda: th.zeros(2))
+            tname = "door.n.01_1"
+
+            def stance_q(self, st):
+                return th.zeros(28)
+
+            def arm_alone_follows(self, manip, q_init, q_goal, by_k, required, arm_reach, arm_q):
+                return False, "stub: the torso-to-handle pre-filter says too far"
+
+        al.__class__ = _Draft
+        al.mode, al.passive, al.door_class, al.hinge_side, al.stable = "hybrid", {}, "cabinet", None, [0.785, 1.021]
+        al.joint_friction = al.counterbalance = None
+        al.push_finish_cfg, al.close_by_push_cfg = None, cfg
+        al.sidecar = SidecarDraft("configuration_matching-articulation_close_large_scale-bottom_cabinet_push", "configuration_matching")
+        manip = Stance("manipulation", (9.6, -6.4, math.pi), 0.0, -0.4, arms=["right"])
+        init = Stance("init", (10.2, -7.6, 2.4), 0.0)
+        contact = P0.ContactSpec("handle", "right", wps[0].eef, wps[0].pre_grasp, classes=("fwd_pinch_h",))
+        d = al._solve_from(manip, init, q_init, 0.0, wps, required, contact, wps[0], goal_set=[0.0], reach_info={}, fractions=fr)
+        with open(path) as f:
+            raw = json.load(f)
+        raw["articulation"] = json.loads(json.dumps(al.sidecar.to_dict()["articulation"]))
+        return d, raw
+
+    d, raw = solve(AL.close_by_push_config(True))
+    art = raw["articulation"]
+    assert policies == ["hybrid"] and art["follow_mode"] == "arm" and art["base_follow_blocked"].startswith("base_follow_infeasible")
+    assert art["close_by_push"] is True and "push_finish" not in art and "follow_to" not in art
+    rec = art["push_close"]
+    assert rec["swing_sign"] == -1.0 and rec["chunk_deg"] == 45.0 and rec["leaf_width_m"] == pytest.approx(0.3979, abs=1e-4)
+    assert d.summary["close_by_push"] is True and d.summary["push_close"] == rec
+    sc = Sidecar.from_dict(raw)
+    assert sc.problems() == []
+    actions = expand(sc.alias, sc)
+    assert [x.name for x in actions] == ["navigate", "transition", "push_close"]
+    push = actions[-1]
+    assert push.plan is None and (push.q_from, push.q_lower, push.q_closed) == (pytest.approx(q_init), 0.0, 0.0) and push.tol_span_rad is None
+    assert push.hinge_xy == (pytest.approx(8.6734, abs=1e-4), pytest.approx(-6.7254, abs=1e-4)) and push.handle_radius_m == pytest.approx(0.3648, abs=1e-4)
+    assert (push.leaf_width_m, push.face_offset_m, push.handle_standoff_m) == (rec["leaf_width_m"], rec["face_offset_m"], rec["handle_standoff_m"])
+    assert (push.push_inset_m, push.push_height_drop_m, push.chunk_deg, push.drag_m, push.contact_clearance_m) == (0.15, 0.05, 45.0, 0.08, 0.0307)
+    # without the key: the follow search is the hand's (sequential) and the program grasps the handle
+    d, raw = solve(None)
+    assert policies == ["hybrid", "sequential"] and "close_by_push" not in raw["articulation"] and "push_close" not in raw["articulation"]
+    assert "close_by_push" not in d.summary
+    sc = Sidecar.from_dict(raw)
+    assert [x.name for x in expand(sc.alias, sc)] == ["navigate", "transition", "grasp", "base_follow", "retreat"]
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # alignment (§5.5): frame, hang pose, contacts, brace ordering
 # ----------------------------------------------------------------------------------------------------------------

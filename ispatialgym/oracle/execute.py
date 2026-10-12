@@ -4980,7 +4980,9 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
     there (arms "ready"), then arm only: guarded approach along −m onto the outer face (a diff-IK stall counts as contact
     only if the door moves under a 1 cm further push), push along the arc about the hinge to the arm's limit (the base
     drags along −m when the arc gains < 2°), back off; repeat until closed or a chunk gains nothing. A planned push (a
-    cabinet door's push finish, ``action.plan``) runs :func:`_execute_push_close_planned` instead."""
+    cabinet door's push finish, ``action.plan``) runs :func:`_execute_push_close_planned` instead. A cabinet door closed
+    room-door style (``programs.push_close_options``) brings the leaf the sampler measured - width, outer face, handle stand-off,
+    closed joint value - in place of the room door's estimates."""
     if action.plan:
         yield from _execute_push_close_planned(action, motions, state, ctx)
         return
@@ -5001,11 +5003,16 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
         return None
 
     obj = state.object(name)
-    d0, m0, sgn = leaf_frame(action.hinge_xy, action.handle_xy_closed, action.approach_closed)
+    standoff = HANDLE_STANDOFF_M if action.handle_standoff_m is None else float(action.handle_standoff_m)
+    d0, m0, sgn = leaf_frame(action.hinge_xy, action.handle_xy_closed, action.approach_closed, standoff)
     q0 = q_now()
-    _w_aabb, thick = _leaf_dims(obj, action.hinge_xy, rot_z(d0, sgn * q0), rot_z(m0, sgn * q0), action.leaf_link)
-    width = leaf_width(action.handle_radius_m)
+    _w_aabb, thick = _leaf_dims(obj, action.hinge_xy, rot_z(d0, sgn * (q0 - action.q_closed)), rot_z(m0, sgn * (q0 - action.q_closed)), action.leaf_link)
+    width = leaf_width(action.handle_radius_m) if action.leaf_width_m is None else float(action.leaf_width_m)
+    face = (0.5 * thick if action.face_offset_m is None else float(action.face_offset_m)) + action.contact_clearance_m
     rep["geometry"] = {"hinge_xy": list(action.hinge_xy), "leaf_width_m": round(width, 3), "thickness_m": round(thick, 3), "q_start_deg": round(math.degrees(q0), 2)}
+    if action.face_offset_m is not None or action.handle_standoff_m is not None:
+        rep["geometry"].update({"face_offset_m": action.face_offset_m, "contact_clearance_m": action.contact_clearance_m, "handle_standoff_m": round(standoff, 4),
+                                "swing_sign": sgn})
     hinge = th.tensor([action.hinge_xy[0], action.hinge_xy[1], 0.0])
     z_c = action.handle_z - action.push_height_drop_m
     robot = motions.robot
@@ -5015,9 +5022,9 @@ def execute_push_close(action: PushClose, motions: Motions, state, targets, ctx)
         q = q_now()
         if q - action.q_lower <= action.closed_tol_rad:
             break
-        d1, m1 = rot_z(d0, sgn * q), rot_z(m0, sgn * q)
+        d1, m1 = rot_z(d0, sgn * (q - action.q_closed)), rot_z(m0, sgn * (q - action.q_closed))
         edge = hinge + width * d1
-        p_contact = hinge + (width - action.push_inset_m) * d1 + 0.5 * thick * m1 + th.tensor([0.0, 0.0, z_c])
+        p_contact = hinge + (width - action.push_inset_m) * d1 + face * m1 + th.tensor([0.0, 0.0, z_c])
         contact_pose = C.contact_eef(p_contact, -m1, closing=th.tensor([0.0, 0.0, 1.0]))  # a = -m: pushing toward the inside (closing)
         pre = C.pre_pose(contact_pose, action.push_pre_m)
         delta = -sgn * min(math.radians(action.chunk_deg), max(q - action.q_lower, 0.0))

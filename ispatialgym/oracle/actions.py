@@ -1232,6 +1232,13 @@ class PushClose(Action):
     stance search - the recorded contact turns with the leaf to its measured angle, the arc runs to ``q_to``, no base drag; the
     last chunk is repeated ``plan_repeats`` times while it still gains. ``tol_span_rad``: the span the postcondition's §8
     tolerance is taken from (None: ``|q_from − q_lower|``; the finish: the instance's ``|q_goal − q_init|``).
+
+    The leaf of a cabinet door closed room-door style (owner 2026-10-12, ``programs.push_close_options``; None / 0 = the room door's
+    estimate): ``leaf_width_m`` hinge line → free edge (None: the handle radius + 3.5 cm), ``face_offset_m`` the outer face in
+    front of the hinge line (None: half the leaf link's AABB thickness), ``handle_standoff_m`` the handle contact in front of the
+    hinge line (None: ``execute.HANDLE_STANDOFF_M``, a lever 6 cm off the face), ``q_closed`` the joint value of the closed leaf
+    (``handle_xy_closed``), ``contact_clearance_m`` the push contact in front of the outer face (the pad centre goes on it; 0 for a
+    room door).
     """
 
     name: str = "push_close"
@@ -1259,6 +1266,11 @@ class PushClose(Action):
     plan: Optional[List[Dict[str, Any]]] = None
     plan_repeats: int = 2
     tol_span_rad: Optional[float] = None
+    leaf_width_m: Optional[float] = None
+    face_offset_m: Optional[float] = None
+    handle_standoff_m: Optional[float] = None
+    q_closed: float = 0.0
+    contact_clearance_m: float = 0.0
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
     TARGET_KEYS = ("leaf",)
 

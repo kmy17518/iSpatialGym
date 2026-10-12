@@ -1150,6 +1150,36 @@ same arm pushes the leaf's outer face the rest of the way shut from the same man
   than 5 cm / 0.1 rad off it. The push is judged on the instance's tolerance; the evaluator's goal (the joint at q_lower
   within the §8 tolerance) is unchanged. First use: close_large#03 (`bottom_cabinet_rvunhj_0` / `j_link_2`).
 
+**Close: a cabinet door pushed shut room-door style (owner 2026‑10‑12).** Optional `generation.close_by_push` (`true`, or a
+dict overriding `push_inset_m` 0.15, `push_height_drop_m` 0.05, `chunk_deg` 45, `drag_m` 0.08, `contact_clearance_m`
+0.0307; absent = off, so room doors and every other alias are unchanged) closes a revolute `cabinet` door on a vertical
+hinge the way a room door is closed: no grasp, the closed hand pushes the leaf's outer face shut from q_init. On any other
+joint or direction the key is ignored (logged); `generation.push_finish` is ignored alongside it.
+- **Sampling** as for the alias's follow mode, except that a hybrid follow (`follow_mode_override: "hybrid"`) runs with the
+  room door's close policy (the `hybrid_follow.policy` default) instead of `sequential`: the follow is a sampling gate only.
+- **Record**: `articulation.close_by_push` = `true` and `articulation.push_close` = the five options plus the closed leaf
+  (joint record + link box, as for the push finish): `leaf_width_m` (hinge line → free edge), `face_offset_m` (the outer
+  face in front of the hinge line, 12 mm behind a bar / knob contact), `handle_standoff_m` (the handle contact in front of
+  the hinge line), `leaf_z`, `swing_sign`, `hinge_world`; the instance summary carries both.
+- **Program**: the room door's — travel init → manipulation, then `push_close` with the working arm. The hinge, the handle
+  radius and the closed handle frame come from the handle waypoints as for a room door (the circle through three handle
+  contacts, the waypoint at the lower limit); the recorded options and leaf become push options, `q_closed` = the lower
+  limit. A record that is not complete, numeric and in range (0 < inset < width, 0 < `chunk_deg` ≤ 90, `drag_m` ≥ 0,
+  0 ≤ clearance < 0.10, 0 ≤ stand-off < handle radius), whose hinge lies > 3 cm from the waypoints' or whose swing sign
+  differs from theirs, a push finish recorded alongside, or the flag on an open, is a sidecar error.
+- **Push** (room door and cabinet): per chunk the contact = hinge + (width − inset)·d(q) + (face + clearance)·m(q) at the
+  closed handle's height − drop, d / m = the closed leaf's direction / outer normal turned about +z by s·(q − q_closed); the
+  push pose puts the pad centre on the contact, so the cabinet's 3.07 cm clearance puts the fingertips on the face (the push
+  finish's convention) where the room door's 0 leaves them 3 cm into the leaf in the stance search's IK; the arc turns the
+  fist by −s·min(`chunk_deg`, q − q_lower) about the hinge; progress is the joint value falling toward q_lower whatever the
+  swing sign s (an arc gaining < 2° drags the base `drag_m` along −m with the fist on the face, a chunk gaining < 0.5° ends
+  the push). A room door keeps its estimates: width = handle radius + 3.5 cm, face = half the leaf link's thickness, the
+  handle 6 cm in front of the face, no clearance, 20° chunks, a 0.20 m drag. The cabinet defaults scale the room door's to
+  the contact radius (0.25 m on a 0.40 m leaf, ≈ 0.68 m on the test room door): a 45° chunk is 0.20 m of fist travel (the
+  room door's 20°: 0.24 m), 8 cm of drag turns the leaf ≈ 18° (the room door's 0.20 m: ≈ 17°). First use: close_large#03's
+  push alias (`bottom_cabinet_rvunhj_0` / `j_link_2`: 0.398 m leaf, outer face 8.6 mm and bar contact 20.6 mm in front of
+  the hinge line, s = −1; the contact 0.25 m from the hinge line, 0.11 m from the bar, 0.68 m high).
+
 ### 5.4 Prompt 2 — articulation, small-scale (open / close)
 
 Tabletop Phases 1–2 for stance and view (support = the fixed `support`, or the floor for objects taller than 0.6 m);
