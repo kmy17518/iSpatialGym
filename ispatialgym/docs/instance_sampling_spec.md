@@ -1518,6 +1518,13 @@ partner unchanged ≤ 5 mm at the goal, tolerances, init surface = largest horiz
 a reachable band cell from a recorded placement stance; the name-sorted candidate order → uniform draw within the
 grounded init-surface class.
 
+**Relaxation keys (owner 2026‑10‑12 item 2, the large-scale eval picks).** Generation keys an alias may set; unset, the rule
+stays as above. The keys an alias sets are recorded in `template_facts.relaxations`.
+- `partner_view_min_points` (int, default unset = every point): the partner's region is "in frame" when at least this many of
+  its points are inside the image with the 5 % margin (every point when the region has fewer) — stance A's goal region (ontop:
+  5 top-patch + 3 bottom-edge points; under: the 3 edge points, tabletop and floor init) and the place-under stance C's
+  near-edge line (2 points).
+
 ## 6. Per-task rules
 
 Init = the sampled configuration, goal = what the TRO targets describe. Everything the oracle needs is recorded.

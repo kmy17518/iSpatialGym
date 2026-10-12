@@ -259,6 +259,21 @@ def under_admissible(clearance_at_goal: float, target_height: float, extra: floa
     return float(clearance_at_goal) >= float(target_height) + float(extra)
 
 
+#: owner 2026-10-12 item 2 (large-scale eval picks): generation keys that relax a rule of this module; unset (None / False) keeps the
+#: rule as before. The keys an alias sets are recorded in ``template_facts["relaxations"]``.
+RELAXATION_KEYS = ("partner_view_min_points",)
+
+
+def enough_in_view(inside, min_points: Optional[int] = None) -> bool:
+    """Owner 2026-10-12 item 2a (``generation.partner_view_min_points``): the partner's region points in frame (``inside``: one flag per
+    point, the 5 % margin) - every point when ``min_points`` is None (the default, as before), else at least ``min_points`` of them
+    (every point when the region has fewer)."""
+    inside = th.as_tensor(inside, dtype=th.bool).reshape(-1)
+    if min_points is None:
+        return bool(inside.all())
+    return int(inside.sum()) >= min(int(min_points), int(inside.numel()))
+
+
 def intersect_feasible(F_init: Sequence[Tuple[float, Any]], F_goal: Sequence[Tuple[float, Any]], yaw_step: float = math.pi / 8) -> List[Tuple[float, Any]]:
     """F_init ∩ F_goal over (yaw, grasp) pairs: grasps compared by name, yaws by their bucket on the screening grid
     (``yaw_step``; 16 yaws = π/8). The §3.10 feasible-set cache stores floats rounded to 4 decimals (``cache._plain``),
@@ -511,6 +526,10 @@ class IORSLarge(SamplerV2):
         """Target geometry and grasps, the partner's placement geometry, then the init surface: one candidate of the
         grounded class drawn uniformly, the rest of the class in random order; the support role bound (aliased to the
         partner / floor bound when it is the same object)."""
+        relaxed = {k: self.gp.gen(k) for k in RELAXATION_KEYS if self.gp.gen(k) not in (None, False)}
+        if relaxed:
+            self.template_facts["relaxations"] = _jsonable(relaxed)
+            log.info("%s: relaxed rules (owner 2026-10-12 item 2): %s", self.gp.alias, relaxed)
         tgt = self.target
         self.hull = self.world.local_hull(tgt)
         self.grasps, self.grasp_key, self.rest = TT.library_grasps(self, "target")
@@ -1100,11 +1119,19 @@ class IORSLarge(SamplerV2):
         return th.stack(pts)
 
     def goal_region_visible(self, stance: Stance, from_xy=None) -> bool:
-        """The relevant partner region (:meth:`goal_region_points`) in frame with the 5 % margin from ``stance``."""
+        """The relevant partner region (:meth:`goal_region_points`) in frame with the 5 % margin from ``stance``
+        (:meth:`partner_points_in_view`)."""
         cam = self.camera_pose_at(stance)
         if from_xy is None:
             from_xy = stance.focus[:2] if stance.focus is not None else th.as_tensor(stance.base_pose2d[:2])
-        return P0.in_frame(self, cam, self.goal_region_points(from_xy))
+        return self.partner_points_in_view(cam, self.goal_region_points(from_xy))
+
+    def partner_points_in_view(self, cam, points) -> bool:
+        """Partner points in frame with the 5 % margin (stance A's goal region, the place-under stance C's near-edge line): every point,
+        or at least ``generation.partner_view_min_points`` of them (owner 2026-10-12 item 2a; :func:`enough_in_view`)."""
+        k = self.gp.gen("partner_view_min_points")
+        inside = self.world.camera_model.inside(cam, G.t(points).reshape(-1, 3), P0.IN_FRAME_MARGIN)
+        return enough_in_view(inside, None if k is None else int(k))
 
     def partner_visible(self, stance: Stance, n_min: int) -> bool:
         cam = self.camera_pose_at(stance)
@@ -1445,7 +1472,7 @@ class IORSLarge(SamplerV2):
                 on_line = near_line[:, :2].mean(dim=0) + tangent * float(th.dot(th.tensor([gc[0], gc[1]]) - near_line[:, :2].mean(dim=0), tangent))
                 span = half + 0.10
                 near = th.stack([th.cat([on_line - tangent * span, lo[2:3].float()]), th.cat([on_line + tangent * span, lo[2:3].float()])])
-                if not P0.in_frame(self, cam, near):
+                if not self.partner_points_in_view(cam, near):
                     continue
                 focus = th.tensor([gc[0], gc[1], self.floor_z + self.place["height"] / 2])
                 ang = P0.axis_angle(self, cam, focus)
