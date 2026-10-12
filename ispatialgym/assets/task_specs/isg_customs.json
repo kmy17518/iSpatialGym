@@ -36194,7 +36194,7 @@
      ]
     },
     "grasp_keys": {
-     "beer_glass/mxsliu": "beer_glass__mxsliu"
+     "beer_glass/mxsliu": "beer_glass__mxsliu__t2f"
     }
    },
    "partner": {
@@ -36253,7 +36253,7 @@
     "blacklist": {
      "target": {
       "beer_glass": {
-       "lymciz": "ground_isg 2026-10-11: heldout"
+       "lymciz": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -36293,7 +36293,7 @@
     "blacklist": {
      "target": {
       "beer_glass": {
-       "lymciz": "ground_isg 2026-10-11: heldout"
+       "lymciz": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -36331,7 +36331,28 @@
     "partner",
     "target"
    ],
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -36352,7 +36373,7 @@
      ]
     },
     "grasp_keys": {
-     "beer_glass/mxsliu": "beer_glass__mxsliu"
+     "beer_glass/mxsliu": "beer_glass__mxsliu__t2f"
     }
    },
    "partner": {
@@ -36410,7 +36431,7 @@
     "blacklist": {
      "target": {
       "beer_glass": {
-       "lymciz": "ground_isg 2026-10-11: heldout"
+       "lymciz": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -36448,7 +36469,28 @@
     "partner",
     "target"
    ],
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -36469,7 +36511,7 @@
      ]
     },
     "grasp_keys": {
-     "beer_glass/mxsliu": "beer_glass__mxsliu"
+     "beer_glass/mxsliu": "beer_glass__mxsliu__t2f"
     }
    },
    "partner": {
@@ -36527,7 +36569,7 @@
     "blacklist": {
      "target": {
       "beer_glass": {
-       "lymciz": "ground_isg 2026-10-11: heldout"
+       "lymciz": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -36565,7 +36607,28 @@
     "partner",
     "target"
    ],
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -36586,7 +36649,7 @@
      ]
     },
     "grasp_keys": {
-     "beer_glass/mxsliu": "beer_glass__mxsliu"
+     "beer_glass/mxsliu": "beer_glass__mxsliu__t2f"
     }
    },
    "partner": {
@@ -36644,7 +36707,7 @@
     "blacklist": {
      "target": {
       "beer_glass": {
-       "lymciz": "ground_isg 2026-10-11: heldout"
+       "lymciz": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -36682,7 +36745,28 @@
     "partner",
     "target"
    ],
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
