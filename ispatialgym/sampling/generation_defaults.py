@@ -262,7 +262,9 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         # the boundary can touch them (near-wall test on a fixed table: 4/8 still vs 6/8 centred); 1.5 cm starved the placement
         # of four objects (47/64 attempts without a free position)
         "tray_footprint_margin_m": 0.010,
-        "distractor_spacing_extra_m": 0.01,  # §4.6 x = pad_clearance + 0.01 along the pinch axis
+        # §4.6 x = pad_clearance + 0.01 along the pinch axis; not read since the owner dropped the spacing (2026-10-12 A2b), kept so
+        # the grounded customs entries stay what a fresh grounding writes
+        "distractor_spacing_extra_m": 0.01,
         # random (cell, yaw) draws per distractor in place_distractors (same rules; 2026-09-25: 80 -> 400. A lying 22 cm
         # bottle fits the 34 cm wide floor only within a few degrees of the tray's axes once the target's pinch strip and
         # the 1 cm margins are out: 340 of 377 manipulation candidates of the 3-distractor milk alias (0925-034257) ended

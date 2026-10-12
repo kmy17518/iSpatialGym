@@ -2508,6 +2508,61 @@ def test_intended_contacts_and_finger_links_are_exempt(tmp_path):
     assert result["qa"]["stats"]["by_category"] == {} and seen["manip"] > 0
 
 
+def test_grasp_may_touch_objects_must_stay_on_the_source_tray():
+    """Owner 2026-10-12 (A2b): disembedding's grasp may touch the parts / distractors of ``grasps[].may_touch`` (intended contacts of
+    the Grasp); after the grasp each must still lie over the source tray's footprint - the tray's own yawed box, not its world AABB -
+    and after the lift it must not have risen more than 2 cm with the target (``distractor_displaced``); no record, no check."""
+    d = json.load(open(os.path.join(SIDECARS, "disembedding.json")))
+    d["grasps"][0]["may_touch"] = {"objects": ["box_of_cereal.n.01_1", "box_of_cereal.n.01_2"], "stay_on": "tray.n.01_1"}
+    sc = Sidecar.from_dict(d)
+    actions = expand(sc.alias, sc)
+    grasp, lift = actions[1], actions[2]
+    assert (grasp.name, lift.name) == ("grasp", "lift")
+    assert set(EX.intended_contacts(grasp)) == {"bottle_of_beer.n.01_1", "box_of_cereal.n.01_1", "box_of_cereal.n.01_2"}
+    assert "distractor_displaced" in QA.CATEGORIES
+
+    yaw = math.pi / 4
+    R = lambda x, y: (1.0 + x * math.cos(yaw) - y * math.sin(yaw), 2.0 + x * math.sin(yaw) + y * math.cos(yaw))  # tray frame -> world xy
+
+    class Tray:
+        aabb = (th.tensor([0.66, 1.66, 0.79]), th.tensor([1.34, 2.34, 0.81]))  # the yawed 0.565 x 0.396 m tray's world AABB
+
+        def get_base_aligned_bbox(self, xy_aligned=False):
+            return th.tensor([1.0, 2.0, 0.8]), C.quat_from_yaw(yaw), th.tensor([0.565, 0.396, 0.02]), th.zeros(3)
+
+    def box(x, y, z=0.85):
+        return SimpleNamespace(aabb=(th.tensor([x - 0.03, y - 0.03, z - 0.05]), th.tensor([x + 0.03, y + 0.03, z + 0.05])), pos=th.tensor([x, y, z]))
+
+    target = box(*R(0.1, 0.0))
+    objects = {"tray.n.01_1": Tray(), "bottle_of_beer.n.01_1": target, "box_of_cereal.n.01_1": box(*R(0.25, 0.0)), "box_of_cereal.n.01_2": box(*R(-0.2, 0.1))}
+    state = SimpleNamespace(object=lambda n: objects[n], held_object=lambda arm: target, object_pose=lambda n: (objects[n].pos, C.IDENTITY_QUAT.clone()),
+                            init_poses={n: (o.pos.clone(), C.IDENTITY_QUAT.clone()) for n, o in objects.items() if hasattr(o, "pos")})
+    ctx: Dict[str, Any] = {}
+    assert EX.post_grasp(grasp, state, {}, ctx) is None
+    assert ctx["may_touch"]["displaced"] == [] and ctx["may_touch"]["objects"]["box_of_cereal.n.01_1"] == {"over_support": True, "moved_m": 0.0}
+    # pushed 25 cm across the tray's short axis: inside its world AABB, off its footprint
+    objects["box_of_cereal.n.01_2"] = box(*R(0.0, 0.25))
+    assert EX.rests_over(objects["box_of_cereal.n.01_2"], SimpleNamespace(aabb=Tray.aabb)) is True
+    ctx = {}
+    assert EX.post_grasp(grasp, state, {}, ctx) == "distractor_displaced" and ctx["may_touch"]["displaced"] == ["box_of_cereal.n.01_2"]
+    objects["box_of_cereal.n.01_2"] = box(*R(-0.2, 0.1))
+    # the lift: one part rose 6 cm with the target (still over the tray), the other 1 cm (jostled, settled back)
+    ctx = {"may_touch_z0": {"box_of_cereal.n.01_1": 0.85, "box_of_cereal.n.01_2": 0.85}}
+    objects["box_of_cereal.n.01_1"] = box(*R(0.25, 0.0), z=0.91)
+    objects["box_of_cereal.n.01_2"] = box(*R(-0.2, 0.1), z=0.86)
+    assert EX.may_touch_verdict(lift, state, ctx, "lift") == "distractor_displaced" and ctx["may_touch"]["displaced"] == ["box_of_cereal.n.01_1"]
+    assert ctx["may_touch"]["objects"]["box_of_cereal.n.01_1"]["rise_m"] == pytest.approx(0.06)
+    # no record (every other task, older sidecars): nothing is checked
+    plain = expand(sc.alias, Sidecar.load(os.path.join(SIDECARS, "disembedding.json")))[1]
+    assert EX.post_grasp(plain, state, {}, {}) is None and EX.may_touch_objects(state, plain) == {}
+    # the pre-grasp's own overlaps (``may_touch.pre_grasp``, the puzzle's fixed-layout parts): supports of the transit to the pre-grasp
+    assert EX.may_touch_objects(state, grasp, pre_grasp=True) == {}
+    d["grasps"][0]["may_touch"]["pre_grasp"] = ["box_of_cereal.n.01_2"]
+    puzzle = expand(sc.alias, Sidecar.from_dict(d))[1]
+    assert list(EX.may_touch_objects(state, puzzle, pre_grasp=True)) == ["box_of_cereal.n.01_2"]
+    assert list(EX.may_touch_objects(state, puzzle)) == ["box_of_cereal.n.01_1", "box_of_cereal.n.01_2"]
+
+
 def inside_world():
     """The IORS inside test sidecar as a fake world: robot at the init stance, sprout on the table, bowl at the drop."""
     sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-inside.json"))

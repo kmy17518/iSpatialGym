@@ -387,7 +387,11 @@ class GraspRecord:
     Beyond spec §7 (needed by the programs, see the F6 report): ``waypoints`` — the recorded eef key poses of an
     in-hand motion in order, last = the end pose (held-object tasks: 3 intermediate + goal, spec §6.3 / §3.9;
     attachment: the SLERP waypoints from the lifted grasp to the pre-attach pose, spec §6.8); ``place_on`` — the
-    bddl instance the object is placed on / into / attached to (annotation and the intended-contact whitelist).
+    bddl instance the object is placed on / into / attached to (annotation and the intended-contact whitelist);
+    ``may_touch`` (in ``extra``; disembedding, owner 2026-10-12 A2b) — ``{"objects": [...], "stay_on": <instance>[, "pre_grasp":
+    [...]]}``, the instances the grasp may touch or displace (out of the planner's world for the grasp and the lift, intended
+    contacts of the grasp), the one each must still rest on after the grasp and after the lift, and those of them the pre-grasp
+    may overlap too (the puzzle's fixed-layout parts).
     """
 
     object: str
@@ -405,6 +409,24 @@ class GraspRecord:
     extra: Dict[str, Any] = field(default_factory=dict)
 
     KNOWN = ("object", "arm", "grasp_key", "grasp_name", "yaw", "grasp", "pre_grasp", "pre_place", "place", "carry_height", "waypoints", "place_on")
+
+    @property
+    def may_touch(self) -> Tuple[Tuple[str, ...], Optional[str]]:
+        """``(objects, stay_on)`` of the ``may_touch`` record; ``((), None)`` when none is recorded."""
+        v = self.extra.get("may_touch")
+        if not isinstance(v, dict):
+            return (), None
+        objs = tuple(o for o in (v.get("objects") or []) if isinstance(o, str) and o)
+        on = v.get("stay_on")
+        return objs, (on if isinstance(on, str) and on else None)
+
+    @property
+    def may_touch_pre_grasp(self) -> Tuple[str, ...]:
+        """The ``may_touch.pre_grasp`` instances (out of the world for the pre-grasp too); ``()`` when none are recorded."""
+        v = self.extra.get("may_touch")
+        if not isinstance(v, dict):
+            return ()
+        return tuple(o for o in (v.get("pre_grasp") or []) if isinstance(o, str) and o)
 
     @classmethod
     def from_dict(cls, d: Any, where: str) -> "GraspRecord":
@@ -1247,6 +1269,15 @@ class Sidecar:
                 out.append(f"{w}.carry_height: negative")
             if g.waypoints is not None and not g.waypoints:
                 out.append(f"{w}.waypoints: empty list")
+            if "may_touch" in g.extra:
+                mt = g.extra["may_touch"]
+                objs, on = g.may_touch
+                if not isinstance(mt, dict) or not isinstance(mt.get("objects"), list) or len(objs) != len(mt["objects"]) or on is None:
+                    out.append(f"{w}.may_touch: expected {{'objects': [instance, ...], 'stay_on': instance}}, got {mt!r}")
+                elif g.object in objs or on in objs:
+                    out.append(f"{w}.may_touch: lists the grasped object or the support it must stay on")
+                elif "pre_grasp" in mt and (not isinstance(mt["pre_grasp"], list) or not set(mt["pre_grasp"]) <= set(objs)):
+                    out.append(f"{w}.may_touch.pre_grasp: expected a list of instances of may_touch.objects, got {mt['pre_grasp']!r}")
 
         if self.contacts is not None:
             out.extend(_contact_problems(self.contacts.push, self.contacts.brace, "contacts"))

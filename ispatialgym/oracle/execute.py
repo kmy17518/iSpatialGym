@@ -22,7 +22,8 @@ Behaviour per action (§3.6 / §6.1):
   correction threshold → one corrective ``track_path`` to the recorded goal base (correction, not fallback); post:
   trunk converged, camera pose within the spec §8 tolerance (``tolerance``).
 * ``Grasp``      ``gripper(open)`` → ``arm_to(pre_grasp)`` → ``arm_along(approach)`` → ``gripper(close)``; the
-  assisted grasp must hold the object (``failed_grasp``), then backend ``attach_object``.
+  assisted grasp must hold the object (``failed_grasp``), then backend ``attach_object``; the instances of
+  ``grasps[].may_touch`` must still rest on their support (``distractor_displaced``; after the Lift as well).
 * ``Lift`` / ``Reorient``  ``arm_along`` over the recorded segment; post: still held, eef at the segment end.
 * ``Place``      ``arm_to(pre_place)`` → ``arm_along(descent)`` → ``gripper(open)`` (the open command +1 at once, OmniGibson's
   assisted grasp lets go; backend ``detach_object``) → ``arm_along(retreat)`` → settle; post: released, object at rest
@@ -446,6 +447,105 @@ def contact_ignores(state, name: str, extra: Sequence[str] = ()) -> List[Any]:
         if not any(o is x for x in out):
             out.append(o)
     return out
+
+
+#: a ``grasps[].may_touch`` object counts as lifted with the target when its AABB centre rose more than this during the lift
+MAY_TOUCH_LIFT_RISE_M = 0.02
+
+
+def _may_touch_of(action) -> Tuple[Tuple[str, ...], Optional[str]]:
+    """``(objects, stay_on)`` of the ``grasps[].may_touch`` record behind a Grasp (or the Grasp a Lift follows)."""
+    grasp = getattr(action, "grasp", None) if isinstance(action, Grasp) else getattr(getattr(action, "after", None), "grasp", None)
+    return grasp.may_touch if grasp is not None and hasattr(grasp, "may_touch") else ((), None)
+
+
+def may_touch_objects(state, action, pre_grasp: bool = False) -> Dict[str, Any]:
+    """``{instance: scene object}`` the grasp may touch or displace (``grasps[].may_touch``, owner 2026-10-12 A2b: disembedding's parts
+    and distractors): out of the planner's world for the grasp's approach finish and the lift's, as in the sampler's grasp check.
+    ``pre_grasp``: only those the pre-grasp may overlap too (``may_touch.pre_grasp``, the puzzle's fixed-layout parts) - supports of
+    the transit to the pre-grasp."""
+    grasp = getattr(action, "grasp", None)
+    names = getattr(grasp, "may_touch_pre_grasp", ()) if pre_grasp else _may_touch_of(action)[0]
+    out: Dict[str, Any] = {}
+    for inst in names:
+        try:
+            out[inst] = state.object(inst)
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
+def _aabb_centre(obj) -> Optional[th.Tensor]:
+    try:
+        lo, hi = obj.aabb
+        return 0.5 * (th.as_tensor(lo).float() + th.as_tensor(hi).float())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def rests_over(obj, support) -> Optional[bool]:
+    """Whether ``obj``'s AABB centre lies over ``support``'s footprint: inside its bounding box aligned with its own yaw
+    (``get_base_aligned_bbox``) in x / y, else inside its world AABB; None when an AABB is unavailable (the test stubs)."""
+    c = _aabb_centre(obj)
+    if c is None:
+        return None
+    fn = getattr(support, "get_base_aligned_bbox", None)
+    if callable(fn):
+        try:
+            centre, orn, extent, _ = fn(xy_aligned=True)
+            local = C.transform_points(C.invert((th.as_tensor(centre).float(), th.as_tensor(orn).float())), c.reshape(1, 3))[0]
+            half = 0.5 * th.as_tensor(extent).float()
+            return bool(abs(float(local[0])) <= float(half[0]) and abs(float(local[1])) <= float(half[1]))
+        except Exception:  # noqa: BLE001 - the world AABB below
+            pass
+    try:
+        lo, hi = (th.as_tensor(v).float() for v in support.aabb)
+    except Exception:  # noqa: BLE001
+        return None
+    return bool(float(lo[0]) <= float(c[0]) <= float(hi[0]) and float(lo[1]) <= float(c[1]) <= float(hi[1]))
+
+
+def may_touch_verdict(action, state, ctx: Dict[str, Any], stage: str) -> Optional[str]:
+    """Owner 2026-10-12 (A2b): after the grasp and after the lift every ``grasps[].may_touch`` object must still rest on its ``stay_on``
+    support (disembedding: each part / distractor on the source tray) - its AABB centre over the support's footprint
+    (:func:`rests_over`) and, after the lift, not risen more than ``MAY_TOUCH_LIFT_RISE_M`` (lifted with the target; ``ctx
+    ["may_touch_z0"]`` from the lift's start). ``ctx["may_touch"]`` records per object whether it is over the support, its rise and
+    how far it moved since the program start; ``"distractor_displaced"`` when one is off, else None (also without a record)."""
+    objs, on = _may_touch_of(action)
+    if not objs or on is None:
+        return None
+    try:
+        support = state.object(on)
+    except Exception:  # noqa: BLE001
+        return None
+    z0 = ctx.get("may_touch_z0") or {}
+    init = getattr(state, "init_poses", None) or {}
+    per: Dict[str, Any] = {}
+    off: List[str] = []
+    for inst in objs:
+        try:
+            obj = state.object(inst)
+        except Exception:  # noqa: BLE001
+            continue
+        over = rests_over(obj, support)
+        c = _aabb_centre(obj)
+        r: Dict[str, Any] = {"over_support": over}
+        if c is not None and inst in z0:
+            r["rise_m"] = round(float(c[2]) - float(z0[inst]), 4)
+        if inst in init:
+            try:
+                r["moved_m"] = round(float(th.linalg.norm(state.object_pose(inst)[0] - init[inst][0])), 4)
+            except Exception:  # noqa: BLE001
+                pass
+        per[inst] = r
+        if over is False or r.get("rise_m", 0.0) > MAY_TOUCH_LIFT_RISE_M:
+            off.append(inst)
+    ctx.setdefault("may_touch", {}).update({"stage": stage, "stay_on": on, "objects": per, "displaced": off})
+    if off:
+        log.warning("%s(%s): %s %s off %s (owner A2b: the parts / distractors must stay on it)", stage, getattr(action, "object", "?"), off,
+                    "is" if len(off) == 1 else "are", on)
+        return "distractor_displaced"
+    return None
 
 
 def _interior_fact(srf: Any) -> Optional[Dict[str, Any]]:
@@ -1747,6 +1847,10 @@ def _into_witness_posture(motions: Motions, targets, ctx, arm: str) -> Iterator[
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
+    # owner 2026-10-12 (A2b): the parts / distractors the grasp may touch leave the world for the approach finish (the transit plans
+    # around them as before) and count as supports the fingers may stand on; how far the target was pushed before the pads close
+    touch = list(may_touch_objects(state, action).values())
+    obj_pos0 = state.object_pose(action.object)[0] if touch else None
     _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
     yield from motions.gripper(arm, close=False)
     # the container / support the object rests in (the source tray of disembedding, the table; ``grasps[].grasp_from``
@@ -1780,14 +1884,19 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
         ctx["plan_ignored"] = _plan_ignored(split.objects, list(ignore_links) + list(split.links))
     # the transit to the pre-grasp: the goal objects and the grasp's own target are protected until the approach begins
     # (owner 2026-09-26, oracle.protection: teacup 0925-222212 / 235559 - the hand passed low over the saucer and shoved it 20 cm)
+    # owner 2026-10-12 (A2b): the parts the pre-grasp may overlap (``may_touch.pre_grasp``) are supports of the transit - planned around,
+    # out of the world for its last leg and for the supports-ignored fallback
+    pre_touch = [o for o in may_touch_objects(state, action, pre_grasp=True).values() if all(o is not s for s in ignored_supports)]
+    if pre_touch:
+        ctx["plan_ignored"] = list(ctx["plan_ignored"]) + [getattr(o, "name", str(o)) for o in pre_touch]
     with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
-        yield from _grasp_transit(action, motions, state, targets, ctx, arm, ignored_supports, ignore_links)
+        yield from _grasp_transit(action, motions, state, targets, ctx, arm, list(ignored_supports) + pre_touch, ignore_links)
         yield from _into_witness_posture(motions, targets, ctx, arm)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
-    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(ignored_supports), max_stall=cfg.approach_finish_max_stall,
-                            max_remaining=cfg.approach_finish_max_remaining)
+    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(ignored_supports) + touch,
+                            max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     if split is not None and split.links:
         finish.ignore_links = list(split.links)
     # pre-shaped opening (owner 2026-09-16 17:10 item 4, closure probe): pads at pinch width / 2 + margin before the descent,
@@ -1803,7 +1912,7 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
         opening = 0.5 * width + float(margin)
         yield from motions.gripper_opening(arm, opening)
         ctx["preshape_opening_m"] = opening
-    support_objs = list(supports)
+    support_objs = list(supports) + touch
     if split is not None and not split.note["support_was_ignored"]:
         support_objs.append(split.support)  # the board it rests on is what the fingers can stand on (no contact report found it)
     pressed: List[Any] = []
@@ -1832,6 +1941,8 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
                                         "unload_rad": {k: round(v, 4) for k, v in un.items()}}
         log.info("grasp(%s): the fingers stand on %s %.1f mm short of the grasp pose (trunk %.2f deg off its target): the approach stops there, unloaded",
                  action.object, ctx["approach_support_stop"]["on"], short * 1000, trunk_deg)
+    if obj_pos0 is not None:
+        ctx.setdefault("may_touch", {})["target_shift_before_close_m"] = round(float(th.linalg.norm(state.object_pose(action.object)[0] - obj_pos0)), 4)
     # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step. A handle's
     # link is attached with a FIXED joint by the task's rule (ISpatialGymTask: AG_MOVING_LINK_JOINT_TYPE), the only kind the
     # follow was designed for - the same rule an evaluated policy's grasp meets
@@ -1848,7 +1959,9 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
 
 
 def post_grasp(action: Grasp, state, targets, ctx) -> Optional[str]:
-    return None if state.held_object(action.arm) is state.object(action.object) else "failed_grasp"
+    if state.held_object(action.arm) is not state.object(action.object):
+        return "failed_grasp"
+    return may_touch_verdict(action, state, ctx, "grasp")
 
 
 def _free_leg_finish(state, end_pose, witness_q, ignore: Sequence[Any], cfg: ExecuteConfig) -> ApproachFinish:
@@ -1865,7 +1978,12 @@ def execute_lift(action: Lift, motions: Motions, state, targets, ctx) -> Iterato
     supports = contact_ignores(state, action.object)
     # owner 2026-10-11: off an interior shelf only the board pieces under the object leave it (the board above stays an obstacle)
     split = interior_split(state, ctx, action.object, supports)
-    finish = _free_leg_finish(state, targets["lift"][-1], _witness(ctx, "lift"), supports if split is None else split.objects, cfg)
+    # owner 2026-10-12 (A2b): the lift leaves the parts / distractors the grasp may touch (the fingers start among them); where each
+    # stands now, so the postcondition sees one carried along
+    touch = may_touch_objects(state, action)
+    centres = {inst: _aabb_centre(o) for inst, o in touch.items()}
+    ctx["may_touch_z0"] = {inst: float(c[2]) for inst, c in centres.items() if c is not None}
+    finish = _free_leg_finish(state, targets["lift"][-1], _witness(ctx, "lift"), list(supports if split is None else split.objects) + list(touch.values()), cfg)
     if split is not None:
         finish.ignore_links = list(split.links)
         ctx["interior_support"] = {**split.note, "lift_finish": "support present except the board pieces"}
@@ -1877,7 +1995,7 @@ def execute_lift(action: Lift, motions: Motions, state, targets, ctx) -> Iterato
 def post_lift(action: Lift, state, targets, ctx) -> Optional[str]:
     if state.held_object(action.arm) is not state.object(action.object):
         return "failed_grasp"
-    return _eef_reached(state, action.arm, targets["lift"][-1], _cfg(ctx), "lift")
+    return _eef_reached(state, action.arm, targets["lift"][-1], _cfg(ctx), "lift") or may_touch_verdict(action, state, ctx, "lift")
 
 
 def execute_reorient(action: Reorient, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:

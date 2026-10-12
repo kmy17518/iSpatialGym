@@ -571,6 +571,37 @@ def test_program_check_ignore_sets_mirror_the_sampler():
     assert every == [wall, partner] and last == []
 
 
+def test_program_check_ignores_the_objects_a_grasp_may_touch():
+    """Owner 2026-10-12 (A2b): disembedding's grasp record names the distractors / fixed-layout parts its grasp may touch
+    (``grasps[].may_touch``): out of the world with the supports for the grasp pose and along the lift (the fingers start among
+    them); an instance the sampler does not know is skipped and a record without the key changes nothing."""
+    from types import SimpleNamespace
+
+    table, tray, box = SimpleNamespace(name="table"), SimpleNamespace(name="tray"), SimpleNamespace(name="box")
+
+    class Sampler:
+        objects = {"bottle": SimpleNamespace(name="bottle"), "box": box, "tray": tray}
+
+        @staticmethod
+        def support_objects():
+            return [table, tray]
+
+    rec = SimpleNamespace(extra={"may_touch": {"objects": ["box", "ghost"], "stay_on": "tray"}})
+    grasp = SimpleNamespace(name="grasp", object="bottle", grasp=rec)
+    assert PC._ignore_for(grasp, Sampler, None) == ([table, tray, box], [])
+    assert PC._ignore_for(SimpleNamespace(name="lift", object="bottle", after=grasp), Sampler, None) == ([], [table, tray, box])
+    plain = SimpleNamespace(name="grasp", object="bottle", grasp=SimpleNamespace(extra={}))
+    assert PC._ignore_for(plain, Sampler, None) == ([table, tray], [])
+    assert PC._ignore_for(SimpleNamespace(name="lift", object="bottle", after=plain), Sampler, None) == ([], [table, tray])
+    # the fingers may meet them on the way down: removed along the whole approach (the pre-grasp itself keeps them) - no spacing keeps
+    # them out of the finger path any more
+    bottle = Sampler.objects["bottle"]
+    assert PC._approached_for(grasp, Sampler) == [bottle, box] and PC._approached_for(plain, Sampler) == [bottle]
+    # the puzzle's fixed-layout parts (``may_touch.pre_grasp``): out of the world for the pre-grasp too, i.e. for every pose of the pick
+    puzzle = SimpleNamespace(name="grasp", object="bottle", grasp=SimpleNamespace(extra={"may_touch": {"objects": ["box"], "stay_on": "tray", "pre_grasp": ["box"]}}))
+    assert PC._ignore_for(puzzle, Sampler, None) == ([table, tray, box], [box])
+
+
 def test_per_role_scale_default_and_template_id_tag():
     """Owner item 4b: ``roles.<role>.scale = {"<cat>/<model>": s, "default": s}`` (or a bare scalar) applies to every model
     of the role at spawn; the template id carries it (``-s1.25``) so scaled and unscaled draws never share a directory."""

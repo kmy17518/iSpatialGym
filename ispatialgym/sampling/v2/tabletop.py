@@ -3208,18 +3208,16 @@ def _polygons_overlap(a: th.Tensor, b: th.Tensor, margin: float = 0.0) -> bool:
 
 
 def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: th.Tensor, items: Sequence[Tuple[str, th.Tensor, Any]], *,
-                      spacing_axis: Optional[th.Tensor] = None, spacing: float = 0.0, margin: float = TRAY_MARGIN, gap: float = 0.01,
-                      cam: Optional[Pose] = None, in_frame_margin: float = IN_FRAME_MARGIN, n_tries: int = 80, budget: Optional[float] = None,
-                      grow: Optional[Dict[str, float]] = None) -> Dict[str, Pose]:
+                      margin: float = TRAY_MARGIN, gap: float = 0.01, cam: Optional[Pose] = None, in_frame_margin: float = IN_FRAME_MARGIN,
+                      n_tries: int = 80, budget: Optional[float] = None) -> Dict[str, Pose]:
     """§4.6 step 3 / §6.4: each ``(name, hull, rest_quat)`` item on the ``raster`` (``cells()`` world xy, ``polygon_supported
-    (fp, margin)``, ``area()``) at a random cell and yaw, footprint supported (``margin``), >= ``gap`` from every placed
-    footprint and >= ``spacing`` from the target along ``spacing_axis`` (the drawn grasp's pinch axis, world xy unit):
-    the projections of the two footprints on the axis stay ``spacing`` apart. With ``budget`` the footprints (each model's
-    bbox at its rest orientation, grown by ``grow[name]`` on both axes - the rectangle ``ground_isg._distractor_budget``
-    counted) may cover at most that fraction of the raster area (``tray_budget``). ``Reject("distractor_placement")``."""
+    (fp, margin)``, ``area()``) at a random cell and yaw, footprint supported (``margin``) and >= ``gap`` from every placed
+    footprint, the target's included. With ``budget`` the footprints (each model's bbox at its rest orientation) may cover at most
+    that fraction of the raster area (``tray_budget``). Owner 2026-10-12 (A2b): no spacing from the target along the grasp's pinch
+    axis and no pad-clearance growth of the budgeted footprints - the grasp may touch the distractors (``grasps[].may_touch``).
+    ``Reject("distractor_placement")``."""
     placed: Dict[str, Pose] = {}
     fps: Dict[str, th.Tensor] = {"__target__": s.world.footprint(target_hull, target_pose)}
-    t_fp = fps["__target__"]
     cells = raster.cells()
     if len(cells) == 0:
         _reject("distractor_placement", "raster has no cells")
@@ -3235,28 +3233,20 @@ def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: 
                 continue
             if any(_polygons_overlap(fp, other, gap) for other in fps.values()):
                 continue
-            if spacing_axis is not None and spacing > 0:
-                ax = _t(spacing_axis)[:2]
-                ax = ax / max(float(th.linalg.norm(ax)), 1e-9)
-                pa, pb = t_fp @ ax, fp @ ax
-                if not (float(pb.min()) - float(pa.max()) >= spacing or float(pa.min()) - float(pb.max()) >= spacing):
-                    continue
             if cam is not None and not in_frame(s, cam, hull_corners_world(hull, pose), in_frame_margin):
                 continue
             ok = (pose, fp)
             break
         if ok is None:
-            _reject("distractor_placement", f"no free position for {name} (gap {gap}, spacing {spacing:.3f} along the pinch axis)")
+            _reject("distractor_placement", f"no free position for {name} (gap {gap})")
         placed[name], fps[name] = ok
         if budget is not None and hasattr(raster, "area"):
-            g = float((grow or {}).get(name, 0.0))
-            # the model's own footprint at its rest orientation (yaw-invariant), grown on both axes: the rectangle the
-            # grounding budgeted (ground_isg._distractor_budget); the yawed world AABB used before inflated a long thin
-            # object up to (long + short)²/2 at 45 deg and rejected sets the grounding had admitted
+            # the model's own footprint at its rest orientation (yaw-invariant); the yawed world AABB used before inflated a long
+            # thin object up to (long + short)²/2 at 45 deg and rejected sets the grounding had admitted
             ext = hull_extents(hull, rest)
-            used_area += (float(ext[0]) + 2 * g) * (float(ext[1]) + 2 * g)
+            used_area += float(ext[0]) * float(ext[1])
             if used_area > float(budget) * float(raster.area()):
-                _reject("distractor_placement", f"distractor footprints (grown by pad_clearance) cover {used_area / max(raster.area(), 1e-9):.2f} > {budget} of the floor")
+                _reject("distractor_placement", f"distractor footprints cover {used_area / max(raster.area(), 1e-9):.2f} > {budget} of the floor")
     return placed
 
 

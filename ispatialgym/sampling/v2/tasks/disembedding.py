@@ -14,18 +14,21 @@ edge) as the in-frame body.
 Instance (``sample_instance``): a Phase-2 survivor + transition; source tray at the focus; the target inside it from
 the feasible set F (footprint on the tray floor, 0.5 cm); the destination tray on the template's side at the lateral
 position where exactly 4 cm of it is inside the init image (>= 4 cm from the source tray, footprint on the top);
-distractors on the source floor >= x from the target along the drawn grasp's pinch axis (x = pad_clearance + 0.01),
-footprints grown by their pad clearance <= ``tray_budget`` of the floor, each at its rest orientation - the target's pose when
-the alias says so (``generation.distractor_pose`` lying / standing, the milk picks of the handoff 2026-10-10) - or, for the
-puzzle (``generation.fixed_layout``), every part of the embedded figure at its layout position with the target held there
-too; every object but the destination in frame (5 %);
+distractors on the source floor, footprints >= 1 cm from each other and from the target and <= ``tray_budget`` of the floor
+(owner 2026-10-12 A2b: no spacing along the grasp's pinch axis, no pad-clearance growth), each at its rest orientation - the
+target's pose when the alias says so (``generation.distractor_pose`` lying / standing, the milk picks of the handoff
+2026-10-10) - or, for the puzzle (``generation.fixed_layout``), every part of the embedded figure at its layout position with
+the target held there too; every object but the destination in frame (5 %);
 whole-body checks at init and manipulation with the objects placed; occlusion <= 0.30 (two segmentation renders,
 visible area >= 400 px) with the destination tray confirmed visible; the §4.7 placement stance with the place /
 pre-place IK (object in hand, tray + support ignored for the place pose) and the lateral path with the object at the
-carry height (>= tallest distractor + tray rim + 3 cm above the source floor). Sidecar: ``init`` / ``manipulation`` /
-``placement`` stances, the transition, the path, one grasp record (pre-grasp, grasp, pre-place, place, carry_height,
-``place_on`` = the destination), language descriptors; TRO ``initial_occlusion`` (``ratio``, ``visible_area``,
-``reference_area``, ``occluder_ids``, ``camera_key``).
+carry height (>= tallest distractor + tray rim + 3 cm above the source floor). The grasp ignores the table, the source tray and
+every distractor / fixed-layout part, the whole pick (pre-grasp included) the fixed-layout parts (owner 2026-10-12 A2b: the
+grasp may touch or displace them as long as they stay on the source tray). Sidecar: ``init`` / ``manipulation`` / ``placement``
+stances, the transition, the path, one grasp record (pre-grasp, grasp, pre-place, place, carry_height, ``place_on`` = the
+destination, ``may_touch`` = those parts / distractors, the source tray they must stay on and the parts the pre-grasp ignores),
+language descriptors; TRO ``initial_occlusion`` (``ratio``, ``visible_area``, ``reference_area``, ``occluder_ids``,
+``camera_key``).
 """
 
 from __future__ import annotations
@@ -438,6 +441,22 @@ class Disembedding(SamplerV2):
         before the roles are bound)."""
         return [self.obj(role) for role in ("support", self.src_role, self.dst_role) if self.bindings.has(role)]
 
+    def grasp_ignore_list(self) -> List[Any]:
+        """What the target's grasp ignores at the grasp pose (§3.6): the table, the source tray and - owner 2026-10-12 (A2b) - every
+        distractor / fixed-layout part, which the grasp may touch or displace as long as it stays on the source tray (recorded as
+        ``grasps[].may_touch``: the program check ignores them for the grasp and the lift, the demo checks the tray after both)."""
+        return [self.obj("support"), self.obj(self.src_role)] + [self.objects[b.name] for b in self.bindings.many("distractors")]
+
+    def layout_parts(self) -> List[Any]:
+        """The fixed layout's parts around the target (the puzzle's figure), none for a pool draw."""
+        return [self.objects[b.name] for b in self.bindings.many("distractors")] if self.layout is not None else []
+
+    def pick_world(self):
+        """Owner 2026-10-12 (A2b): the fixed-layout parts out of the collision world for every pose of the target's pick - pre-grasp,
+        approach and grasp, its feasible set F included (``grasps[].may_touch.pre_grasp``); nothing changes for a pool draw. Every pick
+        check of a fixed layout runs inside it: F's cache key does not record the context."""
+        return self.ikc.ignoring(self.layout_parts())
+
     def spawn_roles(self):
         # owner decision 2026-09-16 4b: the source tray spawns at ``roles.source.scale`` (D1 writes 1.25; until it lands the
         # ``source_tray_scale`` default), the destination tray at 1.0. The scaled choice replaces the template's so the band
@@ -756,7 +775,6 @@ class Disembedding(SamplerV2):
 
     def _sample_with(self, rng, init: Stance, manip: Stance, tname: str, sname: str, dname: str, dnames: List[str], k: int) -> Draft:
         d = Draft()
-        support = self.obj("support")
         src, tgt = self.obj(self.src_role), self.obj("target")
         # §4.5 step 5: transition init -> manipulation
         self.record_stance_travel(init, manip)
@@ -768,20 +786,21 @@ class Disembedding(SamplerV2):
         src.keep_still()
         self.kit.sync_world()
         src_w = self.src_floor.at(s_pose)
-        # the puzzle (handoff 2026-10-10): the figure's parts at their layout positions first, so the target's grasp is screened with
-        # them around it; the target itself is held at its layout position
+        # the puzzle (handoff 2026-10-10): the figure's parts at their layout positions first (the pick ignores them, owner 2026-10-12
+        # A2b: ``pick_world``); the target itself is held at its layout position
         layout, fixed = None, None
         if self.layout is not None:
             layout, fig_yaw = self._layout_poses(manip, src_w)
             self._place_layout(layout)
             fixed = (layout[tname][0][:2], fig_yaw)
-        # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray ignored for the grasp; the other
-        # arm is tried only where its band covers the focus (owner 2026-09-27)
+        # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray + distractors ignored for the
+        # grasp (``grasp_ignore_list``); the other arm is tried only where its band covers the focus (owner 2026-09-27)
         default = self.segment_arms[0]
         arms_here = [a for a in self.segment_arms if a == default or a in (manip.extras.get("focus_arms") or [])]
-        t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], [support, src], top=src_w, support_z=src_w.z,
-                                         margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale, bands=self.bands,
-                                         arms=arms_here, arm_bands=self.arm_bands or None, fixed=fixed)
+        with self.pick_world():
+            t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
+                                             support_z=src_w.z, margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale,
+                                             bands=self.bands, arms=arms_here, arm_bands=self.arm_bands or None, fixed=fixed)
         if grasp.arm != default:
             self.sidecar.transitions.clear()
             self.record_stance_travel(init, manip)  # the other arm idles now
@@ -796,8 +815,9 @@ class Disembedding(SamplerV2):
                 others = [a for a in TT.fallback_arms(grasp) if a not in tried]
                 if not others:
                     raise
-                g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.grasps, others[0], ignore_for_grasp=[support, src],
-                                               scale_key=self.choice.models["target"].scale, support_z=src_w.z, why=f"[{e.reason}] {e}")
+                with self.pick_world():
+                    g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.grasps, others[0], ignore_for_grasp=self.grasp_ignore_list(),
+                                                   scale_key=self.choice.models["target"].scale, support_z=src_w.z, why=f"[{e.reason}] {e}")
                 if g2 is None:
                     raise
                 grasp = g2
@@ -825,18 +845,15 @@ class Disembedding(SamplerV2):
         row_name = C.split_twin(grasp.grasp_name or "")[0]  # a twin pinches the same width as its library row
         width = TT.grasp_pinch_width(next((g for g in self.grasps if g.name == row_name), None))
         if layout is not None:
-            # the puzzle's parts stay where the layout puts them: no pool draw, no spacing, outside the budget (handoff 2026-10-10)
-            spacing = None
+            # the puzzle's parts stay where the layout puts them: no pool draw, outside the budget (handoff 2026-10-10)
             dist_poses = {n: layout[n] for n in dnames}
         else:
-            # distractors on the source floor (spacing along the pinch axis, budget)
-            spacing = TT.distractor_spacing(width if width is not None else 0.0, float(self.g("distractor_spacing_extra_m")))
-            pinch_axis = C.closing_axis(grasp.grasp[1])
+            # distractors on the source floor: footprints >= 1 cm from each other and from the target, within the budget. Owner
+            # 2026-10-12 (A2b): no spacing along the drawn grasp's pinch axis and no pad-clearance growth of the budgeted footprints - the
+            # grasp may touch them, the demo checks they are still on the source tray
             items = [(n, self.hull[n], self.rest[n]) for n in dnames]
-            grow = {n: TT.distractor_spacing(width if width is not None else 0.0, 0.0) for n in dnames}
-            dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, spacing_axis=pinch_axis[:2], spacing=spacing,
-                                              margin=float(self.g("tray_footprint_margin_m")), gap=0.01, cam=cam_init, budget=self._tray_budget(), grow=grow,
-                                              n_tries=int(self.g("distractor_place_tries") or 80))
+            dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, margin=float(self.g("tray_footprint_margin_m")), gap=0.01,
+                                              cam=cam_init, budget=self._tray_budget(), n_tries=int(self.g("distractor_place_tries") or 80))
         objects = {tname: t_pose, sname: s_pose, dname: d_pose, **dist_poses}
         # §4.6 step 4: every object in frame (5 %) in the init image except the destination tray
         items_all = [(tname, self.hull["target"], t_pose), (sname, self.hull[self.src_role], s_pose)] + [(n, self.hull[n], dist_poses[n]) for n in dnames]
@@ -891,11 +908,14 @@ class Disembedding(SamplerV2):
         if masses:
             d.extras["constraints"] = masses
         d.summary.update({"manipulation_candidate": k, "grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "pinch_width": width},
-                          "dest_side": "left" if side > 0 else "right", "destination": dest_diag, "distractor_spacing_m": spacing, "occlusion": occ,
+                          "dest_side": "left" if side > 0 else "right", "destination": dest_diag, "occlusion": occ,
                           "carry_height": grasp.carry_height, "placement_stance": place_st.to_meta(), "arm": TT.segment_arm_summary(grasp, arms_here)})
         if layout is not None:
             d.summary["fixed_layout"] = (self.template_facts.get("fixed_layout") or {}).get("file")
         grasp.extras["arm_offer"] = TT.arm_offer_record(self.segment_arms, arms_here, grasp, self.arm_offer_why)
+        # owner 2026-10-12 (A2b): the parts / distractors the grasp may touch or displace, each still on the source tray after it; the
+        # fixed-layout parts at the pre-grasp too
+        grasp.extras["may_touch"] = {"objects": list(dnames), "stay_on": sname, **({"pre_grasp": list(dnames)} if layout is not None else {})}
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), self._descriptor(tname, objects, cam_init))
         self.sidecar.describe(sname, "source tray", "the tray in front of the robot")
         self.sidecar.describe(dname, "destination tray", f"the tray on the {'left' if side > 0 else 'right'}")
@@ -1157,23 +1177,25 @@ class Disembedding(SamplerV2):
 
     def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
         """``tabletop.held_turns``: this module's checks that depend on the wrist turn, for ``grasp`` just recorded as its other finger
-        assignment - the pick from the manipulation stance as the draw solved it (support and source tray ignored at the grasp; from
+        assignment - the pick from the manipulation stance as the draw solved it (``grasp_ignore_list`` ignored at the grasp; from
         ``q_first``, the recorded pre-grasp witness wrist-flipped, else afresh) with the wrist camera clear of the source tray's floor
         and of the world, the carried path to the placement stance swept again with this turn in the hand, and the pre-place -> place
         from the placement stance as ``after_goal_check`` solves it. None when every check passes, else the first failure."""
         from ispatialgym.sampling.v2 import orient as O
 
-        tgt, support, src, dst = self.obj("target"), self.obj("support"), self.obj(self.src_role), self.obj(self.dst_role)
+        tgt, support, dst = self.obj("target"), self.obj("support"), self.obj(self.dst_role)
         manip, place_st = self.sidecar.stance("manipulation"), self.sidecar.stance("placement")
         scale = self.choice.models["target"].scale
-        kw = {"ignore_for_last": [support, src], "scale_key": scale, "cache": False}
-        res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
-        if not res.ok and q_first is not None:
-            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)
+        kw = {"ignore_for_last": self.grasp_ignore_list(), "scale_key": scale, "cache": False}
+        with self.pick_world():
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
+            if not res.ok and q_first is not None:
+                res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)
+            camera_clear = res.ok and O.camera_clear(self.ikc, res.q, grasp.arm)
         if not res.ok:
             return f"pick: {res.reason}"
         floor_z = float(self.src_floor.at(draft.object_poses[self.bindings.one(self.src_role).name]).z)
-        if TT.wrist_camera_clearance(grasp.grasp, floor_z) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, grasp.arm):
+        if TT.wrist_camera_clearance(grasp.grasp, floor_z) < TT.TWIN_CAMERA_CLEARANCE_M or not camera_clear:
             return "pick: the wrist camera on the tray floor / within 5 mm of the world"
         why = self.recheck_carried_travel(self.tname)
         if why:

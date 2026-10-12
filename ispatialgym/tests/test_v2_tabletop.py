@@ -627,6 +627,78 @@ def test_phase3_target_fixed_pose_screens_and_places_only_that_pose(monkeypatch)
     assert th.allclose(pose[1], C.quat_from_yaw(0.3), atol=1e-6)
 
 
+def test_disembedding_grasp_ignores_the_distractors_and_parts():
+    """Owner 2026-10-12 (A2b): the target's grasp ignores the table, the source tray and every distractor / fixed-layout part (the
+    grasp may touch or displace them as long as they stay on the source tray); the destination tray stays in the world."""
+    from types import SimpleNamespace
+
+    D = _disembedding()
+    roles = {"support": "table", "source": "source_tray", "destination": "destination_tray"}
+    s = SimpleNamespace(src_role="source", dst_role="destination", obj=lambda role: roles[role], objects={"part_1": "P1", "part_2": "P2"},
+                        bindings=SimpleNamespace(many=lambda role: [SimpleNamespace(name="part_1"), SimpleNamespace(name="part_2")] if role == "distractors" else []),
+                        layout=None)
+    assert D.Disembedding.grasp_ignore_list(s) == ["table", "source_tray", "P1", "P2"]
+    # the pre-grasp too ignores only a fixed layout's parts (the puzzle): every pose of the pick runs in ``pick_world``
+    assert D.Disembedding.layout_parts(s) == []
+    s.layout = {"part_1": (0.0, 0.0), "part_2": (0.1, 0.0)}
+    assert D.Disembedding.layout_parts(s) == ["P1", "P2"]
+    seen = []
+    s.ikc = SimpleNamespace(ignoring=lambda objs: seen.append(list(objs)) or "ctx")
+    s.layout_parts = lambda: D.Disembedding.layout_parts(s)
+    assert D.Disembedding.pick_world(s) == "ctx" and seen == [["P1", "P2"]]
+
+
+def test_place_distractors_keeps_the_gap_floor_and_budget_without_pinch_spacing():
+    """Owner 2026-10-12 (A2b addition): the distractors keep their footprints >= 1 cm apart (the target's included), on the source
+    floor (its margin) and within ``tray_budget`` of the floor - their own footprints, not grown by the pad clearance - but no spacing
+    from the target along the grasp's pinch axis: disembedding#04 lost 280 candidates to it."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.sim_utils import Reject
+
+    class Floor:
+        """A 0.30 x 0.20 m floor, 1 cm cells, centred on the origin."""
+
+        def __init__(self, cells):
+            self._cells = cells
+
+        def cells(self):
+            return self._cells
+
+        def area(self):
+            return 0.06
+
+        def polygon_supported(self, fp, margin=0.0):
+            return bool((fp[:, 0].abs() <= 0.15 - margin).all() and (fp[:, 1].abs() <= 0.10 - margin).all())
+
+    def footprint(hull, pose):
+        return C.transform_points((TT._t(pose[0]), TT._t(pose[1])), hull)[:, :2][[0, 2, 6, 4]]
+
+    s = SimpleNamespace(world=SimpleNamespace(footprint=footprint, bottom_offset=lambda hull, q: 0.0))
+    target, box = _box(0.06, 0.04, 0.05), _box(0.04, 0.04, 0.05)
+    t_pose = (th.tensor([0.0, 0.0, 0.8]), C.IDENTITY_QUAT.clone())
+    # the only cell offered puts the box 1.7-2.5 cm (by its yaw) beside the target along x - the pinch axis of a 6 cm pinch closing
+    # along x, which the old rule kept 3 cm clear for the open pads: the box is placed there now
+    near = Floor(th.tensor([[0.075, 0.0]]))
+    rng = np.random.default_rng(0)
+    for _ in range(50):
+        poses = TT.place_distractors(s, rng, near, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], margin=0.01, gap=0.01, n_tries=1)
+        gap = TT.polygon_gap(footprint(target, t_pose), footprint(box, poses["box"]))
+        assert gap >= 0.01 - 1e-6
+    # closer than the 1 cm gap, or off the floor: no position
+    with pytest.raises(Reject) as err:
+        TT.place_distractors(s, rng, Floor(th.tensor([[0.045, 0.0]])), 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], gap=0.01, n_tries=1)
+    assert err.value.reason == "distractor_placement" and "spacing" not in str(err.value)
+    with pytest.raises(Reject):
+        TT.place_distractors(s, rng, Floor(th.tensor([[0.14, 0.0]])), 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], margin=0.01, n_tries=1)
+    # the budget counts the bbox at the rest orientation as it is: 0.0016 m2 of a 0.06 m2 floor fits 3 %, not 2 %
+    far = Floor(th.tensor([[-0.10, 0.0]]))
+    TT.place_distractors(s, rng, far, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], budget=0.03, n_tries=1)
+    with pytest.raises(Reject) as err:
+        TT.place_distractors(s, rng, far, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], budget=0.02, n_tries=1)
+    assert "cover 0.03 > 0.02" in str(err.value)
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # sidecar blocks the tabletop tasks emit, read back by the F6 sidecar / programs (schema compatibility, no simulator)
 # ----------------------------------------------------------------------------------------------------------------

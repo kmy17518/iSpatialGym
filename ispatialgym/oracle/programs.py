@@ -148,7 +148,7 @@ def _brace_contact(sc: Sidecar):
 
 
 def _pick(g: GraspRecord) -> Tuple[Grasp, Lift]:
-    grasp = Grasp(kind="library", arm=g.arm, object=g.object, grasp=g)
+    grasp = Grasp(kind="library", arm=g.arm, object=g.object, grasp=g, touches=g.may_touch[0])
     return grasp, Lift(arm=g.arm, object=g.object, carry_height=g.carry_height, after=grasp)
 
 
@@ -258,7 +258,8 @@ def program_held_object_rotation(sc: Sidecar) -> List[Action]:
 def program_disembedding(sc: Sidecar) -> List[Action]:
     """init → manipulation stance (transition) → grasp at the recorded pose → lift to the carry height (orientation
     kept) → drive sideways along the edge to the placement stance (recorded path) → place at the destination centre
-    (orientation kept) → retreat."""
+    (orientation kept) → retreat. The grasp may touch the parts / distractors of ``grasps[0].may_touch`` (owner 2026-10-12
+    A2b); after the grasp and after the lift each must still rest on the source tray (``execute.may_touch_verdict``)."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     grasp, lift = _pick(g)
     return (

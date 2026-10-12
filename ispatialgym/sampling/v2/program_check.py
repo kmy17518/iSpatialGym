@@ -1231,9 +1231,11 @@ def _ignore_for(action, sampler, carried: Optional[str], sidecar=None) -> Tuple[
     except Exception:  # noqa: BLE001
         grasp_supports = supports
     if name == "grasp":
-        last += grasp_supports  # the final grasp pose only
+        last += grasp_supports + _may_touch(getattr(action, "grasp", None), objs)  # the final grasp pose only
+        every += _may_touch(getattr(action, "grasp", None), objs, "pre_grasp")  # the puzzle's fixed-layout parts: the pre-grasp too
     if name == "lift":
-        every += grasp_supports  # the lift starts at the grasp pose (object resting on the support) and goes up
+        # the lift starts at the grasp pose (object resting on the support, the fingers among the parts it may touch) and goes up
+        every += grasp_supports + _may_touch(getattr(getattr(action, "after", None), "grasp", None), objs)
     if name == "place":
         every += supports  # the descent ends 1 cm above the support / partner with the object attached
         # F6 ``Place.on`` = the instance placed on / into (``grasps[].place_on``); older drafts carried the grasp record
@@ -1286,8 +1288,9 @@ def _is_pack_push(sidecar, action) -> bool:
 
 def _approached_for(action, sampler) -> Optional[List[Any]]:
     """The object an action's approach closes in on (removed along the whole tracked segment, owner 2026-09-16 10:15 A):
-    the grasped / lifted / released object, the placed-on partner, the pushed / braced object. None = let ``IKChecker``
-    infer it from the end pose."""
+    the grasped / lifted / released object, the placed-on partner, the pushed / braced object; a grasp's ``grasps[].may_touch``
+    objects too (owner 2026-10-12 A2b: the fingers may meet disembedding's distractors on their way down, no spacing keeps them
+    out of the finger path; the pre-grasp itself keeps them). None = let ``IKChecker`` infer it from the end pose."""
     name = getattr(action, "name", "")
     objs = sampler.objects
     cand = None
@@ -1299,7 +1302,10 @@ def _approached_for(action, sampler) -> Optional[List[Any]]:
         cand = getattr(getattr(action, "contact", None), "object", None)
     if cand is None:
         return None
-    return [objs[cand]] if cand in objs else []
+    out = [objs[cand]] if cand in objs else []
+    if name == "grasp":
+        out += [o for o in _may_touch(getattr(action, "grasp", None), objs) if all(o is not x for x in out)]
+    return out
 
 
 def _block_eef_in_object(sidecar, sampler, carried: str) -> Optional[Tuple[th.Tensor, th.Tensor]]:
@@ -1345,6 +1351,15 @@ def _block_pick_q(sidecar, sampler, name: str) -> Optional[List[float]]:
         if float(th.linalg.norm(th.tensor([float(v) for v in after["position"]]) - p.float())) < 0.02:
             q = rq
     return [float(v) for v in q] if isinstance(q, list) and len(q) == 7 else None
+
+
+def _may_touch(grasp_rec, objs: Dict[str, Any], key: str = "objects") -> List[Any]:
+    """The objects of ``grasps[].may_touch.<key>`` (owner 2026-10-12 A2b: ``objects`` = disembedding's distractors and fixed-layout
+    parts, which its grasp may touch or displace as long as they stay on the source tray - the oracle checks that after the grasp;
+    ``pre_grasp`` = the fixed-layout parts, which the pre-grasp ignores too)."""
+    mt = (getattr(grasp_rec, "extra", None) or {}).get("may_touch") if grasp_rec is not None else None
+    names = mt.get(key) or [] if isinstance(mt, dict) else []
+    return [objs[n] for n in names if n in objs]
 
 
 def _explicit_ignores(rec, sampler) -> Optional[Tuple[List[Any], List[Any]]]:

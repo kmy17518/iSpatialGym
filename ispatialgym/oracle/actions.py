@@ -635,11 +635,15 @@ class Grasp(Action):
     grasp: Optional[GraspRecord] = None
     block: Optional[BlockRecord] = None
     articulation: Optional[Articulation] = None
+    #: instances the grasp may touch besides the grasped object (QA whitelist): ``grasps[].may_touch`` (disembedding's parts and
+    #: distractors, owner 2026-10-12 A2b)
+    touches: Tuple[str, ...] = ()
     TARGET_KEYS = ("pre_grasp", "grasp", "approach")
 
     def __post_init__(self):
         self.arms = (self.arm,)
         self.objects = (self.object,)
+        self.touches = tuple(self.touches)
         super().__post_init__()
         needed = {"library": self.grasp, "cube": self.block, "handle": self.articulation}
         if self.kind not in needed:

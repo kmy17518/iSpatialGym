@@ -429,7 +429,9 @@ Details kept from v1 that the checks depend on:
   contact − 0.012·a. Push / brace contacts: pad centre on the contact point, eef origin = point − `CONTACT_CENTER_Z`·a.
 - "Support ignored for the grasp pose only": the support (table, tray floor, wall, mattress; with its neighbouring
   supports, 3.2) is removed from the collision world for the final grasp / contact pose and for nothing else; the target object is ignored for the
-  final contact pose unless the rule says otherwise; every other object (partner, distractors, scene) stays.
+  final contact pose unless the rule says otherwise; every other object (partner, distractors, scene) stays — except
+  disembedding's distractors and fixed-layout parts, which the grasp ignores like its support (the fixed-layout parts at
+  the pre-grasp too; 6.4, A2b).
 - Every arm the oracle will use (right, left, both) has its cuRobo embodiment; the arm rule of the task decides.
 
 ### 3.7 Navigation feasibility (init stance → manipulation stance → placement stance)
@@ -898,10 +900,12 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      and checks, at the drawn target pose, the lateral gap, the reach rule of the segment's arm, the 3 cm clearance and
      the frame. Recorded: `template_facts.meta_link_spots` (every meta link with `on_top` / `in_frame`) and
      `partner_draw.meta_link`.
-3. **Distractors** (disembedding) on the source tray, each ≥ x from the target along the drawn grasp's pinch axis,
-   x = (open width 0.10 − pinch width of the drawn grasp)/2 + 0.01 (`Grasp.pad_clearance` + margin), so the grasp
-   stays possible with the distractors placed; they may occlude the target up to **30 %** of its visible area
-   (segmentation render, distractors visible vs hidden); no other occlusion bucket exists.
+3. **Distractors** (disembedding) on the source tray, footprints ≥ 1 cm from each other and from the target, within
+   `tray_budget` (6.4); they may occlude the target up to **30 %** of its visible area (segmentation render, distractors
+   visible vs hidden); no other occlusion bucket exists. *Owner decision 2026‑10‑12 (A2b):* no spacing along the drawn
+   grasp's pinch axis any more — until then each distractor kept x = (open width 0.10 − pinch width)/2 + 0.01 from the
+   target along it (280 candidate rejections of disembedding#04); the grasp may touch the distractors as long as they stay
+   on the source tray (6.4).
 4. Every sampled object fully in frame (5 %) in the init image except the disembedding destination tray.
 5. Whole-body collision check at the init pose and at the manipulation stance with the objects placed; on failure
    take the next Phase-2 survivor before rejecting the attempt.
@@ -1525,7 +1529,9 @@ Numbers and records kept from v1 §5.3:
   pickable from above. (0.60 until 2026-10-11, when the owner raised it for the new sheet's lying milk family and fork,
   which got 2 distractors at 0.60. Until 2026-09-24: 0.45 of a conservative square `(long + 2c)²` per distractor, which left a
   22 cm bottle alone on the tray; the member count is fixed at grounding with the same rule, `ground_isg`
-  `generation.distractor_budget`.)
+  `generation.distractor_budget`.) *Owner decision 2026‑10‑12 (A2b):* at sampling time the placed footprints are no longer
+  grown by the pad clearance — each model's bbox rectangle at its rest orientation counts as it is — and no spacing along
+  the drawn grasp's pinch axis is kept (4.6 step 3); the grounding's member count keeps the grown rectangles.
 - Representative sheet (handoff 2026-10-10, owner 2026-10-11): a pick's `distractors` rows with slot `same_category` /
   `other_category` are its pools (minus the target, its look-alikes and the held-out models). A draw takes at most 2
   models of the target's category, at most 1 of each other category and at most one per look-alike group; the member
@@ -1536,7 +1542,20 @@ Numbers and records kept from v1 §5.3:
   largest extent vertical with the wider end down). The puzzle's `fixed_layout` rows are placed with the target at the
   x / y of the layout file their notes name (`generation.fixed_layout`; figure centre on the source floor's centre, +x the
   robot's right, +y away from the robot, released 0.5 mm above the floor), not drawn and outside the budget; the target's
-  grasp is screened at its layout pose with the other parts in place.
+  grasp is screened at its layout pose with the other parts in place, which the whole pick ignores (next item).
+- Grasp and the other tray objects (*owner decision 2026‑10‑12, A2b*): the distractors and fixed-layout parts may be
+  touched or displaced by the grasp as long as they stay on the source tray. The target's grasp ignores them like the table
+  and the source tray (the grasp pose and the last 3.3 cm of its approach in the draw and the wrist-turn re-check; the
+  program check's grasp pose, its whole approach — the fingers may meet a distractor on the way down, no spacing keeps
+  them out of the finger path — and the lift). The pre-grasp keeps the distractors in the world but not the fixed-layout
+  parts: the puzzle's pick (feasible set F, exact IK, wrist-turn re-check, program check, the oracle's transit) runs with
+  them out of the world for every pose (B9: with only the grasp pose ignoring them F stayed empty). The grasp record
+  carries them as `grasps[].may_touch = {objects, stay_on: <source tray>, pre_grasp: [the fixed-layout parts]}`. The
+  oracle plans the transit to the pre-grasp around the `pre_grasp` parts (out of the world for its last leg and the
+  supports-ignored fallback), leaves every `may_touch` object out of the planner's world for the approach finish and the
+  lift's, lets the grasp touch them (QA whitelist) and checks after the grasp and after the lift that each still rests over
+  the source tray's footprint and did not rise more than 2 cm with the target (`distractor_displaced` otherwise, the
+  attempt is retried from its checkpoint). "No distractor on the destination tray" stays a goal condition.
 - Occlusion: `external_occlusion_ratio = 1 − V / A` from two segmentation renders at the init stance — the complete
   scene, and the same view with the other candidate objects hidden (A = the target's own visible area, so
   self-occlusion is excluded); the target's projection must lie fully inside a 5 % image margin; ratio ≤ 0.30 and

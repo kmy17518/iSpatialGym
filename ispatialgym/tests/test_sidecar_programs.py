@@ -498,6 +498,27 @@ def test_travel_rule_between_stances():
         expand("object_scaling-mug", sc)
 
 
+def test_disembedding_grasp_may_touch_the_tray_objects():
+    """Owner 2026-10-12 (A2b): ``grasps[].may_touch`` names the distractors / parts the grasp may touch and the tray they must stay on;
+    the program's Grasp carries them as its ``touches`` (QA whitelist), the record round-trips, and a sidecar without it is unchanged."""
+    d = raw("disembedding")
+    d["grasps"][0]["may_touch"] = {"objects": ["box_of_cereal.n.01_1", "box_of_cereal.n.01_2"], "stay_on": "tray.n.01_1"}
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == []
+    assert sc.grasps[0].may_touch == (("box_of_cereal.n.01_1", "box_of_cereal.n.01_2"), "tray.n.01_1")
+    assert sc.grasps[0].to_dict()["may_touch"] == d["grasps"][0]["may_touch"]
+    grasp = [a for a in expand(sc.alias, sc) if a.name == "grasp"][0]
+    assert grasp.touches == ("box_of_cereal.n.01_1", "box_of_cereal.n.01_2") and grasp.objects == ("bottle_of_beer.n.01_1",)
+    assert sc.grasps[0].may_touch_pre_grasp == ()
+    plain = load("disembedding")
+    assert plain.grasps[0].may_touch == ((), None) and [a for a in expand(plain.alias, plain) if a.name == "grasp"][0].touches == ()
+    # the puzzle's fixed-layout parts: the pre-grasp may overlap them too
+    d["grasps"][0]["may_touch"]["pre_grasp"] = ["box_of_cereal.n.01_2"]
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.grasps[0].may_touch_pre_grasp == ("box_of_cereal.n.01_2",)
+    assert sc.grasps[0].to_dict()["may_touch"]["pre_grasp"] == ["box_of_cereal.n.01_2"]
+
+
 def test_iors_place_kinds_and_relations():
     kinds = {}
     for rel in ("ontop_small_scale", "under_small_scale", "inside", "nextto", "touching", "ontop_large_scale", "under_large_scale"):
@@ -1379,6 +1400,10 @@ def test_attachment_without_a_brace_record_is_a_one_arm_attach():
         ("disembedding", lambda d: d["grasps"][0].update(arm="middle"), "arm"),
         ("disembedding", lambda d: d["grasps"][0].pop("place_on"), "place_on"),
         ("disembedding", lambda d: d["language"]["objects"].pop("tray.n.01_2"), "language.objects has no entry"),
+        ("disembedding", lambda d: d["grasps"][0].update(may_touch={"objects": ["box_of_cereal.n.01_1"]}), "may_touch"),
+        ("disembedding", lambda d: d["grasps"][0].update(may_touch={"objects": ["bottle_of_beer.n.01_1"], "stay_on": "tray.n.01_1"}), "may_touch"),
+        ("disembedding", lambda d: d["grasps"][0].update(may_touch={"objects": ["box_of_cereal.n.01_1"], "stay_on": "tray.n.01_1", "pre_grasp": ["tray.n.01_2"]}),
+         "may_touch.pre_grasp"),
         ("camera_relocalization-standard", lambda d: d.update(path_bucket_m=None), "path_bucket_m"),
         ("camera_relocalization-standard", lambda d: d["goal"].update(arms="tucked"), "goal.arms"),
         ("alignment-axial", lambda d: d["contacts"]["brace"].update(arm="right"), "same arm"),

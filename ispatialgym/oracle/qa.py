@@ -23,6 +23,8 @@ Verdict categories (the executor's verdict / ``SkillError.reason``; this module 
 ``release_not_commanded``   an assisted-grasp release did not come from a gripper command of +1 (epilogue demo gate
                             ``release_commanded``, ``Executor.release_check``)
 ``failed_grasp``            the assisted grasp did not attach (grasp actions; push / brace exempt)
+``distractor_displaced``    an object the grasp may touch (``grasps[].may_touch``: disembedding's parts / distractors) is no
+                            longer on its support (the source tray) after the grasp, or rose with the target in the lift
 ``no_motion``               a push / articulation moved nothing
 ``plan_failed``             trajopt (or the differential IK along recorded waypoints) found no trajectory
 ``execution``               a motion did not converge / an action did not reach its recorded target
@@ -93,6 +95,7 @@ CATEGORIES: Tuple[str, ...] = (
     "paused",
     "gripper_out_of_fov",
     "failed_grasp",
+    "distractor_displaced",
     "no_motion",
     "plan_failed",
     "execution",

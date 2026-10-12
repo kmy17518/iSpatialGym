@@ -530,6 +530,9 @@ NOTE_KEYS = NOTE_KEYS + ("contact_arms_kept",)
 NOTE_KEYS = NOTE_KEYS + ("transit_dip",)
 #: owner 2026-10-11: an action on an object on an interior shelf kept the support in the world but for the board pieces under it
 NOTE_KEYS = NOTE_KEYS + ("interior_support",)
+#: owner 2026-10-12 (A2b): the parts / distractors a grasp may touch - on the source tray after the grasp / lift, how far they and the
+#: target moved
+NOTE_KEYS = NOTE_KEYS + ("may_touch",)
 
 
 @dataclass
