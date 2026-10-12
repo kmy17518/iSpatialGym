@@ -1,31 +1,43 @@
 (define (problem configuration_matching-18)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_open_large_scale-fridge)
+    (:alias configuration_matching-attachment-cork-wine_bottle-commercial_kitchen_table)
 
-    ; ground_isg 2.0.0: configuration_matching-articulation_open_large_scale-fridge (configuration_matching/articulation_open_large_scale.iddl; configuration_matching-articulation_open_large_scale#02/representative)
-    ; Configuration matching - articulation (large-scale, open). The target is a scene articulated object (cabinet, fridge,
-    ; oven, drawer, door; roles/candidates.csv kind scene, bound per scene); one joint is chosen (customs list roles.target.joint /
-    ; handle_key); closed -> open to a passively stable angle q_goal in S. Handle grasp with the arm on the handle's side;
-    ; opening primarily by base / trunk motion (base-follow), arm secondary.
+    ; ground_isg 2.0.0: configuration_matching-attachment-cork-wine_bottle-commercial_kitchen_table (configuration_matching/attachment.iddl; configuration_matching-attachment#03~T3/representative)
+    ; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced
+    ; by the other gripper while attaching). The assembly group carries the fixed member-to-slot layout target; the
+    ; partner's pose stays as at init. Male / female pairs with matching BEHAVIOR attachment meta-links come from
+    ; roles/constraints_compatible.csv (partner_of, attach_type); the partner brace is computed geometrically (no artefact).
 
     (:objects
-        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cork.n.04_1 - cork.n.04
+        wine_bottle.n.01_1 - wine_bottle.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
+    (:groups
+        cork.n.04_1 wine_bottle.n.01_1 - assembly_group.n.01_1
+    )
+
     (:init
-        (not (open electric_refrigerator.n.01_1))
+        (ontop assembly_group.n.01_1 countertop.n.01_1)
+        (not (attached cork.n.04_1 wine_bottle.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (open ?electric_refrigerator.n.01_1)
-            (layout_reached ?electric_refrigerator.n.01_1)
-            (not (grasped ?agent.n.01_1 ?electric_refrigerator.n.01_1))
-            (pose_settled ?electric_refrigerator.n.01_1)
+            (attached ?cork.n.04_1 ?wine_bottle.n.01_1)
+            (ontop ?wine_bottle.n.01_1 ?countertop.n.01_1)
+            (layout_reached ?assembly_group.n.01_1)
+            (not (grasped ?agent.n.01_1 ?assembly_group.n.01_1))
+            (pose_settled ?assembly_group.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
+    )
+
+    (:measure
+        (pose_reached ?assembly_group.n.01_1)
     )
 )

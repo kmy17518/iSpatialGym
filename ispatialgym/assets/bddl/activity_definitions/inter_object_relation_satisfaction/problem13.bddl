@@ -1,39 +1,38 @@
 (define (problem inter_object_relation_satisfaction-13)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table)
+    (:alias inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-stove)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#04~T1/representative)
-    ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
-    ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-stove (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#02~T4/representative)
+    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
+    ; its init orientation; the partner stays where it was. Both poses measured.
 
     (:objects
-        cinnamon_bark.n.01_1 - cinnamon_bark.n.01
-        chinese_anise.n.02_1 - chinese_anise.n.02
-        breakfast_table.n.01_1 - breakfast_table.n.01
+        steak.n.01_1 - steak.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        stove.n.01_1 - stove.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop cinnamon_bark.n.01_1 breakfast_table.n.01_1)
-        (ontop chinese_anise.n.02_1 breakfast_table.n.01_1)
-        (not (nextto cinnamon_bark.n.01_1 chinese_anise.n.02_1))
+        (ontop steak.n.01_1 stove.n.01_1)
+        (ontop frying_pan.n.01_1 stove.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (nextto ?cinnamon_bark.n.01_1 ?chinese_anise.n.02_1)
-            (not (grasped ?agent.n.01_1 ?cinnamon_bark.n.01_1))
-            (not (grasped ?agent.n.01_1 ?chinese_anise.n.02_1))
-            (pose_settled ?cinnamon_bark.n.01_1)
-            (pose_settled ?chinese_anise.n.02_1)
+            (ontop ?steak.n.01_1 ?frying_pan.n.01_1)
+            (not (grasped ?agent.n.01_1 ?steak.n.01_1))
+            (not (grasped ?agent.n.01_1 ?frying_pan.n.01_1))
+            (pose_settled ?steak.n.01_1)
+            (pose_settled ?frying_pan.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?cinnamon_bark.n.01_1)
-        (pose_reached ?chinese_anise.n.02_1)
+        (pose_reached ?steak.n.01_1)
+        (pose_reached ?frying_pan.n.01_1)
     )
 )

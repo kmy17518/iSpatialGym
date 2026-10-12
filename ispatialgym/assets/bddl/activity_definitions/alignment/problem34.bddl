@@ -1,32 +1,30 @@
 (define (problem alignment-34)
     (:domain ispatialgym)
-    (:alias alignment-axial-board_game-conference_table)
+    (:alias alignment-world_vertical-license_plate-walls)
 
-    ; ground_isg 2.0.0: alignment-axial-board_game-conference_table (alignment/axial.iddl; alignment-axial#03~T3/representative)
-    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
-    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
-    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
-    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
-    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
+    ; ground_isg 2.0.0: alignment-world_vertical-license_plate-walls (alignment/world_vertical.iddl; alignment-world_vertical#05~T5/representative)
+    ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
+    ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted
+    ; 15-45 deg in the wall plane and must be pushed upright (tangential push at the low end + brace at the high end).
+    ; Orientation-only target; the position is fixed by the hinge. Push / brace contacts from
+    ; contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        board_game.n.01_1 - board_game.n.01
-        conference_table.n.01_1 - conference_table.n.01
+        license_plate.n.01_1 - license_plate.n.01
+        wall.n.01_1 - wall.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop board_game.n.01_1 conference_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?board_game.n.01_1 ?conference_table.n.01_1)
-            (pose_reached ?board_game.n.01_1)
-            (not (grasped ?agent.n.01_1 ?board_game.n.01_1))
-            (pose_settled ?board_game.n.01_1)
+            (pose_reached ?license_plate.n.01_1)
+            (not (grasped ?agent.n.01_1 ?license_plate.n.01_1))
+            (pose_settled ?license_plate.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

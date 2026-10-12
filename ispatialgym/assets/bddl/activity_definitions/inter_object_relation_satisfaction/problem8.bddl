@@ -1,41 +1,38 @@
 (define (problem inter_object_relation_satisfaction-8)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table)
+    (:alias inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-countertop)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#04~T1/representative)
-    ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is
-    ; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured. The
-    ; insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container; flowers held
-    ; by the upper stem) is required.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-countertop (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#02~T1/representative)
+    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
+    ; its init orientation; the partner stays where it was. Both poses measured.
 
     (:objects
-        ice_cube.n.01_1 - ice_cube.n.01
-        beer_glass.n.01_1 - beer_glass.n.01
-        breakfast_table.n.01_1 - breakfast_table.n.01
+        steak.n.01_1 - steak.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop ice_cube.n.01_1 breakfast_table.n.01_1)
-        (ontop beer_glass.n.01_1 breakfast_table.n.01_1)
-        (not (inside ice_cube.n.01_1 beer_glass.n.01_1))
+        (ontop steak.n.01_1 countertop.n.01_1)
+        (ontop frying_pan.n.01_1 countertop.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (inside ?ice_cube.n.01_1 ?beer_glass.n.01_1)
-            (not (grasped ?agent.n.01_1 ?ice_cube.n.01_1))
-            (not (grasped ?agent.n.01_1 ?beer_glass.n.01_1))
-            (pose_settled ?ice_cube.n.01_1)
-            (pose_settled ?beer_glass.n.01_1)
+            (ontop ?steak.n.01_1 ?frying_pan.n.01_1)
+            (not (grasped ?agent.n.01_1 ?steak.n.01_1))
+            (not (grasped ?agent.n.01_1 ?frying_pan.n.01_1))
+            (pose_settled ?steak.n.01_1)
+            (pose_settled ?frying_pan.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?ice_cube.n.01_1)
-        (pose_reached ?beer_glass.n.01_1)
+        (pose_reached ?steak.n.01_1)
+        (pose_reached ?frying_pan.n.01_1)
     )
 )

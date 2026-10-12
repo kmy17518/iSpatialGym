@@ -1,37 +1,38 @@
 (define (problem configuration_matching-38)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_small_scale-hinged_jar-countertop)
+    (:alias configuration_matching-articulation_open_small_scale-carton-countertop)
 
-    ; ground_isg 2.0.0: configuration_matching-articulation_close_small_scale-hinged_jar-countertop (configuration_matching/articulation_close_small_scale.iddl; configuration_matching-articulation_close_small_scale#02~T2/representative)
-    ; Configuration matching - articulation (small-scale, close). Spawned articulated object on the support, one joint open
-    ; at q_init in S -> closed limit. Handle arm + brace arm (brace computed geometrically); root pose measured. Joint from
-    ; the customs list (roles.target.joint / handle_key).
+    ; ground_isg 2.0.0: configuration_matching-articulation_open_small_scale-carton-countertop (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#02~T2/representative)
+    ; Configuration matching - articulation (small-scale, open). Spawned articulated object (toolbox, carton, hinged jar) on
+    ; the support (floor for objects taller than 0.6 m), facing the robot; closed -> open to q_goal in S. Handle arm + brace
+    ; arm on the base link (brace computed geometrically); the object's root pose is measured (pose_reached in :measure),
+    ; not gated. Joint from the customs list (roles.target.joint / handle_key).
 
     (:objects
-        hinged_jar.n.01_1 - hinged_jar.n.01
+        carton.n.02_1 - carton.n.02
         countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (open hinged_jar.n.01_1)
-        (ontop hinged_jar.n.01_1 countertop.n.01_1)
+        (not (open carton.n.02_1))
+        (ontop carton.n.02_1 countertop.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (not (open ?hinged_jar.n.01_1))
-            (layout_reached ?hinged_jar.n.01_1)
-            (ontop ?hinged_jar.n.01_1 ?countertop.n.01_1)
-            (not (grasped ?agent.n.01_1 ?hinged_jar.n.01_1))
-            (pose_settled ?hinged_jar.n.01_1)
+            (open ?carton.n.02_1)
+            (layout_reached ?carton.n.02_1)
+            (ontop ?carton.n.02_1 ?countertop.n.01_1)
+            (not (grasped ?agent.n.01_1 ?carton.n.02_1))
+            (pose_settled ?carton.n.02_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?hinged_jar.n.01_1)
+        (pose_reached ?carton.n.02_1)
     )
 )

@@ -1,37 +1,37 @@
 (define (problem configuration_matching-46)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_small_scale-toolbox-conference_table)
+    (:alias configuration_matching-articulation_close_small_scale-carton-breakfast_table)
 
-    ; ground_isg 2.0.0: configuration_matching-articulation_close_small_scale-toolbox-conference_table (configuration_matching/articulation_close_small_scale.iddl; configuration_matching-articulation_close_small_scale#04~T3/representative)
+    ; ground_isg 2.0.0: configuration_matching-articulation_close_small_scale-carton-breakfast_table (configuration_matching/articulation_close_small_scale.iddl; configuration_matching-articulation_close_small_scale#02~T1/representative)
     ; Configuration matching - articulation (small-scale, close). Spawned articulated object on the support, one joint open
     ; at q_init in S -> closed limit. Handle arm + brace arm (brace computed geometrically); root pose measured. Joint from
     ; the customs list (roles.target.joint / handle_key).
 
     (:objects
-        toolbox.n.01_1 - toolbox.n.01
-        conference_table.n.01_1 - conference_table.n.01
+        carton.n.02_1 - carton.n.02
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (open toolbox.n.01_1)
-        (ontop toolbox.n.01_1 conference_table.n.01_1)
+        (open carton.n.02_1)
+        (ontop carton.n.02_1 breakfast_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (not (open ?toolbox.n.01_1))
-            (layout_reached ?toolbox.n.01_1)
-            (ontop ?toolbox.n.01_1 ?conference_table.n.01_1)
-            (not (grasped ?agent.n.01_1 ?toolbox.n.01_1))
-            (pose_settled ?toolbox.n.01_1)
+            (not (open ?carton.n.02_1))
+            (layout_reached ?carton.n.02_1)
+            (ontop ?carton.n.02_1 ?breakfast_table.n.01_1)
+            (not (grasped ?agent.n.01_1 ?carton.n.02_1))
+            (pose_settled ?carton.n.02_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?toolbox.n.01_1)
+        (pose_reached ?carton.n.02_1)
     )
 )

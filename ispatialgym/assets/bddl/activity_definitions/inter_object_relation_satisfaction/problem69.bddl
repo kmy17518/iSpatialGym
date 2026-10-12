@@ -1,40 +1,39 @@
 (define (problem inter_object_relation_satisfaction-69)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-conference_table)
+    (:alias inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-conference_table (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#01~T3/representative)
-    ; IORS - touching. Target grasped and set down next to the partner (partner on the robot's left), then pushed against it
-    ; while the other gripper braces the partner's far side (push and brace computed geometrically, no artefact); the
-    ; partner must not move (> 5 mm) at the goal.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#02~T1/representative)
+    ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
+    ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
 
     (:objects
-        box__of__sanitary_napkin.n.01_1 - box__of__sanitary_napkin.n.01
-        box__of__tissue.n.01_1 - box__of__tissue.n.01
-        conference_table.n.01_1 - conference_table.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        pepper__shaker.n.01_1 - pepper__shaker.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop box__of__sanitary_napkin.n.01_1 conference_table.n.01_1)
-        (ontop box__of__tissue.n.01_1 conference_table.n.01_1)
-        (not (touching box__of__sanitary_napkin.n.01_1 box__of__tissue.n.01_1))
+        (ontop salt__shaker.n.01_1 breakfast_table.n.01_1)
+        (ontop pepper__shaker.n.01_1 breakfast_table.n.01_1)
+        (not (nextto salt__shaker.n.01_1 pepper__shaker.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (touching ?box__of__sanitary_napkin.n.01_1 ?box__of__tissue.n.01_1)
-            (not (grasped ?agent.n.01_1 ?box__of__sanitary_napkin.n.01_1))
-            (not (grasped ?agent.n.01_1 ?box__of__tissue.n.01_1))
-            (pose_settled ?box__of__sanitary_napkin.n.01_1)
-            (pose_settled ?box__of__tissue.n.01_1)
+            (nextto ?salt__shaker.n.01_1 ?pepper__shaker.n.01_1)
+            (not (grasped ?agent.n.01_1 ?salt__shaker.n.01_1))
+            (not (grasped ?agent.n.01_1 ?pepper__shaker.n.01_1))
+            (pose_settled ?salt__shaker.n.01_1)
+            (pose_settled ?pepper__shaker.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?box__of__sanitary_napkin.n.01_1)
-        (pose_reached ?box__of__tissue.n.01_1)
+        (pose_reached ?salt__shaker.n.01_1)
+        (pose_reached ?pepper__shaker.n.01_1)
     )
 )

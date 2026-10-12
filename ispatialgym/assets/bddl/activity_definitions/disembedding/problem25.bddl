@@ -1,8 +1,8 @@
 (define (problem disembedding-25)
     (:domain ispatialgym)
-    (:alias disembedding-mug-mug_2_beaker_1-breakfast_table)
+    (:alias disembedding-pencil_case-sunglasses_1_pencil_1_pen_1-desk)
 
-    ; ground_isg 2.0.0: disembedding-mug-mug_2_beaker_1-breakfast_table (disembedding/disembedding.iddl; disembedding#25~T1/representative)
+    ; ground_isg 2.0.0: disembedding-pencil_case-sunglasses_1_pencil_1_pen_1-desk (disembedding/disembedding.iddl; disembedding#08~T5/representative)
     ; Disembedding. Target and distractors on the source tray, destination tray beside it on the support; the target ends on
     ; the destination tray (centre, init orientation), no distractor does. Distractor categories come from the icl pools
     ; (roles/constraints_compatible.csv same-category / other-category), the member count (1-3) from the customs list
@@ -10,39 +10,41 @@
     ; fixed models for now (tray uekqey source, tray hvlfig destination; roles/candidates.csv).
 
     (:objects
-        mug.n.04_1 mug.n.04_2 mug.n.04_3 - mug.n.04
-        beaker.n.02_1 - beaker.n.02
-        breakfast_table.n.01_1 - breakfast_table.n.01
+        pencil_box.n.01_1 - pencil_box.n.01
+        sunglasses.n.02_1 - sunglasses.n.02
+        pencil.n.01_1 - pencil.n.01
+        pen.n.01_1 - pen.n.01
+        desk.n.01_1 - desk.n.01
         tray.n.01_1 tray.n.01_2 - tray.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:groups
-        mug.n.04_2 mug.n.04_3 beaker.n.02_1 - distractors_group.n.01_1
+        sunglasses.n.02_1 pencil.n.01_1 pen.n.01_1 - distractors_group.n.01_1
     )
 
     (:init
-        (ontop tray.n.01_1 breakfast_table.n.01_1)
-        (ontop tray.n.01_2 breakfast_table.n.01_1)
-        (ontop mug.n.04_1 tray.n.01_1)
+        (ontop tray.n.01_1 desk.n.01_1)
+        (ontop tray.n.01_2 desk.n.01_1)
+        (ontop pencil_box.n.01_1 tray.n.01_1)
         (ontop distractors_group.n.01_1 tray.n.01_1)
-        (not (ontop mug.n.04_1 tray.n.01_2))
+        (not (ontop pencil_box.n.01_1 tray.n.01_2))
         (not (ontop distractors_group.n.01_1 tray.n.01_2))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?mug.n.04_1 ?tray.n.01_2)
+            (ontop ?pencil_box.n.01_1 ?tray.n.01_2)
             (not (ontop ?distractors_group.n.01_1 ?tray.n.01_2))
-            (not (grasped ?agent.n.01_1 ?mug.n.04_1))
-            (pose_settled ?mug.n.04_1)
+            (not (grasped ?agent.n.01_1 ?pencil_box.n.01_1))
+            (pose_settled ?pencil_box.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?mug.n.04_1)
+        (pose_reached ?pencil_box.n.01_1)
     )
 )

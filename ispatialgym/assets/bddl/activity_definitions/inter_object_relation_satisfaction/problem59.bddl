@@ -1,38 +1,41 @@
 (define (problem inter_object_relation_satisfaction-59)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-conference_table)
+    (:alias inter_object_relation_satisfaction-inside-sunflower-vase-bottom_cabinet)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-conference_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#01~T3/representative)
-    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
-    ; its init orientation; the partner stays where it was. Both poses measured.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside-sunflower-vase-bottom_cabinet (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#03~T5/representative)
+    ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is
+    ; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured. The
+    ; insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container; flowers held
+    ; by the upper stem) is required.
 
     (:objects
-        pack__of__kielbasa.n.01_1 - pack__of__kielbasa.n.01
-        platter.n.01_1 - platter.n.01
-        conference_table.n.01_1 - conference_table.n.01
+        sunflower.n.01_1 - sunflower.n.01
+        vase.n.01_1 - vase.n.01
+        cabinet.n.01_1 - cabinet.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop pack__of__kielbasa.n.01_1 conference_table.n.01_1)
-        (ontop platter.n.01_1 conference_table.n.01_1)
+        (ontop sunflower.n.01_1 cabinet.n.01_1)
+        (ontop vase.n.01_1 cabinet.n.01_1)
+        (not (inside sunflower.n.01_1 vase.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?pack__of__kielbasa.n.01_1 ?platter.n.01_1)
-            (not (grasped ?agent.n.01_1 ?pack__of__kielbasa.n.01_1))
-            (not (grasped ?agent.n.01_1 ?platter.n.01_1))
-            (pose_settled ?pack__of__kielbasa.n.01_1)
-            (pose_settled ?platter.n.01_1)
+            (inside ?sunflower.n.01_1 ?vase.n.01_1)
+            (not (grasped ?agent.n.01_1 ?sunflower.n.01_1))
+            (not (grasped ?agent.n.01_1 ?vase.n.01_1))
+            (pose_settled ?sunflower.n.01_1)
+            (pose_settled ?vase.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?pack__of__kielbasa.n.01_1)
-        (pose_reached ?platter.n.01_1)
+        (pose_reached ?sunflower.n.01_1)
+        (pose_reached ?vase.n.01_1)
     )
 )

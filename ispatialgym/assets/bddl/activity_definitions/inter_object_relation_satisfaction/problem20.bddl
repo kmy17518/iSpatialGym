@@ -1,38 +1,38 @@
 (define (problem inter_object_relation_satisfaction-20)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table)
+    (:alias inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-countertop)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#02~T1/representative)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-countertop (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#03~T1/representative)
     ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
     ; its init orientation; the partner stays where it was. Both poses measured.
 
     (:objects
-        apple.n.01_1 - apple.n.01
-        plate.n.04_1 - plate.n.04
-        breakfast_table.n.01_1 - breakfast_table.n.01
+        bar_soap.n.01_1 - bar_soap.n.01
+        soap_dish.n.01_1 - soap_dish.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop apple.n.01_1 breakfast_table.n.01_1)
-        (ontop plate.n.04_1 breakfast_table.n.01_1)
+        (ontop bar_soap.n.01_1 countertop.n.01_1)
+        (ontop soap_dish.n.01_1 countertop.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?apple.n.01_1 ?plate.n.04_1)
-            (not (grasped ?agent.n.01_1 ?apple.n.01_1))
-            (not (grasped ?agent.n.01_1 ?plate.n.04_1))
-            (pose_settled ?apple.n.01_1)
-            (pose_settled ?plate.n.04_1)
+            (ontop ?bar_soap.n.01_1 ?soap_dish.n.01_1)
+            (not (grasped ?agent.n.01_1 ?bar_soap.n.01_1))
+            (not (grasped ?agent.n.01_1 ?soap_dish.n.01_1))
+            (pose_settled ?bar_soap.n.01_1)
+            (pose_settled ?soap_dish.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?apple.n.01_1)
-        (pose_reached ?plate.n.04_1)
+        (pose_reached ?bar_soap.n.01_1)
+        (pose_reached ?soap_dish.n.01_1)
     )
 )

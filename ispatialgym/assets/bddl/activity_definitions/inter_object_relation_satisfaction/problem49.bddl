@@ -1,39 +1,40 @@
 (define (problem inter_object_relation_satisfaction-49)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-nextto-parsnip-carrot-countertop)
+    (:alias inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-bar)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-parsnip-carrot-countertop (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#03~T2/representative)
-    ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
-    ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-bar (inter_object_relation_satisfaction/under_small_scale.iddl; inter_object_relation_satisfaction-under_small_scale#04~T4/representative)
+    ; IORS - under (small-scale). Both objects on the support; the manipulated target (glass, teacup, fries, bottle) is set
+    ; down centred on the partner (coaster, saucer, platter, tray) so that the PARTNER ends under the target. Argument order
+    ; is therefore (under partner target). Both poses measured.
 
     (:objects
-        parsnip.n.03_1 - parsnip.n.03
-        carrot.n.03_1 - carrot.n.03
+        spatula.n.01_1 - spatula.n.01
+        sheet.n.02_1 - sheet.n.02
         countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop parsnip.n.03_1 countertop.n.01_1)
-        (ontop carrot.n.03_1 countertop.n.01_1)
-        (not (nextto parsnip.n.03_1 carrot.n.03_1))
+        (ontop spatula.n.01_1 countertop.n.01_1)
+        (ontop sheet.n.02_1 countertop.n.01_1)
+        (not (under sheet.n.02_1 spatula.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (nextto ?parsnip.n.03_1 ?carrot.n.03_1)
-            (not (grasped ?agent.n.01_1 ?parsnip.n.03_1))
-            (not (grasped ?agent.n.01_1 ?carrot.n.03_1))
-            (pose_settled ?parsnip.n.03_1)
-            (pose_settled ?carrot.n.03_1)
+            (under ?sheet.n.02_1 ?spatula.n.01_1)
+            (not (grasped ?agent.n.01_1 ?spatula.n.01_1))
+            (not (grasped ?agent.n.01_1 ?sheet.n.02_1))
+            (pose_settled ?spatula.n.01_1)
+            (pose_settled ?sheet.n.02_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?parsnip.n.03_1)
-        (pose_reached ?carrot.n.03_1)
+        (pose_reached ?spatula.n.01_1)
+        (pose_reached ?sheet.n.02_1)
     )
 )

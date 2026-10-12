@@ -1,0 +1,39 @@
+(define (problem inter_object_relation_satisfaction-97)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-touching-hardback-hardback-shelf)
+
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-hardback-hardback-shelf (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#03~T2/representative)
+    ; IORS - touching. Target grasped and set down next to the partner (partner on the robot's left), then pushed against it
+    ; while the other gripper braces the partner's far side (push and brace computed geometrically, no artefact); the
+    ; partner must not move (> 5 mm) at the goal.
+
+    (:objects
+        hardback.n.01_1 hardback.n.01_2 - hardback.n.01
+        shelf.n.01_1 - shelf.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop hardback.n.01_1 shelf.n.01_1)
+        (ontop hardback.n.01_2 shelf.n.01_1)
+        (not (touching hardback.n.01_1 hardback.n.01_2))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (touching ?hardback.n.01_1 ?hardback.n.01_2)
+            (not (grasped ?agent.n.01_1 ?hardback.n.01_1))
+            (not (grasped ?agent.n.01_1 ?hardback.n.01_2))
+            (pose_settled ?hardback.n.01_1)
+            (pose_settled ?hardback.n.01_2)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?hardback.n.01_1)
+        (pose_reached ?hardback.n.01_2)
+    )
+)

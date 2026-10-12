@@ -1,8 +1,8 @@
 (define (problem disembedding-24)
     (:domain ispatialgym)
-    (:alias disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table)
+    (:alias disembedding-cellulose_tape-cookie_cutter_1_coaster_1_cap_1-cubicle)
 
-    ; ground_isg 2.0.0: disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table (disembedding/disembedding.iddl; disembedding#24~T1/representative)
+    ; ground_isg 2.0.0: disembedding-cellulose_tape-cookie_cutter_1_coaster_1_cap_1-cubicle (disembedding/disembedding.iddl; disembedding#07~T4/representative)
     ; Disembedding. Target and distractors on the source tray, destination tray beside it on the support; the target ends on
     ; the destination tray (centre, init orientation), no distractor does. Distractor categories come from the icl pools
     ; (roles/constraints_compatible.csv same-category / other-category), the member count (1-3) from the customs list
@@ -10,39 +10,41 @@
     ; fixed models for now (tray uekqey source, tray hvlfig destination; roles/candidates.csv).
 
     (:objects
-        can__of__soda.n.01_1 can__of__soda.n.01_2 can__of__soda.n.01_3 - can__of__soda.n.01
-        can__of__baking_mix.n.01_1 - can__of__baking_mix.n.01
-        breakfast_table.n.01_1 - breakfast_table.n.01
+        cellulose_tape.n.01_1 - cellulose_tape.n.01
+        cookie_cutter.n.01_1 - cookie_cutter.n.01
+        coaster.n.03_1 - coaster.n.03
+        cap.n.02_1 - cap.n.02
+        carrel.n.02_1 - carrel.n.02
         tray.n.01_1 tray.n.01_2 - tray.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:groups
-        can__of__soda.n.01_2 can__of__soda.n.01_3 can__of__baking_mix.n.01_1 - distractors_group.n.01_1
+        cookie_cutter.n.01_1 coaster.n.03_1 cap.n.02_1 - distractors_group.n.01_1
     )
 
     (:init
-        (ontop tray.n.01_1 breakfast_table.n.01_1)
-        (ontop tray.n.01_2 breakfast_table.n.01_1)
-        (ontop can__of__soda.n.01_1 tray.n.01_1)
+        (ontop tray.n.01_1 carrel.n.02_1)
+        (ontop tray.n.01_2 carrel.n.02_1)
+        (ontop cellulose_tape.n.01_1 tray.n.01_1)
         (ontop distractors_group.n.01_1 tray.n.01_1)
-        (not (ontop can__of__soda.n.01_1 tray.n.01_2))
+        (not (ontop cellulose_tape.n.01_1 tray.n.01_2))
         (not (ontop distractors_group.n.01_1 tray.n.01_2))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?can__of__soda.n.01_1 ?tray.n.01_2)
+            (ontop ?cellulose_tape.n.01_1 ?tray.n.01_2)
             (not (ontop ?distractors_group.n.01_1 ?tray.n.01_2))
-            (not (grasped ?agent.n.01_1 ?can__of__soda.n.01_1))
-            (pose_settled ?can__of__soda.n.01_1)
+            (not (grasped ?agent.n.01_1 ?cellulose_tape.n.01_1))
+            (pose_settled ?cellulose_tape.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?can__of__soda.n.01_1)
+        (pose_reached ?cellulose_tape.n.01_1)
     )
 )
