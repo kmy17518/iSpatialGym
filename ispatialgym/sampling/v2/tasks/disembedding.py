@@ -66,6 +66,10 @@ SUBTASK = "disembedding"
 #: within ``REST_TILT_MAX_DEG`` of vertical after the measurement settle
 REST_Z_TOL = 0.01
 REST_TILT_MAX_DEG = 3.0
+#: Owner 2026-10-11 ~20:25: spots of the tray-floor measurement drop - the free cell farthest from any non-free cell or the top's
+#: edge, then the next best ones well apart; the template is rejected only when the tray rests at none of them (a counter's
+#: free-cell centroid can lie on its sink, burner or microwave).
+MEASURE_DROP_SPOTS = 3
 #: floor cells = tray hits within this band of the floor level (10 % quantile of the hit heights); at least ``FLOOR_MIN_CELLS``.
 #: 2026-09-24: 4 mm -> 1.5 mm and the raster eroded by one cell (``FLOOR_ERODE_CELLS``): the 4 mm band (kept for the 1.6 mm
 #: step of the retired gsxbym floor) admitted the first rows of the rim fillet of uekqey / hvlfig (0.5-4 mm up, ~5 % of the
@@ -233,35 +237,77 @@ class TrayFloor:
         return floor_z, keep
 
     @staticmethod
-    def measure(s, tray, top, res: float = 0.01) -> "TrayFloor":
-        """Place the tray on the free centre of the top, raycast a ``res`` raster from above, keep the cells whose first
-        hit is the tray at its lowest inner level (10 % quantile of the hit heights + 4 mm), park the tray again.
+    def drop_spots(top, half_diag: float, n: int = MEASURE_DROP_SPOTS) -> List[Tuple[th.Tensor, float]]:
+        """Up to ``n`` measurement-drop points on ``top`` as ``[(xy, clearance_m)]``: free cells ranked by their clearance - the
+        distance to the nearest non-free cell or past the top's edge (a distance transform of the free grid) - each next one at
+        least 2 x ``half_diag`` from the chosen ones (else ``half_diag``). A top without free cells gives its raster centre."""
+        from scipy.ndimage import distance_transform_edt
 
-        The tray is re-parked first so that ``local_hull`` reads a consistent body (see :func:`repark_spawned`), and after
-        the settle it must rest on the top (bottom within ``REST_Z_TOL`` of the top, tilt < ``REST_TILT_MAX_DEG``): a tray
-        that fell through or off the support is a ``Reject("support")`` with the geometry, not a raster of nothing."""
+        free = top.free.cpu().numpy().astype(bool)
+        if not free.any():
+            return [(th.tensor([float(top.xs.mean()), float(top.ys.mean())]), 0.0)]
+        res = float(top.resolution)
+        clear = distance_transform_edt(np.pad(free, 1))[1:-1, 1:-1] * res - res / 2
+        idx = np.argwhere(free)
+        order = np.lexsort((np.arange(len(idx)), -clear[idx[:, 0], idx[:, 1]]))
+        pts = th.stack([top.xs[th.as_tensor(idx[:, 0])], top.ys[th.as_tensor(idx[:, 1])]], dim=1).float()
+        chosen: List[int] = []
+        for sep in (2.0 * half_diag, half_diag):
+            for k in order:
+                if len(chosen) == n:
+                    break
+                if k in chosen or any(float(th.linalg.norm(pts[k] - pts[c])) < sep for c in chosen):
+                    continue
+                chosen.append(int(k))
+        return [(pts[k].clone(), float(clear[idx[k, 0], idx[k, 1]])) for k in chosen]
+
+    @staticmethod
+    def rest_drop(s, tray, top, hull, spots) -> Tuple[th.Tensor, th.Tensor, th.Tensor, str]:
+        """Drop the tray at each of ``spots`` in turn (identity orientation, bottom on the top, 20 physics steps) until it rests on
+        the top (bottom within ``REST_Z_TOL``, tilt <= ``REST_TILT_MAX_DEG``): ``(rp, rq, placed, where)``. The tray is parked
+        between the drops; resting at none of them is a ``Reject("support")`` that lists every drop."""
+        quat = C.IDENTITY_QUAT.clone()
+        slot = list(s.world.spawned).index(tray.name)
+        tried = []
+        for i, (xy, clear) in enumerate(spots):
+            if i:
+                s.world.park(tray, slot)
+            pos = th.tensor([float(xy[0]), float(xy[1]), top.z + s.world.bottom_offset(hull, quat) + TT.Z_OFFSET])
+            tray.set_position_orientation(pos, quat)
+            s.world.activate(tray)
+            s.world.step_physics(20, still=[s.robot])
+            rp, rq = tray.get_position_orientation()
+            rp, rq = rp.float(), rq.float()
+            bottom = float(C.transform_points((rp, rq), hull)[:, 2].min())
+            tilt = tilt_deg(rq)
+            where = (f"tray at {[round(float(v), 3) for v in rp.tolist()]} (placed at {[round(float(v), 3) for v in pos.tolist()]}, clearance {clear:.2f} m), "
+                     f"bottom z {bottom:.3f}, tilt {tilt:.1f} deg, top z {float(top.z):.3f}")
+            if abs(bottom - float(top.z)) <= REST_Z_TOL and tilt <= REST_TILT_MAX_DEG:
+                if i:
+                    log.info("%s: the measurement drop rests at spot %d of %d (%s)", tray.name, i + 1, len(spots), where)
+                return rp, rq, pos, where
+            tried.append(where)
+        raise Reject("support", f"{tray.name}: did not rest on the top at any of {len(tried)} drop spots ({'; '.join(tried)})")
+
+    @staticmethod
+    def measure(s, tray, top, res: float = 0.01) -> "TrayFloor":
+        """Drop the tray on the free cell of the top with the most clearance (:meth:`drop_spots`, the next spots when it does
+        not rest there: :meth:`rest_drop`), raycast a ``res`` raster from above, keep the cells whose first hit is the tray at
+        its lowest inner level (10 % quantile of the hit heights + 4 mm), park the tray again.
+
+        The tray is re-parked first so that ``local_hull`` reads a consistent body (see :func:`repark_spawned`). A tray that
+        rests at none of the drop spots is a ``Reject("support")`` with the geometry, not a raster of nothing."""
         s.world.park(tray, list(s.world.spawned).index(tray.name))
         hull = s.world.local_hull(tray)
         if len(hull) == 0:
             raise Reject("support", f"{tray.name}: no collision hull")
-        cells = top.cells(free_only=True)
-        centre = cells.mean(dim=0) if len(cells) else th.tensor([float(top.xs.mean()), float(top.ys.mean())])
-        quat = C.IDENTITY_QUAT.clone()
-        pos = th.tensor([float(centre[0]), float(centre[1]), top.z + s.world.bottom_offset(hull, quat) + TT.Z_OFFSET])
-        tray.set_position_orientation(pos, quat)
-        s.world.activate(tray)
-        s.world.step_physics(20, still=[s.robot])
+        ext = hull.max(dim=0).values - hull.min(dim=0).values
+        spots = TrayFloor.drop_spots(top, 0.5 * math.hypot(float(ext[0]), float(ext[1])))
         try:
-            rp, rq = tray.get_position_orientation()
-            rp, rq = rp.float(), rq.float()
+            rp, rq, pos, where = TrayFloor.rest_drop(s, tray, top, hull, spots)
             # raster over the hull's bounds at the settled pose (``tray.aabb`` lags physics-only steps; the PhysX pose does not)
             world_hull = C.transform_points((rp, rq), hull)
             lo, hi = world_hull.min(dim=0).values, world_hull.max(dim=0).values
-            tilt = tilt_deg(rq)
-            where = (f"tray at {[round(float(v), 3) for v in rp.tolist()]} (placed at {[round(float(v), 3) for v in pos.tolist()]}), hull z {float(lo[2]):.3f}..{float(hi[2]):.3f}, "
-                     f"tilt {tilt:.1f} deg, top z {float(top.z):.3f}")
-            if abs(float(lo[2]) - float(top.z)) > REST_Z_TOL or tilt > REST_TILT_MAX_DEG:
-                raise Reject("support", f"{tray.name}: not resting on the top after the settle ({where})")
             xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
             ys = th.arange(float(lo[1]) + res / 2, float(hi[1]), res)
             gx, gy = th.meshgrid(xs, ys, indexing="ij")

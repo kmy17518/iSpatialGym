@@ -390,6 +390,92 @@ def test_tray_rest_tilt_and_repark_slots():
     assert S.world.calls == [(o, list(S.world.spawned).index(n)) for n, o in S.world.spawned.items()]
 
 
+def _ring_top():
+    """A 1.2 x 0.8 m counter whose free cells ring an occupied middle (a sink / burner block at x 0.4-0.8, y 0.24-0.56)."""
+    from ispatialgym.sampling.sim_utils import SupportTop
+
+    xs, ys = th.arange(60) * 0.02, th.arange(40) * 0.02
+    occupied = th.zeros(60, 40, dtype=th.bool)
+    occupied[20:40, 12:28] = True
+    return SupportTop("countertop_x_0", xs, ys, th.ones(60, 40, dtype=th.bool), occupied, 0.9, 0.0)
+
+
+def test_tray_measurement_drop_spots_avoid_an_occupied_middle():
+    """Owner 2026-10-11 ~20:25: the measurement drop went to the free cells' centroid, which on a counter with a sink, burner or
+    microwave in the middle lies on that object (disembedding#02 c1 / c5, #06 c1 / c4). The spots are free cells with the most
+    clearance (distance transform), the first one at least the tray's half-diagonal from any occupied cell or the edge, and the
+    next ones well apart."""
+    D = _disembedding()
+    top = _ring_top()
+    assert not top.contains(top.cells(free_only=True).mean(dim=0))  # the old drop point: on the occupied middle
+    half_diag = 0.12
+    spots = D.TrayFloor.drop_spots(top, half_diag)
+    assert len(spots) == D.MEASURE_DROP_SPOTS == 3
+    assert all(top.contains(xy) for xy, _ in spots) and spots[0][1] >= half_diag
+    assert [round(c, 3) for _, c in spots] == sorted((round(c, 3) for _, c in spots), reverse=True)
+    for (a, _), (b, _) in itertools.combinations(spots, 2):
+        assert float(th.linalg.norm(a - b)) >= half_diag
+    empty = _ring_top()
+    empty.occupied[:] = True
+    assert len(D.TrayFloor.drop_spots(empty, half_diag)) == 1  # no free cell: the raster centre, as before
+
+
+def test_tray_measurement_drop_tries_the_next_spot_after_a_failed_rest():
+    """A drop that does not rest (the tray sank into a sink / tipped off a burner) parks the tray and drops it at the next spot;
+    resting at none of them is the support rejection that lists every drop."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.sim_utils import Reject
+
+    D = _disembedding()
+    top = _ring_top()
+    hull = _box(0.3, 0.2, 0.04)
+
+    class World:
+        spawned = {"target_0": None, "source_tray_0": None}
+
+        def __init__(self):
+            self.parks = []
+
+        def park(self, obj, slot):
+            self.parks.append(slot)
+
+        def bottom_offset(self, hull, quat):
+            return 0.02
+
+        def activate(self, obj):
+            pass
+
+        def step_physics(self, n, still=()):
+            pass
+
+    class Tray:
+        name = "source_tray_0"
+
+        def __init__(self, sinks):
+            self.sinks, self.drops, self.placed = sinks, 0, []
+
+        def set_position_orientation(self, pos, quat):
+            self.drops += 1
+            self.placed.append(pos.clone())
+
+        def get_position_orientation(self):
+            p = self.placed[-1].clone()
+            if self.drops <= self.sinks:
+                p[2] -= 0.05
+            return p, C.IDENTITY_QUAT.clone()
+
+    spots = D.TrayFloor.drop_spots(top, 0.18)
+    s = SimpleNamespace(world=World(), robot=None)
+    tray = Tray(sinks=1)
+    rp, rq, placed, where = D.TrayFloor.rest_drop(s, tray, top, hull, spots)
+    assert tray.drops == 2 and th.allclose(placed[:2], spots[1][0]) and s.world.parks == [1]
+    s2 = SimpleNamespace(world=World(), robot=None)
+    with pytest.raises(Reject) as err:
+        D.TrayFloor.rest_drop(s2, Tray(sinks=3), top, hull, spots)
+    assert err.value.reason == "support" and "did not rest on the top at any of 3 drop spots" in str(err.value) and s2.world.parks == [1, 1]
+
+
 def _box(dx, dy, dz):
     return th.tensor([[sx * dx / 2, sy * dy / 2, sz * dz / 2] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)])
 
