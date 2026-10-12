@@ -344,6 +344,10 @@ class ExecuteConfig:
     pre_pose_standoff_m: float = 0.08
     #: (owner 2026-09-18 12:42) no standoff when the pre-pose is already this clear of every support (m): planned directly
     pre_pose_standoff_skip_m: float = 0.08
+    #: (owner 2026-10-12 item 2b, axial#02) no standoff either for a brace / push pre-contact standing at least this far ABOVE every
+    #: support near it - inside their footprints, over their tops (a table / desk contact, not a wall) - planned directly as above
+    #: (m; None = off, only ``pre_pose_standoff_skip_m``; the owner's value 0.06)
+    pre_pose_standoff_skip_above_m: Optional[float] = None
     #: (owner 2026-09-18 12:42) a straight push's pre-pose sits this far above / before its first contact pose (m; None = the record's 10 cm)
     push_pre_dist_m: Optional[float] = 0.04
     #: the carry leg lift end -> pre-place (FOV rule (b), owner 2026-09-16 17:10): ``"straight"`` = a straight Cartesian
@@ -685,6 +689,27 @@ def support_clearance(state, pose, objects: Sequence[Any]) -> Optional[float]:
     return best
 
 
+def height_above_supports(pose, objects: Sequence[Any], near: float = 0.15) -> Optional[float]:
+    """How far ``pose``'s position stands above the ``objects`` near it (within ``near`` of their AABBs, ``escape_direction``'s
+    rule): the smallest height over their tops when it stands inside every such footprint, above the top; None when one of them
+    is beside or over it (a wall, a board overhead) or none is near."""
+    p = as_world_pose(pose)[0]
+    best = None
+    for o in objects:
+        try:
+            lo, hi = o.aabb
+        except Exception:  # noqa: BLE001
+            continue
+        lo, hi = C.as_tensor(lo).float(), C.as_tensor(hi).float()
+        if float(th.linalg.norm(p - th.minimum(th.maximum(p, lo), hi))) > near:
+            continue
+        if not (bool(th.all(p[:2] >= lo[:2])) and bool(th.all(p[:2] <= hi[:2])) and float(p[2]) > float(hi[2])):
+            return None
+        h = float(p[2] - hi[2])
+        best = h if best is None else min(best, h)
+    return best
+
+
 def _counted(gen: Iterator[th.Tensor], n: List[int]) -> Iterator[th.Tensor]:
     """``gen``'s actions, counted in ``n[0]`` (did a motion that raised move the robot first?)."""
     try:
@@ -696,7 +721,7 @@ def _counted(gen: Iterator[th.Tensor], n: List[int]) -> Iterator[th.Tensor]:
 
 
 def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any], cfg: "ExecuteConfig",
-                   ignore_links: Sequence[Any] = (), accept_other_branch: bool = False) -> Iterator[th.Tensor]:
+                   ignore_links: Sequence[Any] = (), accept_other_branch: bool = False, skip_above_m: Optional[float] = None) -> Iterator[th.Tensor]:
     """Reach a contact pre-pose that the sampler checked with its supports ignored (a wall / table 2 cm from the
     pads). The supports leave the collision world only for the **last straight leg**: the trajopt goes to a standoff
     ``pre + standoff · n`` (``n`` away from the supports) with the supports present — a trajopt with the wall ignored
@@ -705,7 +730,9 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
     A standoff that does not track from the witness ``q_hint`` (owner 2026-10-12, axial#02) is not planned first: the pre-pose
     is planned straight to with the witness, the supports present (the skip branch's call); the bare standoff only when that
     plan fails before the robot moved. ``ctx["pre_pose_standoff"]["branch"]``: witness / direct / planner.
-    ``accept_other_branch``: passed to ``Motions.arm_to`` for the planned legs to the pre-pose (a push, owner 2026-09-26)."""
+    ``accept_other_branch``: passed to ``Motions.arm_to`` for the planned legs to the pre-pose (a push, owner 2026-09-26).
+    ``skip_above_m``: a pre-pose at least this far above every support near it is planned directly too (the brace / push callers
+    pass ``pre_pose_standoff_skip_above_m``)."""
     if not supports:
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links), accept_other_branch=accept_other_branch)
         if getattr(motions, "last_relaxed_links", None):
@@ -718,11 +745,13 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
     clearance = support_clearance(state, pre, supports)
-    if clearance is not None and clearance >= cfg.pre_pose_standoff_skip_m:
+    above = height_above_supports(pre, supports) if skip_above_m is not None else None
+    if (clearance is not None and clearance >= cfg.pre_pose_standoff_skip_m) or (above is not None and above >= skip_above_m):
         # owner 2026-09-18 12:42 (1): a pre-pose already this clear of its supports (a table push's pre-pose 10-16 cm
         # above the table) is planned directly with the supports present - the standoff excursion (up 8 cm, then down
         # again) was a redundant raise before the descent; the wall contacts (pre-pose 2-5 cm off the wall) keep it
-        ctx["pre_pose_standoff"] = {"skipped": True, "clearance_m": round(clearance, 3)}
+        ctx["pre_pose_standoff"] = {"skipped": True, "clearance_m": None if clearance is None else round(clearance, 3),
+                                    **({"above_m": round(above, 3)} if above is not None else {})}
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through), ignore_links=list(ignore_links), accept_other_branch=accept_other_branch)
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
@@ -1139,6 +1168,9 @@ def contact_route_goal(motions: Motions, state, arm: str, contact: Dict[str, Any
     clearance = support_clearance(state, pre, supports)
     if clearance is not None and clearance >= cfg.pre_pose_standoff_skip_m:
         return q_w, f"the {contact['name']}'s {key} witness ({clearance:.3f} m clear of its supports)"
+    above = height_above_supports(pre, supports) if cfg.pre_pose_standoff_skip_above_m is not None else None
+    if above is not None and above >= cfg.pre_pose_standoff_skip_above_m:
+        return q_w, f"the {contact['name']}'s {key} witness ({above:.3f} m above its supports)"
     p, q = as_world_pose(pre)
     dense = motions._densify((p, q), [(p + n * cfg.pre_pose_standoff_m, q)])
     res = motions.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: wp} for wp in dense], q_start=q_w, pos_tol=motions.cfg.diff_ik_pos_tol,
@@ -3859,7 +3891,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         with _transit(ctx, motions, state, action, "pre_contact", target=obj):
             # owner 2026-09-26 (axial 0926-043254 / 051919): a push's legs are Cartesian and closed-loop from wherever the hand is -
             # a pre-contact witness trajopt cannot reach (another branch) is replaced by cuRobo's own branch instead of failing
-            yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign, accept_other_branch=True)
+            yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign, accept_other_branch=True,
+                                      skip_above_m=cfg.pre_pose_standoff_skip_above_m)
     shift = _push_goal_follow(action, state, ctx, cfg) if getattr(action, "follow", None) else None
     if shift is not None:
         # after the pad's start was placed against the object where it is: the goal (every stop, residual and re-push below
@@ -4182,7 +4215,7 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
     # the transit to the brace's pre-contact (owner 2026-09-26, oracle.protection): the goal objects and the braced object are protected
     with _transit(ctx, motions, state, action, "pre_contact", target=action.contact.object):
         try:
-            yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], q_hint_pre, ctx, cfg)
+            yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], q_hint_pre, ctx, cfg, skip_above_m=cfg.pre_pose_standoff_skip_above_m)
         except SkillError as e:
             if at_goal is None or e.reason != "plan_failed":
                 raise
@@ -4190,7 +4223,7 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
             log.warning("brace(%s): the goal-edge pre pose is not reachable (%s) - bracing at the recorded contact", action.contact.object, e.message)
             targets.update(recorded)
             ctx["brace_at_goal"] = {**ctx.get("brace_at_goal", {}), "fallback": "recorded contact", "reason": e.message[:160]}
-            yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
+            yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg, skip_above_m=cfg.pre_pose_standoff_skip_above_m)
     _hook(ctx, "fov")(True)
     obj = action.contact.object
     if cfg.brace_touch_stop_m > 0:

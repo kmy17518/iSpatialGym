@@ -299,6 +299,10 @@ def push_pre_standoff(sampler, arm: str, q_pre: th.Tensor, pre_pose, supports: S
     if clearance is not None and clearance >= ecfg.pre_pose_standoff_skip_m:
         rep["branch"] = "skipped"
         return True, f"the pre-contact stands {clearance:.3f} m clear of its supports (planned directly)", rep
+    above = E.height_above_supports(pre, supports) if ecfg.pre_pose_standoff_skip_above_m is not None else None
+    if above is not None and above >= ecfg.pre_pose_standoff_skip_above_m:
+        rep.update({"branch": "skipped", "above_m": round(above, 4)})
+        return True, f"the pre-contact stands {above:.3f} m above its supports (planned directly)", rep
     kit = sampler.kit
     frame, idx = M.EEF_LINK[arm], kit.robot.arm_control_idx[arm]
     q_w = th.as_tensor(q_pre).reshape(-1).float().clone()

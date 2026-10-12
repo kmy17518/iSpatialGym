@@ -387,7 +387,10 @@ with only the pushed object removed (the straight plan), else when the standoff 
 present; rejected `approach_untrackable` when none holds. The pre witness records `standoff: {clearance_m, branch}`.
 Not modelled: an articulated push, a lever slide, a push with the other arm locked at its brace (the oracle relaxes that
 arm's start collisions), a straight push whose pre-contact the oracle lowers (no witness: the bare standoff as before);
-`ISG_PUSH_STANDOFF_CHECK=off` switches the check off.
+`ISG_PUSH_STANDOFF_CHECK=off` switches the check off. `ExecuteConfig.pre_pose_standoff_skip_above_m` (owner 2026‑10‑12
+item 2b; default None = off, the owner's value 0.06) also plans a brace / push pre-contact directly when it stands at least
+that far above every support near it (inside the footprints, over the tops — a desk, not a wall); grasp pre-poses keep the
+8 cm rule. The program check follows the knob.
 
 **One chain, as the oracle runs it** (owner 2026-09-24). The targets of an action are checked in the order the arm
 moves through them, and every leg leaves from the configuration the arm is actually in: a chain whose first pose is

@@ -90,10 +90,10 @@ class _Motions:
         yield th.zeros(3)
 
 
-def _reach(motions: _Motions, pre, supports, q_hint: Optional[th.Tensor], through=(), accept_other_branch: bool = True, cfg=None):
+def _reach(motions: _Motions, pre, supports, q_hint: Optional[th.Tensor], through=(), accept_other_branch: bool = True, cfg=None, skip_above=None):
     ctx: Dict[str, Any] = {}
     n = len(list(EX.reach_pre_pose(motions, SimpleNamespace(), ARM, pre, supports, list(through), q_hint, ctx, cfg or EX.ExecuteConfig(),
-                                   accept_other_branch=accept_other_branch)))
+                                   accept_other_branch=accept_other_branch, skip_above_m=skip_above)))
     return n, ctx
 
 
@@ -319,3 +319,49 @@ def test_program_check_models_the_pre_contact_the_oracle_keeps_its_witness_for()
     assert PC.push_keeps_recorded_pre(SimpleNamespace(mid=object(), extra={}), far, init)
     assert PC.push_keeps_recorded_pre(SimpleNamespace(mid=None, extra={"pose_class": "push_blade_45"}), far, init)
     assert not PC.push_keeps_recorded_pre(SimpleNamespace(mid=None, extra={"pose_class": "push_blade_15"}), far, init)
+
+
+# ------------------------------------------------------------------------------------------------ 2b: the skip-above knob (default off)
+
+
+def test_the_skip_above_knob_is_off_by_default_and_plans_a_pre_contact_above_its_support_directly():
+    assert EX.ExecuteConfig().pre_pose_standoff_skip_above_m is None
+    pre, desk, wit = _pre(0.072), _desk(), _witness()
+    m = _Motions(track=True)  # off: the standoff as before
+    _, ctx = _reach(m, pre, [desk], wit, through=["book"], skip_above=None)
+    assert [c["fn"] for c in m.calls] == ["arm_to", "arm_along"] and ctx["pre_pose_standoff"]["branch"] == "witness"
+    m = _Motions(track=True)  # 0.06: 7.2 cm above the desk -> the skip branch's call, no standoff IK
+    _, ctx = _reach(m, pre, [desk], wit, through=["book"], skip_above=0.06)
+    assert [c["fn"] for c in m.calls] == ["arm_to"] and m.calls[0]["q_hint"] is wit and m.calls[0]["ignore_objects"] == ["book"] and m.ik_calls == 0
+    assert ctx["pre_pose_standoff"] == {"skipped": True, "clearance_m": pytest.approx(0.072, abs=1e-3), "above_m": pytest.approx(0.072, abs=1e-3)}
+    m = _Motions(track=True)  # 5 cm above: below the knob
+    _, ctx = _reach(m, _pre(0.05), [desk], wit, through=["book"], skip_above=0.06)
+    assert ctx["pre_pose_standoff"]["branch"] == "witness"
+    # 7 cm before a wall (beside it, not above): the standoff as before; above the desk with a wall 5 cm beside it: too
+    wall = _Support("walls_0", [0.57, 0.0, 0.0], [0.7, 1.0, 2.0])
+    m = _Motions(track=True)
+    _, ctx = _reach(m, SimpleNamespace(position=[0.5, 0.5, 1.4], orientation=list(QUAT)), [wall], wit, skip_above=0.06)
+    assert ctx["pre_pose_standoff"]["branch"] == "witness" and ctx["pre_pose_standoff"]["direction"] == [-1.0, 0.0, 0.0]
+    m = _Motions(track=True)
+    _, ctx = _reach(m, pre, [desk, _Support("walls_1", [0.55, 0.0, 0.0], [0.7, 1.0, 2.0])], wit, skip_above=0.06)
+    assert ctx["pre_pose_standoff"]["branch"] == "witness"
+    assert EX.height_above_supports(EX.as_world_pose(pre), [desk]) == pytest.approx(0.072, abs=1e-3)
+    assert EX.height_above_supports(EX.as_world_pose(_pre(0.20)), [desk]) is None  # none near
+
+
+def test_contact_route_goal_and_the_program_check_follow_the_knob(monkeypatch):
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    desk, wit = _desk(), _witness()
+    state = SimpleNamespace(contact_supports=lambda name: [desk])
+    contact = {"name": "push", "object": "paperback_book.n.01_1", "targets": {"pre": _pre(0.072)}, "witnesses": {"pre": wit}}
+    m = _Motions(track=True)
+    goal, label = EX.contact_route_goal(m, state, ARM, contact, th.zeros(len(M.ALL_JOINTS)), EX.ExecuteConfig(pre_pose_standoff_skip_above_m=0.06))
+    assert th.allclose(goal[IDX[ARM]], wit[IDX[ARM]]) and label == "the push's pre witness (0.072 m above its supports)" and m.ik_calls == 0
+    ok, _, rep = _pc(_PcSampler())  # off: the decision runs (nothing works in this fake -> rejected)
+    assert not ok and "above_m" not in rep
+    real = EX.ExecuteConfig
+    monkeypatch.setattr(EX, "ExecuteConfig", lambda: real(pre_pose_standoff_skip_above_m=0.06))
+    s = _PcSampler()
+    ok, why, rep = _pc(s)
+    assert ok and rep["branch"] == "skipped" and rep["above_m"] == pytest.approx(0.072, abs=1e-3) and s.calls == [] and "above its supports" in why
