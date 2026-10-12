@@ -237,7 +237,9 @@ cannot meet furniture in the demo that did not exist while sampling, and segment
 objects through doorways and glass instead of sky. v1 loaded the task rooms only because of the renderer crash
 described in 3.4; that guard no longer depends on the room set. Table tasks sample in the
 stable scene minus the chairs within 1.0 m of the support (`scene_variants`, `freed_footprints` recorded and applied
-by evaluation and by the oracle's navigation map). The obstructed camera-relocalization variant records the obstacle
+by evaluation and by the oracle's navigation map). "Chairs" are the categories of `scene_variants.CHAIR_CATEGORIES`
+(straight / arm / swivel / folding / high / rocking / office chairs, stools, bar stools and, since 2026-10-12, ottomans);
+the reach-band cache key includes the parked objects. The obstructed camera-relocalization variant records the obstacle
 footprint as `blocked_footprints` in the same structure.
 
 ### 3.2 Support and placement

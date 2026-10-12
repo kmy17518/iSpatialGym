@@ -33,7 +33,9 @@ import torch as th
 from ispatialgym.sampling import knowledge as K
 
 #: categories treated as "chairs" around a work table
-CHAIR_CATEGORIES = ("straight_chair", "armchair", "swivel_chair", "folding_chair", "highchair", "stool", "bar_stool", "rocking_chair", "office_chair")
+#: chair-like objects parked when within ``chair_distance`` (1.0 m) of the work table; "ottoman" added by the owner 2026-10-12 (A6)
+CHAIR_CATEGORIES = ("straight_chair", "armchair", "swivel_chair", "folding_chair", "highchair", "stool", "bar_stool", "rocking_chair", "office_chair",
+                    "ottoman")
 
 
 def _quat_to_yaw(q: Sequence[float]) -> float:
