@@ -648,6 +648,85 @@ def test_disembedding_grasp_ignores_the_distractors_and_parts():
     assert D.Disembedding.pick_world(s) == "ctx" and seen == [["P1", "P2"]]
 
 
+def _destination_fit_sampler(D):
+    """A disembedding sampler on a synthetic world: a 0.7 x 1.95 m top (x 0..0.7 into the table, y -1.0..0.95 along the edge, the
+    robot at x -0.45 facing +x, its left = +y), a pinhole init camera at x -0.25 with a 90 deg horizontal view (the image border at
+    |y| = depth from the camera, image right = the robot's right), the source tray 0.565 x 0.396 m and the destination 0.44 x 0.27 m."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
+
+    class Top:
+        z = 0.75
+
+        def polygon_supported(self, fp, margin=0.0):
+            return bool((fp[:, 0] >= margin).all() and (fp[:, 0] <= 0.7 - margin).all() and (fp[:, 1] >= -1.0 + margin).all()
+                        and (fp[:, 1] <= 0.95 - margin).all())
+
+    class Camera:
+        width = 1000
+
+        def project(self, cam, pts):
+            depth = pts[:, 0] + 0.25
+            return th.stack([500.0 - 500.0 * pts[:, 1] / depth, th.full_like(depth, 400.0)], dim=1), depth
+
+    def footprint(hull, pose):
+        return C.transform_points((TT._t(pose[0]), TT._t(pose[1])), hull)[:, :2][[0, 2, 6, 4]]
+
+    s = D.Disembedding.__new__(D.Disembedding)
+    s.top, s.src_role, s.dst_role, s.dest_side = Top(), "source", "destination", -1.0
+    s.world = SimpleNamespace(camera_model=Camera(), footprint=footprint, bottom_offset=lambda hull, q: 0.01)
+    s.hull = {"source": _box(0.565, 0.396, 0.02), "destination": _box(0.44, 0.27, 0.02)}
+    cells = th.stack(th.meshgrid(th.arange(-0.25, 0.26, 0.01), th.arange(-0.17, 0.18, 0.01), indexing="ij"), dim=-1).reshape(-1, 2)
+    s.src_floor = D.TrayFloor(cells, z_local=0.002, res=0.01, rim_local=0.02)
+    s.g = lambda k: {"destination_visible_width_m": 0.04, "destination_gap_min_m": 0.04}[k]
+    s.gp, s.template_facts = SimpleNamespace(alias="disembedding-x"), {}
+    s.camera_pose_at = lambda stance: None
+    edge = EdgeFrame.from_edge("-x", th.tensor([0.0, 0.0]), th.tensor([-1.0, 0.0]), 1.95)
+    init = Stance("init", (-0.45, 0.0, 0.0), 0.5, 0.0, 0.45, edge)
+
+    def cand(x, y, stand_off=0.45, lateral=0.0):
+        c = init.shifted(stand_off=stand_off, lateral=lateral, name="manipulation")
+        c.focus = th.tensor([x, y, 0.77])
+        return c
+
+    return s, init, cand
+
+
+def test_destination_fit_decides_the_source_tray_position():
+    """Owner 2026-10-12 (A2 fix a, disembedding#03 c4): of the Phase-2 (stance, position) candidates only those for which the
+    destination placement (init camera, the template's side) succeeds beside the source tray centred on the position survive. On the
+    right the top ends 1.0 m from the init centre line: a deep position widens the image border until the top ends before only 4 cm
+    of the destination are left in the image; a position shifted toward the destination leaves no room between the tray and the
+    border; a work stance shifted away from it (variant C) keeps its room. Each position is checked once."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    D = _disembedding()
+    s, init, cand = _destination_fit_sampler(D)
+    calls = []
+    place = s._place_destination
+    s._place_destination = lambda *a: calls.append(round(float(a[2].focus[0]), 3)) or place(*a)
+    ok, deep, toward = cand(0.25, 0.0), cand(0.45, 0.0), cand(0.25, -0.15)
+    away = cand(0.25, 0.1, stand_off=0.55, lateral=0.1)
+    same_pos = cand(0.25, 0.0, stand_off=0.35, lateral=0.2)  # another work stance of the first position
+    kept = s._destination_fit(init, [ok, deep, toward, away, same_pos])
+    assert kept == [ok, away, same_pos] and len(calls) == 4
+    fact = s.template_facts["destination_fit"][-1]
+    assert (fact["edge"], fact["positions"], fact["fit"], fact["candidates_before"], fact["candidates_after"]) == ("-x", 4, 2, 5, 3)
+    gaps = {}
+    for c in (deep, toward):
+        with pytest.raises(Reject) as err:
+            s._place_destination(None, init, c, None, s._tray_pose_centred("source", s.src_floor, c, c.focus[:2]))
+        lo, hi = (float(v) for v in str(err.value).split("border gap ")[1].split(" px")[0].split(".."))
+        gaps[round(float(c.focus[0]), 2), round(float(c.focus[1]), 2)] = (lo, hi)
+    assert gaps[(0.45, 0.0)][1] < 0  # the farthest supported position still shows more than 4 cm
+    assert gaps[(0.25, -0.15)][0] > 0  # the nearest position beside the tray already shows less than 4 cm
+    assert s._destination_fit(init, [deep, toward]) == [] and s.template_facts["destination_fit"][-1]["fit"] == 0
+    # the destination on the left (0.95 m of top there): the position shifted to the right is shifted away from it now
+    s.dest_side = 1.0
+    assert s._destination_fit(init, [toward, deep]) == [toward] and len(s.template_facts["destination_fit"]) == 3
+
+
 def test_place_distractors_keeps_the_gap_floor_and_budget_without_pinch_spacing():
     """Owner 2026-10-12 (A2b addition): the distractors keep their footprints >= 1 cm apart (the target's included), on the source
     floor (its margin) and within ``tray_budget`` of the floor - their own footprints, not grown by the pad clearance - but no spacing

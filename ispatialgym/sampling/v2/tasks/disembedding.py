@@ -9,7 +9,8 @@ floors (rasters in the tray frame), the reach band of the target at the tray-flo
 side (``generation.destination_side``, else drawn from the template seed), Phases 1a (any edge) / 1b (H_max = tallest of
 target, distractors, trays) / 1c (row ``disembedding``: m = b + 0.437 + 0.02 on the destination side, |λ| + half the source
 tray's length along the edge + 0.02 on the other) and Phase 2 with the source tray (centred on the focus, long axis along the
-edge) as the in-frame body.
+edge) as the in-frame body, keeping only the (stance, position) candidates beside whose source tray the destination fits
+(``_destination_fit``, owner 2026-10-12).
 
 Instance (``sample_instance``): a Phase-2 survivor + transition; source tray at the focus; the target inside it from
 the feasible set F (footprint on the tray floor, 0.5 cm); the destination tray on the template's side at the lateral
@@ -647,9 +648,13 @@ class Disembedding(SamplerV2):
                 self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=bands) if len(self.segment_arms) > 1 else {}
                 cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT), target_height=self.height[self.src_role],
                                                       in_frame_fn=self._source_tray_in_frame, bands=bands, top=self.top, focus_z=self.top.z + self.src_floor.z_local,
-                                                      arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self))
+                                                      arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                      keep_pairs=lambda cs: self._destination_fit(init, cs))
                 if not cands:
-                    raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the source tray in frame")
+                    fits = [f for f in self.template_facts.get("destination_fit", []) if f["edge"] == edge.name]
+                    raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the source tray in frame" if not fits else
+                                 f"Phase 2: the destination tray fits beside the source tray at none of the positions ({fits[-1]['positions']} positions, "
+                                 f"{fits[-1]['candidates_before']} candidates; e.g. {(fits[-1]['examples'] or [''])[0][:300]})")
                 self.edge, self.init_stance, self.manip_candidates = edge, init, cands
                 break
             except Reject as e:
@@ -675,6 +680,37 @@ class Disembedding(SamplerV2):
             raise Reject("spec", f"{self.gp.alias}: generation.destination_side must be 'left' or 'right', got {want!r}")
         self.template_facts["destination_side"] = {"side": side, "source": source}
         return side
+
+    def _destination_fit(self, init: Stance, cands: List[Stance]) -> List[Stance]:
+        """Owner 2026-10-12 (A2 fix a): the destination's fit decides the source tray's position - of the Phase-2 (stance, position)
+        candidates only those for which :meth:`_place_destination` (the init camera, the template's destination side) places the
+        destination beside the source tray centred on the position survive (Phase 2's ``keep_pairs``: none kept counts as none found, so
+        the split cone's fallback runs). Phase 1c's reserve is measured around the init stance; the source tray sits on the work
+        stance's focus (variant C shifts it up to 0.3 m along the edge, deeper foci widen the image border) and nothing else ties
+        its position to the destination's room. The verdict depends on the position alone (the stances of one edge share its
+        tangent), so each position is checked once; ``template_facts.destination_fit`` gets one record per call."""
+        cam = self.camera_pose_at(init)
+        verdict: Dict[Tuple[float, float], Optional[str]] = {}
+        keep: List[Stance] = []
+        for c in cands:
+            key = (round(float(c.focus[0]), 3), round(float(c.focus[1]), 3))
+            if key not in verdict:
+                s_pose = self._tray_pose_centred(self.src_role, self.src_floor, c, c.focus[:2])
+                try:
+                    self._place_destination(None, init, c, cam, s_pose)
+                    verdict[key] = None
+                except Reject as e:
+                    verdict[key] = str(e)
+            if verdict[key] is None:
+                keep.append(c)
+        failed = [why for why in verdict.values() if why is not None]
+        fact = {"edge": init.edge.name, "positions": len(verdict), "fit": len(verdict) - len(failed), "candidates_before": len(cands),
+                "candidates_after": len(keep), "examples": failed[:3]}
+        self.template_facts.setdefault("destination_fit", []).append(fact)
+        log.info("%s: destination fit (%s side, edge %s): %d of %d positions, %d of %d (stance, position) candidates kept%s", self.gp.alias,
+                 "left" if self.dest_side > 0 else "right", init.edge.name, fact["fit"], fact["positions"], len(keep), len(cands),
+                 f" (e.g. {failed[0][:240]})" if failed else "")
+        return keep
 
     def _tray_yaw(self, key: str, stance: Stance) -> float:
         """Yaw putting the tray's longer footprint axis along the front edge (stance tangent)."""

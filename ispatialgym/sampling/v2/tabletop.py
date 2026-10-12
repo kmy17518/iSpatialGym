@@ -1878,7 +1878,8 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
                                angle_classes_deg: Sequence[float] = ANGLE_CLASSES_DEG, margin: float = IN_FRAME_MARGIN, bands: Optional[RB.ReachBands] = None,
                                class1_when_deep_m: Optional[float] = None,
                                top=None, erosion_extra: float = 0.02, focus_z: Optional[float] = None, order: Optional[str] = None,
-                               arm_bands: Optional[Dict[str, RB.ReachBands]] = None, split_cone: Optional[Dict[str, Any]] = None) -> List[Stance]:
+                               arm_bands: Optional[Dict[str, RB.ReachBands]] = None, split_cone: Optional[Dict[str, Any]] = None,
+                               keep_pairs: Optional[Callable[[List[Stance]], List[Stance]]] = None) -> List[Stance]:
     """§4.5: scan stand-off {0.35, 0.45, 0.55} x translate {0, …, 0.95} x tilt (0 → torso_joint3 limit, ``n_tilts`` samples)
     at the init edge and lateral; (1) whole-body collision check without objects; (2) band = the grid trunk with the
     same translate and nearest tilt, focus candidates = its cells inside the top eroded by ``target_half_extent`` +
@@ -1900,12 +1901,18 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
 
     ``split_cone`` (:func:`split_cone_opts`, opt-in ``generation.phase2_split_cone``): :func:`phase2_split_cone` instead - the
     start position in a wide cone of the init view, the work stance in its own cone with a search along the edge. When it finds
-    no (stance, position) pair and the options carry ``fallback_classes_deg``, the plain Phase 2 below with those classes."""
+    no (stance, position) pair and the options carry ``fallback_classes_deg``, the plain Phase 2 below with those classes.
+
+    ``keep_pairs(survivors) -> survivors`` (a task's own test of the (stance, position) pairs, disembedding's destination fit):
+    applied to the split cone's survivors before the fallback is decided - none kept counts as none found - and to the plain Phase
+    2's per angle class."""
     if split_cone is not None:
         opts = {k: v for k, v in split_cone.items() if k != "fallback_classes_deg"}
         out = phase2_split_cone(s, init, target_half_extent, target_height=target_height, in_frame_fn=in_frame_fn, focus_candidates=focus_candidates,
                                 stand_offs=stand_offs, translates=translates, n_tilts=n_tilts, margin=margin, bands=bands,
                                 class1_when_deep_m=class1_when_deep_m, top=top, erosion_extra=erosion_extra, focus_z=focus_z, arm_bands=arm_bands, **opts)
+        if out and keep_pairs is not None:
+            out = keep_pairs(out)
         fallback = split_cone.get("fallback_classes_deg")
         if out or not fallback:
             return out
@@ -1983,6 +1990,8 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
             a_min, f_min = min(angs, key=lambda t: t[0])
             diag.append(f"s={st.stand_off:.2f} t=({st.translate:.2f},{st.tilt:+.2f}): {len(foci)} foci, min axis angle {math.degrees(a_min):.0f}° at base "
                         f"{[round(float(v), 2) for v in st.world_to_base(f_min[:2]).tolist()]}")
+    if keep_pairs is not None:
+        classes = {k: (keep_pairs(v) if v else v) for k, v in classes.items()}
     out = classes[0] or classes[1]
     which = "0" if classes[0] else "1"
     if class1_when_deep_m is not None and classes[0] and classes[1]:

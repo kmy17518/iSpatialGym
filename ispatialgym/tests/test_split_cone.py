@@ -338,3 +338,32 @@ def test_block_design_candidates_record_their_shift_from_the_init(monkeypatch):
     assert sample({}) == [(0.2, 0.2)]  # the split cone from the subtask's defaults: the survivor's own shift
     fallback.append(True)
     assert sorted(set(sample({}))) == [(0.0, 0.0)]  # its plain fallback stands at the init
+
+
+def test_phase2_keep_filters_the_pairs_before_the_fallback_is_decided(monkeypatch):
+    """Owner 2026-10-12 (disembedding's destination fit): Phase 2's ``keep_pairs`` is a task's own test of the (stance, position) pairs - the
+    split cone's survivors pass it before the fallback is decided (none kept runs the plain Phase 2 like none found), and the plain
+    Phase 2 applies it per angle class (a loose-class survivor counts when every tight one is dropped)."""
+    s, init, top = _scene(monkeypatch, ON)
+    opts = {**TT.split_cone_opts(s), "fallback_classes_deg": (20.0, 30.0)}
+
+    def phase2(rb, split, keep=None):
+        return TT.phase2_manipulation_stance(s, init, 0.03, target_height=0.06, stand_offs=STAND_OFFS, translates=(0.5,), n_tilts=3, bands=rb, top=top,
+                                             focus_z=0.78, angle_classes_deg=(20.0, 30.0), split_cone=split, keep_pairs=keep)
+
+    with tempfile.TemporaryDirectory() as d:
+        rb = _band(d)
+        full = phase2(rb, opts)
+        left = phase2(rb, opts, keep=lambda cs: [c for c in cs if float(c.focus[1]) >= 0.0])
+        assert "_position" in full[0].extras and left and [_key(c) for c in left] == [_key(c) for c in full if float(c.focus[1]) >= 0.0]
+        calls = []
+
+        def plain_loose_only(cs):
+            calls.append("split" if "_position" in cs[0].extras else f"class {cs[0].extras['angle_class']}")
+            return [] if "_position" in cs[0].extras else [c for c in cs if c.extras["angle_class"] == 1]
+
+        fb = phase2(rb, opts, keep=plain_loose_only)
+        plain = phase2(rb, None)
+    assert calls[0] == "split" and set(calls[1:]) <= {"class 0", "class 1"} and "class 1" in calls
+    assert fb and all(c.extras["angle_class"] == 1 and "_position" not in c.extras for c in fb)
+    assert plain and all(c.extras["angle_class"] == 0 for c in plain)  # without the test the tight class wins

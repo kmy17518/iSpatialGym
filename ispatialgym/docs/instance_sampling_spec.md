@@ -840,7 +840,14 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      the tray floor, 0.5 cm margin). Destination tray on the template's destination side (4.4, A2a), aligned with the edge and the
      source tray (same depth), at the lateral position where exactly 4 cm of it is inside the **init** image (border
      at tray depth = camera-frame depth × tan 49.6°, confirmed by one segmentation render), ≥ 4 cm from the source
-     tray, footprint on the top.
+     tray, footprint on the top. *Owner decision 2026‑10‑12 (A2, destination fit):* this placement decides the source
+     tray's position — Phase 2 keeps only the (stance, position) candidates for which it succeeds with the source tray
+     centred on the position (checked once per position at the template, `template_facts.destination_fit`; the plain
+     Phase 2 per angle class, and a split cone whose pairs all fail runs its fallback like one that found none); an edge
+     where it succeeds nowhere fails Phase 2 (`no_manipulation_stance`). Phase 1c's reserve (4.4) is measured around
+     the init stance at the workspace-centre depth, while the source tray sits on the work stance's focus (variant C:
+     up to 0.3 m along the edge) and deeper foci widen the image border, so the reserve alone did not hold
+     (disembedding#03 c4: every attempt failed `destination_placement`).
    - *Blocks*: one block per region cell drawn at random with ≥ 3 cm gaps between footprints, distinct up faces,
      **no block's up face is the opposite of its goal face** (section 6.5), and the **visible-face rule** (kept from
      v1 §5.4): every pattern used in the goal is visible in the init image — a block whose goal face is its up face
