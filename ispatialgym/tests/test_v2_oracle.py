@@ -733,6 +733,19 @@ def test_push_closure_geometry_residual_and_extension():
     assert len(ext) == 1 and abs(float(th.linalg.norm(ext[0][0] - p1)) - 0.02) < 1e-6
 
 
+def test_wall_alignment_without_a_brace_is_push_only():
+    """Owner 2026-10-11 (round wall clocks): a target without a low corner records no brace; the world-vertical program is
+    then transition -> push -> retreat (as axial's push-only program) instead of failing on the missing brace."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "alignment-world_vertical.json"))
+    with_brace = expand(sc.alias, sc)
+    sc.contacts = replace(sc.contacts, brace=None)
+    acts = expand(sc.alias, sc)
+    assert any(isinstance(a, QA_Brace) for a in with_brace) and not any(isinstance(a, QA_Brace) for a in acts)
+    pushes = [a for a in acts if isinstance(a, Push)]
+    assert len(pushes) == 1 and type(acts[-1]).__name__ == "Retreat" and acts[-1].arm == pushes[0].contact.arm
+    assert [type(a).__name__ for a in acts[:-2]] == [type(a).__name__ for a in with_brace if not isinstance(a, (QA_Brace, Push))][:len(acts) - 2]
+
+
 def test_push_geometry_of_a_hanging_painting_is_an_arc_about_the_hook_axis():
     """The wall-vertical push swings a painting about its horizontal hook axis: the recorded init / mid / goal pad
     poses lie on a circle in a vertical plane. The geometry is an arc about that (horizontal) axis — not the planar

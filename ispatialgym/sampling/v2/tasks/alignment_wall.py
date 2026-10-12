@@ -56,6 +56,11 @@ SUBTASKS = ("alignment-world_vertical",)
 V1_DEFINITION_ID = {"alignment-world_vertical": 1}
 #: §5.5 brace candidates in order (first reachable wins)
 BRACE_KINDS = ("below_high", "above_low", "side_high")
+#: Owner 2026-10-11 (round wall clocks): a target whose lowest point at the tilt lies within this fraction of its half-width
+#: beside the hinge has no low corner (a disc turns about its COM hinge without changing its outline). Its push acts at the
+#: low end of the tilted level axis, so arm and direction follow the tilt sign, and it gets no brace (no edge reaches a stop;
+#: the hinge resistance holds the upright pose). Rectangles within |δ| ≤ MAX_DEVIATION_DEG keep their lowest corner.
+NO_CORNER_OFFSET_FRACTION = 0.15
 #: A8 (owner decision 2026‑09‑16): |δ| ≤ 25° until the two-stroke push for larger tilts exists (TODO: two strokes with a
 #: re-grasp of the push point between them, each within the arm's arc reach; the ±30° template filter then returns)
 MAX_DEVIATION_DEG = 25.0
@@ -463,6 +468,11 @@ class AlignmentWall(SamplerV2):
         # where it touches the finger along the whole arc (a push at the middle of the end runs parallel to its side face)
         push_high = str(self.param("push_end", "low")).lower() == "high"
         E_push = on_plane(extreme_z_point(pts_t, lowest=not push_high), mid_plane, n)
+        _, width, _ = self.dims(hull)
+        lateral = th.tensor([float(n[1]), -float(n[0]), 0.0])
+        no_corner = abs(float(th.dot((E_push - C_)[:2], lateral[:2]))) < float(self.param("no_corner_offset_fraction", NO_CORNER_OFFSET_FRACTION)) * width / 2
+        if no_corner:
+            E_push = E_high if push_high else E_low
         a_push = leveling_tangent(E_push, C_, n, delta, rises=not push_high)
         # the corner meets the middle of the finger side (0927-010159: with the corner 3 mm inside the finger's edge the first
         # arc lost it after 0.1 rad - the loaded fist sags across the tangent); the target's lower edge then rests on the
@@ -488,7 +498,7 @@ class AlignmentWall(SamplerV2):
         _, w, h = self.dims(hull)
         gap_b = float(self.param("brace_offset_m", 0.005))
         braces = []
-        for kind in brace_candidate_order(h, w, self.param("brace_kinds", BRACE_KINDS)):
+        for kind in () if no_corner else brace_candidate_order(h, w, self.param("brace_kinds", BRACE_KINDS)):
             B, a = brace_point(pts_l, kind, side_l, high_sign, C_l, band)
             B = on_plane(B, mid_plane, n)
             # the stop: a finger's outer side ``brace_offset_m`` before B along a (toward the target), reached along a in the
@@ -503,7 +513,7 @@ class AlignmentWall(SamplerV2):
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,
                          "distance": float(th.linalg.norm(push_goal[0] - push_init[0])), "variants": push_variants, "end": "high" if push_high else "low",
                          "face_m": face},
-                "braces": braces, "brace_arm": other_arm(push_arm), "delta": delta}
+                "braces": braces, "brace_arm": other_arm(push_arm), "delta": delta, "no_corner": no_corner}
 
     def brace_clear(self, geo: Dict[str, Any], brace: Dict[str, Any]) -> bool:
         """§5.5: at init the brace hand must be ≥ 2 cm clear of the tilted hull (fingertip, pad centre and the finger side
@@ -538,7 +548,8 @@ class AlignmentWall(SamplerV2):
         st_ = stats if stats is not None else {}
         st_["brace_kinds_clear"] = [b["kind"] for b, _ in braces]
         st_["brace_kinds_blocked_by_tilted_hull"] = [b["kind"] for b in geo["braces"] if b["kind"] not in st_["brace_kinds_clear"]]
-        if not braces:
+        push_only = bool(geo.get("no_corner"))
+        if not braces and not push_only:
             return []
         reach: List[Tuple[Stance, List[Dict[str, Any]]]] = []
         n_push = 0
@@ -550,7 +561,7 @@ class AlignmentWall(SamplerV2):
             ok = [b for b, sp in braces if sp.volume_ok(rv, st, bz)]
             for b in ok:
                 kinds_ok[b["kind"]] = kinds_ok.get(b["kind"], 0) + 1
-            if ok:
+            if ok or push_only:
                 reach.append((st, ok))
         st_["step2_push_reach"] = n_push
         st_["step2_brace_reach_by_kind"] = kinds_ok
@@ -560,7 +571,7 @@ class AlignmentWall(SamplerV2):
         cams = P0.camera_poses(self, [st for st, _ in reach])
         classed = []
         for (st, ok), cam in zip(reach, cams):
-            pts = th.stack([geo["C"], geo.get("E_push", geo["E_low"]), ok[0]["B"]])  # the pushed end in frame
+            pts = th.stack([geo["C"], geo.get("E_push", geo["E_low"])] + [ok[0]["B"]] * bool(ok))  # the pushed end in frame
             if not P0.in_frame(self, cam, pts):
                 continue
             ang = P0.axis_angle(self, cam, geo["C"])
@@ -878,8 +889,10 @@ class AlignmentWall(SamplerV2):
             eqs.append(half_turn_equivalence(self.front))
         d.pose_targets[tname] = pose_target(orientation=geo["pose_level"][1], orientation_metric="full", orientation_tolerance=self.tol("orientation", 0.08),
                                             equivalences=eqs)
-        d.summary.update({"wall": spot["wall_name"], "spot": spot["id"], "deviation_deg": math.degrees(delta), "push_arm": geo["push"]["arm"], "brace_arm": geo["brace_arm"],
-                          "brace_kind": self.sidecar.contacts["brace"].brace_kind, "scale": self.choice.models["target"].scale, "phase2": stats,
+        brace = self.sidecar.contacts.get("brace")
+        d.summary.update({"wall": spot["wall_name"], "spot": spot["id"], "deviation_deg": math.degrees(delta), "push_arm": geo["push"]["arm"],
+                          "brace_arm": brace.arm if brace is not None else None, "brace_kind": brace.brace_kind if brace is not None else None,
+                          "push_point": "level_axis_end" if geo.get("no_corner") else "lowest_point", "scale": self.choice.models["target"].scale, "phase2": stats,
                           "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip), "symmetric_180": self.symmetric_180(),
                           "frame": dict(self.template_facts.get("frame") or {}),
                           "hang": {"back_off_wall_m": self.wall_offset(spot), "wall_protrusion_m": spot.get("wall_protrusion_m"),
@@ -954,12 +967,7 @@ class AlignmentWall(SamplerV2):
                 return False, res, None, "brace arm inside the wall at the contact or pre-contact"
             return True, res, None, ""
 
-        def push_with(sb):
-            b = sb.proposal.payload[0]
-            tag = f"{b['kind']}/{b.get('wrist', 'n+')}"
-            q_seed = q0.clone()
-            q_seed[arm_b] = sb.result.q[arm_b]
-
+        def make_eval_push(q_seed, tag):
             def eval_push(p):
                 push = p.payload
                 ptag = f"{tag}/push-{push.get('wrist', 'n+')}"
@@ -997,10 +1005,18 @@ class AlignmentWall(SamplerV2):
                     why.append(f"{ptag}: combined configuration (brace contact + push pre-contact) collides")
                     return False, None, None, "combined configuration collides"
                 return True, r_pre, [r_pre.q, r_init.q, r_goal.q], ""
+            return eval_push
 
-            chosen_p, dec_p, _fails_p = ORI.choose_first(self.ikc, push_arm, geo["push"].get("variants") or [geo["push"]], key=lambda v: v["init"],
-                                                         label=lambda v: v.get("wrist", "n+"), chain=lambda v: [v["pre"], v["init"], v["goal"]], evaluate=eval_push,
-                                                         q_start=q_seed, camera_idx=[1], stage="wall push")
+        def choose_push(q_seed, tag):
+            return ORI.choose_first(self.ikc, push_arm, geo["push"].get("variants") or [geo["push"]], key=lambda v: v["init"],
+                                    label=lambda v: v.get("wrist", "n+"), chain=lambda v: [v["pre"], v["init"], v["goal"]], evaluate=make_eval_push(q_seed, tag),
+                                    q_start=q_seed, camera_idx=[1], stage="wall push")
+
+        def push_with(sb):
+            b = sb.proposal.payload[0]
+            q_seed = q0.clone()
+            q_seed[arm_b] = sb.result.q[arm_b]
+            chosen_p, dec_p, _fails_p = choose_push(q_seed, f"{b['kind']}/{b.get('wrist', 'n+')}")
             if chosen_p is None:
                 return False, "no push with this brace"
             push_of[id(sb)] = (chosen_p, dec_p)
@@ -1009,23 +1025,32 @@ class AlignmentWall(SamplerV2):
         # brace candidates in order (kind order, a contact's two wrist turns by the orientation rule, owner 2026-09-27), then the push
         # arm (its two wrist turns likewise) with the brace arm locked at its solution; when the push chain fails with that brace, the
         # other turn and then the next brace candidate are tried before the caller moves to the next survivor
-        chosen_b, dec_b, _fails_b = ORI.choose_first(self.ikc, brace_arm, braces, key=lambda c: c[0]["pose"], label=lambda c: f"{c[0]['kind']}/{c[0].get('wrist', 'n+')}",
-                                                     chain=lambda c: [tuple(x) for x in C.line_waypoints(c[0]["pre"], c[0]["pose"], 3)], evaluate=eval_brace,
-                                                     q_start=q0, stage="wall brace", downstream=push_with)
-        if chosen_b is not None:
-            chosen_p, dec_p = push_of[id(chosen_b)]
-            solved = (chosen_b.proposal.payload[0], chosen_p.proposal.payload)
+        dec_b = None
+        if geo.get("no_corner"):  # a target without a low corner: the push alone, the other arm idle in its recorded posture
+            chosen_p, dec_p, _fails_p = choose_push(q0.clone(), "no brace")
+            if chosen_p is not None:
+                solved = (None, chosen_p.proposal.payload)
+        else:
+            chosen_b, dec_b, _fails_b = ORI.choose_first(self.ikc, brace_arm, braces, key=lambda c: c[0]["pose"], label=lambda c: f"{c[0]['kind']}/{c[0].get('wrist', 'n+')}",
+                                                         chain=lambda c: [tuple(x) for x in C.line_waypoints(c[0]["pre"], c[0]["pose"], 3)], evaluate=eval_brace,
+                                                         q_start=q0, stage="wall brace", downstream=push_with)
+            if chosen_b is not None:
+                chosen_p, dec_p = push_of[id(chosen_b)]
+                solved = (chosen_b.proposal.payload[0], chosen_p.proposal.payload)
         if solved is None:
-            raise Reject("push_unreachable" if any("push" in w for w in why) else "brace_unreachable",
+            raise Reject("push_unreachable" if geo.get("no_corner") or any("push" in w for w in why) else "brace_unreachable",
                          f"no (brace, push) chain passes the exact IK from the manipulation stance: {'; '.join(why) or 'no brace candidate'}")
         b, push = solved
-        manip.contacts = ["push", "brace"]
-        manip.extras["closing_axes"] = {"brace": b.get("wrist", "n+"), "push": push.get("wrist", "n+")}
+        manip.contacts = ["push"] if b is None else ["push", "brace"]
+        manip.extras["closing_axes"] = {"push": push.get("wrist", "n+")} if b is None else {"brace": b.get("wrist", "n+"), "push": push.get("wrist", "n+")}
         self.sidecar.add_stance(manip)
         P0.connect(self, init, manip, float(self.param("path_max_m", P0.PATH_MAX_M)))
         tname = self.tname
         self.sidecar.add_contact(ContactRecord("push", push_arm, push["pre"], push["init"], push["mid"], push["goal"], geo["push"]["direction"], geo["push"]["distance"],
                                                object=tname, extras={"contact_face": "finger_side", "wrist": push.get("wrist"), **_orient_extra(dec_p)}))
+        if b is None:
+            self.sidecar.waypoint_policy = "push arc: screening at δ/2, exact at init and goal; no brace (no low corner); wall-present margin-0 re-check of every contact configuration"
+            return
         # the stop stands at the GOAL edge already (brace_point on the level pose): the oracle keeps it where it is recorded
         self.sidecar.add_contact(ContactRecord("brace", brace_arm, b["pre"], b["pose"], direction=b["a"], brace_kind=b["kind"], object=tname,
                                                extras={"contact_face": "finger_side", "placed_at": "goal", "wrist": b.get("wrist"), **_orient_extra(dec_b)}))
@@ -1102,9 +1127,10 @@ class AlignmentWall(SamplerV2):
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         manip = self.sidecar.stances.get("manipulation")
         brace = self.sidecar.contacts.get("brace")
-        if manip is None or brace is None:
+        if manip is None or "push" not in self.sidecar.contacts:
             return []
         c = self.choice.models["target"]
         return [{"scope": {"scene": self.scene, "target": f"{c.category}/{c.model}", "wall": self._spot["wall_name"]}, "type": "contacts",
-                 "push_arm": self.sidecar.contacts["push"].arm, "brace_arm": brace.arm, "brace_kind": brace.brace_kind, "deviation_deg": round(draft.summary["deviation_deg"], 1),
+                 "push_arm": self.sidecar.contacts["push"].arm, "brace_arm": brace.arm if brace is not None else None,
+                 "brace_kind": brace.brace_kind if brace is not None else None, "deviation_deg": round(draft.summary["deviation_deg"], 1),
                  "stand_off": manip.stand_off, "lateral": manip.lateral, "trunk": [manip.translate, round(manip.tilt, 3)], "hard": False}]

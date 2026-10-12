@@ -800,13 +800,18 @@ def program_attachment(sc: Sidecar) -> List[Action]:
 def program_alignment_wall(sc: Sidecar) -> List[Action]:
     """init → manipulation stance → close both grippers → brace at the recorded stop (below_high / above_low /
     side_high) → push at E_low along the arc (δ/2, goal) with the arm only until the upright orientation → retreat
-    both."""
-    push, brace = _push_contact(sc), _brace_contact(sc)
+    both. A target without a low corner (round, owner 2026-10-11) records no brace: ``transition → push → retreat``,
+    the hinge resistance holds the upright pose."""
+    push = _push_contact(sc)
+    brace = sc.contacts.brace if sc.contacts is not None else None
     if push.mid is None:
         raise SidecarError("contacts.push.mid: the wall alignment push is an arc (δ/2 waypoint required)")
-    if push.object != brace.object:
+    if brace is not None and push.object != brace.object:
         raise SidecarError("contacts: push and brace must act on the same target")
     base_yaw = sc.stance("manipulation").base_pose2d[2]
+    if brace is None:
+        p = Push(contact=push, base_yaw=base_yaw)
+        return _travel(sc, "init", "manipulation") + [p, Retreat(arm=push.arm, object=push.object, after=p)]
     return _travel(sc, "init", "manipulation") + _brace_push_retreat(sc, brace, push, base_yaw)
 
 

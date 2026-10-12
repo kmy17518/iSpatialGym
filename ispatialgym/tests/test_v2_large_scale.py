@@ -536,6 +536,37 @@ def test_wall_push_finger_side_carries_the_corner():
             assert max(ov) < 0.5 * across and max(ov) - min(ov) < 1e-4, f"{v['wrist']}: the fist overlaps the target {ov}"
 
 
+def _disc_stub(radius=0.282, thickness=0.048, n_rim=64, phase=0.0):
+    """``_wall_stub`` with a round wall clock of jerval's size: ``n_rim`` rim points starting at ``phase``, the COM hinge at
+    the centre."""
+    S, spot, _ = _wall_stub()
+    angles = [phase + 2 * math.pi * k / n_rim for k in range(n_rim)]
+    S.hull = th.tensor([[x, radius * math.cos(a), radius * math.sin(a)] for a in angles for x in (-thickness / 2, thickness / 2)], dtype=th.float32)
+    return S, spot
+
+
+def test_wall_round_target_pushes_the_level_axis_end_without_brace():
+    """Owner 2026-10-11 (world_vertical#02, round wall clocks): a disc turning about its COM hinge has no low corner - its
+    lowest point stays under the hinge at every tilt, where the rim's tessellation decided the push arm and direction (the
+    -25 deg template filter found no stance on any wall). The push now acts at the low end of the tilted level axis, its arm
+    and rising direction follow the tilt sign, and the disc gets no brace (a stop at the level outline touches the unchanged
+    tilted outline). A box keeps its lowest corner and its braces up to the deviation cap."""
+    for phase in (0.0, 0.049):
+        S, spot = _disc_stub(phase=phase)
+        n = spot["normal"]
+        for deg in (25.0, -25.0, 15.0, -18.0):
+            geo = S.contacts_for(spot, math.radians(deg))
+            assert geo["no_corner"] and geo["braces"] == []
+            assert th.allclose(geo["E_push"], geo["E_low"], atol=1e-6)  # the low end of the tilted level axis
+            t = geo["push"]["direction"]
+            assert float(t[2]) > 0.5 and abs(float(th.dot(t, n))) < 1e-6  # rises, in the wall plane
+            assert geo["push"]["arm"] == ("right" if deg < 0 else "left")  # the arm on the low end's side, as for the box
+    S, spot, _ = _wall_stub()
+    for deg in (AW.MAX_DEVIATION_DEG, -AW.MAX_DEVIATION_DEG, 15.0):
+        geo = S.contacts_for(spot, math.radians(deg))
+        assert not geo["no_corner"] and geo["braces"]
+
+
 def test_brace_order():
     assert AW.brace_candidate_order(height=0.6, width=0.8) == ["below_high", "above_low", "side_high"]
     assert AW.brace_candidate_order(height=0.1, width=0.8) == ["below_high", "above_low"]  # side_high needs height >= width/2
