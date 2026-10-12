@@ -1734,6 +1734,20 @@ present (grasp → place(intermediate) → grasp → place). Braces are not atte
 - **Brace points**: after each placement the oracle pushes the block left (row) and up (column) with the right hand
   while the closed left gripper braces the already-placed blocks (row-left / column-top): the left-arm brace poses at
   the goal grid (pre-contact + contact) are IK-checked from the manipulation stance and recorded.
+- **Flip room** (in-hand flips about the forward axis, `generation.flip_directions` right / left): a flipping block's cell
+  lies ≥ 0.10 m to the flip side of the manipulation base's centre line, ≥ `flip_cell_min_edge_depth_m` (0.10 m) in from
+  the edge and ≥ `flip_face_visibility_lateral_m` (0.07 m) to the other side of the init camera's centre line, so the
+  manipulation stance stands along the edge from the init, away from the flip side (`manip_lateral_shifts_m`, the first is
+  the preferred shift). Phase 1c draws the init lateral anywhere in its range; an init whose first shift leaves the range is
+  moved along the edge (same trunk and stand-off) by the minimum that brings the shifted stance back inside it. *With the
+  puzzle board (owner 2026-10-12):* the move goes on, in 1 cm steps with the init kept inside its range, to the first
+  lateral whose manipulation stance (the init shifted by the first `manip_lateral_shifts_m`) has a
+  `board_base_xy_candidates` position on the top at every Phase 2 stand-off (0.35 / 0.45 / 0.55; the board's
+  off-the-top test, geometry only), else the smallest move with the most such stand-offs. On the 1.16 m edge of
+  breakfast_table_rhjoby_0 the minimum move leaves the stance 3 cm from the edge's end, where stand-off 0.55 has no
+  position on the top (only (0.60, +0.05) lies deep enough, and it is off the end), so inits drawn at 0.20-0.55 move to
+  0.127. `template_facts.init_flip_room_move` records the drawn and the moved lateral, the move and the minimum move, the
+  reason, and the positions on the top per stand-off after the move and after the minimum move.
 - Tolerances: position 0.4 × edge (≈ 1 cm), orientation 0.15 rad (section 8).
 
 ### 6.6 Configuration matching — articulation (large-scale, open / close)

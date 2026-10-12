@@ -120,6 +120,10 @@ FLIP_CELL_MAX_LATERAL = -0.10
 #: flip-in-place + re-grasp passed at every try from the cell 29 cm in (manip depth 0.64 at stand-off 0.35) and the re-grasp of
 #: the turned block failed at every class and stance from the cells 13 cm in (depth 0.48 at 0.35, 0.58 at 0.45)
 FLIP_CELL_MIN_EDGE_DEPTH = 0.10  # 0.22 (0919-090517 / 091857) left every region with a single flip cell; the pool's 0.40 / 0.50 stand-offs put the 13 cm cell at the proven base depth
+#: step (m) of the flip-room move of the init along the edge when the minimum move leaves the board off the top (owner 2026-10-12)
+FLIP_ROOM_STEP = 0.01
+#: the puzzle board's (base depth, lateral) positions of the manipulation stance when the alias has no ``board_base_xy_candidates``
+BOARD_BASE_XY = ((0.46, -0.02), (0.44, -0.10), (0.50, 0.04), (0.60, 0.05))
 #: head-camera margin (fraction of the image) of the fingertips along the chain (the oracle's FOV monitor uses 5 %)
 CHAIN_FOV_MARGIN = 0.06
 #: hand collision spheres in the eef frame (``r1pro_description_curobo_default.yaml`` mapped through EEF_IN_GRIPPER, as in
@@ -293,6 +297,8 @@ class BlockDesign(SamplerV2):
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "edge_m": self.edge, "faces": self.faces,
                                     "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None})
+        if getattr(self, "_flip_room", None) is not None:
+            self.template_facts["init_flip_room_move"] = self._flip_room
 
     # -- Phase 2 hooks (§4.5 blocks) --------------------------------------------------------------------------------
 
@@ -353,7 +359,14 @@ class BlockDesign(SamplerV2):
         """Phase 1c draws the init lateral anywhere in its admissible range; with right-facing flips the manipulation
         stance must stand ``manip_lateral_shifts_m[0]`` further left, so an init drawn too far left is moved right along the
         edge (same trunk / stand-off) until that shift fits the range (the in-frame / visibility / collision checks of the
-        instance validate the moved init); unchanged when the shift fits or no flips are expected."""
+        instance validate the moved init); unchanged when the shift fits or no flips are expected.
+
+        With a puzzle board (owner 2026-10-12) the move is the smallest one, from that minimum on in ``FLIP_ROOM_STEP`` steps with
+        the init kept inside its range, after which the manipulation stance has a ``board_base_xy_candidates`` position on the top
+        at every Phase 2 stand-off (:meth:`_board_fit`) - else the smallest with the most such stand-offs: at the end of the range
+        the positions that stand-off 0.55 leaves on the top by depth are off its end (s3 c1_k1: every attempt). The drawn and
+        the moved lateral, the reason and the board fit go to ``template_facts.init_flip_room_move``."""
+        self._flip_room = None
         if not (self._flips_expected() and self._flip_directions()[0] in ("right", "left")):
             return init
         bounds = init.extras.get("lateral_bounds")
@@ -364,17 +377,77 @@ class BlockDesign(SamplerV2):
         lo, hi = float(bounds[0]), float(bounds[1])
         target = float(init.lateral) + need
         excess = (target - hi) if target > hi else ((lo - target) if target < lo else 0.0)
+        half = 0.5 * float(self._board_geometry()["plate_m"]) if self._has_board() else None
+        rec: Dict[str, Any] = {"lateral_drawn": round(float(init.lateral), 4), "lateral_bounds": [round(lo, 4), round(hi, 4)], "manipulation_shift_m": need}
         if excess <= 1e-6:
+            self._flip_room = {**rec, "lateral": rec["lateral_drawn"], "move_m": 0.0, "reason": f"the {need:+.2f} m manipulation shift fits the lateral range",
+                               **({"board_fit": self._board_fit(init, need, half)} if half is not None else {})}
             return init
-        moved = self._shifted_along_edge(init, -sign * excess, "init")
-        if moved is None:
+        # the minimum move first (no board: the only one), then further along the edge while the moved init stays inside its range
+        m_max = (float(init.lateral) - lo) if sign > 0 else (hi - float(init.lateral))
+        n_moves = 1 if half is None else 1 + max(0, int(math.floor((m_max - excess) / FLIP_ROOM_STEP + 1e-9)))
+        best, fit0 = None, None
+        for k in range(n_moves):
+            m = excess + k * FLIP_ROOM_STEP
+            cand = self._shifted_along_edge(init, -sign * m, "init")
+            if cand is None:
+                continue
+            fit = self._board_fit(cand, need, half) if half is not None else {}
+            if k == 0:
+                fit0 = fit
+            n_fit = sum(1 for v in fit.values() if v)
+            if best is None or n_fit > best[1]:
+                best = (m, n_fit, cand, fit)
+            if half is None or n_fit == len(TT.STAND_OFFS):
+                break
+        if best is None:
             log.info("%s: init lateral %.2f leaves no room for the %.2f m manipulation shift and cannot be moved (off the free floor)", self.gp.alias, init.lateral, need)
+            self._flip_room = {**rec, "lateral": rec["lateral_drawn"], "move_m": 0.0,
+                               "reason": f"the {need:+.2f} m manipulation shift leaves the lateral range and every move puts the init off the free floor"}
             return init
+        m, n_fit, moved, fit = best
         moved.extras.update(init.extras)
-        moved.extras["flip_room_shift_m"] = float(-sign * excess)
-        log.info("%s: init moved %+.2f m along the edge (lateral %.2f -> %.2f) so the manipulation stance can stand %+.2f m from it within %s", self.gp.alias,
-                 -sign * excess, init.lateral, moved.lateral, need, [round(lo, 2), round(hi, 2)])
+        moved.extras["flip_room_shift_m"] = float(-sign * m)
+        reason = f"the {need:+.2f} m manipulation shift leaves the lateral range [{lo:.2f}, {hi:.2f}] at {init.lateral:.2f}"
+        if half is not None:
+            if abs(m - excess) < 1e-9:
+                reason += "; the minimum move puts a board position on the top at every Phase 2 stand-off" if n_fit == len(TT.STAND_OFFS) else \
+                    f"; the minimum move leaves a board position on the top at {n_fit} of {len(TT.STAND_OFFS)} Phase 2 stand-offs, no further move gives more"
+            else:
+                bare = [so for so, v in (fit0 or {}).items() if not v]
+                reason += (f"; the minimum move {-sign * excess:+.3f} m leaves no board position on the top at stand-off {', '.join(bare) or '-'}"
+                           + (" (or puts the init off the free floor)" if fit0 is None else "") + f"; moved {-sign * m:+.3f} m: "
+                           + ("every Phase 2 stand-off has one" if n_fit == len(TT.STAND_OFFS) else f"{n_fit} of {len(TT.STAND_OFFS)} stand-offs have one, the most any move gives"))
+        self._flip_room = {**rec, "lateral": round(float(moved.lateral), 4), "move_m": round(float(moved.lateral - init.lateral), 4),
+                           "minimum_move_m": round(-sign * excess, 4), "reason": reason, **({"board_fit": fit, "board_fit_at_minimum_move": fit0} if half is not None else {})}
+        log.info("%s: init moved %+.2f m along the edge (lateral %.2f -> %.2f) so the manipulation stance can stand %+.2f m from it within %s%s", self.gp.alias,
+                 -sign * m, init.lateral, moved.lateral, need, [round(lo, 2), round(hi, 2)], "" if half is None else f"; board on the top: {fit} ({reason})")
         return moved
+
+    def _board_positions(self) -> List[Tuple[float, float]]:
+        """``generation.board_base_xy_candidates``: the board centre's (base depth, lateral) at the manipulation stance, in order."""
+        return [(float(d), float(l)) for d, l in (self.gen("board_base_xy_candidates", None) or BOARD_BASE_XY)]
+
+    def _board_on_top(self, manip: Stance, depth: float, lateral: float, half: float, right: th.Tensor, far: th.Tensor) -> bool:
+        """:meth:`_place_board`'s off-the-top test: the four plate corners of the table-aligned board centred ``depth`` ahead of
+        and ``lateral`` left of ``manip``'s base lie on free cells of the top (1 cm margin)."""
+        xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
+        return all(self.top.contains(xy + right * sx * half + far * sy * half, 0.01) for sx in (-1.0, 1.0) for sy in (-1.0, 1.0))
+
+    def _board_fit(self, init: Stance, shift: float, half: float) -> Dict[str, List[str]]:
+        """Per Phase 2 stand-off (``TT.STAND_OFFS``, key ``"0.35"`` ...), the ``board_base_xy_candidates`` positions that pass the
+        off-the-top test (geometry only) at the manipulation stance ``shift`` m along the edge from ``init``, built as Phase 2
+        builds it; a stand-off whose base is off the free floor (Phase 2 skips it), or a shift off the floor, has none."""
+        manip = self._shifted_along_edge(init, shift, "manipulation")
+        out: Dict[str, List[str]] = {}
+        for so in TT.STAND_OFFS:
+            st = manip.shifted(stand_off=float(so)) if manip is not None else None
+            if st is None or not self.kit.trav_free(st.base_xy):
+                out[f"{float(so):.2f}"] = []
+                continue
+            right, toward, _ = self._table_axes(st)
+            out[f"{float(so):.2f}"] = [f"({d:.2f}, {l:+.2f})" for d, l in self._board_positions() if self._board_on_top(st, d, l, half, right, -toward)]
+        return out
 
     def _shifted_along_edge(self, stance: Stance, shift: float, name: Optional[str] = None) -> Optional[Stance]:
         """``stance`` moved ``shift`` m along the edge toward the robot's LEFT (world ``+tangent``; the edge frame's own
@@ -2452,11 +2525,10 @@ class BlockDesign(SamplerV2):
         n_flip_needed = self._n_flips() if self._flips_expected() else 0
         board_obj = self.objects[name]
         why: List[str] = []
-        for depth, lateral in (self.gen("board_base_xy_candidates", None) or [[0.46, -0.02], [0.44, -0.10], [0.50, 0.04], [0.60, 0.05]]):
+        for depth, lateral in self._board_positions():
             tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
             xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
-            corners = [xy + right * sx * half + far * sy * half for sx in (-1.0, 1.0) for sy in (-1.0, 1.0)]
-            if not all(self.top.contains(c, 0.01) for c in corners):
+            if not self._board_on_top(manip, depth, lateral, half, right, far):
                 why.append(f"{tag}: off the top")
                 continue
             kept = list(cells or [])

@@ -321,7 +321,7 @@ def test_block_design_candidates_record_their_shift_from_the_init(monkeypatch):
         s.spec = SimpleNamespace(generation={"patterns": {"test_rbbr": ["red", "blue", "blue", "red"]}, "block_no_flip": True, "flip_directions": ["right"],
                                              "manip_lateral_shifts_m": [0.35, 0.45, 0.25], **gen})
         s.subtask, s.defaults, s.variant, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), None, "targets"
-        s.gp = SimpleNamespace(alias="configuration_matching-block_design-block_4-breakfast_table_board")
+        s.gp = SimpleNamespace(alias="configuration_matching-block_design-block_4-breakfast_table_board", roles={"targets": None})
         s.ctx = SimpleNamespace(base_seed=0)
         s.kit = SimpleNamespace(trav_free=lambda xy: True)
         s.world = SimpleNamespace(local_hull=lambda obj: corners)
