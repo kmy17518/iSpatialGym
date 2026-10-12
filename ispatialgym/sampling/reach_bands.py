@@ -63,7 +63,9 @@ kinematics entries and the batched IK solvers only) and the neighbouring rooms' 
 objects, scene load 117 s -> 54 s on house_single_floor); per trunk, the near meshes no robot sphere can reach are
 disabled during that trunk's IK passes (:class:`TrunkBound`). ``--cameras`` / ``--prebuild-planner`` / ``--full-load`` /
 ``--no-trunk-bound`` restore the old setup; none changes a band. Same-algorithm opt-ins (marginal cells may differ,
-default off): ``--mesh-cache auto`` (2.5x faster IK), ``--ik-tail-sizes``. Approximate opt-in (default off):
+default off): ``--mesh-cache auto`` (2.5x faster IK), ``--ik-tail-sizes``. The bands the sampler computes in-process get the
+``--mesh-cache auto`` store by default, on a kit of their own (:func:`band_kit`, ``ISPATIALGYM_BAND_MESH_CACHE``; the sampler's
+kit keeps its store). Approximate opt-in (default off):
 ``--collision sdf-grid [--sdf-res 0.01]`` - the static obstacles become float16 signed-distance voxel layers (cuRobo
 ``VoxelGrid``, trilinear lookup, sampled from the exact mesh SDF; :mod:`ispatialgym.oracle.sdf_grid`), ~25x cheaper per
 batched IK call; recorded as ``schedule.collision`` and in the file-name key, so such bands never shadow exact ones by name.
@@ -1974,6 +1976,13 @@ def _chairs_to_remove(scene: str, support_name: str, rooms: List[str], stable: O
 MESH_CACHE_HEADROOM = 256
 MESH_CACHE_MIN = 512
 MESH_CACHE_RESERVE = 64
+
+
+def snug_mesh_cache(n_meshes: int) -> int:
+    """``--mesh-cache auto``: the mesh-store capacity for ``n_meshes`` loaded collision meshes."""
+    return max(MESH_CACHE_MIN, 64 * math.ceil((int(n_meshes) + MESH_CACHE_HEADROOM) / 64))
+
+
 #: --collision sdf-grid defaults (APPROXIMATE OPT-IN, see build_parser): voxel size (m) and the mesh-store capacity for the
 #: spawned objects (the only meshes of that mode; ~0.6 ms per slot per batched IK call)
 SDF_RES = 0.01
@@ -2319,7 +2328,7 @@ def load_world(args, rooms: List[str], variant: Optional[dict], removed: List[st
     n_meshes = RobotKit.count_collision_meshes(world)
     cache = None
     if args.mesh_cache:
-        cache = max(MESH_CACHE_MIN, 64 * math.ceil((n_meshes + MESH_CACHE_HEADROOM) / 64)) if str(args.mesh_cache).lower() == "auto" else int(args.mesh_cache)
+        cache = snug_mesh_cache(n_meshes) if str(args.mesh_cache).lower() == "auto" else int(args.mesh_cache)
     sdf = sdf_grid_config(args)
     kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms) if args.prebuild_planner else (), mesh_cache_size=cache, sdf_grid=sdf)
     if sdf:
@@ -2379,6 +2388,88 @@ def reset_world_between_bands(world, kit):
     else:
         kit.sync_world()
     _reset_kit_seeds(kit)
+
+
+#: the bands the sampler computes itself (owner 2026-10-12 item 2a: the CLI's fast path, scoped to band computation): the
+#: capacity of the mesh store of :func:`band_kit` - ``auto`` (default: :func:`snug_mesh_cache` of the world's collision meshes),
+#: a number, or ``off`` (the sampler's own kit and store, the path before 2026-10-12)
+BAND_MESH_CACHE_ENV = "ISPATIALGYM_BAND_MESH_CACHE"
+
+
+def band_mesh_cache_setting() -> str:
+    return os.environ.get(BAND_MESH_CACHE_ENV, "").strip().lower() or "auto"
+
+
+def _collision_mesh_names(world) -> set:
+    """Prim paths of the collision meshes a cuRobo world sync loads from ``world`` now (``RobotKit.count_collision_meshes``)."""
+    names = set()
+    for o in world.scene.objects:
+        if o is world.robot or getattr(o, "visual_only", False) or (hasattr(world, "obstacle_filter") and not world.obstacle_filter(o)):
+            continue
+        for link in o.links.values():
+            names.update(cm.prim_path for cm in link.collision_meshes.values())
+    return names
+
+
+def gpu_free_gb() -> Optional[float]:
+    try:
+        return th.cuda.mem_get_info()[0] / 2 ** 30 if th.cuda.is_available() else None
+    except Exception:  # noqa: BLE001 - a diagnostic only
+        return None
+
+
+def band_kit(world, kit, kit_cls=None):
+    """The kit an in-process band (``tabletop.compute_bands``, ``iors_large.compute_band``, ``articulation_small._brace_band``)
+    is computed on: a ``RobotKit`` of its own on the sampler's world, as the CLI's ``load_world`` builds it with ``--mesh-cache
+    auto`` (no planners; mesh store = :func:`snug_mesh_cache` of the world's collision meshes, or ``ISPATIALGYM_BAND_MESH_CACHE``),
+    synced now, with the sampler kit's measured ``floor_z`` and fresh solver seed streams (:func:`_reset_kit_seeds`). The
+    sampler's ``kit`` is not touched: its store, collision world and solvers stay as a band loaded from the cache leaves them,
+    so sampling outside bands is the same whether a band was computed or loaded. Kept on ``kit`` and reused; rebuilt when the
+    meshes it holds (removed objects' stay, disabled) plus the world's current ones would leave fewer than MESH_CACHE_RESERVE
+    free slots. ``kit`` itself is returned with ``ISPATIALGYM_BAND_MESH_CACHE=off`` and when its store is not larger than the
+    band kit's would be (``ISPATIALGYM_SAMPLER_MESH_CACHE``)."""
+    setting = band_mesh_cache_setting()
+    if setting in ("off", "0", "none", "sampler"):
+        return kit
+    names = _collision_mesh_names(world)
+    cap = snug_mesh_cache(len(names))
+    if setting != "auto":
+        try:
+            want = int(setting)
+        except ValueError:
+            raise ValueError(f"{BAND_MESH_CACHE_ENV}={setting!r}: expected auto, off or a mesh-store capacity") from None
+        if want >= len(names) + MESH_CACHE_RESERVE:
+            cap = want
+        else:
+            log.warning("%s=%d is too small for %d collision meshes; the band kit gets %d", BAND_MESH_CACHE_ENV, want, len(names), cap)
+    if cap >= int(kit.backend.mesh_cache_size):
+        return kit
+    bk = getattr(kit, "_band_kit", None)
+    if bk is not None and bk.world is world:
+        if len(set(bk.backend._world_mesh_names) | names) + MESH_CACHE_RESERVE <= int(bk.backend.mesh_cache_size):
+            bk.floor_z = kit.floor_z
+            bk.sync_world()
+            _reset_kit_seeds(bk)
+            return bk
+        log.info("band kit: its %d-slot store holds %d meshes and the world has %d; rebuilt", bk.backend.mesh_cache_size, len(bk.backend._world_mesh_names), len(names))
+    if kit_cls is None:
+        from ispatialgym.sampling.robot_utils import RobotKit as kit_cls
+    kit._band_kit = None
+    t0, free0 = time.time(), gpu_free_gb()
+    bk = kit_cls(world, prebuild=(), mesh_cache_size=cap)
+    bk.floor_z = kit.floor_z
+    bk.sync_world()
+    free1 = gpu_free_gb()
+    kit._band_kit = bk
+    log.info("band kit: a cuRobo kit of its own for the in-process bands, mesh store %d for %d collision meshes (the sampler's kit keeps %d), "
+             "built and synced in %.1fs%s (%s=%s)", cap, len(names), kit.backend.mesh_cache_size, time.time() - t0,
+             f"; GPU free {free0:.2f} -> {free1:.2f} GB" if free0 is not None and free1 is not None else "", BAND_MESH_CACHE_ENV, setting)
+    return bk
+
+
+def band_schedule(kit, sampler_kit) -> Dict[str, Any]:
+    """``meta.schedule`` of an in-process band: the mesh-store capacity it was computed with and whose kit that was."""
+    return {"mesh_cache": int(kit.backend.mesh_cache_size), "kit": "sampler" if kit is sampler_kit else "band"}
 
 
 def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: List[str], floor_mode: bool, arms: Sequence[str], t_load: float,

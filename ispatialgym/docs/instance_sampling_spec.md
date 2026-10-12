@@ -509,6 +509,8 @@ carried drive keeps the holding arm's configuration for that chain (IORS large�
 - **Reach bands** (per support + object, section 4.1): two factors cached separately — the object-independent factor
   (trunk collision check, lattice, shoulder-distance prune; key = support name + top height + trunk grid + posture)
   and the object factor (grasp mask; key = model + grasp set + rest orientation + objects placed before it).
+  A band missing from the cache is computed in-process on a cuRobo kit of its own (owner 2026-10-12, item 2a; 4.1),
+  never on the sampler's kit; the mesh-store capacity it was computed with is in `meta.schedule`, not in the key.
 - **Feasible grasp sets F** per (trunk, cell) found in Phase 3 are stored in the band cache; a cell with empty F is
   removed from the band.
 - Stance survivors of Prompt 0 steps 1–3 per (scene, target, init state).
@@ -679,6 +681,23 @@ Cache key: 3.10 (two factors). Not the base pose; the stand-off is not a dimensi
 changes which cells fall on the top). Expected cost: 5–20 s per surviving trunk, 1–4 min cold per (support, object).
 `sample_isg` calls the function on a cache miss. Neighbouring supports (3.2): the band of the support and the band of each
 neighbour (same object, grasp key, scale; computed like any support's) are loaded, each read on its own top only.
+
+**In-process bands (owner decision 2026‑10‑12, item 2a).** A band `sample_isg` computes itself (`tabletop.compute_bands`:
+tabletop, neighbour, attach‑reach and left contact bands; `IORSLarge.compute_band`: floor / under bands;
+`ArticulationSmall._brace_band`: handle bands) runs on the CLI's fast path, scoped to the band computation:
+`reach_bands.band_kit` builds, on the first in‑process band of a world, a cuRobo kit of its own on the sampler's world (no
+planners) whose mesh store is sized to the world's collision meshes like `--mesh-cache auto` (+ 256 slots, ≥ 512, a multiple
+of 64: 832 instead of cuRobo's 8192 for the 556 meshes of a kitchen). cuRobo launches spheres × capacity threads per
+collision evaluation, so the empty slots of the 8192 store are what a band paid for. The kit is synced before every band,
+takes the sampler kit's floor height and fresh solver seed streams, and is rebuilt when its store would keep fewer than 64
+free slots (removed objects' meshes stay in it, disabled). The sampler's own kit is never used by an in‑process band: its
+8192 store, exact mesh world and solvers are exactly as a cache hit leaves them, so sampling outside bands is the same whether
+the band was computed or loaded (before, the band advanced the sampler's batched‑IK seed streams). Same algorithm, other
+thread layout: a marginal cell can differ from a band computed with the 8192 store. `meta.schedule = {mesh_cache, kit}`
+records how a band was computed; the file‑name key does not change (`ReachBands.find` matches meta fields).
+`ISPATIALGYM_BAND_MESH_CACHE` = `auto` (default) | a capacity | `off` (the sampler's kit, the path before 2026‑10‑12); with
+`ISPATIALGYM_SAMPLER_MESH_CACHE=auto` the sampler's store is already as small and bands stay on it. The approximate sdf‑grid
+world (`reach_bands --collision sdf-grid`) stays a CLI opt‑in.
 
 ### 4.2 Phase 1a — edge and stand-off
 

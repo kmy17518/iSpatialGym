@@ -919,14 +919,16 @@ class IORSLarge(SamplerV2):
     def compute_band(self, kind: str, support_obj=None, under_partner=None) -> RB.ReachBands:
         """Compute-on-miss of the floor-mode bands (``--support floor [--under partner]``) with the computation the CLI
         runs (the ``stance_free_floor`` / ``stance_under`` stance, the 2 cm floor lattice (under: the clear cells), the
-        library grasp mask per trunk incl. tilt −1.2); written to the cache root in the CLI's layout."""
+        library grasp mask per trunk incl. tilt −1.2); written to the cache root in the CLI's layout. Computed on
+        ``reach_bands.band_kit`` (``self.kit`` is not touched), recorded in ``meta.schedule``."""
         c = self.choice.models["target"]
-        bc = RB.BandComputer(self.world, self.kit, arms=("right",))
+        kit = RB.band_kit(self.world, self.kit)
+        bc = RB.BandComputer(self.world, kit, arms=("right",))
         t0 = time.time()
         parked = self.world.snapshot()
         try:
             self.world.park(self.target, list(self.world.spawned).index(self.target.name))
-            self.kit.sync_world()
+            kit.sync_world()
             if kind == "floor":
                 z = self.floor_z
                 if under_partner is not None:
@@ -956,14 +958,14 @@ class IORSLarge(SamplerV2):
             result = bc.compute(stance, lattice_world, z, pose_fn, self.grasps, ignore, arm="right", trunks=trunks, max_grasp_offset=max_off)
         finally:
             self.world.restore(parked)
-            self.kit.sync_world()
+            kit.sync_world()
         meta = {"scene": self.world.scene_model, "rooms": list(self.world.rooms or []), "support": "floor" if kind == "floor" else support_obj.name, "lattice": bc.lattice,
                 "stand_off": RB.STAND_OFF, "arms": "untucked", "grid": RB.grid_meta((z - self.floor_z) < RB.LOW_TOP_Z), "seeds": 12,
                 "pre_grasp": RB.PRE_GRASP, "yaws": RB.YAWS, "mode": "floor" if kind == "floor" else "tabletop", "scale": c.scale, "placed_specs": [],
                 "object": f"{c.category}/{c.model}", "grasp_key": self.grasp_key, "n_grasps": len(self.grasps), "grasp_names": [g.name for g in self.grasps],
                 "rest_quat_xyzw": self.rest.tolist(), "generic_pinch": False, "stance": stance, "top": top_json, "z_support": z,
                 "under_partner": under_partner.name if under_partner is not None else None, "trunks": result["trunks"], "computed_by": "iors_large compute-on-miss",
-                "time_s": round(time.time() - t0, 1)}
+                "time_s": round(time.time() - t0, 1), "schedule": RB.band_schedule(kit, self.kit)}
         lat_all = np.concatenate([cc[:, 1] for cc in result["cells"].values() if len(cc)]) if any(len(cc) for cc in result["cells"].values()) else np.zeros(0)
         meta["union_extent"] = [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None
         meta["n_reachable_total"] = int(sum(len(cc) for cc in result["cells"].values()))

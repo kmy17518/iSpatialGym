@@ -843,6 +843,10 @@ class ArticulationSmall(SamplerV2):
                 return b
             log.info("%s: B3 %s band %s has no cell (no §5.4 brace is IK-feasible): computing the handle band", self.gp.alias, mode, b.path)
         self.handle_only_band = True
+        # the band itself on reach_bands.band_kit (self.kit is not touched); the stance above keys the cache lookup and stays the sampler kit's
+        kit = RB.band_kit(world, self.kit)
+        if kit is not self.kit:
+            bc = RB.BandComputer(world, kit, arms=(self.handle_arm, self.brace_arm))
         base_cells, world_cells = bc.lattice_on_cells(stance, self.top.cells(free_only=True))
         # the §5.3 required set exactly as the instance checks it (q_init + every q_k up to the passive fraction); B3's brace
         # bands record n_all_q = 0 for every target at all five fractions, so requiring q_goal itself would empty the band
@@ -906,7 +910,8 @@ class ArticulationSmall(SamplerV2):
                 "mode": "handle", "smoke": False, "scale": None, "placed_specs": [], "stance": stance, "top": self.top.to_json(), "z_support": self.top.z,
                 "target": cache_key["target"], "joint": self.joint_name, "joint_values": q_values, "face_yaw_offset": face_off, "handle_arm": self.handle_arm,
                 "brace_arm": self.brace_arm, "trunks": per_trunk, "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
-                "n_reachable_total": int(sum(len(c) for c in cells_out.values())), "computed_by": "sampling.v2.tasks.articulation_small", "handle_sig": handle_sig}
+                "n_reachable_total": int(sum(len(c) for c in cells_out.values())), "computed_by": "sampling.v2.tasks.articulation_small", "handle_sig": handle_sig,
+                "schedule": RB.band_schedule(kit, self.kit)}
         key = RB._key({**cache_key, "q": q_values, "handle": True, "grid": meta["grid"], "lattice": bc.lattice, "stance": stance["edge"], "handle_sig": handle_sig})
         meta["key"] = key
         out_dir = RB.cache_root()

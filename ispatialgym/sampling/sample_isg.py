@@ -191,7 +191,9 @@ def kit_mesh_cache(world) -> Optional[int]:
     same-algorithm opt-in, like reach_bands': the thread layout changes the order of cuRobo's atomic float sums, and
     large-scale ontop sampled different instances with it (dishwasher, blender and block design: identical TROs). The
     store keeps the meshes of removed objects (disabled), so ``auto`` suits a process that samples one template
-    (production), not many aliases reusing one world."""
+    (production), not many aliases reusing one world. The bands the sampler computes in-process do not need it: they run on a
+    kit of their own with a snug store (``reach_bands.band_kit``, ``ISPATIALGYM_BAND_MESH_CACHE``), or on this kit when its
+    store is not larger (``auto`` here)."""
     value = os.environ.get("ISPATIALGYM_SAMPLER_MESH_CACHE", "").strip().lower()
     if not value:
         return None

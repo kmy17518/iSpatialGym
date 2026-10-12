@@ -890,8 +890,10 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
                   trunks: Optional[Sequence[Tuple[float, float]]] = None) -> RB.ReachBands:
     """§4.1 steps 1–4 in-process (``reach_bands.BandComputer``) at the band stance (edge midpoint, s = 0.45 + overhang) of
     ``edge`` (default: the longest free edge), written as ``<cache>/<name>.npz/.json`` like the CLI. A union top's band is its
-    support's own (bands are per support)."""
-    world, kit = s.world, s.kit
+    support's own (bands are per support). Computed on ``reach_bands.band_kit`` (the band's own kit with a snug mesh store;
+    ``s.kit`` is not touched), recorded in ``meta.schedule``."""
+    world = s.world
+    kit = RB.band_kit(world, s.kit)
     top = NB.own_top(top)
     support = world.obj(top.name)
     bc = RB.BandComputer(world, kit, arms=(spec.arm,), lattice=lattice)
@@ -938,7 +940,7 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
                             "top": top.to_json(), "z_support": z_eval, "trunks": result["trunks"],
                             "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
                             "n_reachable_total": int(sum(len(c) for c in result["cells"].values())), "time_s": round(time.time() - t0, 1),
-                            "computed_by": "sampling.v2.tabletop.compute_bands", "arm": spec.arm}
+                            "computed_by": "sampling.v2.tabletop.compute_bands", "arm": spec.arm, "schedule": RB.band_schedule(kit, s.kit)}
     if contact_mode:  # B3's contact-band fields (``ReachBands.find(arm="left", contact_set=..., height=...)`` matches them)
         meta.update({"contact_set": CONTACT_SET, "height_class": height_class(h), "contact_height_fraction": CONTACT_HEIGHT_FRACTION,
                      "classes": [c["name"] for c in getattr(RB, "CONTACT_CLASSES", [])], "fingers": bc.fingers})
@@ -965,8 +967,10 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
     cells = {k: np.asarray(v, dtype=np.float32).reshape(-1, 2) for k, v in result["cells"].items() if not _trunk_collides(result["trunks"], k)}
     pairs = {k: np.asarray(v, dtype=np.int32).reshape(-1, 3) for k, v in result.get("pairs", {}).items() if k in cells}
     classes = {k: np.asarray(v, dtype=np.int64).reshape(-1) for k, v in (result.get("classes") or {}).items() if k in cells and v is not None and len(v)}
-    log.info("reach band computed for %s / %s: %d reachable cells over %d trunks in %.0fs -> %s", top.name, spec.object, meta["n_reachable_total"], len(cells),
-             meta["time_s"], path)
+    free = RB.gpu_free_gb()
+    log.info("reach band computed for %s / %s: %d reachable cells over %d trunks in %.0fs -> %s (%s kit, mesh store %d%s)", top.name, spec.object,
+             meta["n_reachable_total"], len(cells), meta["time_s"], path, meta["schedule"]["kit"], meta["schedule"]["mesh_cache"],
+             "" if free is None else f", GPU free {free:.2f} GB")
     try:
         return RB.ReachBands(meta, cells, pairs, path, classes)
     except TypeError:  # loader without the classes field
