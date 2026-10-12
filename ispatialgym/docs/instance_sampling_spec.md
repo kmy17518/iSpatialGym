@@ -897,9 +897,10 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      arm (6.10) reachable.
 2. **Partner** on a side of the target with edge-to-edge gap g: ontop / under / inside g ∈ [0.03, D_p];
    nextto g ∈ [g_NT + 0.03, D_p]; touching g ∈ [0.03, D_p] **on the robot's left** (the right hand pushes toward it,
-   the left hand braces its far side, section 6.11); attachment: partner on a cell of the attach-reach band (every
-   attachment pose reachable ignoring collision with the target), gap ≥ 0.04, centre distance ≥ 0.08. Footprints on
-   the top, ≥ 3 cm apart.
+   the left hand braces its far side, section 6.11); attachment: partner on a cell of the attach-reach band (one
+   (partner yaw, attach grasp) pair reachable ignoring collision with the target — the band marks a cell with its first
+   feasible pair; the attempt then solves the drawn grasp's attach pose exactly), gap ≥ 0.04, centre distance ≥ 0.08.
+   Footprints on the top, ≥ 3 cm apart.
 
    *IORS start region (owner decision 2026‑10‑12, A1; ontop, under, inside, nextto, touching small-scale).*
    - **Side first.** The partner's side (of the target, robot frame) is fixed before the target is placed. Train: uniform
@@ -1767,9 +1768,13 @@ depth (≤ 0.62 m base‑forward first) and the lift's carry height laddered 12 
 every class‑0 (8°) focus of the lid–teapot alias lies 0.77–0.81 m base‑forward, where the lift / SLERP have no IK —
 A `generation.phase2_loose_class_deg` (20–25°) or B `generation.phase2_class1_when_deep_m` (0.65: `phase2_manipulation_
 stance(class1_when_deep_m=…)` admits the class‑1 survivors when every class‑0 focus is deeper than that; §4.5 general rule).
-Since the owner decision of 2026‑10‑11 the attachment classes are the tabletop 20° / 30° of §4.5 step 3 (were 8° / 20°);
-rule B (0.65 m, set in the attachment customs) stays and now compares the 20° class: the ≤ 30° survivors are admitted
-when every ≤ 20° focus is deeper than 0.65 m base‑forward.
+Since the owner decision of 2026‑10‑11 the plain Phase 2's attachment classes are the tabletop 20° / 30° of §4.5 step 3
+(were 8° / 20°); rule B (0.65 m, set in the attachment customs) stays and there compares the 20° class: the ≤ 30° survivors
+are admitted when every ≤ 20° focus is deeper than 0.65 m base‑forward. That does not hold for the split‑cone aliases (every
+attachment alias since the subtask default of 2026‑10‑11, variant C, 532cfd10): the work stance keeps 8° / 20° by design
+(`phase2_tight_class_deg` / `phase2_loose_class_deg`), the start position 20° / 30° of the init view, and 20° / 30° only in the
+plain fallback (`phase2_split_fallback_classes_deg`); rule B then compares the 8° class (`split_cone_positions`: a position's
+≤ 20° work stances are admitted when every ≤ 8° focus is deeper than 0.65 m).
 
 *Carry over the partner (owner decision 2026‑10‑12, attachment#04 3b; `generation.carry_over_partner_m`, default off).* The
 carry was a straight SLERP line from the 5–12 cm lift to the pre‑attach; with the x0.65 lid and stockpot (lid 22 cm across,

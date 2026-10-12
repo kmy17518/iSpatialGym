@@ -7,8 +7,9 @@ Template: both parts get the ``attachable`` ability at spawn; the male / female 
 parent candidates), the collision filter between the two members (applied once, restored by the loader), the
 mating-axis symmetry test (5 mm slabs, a rotation is accepted when >= 90 % of the slabs match) -> ``orientation_
 equivalences`` for both members; two reach bands — the male's grasp band and the **attach-reach band** of the partner
-(the partner posed at a cell, grasp set = the attach eef poses ``T_partner ∘ T_F ∘ inv(T_M) ∘ T_obj→eef`` of every male
-grasp, so a cell is in it when every attachment pose is reachable ignoring the target); Phases 1a / 1b (H_max = the
+(the partner posed at a cell, grasp set = the attach eef poses ``T_partner ∘ T_F ∘ inv(T_M) ∘ T_obj→eef`` of the male
+grasps, so a cell is in it when one (partner yaw, attach eef pose) pair is reachable ignoring the target - the band marks
+a cell with its first feasible pair, like any library-grasp band); Phases 1a / 1b (H_max = the
 taller part) / 1c (row ``attachment``: max(w_target, w_partner) + 0.02) / 2 (male half-extent).
 
 Instance: the male at the focus from F (Phase 3 step 1); the partner on a cell of the attach-reach band (gap >= 0.04,
