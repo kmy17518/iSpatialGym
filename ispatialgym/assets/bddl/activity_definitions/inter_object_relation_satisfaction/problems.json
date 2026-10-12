@@ -1106,7 +1106,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "inter_object_relation_satisfaction-touching",
    "iddl": "inter_object_relation_satisfaction/touching.iddl",
-   "pick": "inter_object_relation_satisfaction-touching#03~T8",
+   "pick": "inter_object_relation_satisfaction-touching#03~T6",
    "slot": "representative",
    "mode": "representative"
   },

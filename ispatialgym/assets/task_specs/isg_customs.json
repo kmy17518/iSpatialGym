@@ -36354,6 +36354,7 @@
  "inter_object_relation_satisfaction-touching-hardback-hardback-bookcase": {
   "iddl": "inter_object_relation_satisfaction/touching.iddl",
   "definition_id": 98,
+  "superseded_by": true,
   "roles": {
    "target": {
     "category": "hardback",
@@ -36558,15 +36559,29 @@
   "scenes": {
    "house_double_floor_upper": {
     "rooms": [
-     "living_room_0",
-     "bedroom_2"
+     "bedroom_2",
+     "bedroom_0",
+     "living_room_0"
     ],
     "bindings": {
      "support": [
-      "bookcase_otwukr_1",
-      "bookcase_opryhp_0"
+      "bookcase_opryhp_0",
+      "bookcase_kmuacd_0",
+      "bookcase_otwukr_1"
      ],
      "support_surfaces": [
+      {
+       "name": "bookcase_opryhp_0",
+       "init": "inside",
+       "top_z": 0.37,
+       "row": "inter_object_relation_satisfaction-touching#03~T6"
+      },
+      {
+       "name": "bookcase_kmuacd_0",
+       "init": "inside",
+       "top_z": 0.84,
+       "row": "inter_object_relation_satisfaction-touching#03~T1"
+      },
       {
        "name": "bookcase_otwukr_1",
        "init": "inside",
@@ -36578,16 +36593,10 @@
        "init": "inside",
        "top_z": 0.39,
        "row": "inter_object_relation_satisfaction-touching#03~T7"
-      },
-      {
-       "name": "bookcase_opryhp_0",
-       "init": "inside",
-       "top_z": 0.37,
-       "row": "inter_object_relation_satisfaction-touching#03~T6"
       }
      ],
      "floor": {
-      "room": "living_room_0"
+      "room": "bedroom_2"
      }
     },
     "whitelist": {
@@ -36605,14 +36614,14 @@
     "blacklist": {
      "target": {
       "hardback": {
-       "axvnml": "ground_isg 2026-10-11: heldout",
-       "bobmzf": "ground_isg 2026-10-11: heldout"
+       "axvnml": "ground_isg 2026-10-12: heldout",
+       "bobmzf": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "hardback": {
-       "axvnml": "ground_isg 2026-10-11: heldout",
-       "bobmzf": "ground_isg 2026-10-11: heldout"
+       "axvnml": "ground_isg 2026-10-12: heldout",
+       "bobmzf": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -36658,13 +36667,35 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
  "inter_object_relation_satisfaction-touching-hardback-hardback-shelf": {
   "iddl": "inter_object_relation_satisfaction/touching.iddl",
   "definition_id": 97,
+  "superseded_by": true,
   "roles": {
    "target": {
     "category": "hardback",
