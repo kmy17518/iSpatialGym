@@ -15,7 +15,7 @@ Instance: the male at the focus from F (Phase 3 step 1); the partner on a cell o
 centre distance >= 0.08, on the top, in frame); the attach pose ``T_partner ∘ T_F ∘ inv(T_M)`` and the **pre-attach**
 10 cm back along the female meta-link's insertion axis, exact-IK-checked with the male in hand (partner and support
 ignored for the attach pose only); the in-hand reorientation from the lifted grasp pose to the pre-attach pose at 3
-SLERP waypoints (§3.9); the **partner brace** (closed left gripper on the partner's face opposite to the insertion
+SLERP waypoints (§3.9; ``generation.carry_over_partner_m``: a vertical rise over the partner first); the **partner brace** (closed left gripper on the partner's face opposite to the insertion
 direction; pre-contact + contact IK with the target arm locked at the attach solution, combined whole-body check).
 Goal: partner unchanged, target attached (verified with ``AttachedTo.set_value(True)`` at the goal check); group
 target with the fixed assignment, tolerances 0.01 / 0.15, equivalences. Sidecar: ``init`` / ``manipulation`` stances,
@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -102,6 +103,28 @@ REST_SUPPORT_TOL_M = 0.002
 #: SOUND and is never flipped on geometry alone (owner 2026-09-25: the flat cap, margin 3.4, was turned open side up for a 1.6x
 #: "better" margin and lost every grasp - 0925-144739 'grasp_unreachable' 8/8); below it the flip is weighed as before
 REST_SOUND_MARGIN = 0.5
+
+
+def carry_over_ladder(value) -> Tuple[float, ...]:
+    """``generation.carry_over_partner_m`` as the clearances (m) the carry over the partner tries in order (a number = one); () = off:
+    absent, null, a boolean, 0 or an empty list (the lift ladder ``CARRY_HEIGHTS`` and the straight line to the pre-attach)."""
+    if value is None or isinstance(value, bool):
+        return ()
+    return tuple(float(v) for v in (value if isinstance(value, (list, tuple)) else [value]) if v is not None and float(v) > 0.0)
+
+
+@dataclass
+class CarryPlan:
+    """The carry from the lifted grasp to the pre-attach that :meth:`Attachment._carry_to_pre_attach` settled on (or tried last):
+    the tracked chain's result, the lift pose, the recorded SLERP waypoints (pre-attach last), the lift height, the over-the-partner
+    facts (None with the carry over the partner off) and the ladder for the log."""
+
+    result: Any
+    lift: Optional[TT.Pose]
+    waypoints: List[TT.Pose]
+    carry: Optional[float]
+    over: Optional[Dict[str, Any]]
+    ladder: str
 
 
 def _support_margin(pts: th.Tensor, com: th.Tensor) -> Tuple[float, float, int]:
@@ -641,6 +664,8 @@ class Attachment(SamplerV2):
         grasp.pre_place, grasp.place = pre_attach, attach
         grasp.extras.update({"attach_stance": work_st.name, "lift": [float(v) for v in lift[0]] if lift is not None else None,
                              "slerp_policy": att.get("slerp_policy")})
+        if att.get("carry_over") is not None:
+            grasp.extras["carry_over"] = att["carry_over"]
         self._record_approach_standoff(grasp, f_pose, manip)  # over-the-top pre-grasp approach when the partner stands near the male
         # owner item 3 (release height): the attach pose is fixed by the mating links (no release above a surface), but the
         # surface under the male's footprint centre at the goal (the female's mating face) is recorded for the audit
@@ -1242,25 +1267,13 @@ class Attachment(SamplerV2):
                     log.info("%s: partner cell rejected: %s", self.gp.alias, why)
                     continue
                 with attached(self.kit, "right", male):
-                    # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner. The
-                    # carry height ladder (owner item 2 / att_diag2: a 12 cm lift of a grasp at 0.8 m base-forward has no IK)
-                    r_w, lift, wps = None, None, []
-                    # the SLERP is TRACKED from the lift's solution at the oracle's densification (track_dense, as block design's
-                    # reorients; owner 2026-09-19 20:42): 32-seed IK at every waypoint said "reachable" for a pre-attach 25 cm from the
-                    # lift while the oracle's differential IK stalled 13.7 mm short at waypoint 24/29 (pwgbsb / jlalfc 0919-185350 /
-                    # 193702) - a chain the arm cannot follow in one branch is rejected here, so the place stance (second base pose,
-                    # brace False) is recorded instead
-                    tracked = bool(self.gen("slerp_tracked", True))
-                    for carry in CARRY_HEIGHTS:
-                        lift = (grasp.grasp[0] + th.tensor([0.0, 0.0, carry]) + shift, grasp.grasp[1])  # the carried male moves with the base
-                        wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, eef_pre, int(self.g("reorientation_waypoints")) + 1)]
-                        r_w = self.ikc.waypoints_ok([lift] + wps, st, "right", ignore_all=[support], track_dense=tracked)
-                        if r_w.ok:
-                            break
+                    # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner
+                    plan = self._carry_to_pre_attach(grasp, eef_pre, pose, st, shift)
+                    r_w, lift, wps, carry = plan.result, plan.lift, plan.waypoints, plan.carry
                     if not r_w.ok:
                         fails["slerp"] += 1
                         seq = [lift] + wps
-                        log.info("%s: SLERP_FAILURE at %s (carry ladder %s): %s | %s", self.gp.alias, st.name, CARRY_HEIGHTS, r_w.reason,
+                        log.info("%s: SLERP_FAILURE at %s (%s): %s | %s", self.gp.alias, st.name, plan.ladder, r_w.reason,
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
                                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)))
                         continue
@@ -1284,8 +1297,67 @@ class Attachment(SamplerV2):
                         if require_joint:
                             continue
             return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace_rec, "b_dir": b_dir,
-                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient}
+                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient, "carry_over": plan.over}
         return None
+
+    def _carry_to_pre_attach(self, grasp, eef_pre: TT.Pose, f_pose: TT.Pose, st: Stance, shift: th.Tensor) -> CarryPlan:
+        """The carry of the attached male from its lifted grasp to the pre-attach, tracked as the oracle runs it (``Lift``, then
+        ``Reorient`` through the recorded waypoints): the first carry whose chain passes, else the last one tried.
+
+        Default: the lift ladder ``CARRY_HEIGHTS`` (owner item 2 / att_diag2: a 12 cm lift of a grasp at 0.8 m base-forward has no IK),
+        each followed by the straight SLERP line of ``reorientation_waypoints`` + 1 poses to the pre-attach. ``generation.
+        carry_over_partner_m`` (owner 2026-10-12 attachment#04 3b, the lid-stockpot aliases: the straight line from a 5-12 cm lift
+        clipped the stockpot's rim): the 12 cm lift, then straight up until the male's lowest point is that clearance above the
+        partner's highest point (:meth:`_carry_rise_z`; a list is a ladder tried in order), then the line to the pre-attach; a carry
+        whose fingertip point leaves the stance camera's image (``program_check.fingertips_in_frame``, the program check's rule) is
+        not tried. The chain is TRACKED from the lift's solution at the oracle's densification (track_dense, as block design's
+        reorients; owner 2026-09-19 20:42): 32-seed IK at every waypoint said "reachable" for a pre-attach 25 cm from the lift while
+        the oracle's differential IK stalled 13.7 mm short at waypoint 24/29 (pwgbsb / jlalfc 0919-185350 / 193702) - a chain the
+        arm cannot follow in one branch is rejected here, so the place stance (second base pose, brace False) is recorded instead."""
+        tracked = bool(self.gen("slerp_tracked", True))
+        n = int(self.g("reorientation_waypoints")) + 1
+        support = self.obj("support")
+        ladder = carry_over_ladder(self.gen("carry_over_partner_m", None))
+        tries = [(max(CARRY_HEIGHTS), c) for c in ladder] if ladder else [(c, None) for c in CARRY_HEIGHTS]
+        label = f"carry over the partner {list(ladder)} m" if ladder else f"carry ladder {CARRY_HEIGHTS}"
+        plan = CarryPlan(None, None, [], None, None, label)
+        for carry, clearance in tries:
+            lift = (grasp.grasp[0] + th.tensor([0.0, 0.0, carry]) + shift, grasp.grasp[1])  # the carried male moves with the base
+            start, over = lift, None
+            if clearance is not None:
+                rise_z, over = self._carry_rise_z(grasp, lift, f_pose, clearance)
+                if rise_z > float(lift[0][2]) + 1e-3:
+                    start = (th.tensor([float(lift[0][0]), float(lift[0][1]), rise_z]), TT._t(lift[1]))
+            wps = ([start] if start is not lift else []) + [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(start, eef_pre, n)]
+            plan = CarryPlan(None, lift, wps, carry, over, label)
+            if clearance is not None:
+                out = self._carry_out_of_frame(st, wps)
+                if out is not None:
+                    plan.result = IK.IKResult(False, None, f"the carry {clearance:.2f} m over the partner leaves the image: {out}", len(wps))
+                    continue
+            plan.result = self.ikc.waypoints_ok([lift] + wps, st, "right", ignore_all=[support], track_dense=tracked)
+            if plan.result.ok:
+                break
+        return plan
+
+    def _carry_rise_z(self, grasp, lift: TT.Pose, f_pose: TT.Pose, clearance: float) -> Tuple[float, Dict[str, Any]]:
+        """``(eef z, facts)``: the height of the eef, held at ``lift``'s orientation, at which the male in the hand
+        (``grasp.eef_in_object``) has its lowest hull point ``clearance`` above the highest hull point of the partner at ``f_pose``."""
+        m_pose = C.compose(lift, C.invert((TT._t(grasp.eef_in_object[0]), TT._t(grasp.eef_in_object[1]))))
+        low = float(C.transform_points(m_pose, TT._t(self.hull[self.t_role]))[:, 2].min())
+        top = float(C.transform_points((TT._t(f_pose[0]), TT._t(f_pose[1])), TT._t(self.hull[self.p_role]))[:, 2].max())
+        z = float(lift[0][2]) + top + float(clearance) - low
+        return z, {"clearance_m": round(float(clearance), 4), "partner_top_z": round(top, 4), "male_low_below_eef_m": round(float(lift[0][2]) - low, 4),
+                   "rise_z": round(max(z, float(lift[0][2])), 4), "rise_m": round(max(0.0, z - float(lift[0][2])), 4)}
+
+    def _carry_out_of_frame(self, st: Stance, wps: Sequence[TT.Pose]) -> Optional[Dict[str, Any]]:
+        """The program check's frame rule on the carry's waypoints (``program_check.fingertips_in_frame``: the fingertip point inside the
+        stance camera's image, 5 % + execution slack; off with ``ISG_FINGERTIP_FRAME_CHECK=off`` as there): the first pose outside, or None."""
+        from ispatialgym.sampling.v2 import program_check as PC
+
+        if os.environ.get("ISG_FINGERTIP_FRAME_CHECK", "on").lower() in ("off", "0", "false"):
+            return None
+        return PC.fingertips_in_frame(self, st, "reorient", [("waypoints", list(wps))])
 
     def _second_base_pose(self, rng, manip: Stance, m_pose: TT.Pose, grasp, cam_init, tname: str, require_joint: bool = True, brace: bool = True):
         """§6.8 (owner 2026-09-16 17:10): when the attach pose and the left brace are not both reachable from the grasp

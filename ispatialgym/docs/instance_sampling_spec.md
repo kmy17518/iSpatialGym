@@ -1771,6 +1771,16 @@ Since the owner decision of 2026‑10‑11 the attachment classes are the tablet
 rule B (0.65 m, set in the attachment customs) stays and now compares the 20° class: the ≤ 30° survivors are admitted
 when every ≤ 20° focus is deeper than 0.65 m base‑forward.
 
+*Carry over the partner (owner decision 2026‑10‑12, attachment#04 3b; `generation.carry_over_partner_m`, default off).* The
+carry was a straight SLERP line from the 5–12 cm lift to the pre‑attach; with the x0.65 lid and stockpot (lid 22 cm across,
+pot 14.3 cm tall) that line ran through the pot's rim (12 tracked carries `collides with partner_stockpot_oshwps_0` in the
+05:10–06:10 runs). With the key the lift is the 12 cm one, the first recorded waypoint rises straight up until the carried
+part's lowest point is the key's clearance above the partner's highest point (a list is tried in order: the lid–stockpot
+aliases carry [0.20, 0.12, 0.06] m), then the SLERP line runs to the pre‑attach. A carry whose fingertip point leaves the
+stance camera's image (the program check's fingertip rule) is not tried. The oracle tracks the recorded waypoints as before;
+`grasps[].extras.carry_over` records the clearance, the partner's top and the rise. The other attachment aliases (lid–teapot,
+cork, cap) keep the straight carry.
+
 
 Init per section 4 with: partner (female) upright on a cell of the attach-reach band, target (male) at the focus with
 the attachment pipeline's library grasps. Goal: partner unchanged; target attached at
