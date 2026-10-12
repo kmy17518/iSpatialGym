@@ -1,10 +1,12 @@
 """IORS small-scale (spec §6.11): ontop, under, inside, nextto, touching — the reference v2 task module.
 
 Init per §4 through the shared tabletop phases (``v2/tabletop.py``: 1a edge + stand-off, 1b init trunk, 1c lateral with
-the IORS margin row, 2 manipulation stance survivors, 3 target from the feasible set F, partner placement); this module
-adds the §6.11 rules only: pair admissibility per template, the partner side / gap rule of §4.6 step 2, the goal pose per
-relation, the place / pre-place IK from the manipulation stance after the goal settled, the touching push + brace, the
-constraints it learned. Every number comes from the customs ``generation`` block (D1 ``generation_defaults``):
+the IORS edge rule, 2 manipulation stance survivors, 3 target from the feasible set F, partner placement); this module
+adds the §6.11 rules only: pair admissibility per template, the start region and the partner side / gap rule of §4.6 step 2
+(A1, owner 2026-10-12: the side is fixed before the target is placed - ``partner_side`` for eval -, the target starts on a cell
+whose partner fits at some gap of its interval), the goal pose per relation, the place / pre-place IK from the manipulation
+stance after the goal settled, the touching push + brace, the constraints it learned. Every number comes from the customs
+``generation`` block (D1 ``generation_defaults``): ``table_end_margin_m``, ``start_region_lateral_draws``,
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
 (inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
@@ -148,6 +150,37 @@ FINGER_HALF_WIDTH = 0.012
 #: touching#03 shelf layout: the lift of the target before it is slid along the board to the partner's side (it never passes over
 #: the partner); 5 mm under the headroom the interior raster keeps above the tallest book at every free cell
 SHELF_CARRY_HEIGHT_M = TT.INTERIOR_HEADROOM_MARGIN_M - 0.005
+#: A1 start region (owner 2026-10-12): Phase-1c lateral draws of the template before it is rejected when no partner side the template
+#: may draw has a start cell (``generation.start_region_lateral_draws``)
+START_REGION_LATERAL_DRAWS = 4
+#: A1: partner orientations tried per attempt, each with the start region's gap interval re-evaluated at the drawn target pose
+PARTNER_YAW_DRAWS = 16
+#: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
+BAND_DEPTH_WINDOW_M = 0.12
+#: A1: extras key of a Phase-2 candidate: ``{"left" | "right": [arm, ...]}``, the arms whose band meets the side's reach rule there
+REGION_ARMS = "start_region_arms"
+
+
+def partner_sides(relation: str, handed: Optional[Dict[str, str]] = None) -> List[float]:
+    """A1 step 3 (owner 2026-10-12): the partner sides (+1 = the robot's left of the target, -1 = its right) a pair admits - touching the
+    robot's left (the right hand pushes toward it, the left braces its far side, §6.11), a handed nextto pair (``handedness_pair``) the
+    side that leaves the target on its own hand's side, otherwise both."""
+    from ispatialgym.sampling import pair_rules as PR
+
+    if relation == "touching":
+        return [1.0]
+    if handed:
+        return [PR.partner_side_for(handed["target_side"])]
+    return [1.0, -1.0]
+
+
+def region_sides(allowed: Sequence[float], assigned: Optional[float], cells: Dict[float, int]) -> List[float]:
+    """A1 step 3: the partner sides an attempt draws from - eval (``assigned`` = ``generation.partner_side``) that side alone when its
+    start region has a cell, train every allowed side whose region has one (``cells``: side -> start cells), in ``allowed``'s order.
+    Empty: the robot's lateral is redrawn, then the template rejected."""
+    if assigned is not None:
+        return [assigned] if cells.get(assigned, 0) > 0 else []
+    return [sd for sd in allowed if cells.get(sd, 0) > 0]
 
 
 def push_face_point(hull_w: th.Tensor, direction) -> th.Tensor:
@@ -160,6 +193,12 @@ def push_face_point(hull_w: th.Tensor, direction) -> th.Tensor:
     face = float((hull_w[:, :2] @ d).min())
     centre = hull_w.mean(dim=0)
     return th.tensor([*(centre[:2] + d * (face - float(centre[:2] @ d))).tolist(), z])
+
+
+def footprint_laterals(pts: th.Tensor, tangent) -> Tuple[float, float]:
+    """(min, max) of points (a footprint polygon, a hull) along the horizontal ``tangent``."""
+    v = G.t(pts)[:, :2].float() @ G.t(tangent)[:2].float()
+    return float(v.min()), float(v.max())
 
 
 def gap_along(behind_w: th.Tensor, ahead_w: th.Tensor, direction) -> float:
@@ -221,12 +260,19 @@ class IORSSmall(SamplerV2):
         self.shelf_start: Optional[Dict[str, Any]] = None  # touching with an upright-shelf key: the leaning start (tabletop.shelf_lean_pose)
         self.shelf_pose: Optional[G.Pose] = None
         self.shelf_partner_pose: Optional[G.Pose] = None  # the partner leaning against the opposite board
+        self.region_sides: List[float] = []  # A1: the partner sides whose start region has a cell (sample_template)
+        self.region_side: Optional[float] = None  # A1: the partner side of the current attempt (+1 = the robot's left of the target)
+        self.partner_draw: Optional[Dict[str, Any]] = None  # A1: the drawn partner's side, gap and the gap interval it came from
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
     @property
     def margin_support(self) -> float:
         return float(self.gen("support_margin", 0.02))
+
+    @property
+    def table_end_margin(self) -> float:
+        return float(self.gen("table_end_margin_m", TT.TABLE_END_MARGIN))
 
     @property
     def gap_min(self) -> float:
@@ -309,6 +355,7 @@ class IORSSmall(SamplerV2):
             self.rest["partner"] = TT.upright_lean_quat(self.hull["partner"], -self.shelf_start["lean_side"], self.shelf_start["lean_deg"])
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair
+        self.template_facts["partner_sides"] = [TT.side_name(sd) for sd in self.template_sides()]  # A1: Reject("partner_side") before any phase
         H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
         self.top = TT.support_surface(self, self.support, height=H_max)
         if int(self.top.free.sum()) < 50:
@@ -317,9 +364,10 @@ class IORSSmall(SamplerV2):
         rng_t = np.random.default_rng(self.ctx.base_seed)
         errors: List[str] = []
         self.init_stance = None
+        init_trunk = None
         # Phases 1a / 1b / 1c per edge: §4.2 has no preference among the edges and §4.4 checks floor + collision per
         # lateral position, so every edge with a free-floor run in front of it (a third of its 10 cm lateral raster at
-        # s = 0.45 on free floor) is tried; an edge whose margins exceed its length is skipped (§4.4 step 2)
+        # s = 0.45 on free floor) is tried; an edge too short for both objects is skipped (§4.4 step 2, A1)
         for edge, init in TT.edge_frames(self, self.top, rng_t):
             lats = th.linspace(-edge.length / 2 + 0.1, edge.length / 2 - 0.1, max(2, int(edge.length / 0.1))).tolist()
             n_free = sum(1 for lat in lats if self.kit.trav_free(edge.base_xy(init.stand_off, lat)))
@@ -327,8 +375,8 @@ class IORSSmall(SamplerV2):
                 errors.append(f"{edge.name}: free floor at {n_free}/{len(lats)} lateral positions")
                 continue
             try:
-                init = TT.phase1b_init_trunk(self, init, H_max, top=self.top)
-                self.init_stance = TT.phase1c_lateral(self, init, margins, rng_t, top=self.top)
+                init_trunk = TT.phase1b_init_trunk(self, init, H_max, top=self.top)
+                self.init_stance = TT.phase1c_lateral(self, init_trunk, margins, rng_t, top=self.top)
                 self.edge = edge
                 break
             except Reject as e:
@@ -370,12 +418,35 @@ class IORSSmall(SamplerV2):
         else:
             self.segment_arms, self.arm_offer_why = TT.arm_offer(self, other_arm_roles=self.other_arm_roles())
             self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands) if len(self.segment_arms) > 1 else {}
-        # Phase 2: manipulation stance survivors of the best angle class (each with its focus)
-        self.manip_candidates = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
-                                                              target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top,
-                                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), **phase2_band)
+        # Phase 2: manipulation stance survivors of the best angle class (each with its focus), cut to the A1 start region (owner 2026-10-12):
+        # the foci that admit the partner on a side the template may draw. Without one the robot's lateral is redrawn (Phase 1c) a few
+        # times before the template is rejected. The shelf layout has no region: the boards fix both books.
+        failed: List[str] = []  # the lateral draws without a start cell
+        phase2_any = False
+        for i in range(max(1, int(self.gen("start_region_lateral_draws", START_REGION_LATERAL_DRAWS)))):
+            if i:
+                try:
+                    self.init_stance = TT.phase1c_lateral(self, init_trunk, margins, rng_t, top=self.top)
+                except Reject as e:
+                    failed.append(f"redraw: [{e.reason}] {e}")
+                    break
+                self.init_stance.name = "init"
+            cands = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
+                                                  target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top,
+                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                  **phase2_band)
+            phase2_any = phase2_any or bool(cands)
+            self.manip_candidates = cands if self.shelf_start is not None else self.start_region(cands)
+            if self.manip_candidates:
+                break
+            failed.append(f"lateral {self.init_stance.lateral:+.2f}: " + ("Phase 2 left no survivor" if not cands else "no start cell for the partner on the "
+                                                                          + " / ".join(TT.side_name(sd) for sd in self.template_sides())))
+        if "start_region" in self.template_facts:
+            self.template_facts["start_region"]["failed_lateral_draws"] = failed
         if not self.manip_candidates:
-            raise Reject("no_manipulation_stance", "Phase 2 left no survivor")
+            if not phase2_any:
+                raise Reject("no_manipulation_stance", "Phase 2 left no survivor: " + "; ".join(failed))
+            raise Reject("no_start_region", f"{self.support.name} edge {self.edge.name} (L {self.edge.length:.2f}): " + "; ".join(failed))
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "bands": getattr(getattr(self, "bands", None), "path", None), "H_max": H_max, "segment_arms": list(self.segment_arms)})
@@ -666,29 +737,153 @@ class IORSSmall(SamplerV2):
             raise Reject("handedness_pair", f"target {t.category}/{t.model} and partner {p.category}/{p.model} are both {ht}")
         return None if side is None else {"target": ht, "partner": hp, "target_side": side}
 
-    def handed_ranges(self, ranges: Dict[float, Tuple[float, float]]) -> Dict[float, Tuple[float, float]]:
-        """The partner sides of ``ranges`` (``place_partner``: +1 = the robot's left of the target) left by :meth:`handedness_pair`:
-        only the side that leaves the target on its own side of the partner; ``Reject("partner_placement")`` when that side has no
-        admissible gap range."""
-        from ispatialgym.sampling import pair_rules as PR
+    # ------------------------------------------------------------------ A1 start region (owner 2026-10-12)
 
-        handed = (self.pair or {}).get("handedness")
-        if not handed:
-            return ranges
-        sd = PR.partner_side_for(handed["target_side"])
-        if sd not in ranges:
-            raise Reject("partner_placement", f"handedness: the {handed['target']} target must end {handed['target_side']} of the {handed['partner']} partner, "
-                                              f"but the partner side {'left' if sd > 0 else 'right'} of the target has no admissible gap range")
-        return {sd: ranges[sd]}
+    def assigned_side(self) -> Optional[float]:
+        """A1 step 3, eval: ``generation.partner_side`` (``"left"`` / ``"right"``: the partner's side of the target, robot frame;
+        ``multiply_isg`` drops it for train) as +1 / -1, None without it; ``Reject("partner_side")`` for a side the pair does not admit."""
+        name = self.gen("partner_side")
+        if name is None:
+            return None
+        if name not in ("left", "right"):
+            raise Reject("spec", f"{self.gp.alias}: generation.partner_side must be 'left' or 'right', got {name!r}")
+        side = 1.0 if name == "left" else -1.0
+        allowed = partner_sides(self.relation, (self.pair or {}).get("handedness"))
+        if side not in allowed:
+            raise Reject("partner_side", f"{self.gp.alias}: generation.partner_side {name} - the pair admits the partner on the "
+                                         f"{' / '.join(TT.side_name(sd) for sd in allowed)} only")
+        return side
+
+    def template_sides(self) -> List[float]:
+        """A1 step 3: the partner sides the template may draw - the eval side alone (:meth:`assigned_side`), else every side the pair admits."""
+        assigned = self.assigned_side()
+        return [assigned] if assigned is not None else partner_sides(self.relation, (self.pair or {}).get("handedness"))
+
+    def reach_rule(self) -> Optional[str]:
+        """A1 step 2 (c), the band cut the partner placement always made (``tabletop.lateral_gap_masks``): ontop / under / inside the partner's
+        centre (the goal is on / in it), nextto - and touching without its push stance - the target's place position, touching with the push
+        stance nothing (the place and push screens of the draw judge it from the second base pose)."""
+        if self.relation in ("ontop", "under", "inside"):
+            return "partner_centre"
+        if self.relation == "touching" and bool(self.gen("push_stance", True)) and bool(self.gen("reach_screen_place", True)):
+            return None
+        return "target_goal"
+
+    def band_near(self, st: Stance, depth: float, arms: Sequence[str]) -> Optional[np.ndarray]:
+        """Base-frame band cells (N, 2) within ``BAND_DEPTH_WINDOW_M`` of base-frame ``depth`` at ``st``'s trunk, over the bands of ``arms``;
+        None when none of them has a band."""
+        bands = list({id(b): b for b in (self.band_of_arm(a) for a in arms) if b is not None}.values())
+        if not bands:
+            return None
+        cells = np.concatenate([np.asarray(b.band(st.translate, st.tilt, **TT.band_kw(b, st)), dtype=float).reshape(-1, 2) for b in bands])
+        return cells[np.abs(cells[:, 0] - float(depth)) <= BAND_DEPTH_WINDOW_M]
+
+    def band_rule(self, st: Stance, depth: float, arms: Sequence[str]) -> Tuple[Optional[str], Optional[Tuple[float, float]]]:
+        """``(reach, band)`` for ``tabletop.lateral_gap_masks`` at ``st``: :meth:`reach_rule` and the laterals (λ_min, λ_max) of :meth:`band_near`
+        (None without a cell there: the rule passes nothing); no rule without a band."""
+        near = self.band_near(st, depth, arms)
+        if near is None:
+            return None, None
+        return self.reach_rule(), ((float(near[:, 1].min()), float(near[:, 1].max())) if len(near) else None)
+
+    def edge_partner_quats(self) -> List[th.Tensor]:
+        """The partner's rest orientation turned so its footprint lies along the edge, and a quarter turn from there (only the first when
+        both footprints span the same along the edge): the orientations the start region tries."""
+        q0 = self.edge_aligned_quat(self.hull["partner"], self.rest["partner"], self.init_stance)
+        q1 = G.qmul(G.quat_from_yaw(math.pi / 2), q0)
+        (a0, b0), (a1, b1) = (footprint_laterals(self.world.footprint(self.hull["partner"], (th.zeros(3), q)), self.init_stance.tangent) for q in (q0, q1))
+        return [q0] if abs((b0 - a0) - (b1 - a1)) < 0.01 else [q0, q1]
+
+    def start_region(self, cands: Sequence[Stance]) -> List[Stance]:
+        """A1 step 2 at the template, after Phase 2: the candidates whose focus is a valid target start for a partner side the template may
+        draw (:meth:`template_sides`) - some gap of [g_min, D_p] puts the partner (a) on the top with both footprints at least
+        ``table_end_margin_m`` from the edge's ends, (b) fully in the init image, (c) meeting :meth:`reach_rule` at the candidate's trunk with
+        the band of an arm that may make the segment there; the target nominally a ``w_t`` square at the focus, the partner in either
+        edge-aligned orientation (:meth:`edge_partner_quats`). Each survivor's ``extras["start_region"]`` holds the gap interval per side and
+        ``extras["start_region_arms"]`` the arms that meet (c) per side; ``region_sides`` the sides with a cell; the region's size goes to
+        ``template_facts["start_region"]``."""
+        allowed = partner_sides(self.relation, (self.pair or {}).get("handedness"))
+        assigned = self.assigned_side()
+        sides = [assigned] if assigned is not None else allowed
+        g_lo, g_hi = self.gap_range()
+        gs = TT.gap_grid(g_lo, g_hi)
+        cam = self.camera_pose_at(self.init_stance)
+        w_t = TT.half_extent(self.hull["target"], self.rest["target"])
+        place_gap = self.place_gap()
+        quats = [(q, footprint_laterals(self.world.footprint(self.hull["partner"], (th.zeros(3), q)), self.init_stance.tangent)) for q in self.edge_partner_quats()]
+        focus_masks: Dict[Tuple, np.ndarray] = {}  # (focus, side, orientation) -> the rules of the focus alone: ends, top, frame
+        cells: Dict[float, set] = {sd: set() for sd in sides}
+        n_cands: Dict[float, int] = {sd: 0 for sd in sides}
+        gaps: Dict[float, List[float]] = {sd: [] for sd in sides}
+        out: List[Stance] = []
+        for c in cands:
+            depth, t_c = c.local(c.focus[:2])
+            t_fp = th.stack([c.world(depth + dd, t_c + dl) for dd in (-w_t, w_t) for dl in (-w_t, w_t)])
+            # the reach rule per arm that may make the segment here: the attempt offers the arms whose band admits the drawn side
+            rules = {a: self.band_rule(c, float(c.world_to_base(c.focus[:2])[0]), [a]) for a in (c.extras.get("focus_arms") or self.segment_arms[:1])}
+            fkey = (round(float(c.focus[0]), 3), round(float(c.focus[1]), 3))
+            region: Dict[str, List[float]] = {}
+            arms: Dict[str, List[str]] = {}
+            for sd in sides:
+                ok = np.zeros(len(gs), dtype=bool)
+                for arm, (reach, band) in rules.items():
+                    ok_arm = np.zeros(len(gs), dtype=bool)
+                    for qi, (q, p_lat) in enumerate(quats):
+                        key = (fkey, sd, qi)
+                        if key not in focus_masks:
+                            masks = TT.partner_gap_masks(self, sd, t_fp, depth, self.hull["partner"], q, c, gs, top=self.top, cam=cam, margin=self.margin_support,
+                                                         m_end=self.table_end_margin)
+                            focus_masks[key] = np.logical_and.reduce([np.ones(len(gs), dtype=bool)] + list(masks.values()))
+                        m = focus_masks[key]
+                        if reach is not None:
+                            m = m & TT.lateral_gap_masks(gs, sd, (t_c - w_t, t_c + w_t), p_lat, band=band, reach=reach, t_origin=t_c, place_gap=place_gap)["reach"]
+                        ok_arm |= m
+                    if ok_arm.any():
+                        arms.setdefault(TT.side_name(sd), []).append(arm)
+                    ok |= ok_arm
+                run = TT.longest_run(gs, ok)
+                if run is not None:
+                    region[TT.side_name(sd)] = [round(run[0], 4), round(run[1], 4)]
+                    cells[sd].add(tuple(c.extras.get("_position") or fkey))
+                    n_cands[sd] += 1
+                    gaps[sd] += list(run)
+            if region:
+                c.extras[TT.START_REGION] = region
+                c.extras[REGION_ARMS] = arms
+                out.append(c)
+        self.region_sides = region_sides(allowed, assigned, {sd: len(v) for sd, v in cells.items()})
+        margins = self.init_stance.extras.get("margins") or {}
+        self.template_facts["start_region"] = {
+            "edge": self.edge.name, "edge_length_m": round(float(self.edge.length), 3), "L_min_m": round(float(margins.get("L_min", 0.0)), 3),
+            "m_end_m": self.table_end_margin, "lateral_m": round(float(self.init_stance.lateral), 3),
+            "assigned": None if assigned is None else TT.side_name(assigned), "sides": [TT.side_name(sd) for sd in sides],
+            "drawn_sides": [TT.side_name(sd) for sd in self.region_sides], "gap_range_m": [round(g_lo, 4), round(g_hi, 4)], "phase2_candidates": len(cands),
+            "cells": {TT.side_name(sd): len(cells[sd]) for sd in sides}, "candidates": {TT.side_name(sd): n_cands[sd] for sd in sides},
+            "gap_m": {TT.side_name(sd): ([round(min(gaps[sd]), 4), round(max(gaps[sd]), 4)] if gaps[sd] else None) for sd in sides}}
+        log.info("%s: start region on edge %s (L %.2f, lateral %+.2f): %s of %d Phase-2 candidates", self.gp.alias, self.edge.name, self.edge.length,
+                 self.init_stance.lateral, ", ".join(f"{TT.side_name(sd)} {len(cells[sd])} cells ({n_cands[sd]} candidates)" for sd in sides), len(cands))
+        return out
+
+    def draw_partner_side(self, rng: np.random.Generator) -> float:
+        """A1 step 3, once per attempt before the target is placed: uniform among ``region_sides`` (eval: the assigned side, the only one)."""
+        sides = self.region_sides
+        if not sides:
+            raise Reject("no_start_region", "no partner side has a start cell")
+        return sides[int(rng.integers(len(sides)))] if len(sides) > 1 else sides[0]
+
+    def sample(self, rng: np.random.Generator) -> Draft:
+        # A1 step 3: the partner's side is fixed before the target is placed - before the split cone draws the start position too
+        self.region_side = None if self.shelf_start is not None else self.draw_partner_side(rng)
+        return super().sample(rng)
 
     def lateral_margins(self) -> Dict[str, Any]:
         """The IORS row of §4.4 for ``tabletop.lateral_margins`` (λ, b, R_img are filled by Phase 1b / 1c): w_t, w_p, W_p,
-        D_p_max = W_p + 0.03, safety, relation, g_NT."""
+        D_p_max = W_p + 0.03, safety, relation, g_NT, g_min, m_end (A1: the edge holds both objects at the smallest gap)."""
         w_t = TT.half_extent(self.hull["target"], self.rest["target"])
         w_p = TT.half_extent(self.hull["partner"], self.rest["partner"])
         W_p = 2 * w_p
         return {"kind": "iors", "w_t": w_t, "w_p": w_p, "W_p": W_p, "D_p_max": W_p + self.partner_gap_extra, "safety": 0.02, "relation": self.relation,
-                "g_NT": self.pair.get("g_NT"), "nextto_gap_extra": self.partner_gap_extra}
+                "g_NT": self.pair.get("g_NT"), "nextto_gap_extra": self.partner_gap_extra, "g_min": self.gap_min, "m_end": self.table_end_margin}
 
     # ------------------------------------------------------------------ instance (§4.6 Phase 3 + §6.11)
 
@@ -698,14 +893,16 @@ class IORSSmall(SamplerV2):
         init = self.init_stance
         self.sidecar.add_stance(init)
         cam_init = self.camera_pose_at(init)
-        order = rng.permutation(len(self.manip_candidates))
+        # A1: the target starts in the start region of the attempt's partner side
+        cands = [c for c in self.manip_candidates if TT.in_start_region(c, self.region_side)]
+        order = rng.permutation(len(cands))
         if self.shelf_pose is not None:  # the start is fixed: the stances whose focus is nearest it first
             sx = self.shelf_pose[0][:2]
-            order = sorted(order, key=lambda i: float(th.linalg.norm(self.manip_candidates[int(i)].focus[:2] - sx)) if self.manip_candidates[int(i)].focus is not None else 1e9)
+            order = sorted(order, key=lambda i: float(th.linalg.norm(cands[int(i)].focus[:2] - sx)) if cands[int(i)].focus is not None else 1e9)
         errors = []
         default = self.segment_arms[0]
         for k in order[:6]:
-            cand = self.manip_candidates[int(k)]
+            cand = cands[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, [default]
             manip.extras.update(cand.extras)
@@ -717,8 +914,14 @@ class IORSSmall(SamplerV2):
                     errors.append(f"candidate {int(k)}: no collision-free idle posture of the other arm with the {default} arm working")
                     continue
                 TT.adopt_arm(manip, st_arm)
-            # the other arm is tried only where its band covers the focus (owner 2026-09-27)
+            # the other arm is tried only where its band covers the focus (owner 2026-09-27), and only the arms that can place the partner on
+            # the attempt's side from here (A1 start region)
             arms_here = [a for a in self.segment_arms if a == default or a in (cand.extras.get("focus_arms") or [])]
+            if self.region_side is not None and REGION_ARMS in cand.extras:
+                arms_here = [a for a in arms_here if a in cand.extras[REGION_ARMS].get(TT.side_name(self.region_side), [])]
+                if not arms_here:
+                    errors.append(f"candidate {int(k)}: no offered arm meets the {TT.side_name(self.region_side)} partner's reach rule")
+                    continue
             try:
                 # §4.5 step 5: transition init -> manipulation
                 self.sidecar.transitions.clear()
@@ -767,7 +970,8 @@ class IORSSmall(SamplerV2):
                 d.robot_q = self.stance_q(init)
                 d.base_pose2d = tuple(init.base_pose2d)
                 d.summary.update({"relation": self.relation, "manipulation_candidate": int(k), "grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw},
-                                  "manipulation_stance": manip.to_meta(), "pair": self.pair, "arm": TT.segment_arm_summary(grasp, arms_here)})
+                                  "manipulation_stance": manip.to_meta(), "pair": self.pair, "arm": TT.segment_arm_summary(grasp, arms_here),
+                                  "partner_draw": self.partner_draw})
                 grasp.extras["arm_offer"] = TT.arm_offer_record(self.segment_arms, arms_here, grasp, self.arm_offer_why)
                 d.pose_targets[pname] = self._pose_target("partner", p_pose)
                 d.pose_targets[tname] = self._pose_target("target", t_pose)
@@ -784,7 +988,7 @@ class IORSSmall(SamplerV2):
     def _segment_draw(self, rng: np.random.Generator, d: Draft, k: int, t_pose: G.Pose, grasp: GraspRecord, manip: Stance, cam_init: G.Pose, pname: str) -> G.Pose:
         """The draw's checks of the segment after its grasp, with the grasp's arm: §4.6 step 2 (the partner in that arm's band), step 4
         (frame), the place in the manipulation image and the place screening. Records the stance and the grasp; returns the partner pose."""
-        # §4.6 step 2: partner on a random side (touching: robot's left) at gap g ∈ [g_lo, D_p]
+        # §4.6 step 2: partner on the attempt's side (A1) at a gap of the start region's interval
         p_pose = self.place_partner(rng, t_pose, manip, cam_init)
         if self.edge_aligned():
             d.summary["edge_alignment"] = {
@@ -871,72 +1075,53 @@ class IORSSmall(SamplerV2):
         gap = self.place_gap() if gap_at_place is None else max(0.0, float(gap_at_place))
         return gap + self.push_margin()
 
+    def draw_partner_pose(self, rng: np.random.Generator, side: float, t_pose: G.Pose, manip: Stance, cam: G.Pose, yaw: float) -> Tuple[Optional[G.Pose], str]:
+        """One A1 partner draw at world ``yaw`` on ``side`` of the placed target: the start region's gap interval re-evaluated at the drawn target
+        pose and this orientation (``tabletop.partner_gap_masks`` with :meth:`band_rule` at the band of the arm that makes the segment), a gap
+        drawn uniformly from it, the pose checked as §4.6 step 2 checks it. ``(pose, "")`` or ``(None, why)``; the draw's facts in
+        ``partner_draw``."""
+        p_quat = G.qmul(G.quat_from_yaw(yaw), G.t(self.rest["partner"]))
+        t_fp = self.world.footprint(self.hull["target"], t_pose)
+        depth, t_c = manip.local(t_pose[0])
+        reach, band = self.band_rule(manip, float(manip.world_to_base(t_pose[0][:2])[0]), (manip.working_arms or self.segment_arms)[:1])
+        gs = TT.gap_grid(*self.gap_range(), step=0.5 * TT.START_REGION_GAP_STEP)
+        masks = TT.partner_gap_masks(self, side, t_fp, depth, self.hull["partner"], p_quat, manip, gs, top=self.top, cam=cam, margin=self.margin_support,
+                                     m_end=self.table_end_margin, band=band, reach=reach, t_origin=t_c, place_gap=self.place_gap())
+        run = TT.longest_run(gs, np.logical_and.reduce([np.ones(len(gs), dtype=bool)] + list(masks.values())))
+        if run is None:
+            return None, TT.gap_masks_why(gs, masks)
+        g = float(rng.uniform(run[0], run[1]))
+        pose = TT.partner_pose_at(self, side, t_fp, depth, self.hull["partner"], p_quat, manip, g, top=self.top)
+        why = TT.partner_pose_why(self, t_fp, self.hull["partner"], pose, top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
+        if why:
+            return None, f"gap {g:.3f}: {why}"
+        self.partner_draw = {"side": TT.side_name(side), "gap_m": round(g, 4), "gap_interval_m": [round(run[0], 4), round(run[1], 4)],
+                             "yaw_deg": round(math.degrees(yaw), 1), "cell_interval_m": (manip.extras.get(TT.START_REGION) or {}).get(TT.side_name(side))}
+        return pose, ""
+
     def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
-        """§4.6 step 2 with the gap range per side cut to the reach band of the manipulation trunk (§4.1 / principle 3:
-        placements come from the cached reachability sets): the goal position of the target — the partner's centre for
-        ontop / under / inside — must be a lateral the band covers at the target's depth, otherwise the place pose of
-        §6.11 cannot pass. Sides with an empty admissible gap range are not drawn; touching keeps the robot's left. The band is the
-        one of the arm that makes the segment (``manip``'s working arm)."""
+        """§4.6 step 2 with the A1 start region (owner 2026-10-12): the partner on the attempt's side (``region_side``, fixed before the target
+        was placed; touching the robot's left) at a gap of the start region's interval re-evaluated at the drawn target pose
+        (:meth:`draw_partner_pose`: on the top, both footprints ``table_end_margin_m`` from the edge's ends, in the init image, and the reach
+        rule cut to the band of the manipulation trunk - §4.1 / principle 3, the place pose of §6.11 needs its goal in the band).
+        ``PARTNER_YAW_DRAWS`` random partner yaws, then the two edge-aligned ones (:meth:`edge_partner_quats`); ``Reject("partner_placement")``
+        when none admits a gap. The shelf layout keeps its partner leaning against the opposite board."""
+        self.partner_draw = None
         if self.shelf_partner_pose is not None:
             self._brace_gate = {"ok": False, "why": "shelf (owner 2026-10-11): the side board holds the partner, no brace"}
             return self.shelf_partner_pose
-        g_lo, g_hi = self.gap_range()
-        sides = [1.0] if self.relation == "touching" else [1.0, -1.0]
-        ranges: Dict[float, Tuple[float, float]] = {}
-        band = self.band_of_arm((manip.working_arms or self.segment_arms)[0])
-        if self.relation in ("ontop", "under", "inside") and band is not None:
-            cells = band.band(manip.translate, manip.tilt, **TT.band_kw(band, manip))
-            t_fp = self.world.footprint(self.hull["target"], t_pose)
-            t_lat = (t_fp - manip.base_xy) @ manip.tangent
-            depth_t = float(manip.world_to_base(t_pose[0][:2])[0])
-            w_p = TT.half_extent(self.hull["partner"], self.rest["partner"])
-            near = cells[np.abs(cells[:, 0] - depth_t) <= 0.12] if len(cells) else cells
-            if len(near):
-                lam_min, lam_max = float(near[:, 1].min()), float(near[:, 1].max())
-                for sd in sides:
-                    if sd > 0:
-                        lo, hi = lam_min - float(t_lat.max()) - w_p, lam_max - float(t_lat.max()) - w_p
-                    else:
-                        lo, hi = float(t_lat.min()) - w_p - lam_max, float(t_lat.min()) - w_p - lam_min
-                    lo, hi = max(lo, g_lo), min(hi, g_hi)
-                    if lo <= hi:
-                        ranges[sd] = (lo, hi)
-            if not ranges:
-                raise Reject("partner_placement", f"no side admits a partner centre inside the band (λ ∈ [{lam_min:.2f}, {lam_max:.2f}] at depth "
-                                                  f"{depth_t:.2f}) with g ∈ [{g_lo:.2f}, {g_hi:.2f}]" if len(near) else "band has no cell at the target's depth")
-        elif self.relation == "touching" and bool(self.gen("push_stance", True)) and bool(self.gen("reach_screen_place", True)):
-            # touching with the push stance (owner 2026-09-18 16:32): the place is judged by the exact-IK screening of the
-            # draw (``reach_screen_place``) and the push by its own stance - the band cut on the place gap is not applied
-            ranges = {sd: (g_lo, g_hi) for sd in sides}
-        elif band is not None:
-            # nextto / touching: the target's *place* position (its origin at the goal gap — touching: the nextto position
-            # the push starts from) must be a band lateral at the target's depth, else the place IK of §6.11 fails
-            # (touching box_of_sanitary_napkins: every attempt place_unreachable with the goal 4-9 cm left of centre)
-            cells = band.band(manip.translate, manip.tilt, **TT.band_kw(band, manip))
-            base_t = manip.world_to_base(t_pose[0][:2])  # band cells are base-frame (x ahead, lateral + left)
-            depth_t, lat_t = float(base_t[0]), float(base_t[1])
-            near = cells[np.abs(cells[:, 0] - depth_t) <= 0.12] if len(cells) else cells
-            gap_goal = self.place_gap()
-            if len(near):
-                lam_min, lam_max = float(near[:, 1].min()), float(near[:, 1].max())
-                for sd in sides:
-                    if sd > 0:  # partner on the robot's left: the target moves left by g - gap_goal
-                        lo, hi = lam_min - lat_t + gap_goal, lam_max - lat_t + gap_goal
-                    else:
-                        lo, hi = lat_t + gap_goal - lam_max, lat_t + gap_goal - lam_min
-                    lo, hi = max(lo, g_lo), min(hi, g_hi)
-                    if lo <= hi:
-                        ranges[sd] = (lo, hi)
-            if not ranges:
-                raise Reject("partner_placement", f"no side keeps the target's place position inside the band (λ ∈ [{lam_min:.2f}, {lam_max:.2f}] at depth "
-                                                  f"{depth_t:.2f}, target at {lat_t:+.2f}) with g ∈ [{g_lo:.2f}, {g_hi:.2f}]" if len(near) else "band has no cell at the target's depth")
-        else:
-            ranges = {sd: (g_lo, g_hi) for sd in sides}
-        ranges = self.handed_ranges(ranges)
-        side = list(ranges)[int(rng.integers(len(ranges)))]
+        side = self.region_side if self.region_side is not None else self.template_sides()[0]
+        misses: List[str] = []
         if self.relation != "touching":
-            return TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
-                                    top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
+            # random yaws, then the two edge-aligned footprints the start region was computed with (a tight top admits little else)
+            yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip)
+            yaws = [float(rng.uniform(-math.pi, math.pi)) for _ in range(PARTNER_YAW_DRAWS)] + [yaw0, yaw0 + math.pi / 2]
+            for yaw in yaws:
+                p_pose, why = self.draw_partner_pose(rng, side, t_pose, manip, cam, yaw)
+                if p_pose is not None:
+                    return p_pose
+                misses.append(f"yaw {math.degrees(yaw):+.0f}: {why}")
+            raise Reject("partner_placement", f"no partner yaw of {len(yaws)} admits a gap on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
         # A1 with the brace optional (owner 2026-09-16 17:10, the axial rule): a partner position whose push work point (the
         # target's right face at the *place* position) lies in the right band and whose brace point (partner's far / left
         # face) lies in the left contact band of the same trunk is preferred and enables the brace; otherwise the last
@@ -947,12 +1132,15 @@ class IORSSmall(SamplerV2):
         errors = []
         p_pose = None
         # edge alignment (owner 2026-09-18 13:50): the partner's footprint axes along the support edge - the two aligned
-        # footprints (long side along / across the edge) alternate over the tries; None = the random yaw of the record
+        # footprints (long side along / across the edge) alternate over the tries; without it a random yaw per try
         yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() else None
         for i in range(8):
-            yaw_i = None if yaw0 is None else yaw0 + (i % 2) * (math.pi / 2)
-            p_pose = TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
-                                      top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min, yaw=yaw_i)
+            yaw = yaw0 + (i % 2) * (math.pi / 2) if yaw0 is not None else float(rng.uniform(-math.pi, math.pi))
+            pose, why = self.draw_partner_pose(rng, side, t_pose, manip, cam, yaw)
+            if pose is None:
+                misses.append(f"yaw {math.degrees(yaw):+.0f}: {why}")
+                continue
+            p_pose = pose
             if left_cells is None or right_cells is None:
                 self._brace_gate = {"ok": None, "why": "left contact band unavailable"}  # unknown: the two-arm IK decides
                 return p_pose
@@ -964,6 +1152,8 @@ class IORSSmall(SamplerV2):
                 return p_pose
             errors.append(f"work {[round(float(v), 2) for v in w_b]} {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace "
                           f"{[round(float(v), 2) for v in b_b]} {'in' if in_band(b_b, left_cells) else 'OFF'} left band")
+        if p_pose is None:
+            raise Reject("partner_placement", f"no partner yaw of 8 admits a gap on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
         self._brace_gate = {"ok": False, "why": f"none of 8 partner positions puts the push point in the right band ({len(right_cells)} cells) and the brace point "
                                                 f"in the left contact band ({len(left_cells)} cells) at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
         return p_pose

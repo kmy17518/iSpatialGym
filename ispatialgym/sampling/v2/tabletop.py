@@ -10,8 +10,8 @@ Phases (every rule number refers to the spec)::
                                                                                               focus per survivor, best angle class
     phase3_target(s, manip, rng, grasps, hull, rest, ignore)    -> (obj_pose, GraspRecord)  §4.6 step 1 (F at the focus, exact IK)
 
-plus the shared helpers of §4.6 steps 2–6 (``place_partner``, ``place_distractors``, ``all_in_frame``,
-``whole_body_check_at``, ``brace_second_arm``), the §4.7 ``placement_stance`` and the reach-band access of §4.1 / §3.10
+plus the shared helpers of §4.6 steps 2–6 (``place_partner``, the IORS start region ``partner_gap_masks``, ``place_distractors``,
+``all_in_frame``, ``whole_body_check_at``, ``brace_second_arm``), the §4.7 ``placement_stance`` and the reach-band access of §4.1 / §3.10
 (``BandSpec``, ``ensure_bands``: ``ReachBands.load`` on a cache hit, ``BandComputer`` in-process on a miss, written back to the
 cache directory).
 
@@ -22,7 +22,8 @@ pure helpers and what the tests compare the FK against.
 Pure helpers (no simulator, unit-tested in ``tests/test_v2_tabletop.py``): ``lateral_margins`` (the §4.4 table),
 ``init_trunk_delta`` (§4.3 clamp), ``CameraFK`` (conventions FK), ``cube_flip_plan`` / ``cube_tilt_pair`` /
 ``facing_coarse_yaw`` (§6.5 cube grasp and visible-face rules), ``distractor_spacing`` / ``exclude_lookalikes`` (§4.6 step 3,
-§3.12), ``axial_init_yaw`` (§6.10). Everything that touches the simulator imports ``ik`` / ``sim_utils`` lazily so the
+§3.12), ``axial_init_yaw`` (§6.10), ``lateral_gap_masks`` / ``longest_run`` (§4.6 step 2 IORS start region). Everything that touches
+the simulator imports ``ik`` / ``sim_utils`` lazily so the
 module (and the tests) import without OmniGibson.
 
 Frames: base frame x ahead, lateral + = robot's left (§3.3); band cells are base-frame (x, lateral) at *any* stance of
@@ -93,6 +94,8 @@ YAWS = tuple(RB.YAWS)  # §4.6 step 1: 8 fixed yaws (45° steps)
 SUPPORT_MARGIN = 0.02  # §3.2 footprint inside the top shrunk by 2 cm
 TRAY_MARGIN = 0.005  # §3.2 0.5 cm on a tray floor
 MIN_GAP = 0.03  # §3.2 footprint clearance target–partner
+TABLE_END_MARGIN = 0.10  # §4.4 IORS (A1, owner 2026-10-12; generation.table_end_margin_m): target / partner footprints this far from the edge's ends
+START_REGION_GAP_STEP = 0.01  # §4.6 step 2 IORS start region: the gap grid of a cell's interval
 OVERHANG_MIN = 0.05  # §4.2 AABB overhang beyond the raster edge counts when >= 5 cm
 HANDS_ABOVE = 0.10  # §4.3 hands >= 10 cm above the tallest object
 HAND_BELOW_CAMERA_PILOT = 0.19  # §4.3 [pilot]
@@ -384,8 +387,10 @@ def lateral_margins(margins: Dict[str, Any], lam_min: float, lam_max: float, b: 
     ``lam_min <= 0`` (right end of the band union), ``lam_max`` (left end), ``b`` = lateral offset of the image border at
     the source-tray depth, ``R_img`` = surface distance from the target (centre line) to the image border. Rows::
 
-        iors (ontop, under, inside, nextto, touching): |λ_min| + w_t + D_p + 2·w_p + 0.02 / max(0, λ_max) + w_t + D_p + 2·w_p + 0.02,
-                                                       D_p = min(W_p + 0.03, R_img); nextto: D_p < g_NT + 0.03 -> info["reject"]
+        iors (ontop, under, inside, nextto, touching; A1, owner 2026-10-12): 0 / 0 - the lateral is drawn over the whole edge, which
+                                                       must be at least info["L_min"] = 2·w_t + g_min + 2·w_p + 2·m_end long (g_min = 0.03,
+                                                       nextto g_NT + 0.03; m_end = generation.table_end_margin_m); D_p = min(W_p + 0.03,
+                                                       R_img); nextto: D_p < g_NT + 0.03 -> info["reject"]
         attachment:        |λ_min| + max(w_target, w_partner) + 0.02 / max(0, λ_max) + max(w_target, w_partner) + 0.02
         axial:             |λ_min| + w_diag + 0.02 / max(0, λ_max) + w_diag + 0.02,  w_diag = ½√(long² + short²)
         block_design:      |λ_min| + edge/2 + (edge + 0.001) + 0.02 / max(0, λ_max) + edge/2 + 0.02   (0.0125 + 0.026 + 0.02 for the 2.5 cm cube)
@@ -404,13 +409,16 @@ def lateral_margins(margins: Dict[str, Any], lam_min: float, lam_max: float, b: 
         D_p_max = float(margins.get("D_p_max", float(margins.get("W_p", 2 * w_p)) + 0.03))
         D_p = min(D_p_max, float(R_img))
         info["D_p"] = D_p
+        g_min = float(margins.get("g_min", MIN_GAP))
         if margins.get("relation") == "nextto" and margins.get("g_NT") is not None:
             g_lo = float(margins["g_NT"]) + float(margins.get("nextto_gap_extra", 0.03))
             info["g_NT_lo"] = g_lo
+            g_min = g_lo
             if D_p < g_lo:
                 info["reject"] = ("pair_gap", f"D_p {D_p:.3f} < g_NT + 0.03 = {g_lo:.3f}")
-        m_R = right + w_t + D_p + 2 * w_p + safety
-        m_L = left + w_t + D_p + 2 * w_p + safety
+        m_end = float(margins.get("m_end", TABLE_END_MARGIN))
+        info.update({"g_min": g_min, "m_end": m_end, "L_min": 2 * w_t + g_min + 2 * w_p + 2 * m_end})
+        m_R = m_L = 0.0
     elif kind == "attachment":
         w = max(float(margins["w_target"]), float(margins["w_partner"]))
         m_R, m_L = right + w + safety, left + w + safety
@@ -1768,7 +1776,8 @@ def trunk_sweep_free(s, stance: Stance, translates: Sequence[float] = TRUNK_SWEE
 def phase1c_lateral(s, init: Stance, margins: Dict[str, Any], rng, *, top=None, bands: Optional[RB.ReachBands] = None, n_draws: int = 20,
                     in_frame_margin: float = IN_FRAME_MARGIN) -> Stance:
     """§4.4: margins of the task's row from the band union extent, ``b`` and ``R_img`` of Phase 1b; lateral position
-    uniform over [−L/2 + m_R, L/2 − m_L] (``Reject("edge_too_short")`` when m_R + m_L > L); valid when (1) the base is on
+    uniform over [−L/2 + m_R, L/2 − m_L] (``Reject("edge_too_short")`` when m_R + m_L > L, or for the IORS row when L is below its
+    ``L_min``: the edge cannot hold both objects at the smallest gap ``m_end`` from its ends); valid when (1) the base is on
     free floor, (2) the init configuration (t*, 0, untucked, open) is whole-body collision-free — else t moves within
     [Δ_min, Δ_max] (b, R_img, margins recomputed) or the lateral is redrawn —, (3) the trunk sweep of translates
     0 … 0.95 at tilt 0 is collision-free with the arms excluded. The result is the instance's **init pose**."""
@@ -1794,6 +1803,8 @@ def phase1c_lateral(s, init: Stance, margins: Dict[str, Any], rng, *, top=None, 
     bounds, info, b = bounds_for(init)
     if bounds is None:
         _reject("edge_too_short", f"edge {init.edge.name}: m_R + m_L = {info['m_R'] + info['m_L']:.2f} > L = {L:.2f} ({info})")
+    if L < float(info.get("L_min", 0.0)):
+        _reject("edge_too_short", f"edge {init.edge.name}: L = {L:.2f} < 2 w_t + g_min + 2 w_p + 2 m_end = {info['L_min']:.2f} ({info})")
     for _ in range(int(n_draws)):
         lat = float(rng.uniform(bounds[0], bounds[1]))
         st = init.shifted(lateral=lat, name="init")
@@ -2113,10 +2124,12 @@ def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_c
     return out
 
 
-def split_cone_positions(cands: Sequence[Stance], class1_when_deep_m: Optional[float] = None) -> Dict[Tuple[int, int], List[Stance]]:
+def split_cone_positions(cands: Sequence[Stance], class1_when_deep_m: Optional[float] = None, side: Optional[float] = None) -> Dict[Tuple[int, int], List[Stance]]:
     """Variant C: position -> its work stances of the best class (the tight class, else the loose; D-009 B: the loose-class stances
     admitted too when every tight-class focus lies deeper than ``class1_when_deep_m`` base-forward), over the positions of the best
-    init-view class."""
+    init-view class. With ``side`` (IORS, A1) only the work stances whose start region admits a partner on that side
+    (:func:`in_start_region`) count."""
+    cands = [c for c in cands if in_start_region(c, side)]
     tier = 0 if any(c.extras["init_view_class"] == 0 for c in cands) else 1
     by_pos: Dict[Tuple[int, int], List[Stance]] = {}
     for c in cands:
@@ -2138,15 +2151,24 @@ def split_cone_draw(s, rng: np.random.Generator) -> None:
     init-view class that still have a work stance after the task's own filters (``s.manip_candidates`` as ``sample_template`` left
     them), and that position's work stances of the best class made the task's candidates for this attempt (the task's own order
     applies among them). A no-op that leaves ``rng`` untouched unless the split cone is on. A task's memory of failed candidates by
-    index (attachment's ``_candidate_rejects``) starts empty with each position."""
+    index (attachment's ``_candidate_rejects``) starts empty with each position. With ``s.region_side`` (IORS, A1: the partner side
+    the attempt drew before the target is placed) the positions come from that side's pool (:func:`split_cone_positions` with the
+    side), each pool built once from the candidates ``sample_template`` left."""
     if not phase2_gen(s, "phase2_split_cone", False):
         return
-    pool = getattr(s, "_split_cone_pool", None)
-    if pool is None:
+    cands = getattr(s, "_split_cone_cands", None)
+    if cands is None:
         cands = list(getattr(s, "manip_candidates", None) or [])
         if not cands or "_position" not in cands[0].extras:
             return
-        pool = s._split_cone_pool = split_cone_positions(cands, getattr(s, "_split_cone_class1_deep", None))
+        s._split_cone_cands = cands
+    side = getattr(s, "region_side", None)
+    pools = getattr(s, "_split_cone_pools", None)
+    if pools is None:
+        pools = s._split_cone_pools = {}
+    if side not in pools:
+        pools[side] = split_cone_positions(cands, getattr(s, "_split_cone_class1_deep", None), side=side)
+    pool = pools[side]
     if not pool:
         return
     keys = sorted(pool)
@@ -2902,6 +2924,167 @@ def segment_fallback_grasp(s, manip: Stance, obj_pose: Pose, rec: GraspRecord, g
 # ----------------------------------------------------------------------------------------------------------------
 
 
+#: extras key of a Phase-2 candidate's IORS start region (A1, owner 2026-10-12): ``{"left" | "right": [g_lo, g_hi]}`` - the partner sides (of the
+#: target, robot frame) whose partner fits at some edge-to-edge gap of that interval when the target starts at the candidate's focus
+START_REGION = "start_region"
+
+
+def side_name(side: float) -> str:
+    """``"left"`` for +1 (the robot's left of the target), ``"right"`` for -1."""
+    return "left" if float(side) > 0 else "right"
+
+
+def in_start_region(c: Stance, side: Optional[float]) -> bool:
+    """Whether Phase-2 candidate ``c`` lets the attempt's partner stand on ``side``: its start region has an interval for that side. True
+    without a side or without a region (the shelf layout, the tasks that compute none)."""
+    reg = c.extras.get(START_REGION)
+    return side is None or reg is None or side_name(side) in reg
+
+
+def gap_grid(lo: float, hi: float, step: float = START_REGION_GAP_STEP) -> np.ndarray:
+    """The gaps ``lo``, ``lo + step``, ... up to ``hi`` (``hi`` itself last); empty when ``hi < lo``."""
+    if hi < lo:
+        return np.zeros(0)
+    gs = float(lo) + float(step) * np.arange(int(math.floor((float(hi) - float(lo)) / float(step) + 1e-9)) + 1)
+    return gs if float(hi) - gs[-1] <= 1e-6 else np.append(gs, float(hi))
+
+
+def longest_run(gs: Sequence[float], ok: Sequence[bool]) -> Optional[Tuple[float, float]]:
+    """``(first, last)`` gap of the longest run of consecutive passing grid points (the first of equal runs), None when none passes."""
+    best, start = None, None
+    for i, v in enumerate(list(ok) + [False]):
+        if v and start is None:
+            start = i
+        elif not v and start is not None:
+            if best is None or i - start > best[1] - best[0] + 1:
+                best = (start, i - 1)
+            start = None
+    return None if best is None else (float(gs[best[0]]), float(gs[best[1]]))
+
+
+def lateral_gap_masks(gs: Sequence[float], side: float, t_lat: Tuple[float, float], p_lat: Tuple[float, float], *, ends: Optional[Tuple[float, float]] = None,
+                      m_end: float = 0.0, band: Optional[Tuple[float, float]] = None, reach: Optional[str] = None, t_origin: Optional[float] = None,
+                      place_gap: float = 0.0) -> Dict[str, np.ndarray]:
+    """§4.6 step 2, IORS start region (A1, owner 2026-10-12), the rules along the edge: per gap of ``gs`` between a target footprint spanning
+    ``t_lat`` = (min, max) and a partner on ``side`` of it (+1 = the robot's left) whose footprint spans ``p_lat`` about its own origin -
+    laterals along the stance tangent, + = the robot's left. Masks (absent when the rule does not apply):
+
+    * ``ends``: both footprints at least ``m_end`` inside ``ends`` = (min, max), the edge's ends;
+    * ``reach`` with ``band`` = (λ_min, λ_max), the band's laterals at the target's depth (None: no band cell there - nothing passes):
+      ``"partner_centre"`` (ontop / under / inside) the centre of the partner's footprint is a band lateral; ``"target_goal"`` (nextto,
+      touching without its push stance) the target's place position - its origin ``t_origin`` moved toward the partner until ``place_gap``
+      is left - is one; None (touching: its push-stance screen at the draw) no mask."""
+    gs = np.asarray(gs, dtype=float)
+    t_lo, t_hi = float(t_lat[0]), float(t_lat[1])
+    width = float(p_lat[1]) - float(p_lat[0])
+    p_lo = t_hi + gs if side > 0 else t_lo - gs - width
+    p_hi = p_lo + width
+    out: Dict[str, np.ndarray] = {}
+    if ends is not None:
+        lo, hi = float(ends[0]) + float(m_end) - 1e-9, float(ends[1]) - float(m_end) + 1e-9
+        out["ends"] = (p_lo >= lo) & (p_hi <= hi) & (t_lo >= lo) & (t_hi <= hi)
+    if reach is not None:
+        if reach == "partner_centre":
+            x = 0.5 * (p_lo + p_hi)
+        elif reach == "target_goal":
+            x = float(t_origin) + float(side) * (gs - float(place_gap))
+        else:
+            raise ValueError(f"unknown reach rule {reach!r}")
+        out["reach"] = np.zeros(len(gs), dtype=bool) if band is None else (x >= float(band[0])) & (x <= float(band[1]))
+    return out
+
+
+def polygons_supported(top, polys: th.Tensor, margin: float = SUPPORT_MARGIN) -> th.Tensor:
+    """``SupportTop.polygon_supported`` for a batch of footprints ``polys`` (G, V, 2): (G,) bool - every vertex with its ``margin``
+    neighbours and the centroid on free cells."""
+    offs = [[0.0, 0.0]]
+    if margin > 0:
+        m = float(margin)
+        offs += [[m, 0.0], [-m, 0.0], [0.0, m], [0.0, -m], [m, m], [-m, -m], [m, -m], [-m, m]]
+    pts = (polys[:, :, None, :] + th.tensor(offs, dtype=polys.dtype)).reshape(len(polys), -1, 2)
+    pts = th.cat([pts, polys.mean(dim=1, keepdim=True)], dim=1)
+    xs, ys = _t(top.xs).to(polys.dtype), _t(top.ys).to(polys.dtype)
+    i = th.round((pts[..., 0] - xs[0]) / float(top.resolution)).long()
+    j = th.round((pts[..., 1] - ys[0]) / float(top.resolution)).long()
+    inside = (i >= 0) & (j >= 0) & (i < len(xs)) & (j < len(ys))
+    free = top.free[i.clamp(0, len(xs) - 1), j.clamp(0, len(ys) - 1)]
+    return (inside & free).all(dim=1)
+
+
+def partner_origin_xy(side: float, t_lat: Tuple[float, float], p_lat: Tuple[float, float], depth: float, stance: Stance, gs: Sequence[float]) -> th.Tensor:
+    """World xy (G, 2) of the partner's origin at each gap of ``gs`` beside the target (as :func:`lateral_gap_masks` lays it out), ``depth``
+    from the front edge of ``stance``."""
+    g = th.tensor(np.asarray(gs, dtype=float), dtype=th.float32)
+    lat = (float(t_lat[1]) - float(p_lat[0]) + g) if side > 0 else (float(t_lat[0]) - float(p_lat[1]) - g)
+    base = stance.base_xy + stance.inward * (stance.edge_depth + float(depth))
+    return base[None, :] + lat[:, None] * stance.tangent[None, :]
+
+
+def partner_gap_masks(s, side: float, t_fp: th.Tensor, depth: float, p_hull: th.Tensor, p_quat, stance: Stance, gs: Sequence[float], *, top=None,
+                      cam: Optional[Pose] = None, margin: float = SUPPORT_MARGIN, in_frame_margin: float = IN_FRAME_MARGIN, m_end: float = 0.0,
+                      band: Optional[Tuple[float, float]] = None, reach: Optional[str] = None, t_origin: Optional[float] = None,
+                      place_gap: float = 0.0) -> Dict[str, np.ndarray]:
+    """§4.6 step 2, IORS start region (A1, owner 2026-10-12): per gap of ``gs`` for the partner at orientation ``p_quat`` on ``side`` of the
+    target footprint ``t_fp`` (world polygon), at ``depth`` from the front edge of ``stance`` (the target's): :func:`lateral_gap_masks` with
+    the ends of ``stance.edge`` plus ``top`` (the partner footprint on free cells of the top with ``margin``, the ``place_partner`` test) and,
+    with ``cam``, ``frame`` (its AABB fully in that image)."""
+    top = _top(s, top)
+    tangent = stance.tangent
+    t_lat = (_t(t_fp)[:, :2].float() - stance.base_xy) @ tangent
+    t_lat = (float(t_lat.min()), float(t_lat.max()))
+    fp = s.world.footprint(p_hull, (th.zeros(3), _t(p_quat))).float()  # about the partner's origin
+    p_lat = fp @ tangent
+    p_lat = (float(p_lat.min()), float(p_lat.max()))
+    ends = None
+    if stance.edge is not None:
+        mid = float((stance.edge.mid - stance.base_xy) @ tangent)
+        ends = (mid - 0.5 * float(stance.edge.length), mid + 0.5 * float(stance.edge.length))
+    out = lateral_gap_masks(gs, side, t_lat, p_lat, ends=ends, m_end=m_end, band=band, reach=reach, t_origin=t_origin, place_gap=place_gap)
+    if len(gs) == 0:
+        return out
+    xy = partner_origin_xy(side, t_lat, p_lat, depth, stance, gs)
+    out["top"] = polygons_supported(top, fp[None] + xy[:, None, :], margin).numpy()
+    if cam is not None:
+        z = float(top.z) + s.world.bottom_offset(p_hull, p_quat) + Z_OFFSET
+        corners = hull_corners_world(p_hull, (th.tensor([0.0, 0.0, z]), _t(p_quat)))
+        pts = corners[None] + th.cat([xy, th.zeros(len(xy), 1)], dim=1)[:, None, :]
+        out["frame"] = s.world.camera_model.inside(cam, pts.reshape(-1, 3), in_frame_margin).reshape(len(xy), -1).all(dim=1).numpy()
+    return out
+
+
+def gap_masks_why(gs: Sequence[float], masks: Dict[str, np.ndarray]) -> str:
+    """How many of the grid's gaps pass each rule of a mask dict (``"ends 0/12, top 12/12"``) - the reason a start-region interval is empty."""
+    if not len(gs):
+        return "empty gap range"
+    return ", ".join(f"{k} {int(np.asarray(v).sum())}/{len(gs)}" for k, v in masks.items())
+
+
+def partner_pose_at(s, side: float, t_fp: th.Tensor, depth: float, p_hull: th.Tensor, p_quat, stance: Stance, g: float, *, top=None) -> Pose:
+    """The partner pose of :func:`partner_gap_masks` at gap ``g``: its footprint ``g`` beside the target's along the stance tangent, its origin
+    ``depth`` from the front edge, standing on the top (z = top + bottom offset + 3 mm, §3.2)."""
+    top = _top(s, top)
+    tangent = stance.tangent
+    t_lat = (_t(t_fp)[:, :2].float() - stance.base_xy) @ tangent
+    p_lat = s.world.footprint(p_hull, (th.zeros(3), _t(p_quat))).float() @ tangent
+    xy = partner_origin_xy(side, (float(t_lat.min()), float(t_lat.max())), (float(p_lat.min()), float(p_lat.max())), depth, stance, [g])[0]
+    return th.tensor([float(xy[0]), float(xy[1]), float(top.z) + s.world.bottom_offset(p_hull, p_quat) + Z_OFFSET]), _t(p_quat)
+
+
+def partner_pose_why(s, t_fp: th.Tensor, p_hull: th.Tensor, p_pose: Pose, *, top=None, cam: Optional[Pose] = None, margin: float = SUPPORT_MARGIN,
+                     min_gap: float = MIN_GAP, in_frame_margin: float = IN_FRAME_MARGIN) -> Optional[str]:
+    """§4.6 step 2 checks of a drawn partner pose (those ``place_partner`` makes): why it fails - footprint off the top (``margin``), closer
+    than ``min_gap`` to the target footprint ``t_fp``, not fully in ``cam``'s image - or None."""
+    top = _top(s, top)
+    p_fp = s.world.footprint(p_hull, p_pose)
+    if not top.polygon_supported(p_fp, margin=margin):
+        return "partner footprint off the top"
+    if _polygons_overlap(t_fp, p_fp, min_gap):
+        return f"partner closer than {min_gap:.2f} m to the target"
+    if cam is not None and not in_frame(s, cam, hull_corners_world(p_hull, p_pose), in_frame_margin):
+        return "partner not in the init image"
+    return None
+
+
 def place_partner(s, rng, t_pose: Pose, t_hull: th.Tensor, p_hull: th.Tensor, p_rest, stance: Stance, side: Optional[float], gap_range: Sequence[float], *,
                   top=None, cam: Optional[Pose] = None, z: Optional[float] = None, margin: float = SUPPORT_MARGIN, min_gap: float = MIN_GAP,
                   in_frame_margin: float = IN_FRAME_MARGIN, yaw: Optional[float] = None, n_tries: int = 40) -> Pose:
@@ -3152,6 +3335,7 @@ def placement_stance(s, manip: Stance, dest_xy, *, name: str = "placement", chec
 
 __all__ = [
     "STAND_OFF", "STAND_OFFS", "TRANSLATES", "TILT_GRID", "YAWS", "FOCUS_RADIUS", "YAW_JITTER", "SUPPORT_MARGIN", "TRAY_MARGIN", "MIN_GAP",
+    "TABLE_END_MARGIN", "START_REGION_GAP_STEP", "START_REGION",
     "clamp", "init_trunk_delta", "lateral_margins", "lateral_bounds", "CameraFK", "camera_table", "camera_fk",
     "opposite_face", "face_normal_world", "up_face", "cube_tilt_pair", "cube_flip_plan", "facing_coarse_yaw", "face_points",
     "distractor_spacing", "grasp_pinch_width", "exclude_lookalikes", "axial_init_yaw",
@@ -3161,4 +3345,6 @@ __all__ = [
     "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_lateral", "tilt_scan",
     "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "posed_in_hand",
     "placement_stance", "facade_v1_spec",
+    "side_name", "in_start_region", "gap_grid", "longest_run", "lateral_gap_masks", "polygons_supported", "partner_origin_xy", "partner_gap_masks",
+    "gap_masks_why", "partner_pose_at", "partner_pose_why",
 ]

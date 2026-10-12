@@ -33,20 +33,29 @@ def test_module_imports_without_the_simulator():
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_margins_iors_row_uses_dp_min_of_partner_width_and_r_img():
+def test_margins_iors_row_draws_over_the_whole_edge_and_skips_edges_too_short_for_both_objects():
+    """A1 (owner 2026-10-12): the IORS row draws the lateral over the whole edge and only asks the edge to hold both objects at the
+    smallest gap, m_end from its ends: L >= 2 w_t + g_min + 2 w_p + 2 m_end; D_p = min(W_p + 0.03, R_img) as before."""
     row = {"w_t": 0.05, "w_p": 0.10, "W_p": 0.20, "D_p_max": 0.23, "safety": 0.02, "relation": "ontop", "g_NT": None}
     m_R, m_L, info = TT.lateral_margins(row, lam_min=-0.30, lam_max=0.40, b=0.9, R_img=0.6)
-    assert info["D_p"] == pytest.approx(0.23)  # min(W_p + 0.03, R_img) = W_p + 0.03 here
-    assert m_R == pytest.approx(0.30 + 0.05 + 0.23 + 0.20 + 0.02)
-    assert m_L == pytest.approx(0.40 + 0.05 + 0.23 + 0.20 + 0.02)
-    # R_img smaller than W_p + 0.03 caps D_p
-    m_R2, _, info2 = TT.lateral_margins(row, -0.30, 0.40, b=0.9, R_img=0.10)
-    assert info2["D_p"] == pytest.approx(0.10) and m_R2 == pytest.approx(0.30 + 0.05 + 0.10 + 0.20 + 0.02)
-    # λ_max < 0 contributes nothing to the left margin (max(0, λ_max)); λ_min > 0 nothing to the right
-    _, m_L3, _ = TT.lateral_margins(row, -0.30, -0.10, 0.9, 0.6)
-    assert m_L3 == pytest.approx(0.0 + 0.05 + 0.23 + 0.20 + 0.02)
-    m_R4, _, _ = TT.lateral_margins(row, 0.05, 0.40, 0.9, 0.6)
-    assert m_R4 == pytest.approx(0.0 + 0.05 + 0.23 + 0.20 + 0.02)
+    assert (m_R, m_L) == (0.0, 0.0) and info["D_p"] == pytest.approx(0.23)  # min(W_p + 0.03, R_img) = W_p + 0.03 here
+    assert info["g_min"] == pytest.approx(0.03) and info["m_end"] == pytest.approx(0.10)
+    assert info["L_min"] == pytest.approx(0.10 + 0.03 + 0.20 + 0.20)
+    assert TT.lateral_bounds(0.53, m_R, m_L) == (pytest.approx(-0.265), pytest.approx(0.265))  # the whole edge
+    # R_img caps D_p; the edge rule depends on neither D_p nor the band's extent (the old margins carried both, twice)
+    _, _, info2 = TT.lateral_margins(row, -0.56, 0.16, b=0.9, R_img=0.10)
+    assert info2["D_p"] == pytest.approx(0.10) and info2["L_min"] == pytest.approx(info["L_min"])
+    # generation.table_end_margin_m / footprint_gap_min_m of the alias; nextto's smallest gap is g_NT + 0.03
+    assert TT.lateral_margins(dict(row, m_end=0.05, g_min=0.04), -0.3, 0.4, 0.9, 0.6)[2]["L_min"] == pytest.approx(0.10 + 0.04 + 0.20 + 0.10)
+    nt = TT.lateral_margins(dict(row, relation="nextto", g_NT=0.063), -0.3, 0.4, 0.9, 0.6)[2]
+    assert nt["g_min"] == pytest.approx(0.093) and nt["L_min"] == pytest.approx(0.10 + 0.093 + 0.20 + 0.20)
+    # the s3 cases: under_small#03's plate (w_t 0.123) and place mat (w_p 0.283) need 1.042 m - its 1.06 m pedestal table and the 1.16 m
+    # breakfast-table ends pass (the old margins asked 3.25 / 3.33 m); nextto#04's shoes (0.154 / 0.154, g_NT 0.063) need 0.91 m - the
+    # bench's 1.14 m edge passes, its 0.36 m ends do not (0.909 m with these rounded extents)
+    plate = TT.lateral_margins({**row, "w_t": 0.123, "w_p": 0.283, "W_p": 0.566, "D_p_max": 0.596}, -0.48, 0.16, 0.8, 0.8)[2]
+    assert plate["L_min"] == pytest.approx(1.042) and plate["L_min"] < 1.06
+    shoes = TT.lateral_margins({**row, "w_t": 0.154, "w_p": 0.154, "W_p": 0.308, "D_p_max": 0.338, "relation": "nextto", "g_NT": 0.063}, -0.48, 0.16, 0.8, 0.8)[2]
+    assert shoes["L_min"] == pytest.approx(0.909) and 0.36 < shoes["L_min"] < 1.14
 
 
 def test_margins_nextto_rejects_pair_when_dp_below_gnt_plus_3cm():

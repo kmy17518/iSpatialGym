@@ -70,8 +70,8 @@ from ispatialgym.sampling.v2.problem import GroundedProblem, TemplateChoice, new
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 
-#: customs generation keys that only steer eval instances (dropped for --split train)
-EVAL_ONLY_GENERATION_KEYS = ("requested_bucket_m", "requested_direction", "start_depth_band")
+#: customs generation keys that only steer eval instances (dropped for --split train; IORS small ``partner_side``: train draws the side)
+EVAL_ONLY_GENERATION_KEYS = ("requested_bucket_m", "requested_direction", "start_depth_band", "partner_side")
 
 
 def parse_path_buckets(text: Optional[str]) -> Optional[List[Dict[str, Any]]]:
@@ -275,7 +275,8 @@ def main_train(args) -> int:
         if buckets is not None:
             gp.generation["path_buckets"] = buckets
         # the eval-only draws of the customs entry (owner 2026-10-11): the eval camera bucket and object-scaling direction / start
-        # band; train fills the buckets by the deficit draw and draws the direction at random
+        # band; train fills the buckets by the deficit draw and draws the direction at random (IORS small, owner 2026-10-12: the
+        # partner side among the sides with a start cell)
         for k in EVAL_ONLY_GENERATION_KEYS:
             gp.generation.pop(k, None)
         choice = choice_for_template(gp, meta)

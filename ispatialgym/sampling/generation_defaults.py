@@ -120,6 +120,7 @@ IORS_SMALL_COMMON: Dict[str, Any] = {
     "partner_footprint_margin_m": 0.01,  # §6.11 the partner's top admits the target footprint with ≥ 1 cm margin
     "footprint_gap_min_m": 0.03,  # §4.6 target–partner edge-to-edge gap g ≥ 0.03
     "partner_gap_extra_m": 0.03,  # §4.4 D_p = min(W_p + 0.03, R_img)
+    "table_end_margin_m": 0.10,  # §4.4 / §4.6 (A1, owner 2026-10-12) both footprints ≥ 0.10 m from the edge's ends; L ≥ 2 w_t + g_min + 2 w_p + 2 m_end
     "partner_moved_max_m": 0.005,  # §6.11 partner displacement ≤ 5 mm at the goal
     "goal_drop_m": 0.01,  # §6.11 ontop / under(small) z = partner top + bottom offset + 1 cm drop
 }
@@ -462,7 +463,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {},
         "path_buckets": None,
         **IORS_SMALL_COMMON,
-        "partner_side": "left",  # §4.6 / §6.11 partner on the robot's left (right hand pushes, left hand braces)
+        "partner_side": "left",  # §4.6 / §6.11 partner on the robot's left (right hand pushes, left hand braces); A1: the only side touching admits
         "nudge_m": 0.001,  # §6.11 touching nudges of 1 mm
         "max_nudges": 25,  # §6.11 (≤ 25)
         "partner_stability": {"base_contact_fraction": 0.25, "foot_width_fractions": [0.6, 0.45], "max_height_over_extent": 2.5},  # §6.11

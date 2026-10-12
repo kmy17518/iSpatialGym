@@ -365,15 +365,10 @@ def test_sampler_handedness_pair_and_partner_side():
     with pytest.raises(Reject) as e:
         IS.IORSSmall.handedness_pair(stub("kmcbym", "picdro"))
     assert e.value.reason == "handedness_pair"
-    right = types.SimpleNamespace(pair={"handedness": {"target": "right", "partner": "left", "target_side": "right"}})
-    assert IS.IORSSmall.handed_ranges(right, {1.0: (0.05, 0.2), -1.0: (0.05, 0.3)}) == {1.0: (0.05, 0.2)}
-    left = types.SimpleNamespace(pair={"handedness": {"target": "left", "partner": "right", "target_side": "left"}})
-    assert IS.IORSSmall.handed_ranges(left, {1.0: (0.05, 0.2), -1.0: (0.05, 0.3)}) == {-1.0: (0.05, 0.3)}
-    with pytest.raises(Reject) as e:
-        IS.IORSSmall.handed_ranges(right, {-1.0: (0.05, 0.3)})
-    assert e.value.reason == "partner_placement"
-    both = {1.0: (0.0, 1.0), -1.0: (0.0, 1.0)}
-    assert IS.IORSSmall.handed_ranges(types.SimpleNamespace(pair={"g_NT": 0.05}), both) == both
+    # A1 (owner 2026-10-12): the pair's admissible partner sides (+1 = the robot's left of the target), fixed before the target is placed
+    assert IS.partner_sides("nextto", {"target": "right", "partner": "left", "target_side": "right"}) == [1.0]
+    assert IS.partner_sides("nextto", {"target": "left", "partner": "right", "target_side": "left"}) == [-1.0]
+    assert IS.partner_sides("nextto", None) == [1.0, -1.0]
 
 
 def _box_at(lo, hi):

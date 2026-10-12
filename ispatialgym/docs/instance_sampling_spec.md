@@ -711,8 +711,7 @@ border at the source-tray depth) and R_img (surface distance from the target to 
    band (A1; `[pilot]` on `breakfast_table_rhjoby_0` this makes block design 1.21 m and axial 1.46 m, so only the
    2.9 m edge admits them; the implementation keeps the working‑arm band as the default and the union behind
    `ISG_MARGIN_UNION=1` until the owner confirms); W_p = the partner's top-down AABB extent along the edge (canonical
-   orientation); D_p = maximum edge-to-edge gap target–partner (the partner's side is random, so both margins carry
-   it); safety 0.02.
+   orientation); D_p = maximum edge-to-edge gap target–partner; safety 0.02.
 
    D_p = min(W_p + 0.03, R_img) for ontop, under, inside, touching and nextto; nextto additionally rejects the pair
    when D_p < g_NT + 0.03, with g_NT = mean(dims_target + dims_partner)/6 (element-wise sum of the two AABB extents,
@@ -720,7 +719,7 @@ border at the source-tray depth) and R_img (surface distance from the target to 
 
    | task | m_R (robot's right) | m_L (robot's left) |
    |---|---|---|
-   | ontop, under, inside, nextto, touching | \|λ_min\| + w_t + D_p + 2·w_p + 0.02 | max(0, λ_max) + w_t + D_p + 2·w_p + 0.02 |
+   | ontop, under, inside, nextto, touching | 0 (the whole edge; L ≥ 2·w_t + g_min + 2·w_p + 2·m_end) | 0 |
    | attachment | \|λ_min\| + max(w_target, w_partner) + 0.02 | max(0, λ_max) + max(w_target, w_partner) + 0.02 |
    | axial alignment | \|λ_min\| + w_diag + 0.02, w_diag = ½√(long² + short²) | max(0, λ_max) + w_diag + 0.02 |
    | block design | \|λ_min\| + 0.0125 + 0.026 + 0.02 | max(0, λ_max) + 0.0125 + 0.02 |
@@ -728,7 +727,15 @@ border at the source-tray depth) and R_img (surface distance from the target to 
 
    (block design: half edge + one pitch to the robot's right of the anchor; disembedding: 0.437 = the two fixed trays'
    half lengths along the edge + gap, recompute if the trays change.)
-2. Lateral position uniform over [−L/2 + m_R, L/2 − m_L] (L = edge length); skip the edge if m_R + m_L > L. Valid
+
+   *IORS small (owner decision 2026‑10‑12, A1).* The row was |λ_min| + w_t + D_p + 2·w_p + 0.02 per side: the top had to
+   hold the whole reach band plus the largest gap and the partner on both sides, so short supports failed `no_free_edge`
+   on every candidate (under_small#03 asked 3.25–3.33 m of its 1.06 / 1.16 m tables) although the partner placement kept
+   the partner inside the band anyway. Now the lateral is drawn over the whole edge and the edge is skipped only when
+   L < 2·w_t + g_min + 2·w_p + 2·m_end: g_min = the lower end of the gap range (0.03; nextto g_NT + 0.03), m_end =
+   `generation.table_end_margin_m` (0.10). Where the target may start then follows from the start region of §4.6 step 2.
+2. Lateral position uniform over [−L/2 + m_R, L/2 − m_L] (L = edge length); skip the edge if m_R + m_L > L (IORS: if
+   L is below the rule above). Valid
    when (1) the base centre is on free floor; (2) the resulting configuration — base (x, y, yaw), trunk (t*, 0),
    untucked arms, grippers open — is whole-body collision-free (it is the instance's **init pose**); if not, move t
    within [Δ_min, Δ_max] (recompute b, R_img and the margins) or redraw the lateral position; (3) base + torso links
@@ -773,7 +780,9 @@ otherwise (or when that fails) the §3.7 path to the drive‑back pose plus the 
 (partner / attach / left‑band placement, braces, exact checks) is unchanged. The sidecar's manipulation stance records
 `init_view_angle` / `init_view_class`, `axis_angle` / `angle_class`, `lateral_shift_m` and `init_travel` (`lateral_m`, `base_m`,
 `path_m`, `departure_stand_off_m`, `transition_stand_off_m`). Implemented for the tasks that call tabletop Phase 2 at the
-template: IORS small, disembedding, attachment, block design (its own travel), axial alignment, small articulation.
+template: IORS small, disembedding, attachment, block design (its own travel), axial alignment, small articulation. IORS small
+(A1, §4.6 step 2): the position is drawn from the pool of the attempt's partner side — the work stances whose start region
+has that side, one pool per side.
 
 ### 4.6 Phase 3 — sample objects
 
@@ -818,11 +827,37 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    - *Axial alignment*: yaw = aligned yaw ± U(20°, 70°) with random sign, footprint on the top, at least one end of
      the long axis inside the band and its top-down push pose confirmed with the exact IK; the stop edge for the other
      arm (6.10) reachable.
-2. **Partner** on a random side of the target with edge-to-edge gap g: ontop / under / inside g ∈ [0.03, D_p];
+2. **Partner** on a side of the target with edge-to-edge gap g: ontop / under / inside g ∈ [0.03, D_p];
    nextto g ∈ [g_NT + 0.03, D_p]; touching g ∈ [0.03, D_p] **on the robot's left** (the right hand pushes toward it,
    the left hand braces its far side, section 6.11); attachment: partner on a cell of the attach-reach band (every
    attachment pose reachable ignoring collision with the target), gap ≥ 0.04, centre distance ≥ 0.08. Footprints on
    the top, ≥ 3 cm apart.
+
+   *IORS start region (owner decision 2026‑10‑12, A1; ontop, under, inside, nextto, touching small-scale).*
+   - **Side first.** The partner's side (of the target, robot frame) is fixed before the target is placed. Train: uniform
+     among the sides the pair admits — touching the robot's left, a handed nextto pair the side that leaves the target
+     on its own hand's side, otherwise left / right — whose start region has a cell. Eval: the alias's
+     `generation.partner_side` (`left` / `right`; `multiply_isg --split train` drops it), assigned so that each
+     subtask's eval picks are half left / half right where both sides are allowed; a side the pair does not admit
+     rejects the template (`partner_side`).
+   - **Start region** (template time, after Phase 2), per side the template may draw: a Phase‑2 focus is a valid target
+     start when some g ∈ [g_min, D_p] puts the partner (a) fully on the top (2 cm margin) with both footprints at least
+     m_end from the edge's ends, (b) fully in the init image, (c) meeting its reach rule at the candidate's trunk with
+     the band of an arm that may make the segment there (the attempt offers only those arms for the drawn side) —
+     ontop / under / inside the partner's centre a band lateral at the target's depth (band cells within 0.12 m of it),
+     nextto (and touching without its push stance) the target's place position, touching nothing here (its push‑stance
+     screen at the draw). The target is a w_t square at the focus, the partner in either edge‑aligned orientation. The
+     longest valid gap run (1 cm grid) is the cell's interval (`start_region` of the candidate); the plain Phase‑2
+     candidates and the split cone's position pool (§4.5) keep the cells of the drawn side only. When no side the
+     template may draw has a cell — for eval the assigned side — the robot's lateral is redrawn (§4.4, 4 draws in all,
+     `generation.start_region_lateral_draws`), then the template is rejected (`no_start_region`).
+   - **Attempt.** The target starts on a cell of the side's region (within 5 cm of its focus, step 1); the partner gets
+     a gap drawn uniformly from that cell's interval re‑evaluated at the drawn target pose, the segment's arm and the
+     partner yaw (5 mm grid; 16 random yaws, then the two edge‑aligned footprints the region was computed with; touching
+     the two edge‑aligned footprints in turn, 8 tries), then the checks above. This
+     replaces the 40 blind tries of a random gap; the shelf layout (touching, §6.11) keeps its partner leaning against
+     the opposite board. Recorded: `template_facts.start_region` (edge, L, L_min, lateral, cells and candidates per
+     side, gap range, failed lateral draws) and the instance's `partner_draw` (side, gap, intervals).
 3. **Distractors** (disembedding) on the source tray, each ≥ x from the target along the drawn grasp's pinch axis,
    x = (open width 0.10 − pinch width of the drawn grasp)/2 + 0.01 (`Grasp.pad_clearance` + margin), so the grasp
    stays possible with the distractors placed; they may occlude the target up to **30 %** of its visible area
@@ -1573,7 +1608,8 @@ there are push‑only; the pilot's blocked axial instance succeeded with the clo
 
 ### 6.11 IORS — ontop / under / inside / nextto / touching (small-scale)
 
-Init per section 4. Goal: partner unchanged; target orientation as at init (inside: not evaluated,
+Init per section 4 (the IORS edge rule of 4.4 and the start region / partner side of 4.6 step 2, A1). Goal: partner
+unchanged; target orientation as at init (inside: not evaluated,
 `orientation_metric: null`); position: ontop / under(small) → target centred on the partner (under(small): the
 partner ends under the target, BDDL `(under ?partner ?target)`); inside → centred on the partner's fillable-volume
 floor (drop + settle; standing orientation allowed for stem-grasped objects); nextto / touching → the position
