@@ -14,7 +14,7 @@ move the base: the start base), and the poses the train-repeat rule compares:
   summary ``goal_realised``).
 
 Eval separation (:func:`separation_offenders`): within one task and one (scene, room) every pair of instances whose start
-bases are less than ``min_m`` (1.0 m) apart - for camera relocalization also every pair whose goal bases are - is an offender;
+bases are less than ``min_m`` (0.5 m) apart - for camera relocalization also every pair whose goal bases are - is an offender;
 :func:`resample_choice` walks the aliases in order (an alias list, else sorted) and re-samples an alias that conflicts with
 one kept before it (the later alias of a pair), keeping the rest. The checker CLI (:func:`main`, ``$E/separation_check.py``)
 prints the pairs and the aliases to re-sample with their next seed index (``sample_isg --seed-split eval --seed-index``), and
@@ -41,7 +41,7 @@ CAMERA = "camera_relocalization"
 HELD_TASKS = ("object_scaling", "mental_rotation")
 RULE_TASKS = (CAMERA,) + HELD_TASKS
 AGENT = "agent.n.01_1"
-MIN_SEPARATION_M = 1.0
+MIN_SEPARATION_M = 0.5
 REPEAT_POS_M = 0.25
 REPEAT_ANG_DEG = 15.0
 INDEX_SCHEMA = "isg-instance-index-v1"

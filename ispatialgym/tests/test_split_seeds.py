@@ -297,7 +297,7 @@ def test_separation_check_cli_on_run_tags(tmp_path, capsys):
     # an alias's run set aside (renamed) is skipped
     tro, sc = _camera("cam-a", (9.0, 9.0, 0.0), (0.0, 0.0, 0.0))
     _write(runs / "t1" / "cam-a.hung_1" / "inst" / "cam-a" / "house_single_floor", "cam-a__house_single_floor__0000", tro, sc)
-    assert SEP.main(["t1", "--write-index", str(tmp_path / "idx.json")], runs_root=str(runs)) == 1
+    assert SEP.main(["t1", "--min", "1.0", "--write-index", str(tmp_path / "idx.json")], runs_root=str(runs)) == 1
     out = capsys.readouterr().out
     assert "2 instances of 2 aliases" in out and "RESAMPLE cam-b --seed-split eval --seed-index 1" in out and "SEPARATION FAIL pairs=1" in out
     assert len(SEP.load_instances([str(tmp_path / "idx.json")])) == 2
@@ -306,6 +306,27 @@ def test_separation_check_cli_on_run_tags(tmp_path, capsys):
     _write(runs / "t2" / "cam-b" / "inst" / "cam-b" / "house_single_floor", "cam-b__house_single_floor__0000", tro, sc)
     assert SEP.main(["t1", "t2"], runs_root=str(runs)) == 0
     assert "SEPARATION OK" in capsys.readouterr().out
+
+
+def test_separation_default_is_half_a_metre(tmp_path, capsys):
+    """Owner 2026-10-12 (~08:16): the eval separation threshold is 0.5 m (was 1.0 m); separation_offenders and the checker CLI's
+    --min default to it."""
+    assert SEP.MIN_SEPARATION_M == 0.5
+    pair = (("cam-a", (0.0, 0.0, 0.0), (5.0, 5.0, 0.0)), ("cam-b", (0.7, 0.0, 0.0), (5.0, 5.6, 0.0)))
+    recs = [SEP.record_from_dicts(*_camera(alias, start, goal)) for alias, start, goal in pair]
+    assert SEP.separation_offenders(recs) == []
+    assert [(o.kind, round(o.distance_m, 2)) for o in SEP.separation_offenders(recs, 1.0)] == [("start", 0.7), ("goal", 0.6)]
+    recs.append(SEP.record_from_dicts(*_camera("cam-c", (0.0, 0.3, 0.0), (9.0, 9.0, 0.0))))
+    assert [(o.a.alias, o.b.alias, o.kind) for o in SEP.separation_offenders(recs)] == [("cam-a", "cam-c", "start")]
+    runs = tmp_path / "runs"
+    for alias, start, goal in pair:
+        tro, sc = _camera(alias, start, goal)
+        _write(runs / "t1" / alias / "inst" / alias / "house_single_floor", f"{alias}__house_single_floor__0000", tro, sc,
+               {"split": {"split": "eval", "index": 0, "seed": 1, "seed_source": "split"}})
+    assert SEP.main(["t1"], runs_root=str(runs)) == 0
+    assert "SEPARATION OK" in capsys.readouterr().out
+    assert SEP.main(["t1", "--min", "1.0"], runs_root=str(runs)) == 1
+    assert "SEPARATION FAIL" in capsys.readouterr().out
 
 
 # ----------------------------------------------------------------------------------------------------------------

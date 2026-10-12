@@ -1939,6 +1939,15 @@ success appends constraints (stance, grasp_set, joint_set, placement, contacts) 
 of the rules (draws, exact IK, transitions, paths) with the constraints as priors; camera relocalization fills the
 path buckets; every success appends constraints; rejections are counted per reason (`summary.rejections`).
 
+**Eval seeds and the eval separation** (owner 2026‑10‑11). An eval instance is sampled with `sample_isg --seed-split eval
+--seed-index k` (k = 0, 1, … per alias; the split seeds are stable, disjoint across the splits and unique per alias). Within
+one task and one (scene, room), a pair of eval instances offends when their robot start bases (x, y) are less than **0.5 m**
+apart, or — camera relocalization — their goal bases are; start and goal are checked separately
+(`ispatialgym.sampling.instance_separation`, `MIN_SEPARATION_M`, the checker's `--min`). The checker names the later alias
+of each pair (alias-list order, else sorted) to re-sample with its next seed index. *Owner decision 2026‑10‑12 (~08:16):*
+the threshold went from 1.0 m to 0.5 m; the ten camera-relocalization aliases sharing house_single_floor / living_room_0
+still had five pairs 0.61–0.92 m apart under 1.0 m with the best of seeds 0–2.
+
 ## 10. `[pilot]` numbers
 
 x_c(t), z_c(t), camera pitch at tilt 0, hand height below the camera (FK tables); band extents with untucked idle arms
