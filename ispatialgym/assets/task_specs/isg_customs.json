@@ -36505,7 +36505,7 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "partner_side": "left",
+   "partner_side": "right",
    "nudge_m": 0.001,
    "max_nudges": 25,
    "partner_stability": {
@@ -36640,7 +36640,7 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "partner_side": "left",
+   "partner_side": "right",
    "nudge_m": 0.001,
    "max_nudges": 25,
    "partner_stability": {
@@ -36768,7 +36768,7 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "partner_side": "left",
+   "partner_side": "right",
    "nudge_m": 0.001,
    "max_nudges": 25,
    "partner_stability": {

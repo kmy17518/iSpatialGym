@@ -1641,7 +1641,9 @@ def test_edge_frames_of_an_interior_surface_are_its_open_sides():
     assert [e.name for e, _ in TT.edge_frames(s, top)] == ["-v"]
 
 
-BU_REST_XYZW = [0.45451947767204387, 0.4545194776720438, -0.5416752204197018, 0.5416752204197021]  # hardback__acbrnv__bu (wxyz in the library)
+#: hardback__acbrnv__bu (wxyz in the library): the 15-degree lean of the regenerated key (owner 2026-10-11 item 4)
+BU_REST_XYZW = [0.4304593345768794, 0.43045933457687935, -0.5609855267969309, 0.5609855267969309]
+BU_LEAN_DEG = 15.0
 
 
 def test_upright_shelf_key_leans_toward_the_robots_left(monkeypatch):
@@ -1649,7 +1651,7 @@ def test_upright_shelf_key_leans_toward_the_robots_left(monkeypatch):
 
     monkeypatch.setattr(GL, "_candidates", lambda key: {"ispatialgym": {"rest_pose": "upright_shelf", "context": "bookcase_floor_wall"}} if key.endswith("__bu") else {"ispatialgym": {"rest_pose": "canonical"}})
     f = TT.upright_shelf_facts("hardback__acbrnv__bu", th.tensor(BU_REST_XYZW))
-    assert f["lean_side"] == 1.0 and abs(f["lean_deg"] - 10.0) < 0.1
+    assert f["lean_side"] == 1.0 and abs(f["lean_deg"] - BU_LEAN_DEG) < 0.1
     assert TT.upright_shelf_facts("hardback__acbrnv__bo", C.IDENTITY_QUAT.clone()) is None
 
 
@@ -1685,8 +1687,8 @@ def test_shelf_lean_pose_puts_the_spine_behind_the_edge_and_the_top_edge_at_the_
     assert abs(float(pts[:, 0].min()) - (-0.30 + TT.SHELF_WALL_GAP_M)) < 1e-4
     top_pts, bot_pts = pts[pts[:, 2] > float(pts[:, 2].max()) - 0.01], pts[pts[:, 2] < float(pts[:, 2].min()) + 0.01]
     assert float(top_pts[:, 0].min()) < float(bot_pts[:, 0].min()) - 0.03
-    # standing on its bottom edge on the board (3 mm drop), the ray at 0.8 of the book's height
-    assert abs(float(pts[:, 2].min()) - (0.70 + TT.Z_OFFSET)) < 1e-4 and abs(facts["ray_z"] - (0.70 + 0.8 * 0.2247)) < 2e-3
+    # standing on its bottom edge on the board (3 mm drop), the ray at 0.8 of the book's height (0.2232 m at the 15-degree lean)
+    assert abs(float(pts[:, 2].min()) - (0.70 + TT.Z_OFFSET)) < 1e-4 and abs(facts["ray_z"] - (0.70 + 0.8 * 0.2232)) < 2e-3
     assert facts["lean_side"] == "left" and facts["n_bottom_off_board"] == 0
     # no side board on that side -> Reject
     s.world.raycast = lambda a, b: [{"hit": True, "rigidBody": "/World/other_book/base_link", "distance": 0.1}]
@@ -1734,7 +1736,7 @@ def test_upright_lean_and_mirrored_lean_orientations():
     # mirrored: the bu rest (leaning left, spine toward -x) turned to lean right about the inward axis of an edge facing +x
     edge = EdgeFrame("-v", th.tensor([0.0, 0.0]), th.tensor([1.0, 0.0]), 0.8)
     q0 = th.tensor(BU_REST_XYZW)
-    qm = TT.mirrored_lean_quat(q0, edge, 1.0, 10.0)
+    qm = TT.mirrored_lean_quat(q0, edge, 1.0, BU_LEAN_DEG)
     p0, pm = C.transform_points((th.zeros(3), q0), hull), C.transform_points((th.zeros(3), qm), hull)
     lean = lambda p: float(p[p[:, 2] > 0.1][:, 1].mean() - p[p[:, 2] < -0.1][:, 1].mean())
     assert lean(p0) > 0.03 and lean(pm) < -0.03 and abs(lean(p0) + lean(pm)) < 1e-3

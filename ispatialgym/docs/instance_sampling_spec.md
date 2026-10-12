@@ -904,8 +904,10 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
 
    *IORS start region (owner decision 2026‑10‑12, A1; ontop, under, inside, nextto, touching small-scale).*
    - **Side first.** The partner's side (of the target, robot frame) is fixed before the target is placed. Train: uniform
-     among the sides the pair admits — touching the robot's left, a handed nextto pair the side that leaves the target
-     on its own hand's side, otherwise left / right — whose start region has a cell. Eval: the alias's
+     among the sides the pair admits — touching the robot's left (its shelf layout, §6.11, the side opposite the target's
+     lean, where the partner leans against the other board: the right for touching#03's key, which leans left; that is the
+     side recorded in `template_facts.partner_sides` and the alias's `partner_side`), a handed nextto pair the side that
+     leaves the target on its own hand's side, otherwise left / right — whose start region has a cell. Eval: the alias's
      `generation.partner_side` (`left` / `right`; `multiply_isg --split train` drops it), assigned so that each
      subtask's eval picks are half left / half right where both sides are allowed; a side the pair does not admit
      rejects the template (`partner_side`).

@@ -273,7 +273,7 @@ def test_the_shelf_layout_geometry_chain_on_a_compartment():
     from ispatialgym.sampling.sim_utils import SupportTop
     from ispatialgym.sampling.v2 import tabletop as TT
     from ispatialgym.sampling.v2.stances import nearer_side_lateral
-    from ispatialgym.tests.test_v2_tabletop import BU_REST_XYZW
+    from ispatialgym.tests.test_v2_tabletop import BU_LEAN_DEG, BU_REST_XYZW
 
     IS = _iors()
     hull = _book_hull()
@@ -287,11 +287,12 @@ def test_the_shelf_layout_geometry_chain_on_a_compartment():
 
     world = SimpleNamespace(raycast=raycast, hull_at=_hull_at, bottom_offset=lambda h, q: -float(C.transform_points((th.zeros(3), q), h)[:, 2].min()))
     s = _sampler(1.0, world=world, edge=edge)
+    s.shelf_start["lean_deg"] = BU_LEAN_DEG
     s.target_goal_quat = types.MethodType(IS.IORSSmall.target_goal_quat, s)
     s.place_pose_for = types.MethodType(IS.IORSSmall.place_pose_for, s)
     t_rest = th.tensor(BU_REST_XYZW)
     t_start, tf = TT.shelf_lean_pose(s, hull, t_rest, top, edge, support, 1.0)
-    p_start, pf = TT.shelf_lean_pose(s, hull, TT.upright_lean_quat(hull, -1.0, 10.0), top, edge, support, -1.0)
+    p_start, pf = TT.shelf_lean_pose(s, hull, TT.upright_lean_quat(hull, -1.0, BU_LEAN_DEG), top, edge, support, -1.0)
     t_w, p_w = _hull_at(hull, t_start), _hull_at(hull, p_start)
     assert tf["lean_side"] == "left" and pf["lean_side"] == "right"
     assert float(t_w[:, 0].min()) == pytest.approx(-0.30 + TT.SHELF_WALL_GAP_M, abs=1e-4) and float(p_w[:, 0].max()) == pytest.approx(0.30 - TT.SHELF_WALL_GAP_M, abs=1e-4)

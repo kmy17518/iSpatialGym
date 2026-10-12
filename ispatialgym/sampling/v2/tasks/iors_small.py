@@ -201,14 +201,15 @@ def merge_shelf_pose_facts(start: Dict[str, Any], facts: Dict[str, Any]) -> None
     start.update({("lean_side_name" if k == "lean_side" else k): v for k, v in facts.items()})
 
 
-def partner_sides(relation: str, handed: Optional[Dict[str, str]] = None) -> List[float]:
+def partner_sides(relation: str, handed: Optional[Dict[str, str]] = None, shelf_lean: Optional[float] = None) -> List[float]:
     """A1 step 3 (owner 2026-10-12): the partner sides (+1 = the robot's left of the target, -1 = its right) a pair admits - touching the
-    robot's left (the right hand pushes toward it, the left braces its far side, §6.11), a handed nextto pair (``handedness_pair``) the
-    side that leaves the target on its own hand's side, otherwise both."""
+    robot's left (the right hand pushes toward it, the left braces its far side, §6.11), in the shelf layout (``shelf_lean`` = the
+    target's lean side) the side opposite the lean (the partner leans against the other board), a handed nextto pair
+    (``handedness_pair``) the side that leaves the target on its own hand's side, otherwise both."""
     from ispatialgym.sampling import pair_rules as PR
 
     if relation == "touching":
-        return [1.0]
+        return [-float(shelf_lean)] if shelf_lean is not None else [1.0]
     if handed:
         return [PR.partner_side_for(handed["target_side"])]
     return [1.0, -1.0]
@@ -870,16 +871,26 @@ class IORSSmall(SamplerV2):
         if name not in ("left", "right"):
             raise Reject("spec", f"{self.gp.alias}: generation.partner_side must be 'left' or 'right', got {name!r}")
         side = 1.0 if name == "left" else -1.0
-        allowed = partner_sides(self.relation, (self.pair or {}).get("handedness"))
+        allowed = self.admitted_sides()
         if side not in allowed:
-            raise Reject("partner_side", f"{self.gp.alias}: generation.partner_side {name} - the pair admits the partner on the "
+            who = "the shelf layout (the partner leans against the board opposite the target's lean)" if self.shelf_lean() is not None else "the pair"
+            raise Reject("partner_side", f"{self.gp.alias}: generation.partner_side {name} - {who} admits the partner on the "
                                          f"{' / '.join(TT.side_name(sd) for sd in allowed)} only")
         return side
+
+    def shelf_lean(self) -> Optional[float]:
+        """The target's lean side in the shelf layout (+1 = the robot's left), None on the tabletop."""
+        start = getattr(self, "shelf_start", None)
+        return None if start is None else float(start["lean_side"])
+
+    def admitted_sides(self) -> List[float]:
+        """:func:`partner_sides` of this template: the relation, the pair's handedness and the shelf layout's lean."""
+        return partner_sides(self.relation, (self.pair or {}).get("handedness"), self.shelf_lean())
 
     def template_sides(self) -> List[float]:
         """A1 step 3: the partner sides the template may draw - the eval side alone (:meth:`assigned_side`), else every side the pair admits."""
         assigned = self.assigned_side()
-        return [assigned] if assigned is not None else partner_sides(self.relation, (self.pair or {}).get("handedness"))
+        return [assigned] if assigned is not None else self.admitted_sides()
 
     def reach_rule(self) -> Optional[str]:
         """A1 step 2 (c), the band cut the partner placement always made (``tabletop.lateral_gap_masks``): ontop / under / inside the partner's
@@ -987,7 +998,7 @@ class IORSSmall(SamplerV2):
         ``extras["start_region_arms"]`` the arms that meet (c) per side; ``region_sides`` the sides with a cell; the region's size goes to
         ``template_facts["start_region"]``. With ``partner_on_meta_link`` (A5) the partner stands on a meta-link spot (:meth:`find_meta_spots`)
         and the region follows from those spots (:meth:`meta_spot_region`; the candidate's spots per side in ``extras["meta_link_spots"]``)."""
-        allowed = partner_sides(self.relation, (self.pair or {}).get("handedness"))
+        allowed = self.admitted_sides()
         assigned = self.assigned_side()
         sides = [assigned] if assigned is not None else allowed
         g_lo, g_hi = self.gap_range()

@@ -233,6 +233,28 @@ def test_side_is_fixed_before_the_target_eval_assigned_train_uniform(monkeypatch
     assert IS.IORSSmall.sample(s, np.random.default_rng(0)) == "draft" and seen == [-1.0]
 
 
+def test_shelf_layout_partner_side_is_the_board_opposite_the_lean():
+    """touching#03 (owner 2026-10-12 item 7b): in the shelf layout the partner leans against the board opposite the target's lean, so that
+    is its side in template_sides (template_facts.partner_sides) and the only eval side it admits - the right for hardback__acbrnv__bu,
+    which leans left; the tabletop touching keeps the robot's left."""
+    assert IS.partner_sides("touching", shelf_lean=1.0) == [-1.0] and IS.partner_sides("touching", shelf_lean=-1.0) == [1.0]
+
+    def shelf(lean, gen=None):
+        s = _sampler("touching", gen=gen, pair={"g_NT": 0.05})
+        s.shelf_start = {"lean_side": lean, "lean_deg": 15.0}
+        return s
+
+    for lean in (1.0, -1.0):
+        side = TT.side_name(-lean)
+        assert shelf(lean).template_sides() == [-lean]  # train: the layout's side
+        assert shelf(lean, {"partner_side": side}).template_sides() == [-lean]  # eval: the true side
+        with pytest.raises(Reject) as r:
+            shelf(lean, {"partner_side": TT.side_name(lean)}).template_sides()
+        assert r.value.reason == "partner_side" and "shelf layout" in str(r.value)
+    assert TT.side_name(-1.0) == "right"
+    assert _sampler("touching", gen={"partner_side": "left"}, pair={"g_NT": 0.05}).template_sides() == [1.0]
+
+
 def test_split_cone_pool_follows_the_attempts_partner_side():
     edge = EdgeFrame.from_edge("+x", th.tensor([1.0, 0.0]), th.tensor([-1.0, 0.0]), 1.6)
 
