@@ -1,0 +1,273 @@
+{
+ "task": "IORS",
+ "relation": "inside",
+ "category": "sunflower",
+ "model": "dkajbh",
+ "key": "sunflower__dkajbh__r50",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.19198892211914062,
+  0.07922172164916992,
+  0.06447799301147461
+ ],
+ "ready": true,
+ "base_key": "sunflower__dkajbh",
+ "rest_pose": "r50_hull_face",
+ "rest_quat_wxyz": [
+  0.906273,
+  -0.419598,
+  -0.046325,
+  -0.021448
+ ],
+ "provenance": {
+  "decision": "owner 2026-10-11 ~20:05: inside#03's sunflower/dkajbh rolls ~50 deg off the identity rest of sunflower__dkajbh while settling (inside03_READY.txt); a new key at its stable resting pose, annotated with the pipeline of spatula__hkvsep__t076 (d42e9b0e), grasps that hold in sim and approach from above",
+  "isg_commit": "91420448",
+  "b1k_commit": "6a6194600",
+  "rest": "the collision hull facet with outward normal [-0.1017, 0.7581, -0.6442] (object frame), 49.9 deg from identity, on which the flower came to rest in the 3 inside#03 sampler runs on breakfast_table_rhjoby_0 (17816335-17816493 TRO states: down direction within 0.04 deg of each other); rest_quat_wxyz = the minimal rotation taking that down direction to -z, turned about world z so the stem (+x) points along world +x (roll -49.7 deg about x, pitch -5.9 deg); confirmed by this run's drop test (results/ provenance.settle_test)",
+  "scripts": "isg_home/eval85/scratch_sunflower_r50/scripts = runlogs/grasp_library_20260905/scripts with cluster paths (as scratch_spatula076); gen_candidates.py: a job's own rest_quat_wxyz is the only rest tried (flower_stem_top kept there, stem axis taken in the canonical frame and turned with the rest) and the job's goal_up_axis filter; ag_validate_render.py unchanged from scratch_spatula076",
+  "pipeline": "a1 / flower_stem_top = the pipeline and constraint of the base key sunflower__dkajbh (require grasps:insert, the IORS inside target requirement); approach <= 40 deg from vertical at the rest (from above, the a1 tilt filter) and, standing on +x at the goal (inside#03 generation.target_up_axis), at most 6 deg below horizontal (goal_up_axis / goal_max_below_deg: from the side or above; the base key's grasp_6~r180 came ~30 deg from below there); antipodal sampler at 24000 samples (the default 6000 left 5 candidates after the goal filter, one of which had failed the AG test in the first pass, glib_v1)",
+  "mesh": "collision mesh = grasp_newsheet/meshes/sept__sunflower__dkajbh.obj (export_meshes_batch.py, unit scale, link frame; same COM [0.0007, -0.0006, 0.0019] as the base key's cands log)",
+  "hull": "convex hull of the 4 collision pieces (COM [0.0007, -0.0006, 0.0019]): the r50 face (outward normal [-0.1017, 0.7581, -0.6442], 49.9 deg from identity, with near-coplanar neighbours within 0.7 deg) holds the COM 5.2 mm inside its support polygon (hull vertices within 0.5 mm of the table; 5.7 mm within 1-2 mm); the facets within 43 deg of identity hold it 0.04-2.9 mm inside, and at identity the COM is 0.6 mm outside the support",
+  "settle_test": {
+   "job": 17817498,
+   "file": "isg_home/eval85/scratch_sunflower_r50/glib/settle_test.json",
+   "script": "isg_home/eval85/scratch_sunflower_r50/scripts/settle_test.py",
+   "how": "released like the sampler (R_z(yaw) * rest, hull bottom 3 mm above the support, 120 Hz physics), pose read after 92 / 300 / 600 physics steps, yaws 0-300 by 60",
+   "table": "breakfast_table/rhjoby (fixed): from identity all 6 yaws roll 49.9-50.4 deg onto this rest (0.0-0.5 deg from rest_quat_wxyz), still turning at 92 steps (0.6-1.6 rad/s), at rest by 300; from this rest all 6 stay (<= 0.5 deg, at rest at 92 steps, <= 0.2 mm drift)",
+   "floor": "ground plane: from this rest all 6 stay (<= 0.5 deg); from identity 5 of 6 stop on a facet 8.6-10.6 deg from identity, 1 rolls to this rest",
+   "sampler": "inside#03 sampler runs on 532cfd10 with settle_steps 300 (17816336, 17816482, 17816483, 17816484, 17816493): every logged settle 50 deg, on breakfast_table_rhjoby_0 and bottom_cabinet_jhymlr_0; the 3 written instances' down direction within 0.04 deg of each other = this rest"
+  },
+  "jobs": {
+   "ag": "17817506 (this file: the goal-approach filter, 24000 samples)",
+   "settle": "17817498",
+   "ag_first_pass": "17817429 (no goal filter, 6000 samples: 5 of 6 attached and held, two of them 10-15 deg from below at the standing goal; isg_home/eval85/scratch_sunflower_r50/glib_v1)"
+  }
+ },
+ "goal_up_axis": "+x",
+ "goal_max_below_deg": 6.0,
+ "n_cand": 24000,
+ "candidates_meta": {
+  "object": {
+   "category": "sunflower",
+   "model": "dkajbh"
+  },
+  "task": "IORS",
+  "constraint": "flower_stem_top",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_flower_stem_top",
+  "log": {
+   "n_sampled": 24000,
+   "n_tilt": 2728,
+   "n_width_antipodal": 1169,
+   "n_table": 923,
+   "n_collision": 713,
+   "n_sweep": 280,
+   "n_goal_approach": 42,
+   "n_flower": 42,
+   "stem_len": 0.194,
+   "n_selected": 8,
+   "com": [
+    0.0005,
+    0.0011,
+    0.0017
+   ],
+   "rest_pose": "r50_hull_face"
+  },
+  "rest_pose": "r50_hull_face",
+  "rest_quat_wxyz": [
+   0.906273,
+   -0.419598,
+   -0.046325,
+   -0.021448
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0114,
+    0.0
+   ],
+   "score": 10.8297,
+   "meta": {
+    "com_perp": 0.03291,
+    "width": 0.01066,
+    "antipodal": 0.96378,
+    "coverage": 1.0,
+    "clearance": 0.01405,
+    "tilt_deg": 26.14876,
+    "goal_elev_deg": 25.94267,
+    "stem_t": 0.45679,
+    "pinch_across": 0.14519
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g0_wrist.png"
+   },
+   "t_s": 17.82
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.012,
+    0.0
+   ],
+   "score": 8.6932,
+   "meta": {
+    "com_perp": 0.05074,
+    "width": 0.00981,
+    "antipodal": 0.89224,
+    "coverage": 1.0,
+    "clearance": 0.01864,
+    "tilt_deg": 11.5754,
+    "goal_elev_deg": 14.77972,
+    "stem_t": 0.52244,
+    "pinch_across": 0.18
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g1_wrist.png"
+   },
+   "t_s": 4.65
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0124,
+    0.0
+   ],
+   "score": 7.9233,
+   "meta": {
+    "com_perp": 0.05691,
+    "width": 0.013,
+    "antipodal": 0.88317,
+    "coverage": 1.0,
+    "clearance": 0.02097,
+    "tilt_deg": 3.23939,
+    "goal_elev_deg": 8.45419,
+    "stem_t": 0.56634,
+    "pinch_across": 0.28682
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g2_wrist.png"
+   },
+   "t_s": 4.63
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.011,
+    0.0
+   ],
+   "score": 7.5481,
+   "meta": {
+    "com_perp": 0.06439,
+    "width": 0.011,
+    "antipodal": 0.96378,
+    "coverage": 1.0,
+    "clearance": 0.04167,
+    "tilt_deg": 24.11221,
+    "goal_elev_deg": -3.71852,
+    "stem_t": 0.57667,
+    "pinch_across": 0.14519
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g3_wrist.png"
+   },
+   "t_s": 4.47
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 7.0225,
+   "meta": {
+    "com_perp": 0.06703,
+    "width": 0.01173,
+    "antipodal": 0.98501,
+    "coverage": 1.0,
+    "clearance": 0.02433,
+    "tilt_deg": 25.71451,
+    "goal_elev_deg": 25.99778,
+    "stem_t": 0.6498,
+    "pinch_across": 0.18818
+   },
+   "frames": {},
+   "t_s": 7.0
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0018,
+    0.0007
+   ],
+   "score": 6.9512,
+   "meta": {
+    "com_perp": 0.0702,
+    "width": 0.01122,
+    "antipodal": 0.96378,
+    "coverage": 1.0,
+    "clearance": 0.026,
+    "tilt_deg": 26.14876,
+    "goal_elev_deg": 25.94267,
+    "stem_t": 0.65298,
+    "pinch_across": 0.14519
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g5_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g5_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g5_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/scratch_sunflower_r50/glib/frames/sunflower__dkajbh__r50/g5_wrist.png"
+   },
+   "t_s": 4.7
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 54.9
+}

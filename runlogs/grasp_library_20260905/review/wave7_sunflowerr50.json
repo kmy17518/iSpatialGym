@@ -1,0 +1,44 @@
+{
+ "batch": "wave7_sunflowerr50 (2026-10-11, sunflower_r50 worker on strips/sunflower__dkajbh__r50.png and its frames with review_prompt.md, not the reviewer pool)",
+ "models": [
+  {
+   "key": "sunflower__dkajbh__r50",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch 11/0 just below the head, head hangs free; approach 26 deg off vertical at the rest, from 26 deg above at the standing goal"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch 12/0 mid-stem, head hangs free; near-vertical approach at the rest (tilt 12), from 15 deg above at the standing goal"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch 12/0 mid-stem, head hangs free; vertical approach at the rest (tilt 3), from 9 deg above at the standing goal"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch 11/0 mid-stem, head hangs free; approach 24 deg off vertical at the rest, level (4 deg below) at the standing goal"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 2/1 mm on the 11 mm stem near the cut end: the pads pass into the stem (wrist view)"
+    }
+   ],
+   "object_note": "rest r50_hull_face (rest_quat_wxyz [0.906273, -0.419598, -0.046325, -0.021448]: rolled 49.7 deg about the stem, cut end 5.9 deg down - the hull face the flower settles on); rows 1-4 approach from above at that rest (tilt 3-26 deg) and from 4 deg below to 26 deg above horizontal when the flower stands on +x at the goal; no visible gap in the profile views; row 5 (near the cut end) closes through the stem"
+  }
+ ]
+}
