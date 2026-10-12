@@ -64,6 +64,13 @@ from ispatialgym.sampling.v2.stances import PathRecord, SidecarDraft, Stance, Tr
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
+
+class TemplateExhausted(Reject):
+    """A rejection after which no attempt of the template can succeed (IORS small once every start-region candidate failed its
+    init -> manipulation travel deterministically): ``run_instances`` counts it like any rejection and ends the template's attempts
+    instead of spending the time budget on them."""
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # registry
 # ----------------------------------------------------------------------------------------------------------------
@@ -1218,14 +1225,15 @@ class SamplerV2(TaskSampler):
     def run_instances(self, n: int, max_attempts: int = 30, start_index: Optional[int] = None, indices: Optional[Sequence[int]] = None) -> List[str]:
         """Per attempt: sample (task module) -> apply -> settle + BEHAVIOR validation -> goal feasibility (robot parked per
         §3.3) -> ``after_goal_check`` -> program check -> TRO + sidecar -> constraints write-back. Rejections are counted
-        per reason with the first three examples. ``indices``: the instance indices to sample (default ``n`` from ``start_index``,
+        per reason with the first three examples; a :class:`TemplateExhausted` one ends the template's attempts (counter
+        ``template_exhausted``). ``indices``: the instance indices to sample (default ``n`` from ``start_index``,
         else after the instances written). Returns the TRO paths written."""
         written: List[str] = []
         if indices is None:
             start = self.existing_instances() if start_index is None else int(start_index)
             indices = range(start, start + int(n))
         deadline = getattr(self, "deadline", None)
-        out_of_time = False
+        out_of_time = exhausted = False
         for i_index, index in enumerate(indices):
             ok = False
             for attempt in range(max_attempts):
@@ -1295,7 +1303,12 @@ class SamplerV2(TaskSampler):
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.alias, index, attempt, phase, time.time() - t0, e)
                     self.on_reject(e)
-            if out_of_time:
+                    if isinstance(e, TemplateExhausted):
+                        exhausted = True
+                        self.counters["template_exhausted"] = self.counters.get("template_exhausted", 0) + 1
+                        log.warning("%s: template exhausted at instance %d attempt %d; no further attempt", self.gp.alias, index, attempt)
+                        break
+            if out_of_time or exhausted:
                 break
             if not ok:
                 log.error("%s: instance %d failed after %d attempts; rejections=%s", self.gp.alias, index, max_attempts, self.rejection_log.counts)

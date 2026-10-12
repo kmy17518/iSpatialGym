@@ -29,13 +29,13 @@ import torch as th
 from ispatialgym.oracle.programs import TOUCHING_SHELF_LAYOUT
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
-from ispatialgym.sampling.sim_utils import Reject, SupportTop
+from ispatialgym.sampling.sim_utils import PARK_POSITION, Reject, SupportTop
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, contact_height_extra, register, requested_height_extra
+from ispatialgym.sampling.v2.core import SamplerV2, TemplateExhausted, annotate_height_extra, contact_height_extra, register, requested_height_extra
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
@@ -168,6 +168,27 @@ BAND_DEPTH_WINDOW_M = 0.12
 REGION_ARMS = "start_region_arms"
 #: A5: extras key of a Phase-2 candidate: ``{"left" | "right": [spot index, ...]}``, the meta-link spots the partner may take there
 META_SPOTS = "meta_link_spots"
+#: 7e (owner 2026-10-12): the rejections of the init -> manipulation travel (``SamplerV2.record_stance_travel``: transition, departure,
+#: edge path) that repeat on every redraw of a candidate (:func:`travel_failure_deterministic`)
+TRAVEL_REASONS = ("no_transition", "no_path", "path_collision", "path_too_long")
+#: 7e: extras key of a Phase-2 candidate dropped after such a failure (the failure)
+TRAVEL_DROPPED = "travel_dropped"
+
+
+def travel_failure_deterministic(err: Reject, world) -> bool:
+    """7e: whether a failed init -> manipulation travel of a candidate fails the same way on every redraw. The check is a pure function of
+    the init stance (fixed by ``sample_template``), the candidate's work stance (base pose, trunk, stand-off, the template's working arm,
+    the idle arm's Phase-2 posture), the scene objects (reset to the scene file before every attempt), the traversability maps and the
+    task objects; it draws nothing (no IK: fixed s_T list, trunk-sweep samples and drive strides, grid A* on the maps, collision checks).
+    So it repeats when ``err`` is one of :data:`TRAVEL_REASONS` and every spawned object stands at its park slot (``SimWorld.park``: every
+    rejected attempt parks them) - after a written instance they stand where it left them, and that failure is not taken as final."""
+    if err.reason not in TRAVEL_REASONS:
+        return False
+    for i, obj in enumerate(world.spawned.values()):
+        slot = PARK_POSITION + th.tensor([float(i), 0.0, 0.0])
+        if float(th.linalg.norm(G.t(obj.get_position_orientation()[0]).float() - slot)) > 0.05:
+            return False
+    return True
 
 
 def merge_shelf_pose_facts(start: Dict[str, Any], facts: Dict[str, Any]) -> None:
@@ -988,6 +1009,45 @@ class IORSSmall(SamplerV2):
         self.region_side = None if self.shelf_start is not None else self.draw_partner_side(rng)
         return super().sample(rng)
 
+    def live_candidates(self, side: Optional[float]) -> List[Stance]:
+        """The template's candidates for ``side`` not dropped for their travel (7e): every split-cone position's (``tabletop.split_cone_draw``
+        replaces ``manip_candidates`` per attempt), else ``manip_candidates``."""
+        cands = getattr(self, "_split_cone_cands", None)
+        return [c for c in (self.manip_candidates if cands is None else cands) if TT.in_start_region(c, side) and TRAVEL_DROPPED not in c.extras]
+
+    def drop_candidate(self, cand: Stance, err: Reject) -> None:
+        """7e (owner 2026-10-12; touching#02 c5_k0 redrew its only candidate 407 times, each one ``no_transition``): ``cand``'s init ->
+        manipulation travel failed deterministically (:func:`travel_failure_deterministic`), so it leaves the draws for the rest of the
+        template - marked, out of ``manip_candidates`` and of the split cone (a side's position pool left empty is rebuilt from the live
+        candidates at its next draw, a lower init-view class included) - and a partner side without a live candidate leaves
+        ``region_sides``. Recorded in ``template_meta.travel_dropped`` and the counter ``travel_dropped``."""
+        why = f"[{err.reason}] {err}"
+        cand.extras[TRAVEL_DROPPED] = why[:400]
+        self.manip_candidates = [c for c in self.manip_candidates if c is not cand]
+        if getattr(self, "_split_cone_cands", None):
+            self._split_cone_cands = [c for c in self._split_cone_cands if c is not cand]
+        pools = getattr(self, "_split_cone_pools", None) or {}
+        for side in list(pools):
+            pool = {key: [c for c in cs if c is not cand] for key, cs in pools[side].items()}
+            pool = {key: cs for key, cs in pool.items() if cs}
+            if pool:
+                pools[side] = pool
+            else:
+                del pools[side]
+        self.region_sides = [sd for sd in self.region_sides if self.live_candidates(sd)]
+        self.counters["travel_dropped"] = self.counters.get("travel_dropped", 0) + 1
+        self.template_meta.setdefault("travel_dropped", []).append({"base_pose2d": [round(float(v), 4) for v in cand.base_pose2d], "trunk": [cand.translate, round(float(cand.tilt), 4)],
+                                                                   "focus": None if cand.focus is None else [round(float(v), 4) for v in cand.focus.tolist()], "why": why[:300]})
+        log.info("%s: candidate at %s (trunk %.2f / %+.2f) dropped for the template: its init -> manipulation travel fails on every redraw (%s)", self.gp.alias,
+                 [round(float(v), 2) for v in cand.base_pose2d], cand.translate, cand.tilt, why[:200])
+
+    def start_region_exhausted(self) -> bool:
+        """7e: no candidate is left for any partner side the attempts may draw (the shelf layout: none at all) - every one was dropped for
+        its travel; no attempt of the template can succeed any more."""
+        if self.shelf_start is not None:
+            return not self.live_candidates(None)
+        return not self.region_sides
+
     def lateral_margins(self) -> Dict[str, Any]:
         """The IORS row of §4.4 for ``tabletop.lateral_margins`` (λ, b, R_img are filled by Phase 1b / 1c): w_t, w_p, W_p,
         D_p_max = W_p + 0.03, safety, relation, g_NT, g_min, m_end (A1: the edge holds both objects at the smallest gap)."""
@@ -1005,8 +1065,8 @@ class IORSSmall(SamplerV2):
         init = self.init_stance
         self.sidecar.add_stance(init)
         cam_init = self.camera_pose_at(init)
-        # A1: the target starts in the start region of the attempt's partner side
-        cands = [c for c in self.manip_candidates if TT.in_start_region(c, self.region_side)]
+        # A1: the target starts in the start region of the attempt's partner side (7e: never on a candidate dropped for its travel)
+        cands = [c for c in self.manip_candidates if TT.in_start_region(c, self.region_side) and TRAVEL_DROPPED not in c.extras]
         order = rng.permutation(len(cands))
         if self.shelf_pose is not None:  # the start is fixed: the stances whose focus is nearest it first
             sx = self.shelf_pose[0][:2]
@@ -1037,7 +1097,12 @@ class IORSSmall(SamplerV2):
             try:
                 # §4.5 step 5: transition init -> manipulation
                 self.sidecar.transitions.clear()
-                self.record_stance_travel(init, manip)
+                try:
+                    self.record_stance_travel(init, manip)
+                except Reject as e:
+                    if travel_failure_deterministic(e, self.world):
+                        self.drop_candidate(cand, e)
+                    raise
                 # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation); the upright shelf start is
                 # fixed, its grasp confirmed with nothing ignored (the board above and the side walls are obstacles at the grasp pose)
                 if self.shelf_pose is not None:
@@ -1099,6 +1164,9 @@ class IORSSmall(SamplerV2):
                 errors.append(f"candidate {int(k)}: {e}")
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.grasps.clear()
+        if self.start_region_exhausted():
+            raise TemplateExhausted("target_placement", f"start region exhausted: no candidate left after {self.counters.get('travel_dropped', 0)} deterministic "
+                                                        f"init -> manipulation travel failures ({'; '.join(errors[-3:])})")
         raise Reject("target_placement", "; ".join(errors[-3:]))
 
     def _segment_draw(self, rng: np.random.Generator, d: Draft, k: int, t_pose: G.Pose, grasp: GraspRecord, manip: Stance, cam_init: G.Pose, pname: str) -> G.Pose:

@@ -813,7 +813,15 @@ limit (same edge and lateral as the init stance):
 4. Draw uniformly among the survivors in the best angle class (never always the smallest angle: the target would land
    on the same cell every instance); sample tilt continuously within the surviving band. Record
    `manipulation_stance = {stand_off, translate, tilt, focus, base_pose2d}`.
-5. Transition check init → manipulation (3.8); on failure take the next survivor.
+5. Transition check init → manipulation (3.8); on failure take the next survivor. *IORS small (owner decision 2026‑10‑12,
+   item 7e; touching#02 c5_k0 redrew its only survivor 407 times, each `no_transition`):* that check draws nothing (fixed
+   s_T list, trunk-sweep samples and drive strides, grid path, collision checks, no IK) and depends only on the init stance,
+   the survivor's stance, the scene objects (reset to the scene file before every attempt) and the task objects; with
+   every task object at its park slot (as after every rejected attempt) a failure (`no_transition`, `no_path`,
+   `path_collision`, `path_too_long`) repeats on every redraw, so the survivor is dropped for the rest of the template
+   (out of the split cone's pools too; counter `travel_dropped`, `template_meta.travel_dropped`). A partner side left
+   without survivors is no longer drawn; when none is left the template ends (`TemplateExhausted`, reason
+   `target_placement`, counter `template_exhausted`) instead of spending its time budget.
 
 *Split cone (opt-in per subtask, `generation.phase2_split_cone`; owner 2026‑10‑11, cone A/B variant C):* one cone for the
 start image, one for the work. The object's start position is a band cell of at least one candidate work stance that lies
