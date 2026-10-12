@@ -27,6 +27,7 @@ records, flip waypoints).
 from __future__ import annotations
 
 import copy
+import itertools
 import json
 import logging
 import math
@@ -331,6 +332,68 @@ class BlockDesign(SamplerV2):
         return (float(bc[1]) * sgn <= FLIP_CELL_MAX_LATERAL and float(init.world_to_base(c)[1]) * sgn >= float(self.gen("flip_face_visibility_lateral_m", 0.07))
                 and float(bc[0]) - so >= float(self.gen("flip_cell_min_edge_depth_m", FLIP_CELL_MIN_EDGE_DEPTH)))
 
+    def _flip_plan(self, cs: List[th.Tensor], img_score, slot_faces: List[str], manip: Stance, init: Stance, primary_dir: str, flip_mode: bool) -> Optional[set]:
+        """Which blocks of the cell set ``cs`` flip: the block of rank ``i`` in the init image (``img_score``, top-left first) gets
+        the goal face ``slot_faces[i]``; per goal colour exactly one block shows it up (a non-eligible cell when there is one), every
+        other block of that colour flips and must be flip-eligible; None when no such assignment exists (the spec's image-order
+        assignment, every block eligible, when no flip direction constrains the cells)."""
+        sc = [img_score(c) for c in cs]
+        oi = sorted(range(len(cs)), key=lambda i: sc[i])
+        gf = {bi: slot_faces[si] for si, bi in enumerate(oi)}
+        anchor_bi = oi[0]
+        groups: Dict[str, List[int]] = {}
+        for bi, f in gf.items():
+            groups.setdefault(f, []).append(bi)
+        flips: set = set()
+        for f, members in groups.items():
+            if len(members) == 1:
+                continue
+            if not flip_mode:
+                flips.update(members[1:])  # image order: the first shows the face, the rest flip
+                continue
+            elig = [bi for bi in members if self._flip_cell_ok(cs[bi], manip, init, primary_dir)]
+            non = [bi for bi in members if bi not in elig]
+            if len(non) > 1:
+                return None  # two blocks of one colour that cannot flip
+            if non:
+                up = non[0]
+            elif anchor_bi in elig and not self._has_board():
+                # the anchor's slot IS its cell: its flip is placed where it was picked (the one flip the exact chain passes
+                # broadly), so the anchor flips and the other block of its colour shows the face
+                up = next(bi for bi in elig if bi != anchor_bi)
+            else:
+                # the FARTHEST one shows its face (the flip zone lies at depth 0.55-0.65 of the near stand-offs)
+                up = max(elig, key=lambda bi: float(manip.world_to_base(cs[bi])[0]))
+            flips.update(bi for bi in members if bi != up)
+        # the flip class approaches from the block's right (the side the goal face shows), low over the table: no other
+        # block may stand on that side within the approach's sweep (probe run 2026-09-19 03:1x: 'collides with
+        # targets_toy_dice_isgblk_2' along the approach of a flipping block with a neighbour 10 cm to its right)
+        sgn = 1.0 if primary_dir == "right" else -1.0
+        clear_lat, clear_depth = float(self.gen("flip_approach_clear_lateral_m", 0.20)), float(self.gen("flip_approach_clear_depth_m", 0.12))
+        for bi in flips:
+            bf = manip.world_to_base(cs[bi])
+            for bj in range(len(cs)):
+                if bj == bi:
+                    continue
+                bo = manip.world_to_base(cs[bj])
+                d_lat = (float(bf[1]) - float(bo[1])) * sgn  # > 0: the other block lies on the approach side
+                if 0.0 < d_lat < clear_lat and abs(float(bo[0]) - float(bf[0])) < clear_depth:
+                    return None
+        return flips
+
+    def _has_flip_set(self, cells: List[th.Tensor], n: int, img_score, slot_faces: List[str], manip: Stance, init: Stance, primary_dir: str,
+                      flip_mode: bool) -> bool:
+        """Whether ``n`` of ``cells`` keep the scatter gaps (``edge·√2 + scatter_min_gap_m``) and have a :meth:`_flip_plan` - the
+        test of the instance's exhaustive cell-set search, which every set the layout keeps passes."""
+        gap = float(self.g("scatter_min_gap_m"))
+        for combo in itertools.combinations(range(len(cells)), n):
+            cs = [cells[i] for i in combo]
+            if any(float(th.linalg.norm(cs[a] - cs[b])) < self.edge * math.sqrt(2) + gap for a in range(n) for b in range(a + 1, n)):
+                continue
+            if self._flip_plan(sorted(cs, key=img_score), img_score, slot_faces, manip, init, primary_dir, flip_mode) is not None:
+                return True
+        return False
+
     def _n_flip_cells(self, manip: Stance, init: Stance) -> int:
         """Flip-eligible cells of a manipulation candidate's region."""
         cells = manip.extras.get("focus_info", {}).get("cells")
@@ -364,8 +427,10 @@ class BlockDesign(SamplerV2):
         With a puzzle board (owner 2026-10-12) the move is the smallest one, from that minimum on in ``FLIP_ROOM_STEP`` steps with
         the init kept inside its range, after which the manipulation stance has a ``board_base_xy_candidates`` position on the top
         at every Phase 2 stand-off (:meth:`_board_fit`) - else the smallest with the most such stand-offs: at the end of the range
-        the positions that stand-off 0.55 leaves on the top by depth are off its end (s3 c1_k1: every attempt). The drawn and
-        the moved lateral, the reason and the board fit go to ``template_facts.init_flip_room_move``."""
+        the positions that stand-off 0.55 leaves on the top by depth are off its end (s3 c1_k1: every attempt). An init whose
+        shift fits the range but whose manipulation stance has a stand-off without a position on the top is searched the same way
+        from its drawn lateral (and kept when no move gives more stand-offs). The drawn and the moved lateral, the reason and the
+        board fit go to ``template_facts.init_flip_room_move``."""
         self._flip_room = None
         if not (self._flips_expected() and self._flip_directions()[0] in ("right", "left")):
             return init
@@ -379,17 +444,22 @@ class BlockDesign(SamplerV2):
         excess = (target - hi) if target > hi else ((lo - target) if target < lo else 0.0)
         half = 0.5 * float(self._board_geometry()["plate_m"]) if self._has_board() else None
         rec: Dict[str, Any] = {"lateral_drawn": round(float(init.lateral), 4), "lateral_bounds": [round(lo, 4), round(hi, 4)], "manipulation_shift_m": need}
-        if excess <= 1e-6:
-            self._flip_room = {**rec, "lateral": rec["lateral_drawn"], "move_m": 0.0, "reason": f"the {need:+.2f} m manipulation shift fits the lateral range",
-                               **({"board_fit": self._board_fit(init, need, half)} if half is not None else {})}
+        fit_drawn = self._board_fit(init, need, half) if (half is not None and excess <= 1e-6) else None
+        if excess <= 1e-6 and (fit_drawn is None or all(fit_drawn.values())):
+            self._flip_room = {**rec, "lateral": rec["lateral_drawn"], "move_m": 0.0, "reason": f"the {need:+.2f} m manipulation shift fits the lateral range"
+                               + (" and its manipulation stance has a board position on the top at every Phase 2 stand-off" if fit_drawn else ""),
+                               **({"board_fit": fit_drawn} if fit_drawn is not None else {})}
             return init
+        # the shift fits but a stand-off has no board position on the top (s3 c1_k0 / bd01_board_rc k5: 0.15 + 0.35 on the 1.16 m
+        # edge): the same search, from the drawn lateral on
+        excess = max(excess, 0.0)
         # the minimum move first (no board: the only one), then further along the edge while the moved init stays inside its range
         m_max = (float(init.lateral) - lo) if sign > 0 else (hi - float(init.lateral))
         n_moves = 1 if half is None else 1 + max(0, int(math.floor((m_max - excess) / FLIP_ROOM_STEP + 1e-9)))
         best, fit0 = None, None
         for k in range(n_moves):
             m = excess + k * FLIP_ROOM_STEP
-            cand = self._shifted_along_edge(init, -sign * m, "init")
+            cand = init if m < 1e-9 else self._shifted_along_edge(init, -sign * m, "init")
             if cand is None:
                 continue
             fit = self._board_fit(cand, need, half) if half is not None else {}
@@ -406,20 +476,26 @@ class BlockDesign(SamplerV2):
                                "reason": f"the {need:+.2f} m manipulation shift leaves the lateral range and every move puts the init off the free floor"}
             return init
         m, n_fit, moved, fit = best
+        if m < 1e-9:
+            self._flip_room = {**rec, "lateral": rec["lateral_drawn"], "move_m": 0.0, "board_fit": fit,
+                               "reason": f"the {need:+.2f} m manipulation shift fits the lateral range; its manipulation stance has a board position on the top at "
+                                         f"{n_fit} of {len(TT.STAND_OFFS)} Phase 2 stand-offs, no move along the range gives more"}
+            return init
         moved.extras.update(init.extras)
         moved.extras["flip_room_shift_m"] = float(-sign * m)
-        reason = f"the {need:+.2f} m manipulation shift leaves the lateral range [{lo:.2f}, {hi:.2f}] at {init.lateral:.2f}"
+        reason = f"the {need:+.2f} m manipulation shift {'leaves' if excess > 1e-9 else 'fits'} the lateral range [{lo:.2f}, {hi:.2f}] at {init.lateral:.2f}"
         if half is not None:
             if abs(m - excess) < 1e-9:
                 reason += "; the minimum move puts a board position on the top at every Phase 2 stand-off" if n_fit == len(TT.STAND_OFFS) else \
                     f"; the minimum move leaves a board position on the top at {n_fit} of {len(TT.STAND_OFFS)} Phase 2 stand-offs, no further move gives more"
             else:
                 bare = [so for so, v in (fit0 or {}).items() if not v]
-                reason += (f"; the minimum move {-sign * excess:+.3f} m leaves no board position on the top at stand-off {', '.join(bare) or '-'}"
+                reason += ((f"; the minimum move {-sign * excess:+.3f} m leaves" if excess > 1e-9 else ", but its manipulation stance has")
+                           + f" no board position on the top at stand-off {', '.join(bare) or '-'}"
                            + (" (or puts the init off the free floor)" if fit0 is None else "") + f"; moved {-sign * m:+.3f} m: "
                            + ("every Phase 2 stand-off has one" if n_fit == len(TT.STAND_OFFS) else f"{n_fit} of {len(TT.STAND_OFFS)} stand-offs have one, the most any move gives"))
         self._flip_room = {**rec, "lateral": round(float(moved.lateral), 4), "move_m": round(float(moved.lateral - init.lateral), 4),
-                           "minimum_move_m": round(-sign * excess, 4), "reason": reason, **({"board_fit": fit, "board_fit_at_minimum_move": fit0} if half is not None else {})}
+                           "minimum_move_m": round(-sign * excess, 4) + 0.0, "reason": reason, **({"board_fit": fit, "board_fit_at_minimum_move": fit0} if half is not None else {})}
         log.info("%s: init moved %+.2f m along the edge (lateral %.2f -> %.2f) so the manipulation stance can stand %+.2f m from it within %s%s", self.gp.alias,
                  -sign * m, init.lateral, moved.lateral, need, [round(lo, 2), round(hi, 2)], "" if half is None else f"; board on the top: {fit} ({reason})")
         return moved
@@ -627,13 +703,16 @@ class BlockDesign(SamplerV2):
             return float(uv[0] + uv[1])
 
         cells = [region[int(i)] for i in rng.permutation(len(region))]
+        slot_faces = [c2f[p] for p in pattern]  # the goal face of every slot (slot = the block's rank in the init image)
         # board variant: the board on the table first (table-aligned; its pocket's far-left corner anchors both grids), the init
         # cells under / beside it dropped
         board_name, board_pose = None, None
         if self._has_board():
             _flip_mode0 = n_flip > 0 and primary_dir in ("right", "left")
             board_name, board_pose, cells = self._place_board(manip, right, toward, table_yaw, cells,
-                                                              (lambda c: self._flip_cell_ok(c, manip, init, primary_dir)) if _flip_mode0 else None, n, self.obj("support"))
+                                                              (lambda c: self._flip_cell_ok(c, manip, init, primary_dir)) if _flip_mode0 else None, n, self.obj("support"),
+                                                              layout_ok=(lambda kept: self._has_flip_set(kept, n, img_score, slot_faces, manip, init, primary_dir, True))
+                                                              if _flip_mode0 else None)
             self._teleport({board_name: board_pose})
         region_all = list(cells)
         # 17:24 first-demo run: every pick-screening failure was a block at base-lateral 0.0 / -0.08 with the other blocks
@@ -651,58 +730,8 @@ class BlockDesign(SamplerV2):
         def flip_eligible(c: th.Tensor) -> bool:
             return self._flip_cell_ok(c, manip, init, primary_dir)
 
-        def slots_for(cs: List[th.Tensor]) -> Tuple[List[int], Dict[int, int], Dict[int, str]]:
-            """Image order (top-left first), block -> slot and block -> goal face of a candidate cell set."""
-            sc = [img_score(c) for c in cs]
-            oi = sorted(range(len(cs)), key=lambda i: sc[i])
-            so = {bi: si for si, bi in enumerate(oi)}
-            return oi, so, {bi: c2f[pattern[si]] for bi, si in so.items()}
-
         def flip_plan_for(cs: List[th.Tensor]) -> Optional[set]:
-            """Which blocks of the set flip: per goal colour exactly one block shows it up (a non-eligible cell when there is
-            one), every other block of that colour flips and must be flip-eligible; None when no such assignment exists
-            (the spec's image-order assignment, every block eligible, when no flip direction constrains the cells)."""
-            oi, _, gf = slots_for(cs)
-            anchor_bi = oi[0]
-            groups: Dict[str, List[int]] = {}
-            for bi, f in gf.items():
-                groups.setdefault(f, []).append(bi)
-            flips: set = set()
-            for f, members in groups.items():
-                if len(members) == 1:
-                    continue
-                if not flip_mode:
-                    flips.update(members[1:])  # image order: the first shows the face, the rest flip
-                    continue
-                elig = [bi for bi in members if flip_eligible(cs[bi])]
-                non = [bi for bi in members if bi not in elig]
-                if len(non) > 1:
-                    return None  # two blocks of one colour that cannot flip
-                if non:
-                    up = non[0]
-                elif anchor_bi in elig and not self._has_board():
-                    # the anchor's slot IS its cell: its flip is placed where it was picked (the one flip the exact chain passes
-                    # broadly), so the anchor flips and the other block of its colour shows the face
-                    up = next(bi for bi in elig if bi != anchor_bi)
-                else:
-                    # the FARTHEST one shows its face (the flip zone lies at depth 0.55-0.65 of the near stand-offs)
-                    up = max(elig, key=lambda bi: float(manip.world_to_base(cs[bi])[0]))
-                flips.update(bi for bi in members if bi != up)
-            # the flip class approaches from the block's right (the side the goal face shows), low over the table: no other
-            # block may stand on that side within the approach's sweep (probe run 2026-09-19 03:1x: 'collides with
-            # targets_toy_dice_isgblk_2' along the approach of a flipping block with a neighbour 10 cm to its right)
-            sgn = 1.0 if primary_dir == "right" else -1.0
-            clear_lat, clear_depth = float(self.gen("flip_approach_clear_lateral_m", 0.20)), float(self.gen("flip_approach_clear_depth_m", 0.12))
-            for bi in flips:
-                bf = manip.world_to_base(cs[bi])
-                for bj in range(len(cs)):
-                    if bj == bi:
-                        continue
-                    bo = manip.world_to_base(cs[bj])
-                    d_lat = (float(bf[1]) - float(bo[1])) * sgn  # > 0: the other block lies on the approach side
-                    if 0.0 < d_lat < clear_lat and abs(float(bo[0]) - float(bf[0])) < clear_depth:
-                        return None
-            return flips
+            return self._flip_plan(cs, img_score, slot_faces, manip, init, primary_dir, flip_mode)
 
         def grid_cells(xy):
             return [xy + right * (cc * pitch) + toward * (rr * pitch) for rr in range(n_rows) for cc in range(n_cols)]
@@ -2508,14 +2537,16 @@ class BlockDesign(SamplerV2):
         return None
 
     def _place_board(self, manip: Stance, right: th.Tensor, toward: th.Tensor, table_yaw: float, cells: Optional[List[th.Tensor]] = None,
-                     flip_eligible=None, n_blocks: int = 4, support=None) -> Tuple[str, TT.Pose, List[th.Tensor]]:
+                     flip_eligible=None, n_blocks: int = 4, support=None, layout_ok=None) -> Tuple[str, TT.Pose, List[th.Tensor]]:
         """Put the puzzle board on the table, table-aligned (its +x along ``right``, +y away from the robot), at the first of
         ``generation.board_base_xy_candidates`` (base depth, lateral of the manipulation stance) that (a) lies on the top, (b)
         leaves ``n_blocks`` region cells clear of its footprint (``board_cell_margin_m`` beyond half plate + half cube in both
-        axes) with at least the expected number of flip cells among them, and (c) passes a quick place probe from the manipulation
+        axes) with at least the expected number of flip cells among them, (c) passes a quick place probe from the manipulation
         stance: a pitched top-down pinch releasing the cube at the biased release aim of the far-left and near-right pockets
-        (0920-030951: the board left of the centre line put the slots out of the right arm's reach). Returns ``(bddl name, root
-        pose, the cells kept)``."""
+        (0920-030951: the board left of the centre line put the slots out of the right arm's reach), and (d) leaves a cell set the
+        layout accepts, ``layout_ok(cells kept)`` (owner 2026-10-12: enough flip cells by count is not a flip plan - with
+        (0.52, -0.06) the kept cells of s3 c1_k0 had no set whose repeated colours both flip from a cell with a clear approach
+        side, and every attempt ended at the layout). Returns ``(bddl name, root pose, the cells kept)``."""
         name = self.bindings.one("board").name
         geo = self._board_geometry()
         half = 0.5 * float(geo["plate_m"])
@@ -2567,6 +2598,9 @@ class BlockDesign(SamplerV2):
                     break
             if not probe_ok:
                 why.append(f"{tag}: no pitched place reaches the pockets' release aims from the manipulation stance")
+                continue
+            if layout_ok is not None and cells is not None and not layout_ok(kept):
+                why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
                 continue
             log.info("%s: puzzle board %s at base (%.2f, %+.2f): pitch %.1f mm, seat %.1f mm, rim %.0f mm over the floor, release bias %.1f mm; %d cells clear (%s)",
                      self.gp.alias, name, float(depth), float(lateral), float(geo["pocket_pitch_m"]) * 1000, float(geo["seat_inner_m"]) * 1000,

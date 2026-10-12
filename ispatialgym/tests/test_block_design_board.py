@@ -6,7 +6,9 @@ from types import SimpleNamespace
 import pytest
 import torch as th
 
-from ispatialgym.sampling.sim_utils import SupportTop
+from ispatialgym.robot import conventions as C
+from ispatialgym.sampling.geometry import CameraModel
+from ispatialgym.sampling.sim_utils import Reject, SupportTop
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 from ispatialgym.sampling.v2.tasks import block_design as BD
@@ -129,3 +131,103 @@ def test_flip_room_move_is_recorded_in_template_facts(monkeypatch):
     assert all(rec["board_fit"].values()) and rec["board_fit_at_minimum_move"]["0.55"] == [] and rec["reason"]
     # the manipulation candidates stand where the scan's shifts put them from the moved init (0.45 leaves the range)
     assert sorted({round(c.lateral - s.init_stance.lateral, 6) for c in s.manip_candidates}) == [0.0, 0.25, 0.35]
+
+
+def test_board_fit_also_moves_an_init_whose_shift_fits():
+    """The -v draws of eval seeds k0 / k5 (0.15): the shift fits the range, but the manipulation stance at 0.50 has no board
+    position on the top at stand-off 0.55 ((0.60, +0.05) is off the edge's end) - the same search from the drawn lateral on."""
+    top, edge = _top_and_edge()
+    s = _sampler(top)
+    init = _init(edge, 0.15)
+    assert s._board_fit(init, 0.35, _half(s))["0.55"] == []
+    moved = s._init_with_room_for_flips(init)
+    assert moved.lateral == pytest.approx(0.13, abs=1e-6) and all(s._board_fit(moved, 0.35, _half(s)).values())
+    assert not all(s._board_fit(init.shifted(lateral=0.14), 0.35, _half(s)).values())
+    rec = s._flip_room
+    assert rec["minimum_move_m"] == 0.0 and rec["move_m"] == pytest.approx(-0.02, abs=1e-4) and rec["board_fit_at_minimum_move"]["0.55"] == []
+    assert "fits the lateral range" in rec["reason"] and "stand-off 0.55" in rec["reason"]
+    assert _sampler(top, board=False)._init_with_room_for_flips(init) is init
+    # no move inside the range gives more stand-offs (the range ends 1 mm right of the drawn lateral): the init stays
+    narrow = _init(edge, 0.15)
+    narrow.extras["lateral_bounds"] = [0.149, BOUNDS[1]]
+    assert s._init_with_room_for_flips(narrow) is narrow and s._flip_room["move_m"] == 0.0 and s._flip_room["board_fit"]["0.55"] == []
+    assert "no move along the range gives more" in s._flip_room["reason"]
+
+
+# s3 c1_k0's region cells (base depth, lateral of the manipulation stance; the init 0.35 m to its right): candidate 10 (also c1_k1's
+# candidate 11) and candidate 11
+REGION_10 = [(0.56, -0.24), (0.64, -0.16), (0.64, -0.32), (0.56, -0.08), (0.56, -0.40), (0.72, -0.24)]
+REGION_11 = [(0.56, -0.16), (0.64, -0.08), (0.64, -0.24), (0.56, -0.32), (0.56, 0.00), (0.72, -0.16)]
+
+
+def _layout_scene(stand_off=0.45):
+    top, edge = _top_and_edge()
+    s = _sampler(top)
+    s.edge = 0.0254
+    init = _init(edge, 0.1274).with_trunk(0.55, 0.0, "init")
+    manip = init.shifted(stand_off=stand_off, lateral=init.lateral + 0.35, name="manipulation")
+    cam = C.camera_pose(C.torso_q(init.translate, init.tilt), base_pose=tuple(float(v) for v in init.base_pose2d))
+    cm = CameraModel(1080, 1080, 459.0, 459.0, 540.0, 540.0)
+
+    def img_score(xy):
+        return float(cm.project(cam, th.tensor([[float(xy[0]), float(xy[1]), 0.81 + 0.0127]]))[0][0].sum())
+
+    faces = [{c: f for f, c in BD.DEFAULT_FACES.items()}[p] for p in GEN["patterns"]["test_rbbr"]]
+    return s, init, manip, img_score, faces
+
+
+def _clear_of(board, region, half_b=0.5 * 0.0908 + 0.5 * 0.0254 + 0.06):
+    return [(d, l) for d, l in region if abs(l - board[1]) > half_b or abs(d - board[0]) > half_b]
+
+
+def test_flip_set_needs_two_flip_cells_with_a_clear_approach_side():
+    """Why the -v draws ended at the layout: at shift 0.35 the flip cells lie in lateral [-0.28, -0.10] of the manipulation base
+    (two columns of the region's diagonal lattice) and a flipping block needs no other block within 0.20 m to its right and
+    0.12 m in depth. Candidate 10's cells have no set at all; candidate 11's have one only while the board keeps the near row
+    clear - (0.52, -0.06), the first position on the top at stand-off 0.45, takes it, (0.44, -0.10) keeps it."""
+    s, init, manip, img_score, faces = _layout_scene()
+
+    def has_set(cells_b):
+        return s._has_flip_set([manip.base_to_world(th.tensor(c)) for c in cells_b], 4, img_score, faces, manip, init, "right", True)
+
+    assert [c for c in REGION_10 if s._flip_cell_ok(manip.base_to_world(th.tensor(c)), manip, init, "right")] == [(0.56, -0.24), (0.64, -0.16), (0.72, -0.24)]
+    assert not has_set(REGION_10) and not has_set(_clear_of((0.52, -0.06), REGION_10))
+    assert has_set(REGION_11) and has_set(_clear_of((0.44, -0.10), REGION_11))
+    assert not has_set(_clear_of((0.52, -0.06), REGION_11)) and not has_set(_clear_of((0.60, 0.05), REGION_11))
+    # the plan of candidate 11's set: the two flip cells of one column flip, the blocks left of them show their faces
+    cs = sorted([manip.base_to_world(th.tensor(c)) for c in [(0.56, -0.16), (0.64, -0.08), (0.56, 0.00), (0.72, -0.16)]], key=img_score)
+    flips = s._flip_plan(cs, img_score, faces, manip, init, "right", True)
+    assert flips is not None and sorted(round(float(manip.world_to_base(cs[i])[0]), 2) for i in flips) == [0.56, 0.72]
+    # a neighbour 8 cm right of a flipping block, 8 cm nearer, is on its approach side: no plan
+    blocked = cs[:3] + [manip.base_to_world(th.tensor((0.64, -0.24)))]
+    assert s._flip_plan(sorted(blocked, key=img_score), img_score, faces, manip, init, "right", True) is None
+
+
+def test_board_placement_keeps_a_flip_set():
+    """``_place_board`` takes the first position that also leaves a cell set the layout accepts: at stand-off 0.35 every position is
+    on the top; (0.46, -0.02) passes the count of flip cells but leaves candidate 11's cells no set, (0.44, -0.10) keeps one. Without
+    the test the first position is kept, as before; when no position keeps a set the board is not placed."""
+    s, init, manip, img_score, faces = _layout_scene(stand_off=0.35)
+    cells = [manip.base_to_world(th.tensor(c)) for c in REGION_11]
+    probes = []
+    s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name="tray.n.01_1"))
+    s.objects = {"tray.n.01_1": object()}
+    s._teleport = lambda objects: None
+    s.world = SimpleNamespace(park=lambda obj, i: None)
+    s.ikc = SimpleNamespace(exact=lambda poses, st, arm, **kw: probes.append(st) or SimpleNamespace(ok=True))
+    right, toward, yaw = s._table_axes(manip)
+    eligible = lambda c: s._flip_cell_ok(c, manip, init, "right")  # noqa: E731
+    layout_ok = lambda kept: s._has_flip_set(kept, 4, img_score, faces, manip, init, "right", True)  # noqa: E731
+
+    def placed_at(**kw):
+        _, pose, kept = s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, **kw)
+        b = manip.world_to_base(pose[0][:2])
+        return (round(float(b[0]), 3), round(float(b[1]), 3)), len(kept)
+
+    assert placed_at() == ((0.46, -0.02), 5)
+    n_probe = len(probes)
+    assert placed_at(layout_ok=layout_ok) == ((0.44, -0.10), 6)
+    assert len(probes) == 3 * n_probe  # the first position's place probe still runs (before its layout test), then the next one's
+    with pytest.raises(Reject) as e:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=lambda kept: False)
+    assert e.value.reason == "board_placement" and "no cell set of them lets every repeated-colour block flip" in str(e.value)

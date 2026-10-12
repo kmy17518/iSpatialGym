@@ -1747,7 +1747,18 @@ present (grasp → place(intermediate) → grasp → place). Braces are not atte
   breakfast_table_rhjoby_0 the minimum move leaves the stance 3 cm from the edge's end, where stand-off 0.55 has no
   position on the top (only (0.60, +0.05) lies deep enough, and it is off the end), so inits drawn at 0.20-0.55 move to
   0.127. `template_facts.init_flip_room_move` records the drawn and the moved lateral, the move and the minimum move, the
-  reason, and the positions on the top per stand-off after the move and after the minimum move.
+  reason, and the positions on the top per stand-off after the move and after the minimum move. An init whose first shift
+  fits the range is searched the same way, from its drawn lateral, when its manipulation stance has a Phase 2 stand-off
+  without a board position on the top (the `-v` draws at 0.15 on that edge move to 0.13), and kept when no move inside the
+  range gives more stand-offs.
+- **Puzzle board** (the `board` role): placed before the blocks, table-aligned, at the first `board_base_xy_candidates`
+  position (base depth, lateral of the manipulation stance) that (a) is on the top, (b) leaves the block count of region
+  cells clear of it (`board_cell_margin_m` beyond half the plate + half a block in both axes) with at least the expected
+  number of flip cells among them, (c) passes the place probe (a pitched pinch from the manipulation stance releasing at the
+  far-left and near-right pockets' release aims) and (d) *(owner 2026-10-12)* leaves a cell set the layout accepts: as many
+  cells as blocks at the scatter gaps whose image-order goal faces give every repeated colour one flipping block on a flip
+  cell with no other block of the set within `flip_approach_clear_lateral_m` (0.20 m) to its flip side and
+  `flip_approach_clear_depth_m` (0.12 m) in depth. A position with enough flip cells by count can still leave no such set.
 - Tolerances: position 0.4 × edge (≈ 1 cm), orientation 0.15 rad (section 8).
 
 ### 6.6 Configuration matching — articulation (large-scale, open / close)
