@@ -26072,7 +26072,11 @@
        "name": "burner_mdanhg_0",
        "init": "ontop",
        "top_z": 0.91,
-       "row": "inter_object_relation_satisfaction-inside#04~T4"
+       "row": "inter_object_relation_satisfaction-inside#04~T4",
+       "neighbors": [
+        "oven_ffitak_0",
+        "bar_byvbuc_0"
+       ]
       }
      ],
      "floor": {
@@ -26094,12 +26098,12 @@
     "blacklist": {
      "target": {
       "garlic_clove": {
-       "wyyhmi": "ground_isg 2026-10-11: heldout"
+       "wyyhmi": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "saucepot": {
-       "pkfydm": "ground_isg 2026-10-11: heldout"
+       "pkfydm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -26133,7 +26137,29 @@
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_on_meta_link": "heatsource",
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -26211,12 +26237,12 @@
     "blacklist": {
      "target": {
       "garlic_clove": {
-       "wyyhmi": "ground_isg 2026-10-11: heldout"
+       "wyyhmi": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "saucepot": {
-       "pkfydm": "ground_isg 2026-10-11: heldout"
+       "pkfydm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -26250,7 +26276,28 @@
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -26307,13 +26354,19 @@
        "name": "countertop_kelzer_0",
        "init": "ontop",
        "top_z": 0.89,
-       "row": "inter_object_relation_satisfaction-inside#04~T2"
+       "row": "inter_object_relation_satisfaction-inside#04~T2",
+       "neighbors": [
+        "countertop_kelker_0"
+       ]
       },
       {
        "name": "countertop_kelker_0",
        "init": "ontop",
        "top_z": 0.89,
-       "row": "inter_object_relation_satisfaction-inside#04~T1"
+       "row": "inter_object_relation_satisfaction-inside#04~T1",
+       "neighbors": [
+        "countertop_kelzer_0"
+       ]
       }
      ],
      "floor": {
@@ -26335,12 +26388,12 @@
     "blacklist": {
      "target": {
       "garlic_clove": {
-       "wyyhmi": "ground_isg 2026-10-11: heldout"
+       "wyyhmi": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "saucepot": {
-       "pkfydm": "ground_isg 2026-10-11: heldout"
+       "pkfydm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -26374,7 +26427,28 @@
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -26454,12 +26528,12 @@
     "blacklist": {
      "target": {
       "garlic_clove": {
-       "wyyhmi": "ground_isg 2026-10-11: heldout"
+       "wyyhmi": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "saucepot": {
-       "pkfydm": "ground_isg 2026-10-11: heldout"
+       "pkfydm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -26493,7 +26567,29 @@
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
    "target_fit_scale_min": 0.5,
-   "partner_side": "left"
+   "partner_on_meta_link": "heatsource",
+   "partner_side": "left",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    8.0,
+    20.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
