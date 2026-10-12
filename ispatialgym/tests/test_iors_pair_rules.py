@@ -251,11 +251,12 @@ def test_grounding_withholds_a_bigger_target_until_a_key_at_its_scale_exists(tmp
     # a target that fits is left alone
     kielbasa = _entry(g, ONTOP, "pack_of_kielbasa", "platter")
     assert kielbasa.scenes["house_single_floor"].whitelist["target"] == {"pack_of_kielbasa": ["dgodnn"]} and "target_fit" not in kielbasa.generation
-    # inside: the lying sunflower needs x0.44 for the tube vase - below the floor, withheld with the sampler's reason
+    # inside: the lying sunflower (its key sunflower__dkajbh__r50 at the stable 50-deg rest, 86d7c073) needs x0.42 for the tube
+    # vase - below the floor, withheld with the sampler's reason
     flower = _entry(g, INSIDE, "sunflower", "vase")
     assert flower.generation["target_fit"]["sunflower/dkajbh"]["status"] == "below_floor"
-    assert flower.generation["target_fit"]["sunflower/dkajbh"]["scale"] == 0.44
-    assert "does_not_fit_inside (needs x0.44 < 0.50" in flower.scenes["house_single_floor"].blacklist["target"]["sunflower"]["dkajbh"]
+    assert flower.generation["target_fit"]["sunflower/dkajbh"]["scale"] == 0.42
+    assert "does_not_fit_inside (needs x0.42 < 0.50" in flower.scenes["house_single_floor"].blacklist["target"]["sunflower"]["dkajbh"]
     # under: the partner's box from the asset metadata (paper_sheet/uqbipw has no candidates row): the spatula needs x0.76
     spatula = _entry(g, UNDER, "spatula", "paper_sheet")
     assert spatula.generation["target_fit"]["spatula/hkvsep"]["scale"] == 0.76
@@ -317,7 +318,7 @@ def test_grounding_writes_the_hands_of_a_nextto_mirror_pair(tmp_path):
 
 
 def test_grounding_measures_a_standing_target_on_its_up_axis(tmp_path):
-    """inside#03: without ``generation.target_up_axis`` the lying sunflower is withheld (x0.44); the key written into the grounded
+    """inside#03: without ``generation.target_up_axis`` the lying sunflower is withheld (x0.42); the key written into the grounded
     entry (``generation`` is seeded from it) makes the re-grounding measure it standing - it fits as is, own key, unit scale. The key
     names models one by one, and an ontop alias does not read it."""
     g = _ground(tmp_path, subtasks=(ONTOP, INSIDE))
@@ -338,7 +339,7 @@ def test_grounding_measures_a_standing_target_on_its_up_axis(tmp_path):
     sc = flower.scenes["house_single_floor"]
     assert sc.whitelist["target"] == {"sunflower": ["dkajbh"]} and "dkajbh" not in ((sc.blacklist.get("target") or {}).get("sunflower") or {})
     assert "target_fit" not in flower.generation and flower.generation["target_up_axis"] == UP_KEY
-    assert flower.roles["target"].grasp_keys["sunflower/dkajbh"] == "sunflower__dkajbh" and "sunflower/dkajbh" not in flower.roles["target"].scale
+    assert flower.roles["target"].grasp_keys["sunflower/dkajbh"] == "sunflower__dkajbh__r50" and "sunflower/dkajbh" not in flower.roles["target"].scale
     assert f"{INSIDE}-sunflower-vase-breakfast_table: target fit sunflower/dkajbh standing on +x (generation.target_up_axis): fits as is" in g.report.notes[INSIDE]
     flower.generation["target_up_axis"] = {"sunflower/dkajbh": "up"}  # no axis name: the combination is skipped with the reason
     g.customs.save()
