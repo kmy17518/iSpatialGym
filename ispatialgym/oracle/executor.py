@@ -2297,9 +2297,10 @@ class Executor:
 
     def goal_occlusion_report(self) -> Dict[str, Any]:
         """The demo gate ``goal_occlusion`` (``ispatialgym.eval.goal_occlusion``) on the settled last frame: the head camera's
-        depth, the box screen of every tracked target / partner and the panel screen of a tracked fixture (a second depth
-        render with the robot hidden; the panel = the links its revolute joints move, at the final joint state). Runs after
-        the last recorded frame (``ispatialgym.oracle.head_depth``: the camera's observations stay as loaded) and leaves the robot visible."""
+        depth, the box screen of every tracked target / partner (an inside goal's target measured, not judged: the sidecar's alias
+        names the subtask) and the panel screen of a tracked fixture (a second depth render with the robot hidden; the panel = the
+        links its revolute joints move, at the final joint state). Runs after the last recorded frame (``ispatialgym.oracle.head_depth``:
+        the camera's observations stay as loaded) and leaves the robot visible."""
         from omnigibson.utils.constants import JointType
 
         from ispatialgym.eval import goal_occlusion as GO
@@ -2322,7 +2323,8 @@ class Executor:
                 for _ in range(int(self.cfg.goal_image_renders)):
                     self.sim.render()
         cam = (cp.float().tolist(), cq.float().tolist())
-        objects = GO.screen_scene(depth, cam, intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE)
+        objects = GO.screen_scene(depth, cam, intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE,
+                                  subtask=getattr(self.sidecar, "alias", None))
         return GO.report(objects, method="live head-camera depth", step=self.n, camera_key=self.cam_key, resolution=[intr[0], intr[1]])
 
     # ------------------------------------------------------------------ TRO goal override (§3.8, spec §8)

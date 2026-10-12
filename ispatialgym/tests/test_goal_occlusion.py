@@ -166,6 +166,29 @@ def test_screen_scene_and_report():
     assert GO.report({"target_a": {"status": "out_of_frame"}}, "test")["occluded"] is False
 
 
+def test_inside_goal_judges_the_container_not_the_target():
+    """A3 (owner 2026-10-12): the target of an inside goal sits in an opaque container (inside#02's candy, 100 % hidden in every check):
+    it is measured but not judged; the partner - the container - is judged with the same threshold."""
+    jar = _Obj("partner_hingeless_jar_0", [1.0, 0.0, 0.0], [0.3, 0.3, 0.3])
+    candy = _Obj("target_hard_candy_0", [1.1, 0.0, 0.0], [0.05, 0.05, 0.05])
+    depth = _depth(np.inf)
+    depth[:] = 0.85  # the jar's front wall stands in front of the candy (its own surface is within the tolerance)
+    inside = "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-bar"
+    assert GO.contained_target(inside) and GO.contained_target("inter_object_relation_satisfaction-inside")
+    assert not GO.contained_target("inter_object_relation_satisfaction-ontop_small_scale") and not GO.contained_target(None)
+    objs = GO.screen_scene(depth, CAM, INTR, [jar, candy], subtask=inside)
+    assert objs["target_hard_candy_0"]["occluded"] == 1.0 and objs["target_hard_candy_0"]["judged"] is False
+    assert objs["partner_hingeless_jar_0"]["occluded"] == 0.0 and "judged" not in objs["partner_hingeless_jar_0"]
+    rep = GO.report(objs, "test")
+    assert rep["occluded"] is False and rep["worst"] == "partner_hingeless_jar_0" and rep["max_occluded"] == 0.0
+    # any other goal: the hidden target makes the frame invalid, as before
+    other = GO.report(GO.screen_scene(depth, CAM, INTR, [jar, candy], subtask="inter_object_relation_satisfaction-ontop_small_scale"), "test")
+    assert other["occluded"] is True and other["worst"] == "target_hard_candy_0"
+    # an inside goal whose container is hidden fails on the container, at the same threshold
+    hidden = GO.report(GO.screen_scene(_depth(0.5), CAM, INTR, [jar, candy], subtask=inside), "test")
+    assert hidden["occluded"] is True and hidden["worst"] == "partner_hingeless_jar_0" and hidden["threshold"] == GO.THRESHOLD
+
+
 class _Sensor:
     name = "fake:Camera:0"
     image_height, image_width = 2, 3

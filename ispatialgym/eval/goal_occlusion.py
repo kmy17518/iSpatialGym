@@ -2,9 +2,10 @@
 
 A demo is not valid when one of its target / partner objects (scene names ``target_*``, ``partner_*``, ``targets_*``) is at
 least :data:`THRESHOLD` hidden in that frame; supports, distractors and every other object are not judged, and camera
-relocalization (no target / partner) is exempt. Built-in fixtures (scene names ``dishwasher_*`` / ``door_*``) count only
-what the robot covers of their moving panel: the counter above a dishwasher and a door's frame stand in front of the
-panel in every frame.
+relocalization (no target / partner) is exempt. The target of an inside goal is measured but not judged (owner 2026-10-12, A3):
+an opaque container hides it by design, so its container - the partner - is what has to be visible. Built-in fixtures (scene
+names ``dishwasher_*`` / ``door_*``) count only what the robot covers of their moving panel: the counter above a dishwasher and
+a door's frame stand in front of the panel in every frame.
 
 Measures (all ratios of the in-image silhouette; an object outside the image is not judged):
 
@@ -36,6 +37,9 @@ ROLE_PREFIXES = ("target_", "partner_", "targets_")
 FIXTURE_CATEGORIES = ("dishwasher", "door")
 #: subtasks without a target or partner
 EXEMPT_SUBTASK_PREFIXES = ("camera_relocalization",)
+#: subtasks whose goal puts the target inside its partner: the target is not judged, the partner (the container) is (inside#02's candy
+#: was 100 % hidden in its jar in every check)
+CONTAINED_TARGET_SUBTASK_PREFIXES = ("inter_object_relation_satisfaction-inside",)
 
 
 def enabled(environ=os.environ) -> bool:
@@ -55,6 +59,11 @@ def role(scene_name: str) -> Optional[str]:
 
 def exempt(subtask_or_alias: Optional[str]) -> bool:
     return str(subtask_or_alias or "").startswith(EXEMPT_SUBTASK_PREFIXES)
+
+
+def contained_target(subtask_or_alias: Optional[str]) -> bool:
+    """Whether the goal of the subtask (or an alias of it) puts the target inside its partner (:data:`CONTAINED_TARGET_SUBTASK_PREFIXES`)."""
+    return str(subtask_or_alias or "").startswith(CONTAINED_TARGET_SUBTASK_PREFIXES)
 
 
 def quat_xyzw_to_matrix(q: Iterable[float]) -> np.ndarray:
@@ -162,15 +171,19 @@ def panel_aabb(obj: Any, revolute: Any) -> Tuple[Optional[Tuple[np.ndarray, np.n
 
 
 def screen_scene(depth: np.ndarray, cam_pose: Tuple[Iterable[float], Iterable[float]], intrinsics: Tuple[int, int, float, float, float, float],
-                 judged: Iterable[Any], depth_without_robot: Optional[np.ndarray] = None, revolute: Any = None) -> Dict[str, Dict[str, Any]]:
+                 judged: Iterable[Any], depth_without_robot: Optional[np.ndarray] = None, revolute: Any = None,
+                 subtask: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """Per judged object (by :func:`role`): the box screen of a target / partner, the panel screen of a fixture (needs the
-    depth rendered with the robot hidden)."""
+    depth rendered with the robot hidden). For an inside goal (:func:`contained_target` of ``subtask``, a subtask id or an alias)
+    the target's record carries ``"judged": False``: measured, left out of :func:`worst`."""
     out: Dict[str, Dict[str, Any]] = {}
     for obj in judged:
         kind = role(obj.name)
         if kind == "object":
             pose, size, offset = object_box(obj)
             out[obj.name] = box_occlusion(depth, cam_pose, pose, size, offset, intrinsics)
+            if obj.name.startswith("target_") and contained_target(subtask):
+                out[obj.name].update({"judged": False, "why": "inside goal: the container hides the target by design, the partner is judged"})
         elif kind == "fixture":
             box, part = panel_aabb(obj, revolute) if depth_without_robot is not None else (None, [])
             if depth_without_robot is None:
@@ -186,7 +199,7 @@ def worst(objects: Dict[str, Dict[str, Any]]) -> Tuple[Optional[float], Optional
     """The largest occluded share among the judged objects and its scene name (None when nothing was judged)."""
     best, who = None, None
     for name, rec in (objects or {}).items():
-        v = rec.get("occluded") if rec.get("status") == "ok" else None
+        v = rec.get("occluded") if rec.get("status") == "ok" and rec.get("judged", True) else None
         if v is not None and (best is None or v > best):
             best, who = float(v), name
     return best, who

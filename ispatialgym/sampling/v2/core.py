@@ -1074,7 +1074,8 @@ class SamplerV2(TaskSampler):
         (:meth:`final_configuration`), screened as the oracle screens a demo's last frame - the head camera's depth, the box
         screen per target / partner, the panel screen per fixture (a second depth render with the robot hidden). It runs
         after the instance is written, so the TRO is the one an unchecked run writes; a target / partner at least half
-        hidden removes the instance's files and rejects the attempt (``goal_occluded``) before any demo is recorded."""
+        hidden (an inside goal: the partner, its target is hidden by design) removes the instance's files and rejects the attempt
+        (``goal_occluded``) before any demo is recorded."""
         from omnigibson.utils.constants import JointType
 
         from ispatialgym.eval import goal_occlusion as GO
@@ -1118,7 +1119,8 @@ class SamplerV2(TaskSampler):
                     depth_without = self.world.depth_linear().float().numpy()
                 finally:
                     self.robot.visible = True
-            objects = GO.screen_scene(depth, (cp.tolist(), cq.tolist()), intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE)
+            objects = GO.screen_scene(depth, (cp.tolist(), cq.tolist()), intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE,
+                                      subtask=self.subtask)
             rep = GO.report(objects, method="predicted: settled goal poses, robot at the program check's end, head-camera depth", robot=source,
                             seconds=round(time.time() - t0, 2))
         except Exception as e:  # noqa: BLE001 - a failed prediction keeps the instance; the oracle's gate still judges its last frame

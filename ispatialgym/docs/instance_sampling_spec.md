@@ -1572,6 +1572,12 @@ Goal numbers kept from v1 §5.10: ontop / under(small) z = partner top + target 
 from partner rim + 5 mm, xy at the `fillable` meta-link centroid; touching nudges of 1 mm (≤ 25) with physics steps
 between them; partner displacement ≤ 5 mm at the goal; a fixed partner gets no `pose_settled` atom.
 
+**Goal image, inside (owner decision 2026‑10‑12, A3).** The goal-occlusion screen (the sampler's prediction before an
+instance is written and the oracle's demo gate on the last frame, `ispatialgym.eval.goal_occlusion`) does not judge the
+target of an inside goal — an opaque container hides it by design (inside#02's candy was 100 % hidden in every check);
+its record stays in the report with `judged: false`. The partner (the container) is judged instead, with the same
+threshold (≥ 50 % hidden: `goal_occluded`). Every inside alias.
+
 **Goal predicates `under` / `ontop` (D-007, option A, 2026-09-16).** OmniGibson's `Under` / `OnTop` shoot one vertical ray
 from the supporting object's own surface point into the resting object; on a physically correct placement the verdict
 flips with sub-millimetre contact (the teacup 1.4 mm from its goal, 2.7° tilt, `under` never true). Both the sampler's
