@@ -149,6 +149,18 @@ _CAMERA_RELOCALIZATION_COMMON: Dict[str, Any] = {
 }
 
 #: One ``generation`` seed per iddl subtask id.
+#: Owner 2026-10-11 (cone decision for the 44 tabletop picks: variant C passed its small test): Phase 2 with the split cone in every
+#: tabletop subtask - the start position within 20 / 30 deg of the init camera (wide start image), the work stance shifted along the
+#: edge by these offsets and the position within tight 8 / loose 20 deg of its camera (tabletop.split_cone_opts / phase2_angle_classes
+#: read the keys; an alias's own keys win).
+_TABLETOP_SPLIT_CONE: Dict[str, Any] = {
+    "phase2_split_cone": True,
+    "init_view_class_deg": [20.0, 30.0],
+    "phase2_lateral_shifts_m": [0.0, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3],
+    "phase2_tight_class_deg": 8.0,
+    "phase2_loose_class_deg": 20.0,
+}
+
 DEFAULTS: Dict[str, Dict[str, Any]] = {
     # ---- camera relocalization (§6.1 / §6.2) -------------------------------------------------------------------
     "camera_relocalization-standard": {**COMMON, **_CAMERA_RELOCALIZATION_COMMON},
@@ -215,6 +227,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     # ---- disembedding (§6.4, §4.7) -----------------------------------------------------------------------------
     "disembedding": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": dict(TOLERANCES_MEASURED),  # §8 measured only
         "groups": {"distractors": {"size": [1, 3], "draw": "unique"}},  # §2.3 distractors {size: [1, 3], draw: unique}
         "path_buckets": None,
@@ -273,6 +286,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     # ---- configuration matching (§6.5–6.8) ---------------------------------------------------------------------
     "configuration_matching-block_design": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "time_budget_factor": 1.5,  # owner 2026-10-11: block design takes longer - 1.5 x the sampling / demo / replay time budgets
         "tolerances": {"position": 0.010, "position_edge_fraction": 0.4, "orientation": 0.15},  # §8 0.4·edge (≈ 0.010 m) / 0.15 rad
         "groups": {"targets": {"size": 4, "draw": "same_model"}},  # §2.3 targets {size: 4, draw: same_model}
@@ -318,6 +332,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "configuration_matching-articulation_open_small_scale": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": {**TOLERANCES_ARTICULATION, "position": 0.03, "orientation": 0.20},  # §8 + §6.7 root pose measured 0.03 / 0.20
         "groups": {},
         "path_buckets": None,
@@ -335,6 +350,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "configuration_matching-articulation_close_small_scale": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": {**TOLERANCES_ARTICULATION, "position": 0.03, "orientation": 0.20},  # §8 + §6.7
         "groups": {},
         "path_buckets": None,
@@ -352,6 +368,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "configuration_matching-attachment": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": {"position": 0.01, "orientation": 0.15},  # §8 layout relation 0.01 m / 0.15 rad
         "groups": {},  # the assembly is a :groups composite of two sampleable roles, not a drawn group
         "path_buckets": None,
@@ -374,6 +391,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "alignment-axial": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": {"orientation": 0.10},  # §8 alignment axial 0.10 rad
         "groups": {},
         "path_buckets": None,
@@ -386,6 +404,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     # ---- inter-object relation satisfaction (§6.11, §6.12) ----------------------------------------------------
     "inter_object_relation_satisfaction-ontop_small_scale": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -395,6 +414,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-under_small_scale": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -405,6 +425,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-inside": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": {**TOLERANCES_MEASURED, "orientation_metric": None},  # §8; §6.11 inside: orientation not evaluated
         "groups": {},
         "path_buckets": None,
@@ -417,6 +438,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-nextto": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -426,6 +448,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-touching": {
         **COMMON,
+        **_TABLETOP_SPLIT_CONE,
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,

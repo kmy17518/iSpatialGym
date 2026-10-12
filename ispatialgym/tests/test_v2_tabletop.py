@@ -1278,7 +1278,7 @@ def test_phase2_angle_classes_customs_then_subtask_default_then_global(monkeypat
     from ispatialgym.sampling import generation_defaults as GD
 
     gen = {}
-    s = NS(subtask="inter_object_relation_satisfaction-inside", gen=lambda k, d=None: gen.get(k, d))
+    s = NS(subtask="alignment-world_vertical", gen=lambda k, d=None: gen.get(k, d))
     assert TT.phase2_angle_classes(s) == tuple(TT.ANGLE_CLASSES_DEG)
     real = GD.defaults_for
     monkeypatch.setattr(GD, "defaults_for", lambda st: {**real(st), "phase2_tight_class_deg": 8.0, "phase2_loose_class_deg": 20.0} if st == s.subtask else real(st))

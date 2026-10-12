@@ -63,21 +63,26 @@ SPLIT_INIT_VIEW_CLASSES_DEG = (20.0, 30.0)  # split cone (generation.phase2_spli
 SPLIT_LATERAL_SHIFTS = (0.0, 0.10, -0.10, 0.20, -0.20, 0.30, -0.30)  # split cone: work-stance shifts along the edge (attachment's second base pose)
 
 
-def phase2_angle_classes(s, default: Sequence[float] = ANGLE_CLASSES_DEG) -> Tuple[float, float]:
-    """Phase 2's (tight, loose) angle classes for sampler ``s``: ``generation.phase2_tight_class_deg`` / ``phase2_loose_class_deg``
-    of the alias's customs entry, else of its subtask's generation_defaults, else ``default`` - so a subtask's cone is set in
-    one place and an alias can still override it."""
+def phase2_gen(s, key: str, default=None):
+    """``generation.<key>`` of the alias's customs entry for sampler ``s``, else of its subtask's generation_defaults, else
+    ``default`` - so a subtask's Phase-2 cone is set in one place and an alias can still override it."""
+    v = s.gen(key, None)
+    if v is not None:
+        return v
     from ispatialgym.sampling import generation_defaults as GD
 
     try:
         sub = GD.defaults_for(s.subtask)
     except (KeyError, AttributeError):
         sub = {}
-    out = []
-    for key, fallback in (("phase2_tight_class_deg", default[0]), ("phase2_loose_class_deg", default[1])):
-        v = s.gen(key, None)
-        out.append(float(v if v is not None else sub.get(key, fallback)))
-    return out[0], out[1]
+    v = sub.get(key)
+    return default if v is None else v
+
+
+def phase2_angle_classes(s, default: Sequence[float] = ANGLE_CLASSES_DEG) -> Tuple[float, float]:
+    """Phase 2's (tight, loose) angle classes for sampler ``s``: ``generation.phase2_tight_class_deg`` / ``phase2_loose_class_deg``
+    through :func:`phase2_gen`, else ``default``."""
+    return (float(phase2_gen(s, "phase2_tight_class_deg", default[0])), float(phase2_gen(s, "phase2_loose_class_deg", default[1])))
 
 
 IN_FRAME_MARGIN = 0.05  # §3.4 "in frame (5 %)"
@@ -1954,13 +1959,13 @@ def split_cone_opts(s) -> Optional[Dict[str, Any]]:
     """Owner 2026-10-11 (cone A/B variant C), opt-in per subtask with ``generation.phase2_split_cone``: the keyword arguments of
     :func:`phase2_split_cone` - the start position's classes at the init view (``init_view_class_deg``), the work stance's shifts
     along the edge (``phase2_lateral_shifts_m``) and its classes (``phase2_tight_class_deg`` / ``phase2_loose_class_deg``) - or None
-    (off: Phase 2 as before)."""
-    if not s.gen("phase2_split_cone", False):
+    (off: Phase 2 as before). Every key through :func:`phase2_gen` (the alias's customs, else its subtask's generation_defaults)."""
+    if not phase2_gen(s, "phase2_split_cone", False):
         return None
-    iv = s.gen("init_view_class_deg", None) or SPLIT_INIT_VIEW_CLASSES_DEG
+    iv = phase2_gen(s, "init_view_class_deg") or SPLIT_INIT_VIEW_CLASSES_DEG
     return {"init_view_classes_deg": (float(iv[0]), float(iv[1])),
-            "lateral_shifts": tuple(float(v) for v in (s.gen("phase2_lateral_shifts_m", None) or SPLIT_LATERAL_SHIFTS)),
-            "work_classes_deg": (float(s.gen("phase2_tight_class_deg", ANGLE_CLASSES_DEG[0])), float(s.gen("phase2_loose_class_deg", ANGLE_CLASSES_DEG[1])))}
+            "lateral_shifts": tuple(float(v) for v in (phase2_gen(s, "phase2_lateral_shifts_m") or SPLIT_LATERAL_SHIFTS)),
+            "work_classes_deg": phase2_angle_classes(s)}
 
 
 def stance_cameras(s, stances: Sequence[Stance]) -> List[Pose]:

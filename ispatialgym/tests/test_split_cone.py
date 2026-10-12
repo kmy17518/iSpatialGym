@@ -228,3 +228,21 @@ def test_split_cone_d009b_admits_the_loose_class_per_position_when_every_tight_f
     pool = TT.split_cone_positions([deep0, loose, near0, loose2], class1_when_deep_m=0.65)
     assert pool[(1, 0)] == [deep0, loose] and pool[(2, 0)] == [near0]
     assert TT.split_cone_positions([deep0, loose])[(1, 0)] == [deep0]
+
+
+def test_split_cone_on_from_the_subtask_defaults():
+    """Owner 2026-10-11 (variant C in every tabletop subtask): the keys come from the subtask's generation_defaults when the alias's
+    customs lack them; an alias's own keys still win (``phase2_split_cone: false`` turns it off); the other subtasks stay off."""
+    def sampler(subtask, gen):
+        return SimpleNamespace(subtask=subtask, gen=lambda k, d=None: gen.get(k, d))
+
+    on = {"init_view_classes_deg": (20.0, 30.0), "lateral_shifts": SHIFTS, "work_classes_deg": (8.0, 20.0)}
+    for sub in ("disembedding", "configuration_matching-block_design", "configuration_matching-articulation_open_small_scale",
+                "configuration_matching-articulation_close_small_scale", "configuration_matching-attachment", "alignment-axial",
+                "inter_object_relation_satisfaction-ontop_small_scale", "inter_object_relation_satisfaction-under_small_scale",
+                "inter_object_relation_satisfaction-inside", "inter_object_relation_satisfaction-nextto", "inter_object_relation_satisfaction-touching"):
+        assert TT.split_cone_opts(sampler(sub, {})) == on, sub
+    assert TT.split_cone_opts(sampler("alignment-axial", {"phase2_split_cone": False})) is None
+    assert TT.split_cone_opts(sampler("alignment-axial", {"phase2_tight_class_deg": 5}))["work_classes_deg"] == (5.0, 20.0)
+    for sub in ("alignment-world_vertical", "configuration_matching-articulation_open_large_scale", "inter_object_relation_satisfaction-ontop_large_scale"):
+        assert TT.split_cone_opts(sampler(sub, {})) is None, sub
