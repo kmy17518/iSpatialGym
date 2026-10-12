@@ -592,6 +592,162 @@ def test_disembedding_eval_aliases_split_the_destination_side_half_and_half():
     assert sorted(t for t, v in side.items() if v == "left") == ["beaker", "bottle_of_milk", "cellulose_tape", "tablefork", "toy_dice"]
 
 
+PUZZLE_PARTS = {  # assembly.json of the embedded figure: origin_in_figure_m (x, y) and bbox (x, y) of each part
+    "jigsaw_puzzle_piece.n.01_1": ((-0.03065, 0.057516), (0.1261, 0.072369)),
+    "jigsaw_puzzle_piece.n.01_2": ((0.0, 0.0), (0.212, 0.212)),
+    "jigsaw_puzzle_piece.n.01_3": ((-0.065081, 0.037741), (0.012198, 0.008219)),
+    "jigsaw_puzzle_piece.n.01_4": ((-0.017335, 0.051505), (0.012, 0.035747)),
+}
+
+
+def _puzzle_sampler(D, floor_xy=(0.47, 0.35)):
+    """A disembedding sampler holding the embedded figure (target ``..._1``, its three parts) on a source tray whose inner floor is
+    ``floor_xy`` (1 cm raster, long side along the tray's x like uekqey), the tray 0.565 x 0.396 m, on a top at z 0.75."""
+    from types import SimpleNamespace
+
+    def footprint(hull, pose):
+        return C.transform_points((TT._t(pose[0]), TT._t(pose[1])), hull)[:, :2][[0, 2, 6, 4]]
+
+    s = D.Disembedding.__new__(D.Disembedding)
+    s.src_role, s.dst_role, s.top = "source", "destination", SimpleNamespace(z=0.75, polygon_supported=lambda fp, margin=0.0: True)
+    s.world = SimpleNamespace(footprint=footprint, bottom_offset=lambda hull, q: 0.01)
+    names = list(PUZZLE_PARTS)
+    s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name=names[0]), many=lambda role: [SimpleNamespace(name=n) for n in names[1:]])
+    s.hull = {"source": _box(0.565, 0.396, 0.02), "target": _box(*PUZZLE_PARTS[names[0]][1], 0.02),
+              **{n: _box(*PUZZLE_PARTS[n][1], 0.02) for n in names[1:]}}
+    s.rest = {k: C.IDENTITY_QUAT.clone() for k in s.hull}
+    s.layout = {n: o for n, (o, _) in PUZZLE_PARTS.items()}
+    hx, hy = (round(v / 0.02) * 0.01 for v in floor_xy)
+    cells = th.stack(th.meshgrid(th.arange(-hx, hx + 1e-4, 0.01), th.arange(-hy, hy + 1e-4, 0.01), indexing="ij"), dim=-1).reshape(-1, 2)
+    s.src_floor = D.TrayFloor(cells, z_local=0.002, res=0.01, rim_local=0.02)
+    s.g = lambda k: {"tray_footprint_margin_m": 0.01, "fixed_layout_yaw_step_deg": 22.5}[k]
+    s.layout_yaws, s.tray_turns = D.layout_yaws(22.5), []
+    s.gp, s.template_facts = SimpleNamespace(alias="disembedding-jigsaw_puzzle_piece-x"), {"fixed_layout": {"file": "assembly.json"}}
+    return s
+
+
+def test_puzzle_layout_turns_as_a_whole_about_the_floor_centre():
+    """Owner 2026-10-12 (disembedding#01): the fixed layout - the target with its neighbouring parts - turns about the vertical by a
+    yaw from ``fixed_layout_yaw_step_deg`` (22.5: 16 yaws), its parts' relative poses unchanged, the figure centre on the floor centre.
+    On uekqey's 0.47 x 0.35 m floor the 212 mm figure fits at every yaw, so the tray never turns; on a floor too narrow for its
+    diagonal the tray turns with it at the yaws near 45 deg, and the margins take the turned tray's half length along the edge."""
+    from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
+
+    D = _disembedding()
+    assert D.layout_yaws(22.5) == pytest.approx([math.radians(22.5 * k) for k in range(16)]) and D.layout_yaws(360.0) == [0.0]
+    x, y, yaw = D.turned_axes(th.tensor([0.0, -1.0]), th.tensor([1.0, 0.0]), -math.pi / 2, math.pi / 2)
+    assert x.tolist() == pytest.approx([1.0, 0.0], abs=1e-6) and y.tolist() == pytest.approx([0.0, 1.0], abs=1e-6) and yaw == pytest.approx(0.0)
+    s = _puzzle_sampler(D)
+    st = Stance("manipulation", (-0.5, 0.0, 0.0), 0.5, 0.0, 0.5, EdgeFrame("-x", th.tensor([0.0, 0.0]), th.tensor([1.0, 0.0]), 2.0))
+    src_w = s.src_floor.at(s._tray_pose_centred("source", s.src_floor, st, th.tensor([0.3, 0.1])))
+    base, yaw0 = s._layout_poses(st, src_w)
+    for turn in s.layout_yaws:
+        poses, yaw_t = s._layout_poses(st, src_w, turn)
+        assert yaw_t == pytest.approx(yaw0 + turn)
+        for a, b in itertools.combinations(PUZZLE_PARTS, 2):  # relative distances and yaws unchanged
+            assert float(th.linalg.norm(poses[a][0][:2] - poses[b][0][:2])) == pytest.approx(float(th.linalg.norm(base[a][0][:2] - base[b][0][:2])), abs=1e-5)
+            assert C.quat_angle(poses[a][1], poses[b][1]) == pytest.approx(0.0, abs=1e-4)
+        # the figure centre stays on the floor centre: the frame's (centre) part
+        assert poses["jigsaw_puzzle_piece.n.01_2"][0][:2].tolist() == pytest.approx(src_w.centre.tolist(), abs=1e-5)
+    assert s._layout_turns() == []
+    assert s._source_half_length() == pytest.approx(0.2825, abs=1e-4)
+    narrow = _puzzle_sampler(D, floor_xy=(0.47, 0.26))
+    turns = narrow._layout_turns()
+    assert turns and 0.0 not in turns and all(min(abs(math.degrees(t) % 90.0 - 45.0), 45.0) <= 25.0 for t in turns)
+    narrow.tray_turns = turns
+    assert narrow._source_half_length() > 0.2825 + 0.02  # the turned tray reaches farther along the edge
+    poses = narrow._source_tray_poses(st, th.tensor([0.3, 0.1]))
+    assert len(poses) == 1 + len(turns) and C.quat_angle(poses[0][1], poses[1][1]) == pytest.approx(turns[0], abs=1e-4)
+
+
+def test_puzzle_yaw_draw_keeps_the_yaws_with_a_reachable_grasp(monkeypatch):
+    """Owner 2026-10-12 (disembedding#01): the grasp screening tries every layout yaw (the target's pose of each, every offered arm) and
+    keeps those with a reachable grasp; the yaw is drawn among them per instance and confirmed by the exact pick at its pose, the next
+    kept yaw when that fails; no yaw kept is ``grasp_unreachable`` naming how many yaws keep one with every object ignored."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
+
+    D = _disembedding()
+    s = _puzzle_sampler(D)
+    manip = Stance("manipulation", (-0.5, 0.0, 0.0), 0.5, 0.0, 0.5, EdgeFrame("-x", th.tensor([0.0, 0.0]), th.tensor([1.0, 0.0]), 2.0))
+    manip.focus = th.tensor([0.3, 0.1, 0.77])
+    reachable = {math.radians(90.0), math.radians(112.5)}
+    ignored, screened = [], []
+
+    def feasible_sets(cells, yaws, grasps, pose_at, stance, arm, ignore, cache=True):
+        parts_out = any(o is s.objects["jigsaw_puzzle_piece.n.01_2"] for objs in ignored for o in objs)
+        everything_out = any("table" in objs for objs in ignored)
+        screened.append((arm, len(yaws), parts_out))
+        ok = set(yaws) if everything_out else {y for y in yaws if any(abs(y - r) < 1e-6 for r in reachable)}
+        for y in yaws:
+            pose_at(cells[0], y)
+        return {0: [(y, grasps[0]) for y in yaws if y in ok]}
+
+    class Ignoring:
+        def __init__(self, objs):
+            self.objs = list(objs)
+
+        def __enter__(self):
+            ignored.append(self.objs)
+
+        def __exit__(self, *a):
+            ignored.pop()
+
+    s.ikc = SimpleNamespace(feasible_sets=feasible_sets, ignoring=Ignoring)
+    s.grasps = [SimpleNamespace(name="grasp_0")]
+    s.objects = {n: SimpleNamespace(name=n) for n in PUZZLE_PARTS}
+    s.obj = lambda role: SimpleNamespace(name=role, set_position_orientation=lambda *a: None, keep_still=lambda: None)
+    s.support_objects = lambda: ["table", "source", "destination"]
+    s.choice, s.bands, s.arm_bands = SimpleNamespace(models={"target": SimpleNamespace(scale=None)}), None, {}
+    placed = []
+    s._place_layout = lambda poses: placed.append(poses)
+    drawn = []
+
+    def phase3_target(s_, manip_, rng, grasps, hull, rest, ignore, *, fixed, **kw):
+        drawn.append(fixed[1])
+        if len(drawn) == 1:
+            raise Reject("grasp_unreachable", "F exhausted")
+        return (th.tensor([*fixed[0].tolist(), 0.8]), C.quat_from_yaw(fixed[1])), SimpleNamespace(yaw=fixed[1])
+
+    monkeypatch.setattr(TT, "phase3_target", phase3_target)
+    t_pose, grasp, poses, s_pose, src_w, rec = s._layout_pick(np.random.default_rng(3), manip, ["right"])
+    assert screened == [("right", 16, True)]  # one screen of the 16 yaws, the parts out of the world (pick_world)
+    assert rec["yaws_screened"] == 16 and rec["yaws_reachable_deg"] == [90.0, 112.5] and sum(rec["pairs_per_yaw"].values()) == 2
+    _, yaw0 = s._layout_poses(manip, src_w)
+    assert len(drawn) == 2 and {round(math.degrees(v - yaw0), 2) for v in drawn} == {90.0, 112.5}  # the first draw failed its exact pick
+    assert rec["yaw_deg"] == pytest.approx(math.degrees(drawn[1] - yaw0)) and rec["tray_turned"] is False and len(rec["exact_failed"]) == 1
+    assert placed[-1] is poses and grasp.yaw == pytest.approx(drawn[1])
+    # no yaw reachable: the diagnostic screen with every object ignored names reach as the limit or not
+    reachable.clear()
+    with pytest.raises(Reject) as err:
+        s._layout_pick(np.random.default_rng(3), manip, ["right"])
+    assert err.value.reason == "grasp_unreachable" and "0 of 16 yaws" in str(err.value) and "16 yaws keep one: not reach alone" in str(err.value)
+
+
+def test_puzzle_layout_yaw_is_recorded_in_the_tro_and_template_meta(monkeypatch):
+    """Owner 2026-10-12: the layout's yaw goes into the TRO (``scene.fixed_layout``) and the template meta (per instance), so the oracle
+    and the evaluator rebuild the same scene; an instance without a fixed layout records nothing."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.core import SamplerV2
+
+    D = _disembedding()
+    monkeypatch.setattr(SamplerV2, "tro_meta_block", lambda self, draft, iid, seed: {"scene": {"model": "house_single_floor"}})
+    monkeypatch.setattr(SamplerV2, "write_instance", lambda self, draft, index, seed: f"/x/{index}-tro_state.json")
+    s = D.Disembedding.__new__(D.Disembedding)
+    s.template_meta, s.instance_id = {}, lambda index: f"iid_{index}"
+    rec = {"file": "assembly.json", "yaw_deg": 112.5, "figure_yaw_rad": 0.39, "centre_xy": [7.4, 3.5], "tray_turned": False}
+    draft = SimpleNamespace(extras={"fixed_layout": rec})
+    assert s.tro_meta_block(draft, "iid_0", 1)["scene"] == {"model": "house_single_floor", "fixed_layout": rec}
+    assert s.write_instance(draft, 0, 1) == "/x/0-tro_state.json" and s.template_meta["fixed_layout"]["per_instance"] == {"iid_0": rec}
+    plain = SimpleNamespace(extras={})
+    assert s.tro_meta_block(plain, "iid_1", 1)["scene"] == {"model": "house_single_floor"}
+    s.write_instance(plain, 1, 1)
+    assert list(s.template_meta["fixed_layout"]["per_instance"]) == ["iid_0"]
+
+
 def test_phase3_target_fixed_pose_screens_and_places_only_that_pose(monkeypatch):
     """A fixed-layout target (the embedded figure's): F is screened at the given (xy, yaw) only, the object lands exactly there (no
     jitter, no offset from the focus) and F stays out of the band."""
@@ -674,7 +830,7 @@ def _destination_fit_sampler(D):
         return C.transform_points((TT._t(pose[0]), TT._t(pose[1])), hull)[:, :2][[0, 2, 6, 4]]
 
     s = D.Disembedding.__new__(D.Disembedding)
-    s.top, s.src_role, s.dst_role, s.dest_side = Top(), "source", "destination", -1.0
+    s.top, s.src_role, s.dst_role, s.dest_side, s.tray_turns = Top(), "source", "destination", -1.0, []
     s.world = SimpleNamespace(camera_model=Camera(), footprint=footprint, bottom_offset=lambda hull, q: 0.01)
     s.hull = {"source": _box(0.565, 0.396, 0.02), "destination": _box(0.44, 0.27, 0.02)}
     cells = th.stack(th.meshgrid(th.arange(-0.25, 0.26, 0.01), th.arange(-0.17, 0.18, 0.01), indexing="ij"), dim=-1).reshape(-1, 2)

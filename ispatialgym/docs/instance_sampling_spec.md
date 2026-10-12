@@ -1550,6 +1550,17 @@ Numbers and records kept from v1 §5.3:
   x / y of the layout file their notes name (`generation.fixed_layout`; figure centre on the source floor's centre, +x the
   robot's right, +y away from the robot, released 0.5 mm above the floor), not drawn and outside the budget; the target's
   grasp is screened at its layout pose with the other parts in place, which the whole pick ignores (next item).
+  *Owner decision 2026‑10‑12 (disembedding#01):* the whole figure — the target with its neighbouring parts, relative poses
+  unchanged — turns about the vertical through the floor centre by a yaw drawn per instance among 0, 22.5, …, 337.5°
+  (`generation.fixed_layout_yaw_step_deg`), so the bars the target's top-down pinches use can face a direction the arm
+  reaches: the grasp screening (feasible set F at the target's pose of every yaw, every offered arm) keeps the yaws with a
+  reachable grasp, the draw is among them, and the drawn yaw's exact pick decides (the next kept yaw when it fails; none
+  kept is `grasp_unreachable`, naming how many yaws keep a grasp with every object ignored, i.e. whether reach alone is
+  the limit). The figure turns inside the edge-aligned source tray where it fits, else the tray turns with it — that turned
+  footprint counts for the Phase‑1c margin, the Phase‑2 frame check and the destination fit (uekqey's floor holds the 212 mm
+  figure at every yaw, so its tray never turns). The yaw is recorded in the TRO (`scene.fixed_layout`: file, `yaw_deg`,
+  `figure_yaw_rad`, `centre_xy`, `tray_turned`), the template meta (`fixed_layout.per_instance`) and the summary (with the
+  yaws that kept a grasp); the goal is unchanged.
 - Grasp and the other tray objects (*owner decision 2026‑10‑12, A2b*): the distractors and fixed-layout parts may be
   touched or displaced by the grasp as long as they stay on the source tray. The target's grasp ignores them like the table
   and the source tray (the grasp pose and the last 3.3 cm of its approach in the draw and the wrist-turn re-check; the

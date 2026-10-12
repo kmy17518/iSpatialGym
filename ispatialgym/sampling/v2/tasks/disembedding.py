@@ -19,7 +19,9 @@ distractors on the source floor, footprints >= 1 cm from each other and from the
 (owner 2026-10-12 A2b: no spacing along the grasp's pinch axis, no pad-clearance growth), each at its rest orientation - the
 target's pose when the alias says so (``generation.distractor_pose`` lying / standing, the milk picks of the handoff
 2026-10-10) - or, for the puzzle (``generation.fixed_layout``), every part of the embedded figure at its layout position with
-the target held there too; every object but the destination in frame (5 %);
+the target held there too, the whole figure turned by a yaw drawn among those whose grasp screening keeps a reachable grasp
+(owner 2026-10-12, ``_layout_pick``; recorded in the TRO's ``scene.fixed_layout``); every object but the destination in frame
+(5 %);
 whole-body checks at init and manipulation with the objects placed; occlusion <= 0.30 (two segmentation renders,
 visible area >= 400 px) with the destination tray confirmed visible; the §4.7 placement stance with the place /
 pre-place IK (object in hand, tray + support ignored for the place pose) and the lateral path with the object at the
@@ -145,6 +147,20 @@ def figure_axes(tangent, inward) -> Tuple[th.Tensor, th.Tensor, float]:
     x_axis = -TT._t(tangent)[:2].float()
     y_axis = TT._t(inward)[:2].float()
     return x_axis, y_axis, math.atan2(float(x_axis[1]), float(x_axis[0]))
+
+
+def layout_yaws(step_deg: float) -> List[float]:
+    """The yaws (rad, [0, 2π)) a fixed layout may turn by about the vertical (owner 2026-10-12, the puzzle): 0 - the figure drawn
+    upright, table-aligned - and every ``step_deg`` around."""
+    n = max(1, int(round(360.0 / float(step_deg))))
+    return [2.0 * math.pi * k / n for k in range(n)]
+
+
+def turned_axes(x_axis: th.Tensor, y_axis: th.Tensor, yaw: float, turn: float) -> Tuple[th.Tensor, th.Tensor, float]:
+    """The figure frame (``figure_axes``) turned by ``turn`` about the vertical: both axes rotated, the yaw increased."""
+    c, s = math.cos(turn), math.sin(turn)
+    rot = th.tensor([[c, -s], [s, c]], dtype=x_axis.dtype)
+    return rot @ x_axis, rot @ y_axis, yaw + turn
 
 
 def layout_origins(assembly: Dict[str, Any]) -> Dict[str, Tuple[float, float]]:
@@ -412,6 +428,8 @@ class Disembedding(SamplerV2):
         self.placed_key: Optional[str] = None  # band key of the stance-relative source tray (item 9)
         self.release_surface_z: Optional[float] = None  # raycast surface under the destination goal (owner item 3)
         self.layout: Optional[Dict[str, Tuple[float, float]]] = None  # fixed layout: bddl instance -> figure-frame (x, y)
+        self.layout_yaws: List[float] = [0.0]  # the yaws the fixed layout may turn by (sample_template)
+        self.tray_turns: List[float] = []  # those of them the edge-aligned source floor cannot hold: the tray turns with the layout
         self.dest_side: Optional[float] = None  # the destination tray's side (sample_template): +1 the robot's left, -1 its right
 
     # ------------------------------------------------------------------ parameters (§2.3: numbers from generation)
@@ -598,6 +616,12 @@ class Disembedding(SamplerV2):
         self.src_floor = TrayFloor.measure(self, src, self.top, res)
         self.dst_floor = TrayFloor.measure(self, dst, self.top, res)
         self.kit.sync_world()
+        if self.layout is not None:
+            # owner 2026-10-12 (the puzzle): the layout's yaws, and those at which the source tray turns with it
+            self.layout_yaws = layout_yaws(float(self.g("fixed_layout_yaw_step_deg")))
+            self.tray_turns = self._layout_turns()
+            self.template_facts["fixed_layout"].update({"yaws_deg": [round(math.degrees(v), 2) for v in self.layout_yaws],
+                                                        "tray_turn_yaws_deg": [round(math.degrees(v), 2) for v in self.tray_turns]})
         # band: the target grasped at the source-floor height; the tray moves with the focus, so the lattice is the top
         # itself (the tray walls are ignored for the grasp pose per §3.6; the pre-grasp is 10 cm above the rim in practice)
         mc = self.choice.models["target"]
@@ -620,9 +644,10 @@ class Disembedding(SamplerV2):
         rng = np.random.default_rng(self.ctx.base_seed)
         side = self._destination_side(rng)
         self.dest_side = 1.0 if side == "left" else -1.0
-        # the source tray's half length along the edge: its longer footprint side, the axis ``_tray_yaw`` lays along the edge
+        # the source tray's half length along the edge: its longer footprint side, the axis ``_tray_yaw`` lays along the edge (the
+        # longest of its turns with a fixed layout)
         margins = {"kind": "disembedding", "lateral_margin": float(self.g("lateral_margin_m")), "safety": 0.02, "H_max": H_max,
-                   "destination_side": side, "source_half_length": TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT)}
+                   "destination_side": side, "source_half_length": self._source_half_length()}
         errors = []
         # §4.2 has no preference among the edges and §4.4 checks floor + collision per lateral position (Phase 1c), so
         # every edge with a free-floor run in front of it is tried (a third of its 10 cm lateral raster at s = 0.45 on
@@ -695,9 +720,9 @@ class Disembedding(SamplerV2):
         for c in cands:
             key = (round(float(c.focus[0]), 3), round(float(c.focus[1]), 3))
             if key not in verdict:
-                s_pose = self._tray_pose_centred(self.src_role, self.src_floor, c, c.focus[:2])
                 try:
-                    self._place_destination(None, init, c, cam, s_pose)
+                    for s_pose in self._source_tray_poses(c, c.focus[:2]):
+                        self._place_destination(None, init, c, cam, s_pose)
                     verdict[key] = None
                 except Reject as e:
                     verdict[key] = str(e)
@@ -718,21 +743,38 @@ class Disembedding(SamplerV2):
         tangent_yaw = math.atan2(float(stance.tangent[1]), float(stance.tangent[0]))
         return tangent_yaw if float(ext[0]) >= float(ext[1]) else tangent_yaw - math.pi / 2
 
-    def _tray_pose_centred(self, key: str, floor: TrayFloor, stance: Stance, centre_xy) -> TT.Pose:
-        """Tray pose with its inner-floor centre at ``centre_xy`` and its long axis along the edge."""
-        yaw = self._tray_yaw(key, stance)
+    def _tray_pose_centred(self, key: str, floor: TrayFloor, stance: Stance, centre_xy, turn: float = 0.0) -> TT.Pose:
+        """Tray pose with its inner-floor centre at ``centre_xy`` and its long axis along the edge (turned by ``turn`` about the
+        vertical when a fixed layout turns it)."""
+        yaw = self._tray_yaw(key, stance) + float(turn)
         quat = C.quat_from_yaw(yaw)
         c_local = floor.cells_local.mean(dim=0)
         off = C.quat_rotate(quat, th.tensor([float(c_local[0]), float(c_local[1]), 0.0]))
         pos = th.tensor([float(centre_xy[0]) - float(off[0]), float(centre_xy[1]) - float(off[1]), self.top.z + self.world.bottom_offset(self.hull[key], quat) + TT.Z_OFFSET])
         return pos, quat
 
+    def _source_tray_poses(self, stance: Stance, centre_xy) -> List[TT.Pose]:
+        """The source tray centred on ``centre_xy``: edge-aligned, and turned by each of the fixed layout's ``tray_turns`` - every pose
+        an instance may give it, which the Phase-2 frame check and the destination fit hold for all."""
+        return [self._tray_pose_centred(self.src_role, self.src_floor, stance, centre_xy, t) for t in [0.0] + list(self.tray_turns)]
+
+    def _source_half_length(self) -> float:
+        """The source tray's half length along the edge for the Phase-1c margins: half its longer footprint side (the axis ``_tray_yaw``
+        lays along the edge), the longest over the fixed layout's ``tray_turns``."""
+        hull = self.hull[self.src_role]
+        ext = TT.hull_extents(hull, C.IDENTITY_QUAT)
+        axis = 0 if float(ext[0]) >= float(ext[1]) else 1
+        return max(0.5 * float(TT.hull_extents(hull, C.quat_from_yaw(t))[axis]) for t in [0.0] + list(self.tray_turns))
+
     def _source_tray_in_frame(self, s, stance: Stance, cam, focus, info) -> bool:
-        """§4.5 step 3 (disembedding): the whole source tray centred on the focus, long axis along the edge, in frame (5 %)."""
-        pose = self._tray_pose_centred(self.src_role, self.src_floor, stance, focus[:2])
-        if not self.top.polygon_supported(self.world.footprint(self.hull[self.src_role], pose), margin=TT.SUPPORT_MARGIN):
-            return False
-        return TT.in_frame(self, cam, TT.hull_corners_world(self.hull[self.src_role], pose), TT.IN_FRAME_MARGIN)
+        """§4.5 step 3 (disembedding): the whole source tray centred on the focus, long axis along the edge (and at each turn of a
+        fixed layout's ``tray_turns``), on the top and in frame (5 %)."""
+        for pose in self._source_tray_poses(stance, focus[:2]):
+            if not self.top.polygon_supported(self.world.footprint(self.hull[self.src_role], pose), margin=TT.SUPPORT_MARGIN):
+                return False
+            if not TT.in_frame(self, cam, TT.hull_corners_world(self.hull[self.src_role], pose), TT.IN_FRAME_MARGIN):
+                return False
+        return True
 
     # ------------------------------------------------------------------ fixed layout (handoff 2026-10-10: the puzzle pick)
 
@@ -759,11 +801,12 @@ class Disembedding(SamplerV2):
         self.template_facts["fixed_layout"] = {"file": rel, "origin_in_figure_m": {name: list(xy) for name, xy in layout.items()}}
         return layout
 
-    def _layout_poses(self, stance: Stance, src_w: TrayFloorWorld) -> Tuple[Dict[str, TT.Pose], float]:
+    def _layout_poses(self, stance: Stance, src_w: TrayFloorWorld, layout_yaw: float = 0.0) -> Tuple[Dict[str, TT.Pose], float]:
         """The layout on the source floor (handoff 2026-10-10): the figure's centre at the floor centre, +x the robot's right, +y
-        away from the robot, every part flat at its (x, y), its footprint on the floor (``tray_footprint_margin_m``), else
-        ``Reject("fixed_layout_placement")``. Returns the poses by bddl instance and the figure's yaw."""
-        x_axis, y_axis, yaw = figure_axes(stance.tangent, stance.inward)
+        away from the robot - turned by ``layout_yaw`` about the floor centre as a whole (owner 2026-10-12) -, every part flat at its
+        (x, y), its footprint on the floor (``tray_footprint_margin_m``), else ``Reject("fixed_layout_placement")``. Returns the poses
+        by bddl instance and the figure's yaw."""
+        x_axis, y_axis, yaw = turned_axes(*figure_axes(stance.tangent, stance.inward), float(layout_yaw))
         margin = float(self.g("tray_footprint_margin_m"))
         poses: Dict[str, TT.Pose] = {}
         for name, (ox, oy) in self.layout.items():
@@ -774,6 +817,90 @@ class Disembedding(SamplerV2):
                 raise Reject("fixed_layout_placement", f"{name} at figure ({ox:+.3f}, {oy:+.3f}) m is not on the source floor with the {margin:.3f} m margin")
             poses[name] = pose
         return poses, yaw
+
+    def _layout_turns(self) -> List[float]:
+        """The ``layout_yaws`` at which the turned figure does not fit the edge-aligned source floor (owner 2026-10-12: the tray turns
+        with the layout there, so the figure keeps its pose in the tray). Geometry in a frame of its own: an edge facing +x, the floor
+        centre at the origin."""
+        st = Stance("layout", (-0.5, 0.0, 0.0), 0.5, 0.0, 0.5, EdgeFrame("layout", th.zeros(2), th.tensor([1.0, 0.0]), 2.0))
+        src_w = self.src_floor.at(self._tray_pose_centred(self.src_role, self.src_floor, st, th.zeros(2)))
+        turns = []
+        for yaw in self.layout_yaws:
+            try:
+                self._layout_poses(st, src_w, yaw)
+            except Reject:
+                turns.append(yaw)
+        return turns
+
+    def _layout_yaw_screen(self, manip: Stance, arms: List[str], target_poses: Dict[float, TT.Pose]) -> Dict[float, int]:
+        """§4.6 step 1 over the layout's yaws: the screening IK of [pre-grasp, grasp] of every library pinch at the target's pose of each
+        yaw (``target_poses``), every offered arm at its own stance (as :func:`tabletop.phase3_target`), the support, the source tray and
+        the parts ignored at the grasp (the caller holds ``pick_world``). Returns the feasible (grasp, arm) pairs per yaw."""
+        yaws = list(target_poses)
+        n = {yaw: 0 for yaw in yaws}
+        for a in arms:
+            st = manip if (a == arms[0] and (not manip.working_arms or manip.working_arms == [a])) else TT.stance_for_arm(self, manip, a)
+            if st is None:
+                continue
+            F = self.ikc.feasible_sets([th.zeros(2)], yaws, self.grasps, lambda cell, yaw: target_poses[yaw], st, a, self.grasp_ignore_list(), cache=False)
+            for yaw, _ in F.get(0, []):
+                n[yaw] += 1
+        return n
+
+    def _layout_pick(self, rng, manip: Stance, arms_here: List[str]):
+        """Owner 2026-10-12 (disembedding#01, the puzzle): the fixed layout turned as a whole about the vertical - the target with its
+        neighbouring parts, relative poses unchanged - by a yaw drawn per instance (``rng``) among the ``layout_yaws`` whose screening
+        (:meth:`_layout_yaw_screen`) keeps a reachable grasp, so the bars the pinches use can face a direction the arm reaches. The
+        figure turns inside the edge-aligned source tray, or with the tray at the ``tray_turns``. The drawn yaw's pick is
+        :func:`tabletop.phase3_target` at the target's pose (exact IK), the next kept yaw (without replacement) when it fails. Returns
+        ``(target pose, grasp record, layout poses, source tray pose, its floor, the yaw record)``; ``Reject("grasp_unreachable")``
+        when no yaw keeps a grasp - with the count of yaws that keep one with every object ignored (reach alone)."""
+        tname, src = self.tname, self.obj(self.src_role)
+        options: Dict[float, Tuple[TT.Pose, TrayFloorWorld, Dict[str, TT.Pose], float]] = {}
+        for yaw in self.layout_yaws:
+            s_pose = self._tray_pose_centred(self.src_role, self.src_floor, manip, manip.focus[:2], yaw if yaw in self.tray_turns else 0.0)
+            if not self.top.polygon_supported(self.world.footprint(self.hull[self.src_role], s_pose), margin=TT.SUPPORT_MARGIN):
+                continue
+            src_w = self.src_floor.at(s_pose)
+            try:
+                poses, fig_yaw = self._layout_poses(manip, src_w, yaw)
+            except Reject:
+                continue
+            options[yaw] = (s_pose, src_w, poses, fig_yaw)
+        targets = {yaw: o[2][tname] for yaw, o in options.items()}
+        with self.pick_world():
+            pairs = self._layout_yaw_screen(manip, arms_here, targets)
+        kept = [yaw for yaw in options if pairs[yaw] > 0]
+        deg = lambda v: round(math.degrees(v), 2)  # noqa: E731
+        rec = {"file": (self.template_facts.get("fixed_layout") or {}).get("file"), "yaws_screened": len(options),
+               "yaws_reachable_deg": [deg(v) for v in kept], "pairs_per_yaw": {str(deg(v)): pairs[v] for v in options}}
+        log.info("%s: layout yaws with a reachable grasp: %d of %d %s", self.gp.alias, len(kept), len(options), rec["yaws_reachable_deg"])
+        if not kept:
+            with self.pick_world(), self.ikc.ignoring(self.support_objects()):
+                reach = self._layout_yaw_screen(manip, arms_here, targets)
+            raise Reject("grasp_unreachable", f"no layout yaw keeps a reachable grasp at the focus {[round(float(v), 3) for v in manip.focus[:2].tolist()]} "
+                                              f"(0 of {len(options)} yaws x {len(self.grasps)} grasps, arms {arms_here}; with every object ignored "
+                                              f"{sum(1 for v in reach.values() if v)} yaws keep one: {'not ' if any(reach.values()) else ''}reach alone)")
+        errors = []
+        for i in rng.permutation(len(kept)):
+            yaw = kept[int(i)]
+            s_pose, src_w, poses, fig_yaw = options[yaw]
+            src.set_position_orientation(*s_pose)
+            src.keep_still()
+            self._place_layout(poses)
+            try:
+                with self.pick_world():
+                    t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
+                                                     support_z=src_w.z, margin=float(self.g("tray_footprint_margin_m")),
+                                                     scale_key=self.choice.models["target"].scale, bands=self.bands, arms=arms_here,
+                                                     arm_bands=self.arm_bands or None, fixed=(poses[tname][0][:2], fig_yaw))
+            except Reject as e:
+                errors.append(f"yaw {deg(yaw)}: {str(e)[:200]}")
+                continue
+            rec.update({"yaw_deg": deg(yaw), "figure_yaw_rad": round(float(fig_yaw), 6), "centre_xy": [round(float(v), 4) for v in src_w.centre.tolist()],
+                        "tray_turned": yaw in self.tray_turns, "exact_failed": errors})
+            return t_pose, grasp, poses, s_pose, src_w, rec
+        raise Reject("grasp_unreachable", f"{len(kept)} layout yaws keep a screened grasp, none passes the exact IK ({'; '.join(errors)[:600]})")
 
     def _place_layout(self, poses: Dict[str, TT.Pose]) -> None:
         """The layout's distractors at their poses (the target is placed by its grasp draw), the collision world synced: the target's
@@ -822,21 +949,19 @@ class Disembedding(SamplerV2):
         src.keep_still()
         self.kit.sync_world()
         src_w = self.src_floor.at(s_pose)
-        # the puzzle (handoff 2026-10-10): the figure's parts at their layout positions first (the pick ignores them, owner 2026-10-12
-        # A2b: ``pick_world``); the target itself is held at its layout position
-        layout, fixed = None, None
-        if self.layout is not None:
-            layout, fig_yaw = self._layout_poses(manip, src_w)
-            self._place_layout(layout)
-            fixed = (layout[tname][0][:2], fig_yaw)
         # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray + distractors ignored for the
         # grasp (``grasp_ignore_list``); the other arm is tried only where its band covers the focus (owner 2026-09-27)
         default = self.segment_arms[0]
         arms_here = [a for a in self.segment_arms if a == default or a in (manip.extras.get("focus_arms") or [])]
-        with self.pick_world():
+        layout, layout_rec = None, None
+        if self.layout is not None:
+            # the puzzle (handoff 2026-10-10): the figure's parts at their layout positions, the target held at its own, the whole figure
+            # turned by a yaw that keeps a reachable grasp (owner 2026-10-12); the pick ignores the parts (A2b: ``pick_world``)
+            t_pose, grasp, layout, s_pose, src_w, layout_rec = self._layout_pick(rng, manip, arms_here)
+        else:
             t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
                                              support_z=src_w.z, margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale,
-                                             bands=self.bands, arms=arms_here, arm_bands=self.arm_bands or None, fixed=fixed)
+                                             bands=self.bands, arms=arms_here, arm_bands=self.arm_bands or None)
         if grasp.arm != default:
             self.sidecar.transitions.clear()
             self.record_stance_travel(init, manip)  # the other arm idles now
@@ -845,7 +970,7 @@ class Disembedding(SamplerV2):
         tried: List[str] = []
         while True:
             try:
-                return self._segment_rest(rng, d, init, manip, t_pose, grasp, s_pose, src_w, tname, sname, dname, dnames, k, arms_here, layout)
+                return self._segment_rest(rng, d, init, manip, t_pose, grasp, s_pose, src_w, tname, sname, dname, dnames, k, arms_here, layout, layout_rec)
             except Reject as e:
                 tried.append(grasp.arm)
                 others = [a for a in TT.fallback_arms(grasp) if a not in tried]
@@ -868,9 +993,10 @@ class Disembedding(SamplerV2):
                     self._place_layout(layout)
 
     def _segment_rest(self, rng, d: Draft, init: Stance, manip: Stance, t_pose, grasp, s_pose, src_w, tname: str, sname: str, dname: str, dnames: List[str], k: int,
-                      arms_here: List[str], layout: Optional[Dict[str, TT.Pose]] = None) -> Draft:
+                      arms_here: List[str], layout: Optional[Dict[str, TT.Pose]] = None, layout_rec: Optional[Dict[str, Any]] = None) -> Draft:
         """The segment after its grasp, with the grasp's arm: destination, distractors (drawn on the source floor, or the fixed
-        layout's ``layout`` poses), frame and whole-body checks, the placement stance and its place, the carried path, the records."""
+        layout's ``layout`` poses at the yaw of ``layout_rec``), frame and whole-body checks, the placement stance and its place, the
+        carried path, the records."""
         support = self.obj("support")
         dst, tgt = self.obj(self.dst_role), self.obj("target")
         grasp.place_on = dname
@@ -947,7 +1073,9 @@ class Disembedding(SamplerV2):
                           "dest_side": "left" if side > 0 else "right", "destination": dest_diag, "occlusion": occ,
                           "carry_height": grasp.carry_height, "placement_stance": place_st.to_meta(), "arm": TT.segment_arm_summary(grasp, arms_here)})
         if layout is not None:
-            d.summary["fixed_layout"] = (self.template_facts.get("fixed_layout") or {}).get("file")
+            # owner 2026-10-12: the layout's yaw in the summary, the TRO (``scene.fixed_layout``) and the template meta (write_instance)
+            d.summary["fixed_layout"] = dict(layout_rec or {})
+            d.extras["fixed_layout"] = {k_: (layout_rec or {}).get(k_) for k_ in ("file", "yaw_deg", "figure_yaw_rad", "centre_xy", "tray_turned")}
         grasp.extras["arm_offer"] = TT.arm_offer_record(self.segment_arms, arms_here, grasp, self.arm_offer_why)
         # owner 2026-10-12 (A2b): the parts / distractors the grasp may touch or displace, each still on the source tray after it; the
         # fixed-layout parts at the pre-grasp too
@@ -1259,6 +1387,20 @@ class Disembedding(SamplerV2):
             self.record_path(manip, place_st, carried=self.tname, arm=arm, edge_slide=bool(self.g("carry_edge_slide")),
                              edge_slide_back_m=float(self.g("carry_edge_slide_back_m") or 0.0))
         return None
+
+    def tro_meta_block(self, draft: Draft, instance_id: str, seed: int) -> Dict[str, Any]:
+        """The TRO's scene block carries the fixed layout's yaw (owner 2026-10-12, ``scene.fixed_layout``): the oracle and the evaluator
+        rebuild the parts from their recorded poses, the record says which turn of the figure they are."""
+        meta = super().tro_meta_block(draft, instance_id, seed)
+        if draft.extras.get("fixed_layout"):
+            meta["scene"] = {**meta["scene"], "fixed_layout": dict(draft.extras["fixed_layout"])}
+        return meta
+
+    def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        path = super().write_instance(draft, index, seed)
+        if draft.extras.get("fixed_layout"):
+            self.template_meta.setdefault("fixed_layout", {}).setdefault("per_instance", {})[self.instance_id(index)] = dict(draft.extras["fixed_layout"])
+        return path
 
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         g = self.sidecar.grasp_of(self.tname)

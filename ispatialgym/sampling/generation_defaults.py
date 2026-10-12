@@ -296,6 +296,9 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         # per frame (bottles at 0.3 kg - the mass-ratio probe - 0 of 6 too). Recorded per instance as a TRO ``constraints``
         # record {"type": "mass"} the demo loader re-applies (constraints.apply_mass)
         "tray_mass_kg": 2.0,
+        # owner 2026-10-12 (disembedding#01, the puzzle): a fixed layout turns as a whole about the vertical by a yaw drawn per instance
+        # among 0, step, 2 step, ... deg - those whose grasp screening keeps a reachable grasp (disembedding._layout_pick)
+        "fixed_layout_yaw_step_deg": 22.5,
     },
     # ---- configuration matching (§6.5–6.8) ---------------------------------------------------------------------
     "configuration_matching-block_design": {
