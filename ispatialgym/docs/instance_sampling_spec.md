@@ -728,7 +728,12 @@ thread layout: a marginal cell can differ from a band computed with the 8192 sto
 records how a band was computed; the file‑name key does not change (`ReachBands.find` matches meta fields).
 `ISPATIALGYM_BAND_MESH_CACHE` = `auto` (default) | a capacity | `off` (the sampler's kit, the path before 2026‑10‑12); with
 `ISPATIALGYM_SAMPLER_MESH_CACHE=auto` the sampler's store is already as small and bands stay on it. The approximate sdf‑grid
-world (`reach_bands --collision sdf-grid`) stays a CLI opt‑in.
+world (`reach_bands --collision sdf-grid`) stays a CLI opt‑in. An in‑process band is capped by the run's time budget
+(`sample_isg --time-budget-s`, which otherwise only stops new attempts): once it has passed, the computation stops before
+its next trunk or IK round, nothing is written (so a job publishes nothing) and the rejection is `band_budget` — a band of a
+template's setup ends the template; a left contact band asked for in an attempt is then unavailable and the attempt goes
+on to its end (s3 touching#02 c5_k1 spent 2945 s of an 1800 s budget on one). A band that does not fit the budget comes
+from a band job (`reach_bands` CLI, no limit).
 
 ### 4.2 Phase 1a — edge and stand-off
 

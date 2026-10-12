@@ -859,9 +859,12 @@ class ArticulationSmall(SamplerV2):
             trunks = [tuple(float(v) for v in t) for t in gen_trunks]
         kit.sync_world()
         per_trunk, cells_out = [], {}
+        deadline = getattr(self, "deadline", None)  # the sampling run's time budget: past it the band stops, nothing is written
         scope = RB.ObstacleScope(kit, world, (x0, y0)).__enter__()
         try:
-            for tr, ti in trunks:
+            for k_tr, (tr, ti) in enumerate(trunks):
+                if deadline is not None and time.time() >= deadline:
+                    raise RB.BandDeadline(f"the sampling time budget ended before handle trunk {k_tr + 1} of {len(trunks)} ({tr:.2f}, {ti:+.1f})")
                 q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti), x0, y0, yaw0)
                 entry: Dict[str, Any] = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_reachable": 0, "feasible": []}
                 if not bool(kit.collision_free(q, margin=0.01)[0]):
@@ -901,6 +904,8 @@ class ArticulationSmall(SamplerV2):
                 per_trunk.append(entry)
                 cells_out[(tr, ti)] = np.array([f["cell"] for f in feasible], dtype=np.float32).reshape(-1, 2)
                 log.info("handle trunk (%.2f, %+.1f): %d/%d cells feasible", tr, ti, len(feasible), len(base_cells))
+        except RB.BandDeadline as e:
+            raise Reject("band_budget", f"{self.gp.alias}: in-process handle band of {self.top.name} not finished: {e}; nothing written") from e
         finally:
             scope.__exit__(None, None, None)
             kit.sync_world()

@@ -910,12 +910,15 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
     """§4.1 steps 1–4 in-process (``reach_bands.BandComputer``) at the band stance (edge midpoint, s = 0.45 + overhang) of
     ``edge`` (default: the longest free edge), written as ``<cache>/<name>.npz/.json`` like the CLI. A union top's band is its
     support's own (bands are per support). Computed on ``reach_bands.band_kit`` (the band's own kit with a snug mesh store;
-    ``s.kit`` is not touched), recorded in ``meta.schedule``."""
+    ``s.kit`` is not touched), recorded in ``meta.schedule``. Capped by the sampling run's time budget (``s.deadline``,
+    ``sample_isg --time-budget-s``): past it the computation stops before its next trunk / IK round, nothing is written, and
+    ``Reject("band_budget")``."""
     world = s.world
     kit = RB.band_kit(world, s.kit)
     top = NB.own_top(top)
     support = world.obj(top.name)
     bc = RB.BandComputer(world, kit, arms=(spec.arm,), lattice=lattice)
+    bc.deadline = getattr(s, "deadline", None)
     stance = bc.stance_at_edge(top, support, RB.STAND_OFF, edge.name if edge is not None else None)
     z = float(spec.z_support) if spec.z_support is not None else float(top.z)
     lattice_world = spec.lattice_world if spec.lattice_world is not None else top.cells(free_only=True)
@@ -947,7 +950,12 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
     gen_trunks = getattr(s, "gen", lambda k, d=None: d)("band_trunks", None)
     trunks = list(trunks) if trunks is not None else ([tuple(float(v) for v in t) for t in gen_trunks] if gen_trunks else RB.trunk_grid(z - kit.floor_z))
     t0 = time.time()
-    result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasp_sets, ignore, arm=spec.arm, trunks=trunks, max_grasp_offset=max_off)
+    try:
+        result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasp_sets, ignore, arm=spec.arm, trunks=trunks, max_grasp_offset=max_off)
+    except RB.BandDeadline as e:
+        kit.sync_world()
+        _reject("band_budget", f"in-process {spec.arm}-arm band of {top.name} / {spec.object or 'generic'} not finished: {e} ({time.time() - t0:.0f} s in); "
+                               f"nothing written - a band job publishes it")
     kit.sync_world()
     lat_all = np.concatenate([c[:, 1] for c in result["cells"].values() if len(c)]) if any(len(c) for c in result["cells"].values()) else np.zeros(0)
     meta: Dict[str, Any] = {"scene": world.scene_model, "rooms": list(world.rooms or []), "support": top.name, "lattice": lattice, "stand_off": RB.STAND_OFF,

@@ -273,3 +273,138 @@ def test_handle_band_on_the_band_kit_and_none_built_on_a_cache_hit(band_kit_of_f
     assert _BC.kits == [kit, bk] and scopes == [bk] and kit.calls == ["collision_free"]  # only the stance search on the sampler's kit
     assert bk.calls == ["sync", "sync", "collision_free", "collision_free", "sync"]  # both trunks checked on the band kit (both collide)
     assert rb.meta["schedule"] == {"mesh_cache": 832, "kit": "band"} and os.path.exists(rb.path)
+
+
+# ---------------------------------------------------------------------------------------------------------------- the time budget
+# s3 touching#02 c5_k1: an in-process left contact band ran 2945 s of a 1800 s sampling budget (the job ended at 3429 s)
+
+
+class _Scope:
+    exits = 0
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        _Scope.exits += 1
+        return False
+
+
+def _bare_computer(deadline):
+    """A ``BandComputer`` without a kit (``__new__``): just what :meth:`compute` and :meth:`_trunk` read."""
+    import contextlib
+
+    from ispatialgym.sampling import geometry as G
+
+    bc = RB.BandComputer.__new__(RB.BandComputer)
+    bc.G, bc.world, bc.deadline = G, NS(floor_z=0.0), deadline
+    bc.kit = NS(ignoring=lambda objs: contextlib.nullcontext())
+    bc.scope, bc.cell_obstacle, bc.mesh_groups, bc.protect_extra = None, None, {}, []
+    bc.postures, bc.last_trunk_arm_excluded = ("untucked",), False
+    bc.lattice_on_cells = lambda stance, cells: (th.tensor([[0.5, 0.0], [0.5, 0.1]]), th.tensor([[0.5, 0.0], [0.5, 0.1]]))
+    bc.base_frame = lambda stance: (th.zeros(2), th.tensor([1.0, 0.0]), th.tensor([0.0, 1.0]))
+    return bc
+
+
+def test_band_computation_stops_at_the_time_budget_before_the_next_trunk(monkeypatch):
+    import time
+
+    monkeypatch.setattr(RB, "ObstacleScope", _Scope)
+    _Scope.exits = 0
+    bc = _bare_computer(time.time() + 1000.0)
+    done = []
+
+    def trunk(tr, ti, *a, **kw):
+        done.append((tr, ti))
+        if len(done) == 2 and bc.deadline is not None:
+            bc.deadline = time.time() - 1.0  # the budget runs out during the second trunk
+        return {"translate": tr, "tilt": ti}, np.zeros((0, 2)), np.zeros((0, 3), dtype=np.int32), np.zeros(0, dtype=np.int32)
+
+    bc._trunk = trunk
+    trunks = [(0.0, 0.0), (0.25, 0.0), (0.5, 0.0), (0.75, 0.0), (0.95, 0.0)]
+    with pytest.raises(RB.BandDeadline, match=r"before trunk 3 of 5 \(0.50, \+0.0\)"):
+        bc.compute({"base_pose2d": [0.0, 0.0, 0.0]}, th.zeros(2, 2), 0.8, None, None, [], trunks=trunks)
+    assert done == trunks[:2] and _Scope.exits == 1 and bc.scope is None  # the obstacle scope is left as after a full band
+    bc.deadline = None  # the CLI: no limit
+    done.clear()
+    assert len(bc.compute({"base_pose2d": [0.0, 0.0, 0.0]}, th.zeros(2, 2), 0.8, None, None, [], trunks=trunks)["trunks"]) == 5
+
+
+def test_band_computation_stops_at_the_time_budget_before_the_next_ik_round():
+    """A trunk's IK rounds (one batched pre-grasp + grasp pass per 8 (grasp, yaw) pairs) check the budget too: a trunk can take minutes."""
+    import time
+
+    from ispatialgym.robot import conventions as C
+
+    bc = _bare_computer(time.time() + 1000.0)
+    bc.TRUNK_BOUND = False
+    bc.trunk_config = lambda tr, ti, x0, y0, yaw0: (th.zeros(28), "untucked")
+    bc.idle_arm_q = lambda q: {}
+    bc.shoulder_and_reach = lambda q, arm: (th.tensor([0.5, 0.0, 1.0]), 1.0)
+    bc.grasp_eef_pair = lambda obj_pose, g: [(th.tensor([0.5, 0.0, 1.2]), C.IDENTITY_QUAT), (th.tensor([0.5, 0.0, 1.1]), C.IDENTITY_QUAT)]
+    screens = []
+
+    def ik_screen(poses, q, arm):  # pre-grasps feasible, grasps not: every cell stays open for the next round
+        screens.append(len(poses))
+        bc.deadline = time.time() - 1.0
+        return th.ones(len(poses), dtype=th.bool) if len(screens) % 2 else th.zeros(len(poses), dtype=th.bool)
+
+    bc.ik_screen = ik_screen
+    grasps = [NS(name=f"grasp_{i}") for i in range(3)]  # 3 grasps x 8 yaws = 3 rounds of 8 pairs
+    yaw_order = list(RB.YAWS)
+    with pytest.raises(RB.BandDeadline, match=r"in trunk \(0.50, \+0.0\), round 2"):
+        bc._trunk(0.5, 0.0, th.tensor([[0.5, 0.0], [0.5, 0.1]]), th.tensor([[0.5, 0.0], [0.5, 0.1]]), {"base_pose2d": [0.0, 0.0, 0.0]}, 0.8,
+                  lambda xy, yaw: (th.zeros(3), C.IDENTITY_QUAT), grasps, [], "right", 0.0, yaw_order, {y: k for k, y in enumerate(RB.YAWS)},
+                  {g.name: k for k, g in enumerate(grasps)}, th.tensor([1.0, 0.0]), th.tensor([0.0, 1.0]))
+    assert screens == [16, 16]  # round 1 only: 2 cells x 8 pairs, pre-grasp then grasp
+
+
+def test_compute_bands_past_the_time_budget_rejects_and_writes_nothing(band_kit_of_fakes):
+    import time
+
+    from ispatialgym.sampling.sim_utils import Reject
+
+    seen = []
+
+    class _Late(_BC):
+        def compute(self, *a, **kw):
+            seen.append(self.deadline)
+            raise RB.BandDeadline("the sampling time budget ended before trunk 7 of 20 (0.25, -0.6)")
+
+    RB.BandComputer = _Late  # the fixture restores it
+    world, kit = _setup()
+    top = NS(name="bookcase_jpdtvg_0", z=0.84, cells=lambda free_only=True: th.zeros(4, 2), to_json=lambda: {"name": "bookcase_jpdtvg_0"})
+    spec = TT.BandSpec(object=TT.left_contact_object(0.24), generic_pinch=True, height=0.24, arm="left", contact=True)
+    end = time.time() + 5.0
+    with pytest.raises(Reject) as e:
+        TT.compute_bands(NS(world=world, kit=kit, deadline=end), spec, top, out_dir=str(band_kit_of_fakes))
+    assert e.value.reason == "band_budget" and "before trunk 7 of 20" in str(e.value) and "nothing written" in str(e.value)
+    assert seen == [end] and os.listdir(band_kit_of_fakes) == []
+    # a sampler without a budget (unit tests, the CLI's callers) computes as before
+    RB.BandComputer = _BC
+    assert TT.compute_bands(NS(world=world, kit=kit), spec, top, out_dir=str(band_kit_of_fakes)).meta["n_reachable_total"] == 2
+
+
+def test_handle_band_past_the_time_budget_rejects_and_writes_nothing(band_kit_of_fakes, monkeypatch):
+    import time
+
+    from ispatialgym.sampling.sim_utils import Reject
+
+    AS = pytest.importorskip("ispatialgym.sampling.v2.tasks.articulation_small")
+    monkeypatch.setattr(RB, "ObstacleScope", _Scope)
+    _Scope.exits = 0
+
+    def miss(*a, **kw):
+        raise FileNotFoundError
+
+    monkeypatch.setattr(RB.ReachBands, "load", staticmethod(miss))
+    world, kit = _setup()
+    s = _handle_sampler(world, kit, [(0.5, 0.0), (0.25, -0.3)])
+    s.deadline = time.time() - 1.0
+    with pytest.raises(Reject) as e:
+        AS.ArticulationSmall._brace_band(s, NS(name="+u"), None)
+    assert e.value.reason == "band_budget" and "before handle trunk 1 of 2" in str(e.value)
+    assert _Scope.exits == 1 and not any(f.startswith("handle__") for f in os.listdir(band_kit_of_fakes))

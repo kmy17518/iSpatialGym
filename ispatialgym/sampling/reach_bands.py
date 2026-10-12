@@ -1089,6 +1089,11 @@ class MovingPlaced:
         return rec
 
 
+class BandDeadline(RuntimeError):
+    """An in-process band computation stopped at its caller's time budget (:attr:`BandComputer.deadline`): nothing was returned or
+    written."""
+
+
 class BandComputer:
     #: (yaw, grasp) pairs per round (one batched pre-grasp + grasp IK pass over the open cells)
     CHUNK = 8
@@ -1141,6 +1146,15 @@ class BandComputer:
         #: with the whole body); ``None`` = whole-body check only. ``last_trunk_arm_excluded`` tells the caller which check passed
         self.trunk_skip_arm: Optional[str] = None
         self.last_trunk_arm_excluded = False
+        #: in-process bands (``tabletop.compute_bands``, ``IORSLarge.compute_band``): the sampling run's time budget end (a
+        #: ``time.time()`` value) - :meth:`compute` raises :class:`BandDeadline` before the next trunk or IK round once it has
+        #: passed. ``None`` (the CLI) = no limit
+        self.deadline: Optional[float] = None
+
+    def check_deadline(self, where: str) -> None:
+        """:class:`BandDeadline` once :attr:`deadline` has passed."""
+        if self.deadline is not None and time.time() >= self.deadline:
+            raise BandDeadline(f"the sampling time budget ended {where}")
 
     def ignoring(self, objs):
         return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
@@ -1598,7 +1612,8 @@ class BandComputer:
         try:
             if self.cell_obstacle is not None:
                 self.cell_obstacle.hide()  # the stance-relative placed object enters per cell (_verify_with_placed)
-            for tr, ti in trunks:
+            for k, (tr, ti) in enumerate(trunks):
+                self.check_deadline(f"before trunk {k + 1} of {len(trunks)} ({tr:.2f}, {ti:+.1f})")
                 results.append(self._trunk(tr, ti, base_cells, world_cells, *common))
         finally:
             self.scope.__exit__(None, None, None)
@@ -1683,6 +1698,7 @@ class BandComputer:
                 for r0 in range(0, len(pair_specs), chunk):
                     if not todo:
                         break
+                    self.check_deadline(f"in trunk ({tr:.2f}, {ti:+.1f}), round {entry['rounds'] + 1}")
                     specs = pair_specs[r0:r0 + chunk]
                     pairs, index, spec_of = [], [], []
                     for i in todo:

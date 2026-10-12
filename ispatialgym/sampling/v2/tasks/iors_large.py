@@ -920,10 +920,12 @@ class IORSLarge(SamplerV2):
         """Compute-on-miss of the floor-mode bands (``--support floor [--under partner]``) with the computation the CLI
         runs (the ``stance_free_floor`` / ``stance_under`` stance, the 2 cm floor lattice (under: the clear cells), the
         library grasp mask per trunk incl. tilt −1.2); written to the cache root in the CLI's layout. Computed on
-        ``reach_bands.band_kit`` (``self.kit`` is not touched), recorded in ``meta.schedule``."""
+        ``reach_bands.band_kit`` (``self.kit`` is not touched), recorded in ``meta.schedule``. Past the sampling run's time budget
+        (``self.deadline``) the computation stops, nothing is written: ``Reject("band_budget")``."""
         c = self.choice.models["target"]
         kit = RB.band_kit(self.world, self.kit)
         bc = RB.BandComputer(self.world, kit, arms=("right",))
+        bc.deadline = getattr(self, "deadline", None)
         t0 = time.time()
         parked = self.world.snapshot()
         try:
@@ -956,6 +958,9 @@ class IORSLarge(SamplerV2):
 
             trunks = RB.trunk_grid(z - self.floor_z)
             result = bc.compute(stance, lattice_world, z, pose_fn, self.grasps, ignore, arm="right", trunks=trunks, max_grasp_offset=max_off)
+        except RB.BandDeadline as e:
+            raise Reject("band_budget", f"{self.gp.alias}: in-process {kind} band ({under_partner.name if under_partner is not None else '-'}) not finished: {e} "
+                                        f"({time.time() - t0:.0f} s in); nothing written - a band job publishes it") from e
         finally:
             self.world.restore(parked)
             kit.sync_world()
