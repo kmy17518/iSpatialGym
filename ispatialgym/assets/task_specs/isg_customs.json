@@ -25634,7 +25634,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -25790,7 +25791,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -25901,7 +25903,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -26012,7 +26015,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -26128,7 +26132,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -26244,7 +26249,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -26367,7 +26373,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -26485,7 +26492,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -26642,7 +26650,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -26843,7 +26852,8 @@
    "drop_height_m": 0.005,
    "drop_settle_steps": 120,
    "max_protrusion_fraction": 0.5,
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -26984,7 +26994,8 @@
    "phase2_split_fallback_classes_deg": [
     8.0,
     20.0
-   ]
+   ],
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -27117,7 +27128,8 @@
    "phase2_split_fallback_classes_deg": [
     8.0,
     20.0
-   ]
+   ],
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -27250,7 +27262,8 @@
    "phase2_split_fallback_classes_deg": [
     8.0,
     20.0
-   ]
+   ],
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -27383,7 +27396,8 @@
    "phase2_split_fallback_classes_deg": [
     8.0,
     20.0
-   ]
+   ],
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -27491,7 +27505,8 @@
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
-   }
+   },
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -27599,7 +27614,8 @@
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
-   }
+   },
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -27707,7 +27723,8 @@
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
-   }
+   },
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -27815,7 +27832,8 @@
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
-   }
+   },
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -27923,7 +27941,8 @@
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
-   }
+   },
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28033,7 +28052,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28143,7 +28163,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28253,7 +28274,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28408,7 +28430,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28519,7 +28542,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28629,7 +28653,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28739,7 +28764,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28849,7 +28875,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -28959,7 +28986,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -29069,7 +29097,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -29223,7 +29252,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -29339,7 +29369,8 @@
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
-   "nextto_divisor": 6.0
+   "nextto_divisor": 6.0,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -30809,7 +30840,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: replaces inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-bottom_cabinet as the inter_object_relation_satisfaction-ontop_small_scale#03 candidate alias - the representative bar_soap/ofargb was replaced by bar_soap/utgixp, the grounder's next-model fallback ({\"model\": \"utgixp\", \"primary_model\": \"ofargb\", \"slot\": \"variation_geometry\"}): bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -30916,7 +30948,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: replaces inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-countertop as the inter_object_relation_satisfaction-ontop_small_scale#03 candidate alias - the representative bar_soap/ofargb was replaced by bar_soap/utgixp, the grounder's next-model fallback ({\"model\": \"utgixp\", \"primary_model\": \"ofargb\", \"slot\": \"variation_geometry\"}): bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -31023,7 +31056,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: replaces inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-shelf as the inter_object_relation_satisfaction-ontop_small_scale#03 candidate alias - the representative bar_soap/ofargb was replaced by bar_soap/utgixp, the grounder's next-model fallback ({\"model\": \"utgixp\", \"primary_model\": \"ofargb\", \"slot\": \"variation_geometry\"}): bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -31130,7 +31164,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": [],
   "_note": "owner 2026-10-11 17:30: replaces inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-wall_mounted_sink as the inter_object_relation_satisfaction-ontop_small_scale#03 candidate alias - the representative bar_soap/ofargb was replaced by bar_soap/utgixp, the grounder's next-model fallback ({\"model\": \"utgixp\", \"primary_model\": \"ofargb\", \"slot\": \"variation_geometry\"}): bar_soap/ofargb is withheld (the x0.70 fit under soap_dish/slksbk needs tabletop grasps of bar_soap__ofargb at [0.7, 0.7, 0.7])"
@@ -31296,7 +31331,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -31416,7 +31452,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -31543,7 +31580,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -31657,7 +31695,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -31816,7 +31855,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -31930,7 +31970,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -32044,7 +32085,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -32150,7 +32192,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -32256,7 +32299,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -32362,7 +32406,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -32470,7 +32515,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -32578,7 +32624,8 @@
     "aligned",
     "centred"
    ],
-   "target_fit_scale_min": 0.5
+   "target_fit_scale_min": 0.5,
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -36049,7 +36096,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -36165,7 +36213,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -36281,7 +36330,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -36397,7 +36447,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -36611,7 +36662,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -36728,7 +36780,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "left"
   },
   "constraints": []
  },
@@ -36870,7 +36923,8 @@
      "status": "scaled",
      "grasp_key": "spatula__hkvsep__t076"
     }
-   }
+   },
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -37012,7 +37066,8 @@
      "status": "scaled",
      "grasp_key": "spatula__hkvsep__t076"
     }
-   }
+   },
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -37161,7 +37216,8 @@
      "status": "scaled",
      "grasp_key": "spatula__hkvsep__t076"
     }
-   }
+   },
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -37303,7 +37359,8 @@
      "status": "scaled",
      "grasp_key": "spatula__hkvsep__t076"
     }
-   }
+   },
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -37466,7 +37523,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -37629,7 +37687,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -37747,7 +37806,8 @@
    "argument_order": [
     "partner",
     "target"
-   ]
+   ],
+   "partner_side": "right"
   },
   "constraints": []
  },
