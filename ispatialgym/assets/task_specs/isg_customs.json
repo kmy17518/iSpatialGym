@@ -32881,7 +32881,7 @@
    "partner": {
     "category": "box_of_cereal",
     "sampleable": true,
-    "representative": "hcwbzw"
+    "representative": "dkhgxn"
    },
    "support": {
     "category": "bar",
@@ -32920,21 +32920,22 @@
      },
      "partner": {
       "box_of_cereal": [
-       "hcwbzw"
+       "dkhgxn"
       ]
      }
     },
     "blacklist": {
      "target": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -32980,7 +32981,29 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -33002,7 +33025,7 @@
    "partner": {
     "category": "box_of_cereal",
     "sampleable": true,
-    "representative": "hcwbzw"
+    "representative": "dkhgxn"
    },
    "support": {
     "category": "bookcase",
@@ -33041,21 +33064,22 @@
      },
      "partner": {
       "box_of_cereal": [
-       "hcwbzw"
+       "dkhgxn"
       ]
      }
     },
     "blacklist": {
      "target": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -33101,7 +33125,29 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -33123,7 +33169,7 @@
    "partner": {
     "category": "box_of_cereal",
     "sampleable": true,
-    "representative": "hcwbzw"
+    "representative": "dkhgxn"
    },
    "support": {
     "category": "breakfast_table",
@@ -33162,21 +33208,22 @@
      },
      "partner": {
       "box_of_cereal": [
-       "hcwbzw"
+       "dkhgxn"
       ]
      }
     },
     "blacklist": {
      "target": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -33222,7 +33269,29 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -33244,7 +33313,7 @@
    "partner": {
     "category": "box_of_cereal",
     "sampleable": true,
-    "representative": "hcwbzw"
+    "representative": "dkhgxn"
    },
    "support": {
     "category": "commercial_kitchen_table",
@@ -33283,21 +33352,22 @@
      },
      "partner": {
       "box_of_cereal": [
-       "hcwbzw"
+       "dkhgxn"
       ]
      }
     },
     "blacklist": {
      "target": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -33343,7 +33413,29 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -33365,7 +33457,7 @@
    "partner": {
     "category": "box_of_cereal",
     "sampleable": true,
-    "representative": "hcwbzw"
+    "representative": "dkhgxn"
    },
    "support": {
     "category": "countertop",
@@ -33404,21 +33496,22 @@
      },
      "partner": {
       "box_of_cereal": [
-       "hcwbzw"
+       "dkhgxn"
       ]
      }
     },
     "blacklist": {
      "target": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      },
      "partner": {
       "box_of_cereal": {
-       "ihedod": "ground_isg 2026-10-11: heldout",
-       "pfwgkm": "ground_isg 2026-10-11: heldout"
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -33464,7 +33557,29 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -34516,7 +34631,7 @@
     "blacklist": {
      "target": {
       "spray_bottle": {
-       "miqtui": "ground_isg 2026-10-11: heldout"
+       "miqtui": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -34570,7 +34685,7 @@
     "blacklist": {
      "target": {
       "spray_bottle": {
-       "miqtui": "ground_isg 2026-10-11: heldout"
+       "miqtui": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -34616,7 +34731,29 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
@@ -34684,7 +34821,7 @@
     "blacklist": {
      "target": {
       "spray_bottle": {
-       "miqtui": "ground_isg 2026-10-11: heldout"
+       "miqtui": "ground_isg 2026-10-12: heldout"
       }
      }
     }
@@ -34730,7 +34867,29 @@
    },
    "witness_residual_at_draw_m": 0.015,
    "witness_residual_max_m": 0.015,
-   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)"
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
   },
   "constraints": []
  },
