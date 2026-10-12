@@ -442,7 +442,7 @@ def test_rotation_axes_one_per_antipodal_pair():
 
 
 def test_rotation_goal_set_angle_range():
-    """The 15° grid (the start set's, ``rotation_start_set``; the goal is drawn continuously)."""
+    """The 15° grid of ``scripts/held_comfort`` (the sampler draws its starts and goals continuously)."""
     goals = HO.rotation_goal_set([30.0, 120.0], 15.0)
     mags = sorted({abs(a) for _, a in goals})
     assert mags == [30.0, 45.0, 60.0, 75.0, 90.0, 105.0, 120.0]
@@ -453,9 +453,23 @@ def test_rotation_goal_set_angle_range():
         HO.rotation_goal_set([0.0, 120.0])
 
 
-def test_draw_rotation_goals_draws_continuous_signed_angles_about_the_13_axes():
-    """Owner 2026-10-11: every goal candidate is one of the 13 axes (uniform), |angle| ~ U(goal_angle_range_deg) - off the
-    15° grid - and a sign + / − alike; the same seed draws the same candidates."""
+def _assert_uniform_on_the_sphere(axes: th.Tensor):
+    """Unit axes spread uniformly over the sphere: each coordinate ~ U(−1, 1) (Archimedes), no two alike, and no more of
+    them within 5° of a cube face / edge / corner direction than that area holds (draws among the 13 axes: all of them)."""
+    a = axes.double().numpy()
+    n = len(a)
+    assert np.allclose(np.linalg.norm(a, axis=1), 1.0, atol=1e-6) and len({tuple(r) for r in a.round(6).tolist()}) == n
+    for k in range(3):
+        hist, _ = np.histogram(a[:, k], bins=8, range=(-1.0, 1.0))
+        assert hist.min() > 0.8 * n / 8 and hist.max() < 1.2 * n / 8
+    near = (np.abs(a @ HO.rotation_axes().double().numpy().T).max(axis=1) > math.cos(math.radians(5.0))).mean()
+    assert near < 2 * 26 * (1.0 - math.cos(math.radians(5.0))) / 2  # twice the 26 caps' share of the sphere (~5 %)
+
+
+def test_draw_rotation_goals_draws_uniform_axes_and_continuous_signed_angles():
+    """Owner 2026-10-11 (fully continuous): every goal candidate an axis uniform on the sphere - not one of the 13 cube
+    axes -, |angle| ~ U(goal_angle_range_deg) off the 15° grid and a sign + / − alike; the same seed draws the same
+    candidates."""
     n = 4000
     goals = HO.draw_rotation_goals(np.random.default_rng(0), [30.0, 120.0], n)
     mags = np.array([abs(a) for _, a in goals])
@@ -465,9 +479,7 @@ def test_draw_rotation_goals_draws_continuous_signed_angles_about_the_13_axes():
     hist, _ = np.histogram(mags, bins=9, range=(30.0, 120.0))
     assert hist.min() > 0.8 * n / 9 and hist.max() < 1.2 * n / 9  # uniform in the range
     assert 0.45 < np.mean([a > 0 for _, a in goals]) < 0.55
-    axes = HO.rotation_axes()
-    idx = [int(th.argmin(th.linalg.norm(axes - ax, dim=1))) for ax, _ in goals]
-    assert all(th.equal(ax, axes[i]) for (ax, _), i in zip(goals, idx)) and set(idx) == set(range(13))
+    _assert_uniform_on_the_sphere(th.stack([ax for ax, _ in goals]))
     a, b = (HO.draw_rotation_goals(np.random.default_rng(7), [30.0, 120.0], 16) for _ in range(2))
     c = HO.draw_rotation_goals(np.random.default_rng(8), [30.0, 120.0], 16)
     assert [(x.tolist(), d) for x, d in a] == [(x.tolist(), d) for x, d in b] and [d for _, d in a] != [d for _, d in c]
@@ -539,6 +551,7 @@ def test_generation_waypoints_default_is_three():
     mr = GD.defaults_for("mental_rotation")
     assert "depth_search_range_m" not in mr and "goal_draws_per_start" not in osc
     assert (mr["goal_angle_range_deg"], mr["goal_draws_per_start"], mr["init_angle_range_deg"]) == ([30.0, 120.0], 192, [0.0, 180.0])
+    assert mr["init_draws_per_template"] == 312 and "init_draws_per_template" not in osc
     assert mr["goal_draws_per_start"] >= 2 * HO.MentalRotationV2.GOAL_SCREEN_MAX
 
 
@@ -707,13 +720,43 @@ def test_both_held_object_subtasks_write_the_start_drive_targets(monkeypatch):
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_rotation_start_set_includes_the_hold_and_the_grid():
-    starts = HO.rotation_start_set([0.0, 180.0], 15.0)
-    assert starts[0][1] == 0.0 and len(starts) == 1 + 13 * 12 * 2
-    assert [(a.tolist(), d) for a, d in HO.rotation_start_set([30.0, 120.0])] == [(a.tolist(), d) for a, d in HO.rotation_goal_set([30.0, 120.0])]
-    assert len(HO.rotation_start_set([0.0, 10.0], 15.0)) == 1
+def test_draw_rotation_starts_uniform_axes_and_angles_in_the_range():
+    """Owner 2026-10-11 (fully continuous): each start an axis uniform on the sphere and an angle ~ U(init_angle_range_deg),
+    unsigned - uniform in the angle, not the Haar density ∝ 1 − cos θ; the same seed draws the same starts."""
+    n = 4000
+    starts = HO.draw_rotation_starts(np.random.default_rng(0), [0.0, 180.0], n)
+    angles = np.array([d for _, d in starts])
+    assert len(starts) == n and angles.min() >= 0.0 and angles.max() <= 180.0 and len(set(angles.tolist())) == n
+    hist, _ = np.histogram(angles, bins=9, range=(0.0, 180.0))
+    assert hist.min() > 0.8 * n / 9 and hist.max() < 1.2 * n / 9
+    assert (np.minimum(np.remainder(angles, 15.0), 15.0 - np.remainder(angles, 15.0)) > 1e-6).all()  # off the 15° grid
+    _assert_uniform_on_the_sphere(th.stack([ax for ax, _ in starts]))
+    a, b = (HO.draw_rotation_starts(np.random.default_rng(7), [0.0, 180.0], 16) for _ in range(2))
+    c = HO.draw_rotation_starts(np.random.default_rng(8), [0.0, 180.0], 16)
+    assert [(x.tolist(), d) for x, d in a] == [(x.tolist(), d) for x, d in b] and [d for _, d in a] != [d for _, d in c]
+    assert all(20.0 <= d <= 40.0 for _, d in HO.draw_rotation_starts(np.random.default_rng(1), [20.0, 40.0], 200))
     with pytest.raises(ValueError):
-        HO.rotation_start_set([-15.0, 90.0])
+        HO.draw_rotation_starts(np.random.default_rng(0), [-15.0, 90.0], 4)
+
+
+def test_a_templates_start_set_has_no_twin_orientations():
+    """The grid's ±180° pairs (13 orientations twice) are gone: no two of a template's 312 starts turn the hold alike (the
+    closest two of a random set are a few tenths of a degree apart)."""
+    starts = HO.draw_rotation_starts(HO.rotation_start_rng(0), [0.0, 180.0], 312)
+    q = th.stack([C.quat_from_axis_angle(ax, math.radians(d)) for ax, d in starts]).double()
+    dots = th.abs(q @ q.T) - 2.0 * th.eye(len(q), dtype=th.float64)  # |cos(half the angle between two starts)|
+    assert float(2.0 * th.acos(th.clamp(dots.max(), max=1.0))) > math.radians(0.05)
+
+
+def test_rotation_start_rng_is_the_template_seeds_own_stream():
+    """The start set's RNG: one stream per template seed (the same seed, the same draws), never the stream of an attempt
+    (``run_instances``: ``default_rng(base_seed * 1000003 + index * 1009 + attempt)``) or of the bare template seed."""
+    first = lambda rng: rng.random(8).tolist()  # noqa: E731
+    assert first(HO.rotation_start_rng(0)) == first(HO.rotation_start_rng(0)) != first(HO.rotation_start_rng(7919))
+    for base_seed in (0, 1, 7919, 2**29 * 7919):
+        start = first(HO.rotation_start_rng(base_seed))
+        assert start != first(np.random.default_rng(base_seed))
+        assert all(start != first(np.random.default_rng(base_seed * 1000003 + index * 1009 + attempt)) for index in range(3) for attempt in range(30))
 
 
 def test_turned_about_root_keeps_the_position_and_turns_about_the_base_axis():
@@ -769,7 +812,7 @@ class _MRKit:
         return q
 
 
-def _mr_sampler(monkeypatch, kit):
+def _mr_sampler(monkeypatch, kit, base_seed=0):
     import contextlib
     from types import SimpleNamespace
 
@@ -777,9 +820,11 @@ def _mr_sampler(monkeypatch, kit):
     from ispatialgym.sampling.v2.stances import SidecarDraft
 
     s = object.__new__(HO.MentalRotationV2)
-    # a customs entry seeded before goal_draws_per_start existed: ``g`` takes it from generation_defaults
+    # a customs entry seeded before goal_draws_per_start / init_draws_per_template existed: ``g`` takes them from
+    # generation_defaults
     gen = {"init_angle_range_deg": [0.0, 180.0], "goal_angle_range_deg": [30.0, 120.0], "waypoints": 3, "tolerances": {"orientation": 0.15}}
     s.subtask, s.gen = "mental_rotation", (lambda key, default=None: gen.get(key, default))
+    s.ctx = SimpleNamespace(base_seed=base_seed)  # the template seed (``ContextV2.base_seed``)
     s.kit, s.arm, s.hold, s.hold_arm, s.prior, s.grasp_stats, s.equivalences = kit, "right", HO.HoldConstants(), {}, {}, {}, None
     s.eef_in_base = (th.tensor([0.5, 0.0, 1.2]), C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), 0.4))
     s.cam_in_base = (th.tensor([0.1, 0.0, 1.5]), C.IDENTITY_QUAT.clone())
@@ -808,9 +853,11 @@ def test_mental_rotation_draws_a_start_and_turns_it_to_the_goal(monkeypatch):
     s = _mr_sampler(monkeypatch, _MRKit())
     s.precompute_options()
     opts = s.options["grasp_0"]
-    assert len(opts) == 1 + 13 * 12 * 2 and opts[0]["info"]["angle_deg"] == 0.0 and s.template_facts["start_options"]["feasible"] == len(opts)
-    assert s.template_meta["init_orientation"]["drawn"] and s.template_meta["init_orientation"]["goal_angle"] == "continuous"
-    assert s.template_meta["init_orientation"]["goal_draws_per_start"] == 192
+    meta = s.template_meta["init_orientation"]
+    assert len(opts) == 312 and s.template_facts["start_options"]["feasible"] == len(opts)
+    assert meta["drawn"] and meta["init_axis"] == meta["goal_axis"] == "uniform on the sphere" and meta["init_angle"] == meta["goal_angle"] == "continuous"
+    assert (meta["init_draws_per_template"], meta["goal_draws_per_start"]) == (312, 192)
+    assert meta["start_set_rng"] == {"template_seed": 0, "spawn_key": [HO.ROTATION_START_STREAM]}
     starts, angles = set(), []
     for seed in range(6):
         s.sidecar.reset_instance() if hasattr(s.sidecar, "reset_instance") else None
@@ -819,11 +866,19 @@ def test_mental_rotation_draws_a_start_and_turns_it_to_the_goal(monkeypatch):
         obj0, goal = d.object_poses["block_0"], d.goal_poses["block_0"]
         base2d = d.base_pose2d
         assert 30.0 <= abs(info["angle_deg"]) <= 120.0 and "start" in info and "axis_world" in info["start"]
+        assert 0.0 <= info["start"]["angle_deg"] <= 180.0
         assert th.allclose(G_t(goal[0]), G_t(obj0[0]))  # the object turns in place
         want = HO.turned_about_root(obj0, base2d[2], info["axis_base"], info["angle_deg"])
         assert C.quat_angle(goal[1], want[1]) < 1e-5
-        assert any(th.allclose(G_t(info["axis_base"]), ax) for ax in HO.rotation_axes())  # one of the 13 axes
+        # every axis recorded as a unit vector (base and world frame); the base-frame axes are not the 13 cube axes
+        for ax in (info["axis_base"], info["axis_world"], info["start"]["axis_base"], info["start"]["axis_world"]):
+            assert len(ax) == 3 and float(th.linalg.norm(G_t(ax))) == pytest.approx(1.0, abs=1e-6)
+        for ax in (info["axis_base"], info["start"]["axis_base"]):
+            assert float(th.abs(HO.rotation_axes() @ G_t(ax)).max()) < 1.0 - 1e-6
         # the start is the hold's object turned by the recorded start rotation
+        obj_hold = C.compose(C.compose(s.base_pose3d(base2d), s.eef_in_base), C.invert(s.grasps[0].pose))
+        want0 = HO.turned_about_root(obj_hold, base2d[2], info["start"]["axis_base"], info["start"]["angle_deg"])
+        assert th.allclose(G_t(obj0[0]), G_t(want0[0]), atol=1e-5) and C.quat_angle(obj0[1], want0[1]) < 1e-5
         opt = next(o for o in opts if o["info"] == {k: v for k, v in info["start"].items() if k != "axis_world"})
         assert th.allclose(d.robot_q, s.kit.q_at_base_pose(opt["q_rel"], *base2d))
         rec = s.sidecar.grasp_of("block_0")
@@ -831,12 +886,60 @@ def test_mental_rotation_draws_a_start_and_turns_it_to_the_goal(monkeypatch):
         assert s.sidecar.language["goal_numbers"]["angle_deg"] == pytest.approx(info["angle_deg"])
         starts.add(info["start"]["angle_deg"])
         angles.append(info["angle_deg"])
-    assert len(starts) > 1  # not always the hold's orientation
+    assert len(starts) > 1  # the instances start from different orientations
     # owner 2026-10-11: the goal angle is continuous - off the 15° grid - and the same seed draws the same goal
     assert all(min(abs(a) % 15.0, 15.0 - abs(a) % 15.0) > 1e-3 for a in angles) and len(set(angles)) == len(angles)
     s.sidecar.reset_instance()
     again = s.sample_instance(np.random.default_rng(5)).summary["goal"]
     assert again["angle_deg"] == angles[5] and again["axis_base"] == info["axis_base"] and again["start"] == info["start"]
+
+
+def test_the_start_set_is_the_templates_whatever_the_grasps_and_their_order(monkeypatch):
+    """Owner 2026-10-11: one start set per template seed - the same for every grasp, whichever grasp is screened first and
+    however many there are, and again when the search re-runs (the segment fallback's other arm); another template seed,
+    another set. Each grasp keeps the starts its own screening passes, in the set's order."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    grasps = [GL.Grasp("block__f", f"grasp_{i}", th.tensor([0.0, 0.01 * i, 0.05]), C.quat_from_axis_angle(th.tensor([0.0, 0.0, 1.0]), 0.3 * i),
+                       [0.01, 0.01]) for i in range(3)]
+
+    def start_sets(grasps, base_seed=0, kit=None):
+        s = _mr_sampler(monkeypatch, kit or _MRKit(), base_seed=base_seed)
+        s.grasps = list(grasps)
+        s.precompute_options()
+        return {name: [o["info"] for o in opts] for name, opts in s.options.items()}
+
+    sets = start_sets(grasps)
+    full = sets["grasp_0"]
+    assert len(full) == 312 and sets == {g.name: full for g in grasps}
+    assert start_sets(grasps[::-1]) == sets and start_sets(grasps[2:]) == {"grasp_2": full}
+    assert start_sets(grasps, base_seed=7919)["grasp_0"] != full
+    s = _mr_sampler(monkeypatch, _MRKit())
+    s.precompute_options()
+    s.precompute_options()
+    assert [o["info"] for o in s.options["grasp_0"]] == full
+    # a screening that passes the hand poses above the hold's: per grasp a different part of the same set
+    z_hold = float(C.compose(s.base_pose3d((0.0, 0.0, 0.0)), s.eef_in_base)[0][2])
+    screened = start_sets(grasps, kit=_MRKit(start_ok=lambda pose: float(pose[0][2]) > z_hold))
+    assert set(screened) == {g.name for g in grasps} and any(screened[a.name] != screened[b.name] for a, b in zip(grasps, grasps[1:]))
+    for kept in screened.values():
+        assert 0 < len(kept) < len(full) and [info for info in full if info in kept] == kept
+
+
+def test_one_template_and_attempt_seed_draw_one_start_and_goal(monkeypatch):
+    """Same seed -> same instance: two samplers of one template seed draw the same (grasp, start, goal) at one attempt seed;
+    another attempt seed draws another goal, another template seed another start set."""
+
+    def draw(base_seed, attempt_seed):
+        s = _mr_sampler(monkeypatch, _MRKit(), base_seed=base_seed)
+        s.precompute_options()
+        d = s.sample_instance(np.random.default_rng(attempt_seed))
+        return d.summary["grasp"]["name"], d.summary["goal"]
+
+    name, goal = draw(11, 5)
+    assert (name, goal) == draw(11, 5)
+    assert draw(11, 6)[1]["angle_deg"] != goal["angle_deg"]
+    assert draw(12, 5)[1]["start"] != goal["start"]
 
 
 def test_mental_rotation_without_a_reachable_goal_rejects_the_attempt(monkeypatch):

@@ -32,13 +32,13 @@ before flagged ones, ties in a random order from the attempt RNG; with one insta
 random unflagged row.
 
 Option sets are precomputed **once per template** (they depend on the hold and the object, not on the base pose). Mental
-rotation (owner 2026-10-11: start and goal orientations both drawn) = per grasp the **start set**: the hold's object
-turned about its root by 13 rotation axes (face / edge / corner directions of the base frame, one per antipodal pair) ×
-signed angles on a 15° grid inside ``init_angle_range_deg`` (0 = the hold itself), whole object in frame (5 %), the hand
-pose reached by the screening IK from the hold with the holding arm's embodiment only (the oracle moves the arm, not the
-torso) and the object attached; each instance draws a (grasp, start), places the start configuration at a free base
-pose, and draws the goal = the start turned about the object root by one of the same 13 axes and a continuous angle
-(owner 2026-10-11: magnitude ~ U(``goal_angle_range_deg``), sign + / − alike; position unchanged), screened at the three
+rotation (owner 2026-10-11: start and goal orientations both drawn, fully continuous) = per grasp the **start set**: the
+hold's object turned about its root by each of the template's ``init_draws_per_template`` starts, drawn once from the
+template seed (an axis uniform on the sphere in the base frame, an angle ~ U(``init_angle_range_deg``)), whole object in
+frame (5 %), the hand pose reached by the screening IK from the hold with the holding arm's embodiment only (the oracle
+moves the arm, not the torso) and the object attached; each instance draws a (grasp, start), places the start
+configuration at a free base pose, and draws the goal = the start turned about the object root by an axis uniform on the
+sphere and an angle (magnitude ~ U(``goal_angle_range_deg``), sign + / − alike; position unchanged), screened at the three
 intermediate waypoints of §3.9 (SLERP about the object root, ``conventions.orbit_waypoints``) and confirmed once with the
 exact IK at its base pose (principle 3), with the held object attached, whole-body collision-free at every checked
 pose. Object scaling (owner 2026-09-26) = per grasp the reachable **depth window**: the object at the reference hold
@@ -116,9 +116,11 @@ PIPELINE = "floating"
 FLOATING_SUFFIXES = ("", "__f", "__sf", "__h")
 HOLD_CACHE_PATH = os.environ.get("ISPATIALGYM_HELD_HOLD_CACHE", os.path.expanduser("~/.cache/ispatialgym/held_hold.json"))
 VISIBILITY_PRIOR_PATH = os.environ.get("ISPATIALGYM_HELD_VISIBILITY", os.path.join(REPO_ROOT, "runlogs", "held_visibility_20260915", "visibility.json"))
-#: angle grid of the precomputed mental-rotation start set (``rotation_start_set``: 13 axes x 12 angles x 2 signs + the hold
-#: for 0-180°); the goal angle is continuous (``draw_rotation_goals``)
+#: angle grid of ``scripts/held_comfort``'s rotation sweep (``rotation_goal_set``); the sampler draws its mental-rotation
+#: starts and goals continuously (``draw_rotation_starts``, ``draw_rotation_goals``)
 ROTATION_ANGLE_STEP_DEG = 15.0
+#: spawn key of the mental-rotation start set's stream under the template seed (``rotation_start_rng``)
+ROTATION_START_STREAM = 0x4D52
 #: assisted-grasp window + margin: control steps the press is held while OmniGibson creates the grasp joint
 GRASP_ATTACH_STEPS = 90
 #: settle steps under gravity after the attach (the object must stay in hand)
@@ -310,8 +312,8 @@ def slide_to_depth(eef: C.Pose, eef_in_object: C.Pose, cam_pos, axis: th.Tensor,
 
 def rotation_axes() -> th.Tensor:
     """13 rotation axes in the base frame, one per antipodal pair of the 26 face / edge / corner directions of a cube
-    (unit vectors): the mental-rotation start set is these axes × the signed angle grid and every goal candidate one of
-    them × a signed angle, so a rotation by −θ about n covers the antipodal axis."""
+    (unit vectors): the axes of ``scripts/held_comfort``'s grid (:func:`rotation_goal_set`), where a rotation by −θ about
+    n covers the antipodal axis. The sampler draws its axes uniformly on the sphere (:func:`random_axes`)."""
     dirs = []
     for x in (-1, 0, 1):
         for y in (-1, 0, 1):
@@ -329,8 +331,8 @@ def rotation_goal_set(angle_range_deg: Sequence[float], step_deg: float = ROTATI
                       axes: Optional[th.Tensor] = None) -> List[Tuple[th.Tensor, float]]:
     """Mental-rotation candidates on a grid ``(axis (3,) base frame, signed angle deg)``: every axis of
     :func:`rotation_axes` × the ``step_deg`` grid of magnitudes inside ``angle_range_deg`` (inclusive), both signs. The
-    grid of the start set (:func:`rotation_start_set`) and of ``scripts/held_comfort``; the sampler draws the goal angle
-    continuously (:func:`draw_rotation_goals`)."""
+    grid of ``scripts/held_comfort``'s per-axis coverage; the sampler draws its starts and goals continuously
+    (:func:`draw_rotation_starts`, :func:`draw_rotation_goals`)."""
     lo, hi = float(angle_range_deg[0]), float(angle_range_deg[1])
     if not (0.0 < lo <= hi):
         raise ValueError(f"goal_angle_range_deg must satisfy 0 < lo <= hi, got {angle_range_deg}")
@@ -345,37 +347,45 @@ def rotation_goal_set(angle_range_deg: Sequence[float], step_deg: float = ROTATI
     return out
 
 
-def rotation_start_set(angle_range_deg: Sequence[float], step_deg: float = ROTATION_ANGLE_STEP_DEG,
-                       axes: Optional[th.Tensor] = None) -> List[Tuple[th.Tensor, float]]:
-    """Mental-rotation start candidates ``(axis (3,) base frame, signed angle deg)`` (owner 2026-10-11: the start
-    orientation is drawn too): the reference hold's object turned about its root by every axis of :func:`rotation_axes`
-    × the signed ``step_deg`` grid inside ``angle_range_deg``; a range from 0 includes the hold itself (0°)."""
+def rotation_start_rng(template_seed: int) -> np.random.Generator:
+    """The RNG of a template's mental-rotation start set: the template seed (``ContextV2.base_seed``) under the spawn key
+    ``ROTATION_START_STREAM`` - never the stream of an attempt seed (``default_rng`` of an int64), so the set depends on
+    the template seed alone, not on the attempts, the grasps or their order."""
+    return np.random.default_rng(np.random.SeedSequence(int(template_seed), spawn_key=(ROTATION_START_STREAM,)))
+
+
+def random_axes(rng: np.random.Generator, n: int) -> th.Tensor:
+    """``(n, 3)`` unit axes uniform on the sphere: normalised 3-D standard normals, all drawn at once."""
+    v = rng.standard_normal((int(n), 3))
+    return th.as_tensor(v / np.linalg.norm(v, axis=1, keepdims=True), dtype=th.float32)
+
+
+def draw_rotation_starts(rng: np.random.Generator, angle_range_deg: Sequence[float], n: int) -> List[Tuple[th.Tensor, float]]:
+    """A template's ``n`` mental-rotation start candidates ``(axis (3,) base frame, angle deg)`` (owner 2026-10-11: fully
+    continuous orientations): the reference hold's object turned about its root by an axis uniform on the sphere and an
+    angle ~ U(``angle_range_deg``), unsigned (the axis covers both senses). All axes, then all angles are drawn at once.
+    A uniform axis with a uniform angle is not the uniform (Haar) distribution of orientations, whose angle density is
+    ∝ 1 − cos θ: turns close to the hold are drawn more often."""
     lo, hi = float(angle_range_deg[0]), float(angle_range_deg[1])
     if not (0.0 <= lo <= hi):
         raise ValueError(f"init_angle_range_deg must satisfy 0 <= lo <= hi, got {angle_range_deg}")
-    out: List[Tuple[th.Tensor, float]] = []
-    if lo == 0.0:
-        out.append((th.tensor([0.0, 0.0, 1.0]), 0.0))
-        lo = step_deg
-    if lo <= hi:
-        out += rotation_goal_set([lo, hi], step_deg, axes)
-    return out
+    axes = random_axes(rng, n)
+    angles = rng.uniform(lo, hi, size=int(n))
+    return [(axes[i].clone(), float(angles[i])) for i in range(int(n))]
 
 
-def draw_rotation_goals(rng: np.random.Generator, angle_range_deg: Sequence[float], n: int,
-                        axes: Optional[th.Tensor] = None) -> List[Tuple[th.Tensor, float]]:
+def draw_rotation_goals(rng: np.random.Generator, angle_range_deg: Sequence[float], n: int) -> List[Tuple[th.Tensor, float]]:
     """``n`` mental-rotation goal candidates ``(axis (3,) base frame, signed angle deg)`` drawn from ``rng`` (owner
-    2026-10-11: the goal angle is continuous): each an axis of :func:`rotation_axes` (uniform), a magnitude ~ U(lo, hi) of
-    ``angle_range_deg`` and a sign + / − with probability ½. All ``n`` are drawn at once, so the draws that follow in
-    ``rng`` do not depend on how many candidates the caller uses."""
+    2026-10-11: fully continuous orientations): each an axis uniform on the sphere (:func:`random_axes`), a magnitude
+    ~ U(lo, hi) of ``angle_range_deg`` and a sign + / − with probability ½. All ``n`` axes, then magnitudes, then signs are
+    drawn at once, so the draws that follow in ``rng`` do not depend on how many candidates the caller uses."""
     lo, hi = float(angle_range_deg[0]), float(angle_range_deg[1])
     if not (0.0 < lo <= hi):
         raise ValueError(f"goal_angle_range_deg must satisfy 0 < lo <= hi, got {angle_range_deg}")
-    axes = rotation_axes() if axes is None else axes
-    which = rng.integers(len(axes), size=int(n))
+    axes = random_axes(rng, n)
     mags = rng.uniform(lo, hi, size=int(n))
     signs = np.where(rng.random(int(n)) < 0.5, 1.0, -1.0)
-    return [(axes[int(k)].clone(), float(s * m)) for k, m, s in zip(which, mags, signs)]
+    return [(axes[i].clone(), float(signs[i] * mags[i])) for i in range(int(n))]
 
 
 def turned_about_root(obj: C.Pose, base_yaw: float, axis_base, angle_deg: float) -> C.Pose:
@@ -1465,17 +1475,19 @@ class ObjectScalingV2(HeldObjectV2):
 
 @register("mental_rotation")
 class MentalRotationV2(HeldObjectV2):
-    """§6.3 goal: rotation of the start about the object root by a sampled axis (one of the 13 base-frame axes of
-    :func:`rotation_axes`) and a continuous angle (owner 2026-10-11: magnitude ~ U(``goal_angle_range_deg``), sign + / −
-    alike; :func:`draw_rotation_goals`), position unchanged; world orientation target, 0.15 rad,
+    """§6.3 goal: rotation of the start about the object root by a sampled axis (uniform on the sphere, base frame) and a
+    continuous angle (owner 2026-10-11: magnitude ~ U(``goal_angle_range_deg``), sign + / − alike;
+    :func:`draw_rotation_goals`), position unchanged; world orientation target, 0.15 rad,
     ``orientation_equivalences`` per model (§3.13); symmetric models are rejected (``symmetric_target``).
 
-    Start (owner 2026-10-11: the start orientation is drawn too, not always the hold's): the reference hold's object turned
-    about its root by an axis × angle on the 15° grid of ``init_angle_range_deg`` (0 = the hold itself), the configuration
-    holding it solved by the screening IK from the hold once per template (:meth:`precompute_options`). Each instance tries
-    the grasps in :meth:`grasp_order` (the least used unflagged grasp first, ties random; at most 4 per attempt) and per
-    grasp up to 3 random starts; per start ``goal_draws_per_start`` goal candidates are drawn, the first ``GOAL_SCREEN_MAX``
-    whole in frame are screened at the instance's base pose and the first that passes the exact IK is the goal."""
+    Start (owner 2026-10-11: the start orientation is drawn too, not always the hold's; fully continuous): the reference
+    hold's object turned about its root by one of the template's ``init_draws_per_template`` starts (an axis uniform on the
+    sphere and an angle ~ U(``init_angle_range_deg``), :func:`draw_rotation_starts` from the template seed), the
+    configuration holding it solved by the screening IK from the hold once per template (:meth:`precompute_options`).
+    Each instance tries the grasps in :meth:`grasp_order` (the least used unflagged grasp first, ties random; at most 4
+    per attempt) and per grasp up to 3 random starts; per start ``goal_draws_per_start`` goal candidates are drawn, the
+    first ``GOAL_SCREEN_MAX`` whole in frame are screened at the instance's base pose and the first that passes the exact
+    IK is the goal."""
 
     #: goal candidates screened per drawn start (the first of the start's ``goal_draws_per_start`` draws that keep the object
     #: in frame), exact checks per start, and starts tried per grasp in one attempt
@@ -1489,11 +1501,12 @@ class MentalRotationV2(HeldObjectV2):
             raise Reject("symmetric_target", f"{c.category}/{c.model} has a rotational symmetry ({len(self.equivalences)} equivalent orientations); §3.13 rule 1")
 
     def precompute_options(self):
-        """Per library grasp, the start set: the reference hold's object turned by every element of
-        :func:`rotation_start_set` (``init_angle_range_deg``), whole object in frame (5 %), its hand pose reached by the
-        screening IK from the hold (the holding arm, object attached, robot + object only, the scene removed from the
-        planner world); the IK solutions are kept as the start configurations. Base-frame quantities: the starts hold at
-        any base pose."""
+        """Per library grasp, the start set: the reference hold's object turned by each of the template's
+        ``init_draws_per_template`` starts (:func:`draw_rotation_starts` over ``init_angle_range_deg`` from
+        :func:`rotation_start_rng` of the template seed: the same set for every grasp whatever their order, and for the
+        segment fallback's second search), whole object in frame (5 %), its hand pose reached by the screening IK from the
+        hold (the holding arm, object attached, robot + object only, the scene removed from the planner world); the IK
+        solutions are kept as the start configurations. Base-frame quantities: the starts hold at any base pose."""
         target = self.obj("target")
         ref = self.kit.world_base_pose2d()
         self.ref_base2d = ref
@@ -1502,7 +1515,8 @@ class MentalRotationV2(HeldObjectV2):
         eef_hold = C.compose(base3, self.eef_in_base)
         q_hold = self.q_init_at(ref)
         base_idx = [self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]
-        starts = rotation_start_set(self.g("init_angle_range_deg"), ROTATION_ANGLE_STEP_DEG)
+        n_starts = int(self.g("init_draws_per_template"))
+        starts = draw_rotation_starts(rotation_start_rng(self.ctx.base_seed), self.g("init_angle_range_deg"), n_starts)
         stats = {"grasps": len(self.grasps), "starts": len(starts), "grasps_out_of_view": 0, "out_of_view": 0, "ik_failed": 0, "feasible": 0}
         self.options = {}
         for g in self.grasps:
@@ -1539,7 +1553,9 @@ class MentalRotationV2(HeldObjectV2):
         self.kit.sync_world()
         self.template_facts["start_options"] = {**stats, "grasps_with_options": len(self.options), "per_grasp": {k: len(v) for k, v in self.options.items()}}
         self.template_meta["init_orientation"] = {"drawn": True, "init_angle_range_deg": list(self.g("init_angle_range_deg")),
-                                                  "init_angle_step_deg": ROTATION_ANGLE_STEP_DEG, "goal_angle_range_deg": list(self.g("goal_angle_range_deg")),
+                                                  "init_draws_per_template": n_starts, "init_axis": "uniform on the sphere", "init_angle": "continuous",
+                                                  "start_set_rng": {"template_seed": int(self.ctx.base_seed), "spawn_key": [ROTATION_START_STREAM]},
+                                                  "goal_angle_range_deg": list(self.g("goal_angle_range_deg")), "goal_axis": "uniform on the sphere",
                                                   "goal_angle": "continuous", "goal_draws_per_start": int(self.g("goal_draws_per_start"))}
         if not self.options:
             raise Reject("goal_infeasible", f"no library grasp has a start in view that the screening IK reaches ({stats})")
@@ -1562,7 +1578,7 @@ class MentalRotationV2(HeldObjectV2):
             opts = self.options[gname]
             for si in rng.permutation(len(opts))[: self.STARTS_PER_GRASP]:
                 opt = opts[int(si)]
-                tag = f"{gname} start {opt['info']['angle_deg']:+.0f} deg"
+                tag = f"{gname} start {opt['info']['angle_deg']:.1f} deg"
                 try:
                     base2d = self.sample_start_base(rng, opt["q_rel"])
                 except Reject as e:

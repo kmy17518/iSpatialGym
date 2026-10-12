@@ -1307,12 +1307,15 @@ must stay connected). The obstacle is not a look-alike of any object the init vi
   measured objects at roll 90). Per instance d0 and d1 are drawn uniformly in the window, redrawn until
   |d1 − d0| ≥ 0.05 m — toward or away from the camera; same orientation; target frame = camera sensor,
   `position_metric = depth`, tolerance 20 % of |Δd| with a 2 cm floor (section 8), so the goal never holds at the start.
-- Goal (mental rotation): rotation about a sampled axis by U(30°, 120°), position unchanged; world orientation target,
-  tolerance 0.15 rad, equivalences per model (3.13; symmetric models are not admitted as mental-rotation targets).
+- Goal (mental rotation): rotation of the start about a sampled axis (uniform on the sphere) by U(30°, 120°) with a
+  random sign, position unchanged; world orientation target, tolerance 0.15 rad, equivalences per model (3.13; symmetric
+  models are not admitted as mental-rotation targets). The start is drawn too (owner 2026-10-11, fully continuous): the
+  hold's object turned about its root by an axis uniform on the sphere and an angle ~ U(0°, 180°), one of 312 starts
+  drawn once per template from its seed and pre-screened per grasp (whole object in frame, screening IK from the hold).
 - Feasibility: the goal arm configuration is solved with the **right-arm embodiment only** (the oracle moves the arm,
   not the torso); the motion between init and goal (straight line along the camera ray / SLERP about the object) is
   checked at 3 intermediate waypoints (3.9); whole-body collision-free with the object attached at every checked pose.
-- Kept from v1 §5.2: the goal options (the depth windows, or the axis × angle set) are precomputed **once per
+- Kept from v1 §5.2: the options (the depth windows, or the mental-rotation start set) are precomputed **once per
   template** — they depend on the hold and the object, not on the base pose — and each instance draws from the
   precomputed feasible set; an assisted-grasp attach that fails at the hold for a library row is a rejection of that
   row (`grasp_failed`, the next row is tried), never a fallback to an AABB heuristic; the realised grasp (finger

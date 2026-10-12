@@ -12,10 +12,11 @@ in an empty scene; the cache is only read. Each hold is scored:
 * ``dexterity``: the smallest singular value of the hand's rotational Jacobian (rad of hand rotation per rad of joint motion,
   finite differences of the planner FK; near 0 the hand cannot turn about some axis) and the translational manipulability
   sqrt(det(J J^T)) (m^3);
-* ``rotations``: the mental-rotation goal set screened from the hold as ``MentalRotationV2.precompute_options`` screens it
-  (13 axes x the signed 15 deg grid of ``goal_angle_range_deg``, 3 SLERP waypoints + the goal per candidate, right arm only
-  with the object attached, robot + object only, the whole object in frame with ``in_frame_margin``): feasible (grasp,
-  rotation) pairs of all candidates, and per axis the share of signed angles some grasp reaches;
+* ``rotations``: a fixed grid of rotations screened from the hold the way the sampler screens its continuous draws
+  (13 axes x the signed 15 deg grid of ``goal_angle_range_deg``, ``held_object.rotation_goal_set``; 3 SLERP waypoints + the
+  goal per candidate, right arm only with the object attached, robot + object only, the whole object in frame with
+  ``in_frame_margin``): feasible (grasp, rotation) pairs of all candidates, and per axis the share of signed angles some
+  grasp reaches;
 * ``visibility``: the share of the object's silhouette the robot leaves visible at the hold, per library grasp (segmentation
   renders with / without the robot, as ``scripts/held_visibility/survey.py``; the sampler needs ``min_visible_fraction``).
 
@@ -161,7 +162,8 @@ def in_frame(world, cam, hull, pose, margin: float) -> bool:
 
 
 def screen_rotations(world, kit, obj, hull, grasps, q_hold: th.Tensor, eef_w, cam, base, gp: Dict[str, Any]) -> Dict[str, Any]:
-    """``MentalRotationV2.precompute_options`` at this hold: feasible (grasp, rotation) pairs and per-axis coverage."""
+    """The rotation grid (``HO.rotation_goal_set``) screened at this hold: feasible (grasp, rotation) pairs and per-axis
+    coverage."""
     margin = float(gp["in_frame_margin"])
     cands = HO.rotation_goal_set(gp["goal_angle_range_deg"], HO.ROTATION_ANGLE_STEP_DEG)
     n_wp = int(gp["waypoints"])
