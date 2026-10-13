@@ -204,9 +204,16 @@ def write_variant(stable_path: str, remove: Sequence[str], out_dir: str, mode: s
     return path, variant
 
 
+#: a remaining object whose AABB floor footprint is larger than this is ground-like (a paving, a lawn: one object of many pieces whose
+#: box covers the house) and never re-blocked over a freed footprint (house_double_floor_lower's paver_sekqqq_0, 397 m2, blocked the
+#: whole kitchen once the breakfast table's chairs were removed: "-28488 cells freed")
+GROUND_FOOTPRINT_M2 = 15.0
+
+
 def freed_footprints(stable: dict, removed: Sequence[str], keep_blocked_below_z: float = 1.4) -> Dict[str, List]:
     """Footprints to free in the traversability map (removed objects) and footprints that stay blocked (remaining
-    non-structural objects that a chair may have been tucked under, e.g. the table)."""
+    non-structural objects that a chair may have been tucked under, e.g. the table; not the ground-like ones, see
+    :data:`GROUND_FOOTPRINT_M2`)."""
     init = stable["objects_info"]["init_info"]
     reg = stable["state"]["registry"]["object_registry"]
     free, block = [], []
@@ -228,6 +235,8 @@ def freed_footprints(stable: dict, removed: Sequence[str], keep_blocked_below_z:
             continue  # ceiling fixtures / wall-mounted high objects do not block the base
         # only footprints that overlap a freed one matter
         fmin, fmax = fp.min(dim=0).values, fp.max(dim=0).values
+        if float((fmax - fmin).prod()) > GROUND_FOOTPRINT_M2:
+            continue
         for f in free:
             t = th.tensor(f)
             if bool(((t.max(dim=0).values >= fmin) & (t.min(dim=0).values <= fmax)).all()):

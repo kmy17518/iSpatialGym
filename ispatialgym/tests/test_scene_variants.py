@@ -87,3 +87,28 @@ def test_the_template_lists_the_moved_objects(tmp_path, monkeypatch):
     assert tpl["metadata"]["ispatialgym"]["moved_objects"] == variant["metadata"]["ispatialgym"]["moved_objects"]
     assert tpl["metadata"]["ispatialgym"]["source_scene_file"] == "house_stable.json" and tpl["metadata"]["task"] == {"inst_to_name": {}}
     assert tpl["objects_info"]["init_info"]["chair_0"]["args"]["fixed_base"] is True
+
+
+def test_freed_chairs_are_not_re_blocked_by_a_ground_like_object(monkeypatch):
+    """``freed_footprints``: the table a chair was tucked under stays blocked over the freed chair, a paving / lawn whose box covers
+    the house (house_double_floor_lower's paver_sekqqq_0, 397 m2: every kitchen cell blocked once the breakfast table's chairs were
+    removed) does not (``GROUND_FOOTPRINT_M2``)."""
+    from ispatialgym.sampling import knowledge as K
+
+    boxes = {"chair": [0.5, 0.5, 0.9], "table": [1.0, 1.5, 0.7], "paver": [27.0, 14.0, 0.36], "rug": [3.0, 2.0, 0.01]}
+    monkeypatch.setattr(K, "canonical_bbox", lambda model: list(boxes[model]) if model in boxes else None)
+    monkeypatch.setattr(SV, "_metadata", lambda category, model: {"base_link_offset": [0.0, 0.0, 0.0]})
+
+    def obj(name, category, model):
+        return {"args": {"name": name, "category": category, "model": model, "scale": [1.0, 1.0, 1.0]}}
+
+    stable = {"objects_info": {"init_info": {"chair_0": obj("chair_0", "straight_chair", "chair"), "table_0": obj("table_0", "breakfast_table", "table"),
+                                             "paver_0": obj("paver_0", "paver", "paver"), "rug_0": obj("rug_0", "rug", "rug")}},
+              "state": {"registry": {"object_registry": {"chair_0": {"root_link": {"pos": [0.6, 0.0, 0.45], "ori": [0.0, 0.0, 0.0, 1.0]}},
+                                                         "table_0": {"root_link": {"pos": [0.0, 0.0, 0.35], "ori": [0.0, 0.0, 0.0, 1.0]}},
+                                                         "paver_0": {"root_link": {"pos": [3.0, 1.0, 0.0], "ori": [0.0, 0.0, 0.0, 1.0]}},
+                                                         "rug_0": {"root_link": {"pos": [0.5, 0.0, 0.005], "ori": [0.0, 0.0, 0.0, 1.0]}}}}}}
+    fp = SV.freed_footprints(stable, ["chair_0"])
+    assert len(fp["free"]) == 1
+    (blocked,) = fp["block"]  # the table only: the paver's 378 m2 box is ground-like, the rug lies below 5 cm
+    assert [round(min(p[i] for p in blocked), 3) for i in (0, 1)] == [-0.5, -0.75] and [round(max(p[i] for p in blocked), 3) for i in (0, 1)] == [0.5, 0.75]
