@@ -42359,7 +42359,9 @@
    "push_under_drop_ahead_pref_m": 0.7,
    "_push_under_variant_note": "owner 2026-10-12 ~20:55: under_large#02 / #03 variant 'pitched' on a copy of inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor (palm contact off; keys {\"push_under_hand\": \"pitched_far\", \"push_under_far_pitches_deg\": [60, 65, 70], \"push_far_tip_m\": 0.08, \"push_far_pre_m\": [0.03, 0.06], \"push_under_stand_offs_m\": [0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 1.0], \"push_under_drop_ahead_m\": [0.25, 0.8], \"floor_trunks\": [[2.0, 0.0], [1.75, 0.0]], \"frontal_lane_offset_m\": [0.3, 0.25], \"push_under_drop_ahead_pref_m\": 0.7}); it runs side by side with the push steps on the originals - per pick the first instance by wall clock is pinned and its keys are adopted on the pick's aliases",
    "carry_collision_margin_m": 0.01,
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "grasp_reach_margin_m": 0.015,
+   "push_pinned_settle_m": 0.003
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c2: briefcase/lwbctq under desk_mdhelw_0 (the held-out desk) from the floor of private_office_3; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#02 on the sheet rows with the floor init as the pick's only support row and desk_mdhelw_0 as its representative partner (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
