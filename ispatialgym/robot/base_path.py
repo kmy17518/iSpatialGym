@@ -438,9 +438,24 @@ class BasePath:
         n = max(1, int(math.ceil(abs(d) / max(step, 1e-6))))
         return [yaw_from + d * k / n for k in range(1, n + 1)]
 
-    def stride_poses(self, stride: float, dwell_step_rad: float = DWELL_CHECK_STEP_RAD) -> List[Pose2D]:
+    def _yaw_fill(self, s_a: float, side_a: int, s_b: float, side_b: int, step: float, depth: int = 0) -> List[float]:
+        """Arc lengths strictly between ``s_a`` and ``s_b`` (bisection) at which the drive is sampled so that no two
+        consecutive samples differ by more than ``step`` in yaw (no sharp corner lies strictly between them)."""
+        sm = 0.5 * (s_a + s_b)
+        ya, ym, yb = self.yaw(s_a, side_a), self.yaw(sm), self.yaw(s_b, side_b)
+        if depth >= 16 or s_b - s_a <= 1e-6 or max(abs(ym - ya), abs(yb - ym), abs(yb - ya)) <= step:
+            return []
+        return self._yaw_fill(s_a, side_a, sm, 1, step, depth + 1) + [sm] + self._yaw_fill(sm, 1, s_b, side_b, step, depth + 1)
+
+    def stride_poses(self, stride: float, dwell_step_rad: float = DWELL_CHECK_STEP_RAD, max_yaw_step: Optional[float] = None) -> List[Pose2D]:
         """Every pose the whole-body check must see: the departing pose, the start dwell's sweep, the drive every
-        ``stride`` (the sharp corners' sweeps where they occur), the end dwell's sweep, the goal pose."""
+        ``stride`` (the sharp corners' sweeps where they occur), the end dwell's sweep, the goal pose. ``max_yaw_step``
+        (rad; the sampler's ``navigation.YAW_STEP_MAX_RAD``): no two consecutive poses differ by more in yaw - the drive
+        is sampled between two strides where the schedule turns, a sharp corner from its arrival yaw, the dwells at the
+        smaller of the two steps."""
+        bound = max_yaw_step is not None and max_yaw_step > 0.0
+        if bound:
+            dwell_step_rad = min(dwell_step_rad, float(max_yaw_step))
         x0, y0 = self.position(0.0)
         out: List[Pose2D] = [(x0, y0, self.waypoints[0][2])]
         corners = sorted((d for d in self.dwells if d.kind == "corner"), key=lambda d: d.s)
@@ -449,12 +464,21 @@ class BasePath:
                 out.extend((x0, y0, yaw) for yaw in self.sweep(d.yaw_from, d.yaw_to, dwell_step_rad))
         if self.pieces:
             k = 0
+            last: Optional[Tuple[float, int]] = None  # (arc length, side) of the last drive sample
             for s in self.drive_grid(stride):
                 while k < len(corners) and corners[k].s <= s + 1e-9:
-                    cx, cy = self.position(corners[k].s)
-                    out.extend((cx, cy, yaw) for yaw in self.sweep(self.yaw(corners[k].s, -1), self.yaw(corners[k].s, 1), dwell_step_rad))
+                    sc = corners[k].s
+                    cx, cy = self.position(sc)
+                    if bound and last is not None:
+                        out.extend(self.pose(u) for u in self._yaw_fill(last[0], last[1], sc, -1, float(max_yaw_step)))
+                        out.append((cx, cy, self.yaw(sc, -1)))
+                    out.extend((cx, cy, yaw) for yaw in self.sweep(self.yaw(sc, -1), self.yaw(sc, 1), dwell_step_rad))
+                    last = (sc, 1)
                     k += 1
+                if bound and last is not None:
+                    out.extend(self.pose(u) for u in self._yaw_fill(last[0], last[1], s, 1, float(max_yaw_step)))
                 out.append(self.pose(s))
+                last = (s, 1)
         xe, ye = self.position(self.length)
         for d in self.dwells:
             if d.kind == "end":

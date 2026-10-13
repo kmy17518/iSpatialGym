@@ -122,6 +122,28 @@ def test_sharp_corner_becomes_a_dwell_with_checked_sweep():
     assert float(v[max(i_corner - 1, 0)]) < 0.05
 
 
+def test_stride_poses_bound_the_heading_step():
+    """Owner 2026-10-13 item 3a: ``max_yaw_step`` re-samples the schedule where it turns faster than the bound per stride
+    (fillet turn windows, short end blends), sweeps a sharp corner from its arrival yaw and the dwells at the smaller step;
+    the default (None) is unchanged and a straight drive gets nothing extra."""
+    cfg = BP.BasePathConfig(simplify_tol_m=0.0)
+    step = math.radians(3.0)
+    wps = [(0.0, 0.0, math.radians(100)), (1.0, 0.0, float("nan")), (1.0 + math.cos(math.radians(150)), math.sin(math.radians(150)), float("nan")),
+           (0.0, 1.0, float("nan")), (0.0, 1.3, math.radians(-30))]
+    path = BP.BasePath.build(wps, cfg)
+    assert {d.kind for d in path.dwells} >= {"start", "corner"}
+    plain, bounded = path.stride_poses(0.1), path.stride_poses(0.1, max_yaw_step=step)
+    assert plain == path.stride_poses(0.1, max_yaw_step=None) and len(bounded) > len(plain)
+    assert max(abs(BP.wrap_angle(b[2] - a[2])) for a, b in zip(bounded[:-1], bounded[1:])) <= step + 1e-9
+    assert max(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(bounded[:-1], bounded[1:])) <= 0.1 + 1e-9
+    # every bounded pose lies on the schedule (the drive re-sampled, not interpolated between strides)
+    for x, y, yaw in bounded:
+        s = path.project((x, y), ds=0.001)
+        assert math.hypot(*(u - v for u, v in zip(path.position(s), (x, y)))) < 2e-3
+    straight = BP.BasePath.build([(0.0, 0.0, 0.0), (2.0, 0.0, 0.0)])
+    assert straight.stride_poses(0.5, max_yaw_step=step) == straight.stride_poses(0.5)
+
+
 def test_hybrid_end_turns():
     cfg = BP.BasePathConfig()
     # 170° off the first heading: turn on the spot first, then drive facing the path

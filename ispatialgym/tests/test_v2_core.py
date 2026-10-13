@@ -232,6 +232,94 @@ def test_stride_poses_yaw_envelope_covers_the_trackers_lag_on_a_turn():
     assert max(yaws) <= math.degrees(interp) + 12.0 + 1e-6 and min(yaws) >= math.degrees(interp) - 12.0 - 1e-6, (yaws, math.degrees(interp))
 
 
+def test_stride_poses_bound_the_heading_step_between_checked_poses():
+    """Owner 2026-10-13 ~04:30 item 3a (under#03 144 pitched c1_k1, 17836644 / 17838303: 'held:base_link in contact with desk_mdhelw_1'
+    at navigate[5]): the recorded B -> C carry ends with a 12.7 cm segment turning 134 deg (0.80 -> pi), which the 10 cm strides
+    checked at 46, 113 and 180 deg only; the base was at 137 deg at (18.455, -8.343) when the can swept into the desk. No two
+    consecutive checked poses differ by more than YAW_STEP_MAX_RAD (3 deg) now - in the strides, the yaw-lag envelope and the
+    face_travel poses - and less when the farthest robot / carried point would move more than 3 cm; a straight run is unchanged."""
+    wps = [(18.3761, -8.6936, 1.9002), (18.3, -8.7, 1.249), (18.4, -8.4, 0.8008), (18.4884, -8.3088, -3.1416)]
+    wrap = lambda a: (a + math.pi) % (2 * math.pi) - math.pi  # noqa: E731
+    old, new = NAV.stride_poses(wps, 0.1, max_yaw_step=None), NAV.stride_poses(wps, 0.1)
+    in_last = lambda ps: [p for p in ps if p[0] >= 18.4 - 1e-9 and p[1] >= -8.4 - 1e-9]  # noqa: E731
+    assert [round(math.degrees(p[2])) for p in in_last(old)] == [46, 113, -180]
+    assert len(in_last(new)) >= 45 and len(new) > len(old) and set(wps) <= set(new)
+    assert max(abs(wrap(b[2] - a[2])) for a, b in zip(new[:-1], new[1:])) <= NAV.YAW_STEP_MAX_RAD + 1e-9
+    fail = (18.455, -8.343, math.radians(137.0))
+
+    def nearest(ps):
+        return min(ps, key=lambda p: 100.0 * math.hypot(p[0] - fail[0], p[1] - fail[1]) + abs(math.degrees(wrap(p[2] - fail[2]))))
+
+    p = nearest(new)
+    assert math.hypot(p[0] - fail[0], p[1] - fail[1]) < 0.01 and abs(math.degrees(wrap(p[2] - fail[2]))) < 2.0, p
+    assert abs(math.degrees(wrap(nearest(old)[2] - fail[2]))) > 20.0
+    # a straight run (constant or slowly turning yaw) keeps the 10 cm strides
+    straight = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)]
+    assert NAV.stride_poses(straight, 0.1) == NAV.stride_poses(straight, 0.1, max_yaw_step=None)
+    assert len(NAV.stride_poses([(0.0, 0.0, 0.0), (1.0, 0.0, math.radians(20.0))], 0.1)) == 11
+    assert NAV.stride_poses(straight, 0.1, yaw_envelope=True) == NAV.stride_poses(straight, 0.1)
+    # the lag envelope follows: the plain strides plus, at every stride, its lag yaws <= 3 deg apart, <= 12 deg behind
+    env = NAV.stride_poses(wps, 0.1, yaw_envelope=True)
+    assert set(new) <= set(env) and len(env) > len(NAV.stride_poses(wps, 0.1, yaw_envelope=True, max_yaw_step=None))
+    by_xy = {}
+    for x, y, yaw in env:
+        by_xy.setdefault((x, y), []).append(yaw)
+    for (x, y), yaws in by_xy.items():
+        ys = sorted(yaws)
+        assert all(b - a <= NAV.YAW_STEP_MAX_RAD + 1e-9 for a, b in zip(ys, ys[1:])), ((x, y), ys)
+        assert ys[-1] - ys[0] <= 2 * NAV.YAW_LAG_MAX_RAD + 1e-9
+    # the farthest robot / carried point moves <= 3 cm per step: 0.73 m (the can) -> 2.35 deg; a smaller radius keeps 3 deg
+    assert NAV.yaw_step_bound(None) == NAV.YAW_STEP_MAX_RAD == NAV.yaw_step_bound(0.33)
+    assert NAV.yaw_step_bound(0.73) == pytest.approx(0.03 / 0.73)
+    fine = NAV.stride_poses(wps, 0.1, max_yaw_step=NAV.yaw_step_bound(0.73))
+    assert len(in_last(fine)) >= 57 and max(0.73 * abs(wrap(b[2] - a[2])) for a, b in zip(fine[:-1], fine[1:])) <= 0.03 + 1e-9
+    # an on-the-spot turn (two waypoints at one spot) is swept, not checked at its ends alone
+    spot = NAV.stride_poses([(0.0, 0.0, 0.0), (0.0, 0.0, math.radians(90.0))], 0.1)
+    assert len(spot) == 31 and all(abs(b[2] - a[2]) <= NAV.YAW_STEP_MAX_RAD + 1e-9 for a, b in zip(spot[:-1], spot[1:]))
+    # the face_travel schedule and its envelope: the same bound (the log-only probe of the leg: 50 swept poses before)
+    ft = NAV.face_travel_poses(wps)
+    assert len(NAV.yaw_lag_envelope(NAV.face_travel_poses(wps, max_yaw_step=None), max_yaw_step=None)) == 50
+    assert max(abs(wrap(b[2] - a[2])) for a, b in zip(ft[:-1], ft[1:])) <= NAV.YAW_STEP_MAX_RAD + 1e-9
+    assert len(ft) > len(NAV.face_travel_poses(wps, max_yaw_step=None)) and set(ft) <= set(NAV.yaw_lag_envelope(ft))
+    # a sparse sequence handed to the envelope is filled in first
+    sparse = [(0.0, 0.0, 0.0), (0.1, 0.0, math.radians(30.0))]
+    filled = NAV.bound_yaw_steps(sparse)
+    assert len(filled) == 11 and filled[0] == sparse[0] and filled[-1] == sparse[-1]
+    assert set(filled) <= set(NAV.yaw_lag_envelope(sparse))
+
+
+def test_sweep_radius_is_the_farthest_collision_sphere_and_plan_path_checks_with_its_bound(monkeypatch):
+    """Owner 2026-10-13 item 3a: plan_path takes the heading step from the farthest collision sphere of the navigation posture
+    (the robot's and the attached object's, ``robot_spheres_world``) - 3 cm of travel per step at most - and the angular bound
+    alone when the backend has no sphere model."""
+    from types import SimpleNamespace
+
+    spheres = th.tensor([[[0.2, 0.1, 0.5, 0.05], [0.0, -0.9, 0.7, 0.1], [3.0, 3.0, 0.0, -1.0]]])  # x y z r; r <= 0 = disabled
+    kit = SimpleNamespace(q_config=lambda **kw: th.zeros(3), q_at_base_pose=lambda q, x, y, yaw: th.tensor([x, y, yaw]),
+                          backend=SimpleNamespace(robot_spheres_world=lambda q, emb_name="whole_body": (spheres, ["a", "b", "c"])))
+    assert NAV.sweep_radius(kit, (0.5, 0.0)) == pytest.approx(1.0)
+    assert NAV.sweep_radius(SimpleNamespace(q_config=kit.q_config, q_at_base_pose=kit.q_at_base_pose, backend=object()), (0.5, 0.0)) is None
+    monkeypatch.setenv("ISG_ATTACHED_CHECKS", "off")
+    monkeypatch.setattr(NAV, "local_map", lambda kit, rooms=None, blocked=(): th.ones(30, 30, dtype=th.bool))
+    monkeypatch.setattr(NAV, "_to_map", lambda kit, xy: (int(round(float(xy[1]) / 0.05)), int(round(float(xy[0]) / 0.05))))
+    monkeypatch.setattr(NAV, "_to_world", lambda kit, ij: th.tensor([ij[1] * 0.05, ij[0] * 0.05]))
+    monkeypatch.setattr(NAV, "nearest_free_cell", lambda free, ij, r=15: ij)
+    monkeypatch.setattr(NAV, "same_region", lambda free, a, b: True)
+    monkeypatch.setattr(NAV, "grid_shortest_path", lambda free, a, b: [(0, 0), (0, 20), (20, 20)])
+    monkeypatch.setattr(NAV, "simplify_path", lambda cells, free: list(cells))
+    seen = []
+    monkeypatch.setattr(NAV, "path_collision_free", lambda kit, poses, trunk, posture="untucked", margin=0.01, q_arms=None, fingers=None: (seen.append(list(poses)), (True, -1))[1])
+    st = lambda name, x, y, yaw: SimpleNamespace(name=name, base_xy=th.tensor([x, y]), yaw=yaw, base_pose2d=(x, y, yaw), translate=0.0, tilt=0.0)  # noqa: E731
+    a, b = st("init", 0.0, 0.0, 0.0), st("manipulation", 1.0, 1.0, 1.5708)
+    rec = NAV.plan_path(kit, a, b, arm_q={})
+    swept = seen[-1]
+    assert swept == NAV.stride_poses(rec.waypoints, 0.1, yaw_envelope=True, max_yaw_step=0.03)
+    assert rec.n_checked == len(NAV.stride_poses(rec.waypoints, 0.1, max_yaw_step=0.03)) > len(NAV.stride_poses(rec.waypoints, 0.1))
+    seen.clear()
+    NAV.plan_path(None, a, b, arm_q={})  # no sphere model: 3 deg
+    assert seen[-1] == NAV.stride_poses(rec.waypoints, 0.1, yaw_envelope=True)
+
+
 def test_plan_path_face_travel_style_records_the_schedule_or_falls_back_to_recorded(monkeypatch):
     """Owner 2026-09-26 (item 6): ``style="face_travel"`` checks the shared base_path schedule (with the yaw-lag envelope, same
     posture / margin) and records ``face_travel`` when it clears; when a stride of the schedule collides the polyline check

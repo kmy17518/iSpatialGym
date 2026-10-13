@@ -86,8 +86,16 @@ def trunk_sweep(trunk_from: Tuple[float, float], trunk_to: Tuple[float, float], 
     return [(t0 + (t1 - t0) * i / (n - 1), k0 + (k1 - k0) * i / (n - 1)) for i in range(n)]
 
 
-#: yaw step of the lag envelope a swept stride pose is repeated at (``stride_poses(yaw_envelope=True)``)
+#: yaw step of the lag envelope a swept stride pose is repeated at (``stride_poses(yaw_envelope=True)``), at most the heading
+#: step bound of the check (``max_yaw_step``)
 YAW_ENVELOPE_STEP_RAD = math.radians(10.0)
+#: owner 2026-10-13 ~04:30 item 3a (under#03 144 pitched c1_k1, 17836644 / 17838303 'held:base_link in contact with desk_mdhelw_1'
+#: at navigate[5]: the B -> C carry's last 12.7 cm segment turns 134 deg and its 10 cm strides were checked at 46, 113 and 180 deg
+#: only - at 137 deg the can, 0.73 m from the base centre, swept into the desk): the largest heading step between two consecutive
+#: checked poses of a swept-pose check (:func:`stride_poses`, the yaw-lag envelope, :func:`face_travel_poses`), and the farthest
+#: robot / carried point's travel per heading step (:func:`yaw_step_bound`) - as ``SWEEP_MAX_TILT_STEP`` bounds a trunk sweep
+YAW_STEP_MAX_RAD = math.radians(3.0)
+YAW_SWEEP_MAX_M = 0.03
 #: how far back along the path the yaw reference still shapes the tracker's yaw: the tracker (kp_yaw 2 -> ~0.5 s time constant)
 #: at the 0.3-0.5 m/s of a stance-to-stance drive lags what the reference did over the last ~0.2 m; a long straight run has
 #: caught up, a shuffle of short turning segments has not
@@ -99,21 +107,53 @@ YAW_LAG_LOOKBACK_M = 0.25
 YAW_LAG_MAX_RAD = math.radians(12.0)
 
 
-def stride_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M, yaw_envelope: bool = False) -> List[Tuple[float, float, float]]:
+def yaw_step_bound(radius_m: Optional[float] = None) -> float:
+    """The heading step (rad) allowed between two consecutive checked poses: :data:`YAW_STEP_MAX_RAD`, less when a point
+    ``radius_m`` from the base centre (:func:`sweep_radius`) would move more than :data:`YAW_SWEEP_MAX_M` per step."""
+    if radius_m is None or not radius_m > 0.0:
+        return YAW_STEP_MAX_RAD
+    return min(YAW_STEP_MAX_RAD, YAW_SWEEP_MAX_M / float(radius_m))
+
+
+def _yaw_steps(dyaw: float, max_yaw_step: Optional[float]) -> int:
+    """How many steps of at most ``max_yaw_step`` a heading change ``dyaw`` takes (0 without a bound)."""
+    if not max_yaw_step or max_yaw_step <= 0.0:
+        return 0
+    return int(math.ceil(abs(float(dyaw)) / float(max_yaw_step) - 1e-9))
+
+
+def bound_yaw_steps(poses: Sequence[Sequence[float]], max_yaw_step: Optional[float] = YAW_STEP_MAX_RAD) -> List[Tuple[float, float, float]]:
+    """``poses`` (drive order) with poses interpolated linearly (x, y, the yaw the shortest way) between two consecutive ones
+    whose yaws differ by more than ``max_yaw_step``; the others as they are."""
+    pts = [tuple(float(v) for v in p) for p in poses]
+    out = pts[:1]
+    for a, b in zip(pts[:-1], pts[1:]):
+        d = (b[2] - a[2] + math.pi) % (2 * math.pi) - math.pi
+        m = _yaw_steps(d, max_yaw_step)
+        out.extend((a[0] + (b[0] - a[0]) * k / m, a[1] + (b[1] - a[1]) * k / m, a[2] + d * k / m) for k in range(1, m))
+        out.append(b)
+    return out
+
+
+def stride_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M, yaw_envelope: bool = False,
+                 max_yaw_step: Optional[float] = YAW_STEP_MAX_RAD) -> List[Tuple[float, float, float]]:
     """Base poses every ``stride`` metres along a polyline of (x, y[, yaw]) waypoints; the yaw is interpolated linearly
-    (shortest way) between consecutive waypoint yaws, or taken along the segment when a waypoint has none.
+    (shortest way) between consecutive waypoint yaws, or taken along the segment when a waypoint has none. A segment whose
+    yaw turns more than ``max_yaw_step`` per stride is sampled densely enough that no two consecutive poses differ by more
+    (owner 2026-10-13 item 3a, :data:`YAW_STEP_MAX_RAD` / :func:`yaw_step_bound`; None = the strides alone).
 
     ``yaw_envelope`` (owner 2026-09-25; shampoo 0925-211757 / 222156: the left finger brushed ``wardrobe_pyuwgc_0`` 38 steps into
     a 36 cm shuffle that turns 57 deg - the base 4 mm off the line, its yaw 6 deg BEHIND the interpolated one, while the 3 cm
     sweep of the interpolated yaws had passed): the oracle's tracker (``BaseTrajectoryTracker``: 0.8 rad/s, 1.5 rad/s^2, kp_yaw
     2) lags the yaw reference on a turn, so every stride pose is repeated at the yaws the reference held over the last
     :data:`YAW_LAG_LOOKBACK_M` of path (the angular hull of those yaws and the interpolated one, each capped at
-    :data:`YAW_LAG_MAX_RAD` from the interpolated yaw, every :data:`YAW_ENVELOPE_STEP_RAD`) - the swept volume covers the
-    lag; a straight run with a constant yaw adds nothing."""
+    :data:`YAW_LAG_MAX_RAD` from the interpolated yaw, every :data:`YAW_ENVELOPE_STEP_RAD` or ``max_yaw_step`` if smaller) -
+    the swept volume covers the lag; a straight run with a constant yaw adds nothing."""
     out: List[Tuple[float, float, float]] = []
     wps = [tuple(float(v) for v in w) for w in waypoints]
     if not wps:
         return out
+    env_step = min(YAW_ENVELOPE_STEP_RAD, float(max_yaw_step)) if max_yaw_step and max_yaw_step > 0.0 else YAW_ENVELOPE_STEP_RAD
     strides: List[Tuple[float, float, float, float]] = []  # (x, y, yaw, arc length) of the plain stride poses
     arc = 0.0
     for a, b in zip(wps[:-1], wps[1:]):
@@ -121,7 +161,7 @@ def stride_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M,
         yaw_a = a[2] if len(a) > 2 else math.atan2(b[1] - a[1], b[0] - a[0])
         yaw_b = b[2] if len(b) > 2 else yaw_a
         dyaw = (yaw_b - yaw_a + math.pi) % (2 * math.pi) - math.pi
-        n = max(1, int(math.ceil(seg / stride)))
+        n = max(1, int(math.ceil(seg / stride)), _yaw_steps(dyaw, max_yaw_step))
         for i in range(n):
             s = i / n
             strides.append((a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, yaw_a + dyaw * s, arc + seg * s))
@@ -140,18 +180,21 @@ def stride_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M,
             o = (strides[k][2] - yaw + math.pi) % (2 * math.pi) - math.pi
             offs.append(max(-YAW_LAG_MAX_RAD, min(YAW_LAG_MAX_RAD, o)))
         for o in (min(offs), max(offs)):
-            m = int(math.ceil(abs(o) / YAW_ENVELOPE_STEP_RAD))
+            m = int(math.ceil(abs(o) / env_step - 1e-9))
             for k in range(1, m + 1):
                 out.append((x, y, yaw + o * min(1.0, k / m)))
     return out
 
 
-def yaw_lag_envelope(poses: Sequence[Tuple[float, float, float]]) -> List[Tuple[float, float, float]]:
+def yaw_lag_envelope(poses: Sequence[Tuple[float, float, float]], max_yaw_step: Optional[float] = YAW_STEP_MAX_RAD) -> List[Tuple[float, float, float]]:
     """The yaw-lag envelope of :func:`stride_poses` over an arbitrary drive-ordered pose sequence (the ``face_travel``
     schedule's ``BasePath.stride_poses``: the arc length is the travelled xy distance, a dwell's on-the-spot sweep adds
     none): every pose repeated at the yaws the sequence held over the last :data:`YAW_LAG_LOOKBACK_M`, each capped at
-    :data:`YAW_LAG_MAX_RAD`, every :data:`YAW_ENVELOPE_STEP_RAD` - so the schedule and the polyline are checked alike."""
-    pts = [tuple(float(v) for v in p) for p in poses]
+    :data:`YAW_LAG_MAX_RAD`, every :data:`YAW_ENVELOPE_STEP_RAD` or ``max_yaw_step`` if smaller - so the schedule and the
+    polyline are checked alike. Consecutive poses of the sequence more than ``max_yaw_step`` apart in yaw get poses in
+    between first (:func:`bound_yaw_steps`)."""
+    pts = bound_yaw_steps(poses, max_yaw_step)
+    env_step = min(YAW_ENVELOPE_STEP_RAD, float(max_yaw_step)) if max_yaw_step and max_yaw_step > 0.0 else YAW_ENVELOPE_STEP_RAD
     arc: List[float] = []
     s_ = 0.0
     for i, p in enumerate(pts):
@@ -168,19 +211,21 @@ def yaw_lag_envelope(poses: Sequence[Tuple[float, float, float]]) -> List[Tuple[
             o = (pts[k][2] - yaw + math.pi) % (2 * math.pi) - math.pi
             offs.append(max(-YAW_LAG_MAX_RAD, min(YAW_LAG_MAX_RAD, o)))
         for o in (min(offs), max(offs)):
-            m = int(math.ceil(abs(o) / YAW_ENVELOPE_STEP_RAD))
+            m = int(math.ceil(abs(o) / env_step - 1e-9))
             for k in range(1, m + 1):
                 out.append((x, y, yaw + o * min(1.0, k / m)))
     return out
 
 
-def face_travel_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M) -> List[Tuple[float, float, float]]:
+def face_travel_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M,
+                      max_yaw_step: Optional[float] = YAW_STEP_MAX_RAD) -> List[Tuple[float, float, float]]:
     """The whole-body-checked poses of the ``face_travel`` schedule of ``waypoints`` (owner 2026-09-26: the shared
-    ``robot.base_path`` schedule the oracle drives for ``style = "face_travel"``, built with the module's default config)."""
+    ``robot.base_path`` schedule the oracle drives for ``style = "face_travel"``, built with the module's default config),
+    no two consecutive ones more than ``max_yaw_step`` apart in yaw (``BasePath.stride_poses``)."""
     from ispatialgym.robot import base_path as BP
 
     sched = BP.BasePath.build([tuple(float(v) for v in w) for w in waypoints], BP.BasePathConfig())
-    return [tuple(float(v) for v in p) for p in sched.stride_poses(stride)]
+    return [tuple(float(v) for v in p) for p in sched.stride_poses(stride, max_yaw_step=max_yaw_step)]
 
 
 #: owner 2026-09-26: per-process tally of the log-only face_travel probe of CARRIED legs (they stay ``recorded``): how often the
@@ -407,13 +452,33 @@ def path_collision_free(kit: "RobotKit", poses: Sequence[Tuple[float, float, flo
     (``kit.backend.attach_object``). Returns (all free, first failing index)."""
     if not poses:
         return True, -1
-    kw = {} if fingers is None else {"fingers": fingers}
-    q0 = kit.q_config(arms=posture, translate=trunk[0], tilt=trunk[1], right_arm=(q_arms or {}).get("right"), left_arm=(q_arms or {}).get("left"), **kw)
+    q0 = _nav_q(kit, trunk, posture, q_arms, fingers)
     qs = th.stack([kit.q_at_base_pose(q0, x, y, yaw) for x, y, yaw in poses])
     free = kit.collision_free(qs, margin=margin)
     if bool(free.all()):
         return True, -1
     return False, int(th.nonzero(~free)[0])
+
+
+def _nav_q(kit: "RobotKit", trunk: Tuple[float, float], posture: str = "untucked", q_arms: Optional[Dict[str, th.Tensor]] = None,
+           fingers: Optional[float] = None) -> th.Tensor:
+    kw = {} if fingers is None else {"fingers": fingers}
+    return kit.q_config(arms=posture, translate=trunk[0], tilt=trunk[1], right_arm=(q_arms or {}).get("right"), left_arm=(q_arms or {}).get("left"), **kw)
+
+
+def sweep_radius(kit: "RobotKit", trunk: Tuple[float, float], posture: str = "untucked", q_arms: Optional[Dict[str, th.Tensor]] = None,
+                 fingers: Optional[float] = None) -> Optional[float]:
+    """The farthest point of the navigation posture's collision spheres (the robot's and an attached carried object's) from
+    the base centre in xy (m): what a heading step sweeps the most (:func:`yaw_step_bound`). None when the backend has no
+    sphere forward kinematics (``robot_spheres_world``)."""
+    try:
+        q = kit.q_at_base_pose(_nav_q(kit, trunk, posture, q_arms, fingers), 0.0, 0.0, 0.0)
+        sp, _ = kit.backend.robot_spheres_world(q.unsqueeze(0))
+        sp = th.as_tensor(sp, dtype=th.float32).reshape(-1, 4)
+        sp = sp[sp[:, 3] > 0.0]
+        return float((th.linalg.norm(sp[:, :2], dim=1) + sp[:, 3]).max()) if len(sp) else None
+    except Exception:  # noqa: BLE001 - no sphere model: the angular bound alone
+        return None
 
 
 def attached_checks_enabled() -> bool:
@@ -534,8 +599,8 @@ def plan_edge_slide(kit: "RobotKit", stance_from: Stance, stance_to: Stance, pos
     length = path_length(waypoints)
     if max_length_m is not None and length > max_length_m:
         raise NavigationError("path_too_long", f"edge slide {length:.2f} m > {max_length_m:.2f} m")
-    poses = stride_poses(waypoints, stride)
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+        poses = stride_poses(waypoints, stride, max_yaw_step=yaw_step_bound(sweep_radius(kit, trunk, posture, arm_q)))
         ok, bad = path_collision_free(kit, poses, trunk, posture, margin=float(margin), q_arms=arm_q)
     if not ok:
         raise NavigationError("edge_slide_collision", f"edge slide {stance_from.name} -> {stance_to.name} collides at stride {bad}/{len(poses)} ({poses[bad]}) at trunk {trunk}"
@@ -618,9 +683,10 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         raise NavigationError("path_too_long", f"{length:.2f} m > {max_length_m:.2f} m")
     record_style: Optional[str] = None
     if style == "face_travel":
-        ft = face_travel_poses(filled, stride)
-        ft_swept = yaw_lag_envelope(ft)
         with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+            step = yaw_step_bound(sweep_radius(kit, trunk, posture, arm_q))
+            ft = face_travel_poses(filled, stride, max_yaw_step=step)
+            ft_swept = yaw_lag_envelope(ft, max_yaw_step=step)
             ok_ft, bad_ft = path_collision_free(kit, ft_swept, trunk, posture, margin=float(margin), q_arms=arm_q)
         if ok_ft:
             log.info("face_travel: %s path %s -> %s %.2f m recorded as the face_travel schedule (%d schedule poses, %d swept with the yaw-lag envelope)",
@@ -629,17 +695,21 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         log.info("face_travel: %s path %s -> %s: the schedule collides at swept pose %d/%d (%s) - the polyline is checked and recorded instead",
                  mode, stance_from.name, stance_to.name, bad_ft, len(ft_swept), tuple(round(v, 3) for v in ft_swept[bad_ft]))
         record_style = "recorded"
-    poses = stride_poses(filled, stride)
-    swept = stride_poses(filled, stride, yaw_envelope=True)  # the strides + the tracker's yaw lag on the turns (owner 2026-09-25)
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+        radius = sweep_radius(kit, trunk, posture, arm_q)
+        step = yaw_step_bound(radius)
+        poses = stride_poses(filled, stride, max_yaw_step=step)
+        swept = stride_poses(filled, stride, yaw_envelope=True, max_yaw_step=step)  # the strides + the tracker's yaw lag on the turns (owner 2026-09-25)
         ok, bad = path_collision_free(kit, swept, trunk, posture, margin=float(margin), q_arms=arm_q)
+    log.debug("%s path %s -> %s: heading step <= %.2f deg between checked poses (farthest robot / carried point %s from the base centre): %d strides, %d swept poses",
+              mode, stance_from.name, stance_to.name, math.degrees(step), "unknown" if radius is None else f"{radius:.2f} m", len(poses), len(swept))
     if not ok:
         raise NavigationError("path_collision", f"{mode} path {stance_from.name} -> {stance_to.name} collides at swept pose {bad}/{len(swept)} ({tuple(round(v, 3) for v in swept[bad])}, "
                                                 f"{len(poses)} strides + the yaw-lag envelope) at trunk {trunk}"
                                                 + (f" (margin {float(margin):.3f})" if float(margin) > 0.011 else ""))
     if probe_face_travel and carried_obj is not None:
         try:
-            ft_swept = yaw_lag_envelope(face_travel_poses(filled, stride))
+            ft_swept = yaw_lag_envelope(face_travel_poses(filled, stride, max_yaw_step=step), max_yaw_step=step)
             with attached(kit, carried_arm, carried_obj, eef_in_object=eef_in_object):
                 ok_p, bad_p = path_collision_free(kit, ft_swept, trunk, posture, margin=0.01, q_arms=arm_q)
             FACE_TRAVEL_CARRIED_PROBE["checked"] += 1

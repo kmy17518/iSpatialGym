@@ -627,10 +627,10 @@ class CameraRelocalizationV2(SamplerV2):
         """The ``paths[]`` record of an eroded-map shortest path (``path_schedule``; ``plan`` = its result when the
         caller already has it): the shortcut waypoints, ``length_m`` = their polyline length (informational — the bucket
         is decided on the geodesic), ``style = face_travel``, whole-body collision-checked at 0.1 m strides **of the driven schedule** (the
-        fillets, the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture (the init arms, init trunk). None
-        when a stride collides."""
+        fillets, the on-the-spot turns; the heading stepped by at most ``NAV.YAW_STEP_MAX_RAD`` between two checked poses) at
+        the navigation posture (the init arms, init trunk). None when a stride collides."""
         waypoints, sched = plan if plan is not None else self.path_schedule(path, base0, base1)
-        poses = sched.stride_poses(NAV.STRIDE_M, dwell_step_rad=BP.DWELL_CHECK_STEP_RAD)
+        poses = sched.stride_poses(NAV.STRIDE_M, dwell_step_rad=BP.DWELL_CHECK_STEP_RAD, max_yaw_step=NAV.YAW_STEP_MAX_RAD)
         ok, bad = NAV.path_collision_free(self.kit, poses, trunk, posture=self.init_arms)
         if not ok:
             log.info("%s: path %s -> %s collides at stride %d/%d (%s)", self.gp.alias, frm, to, bad, len(poses), [round(v, 2) for v in poses[bad]])

@@ -321,9 +321,10 @@ def test_camera_relocalization_records_the_shortcut_path_and_checks_the_driven_s
     assert rec is not None and rec.style == BP.FACE_TRAVEL and rec.mode == "global"
     assert rec.waypoints == waypoints and rec.length_m == pytest.approx(sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(waypoints[:-1], waypoints[1:])))
     poses = seen["poses"]
-    assert rec.n_checked == len(poses) == len(sched.stride_poses(NAV.STRIDE_M))
+    assert rec.n_checked == len(poses) == len(sched.stride_poses(NAV.STRIDE_M, max_yaw_step=NAV.YAW_STEP_MAX_RAD)) > len(sched.stride_poses(NAV.STRIDE_M))
+    assert max(abs(BP.wrap_angle(q[2] - p[2])) for p, q in zip(poses[:-1], poses[1:])) <= NAV.YAW_STEP_MAX_RAD + 1e-9  # owner 2026-10-13 item 3a
     at_init = [p for p in poses if math.hypot(p[0] - base0[0], p[1] - base0[1]) < 1e-6]
-    assert len(at_init) >= 8  # the on-the-spot turn is checked in <= 0.2 rad steps
+    assert len(at_init) >= 8  # the on-the-spot turn is checked in <= 3 deg steps
     assert rec.to_sidecar()["style"] == BP.FACE_TRAVEL
     # a record re-read from its waypoints rebuilds the same schedule (the oracle drives exactly what was checked)
     again = BP.BasePath.build(rec.waypoints, BP.BasePathConfig())
