@@ -509,6 +509,8 @@ def _jsonable(x):
 NOTE_KEYS = NOTE_KEYS + ("inhand_reaim",)
 #: room door push-close: the per-chunk record of execute.execute_push_close
 NOTE_KEYS = NOTE_KEYS + ("push_close",)
+#: owner 2026-10-12 (nextto_large): the base push of execute.execute_base_push - pushed distance, sideways drift, NextTo at the end
+NOTE_KEYS = NOTE_KEYS + ("base_push",)
 NOTE_KEYS = NOTE_KEYS + ("protection",)  # oracle.protection (owner 2026-09-26): the transits of the action and their protected objects
 NOTE_KEYS = NOTE_KEYS + ("repose",)  # block design: the joint-space re-pose before a grasp after a base move (execute.repose_arm)
 NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial 0926-061151): a failed retreat leg replaced by a planned transit

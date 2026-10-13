@@ -2,7 +2,7 @@
 
 An action is the unit of checkpoint, annotation and QA in the executor loop (§3.8). This module (TODO F6) declares
 the contract and the vocabulary — ``Navigate``, ``Transition``, ``SetTorso``, ``Grasp``, ``Lift``, ``Reorient``,
-``Place``, ``Push``, ``Brace``, ``BaseFollow``, ``PushClose``, ``Retreat`` — and implements ``targets()`` and ``annotate()``;
+``Place``, ``Push``, ``Brace``, ``BaseFollow``, ``PushClose``, ``BasePush``, ``Retreat`` — and implements ``targets()`` and ``annotate()``;
 ``execute()`` / ``postcondition()`` are declared and implemented by F2 (Layer-1 motions).
 
 ``targets(sidecar, state) -> dict`` resolves every pose / waypoint list / base path the action will track from the
@@ -1305,6 +1305,75 @@ class PushClose(Action):
         return fine, f"{fine}: joint {self.joint} from {self.q_from:.2f} rad to {self.q_lower:.2f} rad ({_deg(abs(self.q_from - self.q_lower))}), pushed in arcs of {self.chunk_deg:.0f}° about the hinge"
 
 
+#: ``contacts.push.kind`` of a base push (IORS nextto large-scale, sampler ``iors_large_nextto``)
+BASE_PUSH_KIND = "base_push"
+
+
+@dataclass(kw_only=True)
+class BasePush(Action):
+    """Push a floor-standing object along a straight floor line by driving the base, the closed hand on its push face
+    (``contacts.push`` with ``kind: "base_push"``, owner 2026-10-12 nextto_large): ``gripper(close)`` → ``arm_to(pre)`` → guarded
+    approach along the push direction until the object moves or the hand is blocked (the room door's evidence rule: a blocked
+    hand counts only when a further 1 cm push moves the object) → the arm held fixed relative to the base while the base drives
+    along the recorded line ``base_start → base_end`` for ``distance_m``; a lagging object is re-contacted, a sideways drift beyond
+    ``drift_tol_m`` (``contacts.push.drift_tol_m``) stops the drive; the drive stops ``nextto_push_on_m`` after ``partner`` is
+    NextTo the object, or when the distance is done. Postcondition: the object moved (``no_motion`` otherwise).
+
+    targets: ``{"pre": Pose, "approach": [Pose, ...], "contact": Pose, "base_path": [[x, y, yaw], [x, y, yaw]], "direction": [x, y, z],
+    "distance_m": float}`` — the pre-contact and the contact at the push stance (the approach densified with ``line_waypoints``),
+    the base line the drive follows. ``end_stance``: the recorded stance where the base ends (the program check moves there).
+    :meth:`end_pose` is where the hand is when the state can tell (the drive may stop before the recorded end), else the recorded
+    end contact ``contacts.push.goal``."""
+
+    name: str = "base_push"
+    contact: PushContact
+    base_yaw: Optional[float] = None
+    partner: Optional[str] = None
+    end_stance: Optional[str] = None
+    qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
+    TARGET_KEYS = ("pre", "approach", "contact", "base_path", "direction", "distance_m")
+
+    def __post_init__(self):
+        self.arms = (self.contact.arm,)
+        self.objects = (self.contact.object,)
+        super().__post_init__()
+
+    @property
+    def base_line(self) -> Tuple[List[float], List[float]]:
+        x = self.contact.extra
+        for k in ("base_start", "base_end"):
+            v = x.get(k)
+            if not isinstance(v, (list, tuple)) or len(v) != 3:
+                raise SidecarError(f"contacts.push.{k}: a base push records [x, y, yaw], got {v!r}")
+        return [float(v) for v in x["base_start"]], [float(v) for v in x["base_end"]]
+
+    def targets(self, sidecar, state):
+        C = _conventions()
+        c = self.contact
+        start, end = self.base_line
+        return {"pre": c.pre, "approach": _line(C, c.pre, c.init), "contact": c.init, "base_path": [start, end], "direction": list(c.direction),
+                "distance_m": c.distance_m}
+
+    def end_pose(self, sidecar, state):
+        eef = getattr(state, "eef_pose", None)
+        if callable(eef):
+            try:
+                return _as_pose(eef(self.contact.arm))
+            except Exception:  # noqa: BLE001 - no live hand (the sampler's check after a travel / contact): the record
+                pass
+        return self.contact.goal
+
+    def annotate(self, sidecar):
+        c = self.contact
+        obj = sidecar.language.phrase(c.object)
+        to = f" next to {sidecar.language.phrase(self.partner)}" if self.partner else ""
+        word = direction_word(c.direction, self.base_yaw)
+        fine = f"push {obj} {word} across the floor{to} by driving the base, the closed {_hand(c.arm)} on it"
+        h = c.extra.get("push_height_m")
+        at = f" at {_cm(float(h))} height" if isinstance(h, (int, float)) else ""
+        return fine, f"push {obj} {_cm(c.distance_m)} {word} across the floor{to} by driving the base, the closed {_hand(c.arm)} on it{at} from {_xyz(c.init.position)}"
+
+
 @dataclass(kw_only=True)
 class Retreat(Action):
     """Move the gripper clear of the object along −a from where the preceding action left it (``after.end_pose``):
@@ -1425,11 +1494,11 @@ class Retreat(Action):
         return fine, numbers
 
 
-VOCABULARY: Tuple[type, ...] = (Navigate, Transition, SetTorso, Grasp, Lift, Reorient, Place, Push, Brace, BaseFollow, PushClose, Retreat)
+VOCABULARY: Tuple[type, ...] = (Navigate, Transition, SetTorso, Grasp, Lift, Reorient, Place, Push, Brace, BaseFollow, PushClose, BasePush, Retreat)
 ACTION_NAMES: Tuple[str, ...] = tuple(cls.__dataclass_fields__["name"].default for cls in VOCABULARY)
 
 __all__ = [
     "PRE_DIST", "RETREAT_DIST", "RETREAT_LITTLE", "N_WAYPOINTS", "N_INHAND", "N_YAW_ALIGN", "N_FLIP", "QA_FAILED_GRASP",
     "State", "Action", "Navigate", "Transition", "SetTorso", "Grasp", "Lift", "Reorient", "Place", "Push", "Brace",
-    "BaseFollow", "PushClose", "Retreat", "VOCABULARY", "ACTION_NAMES", "direction_word", "yaw_align_deg", "block_reorients", "block_centre_pose",
+    "BaseFollow", "PushClose", "BasePush", "BASE_PUSH_KIND", "Retreat", "VOCABULARY", "ACTION_NAMES", "direction_word", "yaw_align_deg", "block_reorients", "block_centre_pose",
 ]

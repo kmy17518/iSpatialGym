@@ -38,6 +38,9 @@ Behaviour per action (§3.6 / §6.1):
 * ``PushClose``  per chunk: stance by backend IK → ``track_path`` → ``gripper(close)`` → ``arm_to(pre)`` → guarded
   approach → ``arm_along(arc)`` → back off (a planned push, a cabinet door's push finish: the recorded stance and contact);
   post: joint within the spec §8 tolerance of the lower limit.
+* ``BasePush``   ``gripper(close)`` → ``arm_to(pre)`` → guarded approach → ``track_path`` along the recorded base line with the
+  arm held (stopped at NextTo + a push-on, a sideways drift, or the end; a lagging object re-contacted) → unload; post: the
+  object moved (``no_motion``).
 * ``Retreat``    ``gripper(open)`` (+ release / detach) when ``release`` → ``arm_along(retreat)``.
 
 Tolerance categories: an eef / base / trunk that did not reach its recorded target is ``execution`` (a motion did
@@ -58,6 +61,7 @@ import torch as th
 from ispatialgym.oracle.actions import (
     Action,
     BaseFollow,
+    BasePush,
     Brace,
     Grasp,
     Lift,
@@ -5315,6 +5319,225 @@ def post_push_close(action: PushClose, state, targets, ctx) -> Optional[str]:
 
 
 # ==========================================================================================
+# base push (IORS nextto large-scale: a floor-standing object pushed along the floor by the base)
+# ==========================================================================================
+
+#: knobs of a base push; the sampler's record (``contacts.push`` extras of the same names) overrides each
+BASE_PUSH_DEFAULTS: Dict[str, float] = {
+    "push_speed_m_s": 0.08,  # base speed along the line (the room door's base drag: 0.06)
+    "push_yaw_rate": 0.2,
+    "moved_m": 0.003,  # the object counts as touched by the approaching hand once it moved this far along the push
+    "evidence_m": 0.002,  # a blocked hand is a contact only when a further 1 cm push moves the object this far (the room door's rule)
+    "approach_extra_m": 0.10,  # the guarded approach runs at most the pre-contact distance + this
+    "lag_m": 0.04,  # the object lags the hand's progress by more than this: the drive stops for a re-contact
+    "recontacts": 2,
+    "drift_tol_m": 0.10,  # sideways drift of the object off the line that stops the drive
+    "yaw_tol_rad": 0.35,  # turn of the object that stops the drive
+    "nextto_push_on_m": 0.05,  # once NextTo holds the drive goes on this far (the object well inside the bound), then stops
+    "nextto_hold_checks": 2,  # NextTo must read true at this many consecutive checks
+    "nextto_check_every": 5,  # steps between NextTo reads
+}
+
+
+def base_push_knobs(extra: Optional[Dict[str, Any]]) -> Dict[str, float]:
+    """:data:`BASE_PUSH_DEFAULTS` with the record's numeric overrides."""
+    out = dict(BASE_PUSH_DEFAULTS)
+    for k in out:
+        v = (extra or {}).get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)):
+            out[k] = float(v)
+    return out
+
+
+def push_frame_offset(p0, p, direction) -> Tuple[float, float]:
+    """``(along, sideways)``: the planar displacement ``p0 -> p`` along the unit push ``direction`` and across it (+ = left of it)."""
+    d = C.as_tensor(direction).reshape(-1)[:2].float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    v = C.as_tensor(p).reshape(-1)[:2].float() - C.as_tensor(p0).reshape(-1)[:2].float()
+    return float(v[0] * d[0] + v[1] * d[1]), float(-v[0] * d[1] + v[1] * d[0])
+
+
+def nextto_now(state, a: str, b: str) -> Optional[bool]:
+    """OmniGibson's ``NextTo(a, b)`` - the state the task's ``(nextto ?a ?b)`` goal reads - now; ``state.nextto(a, b)`` when the
+    state provides one (the test stubs). None when it cannot be read."""
+    fn = getattr(state, "nextto", None)
+    try:
+        if callable(fn):
+            return bool(fn(a, b))
+        from omnigibson.object_states import NextTo
+
+        oa, ob = state.object(a), state.object(b)
+        if NextTo not in getattr(oa, "states", {}):
+            return None
+        return bool(oa.states[NextTo].get_value(ob))
+    except Exception as e:  # noqa: BLE001 - a read failure is no verdict
+        log.debug("NextTo(%s, %s) unreadable (%r)", a, b, e)
+        return None
+
+
+def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    """The closed hand on the object's push face, then the base drives the object along the recorded line (owner 2026-10-12,
+    nextto_large): the pre-contact (planned to the sampler's witness, then with the object present, then ignored), a guarded
+    approach along the push direction until the object moves or the hand is blocked (a blocked hand counts only when a further 1 cm
+    push moves the object), the arm held at its joints while the base drives to the recorded end of the line - stopped once NextTo
+    holds and the object went ``nextto_push_on_m`` further, when it drifts sideways beyond ``drift_tol_m`` or turns beyond
+    ``yaw_tol_rad``, re-contacted (unload, 2 cm back, guarded approach) when it lags the hand by ``lag_m`` - the arm unloaded at the
+    end. ``ctx["base_push"]`` records the pushed distance, the sideways drift, NextTo at the end and why the drive stopped."""
+    c = action.contact
+    arm, obj = c.arm, c.object
+    knobs = base_push_knobs(c.extra)
+    start, end = action.base_line
+    d3 = th.tensor([float(c.direction[0]), float(c.direction[1]), 0.0])
+    d3 = d3 / max(float(th.linalg.norm(d3)), 1e-9)
+    rep: Dict[str, Any] = {"distance_m": round(float(c.distance_m), 4), "drift_tol_m": knobs["drift_tol_m"], "partner": action.partner, "recontacts": 0}
+    ctx["base_push"] = rep
+    _hook(ctx, "fov")(False)
+    yield from motions.gripper(arm, close=True)
+    try:
+        target_obj = [state.object(obj)]
+    except Exception:  # noqa: BLE001
+        target_obj = []
+    pose0 = tuple(x.clone() for x in state.object_pose(obj))
+    ctx["object_pose0"] = pose0
+
+    def along() -> float:
+        return push_frame_offset(pose0[0], state.object_pose(obj)[0], d3)[0]
+
+    tries: List[Tuple[str, Dict[str, Any]]] = []
+    if _witness(ctx, "pre") is not None:
+        tries.append(("the recorded witness", {"q_hint": _witness(ctx, "pre"), "accept_other_branch": True}))
+    tries += [("the object present", {"accept_other_branch": True}), ("the object ignored", {"ignore_objects": target_obj, "accept_other_branch": True})]
+    rep["pre"] = None
+    with _transit(ctx, motions, state, action, "pre_contact", target=obj):
+        for how, kw in tries:
+            try:
+                yield from motions.arm_to(arm, pose=targets["pre"], **kw)
+                rep["pre"] = how
+                break
+            except SkillError as e:
+                rep.setdefault("pre_failures", []).append(f"{how}: {(e.message or e.reason)[:140]}")
+    if rep["pre"] is None:
+        rep["result"] = "pre-contact unreachable"
+        log.warning("base_push(%s): %s (%s)", obj, rep["result"], rep.get("pre_failures"))
+        return
+    _hook(ctx, "fov")(True)
+    a = d3  # the recorded pre-contact -> contact line is horizontal along the push, whatever the hand's pitch
+    pre_dist = float(th.linalg.norm(as_world_pose(targets["contact"])[0] - as_world_pose(targets["pre"])[0]))
+
+    def contact(label: str) -> Generator[th.Tensor, None, bool]:
+        found, travelled, how = yield from guarded_approach(motions, arm, a, along, max_m=pre_dist + knobs["approach_extra_m"], move_rad=knobs["moved_m"])
+        rec: Dict[str, Any] = {"travelled_m": round(travelled, 3), "how": "object moved" if how == "leaf moved" else how}
+        if found is not None and how != "leaf moved":
+            s0 = along()
+            try:
+                eef = motions.eef_pose(arm)
+                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + 0.01 * a, C.as_tensor(eef[1]))], loaded=True)
+            except SkillError:
+                pass
+            yield from motions.hold(3)
+            moved = along() - s0 >= knobs["evidence_m"]
+            rec["evidence"] = {"object_moved_m": round(along() - s0, 4), "contact": moved}
+            if not moved:
+                found = None
+                rec["how"] = "stall at the reach limit (the object did not move under a 1 cm push)"
+        rep.setdefault("approaches", []).append({"leg": label, **rec})
+        return found is not None
+
+    if not (yield from contact("approach")):
+        rep["result"] = f"no contact ({rep['approaches'][-1]['how']})"
+        log.warning("base_push(%s): %s", obj, rep["result"])
+        _hook(ctx, "fov")(False)
+        return
+    tcfg = replace(motions.cfg.base_tracker, v_max=(knobs["push_speed_m_s"], knobs["push_speed_m_s"], knobs["push_yaw_rate"]))
+    idx = motions.robot.arm_control_idx[arm]
+    yaw0 = C.yaw_of(C.as_tensor(pose0[1]).float())
+    why: List[Optional[str]] = [None]
+    nt = {"first_along": None, "streak": 0, "steps": 0}
+    stop_reason = None
+    while True:
+        motions.state.arm_target[arm] = motions.robot.get_joint_positions()[idx].clone().float()  # the arm held fixed relative to the base
+        b0 = motions.base_pose2d()
+        s_obj0 = along()
+
+        def stop() -> bool:
+            p, q = state.object_pose(obj)
+            s, side = push_frame_offset(pose0[0], p, d3)
+            turn = abs(C.wrap_angle(C.yaw_of(C.as_tensor(q).float()) - yaw0))
+            if abs(side) > knobs["drift_tol_m"] or turn > knobs["yaw_tol_rad"]:
+                why[0] = f"drift: {side:+.3f} m sideways, {math.degrees(turn):.1f} deg turned (tolerance {knobs['drift_tol_m']:.2f} m / {math.degrees(knobs['yaw_tol_rad']):.0f} deg)"
+                return True
+            base_s = push_frame_offset(b0[:2], motions.base_pose2d()[:2], d3)[0]
+            if base_s - (s - s_obj0) > knobs["lag_m"]:
+                why[0] = f"lag: the base went {base_s:.3f} m, the object {s - s_obj0:.3f} m"
+                return True
+            if action.partner:
+                nt["steps"] += 1
+                if nt["steps"] % max(1, int(knobs["nextto_check_every"])) == 0:
+                    v = nextto_now(state, obj, action.partner)
+                    nt["streak"] = nt["streak"] + 1 if v else 0
+                    if nt["streak"] >= int(knobs["nextto_hold_checks"]) and nt["first_along"] is None:
+                        nt["first_along"] = s
+                        rep["nextto_first_at_m"] = round(s, 4)
+                if nt["first_along"] is not None and s >= nt["first_along"] + knobs["nextto_push_on_m"]:
+                    why[0] = f"nextto: held since {nt['first_along']:.3f} m, pushed on to {s:.3f} m"
+                    return True
+            return False
+
+        why[0] = None
+        motions.follow_phase = "base"
+        try:
+            stopped = yield from _until(motions.track_path([end], tracker_cfg=tcfg), stop)
+        except SkillError as e:
+            stopped, why[0] = True, f"drive: {(e.message or e.reason)[:160]}"
+        finally:
+            motions.follow_phase = "arm"
+        if not stopped:
+            stop_reason = "distance done"
+            break
+        if why[0] is not None and why[0].startswith("lag") and rep["recontacts"] < int(knobs["recontacts"]):
+            rep["recontacts"] += 1
+            rep.setdefault("lags", []).append(why[0])
+            log.info("base_push(%s): %s -> re-contact %d", obj, why[0], rep["recontacts"])
+            yield from motions.unload([arm])
+            try:
+                eef = motions.eef_pose(arm)
+                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - 0.02 * a, C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+            except SkillError:
+                pass
+            yield from contact(f"re-contact {rep['recontacts']}")
+            continue
+        stop_reason = why[0]
+        break
+    un = yield from motions.unload([arm])  # nothing springs back when the hand leaves
+    if any(v > 0.0 for v in un.values()):
+        rep["unload_rad"] = {k: round(v, 4) for k, v in un.items()}
+    yield from motions.settle(max_steps=30)
+    p, q = state.object_pose(obj)
+    s, side = push_frame_offset(pose0[0], p, d3)
+    bx, by, _ = motions.base_pose2d()
+    rep.update({"stop": stop_reason, "pushed_m": round(s, 4), "drift_m": round(side, 4), "turn_deg": round(math.degrees(abs(C.wrap_angle(C.yaw_of(C.as_tensor(q).float()) - yaw0))), 2),
+                "base_travel_m": round(push_frame_offset(start[:2], (bx, by), d3)[0], 4)})
+    if action.partner:
+        rep["nextto_end"] = nextto_now(state, obj, action.partner)
+    rep["result"] = "pushed"
+    _hook(ctx, "fov")(False)
+    log.info("base_push(%s): pushed %.3f m of %.3f m, sideways drift %+.3f m (tolerance %.2f), turned %.1f deg, NextTo(%s) at the end: %s; stop: %s; %d re-contacts",
+             obj, s, float(c.distance_m), side, knobs["drift_tol_m"], rep["turn_deg"], action.partner, rep.get("nextto_end"), stop_reason, rep["recontacts"])
+
+
+def post_base_push(action: BasePush, state, targets, ctx) -> Optional[str]:
+    """The pushed object moved (``moved_pos`` / ``moved_rot``), else ``no_motion``; whether it ended NextTo its partner is the
+    epilogue's judgement (``ctx["base_push"]`` records it)."""
+    cfg = _cfg(ctx)
+    before = ctx.get("object_pose0")
+    if before is None:
+        return "no_motion"
+    dp, da = _pose_error(state.object_pose(action.contact.object), before)
+    ctx["object_motion"] = (dp, da)
+    return None if dp > cfg.moved_pos or da > cfg.moved_rot else "no_motion"
+
+
+# ==========================================================================================
 # dispatch
 # ==========================================================================================
 
@@ -5330,6 +5553,7 @@ EXECUTORS: Dict[type, Tuple[ExecuteFn, PostconditionFn]] = {
     Brace: (execute_brace, post_brace),
     BaseFollow: (execute_base_follow, post_base_follow),
     PushClose: (execute_push_close, post_push_close),
+    BasePush: (execute_base_push, post_base_push),
     Retreat: (execute_retreat, post_retreat),
 }
 
@@ -5380,5 +5604,6 @@ __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
     "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "contact_ignores", "escape_direction", "reach_pre_pose", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
-    "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry", "push_stop_facts",
+    "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry", "push_stop_facts", "BASE_PUSH_DEFAULTS", "base_push_knobs",
+    "push_frame_offset", "nextto_now",
 ]

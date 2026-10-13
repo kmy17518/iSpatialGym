@@ -1112,6 +1112,25 @@ class _Tracker:
         self._shift(name, pushed, d * travel, sampler)
         sampler.kit.sync_world()
 
+    def advance_base_push(self, action, sampler) -> None:
+        """A base push (IORS nextto large-scale): the robot ends at the push's recorded ``end_stance`` and the pushed object
+        ``distance_m`` further along the push direction, so the retreat is checked from there against the object where the push
+        leaves it (restored by :meth:`restore_moved`)."""
+        end = getattr(action, "end_stance", None)
+        if end in self.sidecar.stances:
+            self.stance = end
+            self.stance_obj = None
+        contact = getattr(action, "contact", None)
+        name = getattr(contact, "object", None)
+        if contact is None or sampler is None or name not in getattr(sampler, "objects", {}):
+            return
+        d = th.tensor([float(v) for v in contact.direction])
+        d[2] = 0.0
+        if float(th.linalg.norm(d)) < 1e-6:
+            return
+        self._shift(name, sampler.objects[name], d / th.linalg.norm(d) * float(contact.distance_m), sampler)
+        sampler.kit.sync_world()
+
     def _shift(self, name: str, obj, delta: th.Tensor, sampler) -> None:
         p0, q0 = obj.get_position_orientation()
         if name not in self.moved:
@@ -1216,6 +1235,8 @@ class _Tracker:
             from ispatialgym.sampling.v2.tasks import articulation_hybrid as AH
 
             self.stance_obj = AH.end_stance_from_witness(witnesses["follow_end"])
+        elif name == "base_push":
+            self.advance_base_push(action, sampler)
         if name == "grasp":
             # a handle grasp does not carry anything: the articulated object stays in the world and only its handle link
             # moves with the hand along the recorded joint trajectory (large articulation, Rs_int drawer bamfsz_1: the
@@ -1790,7 +1811,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     # at 3 cm above the push goal reached past the narrow box into the partner it now touches ('retreat: exact IK failed at
     # pose 1 of 3 ... after push' on 7/16 attempts of touching 0918-181010)
     after_name = getattr(getattr(action, "after", None), "name", None)
-    fingers = 0.0 if name in ("push", "brace") or (name == "retreat" and after_name == "push") else None
+    fingers = 0.0 if name in ("push", "brace", "base_push") or (name == "retreat" and after_name in ("push", "base_push")) else None
     if name == "brace":  # a wide stop braces with the fingers pre-shaped open (owner 2026-09-19 00:49)
         wide = (getattr(getattr(action, "contact", None), "extra", None) or {}).get("fingers_opening_m")
         if wide is not None:
