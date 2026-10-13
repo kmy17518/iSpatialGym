@@ -1362,6 +1362,17 @@
    "pick": "inter_object_relation_satisfaction-inside_large_scale#03~c2",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor",
+   "id": 123,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-89 with the target serving_cart/heqtlk and the relation nextto, owner ~16:05 nextto_large#02)",
+   "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
+   "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto_large_scale#02",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
