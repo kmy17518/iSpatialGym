@@ -41554,6 +41554,122 @@
   "constraints": [],
   "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c1: briefcase/lwbctq under desk_pfsjbc_0 from the floor of lobby_0; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#02 on the sheet rows with the floor init as the pick's only support row (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
  },
+ "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_place": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 141,
+  "roles": {
+   "target": {
+    "category": "briefcase",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "lwbctq",
+    "orientation_equivalences": {
+     "briefcase/lwbctq": []
+    },
+    "grasp_keys": {
+     "briefcase/lwbctq": "briefcase__lwbctq"
+    }
+   },
+   "partner": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "lobby_0"
+    ],
+    "bindings": {
+     "partner": [
+      "desk_pfsjbc_0"
+     ],
+     "support": {
+      "room": "lobby_0"
+     },
+     "floor": {
+      "room": "lobby_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "briefcase": [
+       "lwbctq"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "briefcase": {
+       "uquevd": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0",
+   "push_under_palm_contact": false,
+   "under_mode": "place",
+   "under_axis_max_deg": 45.0,
+   "carry_collision_margin_m": 0.01,
+   "_push_under_variant_note": "owner 2026-10-12 ~21:25: under_large#02 / #03 variant 'place' on a copy of inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor (palm contact off; keys {\"under_mode\": \"place\", \"under_axis_max_deg\": 45.0, \"carry_collision_margin_m\": 0.01}); it runs side by side with the push steps on the originals - per pick the first instance by wall clock is pinned and its keys are adopted on the pick's aliases"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c1: briefcase/lwbctq under desk_pfsjbc_0 from the floor of lobby_0; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#02 on the sheet rows with the floor init as the pick's only support row (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
+ },
  "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_flat": {
   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
   "definition_id": 139,
@@ -41788,6 +41904,122 @@
    "init_support_fallback": true,
    "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0",
    "push_under_palm_contact": true
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c2: briefcase/lwbctq under desk_mdhelw_0 (the held-out desk) from the floor of private_office_3; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#02 on the sheet rows with the floor init as the pick's only support row and desk_mdhelw_0 as its representative partner (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
+ },
+ "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_place": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 142,
+  "roles": {
+   "target": {
+    "category": "briefcase",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "lwbctq",
+    "orientation_equivalences": {
+     "briefcase/lwbctq": []
+    },
+    "grasp_keys": {
+     "briefcase/lwbctq": "briefcase__lwbctq"
+    }
+   },
+   "partner": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_3"
+    ],
+    "bindings": {
+     "partner": [
+      "desk_mdhelw_0"
+     ],
+     "support": {
+      "room": "private_office_3"
+     },
+     "floor": {
+      "room": "private_office_3"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "briefcase": [
+       "lwbctq"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "briefcase": {
+       "uquevd": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0",
+   "push_under_palm_contact": false,
+   "under_mode": "place",
+   "under_axis_max_deg": 45.0,
+   "carry_collision_margin_m": 0.01,
+   "_push_under_variant_note": "owner 2026-10-12 ~21:25: under_large#02 / #03 variant 'place' on a copy of inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor (palm contact off; keys {\"under_mode\": \"place\", \"under_axis_max_deg\": 45.0, \"carry_collision_margin_m\": 0.01}); it runs side by side with the push steps on the originals - per pick the first instance by wall clock is pinned and its keys are adopted on the pick's aliases"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c2: briefcase/lwbctq under desk_mdhelw_0 (the held-out desk) from the floor of private_office_3; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#02 on the sheet rows with the floor init as the pick's only support row and desk_mdhelw_0 as its representative partner (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
@@ -43823,7 +44055,8 @@
    "init_support_fallback": true,
    "under_mode": "place",
    "under_axis_max_deg": 45.0,
-   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0; under_mode place: the target is placed under the desk from the under-band (no floor push)"
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0; under_mode place: the target is placed under the desk from the under-band (no floor push)",
+   "carry_collision_margin_m": 0.01
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c2: trash_can/jlawet under desk_mdhelw_1 from the floor of private_office_2, place-under (generation.under_mode place); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#03 on the sheet rows (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"

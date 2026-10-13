@@ -1560,6 +1560,28 @@
    "pick": "inter_object_relation_satisfaction-under_large_scale#02~c2_flat",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_place",
+   "id": 141,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-117, variant 'place', owner ~21:25 under_large#02 / #03)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#02~c1_place",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_place",
+   "id": 142,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-118, variant 'place', owner ~21:25 under_large#02 / #03)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#02~c2_place",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
