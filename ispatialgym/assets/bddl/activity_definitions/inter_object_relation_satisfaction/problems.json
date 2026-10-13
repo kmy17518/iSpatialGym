@@ -1516,6 +1516,17 @@
    "pick": "inter_object_relation_satisfaction-inside_large_scale#03~V4a/V4b",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink_xecfyh_0-commercial_kitchen_table",
+   "id": 137,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-136 with the V4 ALT keys drop_height_m 0.22 + inside_stance_postures, owner ~21:10 inside_large#03 V4b)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#03~V4b",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }

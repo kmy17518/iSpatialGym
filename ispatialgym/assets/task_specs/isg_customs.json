@@ -30307,6 +30307,135 @@
   "constraints": [],
   "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V4: plate/luhkiz into commercial_kitchen_sink_xecfyh_0 from commercial_kitchen_table_nisnrl_0 (the table beside the sink, ~1.3 m) / commercial_kitchen_table_vxvtec_0 (the prep table, ~4.7 m); the order pins one per step; the partner is the sheet's held-out commercial_kitchen_sink_xecfyh_0 (restaurant_diner kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V4 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
  },
+ "inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink_xecfyh_0-commercial_kitchen_table": {
+  "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+  "definition_id": 137,
+  "roles": {
+   "target": {
+    "category": "plate",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "luhkiz",
+    "orientation_equivalences": {
+     "plate/luhkiz": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "plate/luhkiz": "plate__luhkiz__ts"
+    }
+   },
+   "partner": {
+    "category": "commercial_kitchen_sink",
+    "sampleable": false
+   },
+   "support": {
+    "category": "commercial_kitchen_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "partner": [
+      "commercial_kitchen_sink_xecfyh_0"
+     ],
+     "support": [
+      "commercial_kitchen_table_nisnrl_0",
+      "commercial_kitchen_table_vxvtec_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "commercial_kitchen_table_nisnrl_0",
+       "init": "ontop",
+       "top_z": 0.87,
+       "row": "inter_object_relation_satisfaction-inside_large_scale#03~V4a"
+      },
+      {
+       "name": "commercial_kitchen_table_vxvtec_0",
+       "init": "ontop",
+       "top_z": 0.87,
+       "row": "inter_object_relation_satisfaction-inside_large_scale#03~V4b"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "plate": [
+       "luhkiz"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "plate": {
+       "ntedfx": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.01,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "inside_surface_z_m": 0.67,
+   "inside_surface_tol_m": 0.25,
+   "inside_stance_side": "-y",
+   "_inside_note": "owner 2026-10-12 ~21:10 V4b: a copy of alias 136 (V4, run as specified) with the ALT keys; owner 2026-10-12 ~20:30 inside03v V4 (inside_large#03 variant: commercial_kitchen_sink_xecfyh_0; ALT of the owner's no-drop V4: the release above its rim, as V2 / V3): the sink's basin floor (no fillable meta link) - support_interior requested at 0.67 m +- 0.25 (the sheet's lowest level; the rays start at 0.71, under its 0.85 / 0.87 levels) = the goal-side band's --surface-z / --surface-tol; probes 17833567 / 17833631: the floor at 0.683 m above the floor (z 0.687), 376 board cells in 6 board pieces - one compartment 0.42 m (x) x 0.38 m (y) plus an 8-cell strip behind it, no open side, headroom median 1.5 m (min 0.20 under the wall shelf), the sink's support top (the drop test's rim) 0.870 m above the floor; stance C on the side facing -y (the raster's +u side, 0.40 m; the sink's front, sheet best_side=-y); drop_height_m 0.22 = the rim 0.870 - the floor 0.683 + 0.03 (the plate's bottom ~3 cm above the rim at the release; without it the default-eroded goal cells leave 5-9 cm from the plate's rim to each wall and the goal-side band probe 17833567 found no reachable floor-level grasp there) and default erosion (half extent + opening_margin_m = 0.14 m from the board's outline: 9 goal cells at the compartment's centre, 5-9 cm from the plate's rim to each wall); carry_collision_margin_m 0.01, partner_view_min_points 1, init_support_max_geodesic_m 10, max_partner_geodesic_m 10 as alias 121, no init_support_fallback; inside_stance_postures [untucked, ready, tucked]: the band probe 17833567 at the sink's -y side found no trunk free with untucked arms at stand-off 0.45 (every free trunk ready / tucked), as alias 128 at the fridge",
+   "carry_collision_margin_m": 0.01,
+   "drop_height_m": 0.22,
+   "inside_stance_postures": [
+    "untucked",
+    "ready",
+    "tucked"
+   ]
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V4: plate/luhkiz into commercial_kitchen_sink_xecfyh_0 from commercial_kitchen_table_nisnrl_0 (the table beside the sink, ~1.3 m) / commercial_kitchen_table_vxvtec_0 (the prep table, ~4.7 m); the order pins one per step; the partner is the sheet's held-out commercial_kitchen_sink_xecfyh_0 (restaurant_diner kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V4 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
+ },
  "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-bar": {
   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
   "definition_id": 122,
