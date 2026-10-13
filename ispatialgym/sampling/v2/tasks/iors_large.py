@@ -2960,6 +2960,78 @@ class IORSLarge(SamplerV2):
                 if not o.get("ok"):
                     TT._count(self, "arm_band_mirrored.ik_failed")
 
+    #: failed attached place / drop IKs per C candidate logged with the failing pose, the IK's reason and the contacts (owner 2026-10-13
+    #: ~00:50 item 2; diagnostics only)
+    PLACE_IK_DIAG_PER_C = 3
+
+    def _ik_solution_of(self, arm: str, pose) -> Optional[th.Tensor]:
+        """``IKChecker.solutions``' entry of ``pose`` (``exact`` writes a fresh one for every pose it solves), None without one."""
+        try:
+            return self.ikc.solutions.get((arm, self.ikc._pose_key(pose)))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _place_ik_fail_line(self, r2, place: Stance, g, yaw: float, tilt: float, pre_place, place_eef, arm: str, q_seed, ignore_place, pre_before,
+                            push: bool = False) -> str:
+        """The log line of a failed attached [pre-place, place] exact IK at C (diagnostic, called inside the attachment, no effect on the draw):
+        the pose that failed - the place / drop when the call left a fresh pre-place solution (``pre_before``: the entry before the call) -,
+        the IK's reason and the contacts of a configuration reaching that pose (:meth:`_place_ik_contacts`, from the pre-place solution /
+        the carry seed)."""
+        q_pre = self._ik_solution_of(arm, pre_place)
+        pre_ok = q_pre is not None and q_pre is not pre_before
+        which, pose, ign = ("drop" if push else "place", place_eef, list(ignore_place)) if pre_ok else ("pre-place", pre_place, [])
+        try:
+            contacts = self._place_ik_contacts(pose, q_pre if pre_ok else (q_seed if q_seed is not None else self.ikc.q_locked(place)), arm, ign)
+        except Exception as e:  # noqa: BLE001 - a diagnostic never fails the draw
+            contacts = f"not computed ({e!r})"[:200]
+        return (f"C place IK (attached) fail at d {place.stand_off or 0.0:.2f} λ {place.lateral:+.2f} trunk ({place.translate:.2f}, {place.tilt:.2f}): "
+                f"grasp {getattr(g, 'name', g)} yaw {float(yaw):.2f} tilt {float(tilt):g}: pose {which}: {r2.reason}; contacts: {contacts}")
+
+    def _place_ik_contacts(self, pose, q_start, arm: str, ignored) -> str:
+        """Contacts of a configuration reaching ``pose`` (diagnostic): damped least squares from ``q_start`` with collisions off (as
+        ``IKChecker.polish_witness``), then with ``ignored`` out of the world ``links x object/mesh`` per collision mesh of the partner or a
+        spawned object whose removal frees links (the carried object is ``attached_object_<arm>_eef_link``), the self-collision pairs and
+        ``_collision_blame`` for links no such mesh frees - or why there are none (not reached: reach / joint limits; no contact: the
+        IK's seeds or its joint-limit margin)."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        be, ikc = self.kit.backend, self.ikc
+        self.kit._ensure_synced()
+        res = be.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(pose[0]), G.t(pose[1]))}], q_start=G.t(q_start), pos_tol=1e-3, rot_tol=5e-3,
+                               max_iters=100, check_collisions=False, sync_world=False, max_joint_step=0.3)
+        q = res.q_traj[-1].clone() if getattr(res, "q_traj", None) is not None else G.t(q_start).clone()
+        m_lim, jn = ikc.joint_limit_margin(q, arm)
+        lim = f"{jn} {m_lim * 1000:.0f} mrad from its limit"
+        if not ikc.reaches(q, pose, arm):
+            return f"none - not reached with collisions off ({ikc.fk_residual(q, pose, arm) * 1000:.0f} mm short, {lim})"
+        pairs: List[str] = []
+        with ikc.ignoring(list(ignored)):
+            if bool(self.kit.collision_free(q, margin=0.0)[0]):
+                return f"none at a configuration reaching the pose with collisions off ({lim})"
+            touches = lambda link: bool(be.link_proximity(q, [link], 0.0, emb_name="whole_body")[0])  # noqa: E731
+            hit = {l for l in set(be._collision_costs(be.kin_entry("whole_body"))["link_of_sphere"]) if touches(l)}
+            off = set(be._disabled_obstacles) | set(getattr(be, "_held_off", set()))
+            freed_any: set = set()
+            for o in [self.partner] + list(getattr(self.world, "spawned", {}).values()):
+                for link in getattr(o, "links", {}).values():
+                    for cm in getattr(link, "collision_meshes", {}).values():
+                        name = cm.prim_path
+                        if not hit or name not in be._world_mesh_names or name in off:
+                            continue
+                        be._mesh_enable(name, False)
+                        try:
+                            freed = {l for l in hit if not touches(l)}
+                        finally:
+                            be._mesh_enable(name, True)
+                        if freed:
+                            freed_any |= freed
+                            pairs.append(f"{'/'.join(sorted(freed))} x {getattr(o, 'name', o)}/{name.rsplit('/', 1)[-1]}")
+        pairs += [f"{a} x {b} (self, {pen * 1000:.0f} mm)" for (a, b), pen in ikc.self_collision_pairs(q)[:2]]
+        rest = sorted(hit - freed_any)
+        if rest or not pairs:
+            pairs.append(f"{'/'.join(rest) or 'no link in the world'}: {ikc._collision_blame(q, list(ignored))}")
+        return f"{', '.join(pairs)} ({lim})"
+
     def _couple(self, rng, init: Stance, manip: Stance, c_pool: List[Stance], F_init, focus_xy, z_init: float, seg: Optional[SegmentArms] = None) -> Draft:
         """B ↔ C coupling: for C survivors in random order, F_goal at the goal cell for the init yaws, the draw from
         F_init ∩ F_goal, the target pose at B's focus, the exact IK at B and at C (attached), the B → C path and
@@ -3166,6 +3238,7 @@ class IORSLarge(SamplerV2):
                 errors.append(f"C: F_init ({len(F_live)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
             fails: Dict[str, int] = {}
+            n_place_diag = 0  # failed attached place IKs logged at this C (PLACE_IK_DIAG_PER_C)
             # pairs of F tried per C: the push-under chain search (4 pitches x 2 wrist turns x exact IK) is the expensive leg, so the
             # push mode keeps the earlier 4 draws (0919-233031: 8 draws x 12 C candidates spent the 900 s budget on attempts 0 and 2)
             draw_order = list(rng.permutation(len(F)))
@@ -3304,10 +3377,15 @@ class IORSLarge(SamplerV2):
                     if q_lift_seed is not None:
                         q_seed = self.ikc.q_locked(place).clone()
                         q_seed[self.kit.robot.arm_control_idx[arm]] = q_lift_seed
+                    pre_before = self._ik_solution_of(arm, pre_place) if n_place_diag < self.PLACE_IK_DIAG_PER_C else None
                     with attached(self.kit, arm, target, eef_in_object=g.pose):
                         r2 = self.ikc.exact([pre_place, place_eef], place, arm, ignore_for_last=ignore_place, cache=False, q_seed=q_seed)
+                        if not r2.ok and n_place_diag < self.PLACE_IK_DIAG_PER_C:
+                            n_place_diag += 1
+                            log.info("%s: %s", self.gp.alias, self._place_ik_fail_line(r2, place, g, yaw, tilt, pre_place, place_eef, arm, q_seed, ignore_place,
+                                                                                       pre_before, push))
                     if not r2.ok:
-                        c_fails.append(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)")
+                        c_fails.append(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached): {r2.reason[:200]}")
                         continue
                     if q_lift_seed is not None and r2.q is not None:
                         # a loose sanity bound only (2026-09-21 01:30): the branch the oracle reaches the pre-place in is decided by the straight

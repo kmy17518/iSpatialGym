@@ -471,7 +471,18 @@ class InsideMode:
             pos = th.tensor([0.0, 0.0, z_s + self.world.bottom_offset(self.hull, quat) + drop])
             lows = [float(gripper_corners_world(IK.grasp_pose((pos, quat), g.pose))[:, 2].min()) for g in self.grasps]
             memo[key] = drop + release_lift(lows, z_s, float(self.num("release_clearance_m", RELEASE_CLEARANCE_M)))
+            if not self.__dict__.get("_inside_release_logged"):
+                self.__dict__["_inside_release_logged"] = True
+                self._log_release_lift(lows, z_s, drop)
         return memo[key]
+
+    def _log_release_lift(self, lows: Sequence[float], z_s: float, drop: float) -> None:
+        """Once per template (the first release orientation :meth:`release_above` computes): the lift each library grasp needs for its open
+        gripper to clear the surface by ``release_clearance_m`` and the one used, their max (owner 2026-10-13 ~00:50 item 2)."""
+        clearance = float(self.num("release_clearance_m", RELEASE_CLEARANCE_M))
+        per = ", ".join(f"{getattr(g, 'name', i)}: {release_lift([lo], z_s, clearance):.3f} m" for i, (g, lo) in enumerate(zip(self.grasps, lows)))
+        log.info("%s: inside release lift per grasp: {%s}, used (max) %.3f m (drop_height_m %.3f, release_clearance_m %.3f: the target's bottom %.3f m "
+                 "above the surface)", self.gp.alias, per, release_lift(lows, z_s, clearance), drop, clearance, drop + release_lift(lows, z_s, clearance))
 
     def goal_pose_at(self, goal_cell, quat) -> G.Pose:
         """The release pose: the goal cell, the target's bottom :meth:`release_above` above the interior surface (the goal check settles it)."""

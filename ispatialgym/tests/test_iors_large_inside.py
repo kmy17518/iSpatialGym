@@ -124,6 +124,7 @@ class _Stub:
     prepare_partner = IN.InsideMode.prepare_partner
     inside_surface_spec = IN.InsideMode.inside_surface_spec
     release_above = IN.InsideMode.release_above
+    _log_release_lift = IN.InsideMode._log_release_lift
     goal_pose_at = IN.InsideMode.goal_pose_at
     num = IL.IORSLarge.num
 
@@ -222,6 +223,25 @@ def test_release_above_clears_the_surface_with_every_grasp():
     assert float(pose[0][2]) == pytest.approx(0.70 + 0.0108 + above) and float(pose[0][0]) == pytest.approx(0.05)
     lows = [float(gripper_corners_world((pose[0] + g.pose[0], g.pose[1]))[:, 2].min()) for g in s2.grasps]
     assert min(lows) >= 0.70 + IN.RELEASE_CLEARANCE_M - 1e-5
+
+
+def test_release_lift_per_grasp_logged_once_per_template(caplog):
+    """Owner 2026-10-13 ~00:50 item 2: one line per template with the lift each library grasp needs and the one used (their max); the
+    release heights are those of the unlogged computation."""
+    quat, turned = th.tensor([0.0, 0.0, 0.0, 1.0]), IN.G.quat_from_yaw(0.7)
+    high, low = _top_down_grasp(0.10), SimpleNamespace(name="g_low", pose=_top_down_grasp(0.0).pose)
+    s = _Stub(inside_surface_z_m=0.80, grasps=[high, low])
+    s.prepare_partner()
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        above, above_turned = s.release_above(quat), s.release_above(turned)  # a second orientation: computed, not logged again
+    lines = [r.getMessage() for r in caplog.records if "inside release lift per grasp" in r.getMessage()]
+    z_s, clearance = 0.70, IN.RELEASE_CLEARANCE_M
+    pos = th.tensor([0.0, 0.0, z_s + 0.0108 + IN.DROP_HEIGHT_M])
+    lows = [float(gripper_corners_world(IN.IK.grasp_pose((pos, quat), g.pose))[:, 2].min()) for g in s.grasps]
+    assert above == pytest.approx(IN.DROP_HEIGHT_M + IN.release_lift(lows, z_s, clearance)) and above_turned == pytest.approx(above, abs=1e-6)
+    lift = above - IN.DROP_HEIGHT_M
+    assert lift > 0.0 and len(lines) == 1
+    assert f"inside release lift per grasp: {{g: 0.000 m, g_low: {lift:.3f} m}}, used (max) {lift:.3f} m" in lines[0]
 
 
 #: plate__luhkiz__ts grasp_5, the plate's one library row: a side pinch at the rim from outside (approach inward, 28 deg below horizontal)
@@ -691,3 +711,118 @@ def test_inside_program_drops_into_the_partner():
     d["paths"] = []
     with pytest.raises(Exception, match="paths"):
         expand(sc.alias, Sidecar.from_dict(d))
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the attached place IK at C: failure diagnostics (owner 2026-10-13 ~00:50 item 2)
+# ----------------------------------------------------------------------------------------------------------------
+
+FRIDGE = "/World/scene_0/fridge_petcxr_0"
+SHELF_ABOVE, DOOR, BOARD = f"{FRIDGE}/shelf_2/collisions/petcxr__shelf_2__collision__0", f"{FRIDGE}/door/collisions/petcxr__door__collision__0", \
+    f"{FRIDGE}/shelf_1/collisions/petcxr__shelf_1__collision__0"
+JAR_LINK = "attached_object_right_eef_link"
+
+
+class _PlaceDiagStub:
+    """What :meth:`IORSLarge._place_ik_fail_line` reads: a backend whose links touch the meshes ``touch`` names while those are enabled,
+    a collision-blind differential IK landing on ``q_reach`` (reaching the pose when ``reach``), an IK checker with its ``solutions``."""
+
+    _ik_solution_of = IL.IORSLarge._ik_solution_of
+    _place_ik_fail_line = IL.IORSLarge._place_ik_fail_line
+    _place_ik_contacts = IL.IORSLarge._place_ik_contacts
+
+    def __init__(self, touch, reach=True):
+        self.touch, self.enabled, self.ik_paths, self.ignored = dict(touch), {m: True for m in (SHELF_ABOVE, DOOR, BOARD)}, [], []
+        self.q_reach = th.full((28,), 0.3)
+        mesh = lambda path: SimpleNamespace(prim_path=path)  # noqa: E731
+        self.partner = SimpleNamespace(name="fridge_petcxr_0", links={n: SimpleNamespace(collision_meshes={"c": mesh(p)})
+                                                                       for n, p in (("shelf_2", SHELF_ABOVE), ("door", DOOR), ("shelf_1", BOARD))})
+        self.world = SimpleNamespace(spawned={"jar": SimpleNamespace(name="jar", links={})})
+        be = SimpleNamespace(_world_mesh_names=set(self.enabled), _disabled_obstacles=set(), _held_off=set(), kin_entry=lambda name: name,
+                             _collision_costs=lambda entry: {"link_of_sphere": [JAR_LINK, JAR_LINK, "right_gripper_link", "right_arm_link4"]},
+                             _mesh_enable=self.enabled.__setitem__, link_proximity=self._link_proximity, solve_ik_path=self._solve_ik_path)
+        self.kit = SimpleNamespace(backend=be, _ensure_synced=lambda: None,
+                                   collision_free=lambda q, margin=0.0: th.tensor([not any(self._touches(l) for l in self.touch)]))
+        self.ikc = SimpleNamespace(solutions={}, _pose_key=IL.IK.IKChecker._pose_key, joint_limit_margin=lambda q, arm: (0.31, "right_arm_joint6"),
+                                   reaches=lambda q, pose, arm: reach, fk_residual=lambda q, pose, arm: 0.034, q_locked=lambda st: th.zeros(28),
+                                   ignoring=self._ignoring, self_collision_pairs=lambda q: [],
+                                   _collision_blame=lambda q, ign: "collides with the scene object wall_3 (1.10 m from the base)",
+                                   exact=lambda *a, **k: pytest.fail("the diagnostic re-solved the IK"))
+
+    def _touches(self, link):
+        return any(self.enabled[m] for m in self.touch.get(link, ()))
+
+    def _link_proximity(self, q, links, margin, emb_name="whole_body"):
+        assert th.equal(q, self.q_reach) and margin == 0.0
+        return th.tensor([any(self._touches(l) for l in links)])
+
+    def _solve_ik_path(self, emb, waypoints, q_start=None, check_collisions=True, sync_world=True, **kw):
+        assert check_collisions is False and sync_world is False
+        self.ik_paths.append((emb, waypoints, q_start))
+        return SimpleNamespace(success=True, q_traj=th.stack([th.as_tensor(q_start, dtype=th.float32), self.q_reach]))
+
+    def _ignoring(self, objs):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def ctx():
+            self.ignored.append([getattr(o, "name", o) for o in objs])
+            yield
+
+        return ctx()
+
+
+def _place_poses():
+    q = th.tensor([0.0, 0.70710677, 0.0, 0.70710677])
+    return (th.tensor([0.40, 0.10, 0.92]), q), (th.tensor([0.50, 0.10, 0.92]), q)
+
+
+@pytest.mark.parametrize("pre_solved", [False, True])
+def test_place_ik_failure_line_names_the_pose_reason_and_contacts(pre_solved):
+    """The pose that failed (the place when the IK call wrote a fresh pre-place solution), the IK's reason and the robot / carried-object
+    links x the partner's meshes they touch at a collision-blind configuration reaching that pose; the IK result, the IK checker's
+    remembered solutions and the collision world are as before (no re-solve; the meshes switched off one at a time are back on)."""
+    s = _PlaceDiagStub({JAR_LINK: [SHELF_ABOVE], "right_gripper_link": [DOOR, SHELF_ABOVE]})
+    pre_place, place_eef = _place_poses()
+    key = ("right", IL.IK.IKChecker._pose_key(pre_place))
+    stale = th.full((28,), 0.1)
+    s.ikc.solutions[key] = stale
+    pre_before = s._ik_solution_of("right", pre_place)
+    q_pre = th.full((28,), 0.2)
+    if pre_solved:
+        s.ikc.solutions[key] = q_pre  # what exact() leaves when the pre-place solved
+    reason = "approach_untrackable: a configuration just before the end pose collides" if pre_solved else "exact IK failed at pose 1 of 2"
+    r2 = IL.IK.IKResult(False, None, reason, 2)
+    q_seed, floor = th.full((28,), 0.05), SimpleNamespace(name="floor_0")
+    solutions = dict(s.ikc.solutions)
+    line = s._place_ik_fail_line(r2, PLACE_C, SimpleNamespace(name="grasp_3"), 1.25, 0.0, pre_place, place_eef, "right", q_seed, [floor], pre_before)
+    assert line.startswith("C place IK (attached) fail at d 0.45 λ +0.10 trunk (0.50, -0.30): grasp grasp_3 yaw 1.25 tilt 0: ")
+    # the jar touches the shelf above alone; the gripper touches the door and that shelf at once: no single mesh frees it
+    assert line.endswith(f"pose {'place' if pre_solved else 'pre-place'}: {reason}; contacts: {JAR_LINK} x fridge_petcxr_0/petcxr__shelf_2__collision__0, "
+                         "right_gripper_link: collides with the scene object wall_3 (1.10 m from the base) (right_arm_joint6 310 mrad from its limit)")
+    (emb, wps, q_start), = s.ik_paths
+    assert emb == "right_arm" and th.equal(q_start, q_pre if pre_solved else q_seed)
+    assert th.allclose(list(wps[0].values())[0][0], (place_eef if pre_solved else pre_place)[0])
+    assert s.ignored == [["floor_0"] if pre_solved else []]
+    assert (r2.ok, r2.q, r2.reason) == (False, None, reason) and s.ikc.solutions == solutions and all(s.enabled.values())
+
+
+def test_place_ik_failure_line_single_mesh_pairs_rest_and_unreached():
+    """Each mesh whose removal frees links is named with them; links touching two meshes at once (or a scene mesh) fall to
+    ``_collision_blame``; a pose the collision-blind IK does not reach is a reach / joint-limit failure, without a collision query."""
+    s = _PlaceDiagStub({JAR_LINK: [BOARD], "right_arm_link4": [DOOR, SHELF_ABOVE]})
+    pre_place, place_eef = _place_poses()
+    r2 = IL.IK.IKResult(False, None, "exact IK failed at pose 1 of 2", 2)
+    line = s._place_ik_fail_line(r2, PLACE_C, SimpleNamespace(name="grasp_0"), 0.0, 30.0, pre_place, place_eef, "right", None, [], None)
+    contacts = line.split("contacts: ", 1)[1]
+    assert "tilt 30: pose pre-place" in line and contacts.startswith(f"{JAR_LINK} x fridge_petcxr_0/petcxr__shelf_1__collision__0, ")
+    assert "right_arm_link4: collides with the scene object wall_3 (1.10 m from the base)" in contacts and all(s.enabled.values())
+    s2 = _PlaceDiagStub({JAR_LINK: [BOARD]}, reach=False)
+    s2.kit.collision_free = lambda q, margin=0.0: pytest.fail("a collision query for an unreached pose")
+    line2 = s2._place_ik_fail_line(r2, PLACE_C, SimpleNamespace(name="grasp_0"), 0.0, 0.0, pre_place, place_eef, "right", None, [], None, push=True)
+    assert line2.endswith("pose pre-place: exact IK failed at pose 1 of 2; contacts: none - not reached with collisions off (34 mm short, "
+                          "right_arm_joint6 310 mrad from its limit)")
+    s3 = _PlaceDiagStub({})
+    s3.kit.backend.solve_ik_path = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("cuRobo down"))
+    line3 = s3._place_ik_fail_line(r2, PLACE_C, SimpleNamespace(name="grasp_0"), 0.0, 0.0, pre_place, place_eef, "right", None, [], None)
+    assert "contacts: not computed (RuntimeError('cuRobo down'))" in line3
