@@ -1,9 +1,11 @@
 """The oracle's ``BasePush`` (owner 2026-10-12, IORS nextto large-scale): a floor-standing object pushed along a straight floor line by
 the base with the closed hand on it - the executor against stub motions (approach, drive, the NextTo stop, drift, the re-contact of a
-lagging object) and the program check's tracker after the push (no simulator)."""
+lagging object, the realign of a turning one) and the program check's tracker after the push (no simulator)."""
 
 from __future__ import annotations
 
+import logging
+import math
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple
@@ -33,36 +35,69 @@ class _Tracker:
 
 
 class _World:
-    """A cart on a line (x) pushed by a hand fixed relative to the base: the hand at base x + ``reach`` (plus the arm's own
-    moves), the cart's back face ``half`` behind its centre; NextTo once the cart's centre passes ``nextto_x``; ``drift`` m sideways
-    per base step while pushed; ``stick`` steps of the drive in which the cart does not follow the hand."""
+    """A cart pushed along the floor by a hand fixed relative to the base: the hand at the base pose (x, y, yaw) moved ``reach`` plus the
+    arm's own offset in the base frame; the cart's back face ``half`` behind its centre (the root; the face's outward normal its local
+    -x); NextTo once the cart's centre passes ``nextto_x``; ``drift`` m sideways per base step while pushed; ``stick`` steps of the drive
+    in which the cart does not follow the hand; ``spin`` rad the cart turns about the hand per base step while pushed."""
 
-    def __init__(self, cart_x=1.0, base_x=0.25, reach=0.55, half=0.2, nextto_x=2.5, drift=0.0, stick=0):
+    def __init__(self, cart_x=1.0, base_x=0.25, reach=0.55, half=0.2, nextto_x=2.5, drift=0.0, stick=0, spin=0.0):
         self.cart = [cart_x, 0.0]
+        self.yaw = 0.0
         self.base = [base_x, 0.0, 0.0]
-        self.reach, self.half, self.nextto_x, self.drift, self.stick = reach, half, nextto_x, drift, stick
-        self.arm = -0.1  # the hand's offset from base + reach (the pre-contact 10 cm back)
+        self.reach, self.half, self.nextto_x, self.drift, self.stick, self.spin = reach, half, nextto_x, drift, stick, spin
+        self.arm = [-0.1, 0.0]  # the hand's offset from base + reach in the base frame (the pre-contact 10 cm back)
 
-    def hand_x(self) -> float:
-        return self.base[0] + self.reach + self.arm
+    def hand(self) -> Tuple[float, float]:
+        bx, by, byaw = self.base
+        ox, oy = self.reach + self.arm[0], self.arm[1]
+        return bx + math.cos(byaw) * ox - math.sin(byaw) * oy, by + math.sin(byaw) * ox + math.cos(byaw) * oy
 
-    def contact(self) -> None:
-        face = self.cart[0] - self.half
-        if self.hand_x() > face:
-            self.cart[0] += self.hand_x() - face
+    def put_hand(self, x: float, y: float) -> None:
+        bx, by, byaw = self.base
+        dx, dy = x - bx, y - by
+        self.arm = [math.cos(byaw) * dx + math.sin(byaw) * dy - self.reach, -math.sin(byaw) * dx + math.cos(byaw) * dy]
+
+    def contact(self, heading=None, drive=False) -> None:
+        """A hand past the face moves the cart until the face is back at the hand: along ``heading`` (the base's motion; the face's
+        normal when None); on a drive the cart then turns ``spin`` about the hand."""
+        hx, hy = self.hand()
+        c, s = math.cos(self.yaw), math.sin(self.yaw)
+        depth = c * (hx - self.cart[0]) + s * (hy - self.cart[1]) + self.half
+        if depth <= 0.0:
+            return
+        ux, uy = heading if heading is not None else (c, s)
+        k = depth / max(c * ux + s * uy, 0.1)
+        self.cart = [self.cart[0] + k * ux, self.cart[1] + k * uy]
+        if drive and self.spin:
+            cs, sn = math.cos(self.spin), math.sin(self.spin)
+            rx, ry = self.cart[0] - hx, self.cart[1] - hy
+            self.cart = [hx + cs * rx - sn * ry, hy + sn * rx + cs * ry]
+            self.yaw += self.spin
+
+
+#: the base's virtual joints in the stub's 28-D configuration (``execute._q_at_base``)
+_JIDX = {"base_footprint_x_joint": 0, "base_footprint_y_joint": 1, "base_footprint_z_joint": 2, "base_footprint_rz_joint": 5}
 
 
 class _Motions:
-    def __init__(self, w: _World):
+    def __init__(self, w: _World, blocked: bool = False):
         self.w = w
         self.robot = SimpleNamespace(arm_control_idx={"right": th.arange(14, 21), "left": th.arange(7, 14)}, get_joint_positions=lambda: th.zeros(28))
         self.state = SimpleNamespace(arm_target={}, trunk_error=lambda: 0.0)
         self.cfg = SimpleNamespace(base_tracker=_Tracker(), diff_ik_soft_pos_tol_free=0.02)
         self.calls: List[Any] = []
-        self.backend = SimpleNamespace(update_world=lambda **kw: None)
+        self.checked: List[Tuple[th.Tensor, float]] = []  # the configurations and the margin of each collision check
+        self.blocked = blocked
+        self.backend = SimpleNamespace(update_world=lambda **kw: None, q_full=lambda: th.zeros(28), _jidx=_JIDX, world_to_root=lambda pose: pose,
+                                       check_collision=self._check_collision)
+
+    def _check_collision(self, qs, sync_world=False, margin=0.0, **kw):
+        self.checked.append((th.as_tensor(qs).clone(), margin))
+        return th.full((len(qs),), self.blocked)
 
     def eef_pose(self, arm):
-        return th.tensor([self.w.hand_x(), 0.0, 0.45]), th.tensor([0.0, 0.0, 0.0, 1.0])
+        hx, hy = self.w.hand()
+        return th.tensor([hx, hy, 0.45]), th.tensor([0.0, 0.0, 0.0, 1.0])
 
     def _deflection(self, arm):
         return None
@@ -80,9 +115,9 @@ class _Motions:
 
     def arm_along(self, arm, waypoints, loaded=False, **kw):
         p = as_world_pose(waypoints[-1])[0]
-        self.w.arm += float(p[0]) - self.w.hand_x()
+        self.w.put_hand(float(p[0]), float(p[1]))
         self.w.contact()
-        self.calls.append(("arm_along", round(float(p[0]), 3)))
+        self.calls.append(("arm_along", (round(float(p[0]), 3), round(float(p[1]), 3))))
         yield th.zeros(23)
 
     def hold(self, steps=1):
@@ -99,16 +134,23 @@ class _Motions:
         return {a: 0.0 for a in arms}
 
     def track_path(self, waypoints, tracker_cfg=None, **kw):
-        self.calls.append(("track_path", tuple(round(v, 3) for v in waypoints[-1]), tracker_cfg.v_max))
-        goal = waypoints[-1][0]
-        step = 0.02
-        while self.w.base[0] < goal - 1e-9:
-            self.w.base[0] = min(goal, self.w.base[0] + step)
+        """The base in 2 cm steps along the straight line to the last waypoint, turning in proportion."""
+        goal = [float(v) for v in waypoints[-1]]
+        self.calls.append(("track_path", tuple(round(v, 3) for v in goal), tracker_cfg.v_max))
+        x0, y0, yaw0 = self.w.base
+        dx, dy, dyaw = goal[0] - x0, goal[1] - y0, C.wrap_angle(goal[2] - yaw0)
+        length = math.hypot(dx, dy)
+        heading = (dx / length, dy / length) if length > 1e-9 else None
+        n = math.ceil(length / 0.02 - 1e-9) if heading else int(abs(dyaw) > 1e-9)
+        for k in range(1, n + 1):
+            f = min(1.0, k * 0.02 / length) if heading else 1.0
+            hand = self.w.hand()
+            self.w.base = [x0 + f * dx, y0 + f * dy, yaw0 + f * dyaw]
             if self.w.stick > 0:
                 self.w.stick -= 1
-                self.w.arm -= step  # the arm yields: the hand stays on the stuck cart
+                self.w.put_hand(*hand)  # the arm yields: the hand stays on the stuck cart
             else:
-                self.w.contact()
+                self.w.contact(heading, drive=True)
                 self.w.cart[1] += self.w.drift
             yield th.zeros(23)
 
@@ -121,7 +163,7 @@ class _State:
         return SimpleNamespace(name=name)
 
     def object_pose(self, name):
-        return th.tensor([self.w.cart[0], self.w.cart[1], 0.43]), th.tensor([0.0, 0.0, 0.0, 1.0])
+        return th.tensor([self.w.cart[0], self.w.cart[1], 0.43]), C.quat_from_yaw(self.w.yaw)
 
     def base_pose2d(self):
         return tuple(self.w.base)
@@ -136,12 +178,13 @@ def _push(**extra) -> A.BasePush:
     from ispatialgym.oracle.sidecar import Pose, PushContact
 
     c = PushContact(arm="right", object=CART, pre=Pose([0.70, 0.0, 0.45], q), init=Pose([0.80, 0.0, 0.45], q), goal=Pose([2.60, 0.0, 0.45], q),
-                    direction=[1.0, 0.0, 0.0], distance_m=1.8, extra={"kind": "base_push", "base_start": [0.25, 0.0, 0.0], "base_end": [2.05, 0.0, 0.0], **extra})
+                    direction=[1.0, 0.0, 0.0], distance_m=1.8, extra={"kind": "base_push", "base_start": [0.25, 0.0, 0.0], "base_end": [2.05, 0.0, 0.0],
+                                                                      "contact_in_object": [-0.2, 0.0, 0.02], **extra})
     return A.BasePush(contact=c, base_yaw=0.0, partner=TABLE, end_stance="placement")
 
 
-def _run(push, w):
-    motions, state = _Motions(w), _State(w)
+def _run(push, w, blocked=False):
+    motions, state = _Motions(w, blocked=blocked), _State(w)
     ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(), "hooks": {}}
     list(EX.execute_base_push(push, motions, state, push.targets(None, state), ctx))
     return ctx, motions, EX.check_postcondition(push, state, {}, ctx)
@@ -193,6 +236,96 @@ def test_base_push_turn_limit_is_35_deg_unless_the_record_sets_it():
     assert EX.BASE_PUSH_DEFAULTS["yaw_tol_rad"] == pytest.approx(0.61)
     assert EX.base_push_knobs({"yaw_tol_rad": 0.35})["yaw_tol_rad"] == pytest.approx(0.35)
     assert EX.base_push_knobs({"drift_tol_m": 0.1})["yaw_tol_rad"] == pytest.approx(0.61)
+
+
+def test_realign_line_runs_from_the_footprint_centre_to_its_goal():
+    """The cart (root = footprint centre, push face 0.2 m behind it) pushed 0.6 m along +x and turned 15 deg about the hand: the line runs
+    from its centre to the centre's goal (2.8, 0) and enters the face where the hand goes, at the contact's height; no line once the face
+    is 70 deg off it or the goal is reached / passed."""
+    pose0 = (th.tensor([1.0, 0.0, 0.43]), C.quat_from_yaw(0.0))
+    loc, d = [-0.2, 0.0, 0.02], [1.0, 0.0, 0.0]
+    t = math.radians(15.0)
+    centre = th.tensor([1.4, 0.0]) + 0.2 * th.tensor([math.cos(t), math.sin(t)])
+    pose = (th.tensor([float(centre[0]), float(centre[1]), 0.43]), C.quat_from_yaw(t))
+    g = EX.realign_line(pose0, pose, loc, d, 1.8)
+    goal = th.tensor([2.8, 0.0])
+    u = (goal - centre) / th.linalg.norm(goal - centre)
+    assert th.allclose(g["centre"], centre, atol=1e-5) and th.allclose(g["goal"], goal, atol=1e-5) and th.allclose(g["direction"][:2], u, atol=1e-5)
+    assert g["remaining_m"] == pytest.approx(float(th.linalg.norm(goal - centre)), abs=1e-5)
+    pt = g["point"]
+    assert math.cos(t) * float(pt[0] - centre[0]) + math.sin(t) * float(pt[1] - centre[1]) == pytest.approx(-0.2, abs=1e-5) and float(pt[2]) == pytest.approx(0.45, abs=1e-5)
+    back = centre - pt[:2]
+    assert abs(float(back[0] * u[1] - back[1] * u[0])) < 1e-5 and float(back @ u) > 0.0  # on the line, behind the centre
+    assert g["line_rad"] == pytest.approx(math.atan2(float(u[1]), float(u[0])), abs=1e-6) and g["line_rad"] < 0.0 < g["offset_m"]
+    assert EX.realign_line(pose0, (pose[0], C.quat_from_yaw(math.radians(70.0))), loc, d, 1.8) is None
+    assert EX.realign_line(pose0, (th.tensor([2.81, 0.0, 0.43]), C.quat_from_yaw(0.0)), loc, d, 1.8) is None
+    assert EX.realign_line(pose0, (th.tensor([3.2, 0.0, 0.43]), C.quat_from_yaw(0.1)), loc, d, 1.8) is None
+
+
+def test_base_push_realigns_a_turning_cart_and_goes_on(caplog):
+    """A cart that turns about the hand while pushed: each 15 deg turn since the push start / the last realign stops the drive; the hand
+    is unloaded and backs off, the base move (collision-checked) puts the record's stand - base to pre-contact - onto the line from the
+    cart's footprint centre to its goal where it enters the push face, the hand approaches again and the drive goes on along that line;
+    after 3 realigns the yaw tolerance stops the drive. Each realign and the count are logged."""
+    w = _World(nextto_x=99.0, spin=0.03)
+    with caplog.at_level(logging.INFO, logger="ispatialgym.oracle.execute"):
+        ctx, motions, post = _run(_push(yaw_tol_rad=0.35, drift_tol_m=1.0), w)
+    rep = ctx["base_push"]
+    assert post is None and rep["realigns"] == 3 and rep["recontacts"] == 0 and rep["stop"].startswith("drift") and "turned since realign 3" in rep["stop"]
+    assert [a["leg"] for a in rep["approaches"]] == ["approach", "realign 1", "realign 2", "realign 3"] and {a["how"] for a in rep["approaches"]} == {"object moved"}
+    drives = [c for c in motions.calls if c[0] == "track_path"]
+    assert len(drives) == 7 and len(motions.checked) == 3
+    goal = th.tensor([2.8, 0.0])
+    for k, r in enumerate(rep["realign_moves"]):
+        assert r["result"] == "pushing on the new line" and 14.9 < r["leg_turn_deg"] < 20.0 and r["turn_after_deg"] == pytest.approx(r["turn_deg"], abs=0.5)
+        assert r["turn_deg"] == pytest.approx((k + 1) * r["leg_turn_deg"], abs=1.0)  # the turn is measured from the last realign
+        x, y, yaw = r["object_pose2d"]
+        centre, pt, pre = th.tensor([x, y]), th.tensor(r["point"][:2]), th.tensor(r["pre"][:2])
+        u = (goal - centre) / th.linalg.norm(goal - centre)
+        assert math.cos(yaw) * float(pt[0] - x) + math.sin(yaw) * float(pt[1] - y) == pytest.approx(-0.2, abs=1e-3)  # on the push face
+        back = centre - pt
+        assert abs(float(back[0] * u[1] - back[1] * u[0])) < 1e-3 and float(back @ u) > 0.0  # on the line from the centre to the goal
+        assert th.allclose(pre, pt - (0.10 + C.FINGERTIP_LENGTH) * u, atol=1e-3)
+        moves = [c for c in motions.calls if c[0] == "arm_along"]
+        i = next(j for j, c in enumerate(moves) if th.allclose(th.tensor(c[1]), pre, atol=1.5e-3))
+        assert th.allclose(th.tensor(moves[i + 1][1]) - pre, 0.02 * u, atol=2e-3)  # the guarded approach goes along the new line
+        bx, by, byaw = r["base_move"]["to"]
+        assert byaw == pytest.approx(math.radians(r["line_deg"]), abs=1e-3)
+        rel = (math.cos(byaw) * float(pre[0] - bx) + math.sin(byaw) * float(pre[1] - by), -math.sin(byaw) * float(pre[0] - bx) + math.cos(byaw) * float(pre[1] - by))
+        assert rel == pytest.approx((0.45, 0.0), abs=1e-3)  # the record's base_start -> pre
+        q_last, margin = motions.checked[k]
+        assert margin == EX.BASE_PUSH_DEFAULTS["realign_margin_m"] and [float(v) for v in q_last[-1][[0, 1, 5]]] == pytest.approx([bx, by, byaw], abs=1e-3)
+        assert drives[1 + 2 * k][1] == pytest.approx((bx, by, byaw), abs=1e-3)
+        assert drives[2 + 2 * k][1] == pytest.approx((bx + r["remaining_m"] * float(u[0]), by + r["remaining_m"] * float(u[1]), byaw), abs=2e-3)
+    assert sum("realign 1/3:" in m or "realign 2/3:" in m or "realign 3/3:" in m for m in caplog.messages) == 3
+    assert any(m.startswith("base_push(serving_cart.n.01_1): pushed") and m.endswith("0 re-contacts, 3 realigns") for m in caplog.messages)
+
+
+def test_base_push_realign_needs_a_clear_base_move_and_follows_the_record():
+    """The base move's collision check reports a hit: no move, the push ends at the turn (hand backed off). The record's knobs: one realign
+    at 0.4 rad - past the 0.35 rad yaw tolerance, which waits for the realigns to be used; no realigns, or a record without
+    ``contact_in_object``: the yaw tolerance stops the drive as before."""
+    w = _World(nextto_x=99.0, spin=0.03)
+    ctx, motions, post = _run(_push(yaw_tol_rad=0.35, drift_tol_m=1.0), w, blocked=True)
+    rep = ctx["base_push"]
+    assert post is None and rep["realigns"] == 1 and rep["stop"].startswith("turn:") and "realign 1 failed: the base move collides" in rep["stop"]
+    assert rep["realign_moves"][0]["result"].startswith("failed") and len(motions.checked) == 1
+    assert [c[1] for c in motions.calls if c[0] == "track_path"] == [(2.05, 0.0, 0.0)]
+    hx, hy = w.hand()
+    assert math.cos(w.yaw) * (hx - w.cart[0]) + math.sin(w.yaw) * (hy - w.cart[1]) + w.half < -0.09  # the hand stays backed off the face
+    ctx, _, _ = _run(_push(yaw_tol_rad=0.35, drift_tol_m=1.0, realigns=1, realign_turn_rad=0.4), _World(nextto_x=99.0, spin=0.03))
+    rep = ctx["base_push"]
+    assert rep["realigns"] == 1 and 22.9 < rep["realign_moves"][0]["leg_turn_deg"] < 25.0 and "turned since realign 1" in rep["stop"]
+    for push in (_push(yaw_tol_rad=0.35, drift_tol_m=1.0, realigns=0), _push(yaw_tol_rad=0.35, drift_tol_m=1.0)):
+        if "realigns" not in push.contact.extra:
+            push.contact.extra.pop("contact_in_object")
+        w = _World(nextto_x=99.0, spin=0.03)
+        ctx, motions, _ = _run(push, w)
+        rep = ctx["base_push"]
+        assert rep["realigns"] == 0 and "realign_moves" not in rep and not motions.checked and rep["turn_deg"] > 20.0
+        assert rep["stop"].startswith("drift") and "deg turned (tolerance 1.00 m / 20 deg)" in rep["stop"]
+    knobs = EX.base_push_knobs({"realigns": 1, "realign_turn_rad": 0.2, "realign_clear_m": 0.05})
+    assert (knobs["realigns"], knobs["realign_turn_rad"], knobs["realign_clear_m"], knobs["realign_margin_m"]) == (1.0, 0.2, 0.05, 0.01)
 
 
 def test_nextto_now_reads_the_state_or_gives_none():

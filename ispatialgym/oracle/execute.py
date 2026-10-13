@@ -39,8 +39,8 @@ Behaviour per action (§3.6 / §6.1):
   approach → ``arm_along(arc)`` → back off (a planned push, a cabinet door's push finish: the recorded stance and contact);
   post: joint within the spec §8 tolerance of the lower limit.
 * ``BasePush``   ``gripper(close)`` → ``arm_to(pre)`` → guarded approach → ``track_path`` along the recorded base line with the
-  arm held (stopped at NextTo + a push-on, a sideways drift, or the end; a lagging object re-contacted) → unload; post: the
-  object moved (``no_motion``).
+  arm held (stopped at NextTo + a push-on, a sideways drift, or the end; a lagging object re-contacted, a turning one realigned
+  onto the line from its centre to its goal) → unload; post: the object moved (``no_motion``).
 * ``Retreat``    ``gripper(open)`` (+ release / detach) when ``release`` → ``arm_along(retreat)``.
 
 Tolerance categories: an eef / base / trunk that did not reach its recorded target is ``execution`` (a motion did
@@ -5441,6 +5441,12 @@ BASE_PUSH_DEFAULTS: Dict[str, float] = {
     "nextto_push_on_m": 0.05,  # once NextTo holds the drive goes on this far (the object well inside the bound), then stops
     "nextto_hold_checks": 2,  # NextTo must read true at this many consecutive checks
     "nextto_check_every": 5,  # steps between NextTo reads
+    # the object turned this far since the push start / the last realign: the drive stops for a realign (yaw_tol_rad, on the same
+    # turn, stops the drive only once the realigns are used)
+    "realign_turn_rad": 0.26,
+    "realigns": 3,
+    "realign_clear_m": 0.10,  # the hand backs off this far before the realign's base move (it shifts ~9 cm along a face turned 15 deg, ~2.5 cm closer)
+    "realign_margin_m": 0.01,  # whole-body clearance of the realign's base move (the sampler's push sweep margin)
 }
 
 
@@ -5480,6 +5486,56 @@ def nextto_now(state, a: str, b: str) -> Optional[bool]:
         return None
 
 
+def realign_line(pose0, pose, contact_local, direction, distance_m: float) -> Optional[Dict[str, Any]]:
+    """Where a base push's realign puts the hand (owner 2026-10-12 ~20:17, nextto_large): the object was pushed from ``pose0`` along the
+    unit ``direction`` and stands at ``pose`` now; ``contact_local`` is the record's contact point in its root frame (``contact_in_object``)
+    on the push face, whose outward normal was -``direction`` at ``pose0``, and on the face's centre line (the sampler's push face: the
+    line across the face through the footprint centre). The footprint centre is the root's foot on that line. The push line runs from
+    the centre now to the centre's goal (its place at ``pose0`` moved ``distance_m`` along ``direction``); the hand goes where that line
+    enters the face at the object's pose now, at the contact's height. ``{"point", "direction" (unit, z 0), "remaining_m", "line_rad"
+    (the line's angle from ``direction``), "offset_m" (the point along the face from the recorded contact, + = left of the push),
+    "centre", "goal"}``; None when less than 2 cm remain or the line meets the face more than 60 deg off its normal (or from the front)."""
+    d = C.as_tensor(direction).reshape(-1)[:2].float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    p0, q0 = (C.as_tensor(v).reshape(-1).float() for v in pose0)
+    p, q = (C.as_tensor(v).reshape(-1).float() for v in pose)
+    loc = C.as_tensor(contact_local).reshape(-1)[:3].float()
+    turn = C.wrap_angle(C.yaw_of(q) - C.yaw_of(q0))
+    n0 = -d
+    n = th.tensor([math.cos(turn) * float(n0[0]) - math.sin(turn) * float(n0[1]), math.sin(turn) * float(n0[0]) + math.cos(turn) * float(n0[1])])
+    c0, c1 = p0[:3] + C.quat_rotate(q0, loc), p[:3] + C.quat_rotate(q, loc)
+    h = float((c1[:2] - p[:2]) @ n)  # the face ahead of the root along its outward normal
+    centre = c1[:2] - n * h
+    goal = c0[:2] - n0 * float((c0[:2] - p0[:2]) @ n0) + float(distance_m) * d
+    remaining = float(th.linalg.norm(goal - centre))
+    if remaining < 0.02 or h <= 0.0:
+        return None
+    u = (goal - centre) / remaining
+    cos_in = -float(u @ n)
+    if cos_in < 0.5:
+        return None
+    pt = centre - (h / cos_in) * u
+    left = th.tensor([float(n[1]), -float(n[0])])  # left of the push into the face
+    return {"point": th.tensor([float(pt[0]), float(pt[1]), float(c1[2])]), "direction": th.tensor([float(u[0]), float(u[1]), 0.0]), "remaining_m": remaining,
+            "line_rad": C.wrap_angle(math.atan2(float(u[1]), float(u[0])) - math.atan2(float(d[1]), float(d[0]))), "offset_m": float((pt - c1[:2]) @ left),
+            "centre": centre, "goal": goal}
+
+
+def realign_base_clear(motions: Motions, b_from, b_to, margin: float) -> Optional[str]:
+    """Why a realign's base move ``b_from -> b_to`` ([x, y, yaw]) is not clear, None when it is: the whole body with the arms and the
+    trunk as they are at every 5 cm / 0.1 rad of the straight leg (:func:`_base_legs`), cuRobo's check against the synchronised world
+    (the pushed object in it) with ``margin``. A backend that cannot check does not clear the move."""
+    try:
+        q = C.as_tensor(motions.backend.q_full()).reshape(-1).float().clone()
+        qs = _base_legs(motions, q, b_from, b_to)
+        hits = C.as_tensor(motions.backend.check_collision(th.stack(qs), sync_world=True, margin=float(margin))).reshape(-1)
+    except Exception as e:  # noqa: BLE001
+        return f"no collision check of the base move ({e!r})"[:200]
+    if bool(hits.any()):
+        return f"the base move collides at configuration {int(th.nonzero(hits)[0]) + 1} of {len(qs)} (margin {margin:.2f} m)"
+    return None
+
+
 def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     """The closed hand on the object's push face, then the base drives the object along the recorded line (owner 2026-10-12,
     nextto_large): the pre-contact (planned to the sampler's witness, then with the object present, then ignored), a guarded
@@ -5487,14 +5543,20 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
     push moves the object), the arm held at its joints while the base drives to the recorded end of the line - stopped once NextTo
     holds and the object went ``nextto_push_on_m`` further, when it drifts sideways beyond ``drift_tol_m`` or turns beyond
     ``yaw_tol_rad``, re-contacted (unload, 2 cm back, guarded approach) when it lags the hand by ``lag_m`` - the arm unloaded at the
-    end. ``ctx["base_push"]`` records the pushed distance, the sideways drift, NextTo at the end and why the drive stopped."""
+    end. A turn of ``realign_turn_rad`` since the push start or the last realign realigns the push (owner 2026-10-12 ~20:17): unload, the
+    hand ``realign_clear_m`` back, its new contact where the line from the object's footprint centre to its goal enters the push face
+    (:func:`realign_line`), the base moved - collision-checked (:func:`realign_base_clear`) - to stand to that contact as the record
+    stands to its contact, the hand to the pre-contact there, the guarded approach, then the drive along that line for the remaining
+    distance; at most ``realigns`` times, the ``yaw_tol_rad`` stop on the same turn only after them (none without the record's
+    ``contact_in_object``). ``ctx["base_push"]`` records the pushed distance, the sideways drift, NextTo at the end, why the drive
+    stopped and each realign."""
     c = action.contact
     arm, obj = c.arm, c.object
     knobs = base_push_knobs(c.extra)
     start, end = action.base_line
     d3 = th.tensor([float(c.direction[0]), float(c.direction[1]), 0.0])
     d3 = d3 / max(float(th.linalg.norm(d3)), 1e-9)
-    rep: Dict[str, Any] = {"distance_m": round(float(c.distance_m), 4), "drift_tol_m": knobs["drift_tol_m"], "partner": action.partner, "recontacts": 0}
+    rep: Dict[str, Any] = {"distance_m": round(float(c.distance_m), 4), "drift_tol_m": knobs["drift_tol_m"], "partner": action.partner, "recontacts": 0, "realigns": 0}
     ctx["base_push"] = rep
     _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
@@ -5504,9 +5566,14 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
         target_obj = []
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
+    loc = c.extra.get("contact_in_object")
+    n_realign = int(knobs["realigns"]) if isinstance(loc, (list, tuple)) and len(loc) == 3 else 0
+    # the line the hand pushes along (the recorded pre-contact -> contact line is horizontal along the push, whatever the hand's pitch)
+    # and the base's end on it; a realign replaces both
+    leg: Dict[str, Any] = {"a": d3, "end": end}
 
     def along() -> float:
-        return push_frame_offset(pose0[0], state.object_pose(obj)[0], d3)[0]
+        return push_frame_offset(pose0[0], state.object_pose(obj)[0], leg["a"])[0]
 
     tries: List[Tuple[str, Dict[str, Any]]] = []
     if _witness(ctx, "pre") is not None:
@@ -5526,17 +5593,16 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
         log.warning("base_push(%s): %s (%s)", obj, rep["result"], rep.get("pre_failures"))
         return
     _hook(ctx, "fov")(True)
-    a = d3  # the recorded pre-contact -> contact line is horizontal along the push, whatever the hand's pitch
     pre_dist = float(th.linalg.norm(as_world_pose(targets["contact"])[0] - as_world_pose(targets["pre"])[0]))
 
     def contact(label: str) -> Generator[th.Tensor, None, bool]:
-        found, travelled, how = yield from guarded_approach(motions, arm, a, along, max_m=pre_dist + knobs["approach_extra_m"], move_rad=knobs["moved_m"])
+        found, travelled, how = yield from guarded_approach(motions, arm, leg["a"], along, max_m=pre_dist + knobs["approach_extra_m"], move_rad=knobs["moved_m"])
         rec: Dict[str, Any] = {"travelled_m": round(travelled, 3), "how": "object moved" if how == "leaf moved" else how}
         if found is not None and how != "leaf moved":
             s0 = along()
             try:
                 eef = motions.eef_pose(arm)
-                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + 0.01 * a, C.as_tensor(eef[1]))], loaded=True)
+                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + 0.01 * leg["a"], C.as_tensor(eef[1]))], loaded=True)
             except SkillError:
                 pass
             yield from motions.hold(3)
@@ -5556,6 +5622,68 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
     tcfg = replace(motions.cfg.base_tracker, v_max=(knobs["push_speed_m_s"], knobs["push_speed_m_s"], knobs["push_yaw_rate"]))
     idx = motions.robot.arm_control_idx[arm]
     yaw0 = C.yaw_of(C.as_tensor(pose0[1]).float())
+    leg["yaw"] = yaw0  # the object's yaw its turn is measured from: the push start, then each realign's re-contact
+
+    def realign(k: int) -> Generator[th.Tensor, None, Optional[str]]:
+        """Realign ``k`` (the docstring above); None once the hand pushes again on the new line, else why not."""
+        q_was = C.as_tensor(state.object_pose(obj)[1]).float()
+        rec: Dict[str, Any] = {"realign": k, "turn_deg": round(math.degrees(abs(C.wrap_angle(C.yaw_of(q_was) - yaw0))), 2),
+                               "leg_turn_deg": round(math.degrees(abs(C.wrap_angle(C.yaw_of(q_was) - leg["yaw"]))), 2)}
+        rep.setdefault("realign_moves", []).append(rec)
+        yield from motions.unload([arm])
+        try:
+            eef = motions.eef_pose(arm)
+            yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - knobs["realign_clear_m"] * leg["a"], C.as_tensor(eef[1]))],
+                                         soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        except SkillError as e:
+            rec["back_off_failed"] = (e.message or e.reason)[:120]
+        yield from motions.settle(max_steps=30)
+        p, q = state.object_pose(obj)
+        rec["object_pose2d"] = [round(float(p[0]), 4), round(float(p[1]), 4), round(C.yaw_of(C.as_tensor(q).float()), 4)]
+        g = realign_line(pose0, (p, q), loc, d3, float(c.distance_m))
+        if g is None:
+            return "no push line into the face (under 2 cm to the goal, or the face more than 60 deg off the line)"
+        (c_pos, c_quat), (pre_pos, pre_quat) = as_world_pose(targets["contact"]), as_world_pose(targets["pre"])
+        rot = C.quat_from_yaw(g["line_rad"])
+        p_rec = c_pos + C.FINGERTIP_LENGTH * C.approach_axis(c_quat)  # the recorded fingertip point on the face
+
+        def moved(v) -> th.Tensor:  # a point of the recorded push stance carried with its contact: p_rec onto the new point, turned about +z
+            return g["point"] + C.quat_rotate(rot, C.as_tensor(v).reshape(-1)[:3].float() - p_rec)
+
+        b_xy = moved([start[0], start[1], float(p_rec[2])])
+        b_from, b_to = motions.base_pose2d(), (float(b_xy[0]), float(b_xy[1]), C.wrap_angle(start[2] + g["line_rad"]))
+        u = g["direction"]
+        end_new = (b_to[0] + g["remaining_m"] * float(u[0]), b_to[1] + g["remaining_m"] * float(u[1]), b_to[2])
+        pre = (moved(pre_pos), C.qmul(rot, pre_quat))
+        move_m, move_deg = _base_error(b_from, b_to)[0], math.degrees(C.wrap_angle(b_to[2] - b_from[2]))
+        rec.update({"point": [round(float(v), 4) for v in g["point"]], "line_deg": round(math.degrees(g["line_rad"]), 2), "hand_offset_m": round(g["offset_m"], 4),
+                    "remaining_m": round(g["remaining_m"], 4), "pre": [round(float(v), 4) for v in pre[0]],
+                    "base_move": {"from": [round(float(v), 4) for v in b_from], "to": [round(v, 4) for v in b_to], "m": round(move_m, 4), "deg": round(move_deg, 2)}})
+        blocked = realign_base_clear(motions, b_from, b_to, knobs["realign_margin_m"])
+        if blocked is not None:
+            return blocked
+        motions.follow_phase = "base"
+        try:
+            yield from motions.track_path([b_to], tracker_cfg=tcfg)
+        except SkillError as e:
+            return f"the base move: {(e.message or e.reason)[:140]}"
+        finally:
+            motions.follow_phase = "arm"
+        try:
+            yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        except SkillError as e:
+            rec["pre_failed"] = (e.message or e.reason)[:120]
+        leg["a"] = u
+        if not (yield from contact(f"realign {k}")):
+            return f"no contact ({rep['approaches'][-1]['how']})"
+        leg.update({"yaw": C.yaw_of(C.as_tensor(state.object_pose(obj)[1]).float()), "end": end_new})
+        rec.update({"turn_after_deg": round(math.degrees(abs(C.wrap_angle(leg["yaw"] - yaw0))), 2), "result": "pushing on the new line"})
+        log.info("base_push(%s): realign %d/%d: turned %.1f deg on the line (%.1f deg since the push start) -> %.1f deg after the re-contact; the hand %+.3f m "
+                 "along the face from the recorded contact, the line %+.1f deg off the recorded one; base move %.3f m / %+.1f deg; %.3f m to the goal",
+                 obj, k, n_realign, rec["leg_turn_deg"], rec["turn_deg"], rec["turn_after_deg"], g["offset_m"], math.degrees(g["line_rad"]), move_m, move_deg,
+                 g["remaining_m"])
+        return None
+
     why: List[Optional[str]] = [None]
     nt = {"first_along": None, "streak": 0, "steps": 0}
     stop_reason = None
@@ -5567,13 +5695,20 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
         def stop() -> bool:
             p, q = state.object_pose(obj)
             s, side = push_frame_offset(pose0[0], p, d3)
-            turn = abs(C.wrap_angle(C.yaw_of(C.as_tensor(q).float()) - yaw0))
-            if abs(side) > knobs["drift_tol_m"] or turn > knobs["yaw_tol_rad"]:
-                why[0] = f"drift: {side:+.3f} m sideways, {math.degrees(turn):.1f} deg turned (tolerance {knobs['drift_tol_m']:.2f} m / {math.degrees(knobs['yaw_tol_rad']):.0f} deg)"
+            turn = abs(C.wrap_angle(C.yaw_of(C.as_tensor(q).float()) - leg["yaw"]))
+            spent = rep["realigns"] >= n_realign
+            since = f" since realign {rep['realigns']}" if rep["realigns"] else ""
+            if abs(side) > knobs["drift_tol_m"] or (spent and turn > knobs["yaw_tol_rad"]):
+                why[0] = (f"drift: {side:+.3f} m sideways, {math.degrees(turn):.1f} deg turned{since} (tolerance {knobs['drift_tol_m']:.2f} m / "
+                          f"{math.degrees(knobs['yaw_tol_rad']):.0f} deg)")
                 return True
-            base_s = push_frame_offset(b0[:2], motions.base_pose2d()[:2], d3)[0]
-            if base_s - (s - s_obj0) > knobs["lag_m"]:
-                why[0] = f"lag: the base went {base_s:.3f} m, the object {s - s_obj0:.3f} m"
+            if not spent and turn > knobs["realign_turn_rad"]:
+                why[0] = f"turn: {math.degrees(turn):.1f} deg{since} (realign at {math.degrees(knobs['realign_turn_rad']):.0f} deg)"
+                return True
+            base_s = push_frame_offset(b0[:2], motions.base_pose2d()[:2], leg["a"])[0]
+            s_obj = push_frame_offset(pose0[0], p, leg["a"])[0] - s_obj0
+            if base_s - s_obj > knobs["lag_m"]:
+                why[0] = f"lag: the base went {base_s:.3f} m, the object {s_obj:.3f} m"
                 return True
             if action.partner:
                 nt["steps"] += 1
@@ -5591,13 +5726,22 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
         why[0] = None
         motions.follow_phase = "base"
         try:
-            stopped = yield from _until(motions.track_path([end], tracker_cfg=tcfg), stop)
+            stopped = yield from _until(motions.track_path([leg["end"]], tracker_cfg=tcfg), stop)
         except SkillError as e:
             stopped, why[0] = True, f"drive: {(e.message or e.reason)[:160]}"
         finally:
             motions.follow_phase = "arm"
         if not stopped:
             stop_reason = "distance done"
+            break
+        if why[0] is not None and why[0].startswith("turn"):
+            rep["realigns"] += 1
+            failed = yield from realign(rep["realigns"])
+            if failed is None:
+                continue
+            rep["realign_moves"][-1]["result"] = f"failed: {failed}"
+            log.warning("base_push(%s): %s -> realign %d/%d failed: %s", obj, why[0], rep["realigns"], n_realign, failed)
+            stop_reason = f"{why[0]}; realign {rep['realigns']} failed: {failed}"
             break
         if why[0] is not None and why[0].startswith("lag") and rep["recontacts"] < int(knobs["recontacts"]):
             rep["recontacts"] += 1
@@ -5606,7 +5750,7 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
             yield from motions.unload([arm])
             try:
                 eef = motions.eef_pose(arm)
-                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - 0.02 * a, C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - 0.02 * leg["a"], C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
             except SkillError:
                 pass
             yield from contact(f"re-contact {rep['recontacts']}")
@@ -5626,8 +5770,9 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
         rep["nextto_end"] = nextto_now(state, obj, action.partner)
     rep["result"] = "pushed"
     _hook(ctx, "fov")(False)
-    log.info("base_push(%s): pushed %.3f m of %.3f m, sideways drift %+.3f m (tolerance %.2f), turned %.1f deg, NextTo(%s) at the end: %s; stop: %s; %d re-contacts",
-             obj, s, float(c.distance_m), side, knobs["drift_tol_m"], rep["turn_deg"], action.partner, rep.get("nextto_end"), stop_reason, rep["recontacts"])
+    log.info("base_push(%s): pushed %.3f m of %.3f m, sideways drift %+.3f m (tolerance %.2f), turned %.1f deg, NextTo(%s) at the end: %s; stop: %s; %d re-contacts, "
+             "%d realigns", obj, s, float(c.distance_m), side, knobs["drift_tol_m"], rep["turn_deg"], action.partner, rep.get("nextto_end"), stop_reason, rep["recontacts"],
+             rep["realigns"])
 
 
 def post_base_push(action: BasePush, state, targets, ctx) -> Optional[str]:
@@ -5710,5 +5855,5 @@ __all__ = [
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
     "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "contact_ignores", "escape_direction", "reach_pre_pose", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
     "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry", "push_stop_facts", "BASE_PUSH_DEFAULTS", "base_push_knobs",
-    "push_frame_offset", "nextto_now",
+    "push_frame_offset", "nextto_now", "realign_line", "realign_base_clear",
 ]
