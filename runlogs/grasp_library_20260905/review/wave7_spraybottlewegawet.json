@@ -1,0 +1,46 @@
+{
+ "batch": "wave7_spraybottlewegawet (2026-10-12, t04w worker on strips/spray_bottle__wegawe__t.png (rows 1-5), the five grasps' V1 / V2 / V3 / wrist frames, 4x / 6x pad crops of V1 / V2 and the collision hull's first touch per pad (gen_candidates.pad_sides / pinch_pieces; t04w_work/review), review_prompt.md, not the reviewer pool; frames = the stock step close held under gravity)",
+ "models": [
+  {
+   "key": "spray_bottle__wegawe__t",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "36/0: fingertips on the cap rim, 27 mm head floats between pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diagonal pinch across sprayer shroud above cap, 37/0, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diagonal shroud pinch as rank 2, fingers swapped, 37/0, pads touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diagonal pinch across sprayer shroud, other diagonal, 38/0, pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "31/0 on 25 mm head: fingertips on head base, daylight both pads"
+    }
+   ],
+   "object_note": "Trigger head like asztxi's; lateral head pinches stop on the wider cap / head base below (pads span > width)"
+  }
+ ]
+}
