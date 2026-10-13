@@ -138,6 +138,18 @@ _FIT_CACHE: Dict[str, th.Tensor] = {}
 _FIT_COUNTS = {"fits": 0, "fit_s": 0.0, "hits": 0}
 
 
+def shrink_link_spheres(spheres: th.Tensor, mask: th.Tensor, margin: float) -> Tuple[th.Tensor, float]:
+    """``(spheres, activation distance)`` of a per-link proximity query at ``margin``: a negative margin shrinks the radii of the
+    ``mask``-ed enabled spheres (``(..., S, 4)``, r <= 0 = disabled; ``mask`` broadcast over the sphere axis) by ``-margin`` (to >= 0.1 mm)
+    and the query counts penetration only (activation 0) - those spheres may sink up to ``-margin`` into an obstacle."""
+    if margin >= 0.0:
+        return spheres, float(margin)
+    r = spheres[..., 3]
+    out = spheres.clone()
+    out[..., 3] = th.where(mask.reshape(*([1] * (r.dim() - 1)), -1) & (r > 0), (r + float(margin)).clamp(min=1e-4), r)
+    return out, 0.0
+
+
 def _sphere_fit_key(obstacles, num_spheres: int) -> str:
     import hashlib
 
@@ -980,7 +992,9 @@ class R1ProCuRobo:
         """``(N,)`` bool tensor: True where a sphere of one of ``links`` lies within ``margin`` (m) of a world obstacle (the ignored
         / attached obstacles excluded as in :meth:`check_collision`). A per-link proximity check: the block-design sampler keeps
         the ARM links (not the pinching fingers, which work 1 mm above the table by design) clear of the table (demo
-        0919-164732: ``right_arm_link5`` brushed the table during a 45 deg pitched pinch the margin-0 checks had passed)."""
+        0919-164732: ``right_arm_link5`` brushed the table during a 45 deg pitched pinch the margin-0 checks had passed).
+        A negative ``margin`` lets those spheres penetrate an obstacle by up to ``-margin``: their radii shrink by it (to >= 0.1 mm)
+        and only penetration counts (the sampler's approach finger-support touch, owner 2026-10-13)."""
         from curobo._src.geom.collision.buffer_collision import CollisionBuffer
         from curobo._src.robot.kinematics.kinematics_state import KinematicsState
 
@@ -1004,9 +1018,10 @@ class R1ProCuRobo:
         wanted = set(links)
         mask = th.tensor([l in wanted for l in costs["link_of_sphere"]], device=dev).unsqueeze(0)
         weight = th.ones(1, device=dev)
+        spheres, act = shrink_link_spheres(spheres, mask, float(margin))
         with th.no_grad():
             qstate = KinematicsState(robot_spheres=spheres)
-            dm = self.checker.get_sphere_collision(qstate, costs["buffer"], weight, th.full((1,), float(margin), device=dev)).reshape(n, -1)
+            dm = self.checker.get_sphere_collision(qstate, costs["buffer"], weight, th.full((1,), act, device=dev)).reshape(n, -1)
             near = ((dm > 0.0) & mask).any(dim=1)
         return near.cpu()
 

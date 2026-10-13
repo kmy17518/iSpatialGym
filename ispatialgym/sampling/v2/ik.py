@@ -264,6 +264,52 @@ class _Ignoring:
 #: per backend: collision meshes currently switched off by active ``_Ignoring`` contexts -> number of contexts asking
 _ACTIVE_IGNORES: Dict[int, Dict[str, int]] = {}
 
+#: the oracle's pre-shape margin (``MotionsConfig.gripper_preshape_margin``): ``execute_grasp`` opens each finger to pinch width / 2 + this
+#: before the approach
+ORACLE_PRESHAPE_MARGIN_M = 0.010
+#: ``approach_finger_support_touch.max_penetration_m`` above this is a spec error (light contact, not a finger through the support)
+FINGER_TOUCH_MAX_PENETRATION_M = 0.03
+
+
+@dataclass
+class FingerTouch:
+    """``generation.approach_finger_support_touch`` (owner 2026-10-13 ~03:15 item 3): along a tracked grasp approach the acting arm's
+    finger links may touch the grasp's support - their spheres may come within ``margin_m - max_penetration_m`` of it (light contact);
+    every other link, and the finger links against every other object, keep the approach tracking's margin (0). ``preshape``: the finger
+    links are checked at the opening the oracle pre-shapes to before the approach (``opening()``; None = the configuration's own)."""
+
+    margin_m: float = 0.0
+    max_penetration_m: float = 0.005
+    preshape: bool = True
+    supports: Callable[[], Sequence[Any]] = lambda: ()
+    opening: Callable[[], Optional[float]] = lambda: None
+
+
+def finger_touch_params(value: Any) -> Optional[Dict[str, Any]]:
+    """``generation.approach_finger_support_touch`` -> ``{"margin_m", "max_penetration_m", "preshape"}``, None when off (absent / null /
+    false); ``true`` = the defaults of :class:`FingerTouch`. ``ValueError`` for anything else (the caller's ``spec`` rejection)."""
+    if value is None or value is False:
+        return None
+    d = FingerTouch()
+    out = {"margin_m": d.margin_m, "max_penetration_m": d.max_penetration_m, "preshape": d.preshape}
+    if value is True:
+        return out
+    if not isinstance(value, dict) or set(value) - set(out):
+        raise ValueError(f"approach_finger_support_touch {value!r}: expected true or an object with {sorted(out)}")
+    for k in ("margin_m", "max_penetration_m"):
+        if k in value:
+            v = value[k]
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(float(v)):
+                raise ValueError(f"approach_finger_support_touch.{k} {v!r}: expected a number (m)")
+            out[k] = float(v)
+    if "preshape" in value:
+        if not isinstance(value["preshape"], bool):
+            raise ValueError(f"approach_finger_support_touch.preshape {value['preshape']!r}: expected true / false")
+        out["preshape"] = value["preshape"]
+    if out["margin_m"] < 0.0 or not 0.0 <= out["max_penetration_m"] <= FINGER_TOUCH_MAX_PENETRATION_M:
+        raise ValueError(f"approach_finger_support_touch {value!r}: margin_m >= 0 and 0 <= max_penetration_m <= {FINGER_TOUCH_MAX_PENETRATION_M} expected")
+    return out
+
 
 @dataclass
 class IKResult:
@@ -313,6 +359,24 @@ class IKChecker:
         self.solutions: Dict[Tuple[str, Tuple[float, ...]], th.Tensor] = {}
         self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
         self.last_track_stall: Optional[Dict[str, Any]] = None  # where the last ``track_chain`` stalled (``continue_chain`` callers' partial rule)
+        self.finger_touch: Optional[FingerTouch] = None  # :meth:`set_finger_touch` (``generation.approach_finger_support_touch``)
+
+    def set_finger_touch(self, touch: Optional[FingerTouch]) -> None:
+        """Switch the approach finger-support touch rule (:class:`FingerTouch`) on (None: off); its parameters join the cache scope."""
+        self.finger_touch = touch
+        if touch is None:
+            self.cache_scope.pop("finger_touch", None)
+        else:
+            self.cache_scope["finger_touch"] = [round(touch.margin_m, 4), round(touch.max_penetration_m, 4), bool(touch.preshape)]
+
+    def _touch_objects(self, ignore_last: Sequence[Any]) -> List[Any]:
+        """The objects of a chain's last-pose ignore set its approach fingers may touch: the grasp's supports (``FingerTouch.supports``)
+        among them; [] with the rule off."""
+        ft = self.finger_touch
+        if ft is None or not ignore_last:
+            return []
+        sup = list(ft.supports() or [])
+        return [o for o in ignore_last if any(o is s for s in sup)]
 
     def ignoring(self, objs: Sequence[Any], ground: bool = True, ground_meshes: bool = True):
         """Context manager: ``objs`` leave the cuRobo collision world for the queries inside (§3.6 "support ignored for the
@@ -605,6 +669,10 @@ class IKChecker:
         qs: List[Optional[th.Tensor]] = []
         n = len(poses)
         why = "exact IK failed"
+        # the grasp's support the approach fingers may touch, on every approach segment of the chain (the program check tracks the
+        # grasp approach as 3 segments; the support is in the last one's ignore set only)
+        touch = self._touch_objects(ignore_for_last)
+        tkw = {"touch": touch} if touch else {}
         for i, p in enumerate(poses):
             ign = list(ignore_for_last) if i == n - 1 else []
             if i > 0 and q is not None and is_approach(poses[i - 1], p):
@@ -613,7 +681,7 @@ class IKChecker:
                 # one IK branch and the oracle's straight approach is executable (oracle finding: the french-fries pre_grasp
                 # / grasp witnesses 3.16 rad apart -> plan_failed); an untrackable approach fails the chain
                 near = list(approached) if approached is not None else self.approached_objects(p)
-                q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, ignore_mid=near, q_hint=q0)
+                q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, ignore_mid=near, q_hint=q0, **tkw)
                 if q is None:
                     break
                 m_lim, jn = self.joint_limit_margin(q, arm)
@@ -625,7 +693,7 @@ class IKChecker:
                         q_alt, why_lim = self.away_from_limits(q, p, arm, q0)
                     q_pre2 = None
                     if q_alt is not None and not th.equal(q_alt, q):
-                        q_pre2, why_b = self.track_segment(q_alt, p, poses[i - 1], arm, ignore_mid=near, ignore_end=(), ignore_start=ign)
+                        q_pre2, why_b = self.track_segment(q_alt, p, poses[i - 1], arm, ignore_mid=near, ignore_end=(), ignore_start=ign, **tkw)
                     if q_pre2 is None:
                         q, why = None, why_lim or f"ik_joint_limit: {jn} within {m_lim * 1000:.0f} mrad of its limit at the end of the tracked approach"
                         break
@@ -859,7 +927,7 @@ class IKChecker:
         return out
 
     def track_segment(self, q_from: th.Tensor, pose_from: Pose, pose_to: Pose, arm: str, ignore_mid: Sequence[Any] = (),
-                      ignore_end: Sequence[Any] = (), ignore_start: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
+                      ignore_end: Sequence[Any] = (), ignore_start: Sequence[Any] = (), touch: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
         """Differential-IK tracking (``backend.solve_ik_path``) of the straight segment ``pose_from -> pose_to`` from the
         configuration ``q_from`` (which reaches ``pose_from``) in ``APPROACH_STEP_M`` steps: continuous joint path, no
         step above ``APPROACH_MAX_STEP`` rad, joint excursion between consecutive §3.9 waypoints ≤ ``APPROACH_MAX_EXCURSION``,
@@ -867,7 +935,8 @@ class IKChecker:
         pose additionally with ``ignore_end`` removed (the last centimetres of a grasp descent run inside the support's
         sphere margin, as the end pose does: §3.6 "support ignored for the grasp pose only" at the §3.9 waypoint
         granularity), the ones within it of the start pose with ``ignore_start`` removed (backward tracking).
-        Returns ``(q_end, "ok")`` or ``(None, reason)``."""
+        ``touch`` (the grasp's support, :meth:`_touch_objects`): a configuration that collides with it in the world is re-checked by
+        :meth:`_finger_touch_ok` (the finger links may touch it lightly). Returns ``(q_end, "ok")`` or ``(None, reason)``."""
         from ispatialgym.oracle import r1pro_model as M
 
         p0, p1 = (G.t(pose_from[0]), G.t(pose_from[1])), (G.t(pose_to[0]), G.t(pose_to[1]))
@@ -898,6 +967,7 @@ class IKChecker:
         near_end = [i for i in range(1, m) if is_end[i] and not is_start[i]]
         near_start = [i for i in range(1, m) if is_start[i] and not is_end[i]]
         body = [i for i in range(1, m) if not is_end[i] and not is_start[i]]
+        touched: List[float] = []
         for idxs, extra, what in ((body, (), "an intermediate configuration of the approach collides"),
                                   (near_start, ignore_start, "a configuration just after the start pose collides"),
                                   (near_end, ignore_end, "a configuration just before the end pose collides"),
@@ -907,13 +977,84 @@ class IKChecker:
             ign = list(ignore_mid) + list(extra)
             with self.ignoring(ign):
                 free = self.kit.collision_free(traj[idxs], margin=0.0)
+            present = [o for o in touch if all(o is not x for x in ign)]
+            if not bool(free.all()) and present:
+                hit = [j for j, f in enumerate(free.tolist()) if not f]
+                ok_t, pen_mm = self._finger_touch_ok(traj[[idxs[j] for j in hit]], arm, ign, present)
+                free = free.clone()
+                for j, ok_j in zip(hit, ok_t.tolist()):
+                    free[j] = bool(ok_j)
+                if bool(ok_t.any()):
+                    touched.append(pen_mm)
             if not bool(free.all()):
                 bad = [idxs[j] for j, f in enumerate(free.tolist()) if not f]
                 return None, f"approach_untrackable: {what} ({len(bad)}/{len(idxs)}, {[round(dist * i / m, 3) for i in bad[:3]]} m from the start; {self._collision_blame(traj[bad[0]], ign)})"
-        with self.ignoring(list(ignore_mid) + list(ignore_end)):
-            if not bool(self.kit.collision_free(traj[-1], margin=0.0)[0]):
-                return None, "approach_untrackable: the end configuration collides"
+        ign = list(ignore_mid) + list(ignore_end)
+        with self.ignoring(ign):
+            end_free = bool(self.kit.collision_free(traj[-1], margin=0.0)[0])
+        present = [o for o in touch if all(o is not x for x in ign)]
+        if not end_free and present:
+            # the program check's grasp approach is 3 segments: the first two end with the support in the world
+            ok_t, pen_mm = self._finger_touch_ok(traj[-1:], arm, ign, present)
+            end_free = bool(ok_t[0])
+            if end_free:
+                touched.append(pen_mm)
+        if not end_free:
+            return None, "approach_untrackable: the end configuration collides"
+        if touched:
+            self._count("finger_touch_allowed")
+            ft = self.finger_touch
+            opening = ft.opening() if ft.preshape else None
+            log.info("approach finger-support touch allowed: max penetration %.0f mm (cap %.0f mm, margin %.0f mm; %s fingers vs %s; finger opening %s; %.3f m segment)",
+                     max(touched), ft.max_penetration_m * 1000, ft.margin_m * 1000, arm, [getattr(o, "name", str(o)) for o in touch],
+                     "configuration's own" if opening is None else f"{opening:.4f} m (pre-shaped)", dist)
         return traj[-1].clone(), "ok"
+
+    def _finger_touch_ok(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any]) -> Tuple[th.Tensor, float]:
+        """``(ok (K,) bool, max penetration in mm over the passing ones)`` of approach configurations that collide with ``touch`` (the grasp's
+        support) while ``ignored`` is out of the world: (a) the whole body is collision-free at margin 0 with ``touch`` removed too (every
+        other object, self-collision), (b) every link but ``arm``'s finger links is clear of the world at margin 0 (the palm, wrist, arm
+        against the support), (c) the finger links - at the oracle's pre-shaped opening when ``FingerTouch.preshape`` - are clear of the world
+        at ``margin_m - max_penetration_m`` (the light contact with the support; (a) already holds them clear of everything else)."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        ft = self.finger_touch
+        qs = G.t(qs)
+        out = th.zeros(qs.shape[0], dtype=th.bool)
+        fingers = list(M.FINGER_LINKS[arm])
+        others = self._non_finger_links(arm)
+        if ft is None or qs.shape[0] == 0 or not others:
+            return out, 0.0
+        with self.ignoring(list(ignored) + list(touch)):
+            ok = self.kit.collision_free(qs, margin=0.0).clone()
+        q_f = qs.clone()
+        opening = ft.opening() if ft.preshape else None
+        if opening is not None:
+            q_f[:, self.kit.robot.gripper_control_idx[arm]] = float(opening)
+        floor_m = ft.margin_m - ft.max_penetration_m
+        with self.ignoring(list(ignored)):
+            ok &= self.kit.links_clear(qs, others, 0.0)
+            ok &= self.kit.links_clear(q_f, fingers, floor_m)
+            pen_mm = 0.0
+            if bool(ok.any()):
+                # the deepest finger penetration over the passing configurations, to the mm (for the log)
+                q_ok = q_f[ok]
+                for k in range(0, int(math.ceil(ft.max_penetration_m * 1000)) + 1):
+                    if bool(self.kit.links_clear(q_ok, fingers, max(floor_m, -0.001 * k)).all()):
+                        pen_mm = float(k)
+                        break
+        return ok, pen_mm
+
+    def _non_finger_links(self, arm: str) -> List[str]:
+        """Every link with collision spheres in the whole-body model but ``arm``'s finger links ([] when the backend does not say)."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        try:
+            costs = self.kit.backend._collision_costs(self.kit.backend.kin_entry("whole_body"))
+            links = sorted({l for l in costs.get("link_of_sphere", []) if l})
+        except Exception:  # noqa: BLE001 - a backend without the sphere-to-link map: the rule cannot separate the fingers
+            return []
+        return [l for l in links if l not in set(M.FINGER_LINKS[arm])]
 
     #: the oracle's ``Motions._densify`` resolution of a tracked eef chain (``MotionsConfig.cartesian_step`` / ``cartesian_rot_step``)
     TRACK_STEP_M = 0.01
@@ -1200,14 +1341,15 @@ class IKChecker:
         return any("attached_object" in a or "attached_object" in b for (a, b), _ in pairs)
 
     def track_approach(self, q_pre: th.Tensor, pre: Pose, end: Pose, arm: str, ignore_end: Sequence[Any] = (), ignore_mid: Sequence[Any] = (),
-                       q_hint: Optional[th.Tensor] = None) -> Tuple[Optional[th.Tensor], str]:
+                       q_hint: Optional[th.Tensor] = None, touch: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
         """End-pose configuration of a straight approach, branch-consistent with the pre-pose configuration ``q_pre``:
         the segment is tracked forward from ``q_pre``; when that fails the end pose is solved on its own (32 seeds around
         ``q_hint``) and the segment tracked *backward* to the pre pose — the pre configuration is then replaced by the
         end's branch (``self._last_track_start``, recorded by the caller as the pre-pose witness). ``(None, reason)`` when
-        neither branch tracks (``approach_untrackable``)."""
+        neither branch tracks (``approach_untrackable``). ``touch``: :meth:`track_segment`'s finger-support touch objects."""
         self._last_track_start = G.t(q_pre).clone()
-        q_end, why = self.track_segment(q_pre, pre, end, arm, ignore_mid=ignore_mid, ignore_end=ignore_end)
+        tkw = {"touch": list(touch)} if touch else {}
+        q_end, why = self.track_segment(q_pre, pre, end, arm, ignore_mid=ignore_mid, ignore_end=ignore_end, **tkw)
         if q_end is not None:
             return q_end, "ok"
         seed = q_hint if q_hint is not None else q_pre
@@ -1215,7 +1357,7 @@ class IKChecker:
             q_alt = self.kit.ik(end, self._seeded(G.t(seed), end, arm), arm=arm)
         if q_alt is None:
             return None, f"{why}; the end pose has no solution on its own either"
-        q_pre2, why2 = self.track_segment(q_alt, end, pre, arm, ignore_mid=ignore_mid, ignore_end=(), ignore_start=ignore_end)
+        q_pre2, why2 = self.track_segment(q_alt, end, pre, arm, ignore_mid=ignore_mid, ignore_end=(), ignore_start=ignore_end, **tkw)
         if q_pre2 is None:
             return None, f"{why}; from the end's branch: {why2}"
         self._last_track_start = q_pre2.clone()

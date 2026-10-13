@@ -579,10 +579,13 @@ class IORSLarge(SamplerV2):
         self.seg_arm: str = TT.default_arm(self)  # the arm of the grasp -> carry -> place -> release segment being coupled
         self.partner_joints: Optional[Dict[str, float]] = None  # every partner joint once generation.partner_joint_init set them
         self.partner_moved: List[str] = []  # the partner links that request moved (the open door)
+        self.finger_touch_error: Optional[str] = self.setup_finger_touch()  # a bad value: the spec rejection of bind_scene_roles
 
     # ------------------------------------------------------------------ roles
 
     def bind_scene_roles(self):
+        if getattr(self, "finger_touch_error", None):
+            raise Reject("spec", f"{self.gp.alias}: generation.{self.finger_touch_error}")
         if self.relation in MODE_HOOKS and self.relation_mode is None:
             self._adopt_mode(getattr(self, MODE_HOOKS[self.relation])())
             return self.bind_scene_roles()  # the mode's own, else the ontop / under flow from here on with the mode's overrides
@@ -708,6 +711,27 @@ class IORSLarge(SamplerV2):
     def grasp_ignore_objects(self) -> List[Any]:
         """§5.6: the init surface ignored for the grasp pose only (the floor for the floor init)."""
         return [self.obj("floor")] if self.surface.get("kind") == "floor" else self.support_objects()
+
+    def setup_finger_touch(self) -> Optional[str]:
+        """``generation.approach_finger_support_touch`` (owner 2026-10-13 ~03:15 item 3; default off = today's approach check): the IK
+        checker's :class:`IK.FingerTouch` - along a tracked grasp approach (the draw at B, the program check's grasp) the acting arm's
+        finger links may touch :meth:`grasp_ignore_objects` lightly, checked at :meth:`preshape_opening`. Returns the error of a bad value
+        (the rule stays off; :meth:`bind_scene_roles` rejects the template ``spec``)."""
+        try:
+            p = IK.finger_touch_params(self.gp.gen("approach_finger_support_touch"))
+        except ValueError as e:
+            return str(e)
+        self.ikc.set_finger_touch(None if p is None else IK.FingerTouch(p["margin_m"], p["max_penetration_m"], p["preshape"],
+                                                                         supports=self.grasp_ignore_objects, opening=self.preshape_opening))
+        return None
+
+    def preshape_opening(self) -> Optional[float]:
+        """The widest per-finger opening the oracle pre-shapes to before approaching one of the target's library grasps (``execute_grasp``:
+        pinch width / 2 + its pre-shape margin, at most fully open); None when a row has no width (the oracle approaches fully open then)."""
+        widths = [TT.grasp_pinch_width(g) for g in self.grasps]
+        if not widths or any(w is None for w in widths):
+            return None
+        return min(float(C.FINGER_OPEN), max(0.5 * w + IK.ORACLE_PRESHAPE_MARGIN_M for w in widths))
 
     # duck-typed attributes the shared tabletop phases read (``tabletop.py`` / the TEMP stand-in of ``iors_small``)
     @property

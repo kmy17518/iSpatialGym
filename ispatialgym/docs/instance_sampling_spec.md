@@ -1660,7 +1660,12 @@ grasp side up, the far rim down), the release height from the tilted hull's lowe
 for every grasp; owner 2026‑10‑13 ~00:50, inside_large_scale#02) raises the release only as far as the drawn grasp's own open gripper
 needs at the release orientation (level or tilted): the F_goal screen poses each library row at its own release, the C exact IK and
 the goal / settle use the drawn grasp's, `summary.release.release_above_m` records it with `release_above_max_m` (the default's
-height) beside it. **Goal check**: teleport to the
+height) beside it. `approach_finger_support_touch` (any IORS large-scale mode; default none = today's approach check; owner 2026‑10‑13
+~03:15, inside_large_scale#03, e.g. `{"margin_m": 0.0, "max_penetration_m": 0.005}`): along the tracked grasp approach (the draw at B,
+the program check's grasp) a configuration that collides with the grasp's support (`grasp_ignore_objects`) passes when the whole
+body is free of everything else, every link but the acting arm's two finger links is clear of the support (margin 0) and the finger
+links — at the oracle's pre-shaped opening (pinch width / 2 + 10 mm, the widest library row; `preshape: false` = fully open) — sink at
+most `max_penetration_m` below `margin_m`; INFO line 'approach finger-support touch allowed: max penetration N mm'. **Goal check**: teleport to the
 release, settle (drop test); `(inside ?target ?partner)` — for a container without a fillable / openfillable meta link the robust
 predicate's rays branch (`predicates.inside_rays`: the inner AABB centre in the container's AABB, the container on both sides along
 ≥ 2 of z and its own x / y) — and the target's top at most `max_protrusion_fraction` (0.5) of its height above the rim (the
