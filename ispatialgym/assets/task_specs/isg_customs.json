@@ -32422,6 +32422,7 @@
   "scenes": {
    "house_single_floor": {
     "rooms": [
+     "living_room_0",
      "dining_room_0"
     ],
     "bindings": {
@@ -32429,10 +32430,10 @@
       "breakfast_table_rhjoby_0"
      ],
      "support": {
-      "room": "dining_room_0"
+      "room": "living_room_0"
      },
      "floor": {
-      "room": "dining_room_0"
+      "room": "living_room_0"
      }
     },
     "whitelist": {
