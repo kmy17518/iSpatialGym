@@ -1653,6 +1653,55 @@ def flat_tip_half_height(quat) -> float:
     return float(FINGER_PROFILE[0][1]) if abs(float(c[2])) >= 0.5 else float(FINGER_SIDE_PROFILE[0][1])
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# pitched hand (owner 2026-10-12 ~20:55 item C, under_large #02 / #03 push-under): the closed hand pitched 60-70 deg from straight
+# down toward the push, the palm leaning away from the face, the fingertips low on the object's back face
+# ----------------------------------------------------------------------------------------------------------------
+
+#: the closed fingers' cuRobo spheres in the eef frame, both fingers (``r1pro_description_curobo_default.yaml`` through the URDF with the
+#: finger joints at 0, the same for both arms; ``collision_sphere_buffer`` not included): a pitched hand's lowest part can be a fingertip
+FINGER_SPHERES_EEF: Tuple[Tuple[Tuple[float, float, float], float], ...] = tuple(
+    ((0.0, s * y, z), r) for s in (1.0, -1.0) for y, z, r in ((0.0085, -0.0381, 0.010), (0.0075, -0.0181, 0.008), (0.0055, -0.0031, 0.007), (0.0035, 0.0119, 0.005)))
+
+
+def hand_spheres_eef() -> List[Tuple[str, Tuple[float, float, float], float]]:
+    """The hand's collision spheres in the eef frame, ``(part, centre, radius)``: the gripper body and the knuckles (``PALM_SPHERES_EEF``),
+    the wrist camera and the closed fingers (``FINGER_SPHERES_EEF``)."""
+    parts = ["gripper body"] + ["knuckle"] * (len(PALM_SPHERES_EEF) - 1)
+    return ([(p, c, r) for p, (c, r) in zip(parts, PALM_SPHERES_EEF)] + [("wrist camera", c, WRIST_CAMERA_SPHERE_R) for c in WRIST_CAMERA_SPHERES_EEF]
+            + [("finger", c, r) for c, r in FINGER_SPHERES_EEF])
+
+
+def pitched_hand_quats(pitch_deg: float, direction) -> List[Tuple[str, th.Tensor]]:
+    """eef orientations of the hand pushing along the horizontal ``direction`` pitched ``pitch_deg`` from straight down toward it
+    (``pitched_approach``: the fingertips ahead of and below the palm, the palm leaning away from the face): the closing axis lateral with the
+    wrist camera on the hand's upper side (``lateral``; eef +x = c x a points back and down) or below it (``lateral-``), or in the push's
+    vertical plane (``plane``: the camera on the push's right, ``plane-``: on its left). ``[(label, quat), ...]`` in that order."""
+    a = pitched_approach(pitch_deg, direction)
+    lat = C.unit(th.cross(th.tensor([0.0, 0.0, 1.0]), a, dim=0))
+    n = C.unit(th.cross(a, lat, dim=0))  # across the finger axis in the push's vertical plane, toward the face and up
+    return [("lateral", C.eef_quat(a, lat)), ("lateral-", C.eef_quat(a, -lat)), ("plane", C.eef_quat(a, n)), ("plane-", C.eef_quat(a, -n))]
+
+
+def pitched_hand_drop(eef_quat) -> float:
+    """How far the hand's lowest collision sphere (:func:`hand_spheres_eef`) lies below the fingertips - the point ``FINGERTIP_LENGTH``
+    along the approach from the eef origin - at the eef orientation ``eef_quat``: a fingertip sphere for a pitched hand with the camera up,
+    a knuckle with the closing axis in the push plane, the camera with it below."""
+    R = C.quat_to_mat(_t(eef_quat)).float()
+    tip_z = C.FINGERTIP_LENGTH * float(R[2, 2])
+    return tip_z - min(float(R[2] @ _t(c)) - float(r) for _, c, r in hand_spheres_eef())
+
+
+def pitched_tip_offsets(pitch_deg: float, eef_quat, clearance: float = 0.0) -> Tuple[float, float, float]:
+    """The pitched hand against a vertical face: the fingertips' leading edge - ``h`` (:func:`flat_tip_half_height`, the tips' half extent
+    across the finger axis in the push plane) toward the face and up from the fingertip point - touches ``clearance`` short of it. Returns
+    ``(stand-off, rise, h)``: the eef origin ``FINGERTIP_LENGTH·sin p + h·cos p + clearance`` behind the contact point along the push,
+    ``FINGERTIP_LENGTH·cos p`` above the fingertip point (which the leading edge stands ``h·sin p`` above)."""
+    p = math.radians(float(pitch_deg))
+    h = flat_tip_half_height(eef_quat)
+    return C.FINGERTIP_LENGTH * math.sin(p) + h * math.cos(p) + float(clearance), C.FINGERTIP_LENGTH * math.cos(p), h
+
+
 def blade_sweep_clear(hull: th.Tensor, pose_init: Pose, com_xy, delta: float, blade_xy, radius: float, clearance: float, n: int = 12) -> Tuple[bool, float]:
     """Whether a blade (disc of ``radius`` at ``blade_xy``) stays ``clearance`` clear of the object's footprint while it
     rotates about ``com_xy`` from ``pose_init`` by ``delta`` (rad, about +z) — sampled at ``n`` angles short of the goal
