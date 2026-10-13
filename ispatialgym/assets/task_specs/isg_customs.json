@@ -42719,7 +42719,9 @@
    "partner_view_min_points": 1,
    "init_support_max_geodesic_m": 10.0,
    "init_support_fallback": true,
-   "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)"
+   "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)",
+   "carry_collision_margin_m": 0.01,
+   "attempt_budget_s": 3000
   },
   "constraints": []
  },
@@ -43167,7 +43169,9 @@
    "partner_view_min_points": 1,
    "init_support_max_geodesic_m": 10.0,
    "init_support_fallback": true,
-   "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)"
+   "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)",
+   "carry_collision_margin_m": 0.01,
+   "attempt_budget_s": 3000
   },
   "constraints": []
  },
