@@ -1,0 +1,38 @@
+(define (problem inter_object_relation_satisfaction-128)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table)
+
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#02~T3/representative)
+    ; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02: hand-made (rendered from the iddl; the subtask has no candidates rows) - jar_of_spaghetti_sauce/exmsmm onto fridge_petcxr_0's 1.20 m shelf (left door open) from breakfast_table_xftrki_0 (0.6 m, sheet ~T3); registry mode test
+    ; IORS - inside (large-scale). The target starts on a support (a table near the partner, or the floor beside it - an
+    ; explicit support choice made by ground_isg, never a runtime fallback) and ends inside a large scene partner (a copy of
+    ; ontop_large_scale with the goal predicate inside; registered 2026-10-12, the sampler mode comes next). Three recorded
+    ; stances: init A, manipulation B, placement C.
+
+    (:objects
+        jar__of__spaghetti_sauce.n.01_1 - jar__of__spaghetti_sauce.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop jar__of__spaghetti_sauce.n.01_1 breakfast_table.n.01_1)
+        (not (inside jar__of__spaghetti_sauce.n.01_1 electric_refrigerator.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (inside ?jar__of__spaghetti_sauce.n.01_1 ?electric_refrigerator.n.01_1)
+            (not (grasped ?agent.n.01_1 ?jar__of__spaghetti_sauce.n.01_1))
+            (pose_settled ?jar__of__spaghetti_sauce.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?jar__of__spaghetti_sauce.n.01_1)
+    )
+)

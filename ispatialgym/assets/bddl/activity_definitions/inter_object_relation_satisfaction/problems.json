@@ -1417,6 +1417,39 @@
    "pick": "inter_object_relation_satisfaction-touching#04~W5",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table",
+   "id": 128,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#02; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02 c1)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#02~c1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-bar",
+   "id": 129,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#02; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02 c2/c3)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#02~c2/c3",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-floor",
+   "id": 130,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#02; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02 c4)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#02~c4",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
