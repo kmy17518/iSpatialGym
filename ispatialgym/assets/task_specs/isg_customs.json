@@ -30427,6 +30427,247 @@
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03: plate/luhkiz into drop_in_sink_awvzkn_0 from countertop_kelzer_0 (0.6 m, sheet ~T1) / countertop_kelker_0 (1.6 m, ~T3); the order pins one per step; hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
  },
+ "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar": {
+  "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+  "definition_id": 134,
+  "roles": {
+   "target": {
+    "category": "plate",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "luhkiz",
+    "orientation_equivalences": {
+     "plate/luhkiz": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "plate/luhkiz": "plate__luhkiz__ts"
+    }
+   },
+   "partner": {
+    "category": "drop_in_sink",
+    "sampleable": false
+   },
+   "support": {
+    "category": "bar",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_lower": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "partner": [
+      "drop_in_sink_lkklqs_0"
+     ],
+     "support": [
+      "bar_egwapq_0",
+      "bar_byvbuc_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "bar_egwapq_0",
+       "init": "ontop",
+       "top_z": 0.89,
+       "row": "inter_object_relation_satisfaction-inside_large_scale#03~V3a"
+      },
+      {
+       "name": "bar_byvbuc_0",
+       "init": "ontop",
+       "top_z": 0.89,
+       "row": "inter_object_relation_satisfaction-inside_large_scale#03~V3b"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "plate": [
+       "luhkiz"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "plate": {
+       "ntedfx": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.01,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "inside_surface_z_m": 0.77,
+   "inside_surface_tol_m": 0.25,
+   "inside_stance_side": "-x",
+   "_inside_note": "owner 2026-10-12 ~20:30 inside03v V3 (inside_large#03 variant: the other drop-in sink, the release above its rim): drop_in_sink_lkklqs_0's basin floor (no fillable meta link) - support_interior requested at 0.77 m +- 0.25 (the sheet's lower level; the rays start under the rim at 0.81) = the goal-side band's --surface-z / --surface-tol; probes 17833566 / 17833630: the floor at 0.775 m, 374 board cells in one board piece, 0.44 m (x) x 0.34 m (y), headroom median 0.67 m, the sink's support top (the drop test's rim) at 0.886 m; stance C on the side facing -x (the raster's +u side, 0.32 m; the bar's front, sheet best_side=-x); drop_height_m 0.14 = the rim 0.886 - the floor 0.775 + 0.03: the plate's bottom ~3 cm above the rim at the release, the open gripper above the basin (alias 121's only grasp pinches the plate's rim from outside, its pre-grasp 8.8 cm further out); no inside_erosion_m: the 24.1 cm plate is narrower than the 34 cm floor (default: half extent + opening_margin_m = 0.14 m from the board's outline, 6 goal cells on the basin's centre line); carry_collision_margin_m 0.01, partner_view_min_points 1, init_support_max_geodesic_m 10, max_partner_geodesic_m 10 as alias 121, no init_support_fallback",
+   "carry_collision_margin_m": 0.01,
+   "drop_height_m": 0.14
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: plate/luhkiz into drop_in_sink_lkklqs_0 (set in bar_egwapq_0) from bar_egwapq_0 (the sink's own bar, ~0.3-1.2 m along it) / bar_byvbuc_0 (the L-joined bar along -y, ~1.7 m); the order pins one per step; the partner is the sheet's held-out drop_in_sink_lkklqs_0 (house_double_floor_lower kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V3 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
+ },
+ "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table": {
+  "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+  "definition_id": 135,
+  "roles": {
+   "target": {
+    "category": "plate",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "luhkiz",
+    "orientation_equivalences": {
+     "plate/luhkiz": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "plate/luhkiz": "plate__luhkiz__ts"
+    }
+   },
+   "partner": {
+    "category": "drop_in_sink",
+    "sampleable": false
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_lower": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "partner": [
+      "drop_in_sink_lkklqs_0"
+     ],
+     "support": [
+      "breakfast_table_xftrki_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_xftrki_0",
+       "init": "ontop",
+       "top_z": 0.68,
+       "row": "inter_object_relation_satisfaction-inside_large_scale#03~V3c"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "plate": [
+       "luhkiz"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "plate": {
+       "ntedfx": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.01,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "inside_surface_z_m": 0.77,
+   "inside_surface_tol_m": 0.25,
+   "inside_stance_side": "-x",
+   "_inside_note": "owner 2026-10-12 ~20:30 inside03v V3 (inside_large#03 variant: the other drop-in sink, the release above its rim): drop_in_sink_lkklqs_0's basin floor (no fillable meta link) - support_interior requested at 0.77 m +- 0.25 (the sheet's lower level; the rays start under the rim at 0.81) = the goal-side band's --surface-z / --surface-tol; probes 17833566 / 17833630: the floor at 0.775 m, 374 board cells in one board piece, 0.44 m (x) x 0.34 m (y), headroom median 0.67 m, the sink's support top (the drop test's rim) at 0.886 m; stance C on the side facing -x (the raster's +u side, 0.32 m; the bar's front, sheet best_side=-x); drop_height_m 0.14 = the rim 0.886 - the floor 0.775 + 0.03: the plate's bottom ~3 cm above the rim at the release, the open gripper above the basin (alias 121's only grasp pinches the plate's rim from outside, its pre-grasp 8.8 cm further out); no inside_erosion_m: the 24.1 cm plate is narrower than the 34 cm floor (default: half extent + opening_margin_m = 0.14 m from the board's outline, 6 goal cells on the basin's centre line); carry_collision_margin_m 0.01, partner_view_min_points 1, init_support_max_geodesic_m 10, max_partner_geodesic_m 10 as alias 121, no init_support_fallback",
+   "carry_collision_margin_m": 0.01,
+   "drop_height_m": 0.14
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: plate/luhkiz into drop_in_sink_lkklqs_0 from breakfast_table_xftrki_0 (0.68 m, ~4.0 m across kitchen_0); the partner is the sheet's held-out drop_in_sink_lkklqs_0 (house_double_floor_lower kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V3 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
+ },
  "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench": {
   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
   "definition_id": 85,

@@ -1,0 +1,38 @@
+(define (problem inter_object_relation_satisfaction-135)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table)
+
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#03~V3c/representative)
+    ; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: hand-made (rendered from the iddl; the subtask has no candidates rows) - plate/luhkiz into drop_in_sink_lkklqs_0 from breakfast_table_xftrki_0 (0.68 m, ~4.0 m across kitchen_0); registry mode test
+    ; IORS - inside (large-scale). The target starts on a support (a table near the partner, or the floor beside it - an
+    ; explicit support choice made by ground_isg, never a runtime fallback) and ends inside a large scene partner (a copy of
+    ; ontop_large_scale with the goal predicate inside; registered 2026-10-12, the sampler mode comes next). Three recorded
+    ; stances: init A, manipulation B, placement C.
+
+    (:objects
+        plate.n.04_1 - plate.n.04
+        sink.n.01_1 - sink.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop plate.n.04_1 breakfast_table.n.01_1)
+        (not (inside plate.n.04_1 sink.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (inside ?plate.n.04_1 ?sink.n.01_1)
+            (not (grasped ?agent.n.01_1 ?plate.n.04_1))
+            (pose_settled ?plate.n.04_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?plate.n.04_1)
+    )
+)

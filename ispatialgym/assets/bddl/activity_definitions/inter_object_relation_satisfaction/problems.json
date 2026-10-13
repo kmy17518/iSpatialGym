@@ -1483,6 +1483,28 @@
    "pick": "inter_object_relation_satisfaction-under_large_scale#01",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar",
+   "id": 134,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl, alias 121's generation with the V3 inside keys; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3 V3a/V3b)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#03~V3a/V3b",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table",
+   "id": 135,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl, alias 121's generation with the V3 inside keys; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3 V3c)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#03~V3c",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
