@@ -30680,7 +30680,13 @@
     30,
     45
    ],
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "approach_finger_support_touch": {
+    "margin_m": 0.0,
+    "max_penetration_m": 0.005,
+    "preshape": true
+   },
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03: plate/luhkiz into drop_in_sink_awvzkn_0 from bar_udatjt_0 (1.3 m, the 1.05 m kitchen island, sheet ~T2); hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
@@ -30810,7 +30816,13 @@
     30,
     45
    ],
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "approach_finger_support_touch": {
+    "margin_m": 0.0,
+    "max_penetration_m": 0.005,
+    "preshape": true
+   },
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03: plate/luhkiz into drop_in_sink_awvzkn_0 from countertop_kelzer_0 (0.6 m, sheet ~T1) / countertop_kelker_0 (1.6 m, ~T3); the order pins one per step; hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
@@ -30939,7 +30951,13 @@
     30,
     45
    ],
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "approach_finger_support_touch": {
+    "margin_m": 0.0,
+    "max_penetration_m": 0.005,
+    "preshape": true
+   },
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: plate/luhkiz into drop_in_sink_lkklqs_0 (set in bar_egwapq_0) from bar_egwapq_0 (the sink's own bar, ~0.3-1.2 m along it) / bar_byvbuc_0 (the L-joined bar along -y, ~1.7 m); the order pins one per step; the partner is the sheet's held-out drop_in_sink_lkklqs_0 (house_double_floor_lower kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V3 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
@@ -31061,7 +31079,13 @@
     30,
     45
    ],
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "approach_finger_support_touch": {
+    "margin_m": 0.0,
+    "max_penetration_m": 0.005,
+    "preshape": true
+   },
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: plate/luhkiz into drop_in_sink_lkklqs_0 from breakfast_table_xftrki_0 (0.68 m, ~4.0 m across kitchen_0); the partner is the sheet's held-out drop_in_sink_lkklqs_0 (house_double_floor_lower kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V3 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
