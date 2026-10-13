@@ -30194,7 +30194,8 @@
     "tucked"
    ],
    "_shelf070_note": "owner 2026-10-12 ~21:15 item 2: a copy of alias 128 on the fridge's lower shelf (inside_surface_z_m 0.70, tol 0.03; 128's 1.205 m shelf has no (yaw, grasp) for the placement) - door-open band at z 0.706 (j_left_door 2.3, edge +u mid (5.474, -0.288), 0.36 m, the 1.20 shelf's x 5.474 / 0.36 m): 345 usable board cells (1 under the doors left out), headroom median 0.238 m, reachable cells right 23 / left 24 at stand-off 0.45 (tband 17833995 / 17833996)",
-   "carry_collision_margin_m": 0.01
+   "carry_collision_margin_m": 0.01,
+   "attempt_budget_s": 3000
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02: jar_of_spaghetti_sauce/exmsmm onto fridge_petcxr_0's 1.20 m shelf (left door open) from breakfast_table_xftrki_0 (0.6 m, sheet ~T3); hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
