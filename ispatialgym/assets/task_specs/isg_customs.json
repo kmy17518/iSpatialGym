@@ -32038,6 +32038,128 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor": {
+  "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+  "definition_id": 123,
+  "roles": {
+   "target": {
+    "category": "serving_cart",
+    "sampleable": true,
+    "representative": "heqtlk",
+    "orientation_equivalences": {
+     "serving_cart/heqtlk": []
+    }
+   },
+   "partner": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support": {
+      "room": "dining_room_0"
+     },
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "serving_cart": [
+       "heqtlk"
+      ]
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.15,
+    "orientation": 0.35
+   },
+   "_tolerances_note": "pose_reached is measured, not the goal: the push stops nextto_push_on_m after NextTo first holds, short of the recorded goal (the goal's AABB gap is under half the NextTo bound), and the cart may turn a little under the hand",
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.9,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "remove_objects": {
+    "house_single_floor": [
+     "straight_chair_jgoolz_0",
+     "straight_chair_jgoolz_1",
+     "straight_chair_jgoolz_2",
+     "straight_chair_jgoolz_3",
+     "straight_chair_jgoolz_4",
+     "straight_chair_jgoolz_5"
+    ]
+   },
+   "_remove_objects_note": "the six chairs around breakfast_table_rhjoby_0 removed as in the sandal's floor aliases of this table: they stand at its sides, where the cart's goal is",
+   "push_distance_m": [
+    1.5,
+    2.5
+   ],
+   "push_heights_m": [
+    0.45,
+    0.4,
+    0.5,
+    0.55,
+    0.35,
+    0.6
+   ],
+   "push_stand_offs_m": [
+    0.55,
+    0.5,
+    0.6,
+    0.65,
+    0.45
+   ],
+   "drift_tol_m": 0.1,
+   "nextto_push_on_m": 0.05,
+   "push_speed_m_s": 0.08,
+   "attempt_budget_s": 1500,
+   "_nextto_note": "owner 2026-10-12 ~16:05 items 3 / 4: nextto_large#02 - the serving cart heqtlk (one rigid link, 0.39 x 0.44 x 0.85 m, spawned) pushed next to breakfast_table_rhjoby_0 by the base (oracle base_push, no grasp); hand-made from the sandal's under alias of the same table (scene, room, floor init, the six chairs removed); the base-push keys are the sampler's defaults (iors_large_nextto.DEFAULTS), written out to be tuned here"
+  },
+  "constraints": []
+ },
  "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk": {
   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
   "definition_id": 18,
@@ -38781,9 +38903,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "lwmelf",
+    "representative": "miqtui",
     "grasp_keys": {
-     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t"
+     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t",
+     "spray_bottle/miqtui": "spray_bottle__miqtui__t"
     }
    },
    "partner": {
@@ -38823,7 +38946,7 @@
     "whitelist": {
      "target": {
       "spray_bottle": [
-       "lwmelf"
+       "miqtui"
       ]
      },
      "partner": {
@@ -38836,7 +38959,7 @@
      "target": {
       "spray_bottle": {
        "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
-       "miqtui": "ground_isg 2026-10-12: heldout"
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
       }
      }
     }
@@ -38901,7 +39024,8 @@
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
    },
-   "partner_max_aspect": 3.2
+   "partner_max_aspect": 3.2,
+   "push_max_pinch_m": 0.092
   },
   "constraints": []
  },
@@ -38915,9 +39039,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "lwmelf",
+    "representative": "miqtui",
     "grasp_keys": {
-     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t"
+     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t",
+     "spray_bottle/miqtui": "spray_bottle__miqtui__t"
     }
    },
    "partner": {
@@ -38957,7 +39082,7 @@
     "whitelist": {
      "target": {
       "spray_bottle": [
-       "lwmelf"
+       "miqtui"
       ]
      },
      "partner": {
@@ -38970,7 +39095,7 @@
      "target": {
       "spray_bottle": {
        "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
-       "miqtui": "ground_isg 2026-10-12: heldout"
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
       }
      }
     }
@@ -39035,7 +39160,8 @@
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
    },
-   "partner_max_aspect": 3.2
+   "partner_max_aspect": 3.2,
+   "push_max_pinch_m": 0.092
   },
   "constraints": []
  },
@@ -39049,10 +39175,11 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "lwmelf",
+    "representative": "miqtui",
     "grasp_keys": {
      "spray_bottle/asztxi": "spray_bottle__asztxi__t",
-     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t"
+     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t",
+     "spray_bottle/miqtui": "spray_bottle__miqtui__t"
     }
    },
    "partner": {
@@ -39106,7 +39233,7 @@
     "whitelist": {
      "target": {
       "spray_bottle": [
-       "lwmelf"
+       "miqtui"
       ]
      },
      "partner": {
@@ -39119,7 +39246,7 @@
      "target": {
       "spray_bottle": {
        "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
-       "miqtui": "ground_isg 2026-10-12: heldout"
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
       }
      }
     }
@@ -39187,7 +39314,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "push_max_pinch_m": 0.092
   },
   "constraints": []
  },
@@ -39201,9 +39329,10 @@
     "require": {
      "grasps": "tabletop"
     },
-    "representative": "lwmelf",
+    "representative": "miqtui",
     "grasp_keys": {
-     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t"
+     "spray_bottle/lwmelf": "spray_bottle__lwmelf__t",
+     "spray_bottle/miqtui": "spray_bottle__miqtui__t"
     }
    },
    "partner": {
@@ -39243,7 +39372,7 @@
     "whitelist": {
      "target": {
       "spray_bottle": [
-       "lwmelf"
+       "miqtui"
       ]
      },
      "partner": {
@@ -39256,7 +39385,7 @@
      "target": {
       "spray_bottle": {
        "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
-       "miqtui": "ground_isg 2026-10-12: heldout"
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
       }
      }
     }
@@ -39321,7 +39450,8 @@
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
    },
-   "partner_max_aspect": 3.2
+   "partner_max_aspect": 3.2,
+   "push_max_pinch_m": 0.092
   },
   "constraints": []
  },
@@ -41340,128 +41470,6 @@
   },
   "constraints": [],
   "_note": "owner 2026-09-19 20:14: sandal under the breakfast table (the small-scale under/ontop support); hand-grounded probe, breakfast_table_rhjoby_0 has no B4 partner record (under-clearance by raycast in-process)"
- },
- "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor": {
-  "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
-  "definition_id": 123,
-  "roles": {
-   "target": {
-    "category": "serving_cart",
-    "sampleable": true,
-    "representative": "heqtlk",
-    "orientation_equivalences": {
-     "serving_cart/heqtlk": []
-    }
-   },
-   "partner": {
-    "category": "breakfast_table",
-    "sampleable": false
-   },
-   "support": {
-    "category": "floors",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "dining_room_0"
-    ],
-    "bindings": {
-     "partner": [
-      "breakfast_table_rhjoby_0"
-     ],
-     "support": {
-      "room": "dining_room_0"
-     },
-     "floor": {
-      "room": "dining_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "serving_cart": [
-       "heqtlk"
-      ]
-     }
-    }
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "position": 0.15,
-    "orientation": 0.35
-   },
-   "_tolerances_note": "pose_reached is measured, not the goal: the push stops nextto_push_on_m after NextTo first holds, short of the recorded goal (the goal's AABB gap is under half the NextTo bound), and the cart may turn a little under the hand",
-   "groups": {},
-   "path_buckets": null,
-   "max_partner_geodesic_m": 3.0,
-   "path_max_extra_m": 1.0,
-   "goal_cell_margin_m": 0.05,
-   "goal_drop_m": 0.003,
-   "partner_corners_in_frame_min": 4,
-   "floor_init": {
-    "distance_range_m": [
-     0.6,
-     1.5
-    ],
-    "cell_m": 0.02,
-    "clearance_m": 0.02,
-    "max_geodesic_m": 3.0
-   },
-   "stand_offs_m": [
-    0.35,
-    0.45,
-    0.55
-   ],
-   "partner_moved_max_m": 0.005,
-   "target_max_height_m": 0.9,
-   "argument_order": [
-    "target",
-    "partner"
-   ],
-   "remove_objects": {
-    "house_single_floor": [
-     "straight_chair_jgoolz_0",
-     "straight_chair_jgoolz_1",
-     "straight_chair_jgoolz_2",
-     "straight_chair_jgoolz_3",
-     "straight_chair_jgoolz_4",
-     "straight_chair_jgoolz_5"
-    ]
-   },
-   "_remove_objects_note": "the six chairs around breakfast_table_rhjoby_0 removed as in the sandal's floor aliases of this table: they stand at its sides, where the cart's goal is",
-   "push_distance_m": [
-    1.5,
-    2.5
-   ],
-   "push_heights_m": [
-    0.45,
-    0.4,
-    0.5,
-    0.55,
-    0.35,
-    0.6
-   ],
-   "push_stand_offs_m": [
-    0.55,
-    0.5,
-    0.6,
-    0.65,
-    0.45
-   ],
-   "drift_tol_m": 0.1,
-   "nextto_push_on_m": 0.05,
-   "push_speed_m_s": 0.08,
-   "attempt_budget_s": 1500,
-   "_nextto_note": "owner 2026-10-12 ~16:05 items 3 / 4: nextto_large#02 - the serving cart heqtlk (one rigid link, 0.39 x 0.44 x 0.85 m, spawned) pushed next to breakfast_table_rhjoby_0 by the base (oracle base_push, no grasp); hand-made from the sandal's under alias of the same table (scene, room, floor init, the six chairs removed); the base-push keys are the sampler's defaults (iors_large_nextto.DEFAULTS), written out to be tuned here"
-  },
-  "constraints": []
  },
  "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor": {
   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
