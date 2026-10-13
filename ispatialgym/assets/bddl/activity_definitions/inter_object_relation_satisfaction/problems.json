@@ -1527,6 +1527,39 @@
    "pick": "inter_object_relation_satisfaction-inside_large_scale#03~V4b",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_flat",
+   "id": 138,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-115, push-under variant 'flat', owner ~20:55 under_large#02 / #03)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#03~c1_flat",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_flat",
+   "id": 139,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-117, push-under variant 'flat', owner ~20:55 under_large#02 / #03)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#02~c1_flat",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_flat",
+   "id": 140,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-118, push-under variant 'flat', owner ~20:55 under_large#02 / #03)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#02~c2_flat",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
