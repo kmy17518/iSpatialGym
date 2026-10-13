@@ -404,6 +404,16 @@ the approach the sampler tracked from the recorded pre-contact to the init. The 
 (`actions._line`) leaves its start out and begins a third of the push past it — a top-down blade lowered over it stood that far
 toward the object (touching#02, 7.85 cm push: 3.5 mm inside the box's face, the fingers on its top).
 
+**The transit to a push pre-contact** (2026‑10‑12, touching#04). The transit is planned with the pushed object in the
+collision world: it is protected on that leg, and the planner leaves out only what a motion touches, on the leg where it
+touches it (oracle doc 6.4). With it left out, every plan from the place's retreat 10 cm above the 27 cm spray bottle to the
+pre-contact at its side went through its top (-5.2 cm against its box), and so did the via-above's plan and the re-plans,
+planned in the same world. The world without it, the one the program check validates the push chain in, is the fallback
+when no plan exists with it present (`plan_failed`, not the protect check's own). A recorded witness whose arm spheres stand
+within `push_transit_witness_clear_m` (1 cm) of the object's box goes straight to that fallback (`execute.reach_push_pre`,
+`ExecuteConfig.push_transit_target_present`; meta notes `push_transit`). The program check is unchanged: it plans no transit
+(3.5), and the fallback keeps every pre-contact it accepts reachable.
+
 **One chain, as the oracle runs it** (owner 2026-09-24). The targets of an action are checked in the order the arm
 moves through them, and every leg leaves from the configuration the arm is actually in: a chain whose first pose is
 where the previous motion left the arm (the retreat off the place configuration, the lift off the grasp, a `Retreat`

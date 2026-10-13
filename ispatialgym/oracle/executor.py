@@ -541,6 +541,8 @@ NOTE_KEYS = NOTE_KEYS + ("may_touch",)
 NOTE_KEYS = NOTE_KEYS + ("push_stop",)
 #: a straight push's lowered pre-contact (``execute.push_lowered_pre``): where the transit went and the first contact pose under it
 NOTE_KEYS = NOTE_KEYS + ("push_pre_lowered",)
+#: the collision world the transit to a push pre-contact was planned in (``execute.reach_push_pre``): the pushed object present or left out, why
+NOTE_KEYS = NOTE_KEYS + ("push_transit",)
 
 
 @dataclass

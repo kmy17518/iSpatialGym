@@ -540,7 +540,9 @@ checked against the objects' boxes inflated by 2 cm (threshold capped by the end
 passes too close is re‑planned via the point above its goal. Run‑time: a new robot / held‑object contact with a
 protected object, or a protected object moving more than 1 cm, is a `protected_contact` / `protected_moved` verdict and
 the retry takes the via‑above. Planner ignores follow one rule: only what the motion is meant to touch, only on the leg
-where it touches (a grasp's support, a place's partner — never the partner's own supports).
+where it touches (a grasp's support, a place's partner — never the partner's own supports). The pushed object stays in the
+world for the transit to its pre-contact (2026‑10‑12, touching#04: left out, the plans went through the spray bottle's top),
+left out only when no plan exists with it present (`execute.reach_push_pre`).
 
 ### 6.5 `run_isg` modes and recording
 

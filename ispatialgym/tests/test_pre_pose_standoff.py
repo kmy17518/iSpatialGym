@@ -3,6 +3,8 @@ witness is not planned first - the pre-pose is planned straight to with the witn
 the bare standoff only when that plan fails before the robot moved (``reach_pre_pose``). ``contact_route_goal`` predicts the same
 transit end. Every other situation (no supports, none near, clear of them, a standoff that tracks, no witness) runs as before.
 Item 7c: the program check applies the same decision to a push pre-contact (``program_check.push_pre_standoff``).
+Touching#04 (2026-10-12): the transit to a free object's push pre-contact keeps the pushed object in the collision world, the world
+without it only as the fallback (``execute.reach_push_pre``).
 """
 from __future__ import annotations
 
@@ -467,3 +469,133 @@ def test_contact_route_goal_and_the_program_check_follow_the_knob(monkeypatch):
     s = _PcSampler()
     ok, why, rep = _pc(s)
     assert ok and rep["branch"] == "skipped" and rep["above_m"] == pytest.approx(0.072, abs=1e-3) and s.calls == [] and "above its supports" in why
+
+
+# ------------------------------------------------------------------------------------------------ touching#04: the transit's collision world
+
+#: touching#04 m3_k0 (2026-10-12, the sidecar's contacts.push): spray_bottle miqtui (27 cm tall, 9 cm body) pushed 8.1 cm along -x at its
+#: mid height by the fingertip-front class push_tip_h-, the recorded pre-contact 5 cm before the init
+TIP_Q = [-0.7071067690849304, -0.0, 0.7071067690849304, 0.0]
+TIP_INIT = [-9.273651123046875, -4.6875529289245605, 1.0045323371887207]
+TIP_DIST = 0.08119216918945313
+BOTTLE = "target_spray_bottle_miqtui_0"
+
+
+def _tip_push(pre_back: float = 0.05):
+    from ispatialgym.oracle.actions import Push
+    from ispatialgym.oracle.sidecar import Pose, PushContact
+
+    x, y, z = TIP_INIT
+    contact = PushContact(arm=ARM, object="atomizer.n.01_1", pre=Pose([x + pre_back, y, z], list(TIP_Q)), init=Pose([x, y, z], list(TIP_Q)),
+                          goal=Pose([x - TIP_DIST, y, z], list(TIP_Q)), direction=[-1.0, 0.0, 0.0], distance_m=TIP_DIST, mid=None,
+                          extra={"pose_class": "push_tip_h-", "pre_dist_m": pre_back, "tip_front": True, "stop_clearance_m": 0.005})
+    return Push(contact=contact)
+
+
+class _WorldPushMotions(_PushMotions):
+    """``_PushMotions`` recording the collision world of every planned transit (the names ``arm_to`` leaves out). ``present``: what a
+    plan with the bottle in the world raises - None (it plans) or ``(reason, stage)``."""
+
+    def __init__(self, present=None):
+        super().__init__()
+        self.worlds: List[List[str]] = []
+        self.present = present
+
+    def arm_to(self, arm, pose=None, q=None, ignore_objects=(), q_hint=None, **kw):
+        names = [getattr(o, "name", o) for o in ignore_objects]
+        self.worlds.append(names)
+        if self.present is not None and BOTTLE not in names:
+            raise SkillError(self.present[0], f"arm_to({arm}, pose): IK failed: goal pose blocked (fake)", stage=self.present[1])
+        yield from super().arm_to(arm, pose=pose, q=q, ignore_objects=ignore_objects, q_hint=q_hint, **kw)
+
+
+def _run_tip_push(m, cfg=None):
+    bottle = SimpleNamespace(name=BOTTLE, category="spray_bottle", model="miqtui")
+    state = SimpleNamespace(object=lambda name: bottle, object_pose=lambda name: (th.tensor([-9.3378, -4.6937, 1.0029]), th.tensor(QUAT)), pose_target=lambda name: None)
+    push = _tip_push()
+    ctx: Dict[str, Any] = {"cfg": cfg or EX.ExecuteConfig(push_base_nudge_max_m=0.0), "witnesses": {}}
+    list(EX.execute_push(push, m, state, push.targets(None, None), ctx))
+    return ctx
+
+
+def test_the_transit_to_a_push_pre_contact_keeps_the_pushed_object_in_the_collision_world():
+    """m3_k0 (both demos protected_contact during the pre_contact): with the bottle left out every plan from the place's retreat above its
+    sprayer head to the pre-contact at its side went through its top. The transit to the lowered pre-contact (4 cm before the init, no
+    witness) is planned with it present and the push leg follows as before; with the knob off it is left out as before."""
+    cfg = EX.ExecuteConfig(push_base_nudge_max_m=0.0)
+    assert cfg.push_transit_target_present and cfg.push_transit_witness_clear_m == 0.01
+    m = _WorldPushMotions()
+    ctx = _run_tip_push(m, cfg)
+    assert m.worlds == [[]]
+    (go, goal, hint), (leg, wps) = m.calls[0], m.calls[1]
+    assert go == "arm_to" and hint is None and th.allclose(goal[0], th.tensor(TIP_INIT) + th.tensor([cfg.push_pre_dist_m, 0.0, 0.0]), atol=1e-5)
+    assert leg == "arm_along" and _same_pose(wps[0], EX.as_world_pose(_tip_push().contact.init))
+    assert ctx["push_transit"]["target"] == "present" and "no witness" in ctx["push_transit"]["why"] and ctx["plan_ignored"] == []
+    m = _WorldPushMotions()
+    ctx = _run_tip_push(m, EX.ExecuteConfig(push_base_nudge_max_m=0.0, push_transit_target_present=False))
+    assert m.worlds == [[BOTTLE]] and "push_transit" not in ctx and ctx["plan_ignored"] == [BOTTLE]
+
+
+def test_the_pushed_object_is_left_out_of_the_transit_only_when_no_plan_exists_with_it_present():
+    """A pre-contact the sampler validated with the object left out may stand within the planner's collision distance of it: a plan_failed
+    with it present re-plans in the former world. The protect check's own failure (its via-above's lift moved the hand) and every other
+    reason are raised as they are."""
+    m = _WorldPushMotions(present=("plan_failed", "trajopt"))
+    ctx = _run_tip_push(m)
+    assert m.worlds == [[], [BOTTLE]] and [c[0] for c in m.calls[:2]] == ["arm_to", "arm_along"]
+    note = ctx["push_transit"]
+    assert note["target"] == "left out" and note["why"].startswith("no plan with it present") and "goal pose blocked" in note["why"]
+    assert ctx["plan_ignored"] == [BOTTLE]
+    for present in (("plan_failed", "protected"), ("execution", "trajopt")):
+        m = _WorldPushMotions(present=present)
+        with pytest.raises(SkillError) as e:
+            _run_tip_push(m)
+        assert e.value.reason == present[0] and m.worlds == [[]]
+
+
+class _SphereBackend:
+    """A sphere model of one right finger sphere (1 cm) at ``right`` and one left-arm sphere inside the bottle (not the moving arm)."""
+
+    def __init__(self, right):
+        self.right = list(right)
+        self.seen: List[Any] = []
+
+    def q_full(self):
+        return th.zeros(len(M.ALL_JOINTS))
+
+    def robot_spheres_world(self, q, emb):
+        self.seen.append((q.clone(), emb))
+        return th.tensor([[self.right + [0.01], [-9.3378, -4.6937, 1.0, 0.02]]]), ["right_gripper_finger_link1", "left_gripper_finger_link1"]
+
+
+def test_a_witness_within_the_planners_margin_of_the_pushed_object_is_planned_with_it_left_out_at_once():
+    """A recorded pre-contact witness whose arm spheres stand closer than push_transit_witness_clear_m to the pushed object's box would be
+    refused as a goal only after the witness rounds and posture detours: planned in the former world at once. A clear witness, no witness
+    or no sphere model to measure it: the object present first."""
+    face = -9.2926  # the bottle's +x face at the push start (axis -9.3378, 4.52 cm radius)
+    bottle = SimpleNamespace(name=BOTTLE, aabb=(th.tensor([-9.3830, -4.7389, 0.8684]), th.tensor([face, -4.6485, 1.1374])))
+    wit, cfg = _witness(), EX.ExecuteConfig()
+    near = SimpleNamespace(robot=SimpleNamespace(arm_control_idx=IDX), backend=_SphereBackend([face + 0.015, -4.69, 1.0]))
+    ok, why = EX.push_transit_witness_clear(near, ARM, [bottle], wit, cfg)
+    assert not ok and why == f"the pre-contact witness stands 0.0050 m from {BOTTLE}'s box (< 0.010)"
+    q, emb = near.backend.seen[0]
+    assert emb == "right_arm" and q.shape == (1, len(M.ALL_JOINTS)) and th.allclose(q[0, IDX[ARM]], wit[IDX[ARM]])
+    far = SimpleNamespace(robot=near.robot, backend=_SphereBackend([face + 0.04, -4.69, 1.0]))
+    ok, why = EX.push_transit_witness_clear(far, ARM, [bottle], wit, cfg)
+    assert ok and why == f"the pre-contact witness stands 0.0300 m from {BOTTLE}'s box"
+    assert EX.push_transit_witness_clear(near, ARM, [bottle], None, cfg)[0]
+    assert EX.push_transit_witness_clear(SimpleNamespace(robot=near.robot, backend=None), ARM, [bottle], wit, cfg)[0]
+    # reach_push_pre (no supports: reach_pre_pose's single arm_to): the near witness in the former world alone, the far one present
+    pre = SimpleNamespace(position=[face + 0.06, -4.69, 1.0], orientation=list(TIP_Q))
+    for right, worlds, target in ((face + 0.015, [[BOTTLE]], "left out"), (face + 0.04, [[]], "present")):
+        m = _Motions()
+        m.backend.robot_spheres_world = _SphereBackend([right, -4.69, 1.0]).robot_spheres_world
+        ctx: Dict[str, Any] = {}
+        list(EX.reach_push_pre(m, SimpleNamespace(), ARM, pre, [], [bottle], wit, ctx, cfg))
+        assert [c["ignore_objects"] for c in m.calls] == worlds and all(c["q_hint"] is wit and c["accept_other_branch"] for c in m.calls)
+        assert ctx["push_transit"]["target"] == target and "witness stands" in ctx["push_transit"]["why"]
+    # nothing left out (an articulated push keeps its object anyway): one plan, no note
+    m = _Motions()
+    ctx = {}
+    list(EX.reach_push_pre(m, SimpleNamespace(), ARM, pre, [], [], wit, ctx, cfg))
+    assert [c["ignore_objects"] for c in m.calls] == [[]] and "push_transit" not in ctx

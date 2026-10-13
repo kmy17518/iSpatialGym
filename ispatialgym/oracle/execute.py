@@ -354,6 +354,13 @@ class ExecuteConfig:
     pre_pose_standoff_skip_above_m: Optional[float] = None
     #: (owner 2026-09-18 12:42) a straight push's pre-pose sits this far above / before its first contact pose (m; None = the record's 10 cm)
     push_pre_dist_m: Optional[float] = 0.04
+    #: (touching#04 2026-10-12) the transit to a free object's push pre-contact is planned with the pushed object in the collision world -
+    #: the leg protects it, and the planner leaves out only what a motion touches on the leg where it touches it - and with it left out
+    #: only when no plan exists with it present (``reach_push_pre``). False: left out throughout, as before
+    push_transit_target_present: bool = True
+    #: ... a recorded pre-contact witness (solved by the sampler with the object left out) whose arm spheres stand closer than this to the
+    #: object's box is planned with it left out at once: the planner refuses that goal only after its witness rounds and posture detours
+    push_transit_witness_clear_m: float = 0.01
     #: the carry leg lift end -> pre-place (FOV rule (b), owner 2026-09-16 17:10): ``"straight"`` = a straight Cartesian
     #: leg (through the recorded ``grasps[k].carry`` waypoint when the sampler wrote one), differential IK with the
     #: free-leg finish, both ends recorded in frame; ``"trajopt"`` = the former free trajopt transit (the regression
@@ -3788,6 +3795,71 @@ def push_lowered_pre(contact, pre, first, cfg: ExecuteConfig) -> Optional[Pose]:
     return Pose(position=[float(v) for v in (p_first - a_dir * cfg.push_pre_dist_m).tolist()], orientation=[float(v) for v in q_pre.tolist()])
 
 
+def push_transit_witness_clear(motions: Motions, arm: str, objects: Sequence[Any], q_hint, cfg: ExecuteConfig) -> Tuple[bool, str]:
+    """Whether the transit to a push pre-contact tries the pushed ``objects`` in the collision world first (``reach_push_pre``):
+    ``(False, why)`` when the recorded witness ``q_hint`` puts the arm's spheres closer than ``push_transit_witness_clear_m`` to an
+    object's box (``protection.sphere_box_clearance``, the plan check's measure). Without a witness (a lowered pre-contact: cuRobo's IK
+    picks the configuration) or a sphere model to measure it, ``(True, why)``."""
+    if q_hint is None:
+        return True, "no witness (the planner's IK picks the pre-contact's configuration)"
+    backend = getattr(motions, "backend", None)
+    fn = getattr(backend, "robot_spheres_world", None)
+    if fn is None:
+        return True, "no sphere model to measure the witness"
+    from ispatialgym.oracle import protection as PROT
+
+    try:
+        q = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+        idx = motions.robot.arm_control_idx[arm]
+        q[idx] = C.as_tensor(q_hint).reshape(-1).float()[idx]
+        spheres, links = fn(q.reshape(1, -1), f"{arm}_arm")
+        mask = PROT.moving_sphere_mask(links, [arm])
+        worst: Optional[Tuple[float, str]] = None
+        for o in objects:
+            box = PROT.object_box(o)
+            if box is None or not bool(mask.any()):
+                continue
+            clear = float(PROT.sphere_box_clearance(C.as_tensor(spheres)[:, mask], box)[0].reshape(-1)[0])
+            if worst is None or clear < worst[0]:
+                worst = (clear, str(getattr(o, "name", o)))
+    except Exception as e:  # noqa: BLE001 - the measure only decides which world is tried first
+        return True, f"the witness not measured ({e!r})"[:160]
+    if worst is None:
+        return True, "the witness not measured (no box)"
+    if worst[0] < cfg.push_transit_witness_clear_m:
+        return False, f"the pre-contact witness stands {worst[0]:.4f} m from {worst[1]}'s box (< {cfg.push_transit_witness_clear_m:.3f})"
+    return True, f"the pre-contact witness stands {worst[0]:.4f} m from {worst[1]}'s box"
+
+
+def reach_push_pre(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any],
+                   cfg: ExecuteConfig, ignore_links: Sequence[Any] = ()) -> Iterator[th.Tensor]:
+    """The transit to a push's pre-contact (``reach_pre_pose``). The planner leaves out only what a motion touches, on the leg where it
+    touches it (oracle doc 6.4): the pushed objects ``through`` - protected on this leg (``_transit``) - stay in the collision world, and so
+    they do for the protect check's via-above and re-plans (touching#04 m3_k0: with the spray bottle left out every plan from the place's
+    retreat, 10 cm above the 27 cm bottle, to the pre-contact at its side went through its top, -5.2 cm against its box, the via-above's
+    plan and the re-plans too). The world without them - the sampler's for the push chain - is the fallback when no plan exists with them present
+    (a ``plan_failed`` that is not the protect check's own), or at once when the recorded witness stands within
+    ``push_transit_witness_clear_m`` of one (``push_transit_witness_clear``). ``ctx["push_transit"]`` records the world planned in."""
+    kw = dict(ignore_links=ignore_links, accept_other_branch=True, skip_above_m=cfg.pre_pose_standoff_skip_above_m)
+    if through and cfg.push_transit_target_present:
+        names = [str(getattr(o, "name", o)) for o in through]
+        keep, why = push_transit_witness_clear(motions, arm, through, q_hint, cfg)
+        if keep:
+            try:
+                yield from reach_pre_pose(motions, state, arm, pre, supports, [], q_hint, ctx, cfg, **kw)
+            except SkillError as e:
+                if e.reason != "plan_failed" or e.details.get("stage") == "protected":
+                    raise
+                why = f"no plan with it present: {e.message[:160]}"
+                log.warning("push(%s): no transit to the pre-contact with %s in the collision world (%s) - planning with it left out", arm, names, e.message[:160])
+            else:
+                ctx["push_transit"] = {"target": "present", "why": why}
+                ctx["plan_ignored"] = [n for n in ctx.get("plan_ignored", []) if n not in names]
+                return
+        ctx["push_transit"] = {"target": "left out", "why": why}
+    yield from reach_pre_pose(motions, state, arm, pre, supports, through, q_hint, ctx, cfg, **kw)
+
+
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
@@ -3950,8 +4022,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         with _transit(ctx, motions, state, action, "pre_contact", target=obj):
             # owner 2026-09-26 (axial 0926-043254 / 051919): a push's legs are Cartesian and closed-loop from wherever the hand is -
             # a pre-contact witness trajopt cannot reach (another branch) is replaced by cuRobo's own branch instead of failing
-            yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign, accept_other_branch=True,
-                                      skip_above_m=cfg.pre_pose_standoff_skip_above_m)
+            yield from reach_push_pre(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg, ignore_links=link_ign)
     shift = _push_goal_follow(action, state, ctx, cfg) if getattr(action, "follow", None) else None
     if shift is not None:
         # after the pad's start was placed against the object where it is: the goal (every stop, residual and re-push below
