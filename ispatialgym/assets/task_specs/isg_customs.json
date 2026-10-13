@@ -44711,7 +44711,29 @@
    "push_under_drop_ahead_pref_m": 0.66,
    "_push_under_variant_note": "owner 2026-10-12 ~20:55: under_large#02 / #03 variant 'pitched' on a copy of inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor (palm contact off; keys {\"push_under_hand\": \"pitched_far\", \"push_under_far_pitches_deg\": [60, 65, 70], \"push_far_tip_m\": 0.08, \"push_far_pre_m\": [0.03, 0.06], \"push_under_stand_offs_m\": [0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 1.0], \"push_under_drop_ahead_m\": [0.25, 0.8], \"floor_trunks\": [[2.0, 0.0], [1.75, 0.0]], \"frontal_lane_offset_m\": [0.3, 0.25], \"push_under_drop_ahead_pref_m\": 0.66}); it runs side by side with the push steps on the originals - per pick the first instance by wall clock is pinned and its keys are adopted on the pick's aliases",
    "carry_collision_margin_m": 0.01,
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "travel_trunks": [
+    [
+     2.0,
+     0.0
+    ],
+    [
+     1.5,
+     0.0
+    ],
+    [
+     1.0,
+     0.0
+    ],
+    [
+     0.5,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ]
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c1: trash_can/jlawet under desk_mdhelw_1 from the floor of private_office_2, push-under; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-under_large_scale#03 on the sheet rows (scratch sheet), with inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
