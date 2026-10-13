@@ -1651,7 +1651,12 @@ postures `inside_stance_postures` in order (default `["untucked"]`: the working 
 the drive-in and the carried B → C drive after B's departure transition use it, while the working arm at C holds the carry
 configuration, then the exact IK with the target attached (owner 2026‑10‑12 ~20:00, inside_large_scale#02). **Release** (the small-scale drop):
 the target's bottom `drop_height_m` (0.005) above the surface, raised until the open gripper's lowest point clears it by
-`release_clearance_m` (0.02) for every library grasp; the partner stays in the collision world. **Goal check**: teleport to the
+`release_clearance_m` (0.02) for every library grasp; the partner stays in the collision world. `release_tilt_deg` (e.g. `[30, 45]`;
+default none = the level release only; owner 2026‑10‑12 ~22:35, inside_large_scale#03) screens each tilt as an alternative to the
+level release: the target at yaw × tilt × rest, the tilt about the horizontal axis perpendicular to the grasp's radial direction (the
+grasp side up, the far rim down), the release height from the tilted hull's lowest point; the draw tries a pair's tilts in order
+(level first), `grasps[0].release_tilt_deg` / `summary.release_tilt_deg` record the one used and the goal check's up-axis rule
+(`goal_tip_max_deg`) measures a tilted release against its level orientation. **Goal check**: teleport to the
 release, settle (drop test); `(inside ?target ?partner)` — for a container without a fillable / openfillable meta link the robust
 predicate's rays branch (`predicates.inside_rays`: the inner AABB centre in the container's AABB, the container on both sides along
 ≥ 2 of z and its own x / y) — and the target's top at most `max_protrusion_fraction` (0.5) of its height above the rim (the

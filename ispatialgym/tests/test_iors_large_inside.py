@@ -224,6 +224,177 @@ def test_release_above_clears_the_surface_with_every_grasp():
     assert min(lows) >= 0.70 + IN.RELEASE_CLEARANCE_M - 1e-5
 
 
+#: plate__luhkiz__ts grasp_5, the plate's one library row: a side pinch at the rim from outside (approach inward, 28 deg below horizontal)
+GRASP_5 = SimpleNamespace(name="grasp_5", pose=(th.tensor([-0.091, 0.067, 0.014]), th.tensor([-0.33107, 0.78989, -0.36502, 0.36502])))
+PLATE_RADIUS = 0.1205
+
+
+def _plate_hull(n: int = 24) -> th.Tensor:
+    """A 24 cm disc 2.6 cm thick, its origin at the bottom centre."""
+    a = th.arange(n) * (2.0 * math.pi / n)
+    ring = th.stack([PLATE_RADIUS * th.cos(a), PLATE_RADIUS * th.sin(a)], dim=1)
+    return th.cat([th.cat([ring, th.zeros(n, 1)], dim=1), th.cat([ring, th.full((n, 1), 0.026)], dim=1)])
+
+
+def _far_rim() -> th.Tensor:
+    """The rim point opposite grasp_5 (object frame)."""
+    p = GRASP_5.pose[0]
+    return th.tensor([float(-p[0]), float(-p[1]), 0.0]) * (PLATE_RADIUS / math.hypot(float(p[0]), float(p[1])))
+
+
+def test_release_tilts_key():
+    assert IN.release_tilts(None) == [] and IN.release_tilts([]) == [] and IN.release_tilts(30) == [30.0]
+    assert IN.release_tilts([30, 45, 30, 0]) == [30.0, 45.0]  # the level release is always screened: 0 and repeats dropped
+    for bad in (-5, 90, [30, "steep"], [120]):
+        with pytest.raises(ValueError):
+            IN.release_tilts(bad)
+
+
+@pytest.mark.parametrize("yaw", [0.0, 0.7, 2.5, -2.0])
+def test_tilt_raises_the_grasp_side(yaw):
+    """yaw x tilt x rest: about the horizontal axis perpendicular to the grasp's radial direction, the grasp side up and the far rim down
+    at every yaw (owner 2026-10-12 ~22:35: at 45 deg grasp_5's rim point ~16 cm above the far rim, its approach ~70 deg down)."""
+    rest = th.tensor([0.0, 0.0, 0.0, 1.0])
+    level = IN.G.qmul(IN.G.quat_from_yaw(yaw), rest)
+    p, far = GRASP_5.pose[0], _far_rim()
+    assert IN.tilted_quat(level, p, 0.0) is level
+    axis = IN.tilt_axis(p, level)
+    radial = IN.G.rotate(level, p)
+    assert float(axis[2]) == 0.0 and float(th.dot(axis, radial)) == pytest.approx(0.0, abs=1e-6)
+    lift = {}
+    for deg in (30.0, 45.0):
+        q = IN.tilted_quat(level, p, deg)
+        z_g, z_f = float(IN.G.rotate(q, p)[2]), float(IN.G.rotate(q, far)[2])
+        lift[deg] = z_g - z_f
+        assert z_g > float(p[2]) and z_f < 0.0
+        # the same orientation composed in the object's terms: yaw * tilt * rest, the tilt about the rested frame's axis
+        q_obj = IN.G.qmul(IN.G.quat_from_yaw(yaw), IN.G.qmul(IN.G.quat_about_axis(IN.tilt_axis(p, rest), math.radians(deg)), rest))
+        assert C.quat_angle(q, q_obj) < 1e-4
+        assert C.quat_angle(q, level) == pytest.approx(math.radians(deg), abs=1e-4)
+    assert lift[30.0] == pytest.approx(0.129, abs=0.003) and lift[45.0] == pytest.approx(0.175, abs=0.003)
+    a = IN.G.rotate(IN.G.qmul(IN.tilted_quat(level, p, 45.0), GRASP_5.pose[1]), th.tensor([0.0, 0.0, 1.0]))
+    assert math.degrees(math.asin(-float(a[2]))) == pytest.approx(69.5, abs=1.0)
+    assert IN.tilt_axis(th.tensor([0.0, 0.0, 0.1]), level) is None and IN.tilted_quat(level, th.tensor([0.0, 0.0, 0.1]), 45.0) is level
+
+
+class _TiltStub(_Stub):
+    """:class:`_Stub` with the plate (a disc hull, the true bottom offset, grasp_5) and the release-tilt hooks; ``ikc.feasible_sets``
+    records its calls and admits the pairs ``admit(tilt deg, yaw index)`` allows."""
+
+    release_tilts_deg = IN.InsideMode.release_tilts_deg
+    release_quat = IN.InsideMode.release_quat
+    screen_release_tilts = IN.InsideMode.screen_release_tilts
+
+    def __init__(self, admit=lambda deg, i: False, **gen):
+        super().__init__(grasps=[GRASP_5], **gen)
+        self.hull, self.rest = _plate_hull(), th.tensor([0.0, 0.0, 0.0, 1.0])
+        self.world.bottom_offset = lambda hull, quat: -float(IN.G.local_points_world(hull, (th.zeros(3), IN.G.t(quat)))[:, 2].min())
+        self.admit, self.screened = admit, []
+        self.ikc = SimpleNamespace(feasible_sets=self._feasible_sets)
+        self.prepare_partner()
+
+    def _feasible_sets(self, cells, yaws, grasps, pose_at, place, arm, ignore):
+        deg = round(math.degrees(C.quat_angle(pose_at(cells[0], 0.0)[1], th.tensor([0.0, 0.0, 0.0, 1.0]))))
+        self.screened.append((deg, list(yaws), [g.name for g in grasps], pose_at))
+        return {0: [(y, grasps[0]) for i, y in enumerate(yaws) if self.admit(deg, i)]}
+
+
+PLACE_C = SimpleNamespace(stand_off=0.45, lateral=0.1, translate=0.5, tilt=-0.3)
+
+
+def test_release_tilt_default_is_the_level_release():
+    """Without ``release_tilt_deg``: the level F_goal as it came, no extra screening, the level orientation (IORSLarge's hooks: the same)."""
+    s = _TiltStub(inside_surface_z_m=0.80, drop_height_m=0.02)
+    F_goal = [(0.0, GRASP_5)]
+    out, tilts_of = s.screen_release_tilts(F_goal, [0.05, -0.02], [0.0], 0.2, PLACE_C, "right", [], math.pi / 8)
+    assert out is F_goal and tilts_of == {} and s.screened == []
+    q = IN.G.quat_from_yaw(0.3)
+    assert IL.IORSLarge.release_quat(s, q, GRASP_5, 45.0) is q and IL.IORSLarge.screen_release_tilts(s, F_goal, None, [], 0.0, PLACE_C, "right", [], 0.4) == (F_goal, {})
+    with pytest.raises(Reject) as e:
+        _TiltStub(inside_surface_z_m=0.80, release_tilt_deg=[30, 95]).screen_release_tilts(F_goal, [0.05, -0.02], [0.0], 0.2, PLACE_C, "right", [], math.pi / 8)
+    assert e.value.reason == "spec"
+
+
+def test_release_tilt_screen_counts_and_tilted_release_pose(caplog):
+    """``release_tilt_deg`` [30, 45]: each tilt screened per library row at the level screen's yaws (+ the carry's yaw offset), the pairs
+    only a tilt admits after the level ones, per pair the tilts it passed in order, one log line with F_goal per tilt; the release pose
+    puts the tilted hull's lowest point ``drop_height_m`` above the basin floor, the grasp side ~17 cm above the far rim."""
+    yaws, d_yaw, step = [0.0, math.pi / 8, math.pi / 4], 0.2, math.pi / 8
+    s = _TiltStub(admit=lambda deg, i: (deg == 30 and i == 0) or deg == 45, inside_surface_z_m=0.80, drop_height_m=0.02, release_tilt_deg=[30, 45])
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        out, tilts_of = s.screen_release_tilts([], [0.05, -0.02], yaws, d_yaw, PLACE_C, "right", [], step)
+    assert [(deg, names) for deg, _, names, _ in s.screened] == [(30, ["grasp_5"]), (45, ["grasp_5"])]
+    assert all(ys == pytest.approx([y + d_yaw for y in yaws]) for _, ys, _, _ in s.screened)
+    assert [(y, g.name) for y, g in out] == [(pytest.approx(y), "grasp_5") for y in yaws]  # the init yaws, back from the C yaws
+    assert tilts_of == {(0, "grasp_5"): [30.0, 45.0], (1, "grasp_5"): [45.0], (2, "grasp_5"): [45.0]}
+    assert "inside release tilt F_goal at C" in caplog.text and "0 deg: F_goal 0, 30 deg: F_goal 1, 45 deg: F_goal 3" in caplog.text
+    # a level pair keeps the level release first
+    s2 = _TiltStub(admit=lambda deg, i: True, inside_surface_z_m=0.80, drop_height_m=0.02, release_tilt_deg=[30, 45])
+    out2, tilts2 = s2.screen_release_tilts([(0.0, GRASP_5)], [0.05, -0.02], [0.0], 0.0, PLACE_C, "right", [], step)
+    assert len(out2) == 1 and tilts2 == {(0, "grasp_5"): [0.0, 30.0, 45.0]}
+    # the pose the 45 deg screen posed: the tilted hull's lowest point drop_height_m above the surface, the grasp side up
+    pose = s.screened[1][3]([0.05, -0.02], 0.4)
+    z_s = float(s.place["z"])
+    assert float(IN.G.local_points_world(s.hull, pose)[:, 2].min()) == pytest.approx(z_s + 0.02, abs=1e-5)
+    assert s.release_above(pose[1]) == pytest.approx(0.02)  # the open gripper far above the floor: no lift
+    level = IN.G.quat_from_yaw(0.4)
+    assert s.release_above(level) > 0.02  # level, grasp_5's fingers reach below the plate: the release rises
+    g_w = pose[0] + IN.G.rotate(pose[1], GRASP_5.pose[0])
+    f_w = pose[0] + IN.G.rotate(pose[1], _far_rim())
+    assert float(g_w[2] - f_w[2]) == pytest.approx(0.175, abs=0.003) and float(f_w[2]) == pytest.approx(z_s + 0.02, abs=0.005)
+
+
+def test_goal_upright_measures_a_tilted_release_against_level():
+    """A plate released at 45 deg that lands flat: the stock up-axis check against the goal pose (the tilted release) reads 45 deg and
+    rejects (goal_tipped); with ``summary.release_tilt_deg`` it is measured against the level orientation and the release is kept."""
+    from ispatialgym.sampling.tasks.base import Draft
+
+    cls = type("IORSLarge_InsideMode", (IN.InsideMode, IL.IORSLarge), {})
+    s = cls.__new__(cls)
+    level = IN.G.quat_from_yaw(0.4)
+    plate = SimpleNamespace(get_position_orientation=lambda: (th.zeros(3), level))
+    s.bindings, s.objects = SimpleNamespace(one=lambda role: SimpleNamespace(name="plate")), {"plate": plate}
+    s.spec, s.counters = SimpleNamespace(generation={}), {}
+    release = (th.tensor([5.69, -1.81, 0.90]), IN.tilted_quat(level, GRASP_5.pose[0], 45.0))
+    d = Draft()
+    d.goal_poses["plate"] = release
+    with pytest.raises(Reject) as e:
+        s.check_goal_upright(d)
+    assert e.value.reason == "goal_tipped" and d.summary["goal_tilt_deg"]["plate"] == pytest.approx(45.0, abs=0.1)
+    d.summary.update({"release_tilt_deg": 45.0, "release_level_quat": [float(v) for v in level]})
+    s.check_goal_upright(d)
+    assert d.summary["goal_tilt_deg"]["plate"] == pytest.approx(0.0, abs=0.1) and d.goal_poses["plate"] is release
+    d.summary["release_tilt_deg"] = 0.0  # a level release of a tilt-screened draft: the stock check
+    with pytest.raises(Reject):
+        s.check_goal_upright(d)
+
+
+def test_oracle_drop_reaches_a_tilted_release_from_the_level_carry():
+    """The oracle's drop needs no change for a tilted release (eef = tilted object pose x grasp): the carry leg runs from the hand at the
+    level carry to the recorded pre-place with the orientation SLERPed, the descent and the retreat follow the tilted approach axis."""
+    from ispatialgym.oracle.actions import Place
+    from ispatialgym.oracle.sidecar import Pose
+    from ispatialgym.sampling.v2 import ik as IK
+
+    level = IN.G.quat_from_yaw(0.4)
+    release = (th.tensor([5.69, -1.81, 0.90]), IN.tilted_quat(level, GRASP_5.pose[0], 45.0))
+    place_eef = IK.grasp_pose(release, GRASP_5.pose)
+    pre = IK.pre_pose(place_eef)
+    carry = IK.grasp_pose((th.tensor([5.40, -1.60, 1.05]), level), GRASP_5.pose)
+    as_pose = lambda p: Pose([float(v) for v in p[0]], [float(v) for v in p[1]])  # noqa: E731
+    action = Place(kind="drop", arm="right", object="plate", place=as_pose(place_eef), pre_place=as_pose(pre), on="sink", relation="into")
+    t = action.targets(SimpleNamespace(grasps=[]), SimpleNamespace(eef_pose=lambda arm: carry))
+    turn = [C.quat_angle(carry[1], th.tensor(w.orientation)) for w in t["carry"]]
+    assert all(b >= a - 1e-5 for a, b in zip(turn, turn[1:])) and turn[-1] == pytest.approx(C.quat_angle(carry[1], pre[1]), abs=1e-4)
+    assert t["carry"][-1].position == pytest.approx([float(v) for v in pre[0]], abs=1e-5) and turn[-1] > math.radians(40)
+    a = C.approach_axis(place_eef[1])
+    assert math.degrees(math.asin(-float(a[2]))) > 65.0  # the release approaches steeply, its back-off goes up
+    for w in t["descent"] + t["retreat"]:
+        off = th.tensor(w.position) - place_eef[0]
+        assert float(th.linalg.norm(th.linalg.cross(off, a))) < 1e-4 and C.quat_angle(th.tensor(w.orientation), place_eef[1]) < 1e-4
+    assert t["retreat"][-1].position[2] > float(place_eef[0][2]) + 0.09
+
+
 #: the trunks the sink's goal-side band job (tband 17831152, the same base as stance C at stand-off 0.55) found colliding with every
 #: idle-arm posture: the deep leans over the counter run
 SINK_COLLIDING_TRUNKS = {(0.5, -0.9), (0.75, -0.6), (0.75, -0.9), (0.95, -0.6), (0.95, -0.9)}

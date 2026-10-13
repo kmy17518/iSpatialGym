@@ -2405,6 +2405,15 @@ class IORSLarge(SamplerV2):
         z = self.place["z"] + self.world.bottom_offset(self.hull, quat) + self.num("goal_drop_m", 0.01 if self.relation == "ontop" else 0.003)
         return th.tensor([float(goal_cell[0]), float(goal_cell[1]), z]), quat
 
+    def screen_release_tilts(self, F_goal, release_xy, yaws, d_yaw: float, place: Stance, arm: str, ignore_place, yaw_step: float):
+        """Release orientations screened besides the level one at the goal cell (the inside mode's ``release_tilt_deg``): ``(F_goal, {pair
+        key: [tilt deg, ...]})`` - here the level F_goal alone."""
+        return F_goal, {}
+
+    def release_quat(self, level_quat, grasp, tilt_deg: float):
+        """The release orientation of ``grasp`` at ``tilt_deg`` (the inside mode's tilt); here the level orientation."""
+        return level_quat
+
     # ------------------------------------------------------------------ template
 
     def sample_template(self):
@@ -3142,6 +3151,10 @@ class IORSLarge(SamplerV2):
             F_goal = self.ikc.feasible_sets([release_xy], [y + d_yaw for y in yaws], self.grasps,
                                             lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, arm, ignore_place).get(0, [])
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
+            # owner 2026-10-12 ~22:35 (inside): tilted releases as alternatives to the level one; per pair the tilts (deg, 0 = level) it passed
+            tilts_of: Dict[Tuple[int, Any], List[float]] = {}
+            if not push:
+                F_goal, tilts_of = self.screen_release_tilts(F_goal, release_xy, yaws, d_yaw, place, arm, ignore_place, yaw_step)
             F = intersect_feasible(F_live, F_goal, yaw_step=yaw_step)
             if push:
                 log.info("%s: push-under C try %s d %.2f λ %+.2f trunk (%.2f, %.1f): F_init %d, F_goal %d, F %d at drop %s", self.gp.alias, place.extras.get("stance_kind"),
@@ -3269,17 +3282,24 @@ class IORSLarge(SamplerV2):
                 elif seg.leg_ok[lk]:
                     fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
                     continue
-                goal_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
-                goal = release_pose(release_xy, goal_quat)
-                # the recorded finger assignment first; the other one (its B chain passed as well) only when the first fails here
+                level_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
+                # the release tilts the pair passed at F_goal in order (the level release alone without them); per tilt the recorded finger
+                # assignment first, the other one (its B chain passed as well) only when the first fails here
+                g_row = g
+                c_opts = [(tilt, j, o) for tilt in (tilts_of.get(pair_key(yaw0, g_row, yaw_step)) or [0.0]) for j, o in enumerate(b_opts)]
                 c_fails: List[str] = []
-                for j_opt, (g, eef, pre, flip) in enumerate(b_opts):
+                lift_seeds: Dict[int, Optional[th.Tensor]] = {}
+                for tilt, j_opt, (g, eef, pre, flip) in c_opts:
+                    goal_quat = self.release_quat(level_quat, g_row, tilt)
+                    goal = release_pose(release_xy, goal_quat)
                     place_eef = IK.grasp_pose(goal, g.pose)
                     pre_place = IK.pre_pose(place_eef)
                     # the place / drop IK is seeded with the LIFT configuration (the arm the object is carried with, and the branch the
                     # carry pose's straight line stays in) and must land in the same branch: the oracle reaches the pre-place from the
                     # carry with a bounded joint swing (0920-135625: the recorded witness lay 2.09 rad away, 'plan_failed' at the drop)
-                    q_lift_seed = self.lift_arm_q(manip, eef, float(self.num("carry_height_m", 0.12)), target, g.pose)
+                    if j_opt not in lift_seeds:
+                        lift_seeds[j_opt] = self.lift_arm_q(manip, eef, float(self.num("carry_height_m", 0.12)), target, g.pose)
+                    q_lift_seed = lift_seeds[j_opt]
                     q_seed = None
                     if q_lift_seed is not None:
                         q_seed = self.ikc.q_locked(place).clone()
@@ -3298,7 +3318,7 @@ class IORSLarge(SamplerV2):
                             c_fails.append("C: place branch differs from the carry (joint swing)")
                             continue
                     break
-                if len(c_fails) == len(b_opts):
+                if len(c_fails) == len(c_opts):
                     fails[c_fails[0]] = fails.get(c_fails[0], 0) + 1
                     seg.failed.setdefault(bk, c_fails[0])
                     continue
@@ -3351,6 +3371,8 @@ class IORSLarge(SamplerV2):
                                     place_on=(floor_name or pname) if push else pname)
                 if twin_facts is not None:
                     grasp.extras.update({"wrist_flip": bool(flip), "twin_choice": twin_facts})
+                if tilts_of:
+                    grasp.extras["release_tilt_deg"] = float(tilt)
                 if len(offered) > 1 or arm != arm0:
                     grasp.extras["arm_bands"] = {a: TT.band_facts((self.surface.get("arm_bands") or {}).get(a)) for a in offered}
                 if fallback is not None:
@@ -3472,6 +3494,9 @@ class IORSLarge(SamplerV2):
                                   "path_length_m": place.extras["path_length_m"], "F_init": len(F_init), "F_goal": len(F_goal), "F": len(F),
                                   # the carried object's yaw follows the base: goal orientation = init orientation rotated by C.yaw - B.yaw
                                   "goal_quat": [float(v) for v in goal_quat], "carry_yaw_offset_rad": round(d_yaw, 4)})
+                if tilts_of:
+                    d.summary.update({"release_tilt_deg": float(tilt), "release_level_quat": [float(v) for v in level_quat]})
+                    log.info("%s: inside release tilt %g deg coupled (yaw %.2f, grasp %s, C d %.2f λ %+.2f)", self.gp.alias, tilt, yaw, g.name, place.stand_off or 0.0, place.lateral)
                 d.summary["arm"] = TT.segment_arm_summary(grasp, offered)
                 band_c = None if push else (self.place.get("bands") or {}).get(arm)  # the partner-top band of the place is the segment arm's too
                 if band_c is not None and band_c.meta.get("mirrored_from"):

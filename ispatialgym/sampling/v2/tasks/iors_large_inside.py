@@ -22,6 +22,13 @@ clears the surface by ``release_clearance_m`` for every library grasp; the partn
 container). Goal check: teleport to the release, settle (the drop test), ``inside`` (the BDDL goal; ``predicates.inside_rays`` decides for a
 container without a fillable meta link) and the target's top at most ``max_protrusion_fraction`` of its height above the rim. The oracle
 program places with kind ``drop`` (``programs.program_iors_large_inside``).
+
+Release tilt (owner 2026-10-12 ~22:35, inside_large#03: the plate's one grasp pinches its rim from outside, so a level release low in the
+basin leaves the hand no room beside the plate): ``generation.release_tilt_deg`` (e.g. [30, 45]; default none = the level release only)
+screens each tilt as an alternative to the level release - the target at yaw x tilt x rest, the tilt about the horizontal axis perpendicular
+to the grasp's radial direction (the grasp side up, the far rim down), the release height from the tilted hull's lowest point. The draw tries
+a pair's tilts in order (level first), the records carry ``release_tilt_deg`` and the goal check's up-axis rule measures a tilted release
+against the level orientation. The oracle's drop needs nothing more: the carry leg to the recorded pre-place SLERPs the hand's orientation.
 """
 
 from __future__ import annotations
@@ -167,6 +174,46 @@ def best_per_base(stances: Sequence[Stance], k: int) -> List[Stance]:
     for st in stances:
         groups.setdefault(tuple(round(float(v), 4) for v in st.base_pose2d), []).append(st)
     return [st for g in groups.values() for st in sorted(g, key=lambda s_: -float(s_.extras["reach_margin_m"]))[:k]]
+
+
+def release_tilts(value: Any) -> List[float]:
+    """``generation.release_tilt_deg``: a tilt (deg) or a list of them -> the tilts screened besides the level release, in order, 0 and
+    repeats dropped (the level release is always screened); None / [] -> [] (the level release only)."""
+    if value is None:
+        return []
+    out: List[float] = []
+    for v in [value] if isinstance(value, (int, float)) else list(value):
+        try:
+            d = float(v)
+        except (TypeError, ValueError):
+            d = float("nan")
+        if not 0.0 <= d < 90.0:
+            raise ValueError(f"release_tilt_deg {value!r}: expected tilts in degrees, 0 <= tilt < 90")
+        if d > 0.0 and d not in out:
+            out.append(d)
+    return out
+
+
+def tilt_axis(eef_in_object_pos, level_quat) -> Optional[th.Tensor]:
+    """The world axis of the release tilt for a grasp whose eef sits at ``eef_in_object_pos`` in the object frame, the object at the level
+    orientation ``level_quat``: horizontal, perpendicular to the grasp's radial direction (the grasp point's horizontal direction from the
+    object origin), signed so that a positive turn raises the grasp side (radial x z). None when the grasp point lies on the vertical
+    through the origin."""
+    p = G.rotate(G.t(level_quat).float(), G.t(eef_in_object_pos).float())
+    n = math.hypot(float(p[0]), float(p[1]))
+    if n < 1e-6:
+        return None
+    return th.tensor([float(p[1]) / n, -float(p[0]) / n, 0.0])
+
+
+def tilted_quat(level_quat, eef_in_object_pos, deg: float):
+    """The release orientation tilted by ``deg``: ``level_quat`` (yaw * rest) turned about :func:`tilt_axis` - yaw * tilt * rest, the tilt
+    about the rested frame's horizontal axis perpendicular to the grasp's radial direction -, the grasp side up and the far rim down;
+    ``level_quat`` itself at 0 deg or without a radial direction."""
+    axis = tilt_axis(eef_in_object_pos, level_quat) if deg else None
+    if axis is None:
+        return level_quat
+    return G.qmul(G.quat_about_axis(axis, math.radians(float(deg))), G.t(level_quat).float())
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -432,7 +479,65 @@ class InsideMode:
         z = float(self.place["z"]) + self.world.bottom_offset(self.hull, quat) + self.release_above(quat)
         return th.tensor([float(goal_cell[0]), float(goal_cell[1]), z]), quat
 
+    # ------------------------------------------------------------------ the release tilt (owner 2026-10-12 ~22:35, inside_large#03)
+
+    def release_tilts_deg(self) -> List[float]:
+        try:
+            return release_tilts(self.gp.gen("release_tilt_deg"))
+        except ValueError as e:
+            raise Reject("spec", f"{self.gp.alias}: {e}")
+
+    def release_quat(self, level_quat, grasp, tilt_deg: float):
+        """IORSLarge's hook: the release orientation of ``grasp`` (a library row) at ``tilt_deg`` - :func:`tilted_quat` about the axis
+        perpendicular to the row's radial direction."""
+        return tilted_quat(level_quat, grasp.pose[0], tilt_deg)
+
+    def screen_release_tilts(self, F_goal, release_xy, yaws, d_yaw: float, place: Stance, arm: str, ignore_place, yaw_step: float):
+        """IORSLarge's hook after the level F_goal screen of a C candidate: each ``generation.release_tilt_deg`` tilt is an alternative to
+        the level release - screened per library row (the tilt axis follows the row's radial direction) at the yaws of the level screen,
+        the release :meth:`goal_pose_at` the tilted orientation (the tilted hull's lowest point :meth:`release_above` the surface). Returns
+        the level pairs followed by the pairs only a tilt admits, and per pair key (``iors_large.pair_key``) the tilts (deg, 0 = level) it
+        passes in the order the draw tries them; one log line per C with F_goal per tilt. Without the key: ``(F_goal, {})``."""
+        from ispatialgym.sampling.v2.tasks.iors_large import pair_key
+
+        tilts = self.release_tilts_deg()
+        if not tilts:
+            return F_goal, {}
+        tilts_of: Dict[Tuple[int, Any], List[float]] = {}
+        for y, g in F_goal:
+            tilts_of.setdefault(pair_key(y, g, yaw_step), []).append(0.0)
+        out, counts = list(F_goal), [(0.0, len(F_goal))]
+        for t in tilts:
+            n = 0
+            for g in self.grasps:
+                pose_at = lambda xy, yaw, g=g, t=t: self.goal_pose_at(xy, self.release_quat(G.qmul(G.quat_from_yaw(yaw), self.rest), g, t))  # noqa: E731
+                for y, gg in self.ikc.feasible_sets([release_xy], [y_ + d_yaw for y_ in yaws], [g], pose_at, place, arm, ignore_place).get(0, []):
+                    k = pair_key(y - d_yaw, gg, yaw_step)
+                    if k not in tilts_of:
+                        out.append((y - d_yaw, gg))
+                    tilts_of.setdefault(k, []).append(t)
+                    n += 1
+            counts.append((t, n))
+        log.info("%s: inside release tilt F_goal at C (d %.2f λ %+.2f trunk (%.2f, %.2f)) goal cell %s: %s", self.gp.alias, place.stand_off or 0.0, place.lateral,
+                 place.translate, place.tilt, [round(float(v), 2) for v in release_xy], ", ".join(f"{t:g} deg: F_goal {n}" for t, n in counts))
+        return out, tilts_of
+
     # ------------------------------------------------------------------ goal check
+
+    def check_goal_upright(self, draft: Draft):
+        """SamplerV2's up-axis check after the goal settle; a tilted release (``summary.release_tilt_deg`` > 0) is measured against its level
+        orientation (``summary.release_level_quat``): the stock reference, the goal pose, is the tilted release, which a target that lands
+        flat is ``release_tilt_deg`` off."""
+        tname = self.tname
+        level = draft.summary.get("release_level_quat")
+        if not draft.summary.get("release_tilt_deg") or level is None or tname not in draft.goal_poses:
+            return super().check_goal_upright(draft)
+        release = draft.goal_poses[tname]
+        draft.goal_poses[tname] = (release[0], th.tensor([float(v) for v in level]))
+        try:
+            return super().check_goal_upright(draft)
+        finally:
+            draft.goal_poses[tname] = release
 
     def refine_targets_from_goal(self, draft: Draft):
         """IORSLarge's (settled pose -> targets, partner unchanged), then the drop test's protrusion rule (``inside`` itself is the BDDL
@@ -471,6 +576,8 @@ class InsideMode:
                  "release_above_m": None if rel is None else round(self.release_above(rel[1]), 4), "finger_clearance_m": round(low - z_s, 4),
                  "drop_height_m": float(self.num("drop_height_m", DROP_HEIGHT_M)), "release_clearance_m": clearance,
                  "settled_goal_z": round(float(draft.pose_targets[tname]["position"][2]), 4)}
+        if "release_tilt_deg" in draft.summary:
+            facts["release_tilt_deg"] = draft.summary["release_tilt_deg"]
         grasp.extras.update(facts)
         draft.summary["release"] = facts
         if not self.ikc.eef_in_frame(grasp.grasp, self.camera_pose_at(self.sidecar.stance("manipulation"))):
