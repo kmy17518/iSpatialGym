@@ -1373,6 +1373,50 @@
    "pick": "inter_object_relation_satisfaction-nextto_large_scale#02",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-countertop",
+   "id": 124,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#04~W2",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-commercial_kitchen_table",
+   "id": 125,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#04~W3",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-breakfast_table",
+   "id": 126,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#04~W4",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-desk",
+   "id": 127,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#04~W5",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }

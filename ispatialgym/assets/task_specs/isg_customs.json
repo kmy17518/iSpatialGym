@@ -39592,6 +39592,556 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-breakfast_table": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 126,
+  "roles": {
+   "target": {
+    "category": "spray_bottle",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "wegawe",
+    "grasp_keys": {
+     "spray_bottle/wegawe": "spray_bottle__wegawe__t"
+    }
+   },
+   "partner": {
+    "category": "bottle_of_detergent",
+    "sampleable": true,
+    "representative": "gkpmii"
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "inter_object_relation_satisfaction-touching#04~W4"
+      }
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "spray_bottle": [
+       "wegawe"
+      ]
+     },
+     "partner": {
+      "bottle_of_detergent": [
+       "gkpmii"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "spray_bottle": {
+       "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "table_end_margin_m": 0.1,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "partner_max_aspect": 3.2
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W4 = the rows ~T4 of inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table (breakfast_table_rhjoby_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-commercial_kitchen_table": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 125,
+  "roles": {
+   "target": {
+    "category": "spray_bottle",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "wegawe",
+    "grasp_keys": {
+     "spray_bottle/wegawe": "spray_bottle__wegawe__t"
+    }
+   },
+   "partner": {
+    "category": "bottle_of_detergent",
+    "sampleable": true,
+    "representative": "gkpmii"
+   },
+   "support": {
+    "category": "commercial_kitchen_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "commercial_kitchen_table_vxvtec_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "commercial_kitchen_table_vxvtec_0",
+       "init": "ontop",
+       "top_z": 0.87,
+       "row": "inter_object_relation_satisfaction-touching#04~W3"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "spray_bottle": [
+       "wegawe"
+      ]
+     },
+     "partner": {
+      "bottle_of_detergent": [
+       "gkpmii"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "spray_bottle": {
+       "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "table_end_margin_m": 0.1,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "partner_max_aspect": 3.2
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W3 = the rows ~T3 of inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-commercial_kitchen_table (commercial_kitchen_table_vxvtec_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-countertop": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 124,
+  "roles": {
+   "target": {
+    "category": "spray_bottle",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "wegawe",
+    "grasp_keys": {
+     "spray_bottle/wegawe": "spray_bottle__wegawe__t"
+    }
+   },
+   "partner": {
+    "category": "bottle_of_detergent",
+    "sampleable": true,
+    "representative": "gkpmii"
+   },
+   "support": {
+    "category": "countertop",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "utility_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "countertop_fjkase_0",
+      "countertop_ikwqer_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "countertop_fjkase_0",
+       "init": "ontop",
+       "top_z": 0.92,
+       "row": "inter_object_relation_satisfaction-touching#04~W2"
+      },
+      {
+       "name": "countertop_ikwqer_0",
+       "init": "ontop",
+       "top_z": 0.93,
+       "row": "inter_object_relation_satisfaction-touching#04~W1"
+      }
+     ],
+     "floor": {
+      "room": "utility_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "spray_bottle": [
+       "wegawe"
+      ]
+     },
+     "partner": {
+      "bottle_of_detergent": [
+       "gkpmii"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "spray_bottle": {
+       "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W1, ~W2 = the rows ~T1, ~T2 of inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-countertop (countertop_fjkase_0, countertop_ikwqer_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
+ },
+ "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-desk": {
+  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+  "definition_id": 127,
+  "roles": {
+   "target": {
+    "category": "spray_bottle",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "wegawe",
+    "grasp_keys": {
+     "spray_bottle/wegawe": "spray_bottle__wegawe__t"
+    }
+   },
+   "partner": {
+    "category": "bottle_of_detergent",
+    "sampleable": true,
+    "representative": "gkpmii"
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_2"
+    ],
+    "bindings": {
+     "support": [
+      "desk_mdhelw_1"
+     ],
+     "support_surfaces": [
+      {
+       "name": "desk_mdhelw_1",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "inter_object_relation_satisfaction-touching#04~W5"
+      }
+     ],
+     "floor": {
+      "room": "private_office_2"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "spray_bottle": [
+       "wegawe"
+      ]
+     },
+     "partner": {
+      "bottle_of_detergent": [
+       "gkpmii"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "spray_bottle": {
+       "asztxi": "pilot 2026-10-12: owner 2026-10-12 ~10:25 item 5 - touching#04 runs spray_bottle/lwmelf; asztxi trembles (all 96 trembling rejections of the s3 runs)",
+       "lwmelf": "pilot 2026-10-12: owner 2026-10-12 ~16:05 - touching#04 runs spray_bottle/miqtui; lwmelf falls over at its canonical upright rest during the settle (t04diag: tilt 90 deg at every spot of the five supports, open floor included)"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "table_end_margin_m": 0.1,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "partner_max_aspect": 3.2
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W5 = the rows ~T5 of inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-desk (desk_mdhelw_1); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
+ },
  "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table": {
   "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
   "definition_id": 119,
