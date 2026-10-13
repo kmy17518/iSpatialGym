@@ -76,6 +76,16 @@ def test_overhang_release_lift_rim_and_protrusion():
     assert IN.protrusion_ok(0.91, 0.89, 0.026, 0.5)[0] is False
 
 
+def test_best_per_base_keeps_the_most_reach_margin_per_base():
+    def st(x, tr, ti, m):
+        return SimpleNamespace(base_pose2d=(x, -1.1, -1.57), translate=tr, tilt=ti, extras={"reach_margin_m": m})
+
+    stances = [st(5.6, 0.0, 0.0, 0.1), st(5.6, 0.5, -0.3, 0.3), st(5.7, 0.0, 0.0, 0.5), st(5.6, 0.25, 0.0, 0.3), st(5.6, 0.95, -0.9, 0.2)]
+    out = IN.best_per_base(stances, 2)
+    assert [(s.base_pose2d[0], s.translate) for s in out] == [(5.6, 0.5), (5.6, 0.25), (5.7, 0.0)]  # bases in order, the tie in input order
+    assert IN.best_per_base(stances, 9) == [stances[1], stances[3], stances[4], stances[0], stances[2]] and IN.best_per_base([], 3) == []
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # the mode on stubs
 # ----------------------------------------------------------------------------------------------------------------
@@ -189,6 +199,66 @@ def test_release_above_clears_the_surface_with_every_grasp():
     assert float(pose[0][2]) == pytest.approx(0.70 + 0.0108 + above) and float(pose[0][0]) == pytest.approx(0.05)
     lows = [float(gripper_corners_world((pose[0] + g.pose[0], g.pose[1]))[:, 2].min()) for g in s2.grasps]
     assert min(lows) >= 0.70 + IN.RELEASE_CLEARANCE_M - 1e-5
+
+
+#: the trunks the sink's goal-side band job (tband 17831152, the same base as stance C at stand-off 0.55) found colliding with every
+#: idle-arm posture: the deep leans over the counter run
+SINK_COLLIDING_TRUNKS = {(0.5, -0.9), (0.75, -0.6), (0.75, -0.9), (0.95, -0.6), (0.95, -0.9)}
+
+
+class _StanceCStub:
+    """What :meth:`InsideMode._placement_candidates_at` reads without a goal-side band: the sink's +y raster side (18 cm long, 9 cm
+    AABB overhang); the reach margin grows with the lean as the shoulder's (the deep leans first)."""
+
+    _placement_candidates_at = IN.InsideMode._placement_candidates_at
+    num = IL.IORSLarge.num
+
+    def __init__(self, **gen):
+        self.gp = _GP(**gen)
+        self.seg_arm = "right"
+        self.partner = SimpleNamespace(name="drop_in_sink_awvzkn_0")
+        self.place = {"half": 0.12, "height": 0.026, "z": 0.7316, "cells": th.tensor([[5.683, -1.79], [5.70, -1.85]])}
+        self.template_facts = {}
+        self.hull, self.rest = th.zeros(8, 3), th.tensor([0.0, 0.0, 0.0, 1.0])
+
+    def inside_band(self, arm):
+        return None
+
+    def reach_margin(self, st, point, arm):
+        return 0.2 * st.translate - 0.31 * st.tilt
+
+    def goal_pose_at(self, gc, quat):
+        return th.tensor([gc[0], gc[1], 0.75]), quat
+
+    def hull_corners_world(self, hull, pose):
+        return th.zeros(8, 3)
+
+
+def test_no_band_stance_c_keeps_the_free_trunks_with_the_most_reach_margin(monkeypatch):
+    """inside_large#03 (bar alias): without a band the reach-margin cut ran before the collision check and kept the three deepest leans
+    per base - the very trunks the counter blocks -, so every stance C candidate collided while 15 of 20 trunks were free there."""
+    edge = EdgeFrame.from_edge("+u", th.tensor([5.683, -1.752]), th.tensor([0.0025, 1.0]), 0.18, 0.09)
+    monkeypatch.setattr(IN.P0, "base_ok", lambda s, xy: True)
+    monkeypatch.setattr(IN.P0, "body_free", lambda s, cands, **kw: th.tensor([(c.translate, c.tilt) not in SINK_COLLIDING_TRUNKS for c in cands]))
+    monkeypatch.setattr(IN.P0, "camera_poses", lambda s, cands: list(cands))  # the stance stands in for its camera
+    monkeypatch.setattr(IN.P0, "in_frame", lambda s, cam, pts: True)
+    monkeypatch.setattr(IN.P0, "axis_angle", lambda s, cam, point: 0.3)
+    s = _StanceCStub()
+    margin = {(t, k): s.reach_margin(SimpleNamespace(translate=t, tilt=k), None, None) for t in IN.RB.TRANSLATES for k in IN.RB.TILTS}
+    assert set(sorted(margin, key=lambda tk: -margin[tk])[:3]) <= SINK_COLLIDING_TRUNKS  # the cut before the check kept colliding trunks only
+    out = s._placement_candidates_at(edge, (8.25, 0.64), "right")
+    best_free = {(0.25, -0.9), (0.5, -0.6), (0.95, -0.3)}
+    assert len(out) == 12 and all({(c.translate, c.tilt) for c in out if c.stand_off == so} == best_free for so in IN.STAND_OFFS)
+    stats = s.template_facts["placement_stats"]
+    assert stats["collision_free"] == 4 * 15 and stats["visible"] == 4 * 15 and stats["no_band_kept"] == 12
+    assert all(c.extras["goal_cell"] == pytest.approx([5.683, -1.79]) and c.extras["angle_class"] == 1 for c in out)
+    # the cut comes after the frame test too: the tilt -0.9 trunks out of frame give way to the next free trunk in frame
+    monkeypatch.setattr(IN.P0, "in_frame", lambda s, cam, pts: cam.tilt > -0.85)
+    s = _StanceCStub()
+    out = s._placement_candidates_at(edge, (8.25, 0.64), "right")
+    assert {(c.translate, c.tilt) for c in out if c.stand_off == 0.55} == {(0.5, -0.6), (0.95, -0.3), (0.75, -0.3)}
+    # inside_no_band_trunks still sets the number kept
+    assert len(_StanceCStub(inside_no_band_trunks=1)._placement_candidates_at(edge, (8.25, 0.64), "right")) == 4
 
 
 # ----------------------------------------------------------------------------------------------------------------

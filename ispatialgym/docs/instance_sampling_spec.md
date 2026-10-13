@@ -1619,7 +1619,8 @@ goal surface is its **interior surface**: `SimWorld.support_interior` at `inside
 `inside_surface_tol_m` (default 0.03) as its height tolerance — a basin floor (rays from just under the rim, a wide tolerance, e.g.
 0.80 / 0.25 for the sink, finds the floor at 0.73), a shelf. The goal-side band is the interior band with the same two numbers
 (`reach_bands --surface-z Z --surface-tol T`; `ReachBands.load(..., surface_z=Z)`), the other arm's own or mirrored; without one the
-three trunks per base pose with the most reach margin to the goal cell are kept. **Goal cells**: free board cells with headroom
+three collision-free trunks per base pose with the goal in frame and the most reach margin to the goal cell are kept.
+**Goal cells**: free board cells with headroom
 ≥ target height + 0.02, farther than half extent + `opening_margin_m` (0.02) from the board's outline (`inside_erosion_m` replaces
 that distance: a plate as wide as the basin floor rests with its rim over the flaring walls). **Stance C** faces the opening:
 square to the side of the raster facing `inside_stance_side` (world direction, e.g. `"+y"`; default every side), stand-offs

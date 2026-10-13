@@ -51,7 +51,8 @@ OPENING_MARGIN_M = 0.02
 DROP_HEIGHT_M = 0.005
 RELEASE_CLEARANCE_M = 0.02
 MAX_PROTRUSION_FRACTION = 0.5
-#: without a goal-side band: the trunks per base pose kept for the coupling, by reach margin to the goal cell (shoulder -> cell)
+#: without a goal-side band: the trunks per base pose kept for the coupling, by reach margin to the goal cell (shoulder -> cell), chosen among
+#: the collision-free ones with the goal in frame (the most margin = the deepest lean, which the counter run in front of a basin blocks)
 NO_BAND_TRUNKS = 3
 SIDE_MAX_DEG = 45.0
 
@@ -138,6 +139,14 @@ def protrusion_ok(target_top: float, rim_z: float, height: float, fraction: floa
 def nearest_cell(pool: th.Tensor, xy) -> th.Tensor:
     p = G.t(xy).float()[:2]
     return pool[int(th.argmin(th.linalg.norm(pool.float() - p, dim=1)))]
+
+
+def best_per_base(stances: Sequence[Stance], k: int) -> List[Stance]:
+    """Per base pose, the ``k`` stances with the most ``extras["reach_margin_m"]`` (bases in their first order, ties in input order)."""
+    groups: Dict[Tuple[float, ...], List[Stance]] = {}
+    for st in stances:
+        groups.setdefault(tuple(round(float(v), 4) for v in st.base_pose2d), []).append(st)
+    return [st for g in groups.values() for st in sorted(g, key=lambda s_: -float(s_.extras["reach_margin_m"]))[:k]]
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -254,7 +263,8 @@ class InsideMode:
 
     def _placement_candidates_at(self, edge: EdgeFrame, init_xy, arm: Optional[str] = None) -> List[Stance]:
         """Stance C at one side of the interior raster (module docstring): stand-off x lateral x trunk, collision-free, the target at the
-        goal cell in frame; each survivor carries ``goal_cell`` (and ``reach_margin_m`` without a band)."""
+        goal cell in frame (without a band: then the :data:`NO_BAND_TRUNKS` per base pose with the most reach margin); each survivor
+        carries ``goal_cell`` (and ``reach_margin_m`` without a band)."""
         arm = arm or self.seg_arm
         partner = self.partner
         half, height = float(self.place["half"]), float(self.place["height"])
@@ -277,7 +287,6 @@ class InsideMode:
                 if not P0.base_ok(self, xy):
                     continue
                 stats["base_ok"] += len(trunks)
-                at_base: List[Stance] = []
                 for tr, ti in trunks:
                     st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), tr, ti, so, edge, None, lat, None, [arm])
                     if rb is not None:
@@ -295,11 +304,7 @@ class InsideMode:
                     st.extras["goal_cell"] = [float(gc[0]), float(gc[1])]
                     if rb is None:
                         st.extras["reach_margin_m"] = round(self.reach_margin(st, [float(gc[0]), float(gc[1]), z_mid], arm), 4)
-                    at_base.append(st)
-                if rb is None and at_base:
-                    at_base.sort(key=lambda s_: -float(s_.extras["reach_margin_m"]))
-                    at_base = at_base[:int(self.num("inside_no_band_trunks", NO_BAND_TRUNKS))]
-                cands += at_base
+                    cands.append(st)
         self.template_facts["placement_stats"] = stats
         if not cands:
             log.info("%s: inside stance C at %s side %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
@@ -325,6 +330,10 @@ class InsideMode:
             st.extras["angle_class"] = 1
             classed.append((st, 1))
         stats["visible"] = len(classed)
+        if rb is None:
+            kept = {id(st) for st in best_per_base([st for st, _ in classed], int(self.num("inside_no_band_trunks", NO_BAND_TRUNKS)))}
+            classed = [(st, k) for st, k in classed if id(st) in kept]
+            stats["no_band_kept"] = len(classed)
         out = P0.best_class(classed)
         log.info("%s: inside stance C at %s side %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out), stats)
         return out
