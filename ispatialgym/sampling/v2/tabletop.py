@@ -1612,6 +1612,47 @@ def palm_half_extent(eef_quat, direction) -> float:
     return max(float(th.dot(_t(c), u)) + float(r) for c, r in spheres)
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# flat hand (owner 2026-10-12 ~19:40, under_large #02 / #03 push-under): the hand turned flat, the closed fingers pointing
+# forward along the push - the pitched blade at 90 deg; only the fingertips touch the object's back face
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def flat_hand_quats(direction) -> List[Tuple[str, th.Tensor]]:
+    """eef orientations of a flat hand pushing along the horizontal ``direction``: approach = the push direction
+    (``pitched_approach(90, direction)``), the closing axis lateral (horizontal, across the push) or vertical - the two wrist turns -,
+    each with its twin (the closing axis negated: the wrist camera on the other side). ``[(label, quat), ...]`` labelled
+    ``lateral``, ``lateral-``, ``vertical``, ``vertical-``."""
+    a = pitched_approach(90.0, direction)
+    up = th.tensor([0.0, 0.0, 1.0])
+    out = []
+    for name, c in (("lateral", C.unit(th.cross(up, a, dim=0))), ("vertical", up)):
+        for sign in (1.0, -1.0):
+            out.append((name if sign > 0 else f"{name}-", C.eef_quat(a, sign * c)))
+    return out
+
+
+def flat_hand_standoff(clearance: float = 0.0) -> float:
+    """Stand-off of a flat hand: the fingertips touch, so the eef origin stands ``FINGERTIP_LENGTH + clearance`` behind the contact
+    point along the push."""
+    return C.FINGERTIP_LENGTH + float(clearance)
+
+
+def hand_drop_below(eef_quat) -> float:
+    """How far the hand's lowest collision sphere lies below the eef origin at the eef orientation ``eef_quat``: ``palm_half_extent``
+    downward (the gripper body, the knuckles, the wrist camera; the closed fingers and ``arm_link7`` stay above the gripper body's sphere
+    for a horizontal approach)."""
+    return palm_half_extent(eef_quat, th.tensor([0.0, 0.0, -1.0]))
+
+
+def flat_tip_half_height(quat) -> float:
+    """Half height of the closed fingertips at orientation ``quat`` (the band they press on a vertical face): the fingers' half thickness
+    along the closing axis when it is vertical, their half width across it when it is horizontal (``FINGER_PROFILE`` /
+    ``FINGER_SIDE_PROFILE`` at the tip)."""
+    c = C.closing_axis(_t(quat))
+    return float(FINGER_PROFILE[0][1]) if abs(float(c[2])) >= 0.5 else float(FINGER_SIDE_PROFILE[0][1])
+
+
 def blade_sweep_clear(hull: th.Tensor, pose_init: Pose, com_xy, delta: float, blade_xy, radius: float, clearance: float, n: int = 12) -> Tuple[bool, float]:
     """Whether a blade (disc of ``radius`` at ``blade_xy``) stays ``clearance`` clear of the object's footprint while it
     rotates about ``com_xy`` from ``pose_init`` by ``delta`` (rad, about +z) — sampled at ``n`` angles short of the goal
