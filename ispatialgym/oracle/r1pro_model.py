@@ -73,6 +73,13 @@ EEF_IN_GRIPPER_RPY = (0.0, math.pi, 0.0)
 #: Head camera sensor key suffix (``<robot_name>:zed_link:Camera:0``).
 HEAD_CAMERA_SENSOR_SUFFIX = f"{HEAD_CAMERA_LINK}:Camera:0"
 
+#: The box the tucked robot (``tucked_default_joint_pos``) occupies in its ``base_link`` frame at yaw 0, base on the floor:
+#: ``(x back, y right, z floor), (x front, y left, z top)`` in m - what a parked robot takes up (``SimWorld.park_robot``).
+#: Measured 2026-10-12 (``robot.aabb`` of the robot parked on free floor: x [-0.398, 0.239], y +-0.342, z up to 1.695),
+#: rounded outwards. OmniGibson's ``reset_joint_pos_aabb_extent`` (0.728 x 0.684 x 1.478 m, the reset joints) is neither
+#: centred on ``base_link`` nor as tall.
+TUCKED_BOX_IN_BASE = ((-0.40, -0.345, 0.0), (0.24, 0.345, 1.70))
+
 #: The BEHAVIOR-1K evaluator's chassis mass for r1 / r1pro (``omnigibson/eval/evaluator.py: EVAL_BASE_LINK_MASS``,
 #: "heavier base so contact with the (heavy) world does not shove the robot around during eval"); the URDF's
 #: ``base_link`` weighs 47.63 kg. The holonomic base stands on three bounding-sphere wheels with its z / rx / ry virtual

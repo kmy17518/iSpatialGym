@@ -397,11 +397,11 @@ class SimWorld:
         k = self.choose_park_cell(trav.map_to_world(free), th.linalg.norm(free.float() - centre, dim=1), "world load")
         return trav.map_to_world(free[k])
 
-    def park_footprint_half(self) -> th.Tensor:
-        """Half extents (x, y) of the parked robot's footprint at yaw 0 (``park_robot``): OmniGibson's chassis extent at the
-        reset joints (``reset_joint_pos_aabb_extent``, the box its traversability erosion uses; R1Pro 0.728 x 0.684 m, the
-        tucked arms inside it)."""
-        return th.as_tensor(self.robot.reset_joint_pos_aabb_extent, dtype=th.float32)[:2] / 2.0
+    def park_box(self) -> Tuple[th.Tensor, th.Tensor]:
+        """``(lo, hi)``: the box the robot parked by ``park_robot`` (tucked, yaw 0) occupies relative to its base position on
+        the floor (``r1pro_model.TUCKED_BOX_IN_BASE``)."""
+        lo, hi = M.TUCKED_BOX_IN_BASE
+        return th.tensor(lo, dtype=th.float32), th.tensor(hi, dtype=th.float32)
 
     def park_obstacles(self) -> Tuple[List[str], th.Tensor, th.Tensor]:
         """``(names, lo, hi)``: one AABB ``(M, 3)`` per collision mesh (a convex piece; its object's name in ``names``) of
@@ -423,27 +423,27 @@ class SimWorld:
 
     def _park_overlaps(self, pts: th.Tensor, margin: float) -> Tuple[th.Tensor, th.Tensor]:
         """``(idx, over)``: the pieces of :meth:`park_obstacles` within the robot's height and reach of ``pts`` (indices), and
-        ``(N, len(idx))`` how far (m) the tucked footprint at each xy of ``pts``, grown by ``margin``, reaches into each of
-        their AABBs (the smaller of the x / y overlaps; <= 0: apart)."""
+        ``(N, len(idx))`` how far (m) the parked robot's box (:meth:`park_box`) at each xy of ``pts``, grown by ``margin``,
+        reaches into each of their AABBs (the smaller of the x / y overlaps; <= 0: apart)."""
         _, lo, hi = self.park_obstacles()
-        half = self.park_footprint_half() + margin
+        box_lo, box_hi = self.park_box()
+        rlo, rhi = box_lo[:2] - margin, box_hi[:2] + margin
         z0 = float(self.floor_z)
-        top = z0 + float(self.robot.reset_joint_pos_aabb_extent[2]) + margin
         pts = th.as_tensor(pts, dtype=th.float32).reshape(-1, 2)
-        reach_lo, reach_hi = pts.min(dim=0).values - half, pts.max(dim=0).values + half
-        near = (hi[:, 2] > z0 + PARK_FLOOR_BAND_M) & (lo[:, 2] < top) & (hi[:, 0] > reach_lo[0]) & (lo[:, 0] < reach_hi[0]) & \
+        reach_lo, reach_hi = pts.min(dim=0).values + rlo, pts.max(dim=0).values + rhi
+        near = (hi[:, 2] > z0 + PARK_FLOOR_BAND_M) & (lo[:, 2] < z0 + float(box_hi[2]) + margin) & (hi[:, 0] > reach_lo[0]) & (lo[:, 0] < reach_hi[0]) & \
                (hi[:, 1] > reach_lo[1]) & (lo[:, 1] < reach_hi[1])
         idx = th.nonzero(near).flatten()
         lo, hi = lo[idx], hi[idx]
-        ox = th.minimum(pts[:, None, 0] + half[0], hi[None, :, 0]) - th.maximum(pts[:, None, 0] - half[0], lo[None, :, 0])
-        oy = th.minimum(pts[:, None, 1] + half[1], hi[None, :, 1]) - th.maximum(pts[:, None, 1] - half[1], lo[None, :, 1])
+        ox = th.minimum(pts[:, None, 0] + rhi[0], hi[None, :, 0]) - th.maximum(pts[:, None, 0] + rlo[0], lo[None, :, 0])
+        oy = th.minimum(pts[:, None, 1] + rhi[1], hi[None, :, 1]) - th.maximum(pts[:, None, 1] + rlo[1], lo[None, :, 1])
         return idx, th.minimum(ox, oy)
 
     def park_clear_mask(self, pts: th.Tensor, margin: float = PARK_CLEARANCE_M) -> th.Tensor:
         """``(N,)`` bool per world xy of ``pts``: the tucked robot parked there (yaw 0) keeps ``margin`` from the AABB of
-        every collision piece of the scene objects (:meth:`park_obstacles`; from ``PARK_FLOOR_BAND_M`` above the floor to the
-        chassis height + ``margin``) and its footprint lies over the loaded rooms (partial-room loading leaves no floor
-        elsewhere). An AABB test, not the kit's whole-body check: the world-load park runs before the cuRobo world exists."""
+        every collision piece of the scene objects (:meth:`park_obstacles`; from ``PARK_FLOOR_BAND_M`` above the floor to its
+        height + ``margin``) and its footprint lies over the loaded rooms (partial-room loading leaves no floor elsewhere).
+        An AABB test, not the kit's whole-body check: the world-load park runs before the cuRobo world exists."""
         pts = th.as_tensor(pts, dtype=th.float32).reshape(-1, 2)
         # in chunks: without a free cell in the task rooms the candidates are every free cell of the scene (~10^5)
         ok = th.cat([~(self._park_overlaps(c, margin)[1] > 0).any(dim=1) for c in th.split(pts, 1024)]) if len(pts) else th.zeros(0, dtype=th.bool)
@@ -451,10 +451,10 @@ class SimWorld:
         seg = getattr(self.scene, "seg_map", None)
         if rooms and seg is not None:
             ids = th.tensor([seg.room_ins_name_to_ins_id[r] for r in rooms if r in seg.room_ins_name_to_ins_id], dtype=th.long)
-            half = self.park_footprint_half()
+            box_lo, box_hi = self.park_box()
             shape = seg.room_ins_map.shape
-            for sx, sy in ((-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)):
-                corner = pts + th.stack([sx * half[0], sy * half[1]])
+            for cx, cy in ((box_lo[0], box_lo[1]), (box_lo[0], box_hi[1]), (box_hi[0], box_lo[1]), (box_hi[0], box_hi[1])):
+                corner = pts + th.stack([cx, cy])
                 # SegmentationMap.world_to_map for a batch (its flip over every dim reverses the point order of an (N, 2) input)
                 ij = th.flip(corner / seg.map_resolution + seg.map_size / 2.0, dims=(1,)).int()
                 inside = (ij[:, 0] >= 0) & (ij[:, 0] < shape[0]) & (ij[:, 1] >= 0) & (ij[:, 1] < shape[1])
@@ -464,7 +464,7 @@ class SimWorld:
         return ok
 
     def park_blockers(self, xy, margin: float = PARK_CLEARANCE_M) -> List[Tuple[str, float]]:
-        """``[(name, overlap m)]``, deepest first: the scene objects whose collision pieces' AABBs the tucked footprint at
+        """``[(name, overlap m)]``, deepest first: the scene objects whose collision pieces' AABBs the parked robot's box at
         ``xy``, grown by ``margin``, reaches into (the deepest piece per object)."""
         names = self.park_obstacles()[0]
         idx, over = self._park_overlaps(th.as_tensor(xy, dtype=th.float32)[:2], margin)
@@ -477,9 +477,10 @@ class SimWorld:
     def choose_park_cell(self, pts: th.Tensor, dist: th.Tensor, who: str) -> int:
         """Index into ``pts`` (world xy ``(N, 2)``, the admissible park cells) of the cell to park on: the smallest ``dist``
         (the caller's distance to its centre) among the cells :meth:`park_clear_mask` keeps clear - OmniGibson's eroded
-        traversability map keeps only ~0.35 m from mapped obstacles, less than the chassis' half-extent, so a free cell
-        can still put the robot into furniture (2026-10-12: ottoman_hnmndv_1 pushed 13-17 cm). The first minimum wins
-        ties, so a clear cell that was the nearest stays the choice. No cell clear: the nearest cell, with a warning."""
+        traversability map keeps only ~0.35 m from mapped obstacles, less than the robot reaches from its base (0.40 m
+        behind), so a free cell can still put the robot into furniture (2026-10-12: ottoman_hnmndv_1 pushed 13-17 cm). The
+        first minimum wins ties, so a clear cell that was the nearest stays the choice. No cell clear: the nearest cell,
+        with a warning."""
         k0 = int(th.argmin(dist))
         clear = self.park_clear_mask(pts)
         if not bool(clear.any()):

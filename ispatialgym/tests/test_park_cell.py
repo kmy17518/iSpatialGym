@@ -1,6 +1,6 @@
 """Park cells (owner 2026-10-12 ~02:40): the world-load cell (``SimWorld.park_cell``) and the per-attempt cell
-(``navigation.park_pose``) keep the tucked robot - its footprint grown by ``PARK_CLEARANCE_M`` - off every scene object's
-AABB and over the loaded rooms, nearest to the centre the cell came from before (``SimWorld.choose_park_cell``); a cell that
+(``navigation.park_pose``) keep the tucked robot - its box (``r1pro_model.TUCKED_BOX_IN_BASE``) grown by ``PARK_CLEARANCE_M``
+- off the AABB of every collision piece of the scene objects and over the loaded rooms, nearest to the centre the cell came from before (``SimWorld.choose_park_cell``); a cell that
 was clear stays the choice. ``reset_scene_objects`` names what it puts back. Synthetic 6.1 m x 6.1 m rooms on OmniGibson's own
 traversability / segmentation map classes (0.1 m cells, world x = (column - 40) * 0.1, y = (row - 40) * 0.1)."""
 
@@ -12,10 +12,12 @@ import torch as th
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.maps.traversable_map import TraversableMap
 
+from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.sampling import sim_utils as SU
 from ispatialgym.sampling.v2 import navigation as NAV
 
-EXTENT = th.tensor([0.728, 0.684, 1.478])  # R1Pro reset_joint_pos_aabb_extent
+EXTENT = th.tensor([0.728, 0.684, 1.478])  # R1Pro reset_joint_pos_aabb_extent (the traversability erosion: 7 cells)
+BOX_LO, BOX_HI = (th.tensor(v) for v in M.TUCKED_BOX_IN_BASE)  # x -0.40 .. 0.24, y -0.345 .. 0.345, up to 1.70
 SIZE = 80
 
 
@@ -68,19 +70,16 @@ def _free_cells(w):
 
 
 def _clear_of(w, xy, objects, margin=SU.PARK_CLEARANCE_M):
-    half = EXTENT[:2] / 2 + margin
-    for o in objects:
-        lo, hi = o.aabb
-        if float(xy[0]) - half[0] < hi[0] and float(xy[0]) + half[0] > lo[0] and float(xy[1]) - half[1] < hi[1] and float(xy[1]) + half[1] > lo[1]:
-            return False
-    return True
+    p = th.tensor([float(xy[0]), float(xy[1])])
+    rlo, rhi = p + BOX_LO[:2] - margin, p + BOX_HI[:2] + margin
+    return not any(bool((rlo < o.aabb[1][:2]).all() and (rhi > o.aabb[0][:2]).all()) for o in objects)
 
 
 def test_world_load_park_cell_leaves_a_clear_room_as_it_was():
     # the eroded free cells run from -2.7 to 2.7 in x and y: centre (0, 0), the nearest cell is the centre cell itself
     assert _xy(_world().park_cell()) == (0.0, 0.0)
-    # objects outside the parked robot's body do not count: a carpet within the floor band, a ceiling fan above the
-    # chassis height, the floors it stands on
+    # objects outside the parked robot's body do not count: a carpet within the floor band, a ceiling fan above its
+    # height + margin (1.75 m), the floors it stands on
     w = _world([_box("carpet_0", (-1.0, -1.0, 0.0), (1.0, 1.0, 0.012), "carpet"), _box("ceiling_fan_0", (-0.5, -0.5, 2.1), (0.5, 0.5, 2.8), "ceiling_fan"),
                 _box("floors_0", (-3.0, -3.0, -0.1), (3.0, 3.0, 0.0), "floors")])
     assert _xy(w.park_cell()) == (0.0, 0.0)
@@ -88,9 +87,9 @@ def test_world_load_park_cell_leaves_a_clear_room_as_it_was():
 
 def test_world_load_park_cell_moves_off_an_object_the_eroded_map_lets_it_touch(caplog):
     """The ottoman is on the traversability map (a footprint 10 cm inside its AABB), and the erosion (a 7-cell kernel: 0.3 m)
-    leaves cells closer to its AABB than the chassis' half-extent (0.364 m in x): the old choice puts the robot into it
-    (B8: 6.5 cm), the new one is the nearest cell to the same centre whose footprint + margin is clear."""
-    ottoman = _box("ottoman_hnmndv_1", (0.0, -0.6, 0.0), (0.5, 0.6, 0.47), baked=(0.1, 0.4, -0.5, 0.5))
+    leaves cells closer to its AABB than the robot reaches behind its base (0.40 m): the old choice puts the robot into it
+    (B8: 6.5 cm), the new one is the nearest cell to the same centre whose box + margin is clear."""
+    ottoman = _box("ottoman_hnmndv_1", (-0.5, -0.6, 0.0), (0.0, 0.6, 0.47), baked=(-0.4, -0.1, -0.5, 0.5))
     w = _world([ottoman])
     pts = _free_cells(w)
     rows = th.nonzero(w.scene.trav_map._erode_trav_map(th.clone(w.scene.trav_map.floor_map[0]), robot=w.robot) == 255).float()
@@ -117,16 +116,16 @@ def test_park_pose_moves_off_the_object_on_the_old_cell():
     w = _world([desk, ottoman])
     kit.world = w
     xy = NAV.park_pose(kit, ["bedroom_0"], keep_away=[desk])
-    # x + 0.364 + 0.05 <= 0.9 -> 0.4 (0.3 from the centre); |y| >= 0.3 + 0.342 + 0.05 -> 0.7 (0.7 away)
-    assert _xy(xy) == (0.4, 0.0) and _clear_of(w, xy, [ottoman])
+    # the robot's front 0.24 + 0.05 m: x <= 0.61 -> 0.6, 0.1 from the centre (|y| >= 0.3 + 0.345 + 0.05 -> 0.7 away)
+    assert _xy(xy) == (0.6, 0.0) and _clear_of(w, xy, [ottoman])
 
 
 def test_the_footprint_stays_over_the_loaded_rooms():
     """Partial-room loading: no floor outside the loaded rooms, so a footprint corner over an unloaded neighbour (open plan,
     no wall to keep it off) rules the cell out."""
     w = _world(split_x=0.0, loaded=("bedroom_0",))
-    pts = th.tensor([[-0.3, 0.0], [-0.4, 0.0], [-1.5, 1.0]])
-    assert w.park_clear_mask(pts).tolist() == [False, True, True]  # -0.3 + 0.364 > 0: the corridor
+    pts = th.tensor([[-0.2, 0.0], [-0.3, 0.0], [-1.5, 1.0]])
+    assert w.park_clear_mask(pts).tolist() == [False, True, True]  # -0.2 + 0.24 > 0: the front corners over the corridor
     assert w.choose_park_cell(pts, th.tensor([0.0, 0.1, 1.2]), "test") == 1
     w.loaded_rooms = ["bedroom_0", "corridor_0"]
     assert w.park_clear_mask(pts).tolist() == [True, True, True]
@@ -145,11 +144,11 @@ def test_the_boxes_are_per_collision_piece():
     names, lo, hi = w.park_obstacles()
     assert names == ["bar_0", "bar_0"] and _xy(lo[0]) == (-2.5, -2.5) and _xy(hi[0]) == (1.0, -2.0) and _xy(hi[1]) == (-2.0, 2.5)
     assert w.park_blockers(th.tensor([0.0, 0.0])) == [] and _xy(w.park_cell()) == (0.0, 0.0)
-    # 1.7 m from the centre the footprint + margin reaches 11.4 cm into the west arm
-    assert [(n, round(d, 3)) for n, d in w.park_blockers(th.tensor([-1.7, 0.0]))] == [("bar_0", 0.114)]
-    # judged by the object box the centre cell would be ruled out (x up to 1.0 + 0.414)
+    # 1.7 m from the centre the box + margin (0.45 m behind the base) reaches 15 cm into the west arm
+    assert [(n, round(d, 3)) for n, d in w.park_blockers(th.tensor([-1.7, 0.0]))] == [("bar_0", 0.15)]
+    # judged by the object box the centre cell would be ruled out (x from 1.0 + 0.45)
     w = _world([_box("bar_0", (-2.5, -2.5, 0.0), (1.0, 2.5, 1.1), "bar")])
-    assert float(w.park_cell()[0]) >= 1.414
+    assert float(w.park_cell()[0]) >= 1.45
 
 
 def test_no_clear_cell_keeps_the_nearest_cell_with_a_warning(caplog):

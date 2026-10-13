@@ -299,12 +299,13 @@ footprint as `blocked_footprints` in the same structure.
 - **Parking** (object settling, goal-feasibility checks, template resets): the robot is parked tucked (yaw 0) at a free
   cell of the eroded traversability map inside the task room's floor polygon, ≥ 1 m from every spawned object and
   support (a base parked over an unloaded room falls through; the v1 room-centre `PARK_POSITION` is replaced by this
-  rule): of these cells, the one nearest their centre whose footprint is **clear** (owner 2026-10-12) — the tucked
-  chassis box (OmniGibson's reset AABB extent, R1Pro 0.728 × 0.684 m) grown by 5 cm on every side overlaps the AABB of
-  no collision piece (convex mesh) of a scene object between 2 cm above the floor and the chassis height + 5 cm (every
-  object but the floors and visual-only ones, at the scene file's poses; per piece, as the box of a multi-part object —
-  a paving, a wall run, an L-shaped bar, stairs — covers floor it leaves free), and its corners lie over the loaded
-  rooms. OmniGibson's erosion keeps only ~0.35 m from mapped obstacles, less than the chassis' half-extent: in axial#02
+  rule): of these cells, the one nearest their centre whose footprint is **clear** (owner 2026-10-12) — the box the
+  tucked robot occupies (`r1pro_model.TUCKED_BOX_IN_BASE`, measured: x −0.40 … +0.24 m about `base_link`, y ±0.345 m,
+  up to 1.70 m; OmniGibson's reset AABB extent is neither centred on the base nor as tall) grown by 5 cm on every side
+  overlaps the AABB of no collision piece (convex mesh) of a scene object above a 2 cm floor band (every object but the
+  floors and visual-only ones, at the scene file's poses; per piece, as the box of a multi-part object — a paving, a
+  wall run, an L-shaped bar, stairs — covers floor it leaves free), and its corners lie over the loaded rooms.
+  OmniGibson's erosion keeps only ~0.35 m from mapped obstacles, less than the robot reaches from its base: in axial#02
   the free cell nearest the centre put the chassis 6.5 cm into `ottoman_hnmndv_1`, which the park pushed 13–17 cm in
   every attempt. The world-load park cell (`SimWorld.park_cell`: no keep-away) follows the same rule
   (`SimWorld.choose_park_cell`). An AABB test, not the whole-body check: the world-load park comes before the cuRobo
