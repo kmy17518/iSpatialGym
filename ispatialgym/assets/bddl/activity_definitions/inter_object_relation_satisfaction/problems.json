@@ -1340,6 +1340,28 @@
    "pick": "inter_object_relation_satisfaction-touching_large_scale#03~c2",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-countertop",
+   "id": 121,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#03; owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03 c1)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#03~c1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-bar",
+   "id": 122,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#03; owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03 c2)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#03~c2",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
