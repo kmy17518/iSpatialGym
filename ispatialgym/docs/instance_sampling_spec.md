@@ -1674,7 +1674,15 @@ predicate's rays branch (`predicates.inside_rays`: the inner AABB centre in the 
 ≥ 2 of z and its own x / y) — and the target's top at most `max_protrusion_fraction` (0.5) of its height above the rim (the
 partner's support top when ≥ the target's height above the surface, else its AABB top; `inside_rim_z_m` overrides). The release is
 re-checked at the goal check from C (attached, partner present) and must be in the placement image. Oracle:
-`program_iors_large_inside` — … → navigate to C (object attached) → place with kind `drop` → retreat.
+`program_iors_large_inside` — … → navigate to C (object attached) → place with kind `drop` → retreat. **Overhang pick**
+(`generation.pick_overhang_push`, default off; owner 2026‑10‑13 ~03:15, inside_large_scale#03's plate, every IORS large-scale relation
+with a support init): when the direct exact IK of a drawn pair fails at B, the hand pushes the object along the support toward B's edge
+until the grasp's fingers - their closing sweep from the open gripper to the pinch width - stand `finger_clearance_m` (0.01) beyond the
+edge wherever they are below the support top, its centre of mass `com_margin_m` (0.05) inside (the edge by raycast, push distances in
+1 cm rungs), then grasps the library row there: exact IK with the support present, the push chain from B (the open or closed hand
+behind the far side, leaned over it, fingertips `tip_m` above the support, the support may be swept `support_touch_m` deep), a physics
+settle of the pushed object; `contacts.push_pick` (kind `pick_overhang`) and `grasps[0].pick_overhang`, program … → push → retreat →
+grasp → lift → …; the oracle's pick push stops on its own recorded displacement, never on the task goal.
 
 **The partner's joints at init (owner 2026‑10‑12 ~16:05, inside_large_scale#02: the fridge's left door open).**
 `generation.partner_joint_init` = `{joint: position}` (default none: the scene file's joints) is set on the partner as soon as it

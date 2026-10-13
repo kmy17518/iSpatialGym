@@ -717,7 +717,7 @@ class InsideMode:
                      grasp.grasp_name, facts["release_above_m"], facts["release_above_max_m"])
         grasp.extras.update(facts)
         draft.summary["release"] = facts
-        if not self.ikc.eef_in_frame(grasp.grasp, self.camera_pose_at(self.sidecar.stance("manipulation"))):
+        if not self.ikc.eef_in_frame(grasp.grasp, self.camera_pose_at(self.sidecar.stance(getattr(grasp, "stance", None) or "manipulation"))):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
         if not self.ikc.eef_in_frame(grasp.place, self.camera_pose_at(place)):
             raise Reject("gripper_not_in_frame", "release eef pose outside the placement image (5 %)")

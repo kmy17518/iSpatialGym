@@ -154,6 +154,48 @@ def _pick(g: GraspRecord) -> Tuple[Grasp, Lift]:
     return grasp, Lift(arm=g.arm, object=g.object, carry_height=g.carry_height, after=grasp)
 
 
+#: ``contacts.push_pick``: the push before an overhang pick (owner 2026-10-13 ~03:15 item 4; sampler ``iors_large._overhang_pick``)
+PICK_PUSH_SLOT = "push_pick"
+PICK_PUSH_KIND = "pick_overhang"
+
+
+def _pick_push(sc: Sidecar, g: GraspRecord) -> Optional[PushContact]:
+    """``contacts.push_pick`` (kind ``pick_overhang``: the object pushed along its support until it overhangs the edge, then grasped at
+    the overhang), checked against the grasp it prepares - the same object, the same hand; None when the sidecar records none."""
+    rec = (sc.contacts.extra or {}).get(PICK_PUSH_SLOT) if sc.contacts is not None else None
+    if rec is None:
+        return None
+    push = PushContact.from_dict(rec, f"contacts.{PICK_PUSH_SLOT}")
+    if push.kind != PICK_PUSH_KIND:
+        raise SidecarError(f"contacts.{PICK_PUSH_SLOT}.kind {push.kind!r}: expected {PICK_PUSH_KIND!r}")
+    if push.object != g.object:
+        raise SidecarError(f"contacts.{PICK_PUSH_SLOT}.object {push.object!r} is not the grasped object {g.object!r}")
+    if push.arm != g.arm:
+        raise SidecarError(f"contacts.{PICK_PUSH_SLOT}.arm {push.arm!r} differs from the grasp arm {g.arm!r} (the hand that pushes grasps)")
+    return push
+
+
+def _grasp_stance(g: GraspRecord) -> str:
+    """The stance a grasp is taken from (``grasps[].stance``): ``manipulation``, or the overhang pick's grasp stance ``pick`` (B backed off
+    along its axis); the carry to the placement stance leaves from it."""
+    st = g.extra.get("stance") if isinstance(g.extra, dict) else None
+    return st if isinstance(st, str) and st else "manipulation"
+
+
+def _pick_actions(sc: Sidecar, g: GraspRecord, stance: str = "manipulation") -> List[Action]:
+    """grasp -> lift, preceded by the overhang push and its retreat when ``contacts.push_pick`` is recorded: push along the support (it may
+    touch the support: ``touches``) -> retreat -> [the recorded travel to the grasp stance ``pick``] -> grasp at the object's current
+    (pushed) pose -> lift."""
+    grasp, lift = _pick(g)
+    push = _pick_push(sc, g)
+    if push is None:
+        return [grasp, lift]
+    support = push.extra.get("support")
+    p = Push(contact=push, base_yaw=sc.stance(stance).base_pose2d[2], touches=(support,) if isinstance(support, str) and support else ())
+    to_grasp = _travel(sc, stance, _grasp_stance(g)) if _grasp_stance(g) != stance else []
+    return [p, Retreat(arm=push.arm, object=push.object, after=p)] + to_grasp + [grasp, lift]
+
+
 def _place_and_retreat(g: GraspRecord, kind: str, relation: str = "on") -> List[Action]:
     place = Place(kind=kind, arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on, relation=relation)
     return [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)]
@@ -1028,14 +1070,15 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     if mode is not None:
         return mode(sc)
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
-    if sc.path("manipulation", "placement") is None:
-        raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
-    grasp, lift = _pick(g)
+    if sc.path(_grasp_stance(g), "placement") is None:
+        raise SidecarError(f"paths: IORS large-scale needs the recorded path from {_grasp_stance(g)!r} to 'placement'")
+    pick = _pick_actions(sc, g)
+    lift = pick[-1]
     # owner 2026-09-20 05:20: ``grasps[0].waypoints`` = the in-hand line from the lift to the CARRY pose (a compact pose in front
     # of the chest) - the object is carried there through the transitions and the drive (the sampler checked the legs with the
     # arm at that pose); without waypoints the object is carried at the lift configuration as before
     carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)] if g.waypoints else []
-    head = _travel(sc, "init", "manipulation") + [grasp, lift] + carry + _travel(sc, "manipulation", "placement", carried=g.object)
+    head = _travel(sc, "init", "manipulation") + pick + carry + _travel(sc, _grasp_stance(g), "placement", carried=g.object)
     drop = str(g.extra.get("place_kind") or "support") == "drop"
     if not drop:
         return head + _place_and_retreat(g, "support", _IORS_RELATION_WORDS[relation])
@@ -1066,13 +1109,15 @@ def program_iors_large_inside(sc: Sidecar) -> List[Action]:
     """IORS inside, large-scale (``program_iors_large`` with relation ``inside``; owner 2026-10-12 ~16:05 item 1): init A → manipulation B
     → grasp → lift [→ carry pose] → navigate_to placement C with the object attached → place with kind ``drop`` (the small-scale inside
     ending: the release above the partner's interior surface, the container stays an obstacle) → retreat. The target ends inside the
-    partner (``inside`` read in the epilogue)."""
+    partner (``inside`` read in the epilogue). The overhang pick (``contacts.push_pick``, owner 2026-10-13 ~03:15 item 4): push -> retreat
+    before the grasp (:func:`_pick_actions`)."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
-    if sc.path("manipulation", "placement") is None:
-        raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
-    grasp, lift = _pick(g)
+    if sc.path(_grasp_stance(g), "placement") is None:
+        raise SidecarError(f"paths: IORS large-scale needs the recorded path from {_grasp_stance(g)!r} to 'placement'")
+    pick = _pick_actions(sc, g)
+    lift = pick[-1]
     carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)] if g.waypoints else []
-    head = _travel(sc, "init", "manipulation") + [grasp, lift] + carry + _travel(sc, "manipulation", "placement", carried=g.object)
+    head = _travel(sc, "init", "manipulation") + pick + carry + _travel(sc, _grasp_stance(g), "placement", carried=g.object)
     return head + _place_and_retreat(g, "drop", _IORS_RELATION_WORDS["inside"])
 
 
@@ -1182,8 +1227,8 @@ def _iors_large_touching_program(sc: Sidecar) -> List[Action]:
     ``avoid``) and follows it (``Push.follow``: the pad stops when the target reaches its goal, the touching pose - ``execute_push``'s
     stop rule - moved with the partner if the partner moved); ``touching`` is read in the epilogue."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
-    if sc.path("manipulation", "placement") is None:
-        raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
+    if sc.path(_grasp_stance(g), "placement") is None:
+        raise SidecarError(f"paths: IORS large-scale needs the recorded path from {_grasp_stance(g)!r} to 'placement'")
     if str(g.extra.get("place_kind") or "support") != "drop":
         raise SidecarError("grasps[0].place_kind: IORS touching (large-scale) drops the target on the floor before the push ('drop')")
     push = sc.contacts.push if sc.contacts is not None else None
@@ -1196,9 +1241,10 @@ def _iors_large_touching_program(sc: Sidecar) -> List[Action]:
     partner = push.extra.get("partner")
     if not isinstance(partner, str) or not partner:
         raise SidecarError("contacts.push.partner: the instance the target is pushed against is required (IORS touching, large-scale)")
-    grasp, lift = _pick(g)
+    pick = _pick_actions(sc, g)
+    lift = pick[-1]
     carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)] if g.waypoints else []
-    head = _travel(sc, "init", "manipulation") + [grasp, lift] + carry + _travel(sc, "manipulation", "placement", carried=g.object)
+    head = _travel(sc, "init", "manipulation") + pick + carry + _travel(sc, _grasp_stance(g), "placement", carried=g.object)
     place = Place(kind="drop", arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on, relation=_IORS_RELATION_WORDS["touching"])
     push_stance = "push" if "push" in sc.stances else "placement"
     base_yaw = sc.stance(push_stance).base_pose2d[2]

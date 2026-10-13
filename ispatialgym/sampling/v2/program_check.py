@@ -1101,6 +1101,24 @@ class _Tracker:
         self._shift(name, pushed, d * travel, sampler)
         sampler.kit.sync_world()
 
+    def advance_pick_push(self, action, sampler) -> None:
+        """The overhang pick's push (``contacts.push_pick``, kind ``pick_overhang``; owner 2026-10-13 ~03:15 item 4): the pushed object is
+        moved to the record's ``post_push_pose`` (where the sampler settled it), so the grasp is checked at the overhang as the oracle
+        takes it (at the object's current pose). Restored by :meth:`restore_moved`."""
+        contact = getattr(action, "contact", None)
+        name = getattr(contact, "object", None)
+        post = (getattr(contact, "extra", None) or {}).get("post_push_pose")
+        if sampler is None or name not in getattr(sampler, "objects", {}) or not isinstance(post, dict) or post.get("position") is None:
+            log.warning("program check: the pick push of %s has no post_push_pose - the world is not advanced", name)
+            return
+        obj = sampler.objects[name]
+        if name not in self.moved:
+            p0, q0 = obj.get_position_orientation()
+            self.moved[name] = (p0.clone(), q0.clone())
+        obj.set_position_orientation(th.tensor([float(v) for v in post["position"]]), th.tensor([float(v) for v in post["orientation"]]))
+        obj.keep_still()
+        sampler.kit.sync_world()
+
     def advance_base_push(self, action, sampler) -> None:
         """A base push (IORS nextto large-scale): the robot ends at the push's recorded ``end_stance`` and the pushed object
         ``distance_m`` further along the push direction, so the retreat is checked from there against the object where the push
@@ -1242,7 +1260,10 @@ class _Tracker:
             self.carried_arm = None
             self.advance_block(action, sampler)
         elif name == "push":
-            self.advance_push(action, sampler)
+            if str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang":
+                self.advance_pick_push(action, sampler)
+            else:
+                self.advance_push(action, sampler)
         arms = list(getattr(action, "arms", ()) or [])
         if name == "brace" and arms and witnesses and sampler is not None:
             # the brace hand stays at its contact until its own retreat: its solved contact configuration locks the arm for
@@ -1915,6 +1936,10 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     # pose 1 of 3 ... after push' on 7/16 attempts of touching 0918-181010)
     after_name = getattr(getattr(action, "after", None), "name", None)
     fingers = 0.0 if name in ("push", "brace", "base_push") or (name == "retreat" and after_name in ("push", "base_push")) else None
+    push_c = getattr(action, "contact", None) if name == "push" else (getattr(getattr(action, "after", None), "contact", None) if name == "retreat" and after_name == "push" else None)
+    push_open = (getattr(push_c, "extra", None) or {}).get("fingers_opening_m") if push_c is not None else None
+    if push_open is not None:
+        fingers = float(push_open)  # an open-hand push (the overhang pick's): pushed and left with the fingers at the recorded opening
     if name == "brace":  # a wide stop braces with the fingers pre-shaped open (owner 2026-09-19 00:49)
         wide = (getattr(getattr(action, "contact", None), "extra", None) or {}).get("fingers_opening_m")
         if wide is not None:

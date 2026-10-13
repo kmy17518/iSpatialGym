@@ -667,7 +667,15 @@ class Grasp(Action):
             # CURRENT pose exactly like the library transform; the library transform is the fallback for a record without it
             eio = g.extra.get("eef_in_object") if isinstance(g.extra, dict) else None
             if isinstance(eio, dict) and eio.get("position") is not None and eio.get("orientation") is not None:
-                return _as_pose(C.grasp_pose_from_transform(obj.tensors(), _as_pose(eio).tensors()))
+                obj_t = obj.tensors()
+                ov = g.extra.get("pick_overhang")
+                if isinstance(ov, dict) and ov.get("yaw_free") and isinstance(ov.get("post_push_pose"), dict) and ov["post_push_pose"].get("orientation") is not None:
+                    # the overhang pick of a body of revolution about z (owner 2026-10-13 ~03:15 item 4): the grasp at the object's current
+                    # position with the yaw the sampler settled it at - a push-induced turn of a round plate does not move the pinch off the overhang
+                    q_cur = obj_t[1]
+                    dy = C.wrap_angle(C.yaw_of(_tensor(ov["post_push_pose"]["orientation"])) - C.yaw_of(q_cur))
+                    obj_t = (obj_t[0], C.qmul(C.quat_from_yaw(dy), q_cur))
+                return _as_pose(C.grasp_pose_from_transform(obj_t, _as_pose(eio).tensors()))
             # yaw omitted on purpose: the settled pose carries the drawn yaw (see the class docstring)
             return _as_pose(C.grasp_pose(obj.tensors(), g.grasp_key, g.grasp_name))
         if self.kind == "cube":
@@ -1066,6 +1074,15 @@ class Push(Action):
             until = f" until it touches {sidecar.language.phrase(partner)}" if partner else ""
             fine = f"push {obj} along the floor{until} with the closed {_hand(c.arm)}"
             numbers = f"push {obj} {_cm(c.distance_m)} {word} along the floor{until} with the closed {_hand(c.arm)} from {_xyz(c.init.position)}"
+            return fine, numbers
+        if self.kind == "pick_overhang":
+            support = c.extra.get("support")
+            along = f" along {sidecar.language.phrase(support)}" if support in sidecar.language.objects else " along its support"
+            hand = f"the {'open' if c.extra.get('fingers') == 'open' else 'closed'} {_hand(c.arm)}"
+            fine = f"push {obj}{along} until it overhangs the edge, with {hand}"
+            over = c.extra.get("overhang_m")
+            numbers = (f"push {obj} {_cm(c.distance_m)} {word}{along} with {hand}" + (f" until it overhangs the edge by {_cm(float(over))}" if over is not None else "")
+                       + f" from {_xyz(c.init.position)}")
             return fine, numbers
         arc = " along the recorded arc" if c.mid is not None else ""
         fine = f"push {obj} {word} with the closed {_hand(c.arm)}"

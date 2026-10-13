@@ -1784,6 +1784,12 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     v2.0: 2 deg). ``ctx["grasp_support_lift"]`` records the facts."""
     if action.kind != "library" or targets.get("grasp") is None:
         return targets
+    g_extra = getattr(getattr(action, "grasp", None), "extra", None)
+    if isinstance(g_extra, dict) and g_extra.get("pick_overhang"):
+        # the overhang pick (owner 2026-10-13 ~03:15 item 4): the object was pushed past its support's edge so that the finger below it
+        # stands in free space - lifting the grasp would only take the pads off the rim
+        ctx["grasp_support_lift"] = {"applied": False, "reason": "an overhang grasp: the finger below the object stands beyond the support's edge"}
+        return targets
     try:
         lo, hi = state.object(action.object).aabb
         bottom, top = float(lo[2]), float(hi[2])
@@ -3883,14 +3889,44 @@ def reach_push_pre(motions: Motions, state, arm: str, pre, supports: Sequence[An
     yield from reach_pre_pose(motions, state, arm, pre, supports, through, q_hint, ctx, cfg, **kw)
 
 
+class _RecordedPushState:
+    """``state`` without the pushed object's TRO pose target: the overhang pick's push (``contacts.push_pick``, kind ``pick_overhang``)
+    moves the object toward its support's edge, not toward the task's goal - its stop / residual is the recorded displacement."""
+
+    def __init__(self, state, obj: str):
+        self._state, self._obj = state, obj
+
+    def __getattr__(self, name):
+        return getattr(self._state, name)
+
+    def pose_target(self, name: str):
+        return None if name == self._obj else self._state.pose_target(name)
+
+
+def pick_push_geometry(geom: "PushGeometry", distance_m: float) -> "PushGeometry":
+    """The overhang pick's push as the object's motion: the recorded line with the object's displacement (``contacts.push_pick.distance_m``)
+    as its length - the pad travels that plus its start clearance, the residual is measured against what the object should do."""
+    return PushGeometry("line", geom.direction, distance=float(distance_m))
+
+
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
     obj = action.contact.object
-    _hook(ctx, "fov")(False)
-    yield from motions.gripper(arm, close=True)
-    supports = contact_ignores(state, obj)  # the wall / table the target rests against (sampler rule: ignored along the chain)
     extra0 = getattr(action.contact, "extra", None) or {}
+    _hook(ctx, "fov")(False)
+    if extra0.get("fingers_opening_m") is not None:
+        # an open-hand push (the overhang pick's: the open fingers straddle the object's far rim, a cradle it cannot slide off)
+        yield from motions.gripper_opening(arm, float(extra0["fingers_opening_m"]))
+    else:
+        yield from motions.gripper(arm, close=True)
+    pick_push = str(extra0.get("kind") or "") == "pick_overhang"
+    if pick_push:
+        # owner 2026-10-13 ~03:15 item 4: the object's TRO goal is the task's (the sink) - this push stops on its own recorded displacement,
+        # never re-centres on the goal and never nudges the base (the grasp follows from the same stance)
+        state = _RecordedPushState(state, obj)
+        ctx["push_pick"] = {"distance_m": float(action.contact.distance_m), "support": extra0.get("support"), "fingers": extra0.get("fingers")}
+    supports = contact_ignores(state, obj)  # the wall / table the target rests against (sampler rule: ignored along the chain)
     # a re-push after a free short (owner 2026-09-26, braced-push ladder): the pad stops that far PAST the goal (``aim_push_past_goal``)
     ctx["push_aim_past_goal"] = float(extra0.get("aim_past_goal_rad", 0.0) or 0.0)
     try:
@@ -4064,6 +4100,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
     geom = push_geometry(targets["waypoints"], targets["direction"])
+    if pick_push:
+        geom = pick_push_geometry(geom, float(action.contact.distance_m))
     if geom.kind == "arc":
         off = C.as_tensor(pose0[0]).float() - geom.pivot
         off = off - geom.axis * float(th.dot(off, geom.axis))
@@ -4128,7 +4166,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         #     moved the box 0 mm, 3 cm short) is closed with the base: the arm locked at its joints, the base driven
         #     along the push direction by what is still missing (the door base-follow mechanism), pad in contact
         left, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
-        if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m and ctx.get("push_articulation") is None:
+        if (geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m
+                and ctx.get("push_articulation") is None and not pick_push):
             # (no base nudge for a link on its joint: the lever's vertical lift 0920-201652 drove the base 51 mm with the fist under the flap)
             yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push")
             yield from _hold_until_still(motions, state, obj, cfg)
@@ -4158,7 +4197,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     #     needs less push each round), back off, measure; up to push_renudge_rounds
     rounds = 0
     while (geom.kind == "line" and cfg.push_renudge_rounds > rounds and final is not None and cfg.push_base_nudge_min_m <= final <= cfg.push_base_nudge_max_m
-           and cfg.push_backoff_m > 0 and not extra.get("hold")):
+           and cfg.push_backoff_m > 0 and not extra.get("hold") and not pick_push):
         rounds += 1
         log.info("push(%s): %.1f mm reopened after the back-off -> re-nudge round %d", obj, final * 1000, rounds)
         _hook(ctx, "fov")(True)
