@@ -30074,6 +30074,139 @@
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02: jar_of_spaghetti_sauce/exmsmm onto fridge_petcxr_0's 1.20 m shelf (left door open) from breakfast_table_xftrki_0 (0.6 m, sheet ~T3); hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
  },
+ "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf097": {
+  "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+  "definition_id": 147,
+  "roles": {
+   "target": {
+    "category": "jar_of_spaghetti_sauce",
+    "sampleable": true,
+    "require": {
+     "grasps": "floating"
+    },
+    "representative": "exmsmm",
+    "orientation_equivalences": {
+     "jar_of_spaghetti_sauce/exmsmm": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "jar_of_spaghetti_sauce/exmsmm": "jar_of_spaghetti_sauce__exmsmm"
+    }
+   },
+   "partner": {
+    "category": "fridge",
+    "sampleable": false
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_lower": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "partner": [
+      "fridge_petcxr_0"
+     ],
+     "support": [
+      "breakfast_table_xftrki_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_xftrki_0",
+       "init": "ontop",
+       "top_z": 0.68,
+       "row": "inter_object_relation_satisfaction-inside_large_scale#02~T3"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "jar_of_spaghetti_sauce": [
+       "exmsmm"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "jar_of_spaghetti_sauce": {
+       "zahyds": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.01,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.35,
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "inside_surface_z_m": 0.97,
+   "inside_surface_tol_m": 0.03,
+   "inside_stance_side": "+y",
+   "partner_joint_init": {
+    "j_left_door": 2.3
+   },
+   "_inside_note": "owner 2026-10-12 ~16:05 inside02: fridge_petcxr_0's 1.20 m shelf - the left compartment's alone (door-closed probes of 2026-10-12: z 1.205, 339 board cells, headroom median 0.222 m for the 0.132 m jar; 0.969 spans both compartments, half of it behind the closed right door) = the goal-side band's --surface-z 1.20 --surface-tol 0.03; partner_joint_init j_left_door 2.30 rad (132 deg, limit 2.356): at 90 deg the door's 0.29 m bins stand in front of the compartment's +x part, at 2.30 the door lies over bar_byvbuc_0's front-left corner (0.10 m from its front) and clears stance C; inside_stance_side +y = the fridge front / the open door's side (sheet best_side=+y); partner_view_min_points 1, init_support_max_geodesic_m 10, max_partner_geodesic_m 10 as the ontop / under aliases, no init_support_fallback; grasp key jar_of_spaghetti_sauce__exmsmm (the graspgen side pinches; the __t set is top-down lid pinches, which a 0.22 m compartment cannot take with the 10 cm pre-place)",
+   "inside_stance_postures": [
+    "untucked",
+    "ready",
+    "tucked"
+   ],
+   "carry_collision_margin_m": 0.01,
+   "attempt_budget_s": 3000,
+   "inside_goal_region": {
+    "frame": "world",
+    "x": [
+     5.27,
+     5.7
+    ]
+   },
+   "_shelf097_note": "owner 2026-10-13 ~03:15 item 2: a copy of alias 128 on the fridge's 0.969 m shelf (at 0.70 m the jar's pre-place was out of reach, 55-633 mm short) - door-open band at z 0.969 (j_left_door 2.3): 832 board cells in 2 pieces spanning both compartments, headroom median 0.314 m, edge +u mid (5.194, -0.268) 0.92 m; right arm 0 reachable cells (not published), left arm 89 entries all in the left compartment (x 5.354-5.594), stand-offs 0.55 / 0.65 collide at every trunk (tband 17838242 / 17838243); inside_goal_region keeps the left compartment (x 5.27-5.70, the left door's span)"
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02: jar_of_spaghetti_sauce/exmsmm onto fridge_petcxr_0's 1.20 m shelf (left door open) from breakfast_table_xftrki_0 (0.6 m, sheet ~T3); hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
+ },
  "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf070": {
   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
   "definition_id": 143,

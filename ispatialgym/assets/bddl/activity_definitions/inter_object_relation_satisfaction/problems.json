@@ -1626,6 +1626,17 @@
    "pick": "inter_object_relation_satisfaction-under_large_scale#02~c2_pitched",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf097",
+   "id": 147,
+   "grounded": "2026-10-13",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-128 with inside_surface_z_m 0.97 + inside_goal_region, owner ~03:15 inside_large#02 0.969 m shelf)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#02~shelf097",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
