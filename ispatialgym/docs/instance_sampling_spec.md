@@ -1645,6 +1645,18 @@ partner's support top when ≥ the target's height above the surface, else its A
 re-checked at the goal check from C (attached, partner present) and must be in the placement image. Oracle:
 `program_iors_large_inside` — … → navigate to C (object attached) → place with kind `drop` → retreat.
 
+**The partner's joints at init (owner 2026‑10‑12 ~16:05, inside_large_scale#02: the fridge's left door open).**
+`generation.partner_joint_init` = `{joint: position}` (default none: the scene file's joints) is set on the partner as soon as it
+is bound (clamped to the joint limits; an unknown joint is a `spec` rejection), the robot re-parked away from it, 30 physics steps,
+the joints re-read (`template_facts.partner_joint_init`: requested / applied / settled / moved links). Every attempt applies them
+with the draft (`Draft.object_joints`) and records them after the settle as a TRO `constraints` record `{"type": "joint_positions",
+"object", "joints"}` — `run_isg` sets those joints after `load_tro_instance`, holds them through its settle, restores them after a
+reset as the articulation targets, and writes them at the end of the episode (`meta.joint_positions` / the result line: `init` and
+`end`) — and in `summary.partner_joints`. The links the request moved stay an obstacle and nothing more: the parked robot keeps 1 m
+from the partner, every recorded path plans around their floor footprints (+ 2 cm), and the inside mode measures the stance-C
+overhang without them and clears the interior raster's cells under the partner's doors, open or closed (every link but its root:
+a bin in a fridge door is no part of the shelf behind it).
+
 ## 6. Per-task rules
 
 Init = the sampled configuration, goal = what the TRO targets describe. Everything the oracle needs is recorded.

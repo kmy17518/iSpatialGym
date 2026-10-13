@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import torch as th
 
 from ispatialgym.sampling import geometry as G
+from ispatialgym.sampling import object_joints as OJ
 from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
@@ -173,12 +174,18 @@ class InsideMode:
         partner = self.partner
         half, height = self.target_dims()
         spec = self.inside_surface_spec()
-        lo, hi = (G.t(v).float().clone() for v in partner.aabb)
+        # generation.partner_joint_init (the open door): its links are no part of the stand-off nor of the surface
+        static = getattr(self, "partner_static_aabb", None)
+        lo, hi = static() if static is not None else (G.t(v).float().clone() for v in partner.aabb)
         try:
             itop = self.world.support_interior(partner, self.floor_z + spec["z_m"], resolution=float(self.num("support_resolution", 0.02)), z_margin=spec["tol_m"],
                                                ignore=list(self.world.spawned.values()))
         except RuntimeError as e:
             raise Reject("inside_surface", f"{partner.name}: no interior surface at {spec['z_m']:.2f} m (+-{spec['tol_m']:.2f}): {e}")
+        parts = getattr(self, "partner_part_boxes", None)
+        n_part_cells = OJ.mask_out_boxes(itop, parts() if parts is not None else [], pad=0.5 * float(itop.resolution))
+        if n_part_cells and not bool(itop.mask.any()):
+            raise Reject("inside_surface", f"{partner.name}: every interior cell at {float(itop.z):.3f} m lies under its doors (generation.partner_joint_init)")
         usable = itop.usable(height, HEADROOM_MARGIN_M)
         idx = th.nonzero(usable)
         cells = th.stack([itop.xs[idx[:, 0]], itop.ys[idx[:, 1]]], dim=1) if len(idx) else th.zeros(0, 2)
@@ -201,7 +208,7 @@ class InsideMode:
             rim_z, rim_src = self.floor_z + float(self.gp.gen("inside_rim_z_m")), "generation.inside_rim_z_m"
         facts = {"z_requested_above_floor": spec["z_m"], "tol_m": spec["tol_m"], "z_world": round(float(itop.z), 4), "z_above_floor": round(float(itop.z) - self.floor_z, 4),
                  "n_board_cells": int(itop.mask.sum()), "n_free_cells": int(itop.free.sum()), "n_usable_cells": int(len(cells)), "n_goal_cells": int(len(goal_cells)),
-                 "erosion_m": round(margin, 4), "open_edges": list(itop.open_edges), "board_pieces": len(itop.board_pieces),
+                 "erosion_m": round(margin, 4), "open_edges": list(itop.open_edges), "board_pieces": len(itop.board_pieces), "cells_under_doors": n_part_cells,
                  "headroom_m": (itop.to_json() or {}).get("headroom_m"), "rim_z": round(rim_z, 4), "rim_source": rim_src,
                  "stance_side": None if side is None else [round(float(v), 3) for v in side], "stance_edges": [e.name for e in edges]}
         self.place = {"top": itop, "cells": goal_cells, "edges": edges, "z": float(itop.z), "height": height, "half": half, "surface": facts, "rim_z": rim_z,

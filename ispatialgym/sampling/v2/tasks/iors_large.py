@@ -54,6 +54,15 @@ orientation rule decides; a pair the other arm wins waits for that arm's couplin
 push lane and every record follow the segment arm (right-side laterals mirrored for the left arm). A coupling that fails
 after its grasps passed hands the pairs it won to the other arm: a regrasp at B with that arm at the same target pose and
 library row (``grasps[0].extras.segment_fallback``). With one arm offered (``generation.other_arm`` false) nothing changes.
+
+**The partner's joints at init (owner 2026-10-12 ~16:05, inside_large_scale#02: the fridge's left door open).**
+``generation.partner_joint_init`` = ``{joint: position}`` (default none: the scene file's joints) is set on the partner once the
+partner is bound, before anything reads its geometry (the robot re-parked away from it, a settle, the joints re-read:
+``template_facts.partner_joint_init``); every attempt applies those joints with the draft (``Draft.object_joints``) and records them
+after the settle as a ``joint_positions`` constraint of the TRO (``oracle.run_isg`` holds and restores them) and in
+``summary.partner_joints``. The links the request moved (the door) stay an obstacle and nothing else: the parked robot keeps 1 m from
+the partner, every recorded path plans around their floor footprints, and the inside mode leaves them out of the stance-C stand-off
+and the partner's doors (open or closed) out of the interior raster (:mod:`ispatialgym.sampling.object_joints`).
 """
 
 from __future__ import annotations
@@ -71,6 +80,7 @@ import torch as th
 
 from ispatialgym import REPO_ROOT
 from ispatialgym.sampling import geometry as G
+from ispatialgym.sampling import object_joints as OJ
 from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.sampling.sim_utils import Reject, SupportTop
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
@@ -132,6 +142,10 @@ FLOOR_TRUNKS = ((0.75, -0.9), (0.75, -1.2), (0.95, -0.9), (0.95, -1.2)) + tuple(
 #: (``generation.attempt_budget_s`` overrides). 900 -> 1500 s (2026-09-20): the F_init pre-screen (8 B x 16 yaws) and the
 #: carry-leg checks (departure sweep, path, arrival sweep with the object attached) add ~3 min per attempt
 ATTEMPT_BUDGET_S = 1500.0
+#: physics steps after ``generation.partner_joint_init`` set the partner's joints (+ the settle's own 10 and one full step)
+PARTNER_JOINT_SETTLE_STEPS = 30
+#: growth of the moved links' floor footprints on the path planner's local map
+PARTNER_MOVED_FOOTPRINT_M = 0.02
 
 
 class _NullContext:
@@ -416,6 +430,8 @@ class IORSLarge(SamplerV2):
         self.place: Dict[str, Any] = {}  # partner geometry for C: top / under cells, edges, band
         self.floor_z = 0.0
         self.seg_arm: str = TT.default_arm(self)  # the arm of the grasp -> carry -> place -> release segment being coupled
+        self.partner_joints: Optional[Dict[str, float]] = None  # every partner joint once generation.partner_joint_init set them
+        self.partner_moved: List[str] = []  # the partner links that request moved (the open door)
 
     # ------------------------------------------------------------------ roles
 
@@ -436,6 +452,87 @@ class IORSLarge(SamplerV2):
                 raise Reject("spec", f"{self.gp.alias}: no partner candidate of {cats} in {sorted(rooms)}")
             partner = cands[0]
         self.bind_scene_object("partner", partner)
+        self.apply_partner_joint_init()
+
+    def apply_partner_joint_init(self) -> None:
+        """``generation.partner_joint_init`` (module docstring; default none: nothing changes): the partner's joints set (clamped to their
+        limits), the robot re-parked away from the partner, a settle of :data:`PARTNER_JOINT_SETTLE_STEPS`, the joints re-read; the links
+        that moved are kept in ``partner_moved``. ``Reject("spec")`` for an unknown joint or a value that is not a number."""
+        self.partner_joints, self.partner_moved = None, []
+        req = self.gp.gen("partner_joint_init")
+        if not req:
+            return
+        partner = self.partner
+        try:
+            spec, clamped = OJ.parse_joint_spec(req, list(partner.joints), OJ.joint_limits(partner))
+        except ValueError as e:
+            raise Reject("spec", f"{self.gp.alias}: generation.partner_joint_init on {partner.name}: {e}")
+        before = OJ.link_poses(partner)
+        q0 = OJ.joint_dict(partner)
+        OJ.set_joints(partner, spec)
+        self.partner_joints = OJ.joint_dict(partner)  # read by park_keep_away from here on
+        self.park_robot()
+        residual = self.world.settle([partner], steps=PARTNER_JOINT_SETTLE_STEPS)
+        partner.set_joint_velocities(th.zeros_like(partner.get_joint_positions()))
+        partner.keep_still()
+        self.partner_joints = OJ.joint_dict(partner)
+        self.partner_moved = OJ.moved_links(before, OJ.link_poses(partner))
+        settled = {n: round(self.partner_joints[n], 4) for n in spec}
+        dev = max(abs(self.partner_joints[n] - v) for n, v in spec.items())
+        self.template_facts["partner_joint_init"] = {"object": partner.name, "requested": {n: float(v) for n, v in req.items()}, "applied": spec, "clamped": clamped,
+                                                     "scene_file": {n: round(q0[n], 4) for n in spec}, "settled": settled, "max_settle_dev_rad": round(dev, 4),
+                                                     "joints": {n: round(v, 4) for n, v in self.partner_joints.items()}, "moved_links": list(self.partner_moved),
+                                                     "settle_residual": residual}
+        log.info("%s: generation.partner_joint_init on %s: %s -> settled %s (max deviation %.3f%s), moved links %s", self.gp.alias, partner.name, spec, settled, dev,
+                 f"; clamped {clamped}" if clamped else "", self.partner_moved)
+        if dev > 0.05:
+            log.warning("%s: %s's joints moved %.3f from the requested %s during the settle (settled %s)", self.gp.alias, partner.name, dev, spec, settled)
+
+    def partner_static_aabb(self) -> Tuple[th.Tensor, th.Tensor]:
+        """The partner's AABB without the links ``partner_joint_init`` moved (the open door is no part of a stand-off)."""
+        return OJ.static_aabb(self.partner, self.partner_moved)
+
+    def partner_moved_boxes(self) -> List[Tuple[th.Tensor, th.Tensor]]:
+        """World AABBs of the collision pieces of the links ``partner_joint_init`` moved (none without the key)."""
+        return OJ.link_piece_aabbs(self.partner, self.partner_moved) if self.partner_moved else []
+
+    def partner_part_boxes(self) -> List[Tuple[th.Tensor, th.Tensor]]:
+        """With ``partner_joint_init``: the collision pieces of the partner's articulated parts - every link but its root, the doors open
+        or closed (a bin in a fridge door is no part of the shelf behind it); none without the key."""
+        if not getattr(self, "partner_joints", None):
+            return []
+        partner = self.partner
+        root = getattr(partner, "root_link_name", "base_link")
+        return OJ.link_piece_aabbs(partner, [n for n in partner.links if n != root])
+
+    def park_keep_away(self) -> List[Any]:
+        """With ``partner_joint_init`` the parked robot keeps 1 m from the partner too (the open door's swing is no parking cell)."""
+        return [self.partner] if getattr(self, "partner_joints", None) else []
+
+    def path_blocked(self) -> List[Any]:
+        """The moved links' floor footprints: the paths plan around the open door (its body stays in every swept check)."""
+        return OJ.footprints(self.partner_moved_boxes(), PARTNER_MOVED_FOOTPRINT_M) if getattr(self, "partner_moved", None) else []
+
+    def record_partner_joints(self, draft: Draft) -> None:
+        """After the settle: the partner's joints as settled -> the TRO's ``joint_positions`` constraint (the requested joints; the loader
+        sets, holds and restores them) and ``summary.partner_joints``."""
+        if not getattr(self, "partner_joints", None):
+            return
+        partner, pname = self.partner, self.pname
+        q = draft.object_joints.get(pname)
+        joints = {n: float(q[i]) for i, n in enumerate(partner.joints)} if q is not None else OJ.joint_dict(partner)
+        named = {n: round(joints[n], 5) for n in (self.gp.gen("partner_joint_init") or {})}
+        draft.extras["constraints"] = [c for c in (draft.extras.get("constraints") or []) if not (c.get("type") == "joint_positions" and c.get("object") == pname)]
+        draft.extras["constraints"].append({"type": "joint_positions", "object": pname, "joints": named, "source": "generation.partner_joint_init",
+                                            "note": "the partner's joints at init as the sampler set them (owner 2026-10-12 ~16:05, inside_large_scale#02: the fridge "
+                                                    "door open); the loader sets them after load_tro_instance, holds them in the settle and restores them after a reset"})
+        draft.summary["partner_joints"] = {"object": partner.name, "init": {n: round(v, 4) for n, v in joints.items()}, "requested": named}
+
+    def sample(self, rng: np.random.Generator) -> Draft:
+        draft = super().sample(rng)
+        if getattr(self, "partner_joints", None):
+            draft.object_joints[self.pname] = th.tensor([self.partner_joints[n] for n in self.partner.joints], dtype=th.float32)
+        return draft
 
     @property
     def partner(self):
@@ -2975,6 +3072,7 @@ class IORSLarge(SamplerV2):
         draft.goal_poses[tname] = goal
         tgt = draft.pose_targets[tname]
         tgt["position"], tgt["orientation"] = [float(v) for v in goal[0]], [float(v) for v in goal[1]]
+        self.record_partner_joints(draft)
 
     def refine_targets_from_goal(self, draft: Draft):
         super().refine_targets_from_goal(draft)

@@ -165,6 +165,7 @@ class SlotLoader(InstanceLoader):
         self._joint_friction_records: List[dict] = []
         self._counterbalance_records: List[dict] = []
         self._mass_records: List[dict] = []
+        self._joint_position_records: List[dict] = []
         self.grasps: List[dict] = []
         self.hold: Optional[ActionState] = None
         self._articulation_q: Dict[str, th.Tensor] = {}
@@ -458,7 +459,7 @@ class VecInstanceLoader:
             try:
                 rep["constraints"] = sl._restore_constraints(extras.get("constraints") or [])
                 rep["attachments"] = sl._attachment_report(extras.get("attachment_targets") or [])
-                sl._articulation_q = {inst: physical[inst].get_joint_positions().clone() for inst in tro.meta.articulation_targets if inst in physical}
+                sl._articulation_q = sl._held_articulations(physical)
                 sl.grasps = sl._restore_grasps(extras.get("grasps") or [])
                 rep["grasps"] = sl.grasps
             except LoadError as e:

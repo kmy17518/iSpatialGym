@@ -164,6 +164,29 @@ def test_prepare_partner_goal_cells_sides_and_rim():
     assert s.template_facts["inside_surface"]["n_goal_cells"] == len(cells)
 
 
+def test_prepare_partner_leaves_the_open_door_out():
+    """``generation.partner_joint_init`` (inside_large_scale#02, the fridge door open): stance C's overhang is measured on the partner's
+    AABB without the links the request moved, and the interior cells under the partner's doors leave the raster (a door bin at the
+    shelf's height in front of the opening would move the side stance C squares to)."""
+    nx, ny, res = 30, 35, 0.02
+    xs = (th.arange(nx) - (nx - 1) / 2) * res  # -0.29 .. 0.29
+    ys = (th.arange(ny) - 12) * res  # -0.24 .. 0.44
+    gx, gy = th.meshgrid(xs, ys, indexing="ij")
+    bin_cells = (gx >= 0.20) & (gy > 0.25) & (gy <= 0.40 + 1e-6)
+    mask = (gy <= 0.24 + 1e-6) | bin_cells  # the shelf + a door bin in front of it at the same height
+    itop = SupportInterior("fridge_petcxr_0", xs, ys, mask, th.zeros_like(mask), 0.70, 0.0, [], res, headroom=th.full((nx, ny), 1.5), z_requested=0.80)
+    s = _Stub(interior=itop, inside_surface_z_m=0.80, inside_surface_tol_m=0.25, inside_stance_side="+y")
+    s.partner.aabb = (th.tensor([-0.36, -0.30, 0.55]), th.tensor([0.60, 0.90, 1.20]))  # the door swung out to +x / +y
+    s.partner_static_aabb = lambda: (th.tensor([-0.36, -0.30, 0.55]), th.tensor([0.36, 0.30, 1.20]))
+    s.partner_part_boxes = lambda: [(th.tensor([0.19, 0.265, 0.0]), th.tensor([0.60, 0.90, 2.0]))]  # - the half-cell pad: from y 0.255
+    s.prepare_partner()
+    (edge,) = s.place["edges"]
+    assert edge.name == "+v" and float(edge.mid[1]) == pytest.approx(0.24, abs=1e-5)  # the shelf's front, not the bin's 0.40
+    assert edge.overhang == pytest.approx(0.06, abs=1e-5)  # 0.66 with the door in the AABB
+    assert s.template_facts["inside_surface"]["cells_under_doors"] == int(bin_cells.sum()) == 40
+    assert float(s.place["cells"][:, 1].max()) < 0.24 - 0.14 + 1e-6
+
+
 def test_prepare_partner_rejects_without_height_room_or_side():
     with pytest.raises(Reject) as e:
         _Stub().prepare_partner()

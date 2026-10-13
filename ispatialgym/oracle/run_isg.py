@@ -12,7 +12,8 @@ What it does
    ``n_render_iterations = 1``); an :class:`ISpatialGymTask` from the template's ``activity_definitions``; the TRO
    applied with ``load_tro_instance`` and then everything the task loader does not restore yet, re-applied after
    every ``scene.reset()`` (:meth:`InstanceLoader.restore_after_reset`): ``constraints`` (the COM hinges of the
-   alignment tasks, re-created as PhysX revolute joints), ``grasps`` (held-object tasks: the object at
+   alignment tasks, re-created as PhysX revolute joints; ``joint_positions``: a partner's joints the sampler set at init,
+   held like the articulation targets and reported at the end of the episode), ``grasps`` (held-object tasks: the object at
    ``object_pose_in_eef_frame``, the recorded finger joints, the assisted grasp attached before step 0 — an attach
    failure fails the load with ``failed_grasp``), ``attachment_targets`` (the child / parent collision filter, at
    load and therefore also when the policy attaches), ``articulation_targets`` (the target's initial joint values held
@@ -436,7 +437,7 @@ class InstanceLoader:
         extras = self.tro.meta.extras
         self.report["constraints"] = self._restore_constraints(extras.get("constraints") or [])
         self.report["attachments"] = self._attachment_report(extras.get("attachment_targets") or [])
-        self._articulation_q = {inst: self.physical[inst].get_joint_positions().clone() for inst in self.tro.meta.articulation_targets if inst in self.physical}
+        self._articulation_q = self._held_articulations(self.physical)
         self.grasps = self._restore_grasps(extras.get("grasps") or [])
         self.report["grasps"] = self.grasps
         # a gripper command must exist or assisted grasping releases the object at the first physics step
@@ -461,6 +462,26 @@ class InstanceLoader:
         if self.report["controller_targets_restored"]:
             robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
         return obs, info
+
+    def _held_articulations(self, physical: Dict[str, Any]) -> Dict[str, th.Tensor]:
+        """The joint vectors the settle holds and every reset restores: the ``articulation_targets`` instances' (the target's initial
+        joints) and the objects of ``joint_positions`` constraints (a partner's door the sampler opened)."""
+        insts = list(self.tro.meta.articulation_targets) + [r["object"] for r in getattr(self, "_joint_position_records", [])]
+        return {inst: physical[inst].get_joint_positions().clone() for inst in dict.fromkeys(insts) if inst in physical}
+
+    def joint_positions_report(self) -> Dict[str, Any]:
+        """``{instance: {scene_object, init, end}}`` for the ``joint_positions`` constraints: the joints as restored and as they are now
+        (read at the end of the episode, for the report); empty without such a record."""
+        out: Dict[str, Any] = {}
+        for rec in getattr(self, "_joint_position_records", []):
+            ent = self.physical.get(rec["object"])
+            if ent is None:
+                continue
+            names = list(ent.joints)
+            q = ent.get_joint_positions()
+            out[rec["object"]] = {"scene_object": ent.name, "init": {n: float(v) for n, v in rec["joints"].items()},
+                                  "end": {n: round(float(q[names.index(n)]), 4) for n in rec["joints"] if n in names}}
+        return out
 
     def _hold_entities(self):
         for inst, ent in self.physical.items():
@@ -577,6 +598,24 @@ class InstanceLoader:
             restrict_openable_joints(ent, list(rec["openable_joints"]))
         return {"type": "joint_friction", "object": rec["object"], "joint": rec["joint"], **applied}
 
+    def _apply_joint_positions(self, rec: dict) -> dict:
+        """``{"type": "joint_positions", "object", "joints": {joint: position}}`` (IORS large-scale, ``generation.partner_joint_init``,
+        owner 2026-10-12 ~16:05: the fridge door open at init): the joints set (the TRO's object state already holds them; this makes the
+        restore explicit), held through the settle and restored after a reset with the articulation targets (:meth:`_held_articulations`)."""
+        ent = self.physical.get(rec["object"])
+        if ent is None:
+            raise LoadError("error", f"joint_positions constraint names an unbound instance {rec['object']!r}")
+        names = list(ent.joints)
+        unknown = sorted(set(rec.get("joints") or {}) - set(names))
+        if unknown:
+            raise LoadError("error", f"joint_positions constraint: {rec['object']} has no joints {unknown}")
+        q = ent.get_joint_positions().clone()
+        for n, v in (rec.get("joints") or {}).items():
+            q[names.index(n)] = float(v)
+        ent.set_joint_positions(q)
+        ent.set_joint_velocities(th.zeros_like(q))
+        return {"type": "joint_positions", "object": rec["object"], "joints": {n: float(v) for n, v in (rec.get("joints") or {}).items()}}
+
     def _apply_counterbalance(self, rec: dict) -> dict:
         """``{"type": "counterbalance", "object", "joint", "links", "damping"}`` (large articulation, owner decision 2026-09-19): the
         spring-balanced appliance door - gravity off on the leaf assembly, viscous joint damping (:func:`ispatialgym.sampling.constraints.apply_counterbalance`);
@@ -611,8 +650,14 @@ class InstanceLoader:
         self._joint_friction_records = []
         self._counterbalance_records = []
         self._mass_records = []
+        self._joint_position_records = []
         for rec in records:
             kind = rec.get("type", "revolute")
+            if kind == "joint_positions":
+                out.append(self._apply_joint_positions(rec))
+                self._joint_position_records.append(rec)
+                log.info("joint positions applied: %s %s", rec["object"], out[-1]["joints"])
+                continue
             if kind == "mass":
                 out.append(self._apply_mass(rec))
                 self._mass_records.append(rec)
@@ -1198,6 +1243,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             episode = executor.run_stream(policy_actions(policy, executor, obs, info, args.policy_steps))
         timings["episode_s"] = time.time() - t0
         timings.update({f"executor_{k}": v for k, v in episode.get("timings", {}).items()})
+        joints_end = loader.joint_positions_report()  # the TRO's joint_positions constraints (a door opened at init) as the episode leaves them
+        if joints_end:
+            meta["joint_positions"] = joints_end
+            log.info("joint positions at the end of the episode: %s", {k: {"init": v["init"], "end": v["end"]} for k, v in joints_end.items()})
 
         # ---------------------------------------------------------------- epilogue writes (goal override, goal image)
         goal_obs = episode.get("goal_observation")
@@ -1237,6 +1286,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             "final_step_max_position_error": last_errors.get("max_position_error"), "final_step_max_orientation_error": last_errors.get("max_orientation_error"),
             "settled_success": episode.get("settled_success"), "binary_branch": episode.get("binary_branch"), "collisions": (episode.get("qa") or {}).get("collisions", {}).get("n_events"),
             "qa_by_category": (episode.get("qa") or {}).get("stats", {}).get("by_category"), "goal_override": None if override is None else override.get("applied"),
+            **({"joint_positions": {k: {"init": v["init"], "end": v["end"]} for k, v in joints_end.items()}} if joints_end else {}),
         })
         return exit_code, result
     except BaseException as e:  # noqa: BLE001  (KeyboardInterrupt / SystemExit included: the verdict must be written)

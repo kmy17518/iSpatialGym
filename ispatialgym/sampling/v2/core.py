@@ -471,9 +471,17 @@ class SamplerV2(TaskSampler):
 
     # ------------------------------------------------------------------ parking (§3.3)
 
+    def park_keep_away(self) -> List[Any]:  # hook
+        """Scene objects the parked robot also keeps 1 m from, beyond the spawned objects and the supports (default none)."""
+        return []
+
+    def path_blocked(self) -> List[Any]:  # hook
+        """Floor footprints (world xy polygons) every recorded path plans around on the local map (default none)."""
+        return []
+
     def park_robot(self) -> th.Tensor:
-        """§3.3: tucked at a free cell of the task rooms' floor, >= 1 m from every spawned object and support."""
-        keep = list(self.world.spawned.values()) + self.support_objects()
+        """§3.3: tucked at a free cell of the task rooms' floor, >= 1 m from every spawned object and support (and :meth:`park_keep_away`)."""
+        keep = list(self.world.spawned.values()) + self.support_objects() + self.park_keep_away()
         try:
             xy = NAV.park_pose(self.kit, self.gp.rooms(self.scene) or (self.world.rooms or []), keep_away=keep)
         except NAV.NavigationError as e:
@@ -936,7 +944,9 @@ class SamplerV2(TaskSampler):
         ``carry_arm_q``); ``start_pose2d`` = where the path starts when it is not ``frm``'s base pose (the drive-back pose
         of a departure transition); ``force_global`` plans on the eroded map end to end; ``edge_slide`` (owner 2026-09-24)
         tries the same-edge slide (``NAV.plan_edge_slide``: body facing the edge, no turns, ``edge_slide_back_m`` extra
-        stand-off for the slide) before the grid planner; ``Reject(no_path | path_collision | path_too_long)``."""
+        stand-off for the slide) before the grid planner; ``blocked`` (+ :meth:`path_blocked`) = footprints kept off the local
+        map; ``Reject(no_path | path_collision | path_too_long)``."""
+        blocked = list(blocked) + list(self.path_blocked())
         carried = carried or to.carried or frm.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
         if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
