@@ -43631,7 +43631,8 @@
      0.0,
      0.0
     ]
-   ]
+   ],
+   "push_under_yaw": "heel_first"
   },
   "constraints": []
  },
@@ -44137,7 +44138,8 @@
      0.0,
      0.0
     ]
-   ]
+   ],
+   "push_under_yaw": "heel_first"
   },
   "constraints": []
  },
