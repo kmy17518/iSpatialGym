@@ -240,7 +240,7 @@ class PushUnderRecord(ContactRecord):
     the push), ``drop_cell`` / ``goal_cell`` (target centres, world xy); the flat hand's ``push_hand: "flat"``, ``palm_clear``,
     ``wrist_turn``, ``palm_drop_m``, ``fingertip_band_m``, ``contact_height_m``, ``target_com_height_m``; the pitched hand's ``push_hand:
     "pitched_far"``, ``palm_clear``, ``wrist_turn``, ``contact_height_m``, ``target_com_height_m``, ``palm_gap_m``, ``hand_low_m``,
-    ``fingertip_band_m``."""
+    ``fingertip_band_m``; every hand's ``chain_arm_q`` / ``chain_branch`` (the sampled chain's configurations, :func:`push_chain_seed`)."""
 
     def __init__(self, arm: str, pre, start, mid, goal, direction, distance_m: float, object: str, stance: str = "placement", **extras):
         super().__init__("push", arm, pre, start, mid, goal, direction, distance_m, None, object, stance)
@@ -260,6 +260,18 @@ def push_under_palm_flags(chain: Dict[str, Any]) -> Dict[str, Any]:
     ``palm_clear`` - the oracle raises a top-down blade whose palm would meet the object's top unless its record has ``palm_clear``,
     and this push runs as recorded."""
     return {"palm_contact": True, "palm_clear": True} if chain.get("palm_contact") else {}
+
+
+def push_chain_seed(kit, chosen, arm: str) -> Dict[str, Any]:
+    """The push-under record's seed of the chain the orientation rule chose (``orient.Scored``), which the goal check re-solves the chain
+    to the settled goal from (owner 2026-10-13 ~01:05 item 1): ``chain_arm_q`` - ``arm``'s 7 joint values at the chain's poses ``[pre, start,
+    mid, goal]`` as solved (the pre-pose's is the configuration the tracked chain leaves from) - and ``chain_branch``: ``"map"`` (the
+    wrist-flipped configuration of the twin turn's solution) or ``"ik"`` (solved as proposed). Empty when a configuration is missing."""
+    qs = list(getattr(chosen, "qs", None) or [])
+    if not qs or len(qs) != len(chosen.proposal.chain) or any(q is None for q in qs):
+        return {}
+    idx = kit.robot.arm_control_idx[arm]
+    return {"chain_arm_q": [[round(float(v), 5) for v in G.t(q).reshape(-1)[idx].tolist()] for q in qs], "chain_branch": str(chosen.proposal.source)}
 
 
 TARGET_JITTER = math.radians(22.5)
@@ -1315,7 +1327,8 @@ class IORSLarge(SamplerV2):
                              "above the tips", self.gp.alias, standoff, chosen.proposal.payload, half_d)
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
                         "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": chosen.proposal.payload,
-                        "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low), "orient": decision, **({"palm_contact": True} if palm else {})}
+                        "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low), "orient": decision, "seed": push_chain_seed(self.kit, chosen, arm),
+                        **({"palm_contact": True} if palm else {})}
             why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
         log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.alias, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)),
@@ -1396,7 +1409,7 @@ class IORSLarge(SamplerV2):
                          (place.translate, round(place.tilt, 2)))
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": 90.0,
                         "blade_standoff_m": float(standoff), "push_height_m": f["fingertip_z_m"], "half_extent_m": f["half_extent_m"], "wrist_sign": f["wrist_turn"],
-                        "fingertip_z_m": f["fingertip_z_m"], "ground_ignored": False, "orient": decision,
+                        "fingertip_z_m": f["fingertip_z_m"], "ground_ignored": False, "orient": decision, "seed": push_chain_seed(self.kit, chosen, arm),
                         "record": {"push_hand": "flat", "palm_clear": True, "wrist_turn": f["wrist_turn"], "palm_drop_m": f["palm_drop_m"],
                                    "fingertip_band_m": f["fingertip_band_m"], "contact_height_m": float(tip), "target_com_height_m": float(com_h)}}
             why.extend(f"tips {tip:.3f} {o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
@@ -1481,7 +1494,7 @@ class IORSLarge(SamplerV2):
                          [round(float(v), 3) for v in P0.to_base_frame(goal_p[0], place.base_pose2d, base_z).tolist()])
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": f["pitch_deg"],
                         "blade_standoff_m": f["standoff_m"], "push_height_m": f["push_height_m"], "half_extent_m": f["half_extent_m"], "wrist_sign": f["wrist_turn"],
-                        "fingertip_z_m": f["fingertip_z_m"], "ground_ignored": False, "orient": decision,
+                        "fingertip_z_m": f["fingertip_z_m"], "ground_ignored": False, "orient": decision, "seed": push_chain_seed(self.kit, chosen, arm),
                         "record": {"push_hand": "pitched_far", "palm_clear": True, "wrist_turn": f["wrist_turn"], "contact_height_m": f["contact_height_m"],
                                    "target_com_height_m": float(com_h), "palm_gap_m": f["palm_gap_m"], "hand_low_m": f["hand_low_m"],
                                    "fingertip_band_m": f["fingertip_band_m"]}}
@@ -3557,7 +3570,7 @@ class IORSLarge(SamplerV2):
                                                              ground_ignored=bool(chain.get("ground_ignored", False)),
                                                              drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname,
                                                              **({"orient": chain["orient"]} if chain.get("orient") else {}), **push_under_palm_flags(chain),
-                                                             **chain.get("record", {})))
+                                                             **chain.get("record", {}), **chain.get("seed", {})))
                 cam = self.camera_pose_at(init)
                 if not self.frustum_ok(cam, self.hull_corners_world(self.hull, t_pose), 0.05):
                     raise Reject("not_in_frame", "target not in the init image (5 %)")
@@ -3686,9 +3699,10 @@ class IORSLarge(SamplerV2):
                 q = push.contact[1]
                 push_from = self.sidecar.stances.get("push") or place  # the chain is pushed from the deep push stance when the drop and the push split
                 with self.ikc.ignoring([self.obj("floor"), self.target], ground=not bool(push.extras.get("ground_ignored", False))):
-                    r3 = self.ikc.exact([push.pre, (start_b, q), (mid_b, q), (goal_b, q)], push_from, push.arm, cache=False, fingers=C.FINGER_CLOSED)
+                    r3, seed_why = self._push_under_goal_chain(push, [push.pre, (start_b, q), (mid_b, q), (goal_b, q)], push_from)
                 if not r3.ok:
-                    raise Reject("push_unreachable", f"push-under chain to the settled goal fails the exact IK from stance C: {r3.reason}")
+                    raise Reject("push_unreachable", f"push-under chain to the settled goal fails the exact IK from stance C: {r3.reason}"
+                                                     + (f" (seeded from the sampled chain's pre-pose configuration: {seed_why})" if seed_why else ""))
                 push.mid, push.goal = (mid_b, q), (goal_b, q)
                 push.distance_m = float(th.linalg.norm(goal_pos[:2].float() - th.as_tensor(push.extras["drop_cell"], dtype=th.float32)))
                 push.extras["goal_cell"] = [float(goal_pos[0]), float(goal_pos[1])]
@@ -3705,6 +3719,38 @@ class IORSLarge(SamplerV2):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
         if self.relation == "ontop" and not self.ikc.eef_in_frame(place_eef, self.camera_pose_at(place)):
             raise Reject("gripper_not_in_frame", "place eef pose outside the placement image (5 %)")
+
+    def _push_under_goal_chain(self, push: ContactRecord, chain: List[G.Pose], stance: Stance) -> Tuple[Any, Optional[str]]:
+        """The goal check's exact IK of the push-under chain ``[pre, start, mid, goal]`` (the goal at the settled goal) from ``stance``, in the
+        caller's ignore context (owner 2026-10-13 ~01:05 item 1). First the chain leaves from the sampled chain's pre-pose configuration (the
+        record's ``chain_arm_q``, :func:`push_chain_seed`; ``exact``'s ``q_first``) when that is still a witness of the pre-pose (reaches it,
+        collision-free here): the whole chain is tracked from it, so it stays in the sampled wrist branch where a fresh solve lands in the
+        default one (under#02 pitched_c2_k0, 3/3 attempts: the left wrist into the base just after the pre-pose, where the sampler had taken
+        the wrist-flipped branch). When that fails, the unseeded solve with the IK memory as it was before. Returns ``(result, why the seeded
+        solve failed or None)``; one INFO line 'push-under goal check re-solve: ...'."""
+        arm = push.arm
+        arm_q = (push.extras.get("chain_arm_q") or [None])[0]
+        if arm_q is None:
+            why = "no seed (the record has no chain_arm_q)"
+        else:
+            q_first = self.ikc.q_locked(stance, fingers=C.FINGER_CLOSED).clone()
+            q_first[self.kit.robot.arm_control_idx[arm]] = th.as_tensor(arm_q, dtype=q_first.dtype)
+            if not self.ikc.collision_free_at(q_first, chain[0], arm):
+                why = "the sampled pre-pose configuration is off the pre-pose or collides here"
+            else:
+                saved = dict(self.ikc.solutions)
+                res = self.ikc.exact(chain, stance, arm, cache=False, fingers=C.FINGER_CLOSED, q_first=q_first)
+                if res.ok:
+                    branch = {"map": "wrist-flipped", "ik": "solved"}.get(push.extras.get("chain_branch"), str(push.extras.get("chain_branch")))
+                    log.info("%s: push-under goal check re-solve: seeded ok (the sampled chain's %s branch, %s arm)", self.gp.alias, branch, arm)
+                    return res, None
+                self.ikc.solutions.clear()
+                self.ikc.solutions.update(saved)
+                why = str(res.reason)
+        res = self.ikc.exact(chain, stance, arm, cache=False, fingers=C.FINGER_CLOSED)
+        log.info("%s: push-under goal check re-solve: %s -> unseeded %s", self.gp.alias, why if arm_q is None else f"seeded failed ({why[:300]})",
+                 "ok" if res.ok else "failed")
+        return res, None if arm_q is None else why
 
     def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
         """``tabletop.held_turns``: not offered here. The held chain runs through state recorded for the recorded turn alone - the carry

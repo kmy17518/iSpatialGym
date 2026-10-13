@@ -1,11 +1,14 @@
 """Simulator-free tests of the push-under's pitched hand (owner 2026-10-12 ~20:55 item C, under_large #02 / #03: ``generation.push_under_hand``
 = ``"pitched_far"``): the wrist turns' quaternions per pitch, the hand's lowest sphere and the fingertip stand-off, the palm test, the chain's
-poses / pitch ladder / record, the precedence over ``push_under_palm_contact`` and stance C's farther defaults
-(``pytest ispatialgym/tests/test_iors_large_push_pitched.py``)."""
+poses / pitch ladder / record, the precedence over ``push_under_palm_contact``, stance C's farther defaults and the goal check's re-solve
+seeded from the sampled chain (``pytest ispatialgym/tests/test_iors_large_push_pitched.py``)."""
 
 from __future__ import annotations
 
+import contextlib
+import dataclasses
 import importlib.util
+import logging
 import math
 import os
 import xml.etree.ElementTree as ET
@@ -19,6 +22,7 @@ from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import sidecar as SC
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
+from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
@@ -356,3 +360,181 @@ def test_stance_c_stands_farther_out_for_the_pitched_hand(monkeypatch):
     assert {round(st.stand_off, 3) for st in keyed} == {0.9, 1.0} and {(st.translate, st.tilt) for st in keyed} == {(2.0, 0.0)}
     lanes = _candidates(monkeypatch, push_under_hand="pitched_far", frontal_lane_offset_m=[0.35])
     assert {abs(st.extras["lane_offset_m"]) for st in lanes} == {0.35}
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the goal check's re-solve seeded from the sampled chain (owner 2026-10-13 ~01:05 item 1)
+# ----------------------------------------------------------------------------------------------------------------
+
+ARM_IDX = {"right": th.arange(14, 21), "left": th.arange(7, 14)}
+TNAME = "briefcase.n.01_1"
+FRESH_FAIL = "approach_untrackable: a configuration just after the start pose collides (3/3; self-collision (base_link x left_arm_link6))"
+
+
+class _BranchIKC(_IKC):
+    """The exact IK in two wrist branches, writing the IK memory as ``IKChecker.exact`` does (the first pose's configuration - ``q_first``
+    when given - before the approach is tracked, the other poses' on success). ``ok(q_first)`` decides a push chain: by default a chain
+    solved afresh fails (the default branch: under#02 pitched_c2_k0's left wrist into the base) and a chain leaving from a given
+    configuration passes; the drop re-check (two poses) passes. Wrist twins by ``conventions.twin_arm_q``."""
+
+    def __init__(self, ok=lambda q_first: q_first is not None, witness_ok=True):
+        super().__init__()
+        self.chain_ok, self.witness_ok, self.witness_calls = ok, witness_ok, []
+        self.kit = SimpleNamespace(floor_z=0.0, robot=SimpleNamespace(arm_control_idx=ARM_IDX))
+
+    @staticmethod
+    def config(arm: str, k: int) -> th.Tensor:
+        q = th.zeros(28)
+        q[ARM_IDX[arm]] = th.tensor([0.1, 0.2, 0.3, 0.4, 1.5, 0.6, 0.7]) + 0.01 * k
+        return q
+
+    def exact(self, poses, stance, arm="right", ignore_for_last=(), cache=True, fingers=None, q_first=None, **kw):
+        self.calls.append({"poses": list(poses), "fingers": fingers, "stance": stance.name, "arm": arm, "q_first": None if q_first is None else q_first.clone(),
+                           "memory": dict(self.solutions), **self._world})
+        if len(poses) == 2:
+            return SimpleNamespace(ok=True, q=th.zeros(28), reason="")
+        k = len(self.calls)
+        self.solutions[(arm, self._pose_key(poses[0]))] = self.config(arm, k) if q_first is None else q_first.clone()
+        ok = bool(self.chain_ok(q_first))
+        if ok:
+            for i, p in enumerate(poses[1:], 1):
+                self.solutions[(arm, self._pose_key(p))] = self.config(arm, 10 * k + i)
+        return SimpleNamespace(ok=ok, q=self.config(arm, k) if ok else None, reason="" if ok else (FRESH_FAIL if q_first is None else "approach_untrackable: from the seed"))
+
+    def joint_limit_margin(self, q, arm):
+        return 1.0, f"{arm}_arm_joint1"
+
+    def twin_q(self, q, arm):
+        t = C.twin_arm_q(q[ARM_IDX[arm]])
+        if t is None:
+            return None
+        out = q.clone()
+        out[ARM_IDX[arm]] = t
+        return out
+
+    def q_locked(self, stance, **kw):
+        q = th.zeros(28)
+        q[0] = 5.0  # a base joint: the stance's own, never the record's
+        return q
+
+    def collision_free_at(self, q, pose, arm, ignore=()):
+        self.witness_calls.append({"q": q.clone(), "pose": pose, "arm": arm, **self._world})
+        return self.witness_ok
+
+    def eef_in_frame(self, pose, cam):
+        return True
+
+
+def _push_calls(calls):
+    return [c for c in calls if len(c["poses"]) == 4]
+
+
+def _sampled_chain():
+    """The pitched chain of a left-arm push whose every turn fails in its own branch: the orientation rule takes a wrist-flipped one."""
+    s = _sampler(push_under_hand="pitched_far")
+    s.seg_arm, s.ikc = "left", _BranchIKC()
+    s.kit = s.ikc.kit
+    return s, _push(s)
+
+
+def _record(ch, seed=True):
+    """The push record as the C loop writes it."""
+    return IL.PushUnderRecord("left", ch["pre"], ch["start"], ch["mid"], ch["goal"], ch["direction"], ch["distance_m"], TNAME, stance="push",
+                              pitch_deg=ch["pitch_deg"], blade_standoff_m=ch["blade_standoff_m"], push_height_m=ch["push_height_m"],
+                              half_extent_m=ch["half_extent_m"], fingertip_z_m=ch["fingertip_z_m"], ground_ignored=ch["ground_ignored"],
+                              drop_cell=[1.0, 0.0], goal_cell=[1.4, 0.0], **IL.push_under_palm_flags(ch), **ch["record"], **(ch["seed"] if seed else {}))
+
+
+def _goal_check(monkeypatch, rec, ikc):
+    """``after_goal_check`` of the push-under attempt whose push record is ``rec`` (the goal settled on the goal cell, the drop re-check passes)."""
+    s = _sampler(push_under_hand="pitched_far")
+    s.seg_arm, s.ikc, s.kit = "left", ikc, ikc.kit
+    s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name=TNAME))
+    stances = {"placement": dataclasses.replace(_stance(), name="placement", translate=0.95, tilt=-1.2), "push": _stance(),
+               "manipulation": SimpleNamespace(name="manipulation")}
+    eef = (th.tensor([1.0, 0.0, 0.3]), G.IDENTITY_QUAT.clone())
+    grasp = SimpleNamespace(arm="left", grasp=eef, pre_place=eef, place=eef, eef_in_object=(th.zeros(3), G.IDENTITY_QUAT.clone()))
+    s.sidecar = SimpleNamespace(grasp_of=lambda name: grasp, stance=lambda name: stances[name], stances=stances, contacts={"push": rec})
+    s.camera_pose_at = lambda stance: None
+    monkeypatch.setattr(IL, "attached", lambda *a, **k: contextlib.nullcontext())
+    s.after_goal_check(SimpleNamespace(pose_targets={TNAME: {"position": [1.40, 0.0, 0.0], "orientation": [0.0, 0.0, 0.0, 1.0]}}))
+    return s
+
+
+def test_the_push_record_keeps_the_sampled_chain_configuration():
+    s, ch = _sampled_chain()
+    assert ch is not None and ch["orient"]["source"] == "map"  # every turn failed in its own branch: a wrist-flipped one was taken
+    calls = _push_calls(s.ikc.calls)
+    assert all(c["q_first"] is None for c in calls[:4]) and calls[-1]["q_first"] is not None
+    idx, seed = ARM_IDX["left"], ch["seed"]
+    assert seed["chain_branch"] == "map" and len(seed["chain_arm_q"]) == 4 and all(len(q) == 7 for q in seed["chain_arm_q"])
+    # the pre-pose's configuration is the wrist-flipped start the chain was tracked from, the others the chain's solved poses
+    assert seed["chain_arm_q"][0] == pytest.approx(calls[-1]["q_first"][idx].tolist(), abs=1e-5)
+    for q, pose in zip(seed["chain_arm_q"][1:], (ch["start"], ch["mid"], ch["goal"])):
+        assert q == pytest.approx(s.ikc.solutions[("left", s.ikc._pose_key(pose))][idx].tolist(), abs=1e-5)
+    rec = _record(ch)
+    assert rec.extras["chain_arm_q"] == seed["chain_arm_q"] and rec.extras["chain_branch"] == "map"
+    pc = SC.PushContact.from_dict(rec.to_sidecar(), "contacts.push")
+    assert pc.extra["chain_arm_q"] == seed["chain_arm_q"] and pc.extra["chain_branch"] == "map"
+    # without every configuration (an orientation result without them, one missing) no seed is recorded
+    assert IL.push_chain_seed(s.kit, SimpleNamespace(proposal=SimpleNamespace(chain=[None] * 4)), "left") == {}
+    assert IL.push_chain_seed(s.kit, SimpleNamespace(proposal=SimpleNamespace(chain=[None] * 4), qs=[th.zeros(28)] * 3), "left") == {}
+
+
+def test_the_goal_check_re_solve_leaves_from_the_sampled_configuration(monkeypatch, caplog):
+    s, ch = _sampled_chain()
+    rec = _record(ch)
+    n0 = len(s.ikc.calls)
+    with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
+        _goal_check(monkeypatch, rec, s.ikc)
+    calls = _push_calls(s.ikc.calls[n0:])
+    assert len(calls) == 1  # seeded: no unseeded solve
+    c, q_first = calls[0], calls[0]["q_first"]
+    assert q_first is not None and q_first[ARM_IDX["left"]].tolist() == pytest.approx(rec.extras["chain_arm_q"][0], abs=1e-5)
+    assert float(q_first[0]) == 5.0  # the other joints from the stance's configuration
+    assert c["stance"] == "push" and c["arm"] == "left" and c["fingers"] == C.FINGER_CLOSED
+    assert c["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"] and c["ground"] is True
+    assert c["poses"][0] is rec.pre and th.allclose(c["poses"][1][0], ch["start"][0])
+    # the configuration was verified as a witness of the pre-pose first, in the same world
+    w = s.ikc.witness_calls
+    assert len(w) == 1 and w[0]["pose"] is rec.pre and th.equal(w[0]["q"], q_first) and w[0]["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"]
+    assert th.allclose(rec.goal[0], c["poses"][3][0]) and rec.extras["goal_cell"] == pytest.approx([1.40, 0.0])
+    msgs = [r.getMessage() for r in caplog.records if "push-under goal check re-solve" in r.getMessage()]
+    assert len(msgs) == 1 and "push-under goal check re-solve: seeded ok (the sampled chain's wrist-flipped branch, left arm)" in msgs[0]
+
+
+def test_the_goal_check_falls_back_to_the_unseeded_solve(monkeypatch, caplog):
+    _, ch = _sampled_chain()
+
+    def run(ikc, seed=True):
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
+            _goal_check(monkeypatch, _record(ch, seed=seed), ikc)
+        msgs = [r.getMessage() for r in caplog.records if "push-under goal check re-solve" in r.getMessage()]
+        assert len(msgs) == 1
+        return _push_calls(ikc.calls), msgs[0]
+
+    # the seeded solve fails, the unseeded passes - with the IK memory as it was before the seeded one
+    ikc = _BranchIKC(ok=lambda q_first: q_first is None)
+    ikc.solutions[("left", (0.0,))] = th.ones(28)
+    calls, msg = run(ikc)
+    assert [c["q_first"] is not None for c in calls] == [True, False]
+    assert calls[1]["memory"].keys() == calls[0]["memory"].keys() == {("left", (0.0,))}
+    assert "push-under goal check re-solve: seeded failed (approach_untrackable: from the seed) -> unseeded ok" in msg
+    # both fail: the push is unreachable, the unseeded solve's reason first, the seeded one's after it
+    ikc = _BranchIKC(ok=lambda q_first: False)
+    with pytest.raises(Reject) as e:
+        run(ikc)
+    assert e.value.reason == "push_unreachable" and str(e.value) == (f"[push_unreachable] push-under chain to the settled goal fails the exact IK from stance C: "
+                                                                      f"{FRESH_FAIL} (seeded from the sampled chain's pre-pose configuration: approach_untrackable: from the seed)")
+    assert "push-under goal check re-solve: seeded failed (approach_untrackable: from the seed) -> unseeded failed" in caplog.text
+    # the recorded configuration no longer a witness of the pre-pose (it collides here): not pinned, the unseeded solve decides
+    ikc = _BranchIKC(ok=lambda q_first: q_first is None, witness_ok=False)
+    calls, msg = run(ikc)
+    assert [c["q_first"] for c in calls] == [None] and len(ikc.witness_calls) == 1
+    assert "push-under goal check re-solve: seeded failed (the sampled pre-pose configuration is off the pre-pose or collides here) -> unseeded ok" in msg
+    # a record without the configuration (written before it was kept): the unseeded solve alone
+    ikc = _BranchIKC(ok=lambda q_first: q_first is None)
+    calls, msg = run(ikc, seed=False)
+    assert [c["q_first"] for c in calls] == [None] and ikc.witness_calls == []
+    assert "push-under goal check re-solve: no seed (the record has no chain_arm_q) -> unseeded ok" in msg
