@@ -1,7 +1,8 @@
 """Simulator-free tests of the in-process band kit (owner 2026-10-12 item 2a: the bands the sampler computes itself use the CLI's
 ``--mesh-cache auto`` store, scoped to band computation): ``reach_bands.band_kit`` builds a kit of its own with a snug store and
 leaves the sampler's kit alone, ``ISPATIALGYM_BAND_MESH_CACHE`` switches it, and ``tabletop.compute_bands``,
-``IORSLarge.compute_band`` and ``ArticulationSmall._brace_band`` compute on it and record it in ``meta.schedule``."""
+``IORSLarge.compute_band`` and ``ArticulationSmall._brace_band`` compute on it and record it in ``meta.schedule``;
+``ISPATIALGYM_BAND_TRUNK_CHECK=idle-arm`` gives the first two the CLI's ``--trunk-check idle-arm`` (key, file name, meta)."""
 
 from __future__ import annotations
 
@@ -408,3 +409,101 @@ def test_handle_band_past_the_time_budget_rejects_and_writes_nothing(band_kit_of
         AS.ArticulationSmall._brace_band(s, NS(name="+u"), None)
     assert e.value.reason == "band_budget" and "before handle trunk 1 of 2" in str(e.value)
     assert _Scope.exits == 1 and not any(f.startswith("handle__") for f in os.listdir(band_kit_of_fakes))
+
+
+# ---------------------------------------------------------------------------------------------------------------- the trunk check
+# owner 2026-10-12 item 4: the iors_large jobs' in-process floor band of mouse/pljjtu (living_room_0) had 0 cells with the whole-body
+# check; the CLI's --trunk-check idle-arm band has 101
+
+TC = RB.BAND_TRUNK_CHECK_ENV
+
+
+class _RecBC(_BC):
+    """``_BC`` that keeps its instances (the trunk check is set on the computer) and has the under stance."""
+
+    made = []
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.trunk_skip_arm = None
+        _RecBC.made.append(self)
+
+    def stance_under(self, partner, stand_off):
+        self.kit.collision_free(th.zeros(28))
+        return {"edge": None, "base_pose2d": [1.0, 2.0, 0.0], "edge_mid": [1.0, 2.0], "inward": [1.0, 0.0]}
+
+
+def test_band_trunk_check_switch(monkeypatch):
+    monkeypatch.delenv(TC, raising=False)
+    bc = NS(trunk_skip_arm=None)
+    assert RB.band_trunk_check(bc, "right") == {} and bc.trunk_skip_arm is None
+    monkeypatch.setenv(TC, "whole-body")
+    assert RB.band_trunk_check(bc, "right") == {} and bc.trunk_skip_arm is None
+    for idle in ("idle-arm", "IDLE_ARM"):
+        monkeypatch.setenv(TC, idle)
+        bc = NS(trunk_skip_arm=None)
+        assert RB.band_trunk_check(bc, "left") == {"trunk_check": "idle_arm"} and bc.trunk_skip_arm == "left"
+    monkeypatch.setenv(TC, "idle")
+    with pytest.raises(ValueError, match=TC):
+        RB.band_trunk_check(NS(trunk_skip_arm=None), "right")
+    # the CLI's --trunk-check idle-arm record, shared with the in-process bands
+    assert RB.trunk_check_meta("right") == {"mode": "idle_arm", "note": "a trunk whose idle-arm postures all collide with the whole body is retried with the "
+                                            "right arm out of the check (its configuration comes from the IK at every cell); see trunks[].active_arm_excluded"}
+
+
+def test_compute_bands_idle_arm_band_is_keyed_named_and_recorded_like_the_cli(band_kit_of_fakes, monkeypatch):
+    monkeypatch.setattr(RB, "BandComputer", _RecBC)
+    _RecBC.made = []
+    world, kit = _setup()
+    whole = _compute_tabletop(world, kit, band_kit_of_fakes)
+    monkeypatch.setenv(TC, "whole-body")
+    assert _compute_tabletop(world, kit, band_kit_of_fakes).path == whole.path
+    monkeypatch.setenv(TC, "idle-arm")
+    idle = _compute_tabletop(world, kit, band_kit_of_fakes)
+    assert [b.trunk_skip_arm for b in _RecBC.made] == [None, None, "right"]
+    assert os.path.basename(whole.path).startswith("tabletop__house_single_floor__countertop_kelzer_0__stockpot-oshwps__")
+    assert os.path.basename(idle.path).startswith("tabletop__house_single_floor__countertop_kelzer_0-tcidle__stockpot-oshwps__")
+    assert idle.meta["key"] != whole.meta["key"] and idle.meta["trunk_check"] == RB.trunk_check_meta("right") and "trunk_check" not in whole.meta
+    for rb in (whole, idle):  # two files: neither band overwrites the other
+        with open(rb.path[:-4] + ".json") as f:
+            assert json.load(f).get("trunk_check") == rb.meta.get("trunk_check")
+
+
+def test_iors_large_idle_arm_floor_bands_are_keyed_named_and_recorded_like_the_cli(band_kit_of_fakes, monkeypatch):
+    IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
+    monkeypatch.setattr(RB, "BandComputer", _RecBC)
+    _RecBC.made = []
+    world, kit = _setup()
+    world.spawned = {"target_mouse_0": NS(name="target_mouse_0")}
+    s = NS(choice=NS(models={"target": NS(category="mouse", model="pljjtu", scale=None)}), world=world, kit=kit, target=NS(name="target_mouse_0"),
+           floor_z=0.0, gp=NS(rooms=lambda scene: ["living_room_0"], alias="iors-large-test"), scene="house_single_floor", obj=lambda role: NS(name="floors_0"),
+           hull=th.zeros(8, 3), rest=th.tensor([0.0, 0.0, 0.0, 1.0]), grasps=[NS(name="grasp_0", position=th.tensor([0.0, 0.0, 0.1]))],
+           grasp_key="mouse__pljjtu__t", relation="ontop", place={})
+    whole = IL.IORSLarge.compute_band(s, "floor")
+    monkeypatch.setenv(TC, "idle-arm")
+    idle = IL.IORSLarge.compute_band(s, "floor")
+    s.relation, s.place = "under", {"cells": th.zeros(3, 2)}
+    under = IL.IORSLarge.compute_band(s, "floor", under_partner=NS(name="sofa_0"))
+    assert [b.trunk_skip_arm for b in _RecBC.made] == [None, "right", "right"]
+    assert os.path.basename(whole.path).startswith("floor__house_single_floor__floor__mouse-pljjtu__")
+    assert os.path.basename(idle.path).startswith("floor__house_single_floor__floor-tcidle__mouse-pljjtu__")
+    assert os.path.basename(under.path).startswith("floor__house_single_floor__floor-tcidle-under-sofa_0__mouse-pljjtu__")  # the CLI's tag order
+    assert idle.meta["trunk_check"] == under.meta["trunk_check"] == RB.trunk_check_meta("right") and "trunk_check" not in whole.meta
+    assert os.path.exists(whole.path) and os.path.exists(idle.path)
+
+
+def test_handle_band_keeps_the_whole_body_trunk_check(band_kit_of_fakes, monkeypatch):
+    AS = pytest.importorskip("ispatialgym.sampling.v2.tasks.articulation_small")
+    monkeypatch.setenv(TC, "idle-arm")
+    monkeypatch.setattr(RB, "ObstacleScope", _Scope)
+    monkeypatch.setattr(RB, "BandComputer", _RecBC)
+
+    def miss(*a, **kw):
+        raise FileNotFoundError
+
+    monkeypatch.setattr(RB.ReachBands, "load", staticmethod(miss))
+    _RecBC.made = []
+    world, kit = _setup()
+    rb = AS.ArticulationSmall._brace_band(_handle_sampler(world, kit, [(0.5, 0.0)]), NS(name="+u"), None)
+    assert _RecBC.made and all(b.trunk_skip_arm is None for b in _RecBC.made)
+    assert RB.TRUNK_CHECK_IDLE_TAG not in os.path.basename(rb.path) and "trunk_check" not in rb.meta

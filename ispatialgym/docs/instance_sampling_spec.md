@@ -738,7 +738,14 @@ the band was computed or loaded (before, the band advanced the sampler's batched
 thread layout: a marginal cell can differ from a band computed with the 8192 store. `meta.schedule = {mesh_cache, kit}`
 records how a band was computed; the file‑name key does not change (`ReachBands.find` matches meta fields).
 `ISPATIALGYM_BAND_MESH_CACHE` = `auto` (default) | a capacity | `off` (the sampler's kit, the path before 2026‑10‑12); with
-`ISPATIALGYM_SAMPLER_MESH_CACHE=auto` the sampler's store is already as small and bands stay on it. The approximate sdf‑grid
+`ISPATIALGYM_SAMPLER_MESH_CACHE=auto` the sampler's store is already as small and bands stay on it.
+`ISPATIALGYM_BAND_TRUNK_CHECK` = `whole-body` (default, the path before) | `idle-arm` (owner decision 2026‑10‑12, item 4): the
+CLI's `--trunk-check` for the single‑arm in‑process bands (`tabletop.compute_bands`, `IORSLarge.compute_band`; handle bands
+keep the whole‑body check) — a trunk whose idle‑arm postures all collide with the whole body is retried with the band's arm
+out of the check (the IK sets that arm per cell and checks it against the whole body there). Where the whole‑body check skips
+a floor band's deep crouches, no floor pose is within reach of the remaining shoulders (the lowest at 0.84 m): the in‑process
+floor band of mouse/pljjtu in living_room_0 had 0 cells, the CLI's idle‑arm one 101. Such a band has `trunk_check` in its key, `-tcidle` after the support in its
+file name and `meta.trunk_check`, like the CLI's, so it never overwrites a whole‑body band of the same factors. The approximate sdf‑grid
 world (`reach_bands --collision sdf-grid`) stays a CLI opt‑in. An in‑process band is capped by the run's time budget
 (`sample_isg --time-budget-s`, which otherwise only stops new attempts): once it has passed, the computation stops before
 its next trunk or IK round, nothing is written (so a job publishes nothing) and the rejection is `band_budget` — a band of a

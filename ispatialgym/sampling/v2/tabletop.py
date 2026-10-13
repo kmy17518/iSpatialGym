@@ -912,13 +912,15 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
     support's own (bands are per support). Computed on ``reach_bands.band_kit`` (the band's own kit with a snug mesh store;
     ``s.kit`` is not touched), recorded in ``meta.schedule``. Capped by the sampling run's time budget (``s.deadline``,
     ``sample_isg --time-budget-s``): past it the computation stops before its next trunk / IK round, nothing is written, and
-    ``Reject("band_budget")``."""
+    ``Reject("band_budget")``. ``ISPATIALGYM_BAND_TRUNK_CHECK=idle-arm``: the CLI's ``--trunk-check idle-arm``, keyed, named and
+    recorded like the CLI's (``reach_bands.band_trunk_check``)."""
     world = s.world
     kit = RB.band_kit(world, s.kit)
     top = NB.own_top(top)
     support = world.obj(top.name)
     bc = RB.BandComputer(world, kit, arms=(spec.arm,), lattice=lattice)
     bc.deadline = getattr(s, "deadline", None)
+    tc_key = RB.band_trunk_check(bc, spec.arm)
     stance = bc.stance_at_edge(top, support, RB.STAND_OFF, edge.name if edge is not None else None)
     z = float(spec.z_support) if spec.z_support is not None else float(top.z)
     lattice_world = spec.lattice_world if spec.lattice_world is not None else top.cells(free_only=True)
@@ -973,14 +975,17 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
                      "classes": [c["name"] for c in getattr(RB, "CONTACT_CLASSES", [])], "fingers": bc.fingers})
     elif grasp_sets is None:
         meta["classes"] = list(getattr(RB, "GENERIC_CLASSES", []))
+    if tc_key:
+        meta["trunk_check"] = RB.trunk_check_meta(spec.arm)
     key = RB._key({"scene": world.scene_model, "support": top.name, "z": round(z_eval, 2), "stance": stance["edge"], "s": RB.STAND_OFF, "object": spec.object,
                    "scale": spec.scale, "grasps": [(g.name, _t(g.position).tolist(), _t(g.quat).tolist()) for g in (grasp_sets or [])] or "generic",
-                   "rest": _t(spec.rest_quat).tolist(), "placed": list(spec.placed), "grid": meta["grid"], "lattice": lattice, "arms": "untucked", "seeds": 12})
+                   "rest": _t(spec.rest_quat).tolist(), "placed": list(spec.placed), "grid": meta["grid"], "lattice": lattice, "arms": "untucked", "seeds": 12,
+                   **tc_key})
     meta["key"] = key
     out_dir = out_dir or RB.cache_root()
     os.makedirs(out_dir, exist_ok=True)
     oname = (spec.object or "generic").replace("/", "-")
-    name = f"tabletop__{world.scene_model}__{top.name}__{oname}__{key}"
+    name = f"tabletop__{world.scene_model}__{top.name}{RB.TRUNK_CHECK_IDLE_TAG if tc_key else ''}__{oname}__{key}"
     arrays = {RB.trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in result["cells"].items()}
     for (tr, ti), p in result.get("pairs", {}).items():
         arrays[RB.trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)

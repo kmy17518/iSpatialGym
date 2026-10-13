@@ -994,11 +994,14 @@ class IORSLarge(SamplerV2):
         runs (the ``stance_free_floor`` / ``stance_under`` stance, the 2 cm floor lattice (under: the clear cells), the
         library grasp mask per trunk incl. tilt −1.2); written to the cache root in the CLI's layout. Computed on
         ``reach_bands.band_kit`` (``self.kit`` is not touched), recorded in ``meta.schedule``. Past the sampling run's time budget
-        (``self.deadline``) the computation stops, nothing is written: ``Reject("band_budget")``."""
+        (``self.deadline``) the computation stops, nothing is written: ``Reject("band_budget")``. ``ISPATIALGYM_BAND_TRUNK_CHECK=idle-arm``
+        (owner 2026-10-12 item 4: the whole-body check skipped every deep crouch, so no floor pose was within reach of the
+        remaining shoulders): the CLI's ``--trunk-check idle-arm``, keyed, named and recorded like the CLI's."""
         c = self.choice.models["target"]
         kit = RB.band_kit(self.world, self.kit)
         bc = RB.BandComputer(self.world, kit, arms=("right",))
         bc.deadline = getattr(self, "deadline", None)
+        tc_key = RB.band_trunk_check(bc, "right")
         t0 = time.time()
         parked = self.world.snapshot()
         try:
@@ -1044,6 +1047,8 @@ class IORSLarge(SamplerV2):
                 "rest_quat_xyzw": self.rest.tolist(), "generic_pinch": False, "stance": stance, "top": top_json, "z_support": z,
                 "under_partner": under_partner.name if under_partner is not None else None, "trunks": result["trunks"], "computed_by": "iors_large compute-on-miss",
                 "time_s": round(time.time() - t0, 1), "schedule": RB.band_schedule(kit, self.kit)}
+        if tc_key:
+            meta["trunk_check"] = RB.trunk_check_meta("right")
         lat_all = np.concatenate([cc[:, 1] for cc in result["cells"].values() if len(cc)]) if any(len(cc) for cc in result["cells"].values()) else np.zeros(0)
         meta["union_extent"] = [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None
         meta["n_reachable_total"] = int(sum(len(cc) for cc in result["cells"].values()))
@@ -1054,8 +1059,9 @@ class IORSLarge(SamplerV2):
             out_dir = RB.cache_root()
             os.makedirs(out_dir, exist_ok=True)
             key = RB._key({"scene": meta["scene"], "support": meta["support"], "z": round(z, 2), "object": meta["object"], "scale": c.scale, "under": meta["under_partner"],
-                           "grasp_key": self.grasp_key, "computed_by": "iors_large"})
-            name = f"{meta['mode']}__{meta['scene']}__{meta['support']}{'-under-' + meta['under_partner'] if meta['under_partner'] else ''}__{c.category}-{c.model}__{key}"
+                           "grasp_key": self.grasp_key, "computed_by": "iors_large", **tc_key})
+            name = (f"{meta['mode']}__{meta['scene']}__{meta['support']}{RB.TRUNK_CHECK_IDLE_TAG if tc_key else ''}"
+                    f"{'-under-' + meta['under_partner'] if meta['under_partner'] else ''}__{c.category}-{c.model}__{key}")
             arrays = {RB.trunk_key(tr, ti): cc for (tr, ti), cc in cells.items()}
             for (tr, ti), p in pairs.items():
                 arrays[RB.trunk_key(tr, ti) + "__pairs"] = p

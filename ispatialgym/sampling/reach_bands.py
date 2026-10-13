@@ -65,7 +65,8 @@ disabled during that trunk's IK passes (:class:`TrunkBound`). ``--cameras`` / ``
 ``--no-trunk-bound`` restore the old setup; none changes a band. Same-algorithm opt-ins (marginal cells may differ,
 default off): ``--mesh-cache auto`` (2.5x faster IK), ``--ik-tail-sizes``. The bands the sampler computes in-process get the
 ``--mesh-cache auto`` store by default, on a kit of their own (:func:`band_kit`, ``ISPATIALGYM_BAND_MESH_CACHE``; the sampler's
-kit keeps its store). Approximate opt-in (default off):
+kit keeps its store); ``ISPATIALGYM_BAND_TRUNK_CHECK=idle-arm`` gives their single-arm bands ``--trunk-check idle-arm``
+(:func:`band_trunk_check`, default ``whole-body``). Approximate opt-in (default off):
 ``--collision sdf-grid [--sdf-res 0.01]`` - the static obstacles become float16 signed-distance voxel layers (cuRobo
 ``VoxelGrid``, trilinear lookup, sampled from the exact mesh SDF; :mod:`ispatialgym.oracle.sdf_grid`), ~25x cheaper per
 batched IK call; recorded as ``schedule.collision`` and in the file-name key, so such bands never shadow exact ones by name.
@@ -1141,9 +1142,10 @@ class BandComputer:
         #: the object stands on, ignored at the grasp pose instead of the whole support) and objects never pruned per trunk
         self.mesh_groups: Dict[str, List[str]] = {}
         self.protect_extra: List[Any] = []
-        #: ``--trunk-check idle-arm``: when every idle-arm posture collides with the whole body, retry the postures with this
-        #: arm's spheres out of the model - the band's arm, whose configuration comes from the IK at every cell (checked there
-        #: with the whole body); ``None`` = whole-body check only. ``last_trunk_arm_excluded`` tells the caller which check passed
+        #: ``--trunk-check idle-arm`` (in-process bands: :func:`band_trunk_check`): when every idle-arm posture collides with the
+        #: whole body, retry the postures with this arm's spheres out of the model - the band's arm, whose configuration comes from
+        #: the IK at every cell (checked there with the whole body); ``None`` = whole-body check only. ``last_trunk_arm_excluded``
+        #: tells the caller which check passed
         self.trunk_skip_arm: Optional[str] = None
         self.last_trunk_arm_excluded = False
         #: in-process bands (``tabletop.compute_bands``, ``IORSLarge.compute_band``): the sampling run's time budget end (a
@@ -2488,6 +2490,36 @@ def band_schedule(kit, sampler_kit) -> Dict[str, Any]:
     return {"mesh_cache": int(kit.backend.mesh_cache_size), "kit": "sampler" if kit is sampler_kit else "band"}
 
 
+#: the trunk check of the single-arm bands the sampler computes itself (owner 2026-10-12 item 4, the CLI's ``--trunk-check``
+#: in-process): ``whole-body`` (default, the path before) or ``idle-arm`` (:attr:`BandComputer.trunk_skip_arm` = the band's arm)
+BAND_TRUNK_CHECK_ENV = "ISPATIALGYM_BAND_TRUNK_CHECK"
+#: file-name tag of an idle-arm band, after the support (with ``trunk_check`` in the key it never overwrites a whole-body band)
+TRUNK_CHECK_IDLE_TAG = "-tcidle"
+
+
+def trunk_check_meta(arm: str) -> Dict[str, Any]:
+    """``meta["trunk_check"]`` of an idle-arm band of ``arm`` (``--trunk-check idle-arm`` and :func:`band_trunk_check`)."""
+    return {"mode": "idle_arm", "note": f"a trunk whose idle-arm postures all collide with the whole body is retried with the {arm} arm "
+                                        "out of the check (its configuration comes from the IK at every cell); see trunks[].active_arm_excluded"}
+
+
+def band_trunk_check(bc: BandComputer, arm: str) -> Dict[str, Any]:
+    """:data:`BAND_TRUNK_CHECK_ENV` on the computer ``bc`` of an in-process single-arm band of ``arm`` (``tabletop.compute_bands``,
+    ``IORSLarge.compute_band``; not the handle / brace bands - the CLI refuses ``--trunk-check idle-arm`` with ``--brace``).
+    Returns the cache-key extras the CLI adds: ``{}`` for ``whole-body`` (key, file name and meta as before); for ``idle-arm``
+    ``{"trunk_check": "idle_arm"}`` with ``bc.trunk_skip_arm = arm``, and the caller adds :data:`TRUNK_CHECK_IDLE_TAG` to the
+    file name and :func:`trunk_check_meta` to the meta."""
+    setting = os.environ.get(BAND_TRUNK_CHECK_ENV, "").strip().lower().replace("_", "-") or "whole-body"
+    if setting == "whole-body":
+        return {}
+    if setting != "idle-arm":
+        raise ValueError(f"{BAND_TRUNK_CHECK_ENV}={setting!r}: expected whole-body or idle-arm")
+    bc.trunk_skip_arm = arm
+    log.info("in-process %s-arm band: %s=idle-arm (a trunk whose idle-arm postures all collide is retried with the %s arm out of the check)",
+             arm, BAND_TRUNK_CHECK_ENV, arm)
+    return {"trunk_check": "idle_arm"}
+
+
 def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: List[str], floor_mode: bool, arms: Sequence[str], t_load: float,
                  setup_s: float, job_id: Optional[str] = None, spawn_suffix: str = "") -> Dict[str, Any]:
     """One band on an existing ``(world, kit)``: support geometry and stance, placed objects, target spawn, the band
@@ -3021,10 +3053,9 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         mode_name = "contact" if args.generic_contact else meta["mode"]
         under_tag = ("-under-edge-" if args.under_edge else "-under-") + args.under if args.under else ""
         surface_tag = ((f"-interior-z{z_support - world.floor_z:.2f}" if interior else "") + ("-so" + "_".join(f"{s:.2f}" for s in stand_offs) if stand_offs else "")
-                       + ("-tcidle" if trunk_idle else ""))
+                       + (TRUNK_CHECK_IDLE_TAG if trunk_idle else ""))
         if trunk_idle:
-            meta["trunk_check"] = {"mode": "idle_arm", "note": f"a trunk whose idle-arm postures all collide with the whole body is retried with the {band_arm} arm "
-                                   "out of the check (its configuration comes from the IK at every cell); see trunks[].active_arm_excluded"}
+            meta["trunk_check"] = trunk_check_meta(band_arm)
         name = f"{mode_name}__{args.scene}__{args.support}{surface_tag}{under_tag}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
         if args.smoke:
             meta["sanity"] = band_sanity(stance, result, z_eval)
