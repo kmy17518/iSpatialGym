@@ -1448,6 +1448,19 @@ def _slab_off(action) -> bool:
     return bool(_push_kind(push) is not None and (getattr(getattr(push, "contact", None), "extra", None) or {}).get("ground_ignored"))
 
 
+def _two_point_fingers(action, name: str, after_name: Optional[str]) -> Optional[float]:
+    """The finger joints a two-point push-under (``contacts.push.push_contact_form`` = ``"two_point"``, owner 2026-10-13 ~04:30 item 2) and the
+    retreat after it are checked with: the record's ``fingers_opening_m`` (the oracle opens the gripper to it); None for anything else."""
+    if name == "push":
+        rec = getattr(action, "contact", None)
+    elif name == "retreat" and after_name == "push":
+        rec = getattr(getattr(action, "after", None), "contact", None)
+    else:
+        return None
+    ex = getattr(rec, "extra", None) or {}
+    return float(ex["fingers_opening_m"]) if ex.get("push_contact_form") == "two_point" and ex.get("fingers_opening_m") is not None else None
+
+
 def _is_pack_push(sidecar, action) -> bool:
     """A push of the block-design packing tail (``sidecar.pack`` stages; the draft's attribute or the F6 ``extra``)."""
     if getattr(action, "name", "") != "push":
@@ -1944,6 +1957,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         wide = (getattr(getattr(action, "contact", None), "extra", None) or {}).get("fingers_opening_m")
         if wide is not None:
             fingers = float(wide)
+    two_point = _two_point_fingers(action, name, after_name)
+    if two_point is not None:
+        fingers = two_point
     # base-follow in base mode: the handle poses h(q_k) are reached by driving the base, not by the arm from the stance;
     # in arm mode they are checked one by one with the articulated object at q_k (``check_base_follow_handles``), not as a
     # chain against the object frozen at q_init (closing: the hand moves into where the open front was)

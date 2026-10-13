@@ -71,6 +71,16 @@ the chain-first screen and the F draws keep only the yaws at which the heel - th
 points back at the robot within one yaw step (``push_under_yaw_tol_deg``) and the push meets the heel's half; the yaw drawn at B is checked
 again before the place IK. One INFO line 'push-under yaw lock heel_first: kept N of M yaws' per C whose yaws it narrows.
 
+**The push that does not turn the object (owner 2026-10-13 ~04:30 item 2, under_large#01).** A long object pushed from one end turns away from
+the push: c3_k0's sandal landed 5.3 deg off the line and the heel push grew that to 34.8 deg over 0.29 m. ``generation.push_under_stroke_m``
+(default none = one stroke) records a stroke plan (``strokes``: at most ``push_under_strokes_max`` equal strokes, the oracle's back-off /
+re-aim / yaw-gain knobs): the oracle measures the object before each stroke and re-aims the blade so it meets the back where the line through
+the root along the push does (``execute._push_strokes``; sim check 17838968 in c3_k0's scene: 3 strokes turned the sandal -2.0 deg and left
+it 8 mm from the goal, the single stroke +22.3 deg and 49 mm). ``generation.push_under_contact`` (default none = today's blade) tries other
+hand forms first: ``"two_point"`` (the open fingertips across the back; one stroke whatever the stroke key says) and / or ``"closed_turned"``
+(the closed blade turned 90 deg), today's blade last; the record carries ``push_contact_form`` (+ ``fingers_opening_m`` for the open hand,
+which the IK, the goal check and the program check use).
+
 **The arm of the segment (owner 2026-09-27, first-demo v2.2).** Grasp at B → carry → place / drop at C (→ the push-under blade:
 ``programs.py`` wants the grasp arm) is one single-arm segment; the other arm idles in its recorded posture (A6, re-derived per
 working arm). ``tabletop.offered_arms`` offers both arms (the other arm has no role, the target is free); the other arm's bands
@@ -184,6 +194,17 @@ PUSH_UNDER_YAW_LOCKS = ("heel_first",)
 PUSH_HEEL_MIN_ASYM_M = 0.005
 #: heel_first: the push's contact at least this fraction of the heel's extent behind the root (the heel's half, not the strap)
 PUSH_HEEL_CONTACT_FRAC = 0.5
+#: ``generation.push_under_contact`` (owner 2026-10-13 ~04:30 item 2): the blade hand's contact forms. ``"blade"`` = today's (closed, the
+#: closing axis along the push: a 14 mm face); ``"two_point"`` = the gripper open, the closing axis across the push, both fingertips on the
+#: target's back; ``"closed_turned"`` = the closed blade turned 90 deg (both fingers side by side: a 16.8 mm face)
+PUSH_CONTACT_FORMS = ("two_point", "closed_turned", "blade")
+#: two_point: the fingertips' gap = this fraction of the target's width across the push ``PUSH_TWO_POINT_DEPTH_M`` ahead of its rearmost point
+#: in the blade's band, within ``PUSH_TWO_POINT_OPENING_M`` (``generation.push_under_two_point_opening_m`` sets the gap)
+PUSH_TWO_POINT_WIDTH_FRAC = 0.6
+PUSH_TWO_POINT_DEPTH_M = 0.02
+PUSH_TWO_POINT_OPENING_M = (0.025, 0.08)
+#: ``generation.push_under_stroke_m`` (owner 2026-10-13 ~04:30 item 2): the push in at most this many strokes (``push_under_strokes_max``)
+PUSH_STROKES_MAX = 3
 #: the flat hand's lowest collision sphere this far above the floor (``generation.push_flat_floor_clearance_m``)
 PUSH_FLAT_FLOOR_CLEARANCE_M = 0.01
 #: the flat hand's fingertip ladder (owner 2026-10-12 ~20:55): the lowest tip height the arm reaches per floor trunk - offline FK of the
@@ -264,7 +285,9 @@ class PushUnderRecord(ContactRecord):
     the push), ``drop_cell`` / ``goal_cell`` (target centres, world xy); the flat hand's ``push_hand: "flat"``, ``palm_clear``,
     ``wrist_turn``, ``palm_drop_m``, ``fingertip_band_m``, ``contact_height_m``, ``target_com_height_m``; the pitched hand's ``push_hand:
     "pitched_far"``, ``palm_clear``, ``wrist_turn``, ``contact_height_m``, ``target_com_height_m``, ``palm_gap_m``, ``hand_low_m``,
-    ``fingertip_band_m``; every hand's ``chain_arm_q`` / ``chain_branch`` (the sampled chain's configurations, :func:`push_chain_seed`)."""
+    ``fingertip_band_m``; every hand's ``chain_arm_q`` / ``chain_branch`` (the sampled chain's configurations, :func:`push_chain_seed`); with
+    ``generation.push_under_stroke_m`` the stroke plan ``strokes``, with ``generation.push_under_contact`` ``push_contact_form`` (+
+    ``contact_strips_m`` / ``face_half_m``, and ``fingers_opening_m`` / ``contact_width_m`` for ``"two_point"``)."""
 
     def __init__(self, arm: str, pre, start, mid, goal, direction, distance_m: float, object: str, stance: str = "placement", **extras):
         super().__init__("push", arm, pre, start, mid, goal, direction, distance_m, None, object, stance)
@@ -284,6 +307,14 @@ def push_under_palm_flags(chain: Dict[str, Any]) -> Dict[str, Any]:
     ``palm_clear`` - the oracle raises a top-down blade whose palm would meet the object's top unless its record has ``palm_clear``,
     and this push runs as recorded."""
     return {"palm_contact": True, "palm_clear": True} if chain.get("palm_contact") else {}
+
+
+def push_record_fingers(extras: Dict[str, Any]) -> float:
+    """The finger joints a push-under record's chain is solved with: a two-point push's ``fingers_opening_m`` (``generation.push_under_contact``,
+    owner 2026-10-13 ~04:30 item 2), else the closed gripper."""
+    if extras.get("push_contact_form") == "two_point" and extras.get("fingers_opening_m") is not None:
+        return float(extras["fingers_opening_m"])
+    return C.FINGER_CLOSED
 
 
 def push_chain_seed(kit, chosen, arm: str) -> Dict[str, Any]:
@@ -442,6 +473,75 @@ def footprint_heel(pts: th.Tensor, step_deg: float = 1.0) -> Tuple[th.Tensor, fl
     p = xy @ u
     ahead, behind = float(p.max()), float(-p.min())
     return (u, ahead, behind) if ahead >= behind else (-u, behind, ahead)
+
+
+def push_contact_strips(form: str, opening: float = 0.0) -> Tuple[Tuple[Tuple[float, float], ...], float]:
+    """The parts of a contact form's hand that meet the target's back (``generation.push_under_contact``), ``((lateral centre from the eef
+    origin, half width), ...)``, and how far their faces stand ahead of the eef origin along the push (the finger profiles at the tip): today's
+    blade one 14 mm part 8.4 mm ahead, the turned blade one 16.8 mm part 7 mm ahead, a two-point hand its two fingertips (8.4 mm thick each,
+    their pads ``opening`` apart) 7 mm ahead."""
+    t, w = float(TT.FINGER_PROFILE[0][1]), float(TT.FINGER_SIDE_PROFILE[0][1])
+    if form == "two_point":
+        c = 0.5 * float(opening) + 0.5 * t
+        return ((-c, 0.5 * t), (c, 0.5 * t)), w
+    if form == "closed_turned":
+        return ((0.0, t),), w
+    return ((0.0, w),), t
+
+
+def finger_joint_for_opening(opening: float) -> float:
+    """The per-finger joint value (``motions.gripper_opening``'s, the IK's ``fingers``) that holds the pads ``opening`` apart: linear up to the
+    measured full opening (``GRIPPER_MAX_OPENING_M``, 96.9 mm) at ``FINGER_OPEN`` (0.05 per finger)."""
+    inset = 2.0 * C.FINGER_OPEN - C.GRIPPER_MAX_OPENING_M
+    return max(C.FINGER_CLOSED, min(C.FINGER_OPEN, 0.5 * (float(opening) + inset)))
+
+
+def push_form_contact(form: str, pts: th.Tensor, d2, z_lo: float, z_hi: float, opening: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    """Where a contact form's hand meets the target pushed along ``d2`` (``generation.push_under_contact``): ``pts`` = the posed hull (N, 3; the
+    root at the origin), the hand's band ``[z_lo, z_hi]`` above the target's lowest point. ``{"form", "off_m" (how far behind the root the
+    hand's first part meets the back: the rearmost point of the band's footprint within its parts, :func:`execute.push_back_along`),
+    "strips_m", "face_half_m"}`` + for ``"two_point"`` ``"opening_m"`` (``opening``, else :data:`PUSH_TWO_POINT_WIDTH_FRAC` of the footprint's
+    width :data:`PUSH_TWO_POINT_DEPTH_M` ahead of its rearmost point, within :data:`PUSH_TWO_POINT_OPENING_M`) and ``"fingers_m"``
+    (:func:`finger_joint_for_opening`). None when no part meets the band's footprint."""
+    from ispatialgym.oracle.execute import push_back_along
+
+    P = th.as_tensor(pts, dtype=th.float32).reshape(-1, 3).clone()
+    P[:, 2] = P[:, 2] - P[:, 2].min()
+    d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
+    d = d / th.linalg.norm(d)
+    origin = th.zeros(2)
+    if form == "two_point" and opening is None:
+        rear = push_back_along(P, origin, d, 0.0, ((0.0, 10.0),), z_lo, z_hi)
+        if rear is None:
+            return None
+        band = P[(P[:, 2] >= float(z_lo)) & (P[:, 2] <= float(z_hi))][:, :2]
+        n = th.stack([-d[1], d[0]])
+        hull = G.convex_hull_2d(th.stack([band @ d, band @ n], dim=1))
+        cut = rear + PUSH_TWO_POINT_DEPTH_M
+        lats = [float(v[1]) for v in hull if float(v[0]) <= cut]
+        for a, b in zip(hull, th.roll(hull, -1, dims=0)):
+            da, db = float(a[0]) - cut, float(b[0]) - cut
+            if da * db < 0.0:
+                lats.append(float(a[1]) + da / (da - db) * (float(b[1]) - float(a[1])))
+        width = (max(lats) - min(lats)) if lats else 0.0
+        lo, hi = PUSH_TWO_POINT_OPENING_M
+        opening = max(lo, min(hi, PUSH_TWO_POINT_WIDTH_FRAC * width))
+    strips, face = push_contact_strips(form, float(opening or 0.0))
+    along = push_back_along(P, origin, d, 0.0, strips, z_lo, z_hi)
+    if along is None:
+        return None
+    out: Dict[str, Any] = {"form": form, "off_m": -float(along), "strips_m": [[round(c, 5), round(hw, 5)] for c, hw in strips], "face_half_m": face}
+    if form == "two_point":
+        out.update({"opening_m": float(opening), "fingers_m": finger_joint_for_opening(float(opening))})
+    return out
+
+
+def push_stroke_plan(distance_m: float, stroke_m: float, n_max: int = PUSH_STROKES_MAX, **knobs: float) -> Dict[str, Any]:
+    """The push record's stroke plan (``generation.push_under_stroke_m``, owner 2026-10-13 ~04:30 item 2): ``n`` = ``ceil(distance / stroke)``
+    equal strokes, at most ``n_max``; ``ends_m`` the object's progress along the push after each (cumulative); ``knobs`` (``backoff_m``,
+    ``reaim_max_m``, ``yaw_gain_m_per_rad``, ``yaw_deadband_rad``) as given - the oracle's ``execute.push_stroke_plan`` reads it."""
+    n = max(1, min(int(n_max), int(math.ceil(float(distance_m) / max(float(stroke_m), 1e-6) - 1e-9))))
+    return {"n": n, "ends_m": [round(float(distance_m) * k / n, 5) for k in range(1, n + 1)], **{k: round(float(v), 5) for k, v in knobs.items()}}
 
 
 def pitched_palm_gap(pts: th.Tensor, direction_xy, eef_pos, eef_quat) -> Tuple[float, str]:
@@ -1371,6 +1471,43 @@ class IORSLarge(SamplerV2):
                      len(yaws), place.stand_off or 0.0, place.lateral, d_yaw, [round(y, 2) for y in kept], [round(float(offs.get(y, -1.0)), 3) for y in kept])
         return kept
 
+    def push_contact_forms(self) -> List[str]:
+        """``generation.push_under_contact`` (owner 2026-10-13 ~04:30 item 2; :data:`PUSH_CONTACT_FORMS`, one name or a list in preference
+        order): the blade hand's contact forms in the order :meth:`_push_under_chain` tries them, today's ``"blade"`` last unless the list
+        places it (so the key never loses a chain that solves today); ``["blade"]`` without the key. ``Reject("spec")`` for an unknown form."""
+        v = self.gp.gen("push_under_contact")
+        if v is None:
+            return ["blade"]
+        forms = [v] if isinstance(v, str) else list(v) if isinstance(v, (list, tuple)) else None
+        if not forms or any(f not in PUSH_CONTACT_FORMS for f in forms):
+            raise Reject("spec", f"generation.push_under_contact {v!r}: one of {PUSH_CONTACT_FORMS} or a list of them")
+        return list(dict.fromkeys(forms + ([] if "blade" in forms else ["blade"])))
+
+    def push_strokes_record(self, distance_m: float, form: Optional[str] = None) -> Dict[str, Any]:
+        """``generation.push_under_stroke_m`` (owner 2026-10-13 ~04:30 item 2; default none = one stroke): the push record's ``strokes`` - the
+        plan :func:`push_stroke_plan` makes for the push's distance (at most ``push_under_strokes_max`` strokes) with the oracle's knobs
+        ``push_under_stroke_backoff_m`` (0.03), ``push_under_reaim_max_m`` (0.03), ``push_under_reaim_yaw_gain`` (m/rad, 0) and
+        ``push_under_reaim_yaw_deadband_deg`` (2); ``{}`` without the key, and for a chain of the contact form ``"two_point"`` (``form``): the
+        sim check 17838968 re-aimed the open hand at the line through the sandal's root and one fingertip met the round heel first - the
+        sandal turned 80 deg, where the strokes with the blade turned it -2 deg. ``Reject("spec")`` for a stroke that is not a positive
+        length."""
+        v = self.gp.gen("push_under_stroke_m")
+        if v is None:
+            return {}
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not float(v) > 0.0:
+            raise Reject("spec", f"generation.push_under_stroke_m {v!r}: a positive length (m)")
+        if form == "two_point":
+            log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f) not recorded for the two-point hand: one stroke", self.gp.alias, float(v))
+            return {}
+        plan = push_stroke_plan(distance_m, float(v), int(self.num("push_under_strokes_max", PUSH_STROKES_MAX)),
+                                backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=float(self.num("push_under_reaim_max_m", 0.03)),
+                                yaw_gain_m_per_rad=float(self.num("push_under_reaim_yaw_gain", 0.0)),
+                                yaw_deadband_rad=math.radians(float(self.num("push_under_reaim_yaw_deadband_deg", 2.0))))
+        log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f): %d strokes over %.3f m, the object's progress after each %s m, back-off %.3f m, "
+                 "re-aim within %.3f m, yaw gain %.3f m/rad", self.gp.alias, float(v), plan["n"], float(distance_m), plan["ends_m"], plan["backoff_m"], plan["reaim_max_m"],
+                 plan["yaw_gain_m_per_rad"])
+        return {"strokes": plan}
+
     def push_drop_ahead_pref(self) -> Optional[float]:
         """The drop cell's preferred distance ahead of the base in the C order (``generation.push_under_drop_ahead_pref_m``; the pitched
         hand's :data:`PUSH_FAR_DROP_AHEAD_PREF_M` without it)."""
@@ -1397,6 +1534,7 @@ class IORSLarge(SamplerV2):
         d2 = th.as_tensor([float(d2[0]), float(d2[1])])
         d2 = d2 / th.linalg.norm(d2)
         d3 = th.tensor([float(d2[0]), float(d2[1]), 0.0])
+        n3 = th.tensor([-float(d2[1]), float(d2[0]), 0.0])  # across the push: the closing axis of the two-point / turned blade
         height = float(self.place["height"])
         cd = th.as_tensor([float(drop_xy[0]), float(drop_xy[1])])
         gc = th.as_tensor([float(goal_xy[0]), float(goal_xy[1])])
@@ -1404,24 +1542,49 @@ class IORSLarge(SamplerV2):
         why: List[str] = []
         half_d: Optional[float] = self.half_extent_along(quat, d2)  # the footprint's, for the log when no pitch gets a blade
         palm_ok = bool(self.gp.gen("push_under_palm_contact", False))
-        for pitch in TT.approach_pitch_order(None):
+        forms = self.push_contact_forms()
+        keyed = forms != ["blade"]
+        pts = G.local_points_world(self.hull, (th.zeros(3), G.t(quat))) if keyed else None
+        for form, pitch in ((f, p) for f in forms for p in TT.approach_pitch_order(None)):
             z_push, z_tip = self.push_height(pitch)
-            so = TT.blade_standoff((self.floor_z, self.floor_z + height), z_tip, pitch, PUSH_UNDER_CLEARANCE_M)
-            # owner 2026-10-12 ~19:40: the goal counts, not which part of the hand meets the face - the vertical blade's palm pushes a
-            # face past the finger section, standing off by the palm's half extent along the push (per wrist turn, below)
-            palm = so is None and palm_ok and pitch == 0.0 and self.floor_z + height > z_tip + TT.PALM_FROM_TIP
-            if so is None and not palm:
-                why.append(f"pitch {pitch:.0f}: face reaches the palm")
-                continue
-            standoff = 0.0 if palm else so[0]
-            # the blade meets the rearmost collision point within its height band (a sandal's strap, a box's face), not the
-            # footprint's rear edge; the (generation) ``push_contact_offset_m`` overrides the model. The palm meets the face anywhere
-            # above the fingertips (and comes down beside it from the pre-pose)
-            off_cfg = self.gp.gen("push_contact_offset_m")
-            z_hi = height if palm else z_tip - self.floor_z + self.BLADE_SPAN_M
-            off_m = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, z_tip - self.floor_z, z_hi)
+            tag = f"{form} " if keyed else ""
+            fingers, rec = C.FINGER_CLOSED, ({"push_contact_form": "blade"} if keyed else {})
+            if form == "blade":
+                so = TT.blade_standoff((self.floor_z, self.floor_z + height), z_tip, pitch, PUSH_UNDER_CLEARANCE_M)
+                # owner 2026-10-12 ~19:40: the goal counts, not which part of the hand meets the face - the vertical blade's palm pushes a
+                # face past the finger section, standing off by the palm's half extent along the push (per wrist turn, below)
+                palm = so is None and palm_ok and pitch == 0.0 and self.floor_z + height > z_tip + TT.PALM_FROM_TIP
+                if so is None and not palm:
+                    why.append(f"{tag}pitch {pitch:.0f}: face reaches the palm")
+                    continue
+                standoff = 0.0 if palm else so[0]
+                # the blade meets the rearmost collision point within its height band (a sandal's strap, a box's face), not the
+                # footprint's rear edge; the (generation) ``push_contact_offset_m`` overrides the model. The palm meets the face anywhere
+                # above the fingertips (and comes down beside it from the pre-pose)
+                off_cfg = self.gp.gen("push_contact_offset_m")
+                z_hi = height if palm else z_tip - self.floor_z + self.BLADE_SPAN_M
+                off_m = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, z_tip - self.floor_z, z_hi)
+                closing = d3
+            else:
+                # owner 2026-10-13 ~04:30 item 2: the closing axis across the push - both fingertips on the back (open) or both fingers
+                # side by side (closed); the hand stands where its first part meets the back (:func:`push_form_contact`)
+                palm = False
+                so = TT.blade_standoff((self.floor_z, self.floor_z + height), z_tip, pitch, PUSH_UNDER_CLEARANCE_M, side=True)
+                if so is None:
+                    why.append(f"{tag}pitch {pitch:.0f}: face reaches the palm")
+                    continue
+                standoff = so[0]
+                tip = z_tip - self.floor_z
+                fc = push_form_contact(form, pts, d2, tip, tip + self.BLADE_SPAN_M, opening=self.gp.gen("push_under_two_point_opening_m"))
+                off_m = None if fc is None else fc["off_m"]
+                if fc is not None:
+                    rec = {"push_contact_form": form, "contact_strips_m": fc["strips_m"], "face_half_m": round(fc["face_half_m"], 5)}
+                    if form == "two_point":
+                        fingers = fc["fingers_m"]
+                        rec.update({"fingers_opening_m": round(fingers, 5), "contact_width_m": round(fc["opening_m"], 4)})
+                closing = n3
             if off_m is None:
-                why.append(f"pitch {pitch:.0f}: nothing of the target within the blade's height band")
+                why.append(f"{tag}pitch {pitch:.0f}: nothing of the target within the blade's height band")
                 continue
             half_d = off_m
             a_vec = TT.pitched_approach(pitch, d2)  # pitched toward the push direction (= the robot's forward for a frontal stance, its arm's side for a side stance)
@@ -1433,32 +1596,37 @@ class IORSLarge(SamplerV2):
             low = (z_tip - self.floor_z) < self.SLAB_TIP_M
             props = []
             for rank, c_sign in enumerate((1.0, -1.0)):
-                q = C.eef_quat(a_vec, c_sign * d3)
+                q = C.eef_quat(a_vec, c_sign * closing)
                 poses = [(start, q), (mid, q), (goal, q)]
                 if palm:  # the wrist camera reaches 1.8 cm further toward the face than the knuckles: each turn has its stand-off
                     back = d3 * (TT.palm_half_extent(q, d3) + PUSH_UNDER_CLEARANCE_M)
                     poses = [(p - back, q) for p, _ in poses]
-                props.append(O.Proposal(f"pitch {pitch:.0f}{'' if c_sign > 0 else '-'}", rank, c_sign, [C.pre_pose(poses[0])] + poses))
+                props.append(O.Proposal(f"{tag}pitch {pitch:.0f}{'' if c_sign > 0 else '-'}", rank, c_sign, [C.pre_pose(poses[0])] + poses))
 
-            def evaluate(p, low=low):
+            def evaluate(p, low=low, fingers=fingers):
                 with self.ikc.ignoring([floor, target], ground=not low):
-                    res = self.ikc.exact(p.chain, place, arm, cache=False, fingers=C.FINGER_CLOSED, q_first=p.q_first)
+                    res = self.ikc.exact(p.chain, place, arm, cache=False, fingers=fingers, q_first=p.q_first)
                 return bool(res.ok), res, None, str(res.reason)
 
             # the two wrist turns by the orientation rule (owner 2026-09-27); the camera is checked at the blade's start, where the
             # target and the floor left the IK's world
-            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitch {pitch:.0f}",
-                                        downstream=lambda s, ground=not low: self.push_pinned_check(place, s, arm, ground))
+            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under {tag}pitch {pitch:.0f}",
+                                        downstream=lambda s, ground=not low, fingers=fingers: self.push_pinned_check(place, s, arm, ground, fingers=fingers))
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 if palm:
                     standoff = TT.palm_half_extent(start_p[1], d3) + PUSH_UNDER_CLEARANCE_M
                     log.info("%s: push-under by the palm (generation.push_under_palm_contact): stand-off %.3f m (wrist %+.0f), contact offset %.3f m over the face "
                              "above the tips", self.gp.alias, standoff, chosen.proposal.payload, half_d)
+                if keyed:
+                    TT._count(self, f"push_contact_form.{form}")
+                    log.info("%s: push-under contact form %s (generation.push_under_contact %s): pitch %.0f, wrist %+.0f, stand-off %.3f m, contact offset %.3f m%s "
+                             "(C d %.2f λ %+.2f)", self.gp.alias, form, forms, pitch, chosen.proposal.payload, standoff, half_d,
+                             f", fingertips {rec['contact_width_m']:.3f} m apart" if form == "two_point" else "", place.stand_off or 0.0, place.lateral)
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
                         "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": chosen.proposal.payload,
                         "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low), "orient": decision, "seed": push_chain_seed(self.kit, chosen, arm),
-                        **({"palm_contact": True} if palm else {})}
+                        **({"palm_contact": True} if palm else {}), **({"record": rec} if rec else {})}
             why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
         log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.alias, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)),
@@ -1637,7 +1805,7 @@ class IORSLarge(SamplerV2):
                  place.lateral, (place.translate, round(place.tilt, 2)), ends, "; ".join(why))
         return None
 
-    def push_pinned_check(self, stance: Stance, scored, arm: str, ground: bool) -> Tuple[bool, str]:
+    def push_pinned_check(self, stance: Stance, scored, arm: str, ground: bool, fingers: float = C.FINGER_CLOSED) -> Tuple[bool, str]:
         """The push-under chain's ``orient.choose`` downstream (owner 2026-10-13 ~03:15 item 1): the configuration the goal check pins
         (:meth:`_push_under_goal_chain`) checked when the chain is accepted. ``scored``'s pre-pose configuration as the record keeps it
         (:func:`push_chain_seed`), on ``stance``'s locked joints with the gripper closed, must be a collision-free witness of the pre-pose
@@ -1648,15 +1816,16 @@ class IORSLarge(SamplerV2):
         each 'seeded failed' at the goal check. A failing option is passed over for the next one in the order. With
         ``generation.push_pinned_settle_m`` (m, default off) the goal check's seeded re-solve must also pass with the push goal that much
         farther along the push (the settled goal a few mm out, the chain's reach-limited end). A chain without every configuration
-        (no seed recorded) passes as before, every chain with ``generation.push_pinned_start_check`` = ``"off"``. Returns ``(ok, why)``; one
-        INFO line 'push-under pinned-start check: ...' per rejection."""
+        (no seed recorded) passes as before, every chain with ``generation.push_pinned_start_check`` = ``"off"``. ``fingers``: the chain's
+        finger joints (a two-point push's opening, ``generation.push_under_contact``). Returns ``(ok, why)``; one INFO line 'push-under
+        pinned-start check: ...' per rejection."""
         if str(self.gp.gen("push_pinned_start_check", "on")) == "off":
             return True, ""
         seed = push_chain_seed(self.kit, scored, arm)
         if not seed:
             return True, ""
         chain = scored.proposal.chain
-        q_pin = self.ikc.q_locked(stance, fingers=C.FINGER_CLOSED).clone()
+        q_pin = self.ikc.q_locked(stance, fingers=fingers).clone()
         q_pin[self.kit.robot.arm_control_idx[arm]] = th.as_tensor(seed["chain_arm_q"][0], dtype=q_pin.dtype)
         shift = self.gp.gen("push_pinned_settle_m")
         why = ""
@@ -1672,7 +1841,7 @@ class IORSLarge(SamplerV2):
                 saved = dict(self.ikc.solutions)
                 try:
                     res = self.ikc.exact([chain[0], chain[1], (0.5 * (G.t(chain[1][0]).float() + goal), chain[2][1]), (goal, chain[3][1])], stance, arm, cache=False,
-                                         fingers=C.FINGER_CLOSED, q_first=q_pin)
+                                         fingers=fingers, q_first=q_pin)
                 finally:
                     self.ikc.solutions.clear()
                     self.ikc.solutions.update(saved)
@@ -4299,6 +4468,8 @@ class IORSLarge(SamplerV2):
                 self.carry_end_q[tname] = q_end[idx_r].clone()
                 log.info("%s: carry leg hand -> pre-place tracked at C (%.2f rad swing at the finish)", self.gp.alias, fin_swing)
                 if push:
+                    chain = {**chain, "record": {**chain.get("record", {}),
+                                                 **self.push_strokes_record(chain["distance_m"], chain.get("record", {}).get("push_contact_form"))}}
                     self.sidecar.add_contact(PushUnderRecord(arm, chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
                                                              tname, stance="push" if push_st is not None else "placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],
                                                              push_height_m=chain["push_height_m"], half_extent_m=chain["half_extent_m"], fingertip_z_m=chain["fingertip_z_m"],
@@ -4468,17 +4639,18 @@ class IORSLarge(SamplerV2):
         the wrist-flipped branch). When that fails, the unseeded solve with the IK memory as it was before. Returns ``(result, why the seeded
         solve failed or None)``; one INFO line 'push-under goal check re-solve: ...'."""
         arm = push.arm
+        fingers = push_record_fingers(push.extras)
         arm_q = (push.extras.get("chain_arm_q") or [None])[0]
         if arm_q is None:
             why = "no seed (the record has no chain_arm_q)"
         else:
-            q_first = self.ikc.q_locked(stance, fingers=C.FINGER_CLOSED).clone()
+            q_first = self.ikc.q_locked(stance, fingers=fingers).clone()
             q_first[self.kit.robot.arm_control_idx[arm]] = th.as_tensor(arm_q, dtype=q_first.dtype)
             if not self.ikc.collision_free_at(q_first, chain[0], arm):
                 why = "the sampled pre-pose configuration is off the pre-pose or collides here"
             else:
                 saved = dict(self.ikc.solutions)
-                res = self.ikc.exact(chain, stance, arm, cache=False, fingers=C.FINGER_CLOSED, q_first=q_first)
+                res = self.ikc.exact(chain, stance, arm, cache=False, fingers=fingers, q_first=q_first)
                 if res.ok:
                     branch = {"map": "wrist-flipped", "ik": "solved"}.get(push.extras.get("chain_branch"), str(push.extras.get("chain_branch")))
                     log.info("%s: push-under goal check re-solve: seeded ok (the sampled chain's %s branch, %s arm)", self.gp.alias, branch, arm)
@@ -4486,7 +4658,7 @@ class IORSLarge(SamplerV2):
                 self.ikc.solutions.clear()
                 self.ikc.solutions.update(saved)
                 why = str(res.reason)
-        res = self.ikc.exact(chain, stance, arm, cache=False, fingers=C.FINGER_CLOSED)
+        res = self.ikc.exact(chain, stance, arm, cache=False, fingers=fingers)
         log.info("%s: push-under goal check re-solve: %s -> unseeded %s", self.gp.alias, why if arm_q is None else f"seeded failed ({why[:300]})",
                  "ok" if res.ok else "failed")
         return res, None if arm_q is None else why

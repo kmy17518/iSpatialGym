@@ -31,7 +31,8 @@ Behaviour per action (§3.6 / §6.1):
   the part laterally and in yaw there, touches it down on its partner, opens in one step, and the task's attach rule joins the
   part where it rests on its partner.
 * ``Push``       ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(init → mid → goal)``; post: eef at the goal
-  contact, the pushed object moved (``no_motion``).
+  contact, the pushed object moved (``no_motion``). A record with a stroke plan (``strokes``) pushes in strokes, the object measured and the
+  blade re-aimed before each.
 * ``Brace``      ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(pre → contact)``; held (no further command).
 * ``BaseFollow`` ``base_follow(b_k)`` with the arm locked, or ``arm_along(h(q_k))`` in arm mode; post: joint at
   ``q_goal`` (spec §8 tolerance) or ``passive_from`` reached.
@@ -3824,6 +3825,246 @@ def push_lowered_pre(contact, pre, first, cfg: ExecuteConfig) -> Optional[Pose]:
     return Pose(position=[float(v) for v in (p_first - a_dir * cfg.push_pre_dist_m).tolist()], orientation=[float(v) for v in q_pre.tolist()])
 
 
+# ---- push-under strokes (owner 2026-10-13 ~04:30 item 2): a push that does not turn the object --------------------------------
+
+#: the knobs of a push record's stroke plan (``contacts.push.strokes``); the plan's own values override each. ``backoff_m``: the hand backs
+#: off this far along the push between strokes; ``reaim_max_m``: the re-aimed blade stays this close to the recorded line;
+#: ``yaw_gain_m_per_rad`` / ``yaw_deadband_rad``: the contact's sideways move per radian of yaw error beyond the deadband (+ = left of the
+#: root's line for a counter-clockwise error). Sim check 17838968 (the sandal's round heel, 5.1 deg off): 0 turned it back to 3.1 deg, +0.15
+#: put the blade on the heel's flank and turned it 12 deg the wrong way, -0.15 turned it 69 deg
+PUSH_STROKE_DEFAULTS: Dict[str, float] = {"backoff_m": 0.03, "reaim_max_m": 0.03, "yaw_gain_m_per_rad": 0.0, "yaw_deadband_rad": math.radians(2.0)}
+#: the closed blade of today's push-under (closing axis along the push): the front finger's face 8.4 mm ahead of the eef origin
+#: (``tabletop.FINGER_PROFILE`` at the tip), 14 mm wide (``FINGER_SIDE_PROFILE``) - the record's ``face_half_m`` / ``contact_strips_m``
+#: describe another hand (a two-point or turned blade)
+PUSH_BLADE_FACE_HALF_M = 0.0084
+PUSH_BLADE_STRIPS_M: Tuple[Tuple[float, float], ...] = ((0.0, 0.007),)
+#: the height band above the fingertips a floor blade meets the object in (``iors_large.IORSLarge.BLADE_SPAN_M``)
+PUSH_BLADE_BAND_M = 0.05
+
+
+def push_stroke_plan(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The push record's stroke plan (``extra["strokes"]``: ``n``, ``ends_m`` - the object's progress along the push after each stroke,
+    cumulative - and the :data:`PUSH_STROKE_DEFAULTS` knobs) with the defaults filled in; None without one or with a malformed one."""
+    raw = (extra or {}).get("strokes")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        n = int(raw.get("n", 0))
+        ends = [float(v) for v in (raw.get("ends_m") or [])]
+    except (TypeError, ValueError):
+        return None
+    if n < 1 or len(ends) != n or ends[-1] <= 0.0 or any(b < a for a, b in zip(ends[:-1], ends[1:])):
+        return None
+    out: Dict[str, Any] = {"n": n, "ends_m": ends}
+    for k, v in PUSH_STROKE_DEFAULTS.items():
+        r = raw.get(k)
+        out[k] = float(r) if isinstance(r, (int, float)) and not isinstance(r, bool) and math.isfinite(float(r)) else v
+    return out
+
+
+def push_stroke_aim(root_xy, line_xy, direction, yaw_err: float, plan: Dict[str, Any]) -> Tuple[float, float, float]:
+    """Which point of the object's back a stroke pushes, across the push (owner 2026-10-13 ~04:30 item 2): ``(target, off, term)`` in metres
+    from the recorded line (the line through ``line_xy`` along the unit ``direction``; + = left of the push). ``off``: the object's root off
+    that line - the stroke pushes where the line through the root along the push meets the back; ``term``: ``yaw_gain_m_per_rad`` x
+    ``yaw_err`` (the object's yaw minus its reference, rad) once ``|yaw_err|`` exceeds ``yaw_deadband_rad``, else 0; ``target`` = ``off +
+    term``. The blade's aim that meets the back there is :func:`push_contact_aim`'s, within ``reaim_max_m`` of the line."""
+    d = C.as_tensor(direction).reshape(-1)[:2].float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    n = th.tensor([-float(d[1]), float(d[0])])
+    off = float((C.as_tensor(root_xy).reshape(-1)[:2].float() - C.as_tensor(line_xy).reshape(-1)[:2].float()) @ n)
+    term = float(plan["yaw_gain_m_per_rad"]) * float(yaw_err) if abs(float(yaw_err)) > float(plan["yaw_deadband_rad"]) else 0.0
+    return off + term, off, term
+
+
+def _hull_2d(pts: th.Tensor) -> th.Tensor:
+    """Convex hull (counter-clockwise, no repeated end) of planar points (N, 2); fewer than three distinct points come back as they are."""
+    p = sorted({(round(float(x), 6), round(float(y), 6)) for x, y in pts.tolist()})
+    if len(p) < 3:
+        return th.tensor(p, dtype=th.float32).reshape(-1, 2)
+
+    def half(seq):
+        out: List[Tuple[float, float]] = []
+        for q in seq:
+            while len(out) >= 2 and (out[-1][0] - out[-2][0]) * (q[1] - out[-2][1]) - (out[-1][1] - out[-2][1]) * (q[0] - out[-2][0]) <= 0:
+                out.pop()
+            out.append(q)
+        return out
+
+    lo, hi = half(p), half(list(reversed(p)))
+    return th.tensor(lo[:-1] + hi[:-1], dtype=th.float32)
+
+
+def push_back_contact(pts_world, line_xy, direction, aim: float, strips: Sequence[Sequence[float]], z_lo: float, z_hi: float) -> Optional[Tuple[float, float]]:
+    """Where the blade first meets the object moving along the push: ``(along, lateral)`` (from ``line_xy``, along the unit ``direction`` /
+    + = left of it) of the rearmost point of the object's footprint within the blade's parts - ``strips`` = ``(lateral centre from the blade's
+    aim, half width)`` per part touching the object (today's blade one 14 mm part, a two-point hand its two fingertips) - with the blade at
+    ``aim`` across the push. The footprint is the convex hull of the points ``pts_world`` (N, 3) whose height lies in ``[z_lo, z_hi]`` (the
+    blade's band), so a part narrower than the vertex spacing still meets the edges it crosses. None when fewer than three points lie in the
+    band or no part meets the footprint."""
+    P = C.as_tensor(pts_world).reshape(-1, 3).float()
+    P = P[(P[:, 2] >= float(z_lo)) & (P[:, 2] <= float(z_hi))]
+    if len(P) < 3:
+        return None
+    d = C.as_tensor(direction).reshape(-1)[:2].float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    n = th.tensor([-float(d[1]), float(d[0])])
+    rel = P[:, :2] - C.as_tensor(line_xy).reshape(-1)[:2].float()
+    hull = _hull_2d(th.stack([rel @ d, rel @ n], dim=1))  # (along, lateral)
+    if len(hull) < 3:
+        return None
+    best: Optional[Tuple[float, float]] = None
+    for c, hw in strips:
+        lo, hi = float(aim) + float(c) - float(hw), float(aim) + float(c) + float(hw)
+        cand = [(float(v[0]), float(v[1])) for v in hull if lo <= float(v[1]) <= hi]
+        for a, b in zip(hull, th.roll(hull, -1, dims=0)):
+            for lat in (lo, hi):
+                da, db = float(a[1]) - lat, float(b[1]) - lat
+                if da * db < 0.0:
+                    t = da / (da - db)
+                    cand.append((float(a[0]) + t * (float(b[0]) - float(a[0])), lat))
+        for hit in cand:
+            if best is None or hit[0] < best[0]:
+                best = hit
+    return best
+
+
+def push_back_along(pts_world, line_xy, direction, aim: float, strips: Sequence[Sequence[float]], z_lo: float, z_hi: float) -> Optional[float]:
+    """The along coordinate of :func:`push_back_contact` (None when it has none)."""
+    hit = push_back_contact(pts_world, line_xy, direction, aim, strips, z_lo, z_hi)
+    return None if hit is None else hit[0]
+
+
+def push_contact_aim(pts_world, line_xy, direction, target: float, strips: Sequence[Sequence[float]], z_lo: float, z_hi: float,
+                     steps: int = 29) -> Optional[Tuple[float, float, float]]:
+    """The blade's aim across the push whose first contact with the object (:func:`push_back_contact`) lies nearest the lateral ``target``
+    (the point of the object's back a stroke pushes): a blade of one part is tried at ``steps`` aims within its half span of the target - on a
+    round heel the part's edge, not its centre, meets the back when the heel's rearmost point lies beside the target -, a hand of several
+    parts (the two-point fingertips) straddles it. ``(aim, contact along, contact lateral)``; None when the blade meets nothing."""
+    if len(strips) > 1:
+        hit = push_back_contact(pts_world, line_xy, direction, target, strips, z_lo, z_hi)
+        return None if hit is None else (float(target), hit[0], hit[1])
+    span = abs(float(strips[0][0])) + float(strips[0][1])
+    best: Optional[Tuple[Tuple[float, float], float, Tuple[float, float]]] = None
+    for k in range(int(steps)):
+        a = float(target) - span + 2.0 * span * k / max(1, int(steps) - 1)
+        hit = push_back_contact(pts_world, line_xy, direction, a, strips, z_lo, z_hi)
+        if hit is None:
+            continue
+        key = (int(abs(hit[1] - float(target)) / 1e-3), abs(a - float(target)))  # the contact within 1 mm: the blade nearest centred on it
+        if best is None or key < best[0]:
+            best = (key, a, hit)
+    return None if best is None else (best[1], best[2][0], best[2][1])
+
+
+def _object_points_world(state, obj: str) -> Optional[th.Tensor]:
+    """The pushed object's collision boundary points in the world now (every link's, ``sim_utils.local_hull``'s source); None when the
+    state's object has none (the test stubs)."""
+    try:
+        o = state.object(obj)
+        pts = [p for p in (getattr(link, "collision_boundary_points_world", None) for link in o.links.values()) if p is not None and len(p) > 0]
+    except Exception:  # noqa: BLE001 - no live geometry: the caller uses the record's contact offset
+        return None
+    return th.cat([C.as_tensor(p).reshape(-1, 3).float() for p in pts], dim=0) if pts else None
+
+
+def push_yaw_error(state, obj: str, pose0) -> Tuple[float, str]:
+    """``(error, reference)``: the pushed object's yaw minus the goal's (the nearest orientation equivalence) when its TRO target is a world
+    orientation measured in full, else minus its yaw at the push start ``pose0`` (rad)."""
+    q = C.as_tensor(state.object_pose(obj)[1]).reshape(-1)[:4].float()
+    tgt = getattr(state, "pose_target", lambda name: None)(obj)
+    if (tgt is not None and str(getattr(tgt, "frame", "world")) == "world" and getattr(tgt, "orientation", None) is not None
+            and str(getattr(tgt, "orientation_metric", "full") or "full") == "full"):
+        return -_yaw_residual(C.as_tensor(tgt.orientation).reshape(-1)[:4].float(), q, getattr(tgt, "orientation_equivalences", ()) or ()), "goal"
+    return C.wrap_angle(C.yaw_of(q) - C.yaw_of(as_world_pose(pose0)[1].float())), "push start"
+
+
+def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact, geom: "PushGeometry", pose0, cfg: ExecuteConfig, ctx: Dict[str, Any],
+                  plan: Dict[str, Any]) -> Iterator[th.Tensor]:
+    """The recorded straight push in ``plan["n"]`` strokes (owner 2026-10-13 ~04:30 item 2): before each stroke the object is held still and
+    measured, and the blade re-aims where the line through its root along the push direction meets its back (:func:`push_stroke_aim` /
+    :func:`push_back_along` over its live collision points; the record's contact offset without them), at the recorded blade height and
+    orientation; the stroke then pushes along the push until the object has advanced to ``ends_m[k]`` of the push (the last stroke to the
+    recorded goal line), watched as every push leg (stop at the goal). Between strokes the hand backs off ``backoff_m`` along the push. A
+    re-aim move that fails falls back to the recorded line for that stroke. ``ctx["push_strokes"]`` records every stroke."""
+    extra = getattr(contact, "extra", None) or {}
+    wps = targets["waypoints"]
+    p_init, q_blade = (x.float() for x in as_world_pose(wps[0]))
+    p_goal = as_world_pose(wps[-1])[0].float()
+    d3 = geom.direction / max(float(th.linalg.norm(geom.direction)), 1e-9)
+    d3 = th.tensor([float(d3[0]), float(d3[1]), 0.0])
+    d3 = d3 / max(float(th.linalg.norm(d3)), 1e-9)
+    n3 = th.tensor([-float(d3[1]), float(d3[0]), 0.0])
+    goal_along = float((p_goal - p_init) @ d3)
+    standoff = float(extra.get("blade_standoff_m", 0.0) or 0.0)
+    face = float(extra.get("face_half_m", PUSH_BLADE_FACE_HALF_M))
+    strips = [tuple(float(v) for v in s) for s in (extra.get("contact_strips_m") or PUSH_BLADE_STRIPS_M)]
+    tip_z = float(C.fingertip((p_init, q_blade))[2])
+    band = (tip_z, tip_z + PUSH_BLADE_BAND_M)
+    res0, _ = push_residual(geom, state, obj, pose0, None)
+    total = float(plan["ends_m"][-1])
+    rep: Dict[str, Any] = {"n": int(plan["n"]), "plan": {k: (round(v, 4) if isinstance(v, float) else v) for k, v in plan.items()}, "strokes": []}
+    ctx["push_strokes"] = rep
+    e0, ref = push_yaw_error(state, obj, pose0)
+    rep.update({"yaw_reference": ref, "yaw_start_deg": round(math.degrees(e0), 2)})
+    for k in range(1, int(plan["n"]) + 1):
+        if k > 1:
+            p_e, q_e = (C.as_tensor(x).float() for x in motions.eef_pose(arm))
+            yield from motions.arm_along(arm, [(p_e - d3 * float(plan["backoff_m"]), q_e)], loaded=True)
+            yield from _hold_until_still(motions, state, obj, cfg)
+        p_o = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:3].float()
+        e, _ = push_yaw_error(state, obj, pose0)
+        target, off, term = push_stroke_aim(p_o[:2], p_init[:2], d3[:2], e, plan)
+        pts = _object_points_world(state, obj)
+        hit = push_contact_aim(pts, p_init[:2], d3[:2], target, strips, *band) if pts is not None else None
+        cap = abs(float(plan["reaim_max_m"]))
+        if hit is not None:
+            aim = max(-cap, min(cap, hit[0]))
+            back = push_back_contact(pts, p_init[:2], d3[:2], aim, strips, *band) if aim != hit[0] else hit[1:]
+            hit = (aim, *back) if back is not None else None
+        source = "the object's back" if hit is not None else "the recorded contact offset"
+        if hit is None:
+            aim = max(-cap, min(cap, target))
+            rear, contact_lat = float((p_o - p_init) @ d3) - float(extra.get("half_extent_m", 0.0) or 0.0), aim
+        else:
+            aim, rear, contact_lat = hit
+        res_now, _ = push_residual(geom, state, obj, pose0, None)
+        start_along = rear - standoff
+        if k == int(plan["n"]) or res0 is None or res_now is None:
+            end_along = goal_along
+        else:
+            want = float(res0) * (1.0 - float(plan["ends_m"][k - 1]) / total)
+            end_along = min(goal_along, rear + max(0.0, float(res_now) - want) - face)
+        end_along = max(end_along, start_along)
+        pose_at = lambda along, lat: (p_init + d3 * along + n3 * lat, q_blade)  # noqa: E731
+        rec: Dict[str, Any] = {"stroke": k, "yaw_before_deg": round(math.degrees(e), 2), "root_off_line_m": round(off, 4), "yaw_term_m": round(term, 4),
+                               "target_m": round(target, 4), "aim_m": round(aim, 4), "contact_lateral_m": round(contact_lat, 4), "contact": source,
+                               "start_along_m": round(start_along, 4), "end_along_m": round(end_along, 4)}
+        try:
+            yield from motions.arm_along(arm, [pose_at(start_along, aim)], loaded=False)
+        except SkillError as err:
+            rec["reaim_failed"] = (err.message or err.reason)[:160]
+            log.warning("push(%s): stroke %d/%d re-aim %+.1f mm not reached (%s) - the recorded line for this stroke", obj, k, int(plan["n"]), aim * 1000, rec["reaim_failed"])
+            aim = 0.0
+            rec["aim_m"] = 0.0
+            yield from motions.arm_along(arm, [pose_at(start_along, 0.0)], loaded=False)
+        s_before = float((C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:2].float() - pose0[0].reshape(-1)[:2].float()) @ d3[:2])
+        n_stop = len(ctx.get("push_stopped") or [])
+        yield from _push_leg(motions, state, arm, obj, [pose_at(end_along, aim)], geom, pose0, cfg, ctx, f"stroke {k}/{int(plan['n'])}")
+        yield from _hold_until_still(motions, state, obj, cfg)
+        p_after = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:2].float()
+        e1, _ = push_yaw_error(state, obj, pose0)
+        rec.update({"pushed_m": round(float((p_after - pose0[0].reshape(-1)[:2].float()) @ d3[:2]) - s_before, 4), "yaw_after_deg": round(math.degrees(e1), 2)})
+        rep["strokes"].append(rec)
+        log.info("push(%s): stroke %d/%d: yaw %+.1f deg vs the %s, root %+.1f mm off the line (yaw term %+.1f mm) -> contact %+.1f mm, blade %+.1f mm across "
+                 "(contact from %s); pushed %.1f mm, yaw %+.1f deg", obj, k, int(plan["n"]), math.degrees(e), ref, off * 1000, term * 1000, contact_lat * 1000, aim * 1000,
+                 source, rec["pushed_m"] * 1000, math.degrees(e1))
+        if len(ctx.get("push_stopped") or []) > n_stop:
+            break
+    e_end, _ = push_yaw_error(state, obj, pose0)
+    rep["yaw_end_deg"] = round(math.degrees(e_end), 2)
+    log.info("push(%s): %d of %d strokes, yaw %+.1f -> %+.1f deg vs the %s", obj, len(rep["strokes"]), int(plan["n"]), rep["yaw_start_deg"], rep["yaw_end_deg"], ref)
+
+
 def push_transit_witness_clear(motions: Motions, arm: str, objects: Sequence[Any], q_hint, cfg: ExecuteConfig) -> Tuple[bool, str]:
     """Whether the transit to a push pre-contact tries the pushed ``objects`` in the collision world first (``reach_push_pre``):
     ``(False, why)`` when the recorded witness ``q_hint`` puts the arm's spheres closer than ``push_transit_witness_clear_m`` to an
@@ -3929,6 +4170,9 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     supports = contact_ignores(state, obj)  # the wall / table the target rests against (sampler rule: ignored along the chain)
     # a re-push after a free short (owner 2026-09-26, braced-push ladder): the pad stops that far PAST the goal (``aim_push_past_goal``)
     ctx["push_aim_past_goal"] = float(extra0.get("aim_past_goal_rad", 0.0) or 0.0)
+    if extra0.get("push_contact_form") == "two_point" and extra0.get("fingers_opening_m") is not None:
+        # a two-point push-under (owner 2026-10-13 ~04:30 item 2): the fingertips opened above, spread across the object's back
+        ctx["push_contact_form"] = {"form": "two_point", "fingers_opening_m": float(extra0["fingers_opening_m"])}
     try:
         # the pushed object leaves the collision world for the push plan (program_check._ignore_for) - except an articulated
         # lid (stage 2): the hand travels from the released handle on one side of the standing lid to the underside pre-pose on
@@ -4109,8 +4353,11 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         ctx["push_axis"] = [round(float(v), 3) for v in geom.axis.tolist()]
     closed_loop = (geom.kind == "arc" and cfg.push_arc_tracking == "closed_loop" and ctx.get("push_articulation") is None
                    and getattr(getattr(motions, "backend", None), "fk", None) is not None and hasattr(motions, "arm_arc_closed_loop"))
+    strokes = push_stroke_plan(extra) if geom.kind == "line" and ctx.get("push_articulation") is None else None
     if closed_loop:
         yield from _push_arc_closed_loop(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
+    elif strokes is not None:
+        yield from _push_strokes(motions, state, arm, obj, targets, action.contact, geom, pose0, cfg, ctx, strokes)
     else:
         # from a lowered pre-contact the pad finishes the recorded approach at the first contact pose, then pushes: a top-down blade
         # sent from there straight to the first push waypoint would sweep down onto the object's top edge
@@ -4125,7 +4372,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
                             "angle_sign": (math.copysign(1.0, geom.angle) if geom.kind == "arc" else 1.0)}
     # the pad's end pose: where it actually stopped when the leg ended at the goal (0917-235415: judged against the
     # recorded arc end, 64 mm / 0.47 rad away -> 'postcondition of push failed'), else the recorded end
-    end_pose = as_world_pose(state.eef_pose(arm)) if (ctx.get("push_stopped") or ctx.get("push_arc_closed_loop")) else as_world_pose(targets["waypoints"][-1])
+    end_pose = (as_world_pose(state.eef_pose(arm)) if (ctx.get("push_stopped") or ctx.get("push_arc_closed_loop") or ctx.get("push_strokes"))
+                else as_world_pose(targets["waypoints"][-1]))
     # 2. re-push the residual once when it is in the push's sense and the recorded arc / line allows the extension
     if residual is not None:
         forward = residual * (1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)) > 0
