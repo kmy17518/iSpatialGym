@@ -1562,6 +1562,27 @@ stays as above. The keys an alias sets are recorded in `template_facts.relaxatio
 - `under_axis_max_deg` (float, default unset = 20°): the place-under stance C's optical-axis cone to the hidden goal cell (the
   under band's crouched head hangs over the edge as the push-under's does, 45° there); recorded as `axis_angle_deg`.
 
+**Inside (large-scale; owner 2026‑10‑12 ~16:05 item 1, `iors_large_inside.InsideMode`).** Stances A / B, the B ↔ C coupling, the
+carry and the records are the ontop / under rules above; the partner (a drop-in sink, a fridge) has no fillable meta link, so the
+goal surface is its **interior surface**: `SimWorld.support_interior` at `inside_surface_z_m` (m above the floor, required) with
+`inside_surface_tol_m` (default 0.03) as its height tolerance — a basin floor (rays from just under the rim, a wide tolerance, e.g.
+0.80 / 0.25 for the sink, finds the floor at 0.73), a shelf. The goal-side band is the interior band with the same two numbers
+(`reach_bands --surface-z Z --surface-tol T`; `ReachBands.load(..., surface_z=Z)`), the other arm's own or mirrored; without one the
+three trunks per base pose with the most reach margin to the goal cell are kept. **Goal cells**: free board cells with headroom
+≥ target height + 0.02, farther than half extent + `opening_margin_m` (0.02) from the board's outline (`inside_erosion_m` replaces
+that distance: a plate as wide as the basin floor rests with its rim over the flaring walls). **Stance C** faces the opening:
+square to the side of the raster facing `inside_stance_side` (world direction, e.g. `"+y"`; default every side), stand-offs
+`inside_stand_offs_m` (default 0.35 / 0.45 / 0.55 / 0.65) + the AABB overhang, laterals along the side, the goal cell = the band
+cell nearest the base, the target at the goal in frame (5 %; `inside_axis_cone_deg` optional). **Release** (the small-scale drop):
+the target's bottom `drop_height_m` (0.005) above the surface, raised until the open gripper's lowest point clears it by
+`release_clearance_m` (0.02) for every library grasp; the partner stays in the collision world. **Goal check**: teleport to the
+release, settle (drop test); `(inside ?target ?partner)` — for a container without a fillable / openfillable meta link the robust
+predicate's rays branch (`predicates.inside_rays`: the inner AABB centre in the container's AABB, the container on both sides along
+≥ 2 of z and its own x / y) — and the target's top at most `max_protrusion_fraction` (0.5) of its height above the rim (the
+partner's support top when ≥ the target's height above the surface, else its AABB top; `inside_rim_z_m` overrides). The release is
+re-checked at the goal check from C (attached, partner present) and must be in the placement image. Oracle:
+`program_iors_large_inside` — … → navigate to C (object attached) → place with kind `drop` → retreat.
+
 ## 6. Per-task rules
 
 Init = the sampled configuration, goal = what the TRO targets describe. Everything the oracle needs is recorded.

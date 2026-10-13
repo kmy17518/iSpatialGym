@@ -1040,10 +1040,17 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
 
 
 def program_iors_large_inside(sc: Sidecar) -> List[Action]:
-    """IORS inside, large-scale (``program_iors_large`` with relation ``inside``): the program of the inside mode, written with
-    that mode; until then a sidecar of the subtask has no program. The target ends inside the partner (``inside`` read in the
-    epilogue)."""
-    raise NotImplementedError("relation_not_implemented: IORS large-scale 'inside' has no oracle program yet")
+    """IORS inside, large-scale (``program_iors_large`` with relation ``inside``; owner 2026-10-12 ~16:05 item 1): init A → manipulation B
+    → grasp → lift [→ carry pose] → navigate_to placement C with the object attached → place with kind ``drop`` (the small-scale inside
+    ending: the release above the partner's interior surface, the container stays an obstacle) → retreat. The target ends inside the
+    partner (``inside`` read in the epilogue)."""
+    g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
+    if sc.path("manipulation", "placement") is None:
+        raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
+    grasp, lift = _pick(g)
+    carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)] if g.waypoints else []
+    head = _travel(sc, "init", "manipulation") + [grasp, lift] + carry + _travel(sc, "manipulation", "placement", carried=g.object)
+    return head + _place_and_retreat(g, "drop", _IORS_RELATION_WORDS["inside"])
 
 
 def program_iors_large_touching(sc: Sidecar) -> List[Action]:

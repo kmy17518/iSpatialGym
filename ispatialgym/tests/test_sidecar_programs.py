@@ -79,6 +79,7 @@ EXPECTED_SEQUENCE = {
     "alignment-world_vertical": _WALL_IN + _BRACE_PUSH,
     "alignment-axial": _TABLE_IN + _BRACE_PUSH,
     "inter_object_relation_satisfaction-ontop_large_scale": ["transition"] + _PICK + ["navigate", "transition"] + _PLACE,
+    "inter_object_relation_satisfaction-inside_large_scale": ["transition"] + _PICK + ["navigate", "transition"] + _PLACE,  # the place is a drop
     "inter_object_relation_satisfaction-under_large_scale": ["transition"] + _PICK + ["navigate"] + _PLACE,  # B and C share the floor-band trunk
     # the drop from stance C, the deep push crouch entered with empty hands (trunk-only transition), the floor push against the face
     "inter_object_relation_satisfaction-touching_large_scale": ["transition"] + _PICK + ["navigate"] + _PLACE + ["transition", "push", "retreat"],

@@ -24,6 +24,14 @@ measures the separation of the two objects' convex hulls (the collision boundary
 half-spaces, exact for a face-to-face contact, a lower bound otherwise) and accepts a gap up to ``TOUCHING_GAP_MAX_M``
 (3 mm; ``ISG_TOUCHING_GAP_MAX_M`` overrides).
 
+``inside`` of a container without a fillable meta link (owner 2026-10-12, IORS large-scale inside: a kitchen sink - togglebutton /
+fluidsink / fluidsource links -, a fridge - lights): OmniGibson's ``Inside`` tests the inner object's AABB centre against the convex
+hulls of the container's ``fillable`` / ``openfillable`` meta links only, so it reads False for such a container whatever the geometry.
+After that False the **rays** branch (:func:`inside_rays`) applies BEHAVIOR's earlier kinematic rule: the inner object's AABB centre
+inside the container's AABB and the container on both sides of it along at least ``INSIDE_MIN_AXES`` of the three axes (vertical,
+the container's own horizontal axes; rays from the centre, the inner object's bodies ignored, a hit on the container anywhere along
+the ray counts). A container with such a meta link keeps OmniGibson's verdict.
+
 ``attached`` (owner 2026-10-10, replacing the 2026-09-19 5 cm / 15 deg join): the pair's collision stays ON until the parts
 are joined, and only the task's rule joins them - OmniGibson's contact-triggered ``AttachedTo._update`` is blocked for the
 registered pairs (once the pair can touch it joins on contact within 5 cm / 15 deg, checked without the part's symmetry,
@@ -89,6 +97,11 @@ BOTTOM_GAP_MAX_M = 0.008
 UP_AXIS_MAX_DEG = 15.0
 RING_POINTS = 8
 TOUCHING_GAP_MAX_M = float(os.environ.get("ISG_TOUCHING_GAP_MAX_M", "0.003"))
+#: ``inside`` rays branch: the axes with the container on both sides of the inner object's centre, and the rays' length beyond the
+#: container's AABB diagonal
+INSIDE_MIN_AXES = 2
+INSIDE_RAY_MARGIN_M = 0.05
+CONTAINER_META_LINK_TYPES = ("fillable", "openfillable")
 #: attachment alignment record's coarse ``ok`` (OmniGibson ``AttachedTo``'s own thresholds: m.DEFAULT_POSITION_THRESHOLD /
 #: m.DEFAULT_ORIENTATION_THRESHOLD); the join itself needs the tight bounds below
 ATTACH_POS_MAX_M = 0.05
@@ -893,12 +906,22 @@ def evaluate_predicate(predicate_cls, *entities) -> bool:
         s["entity"] = kind
         _log(name, entities, "drift" if s.get("ok") else "none", bool(s.get("ok")), s)
         return bool(s.get("ok"))
-    if name not in ("under", "ontop", "touching", "attached") or len(entities) != 2 or any(e is None or not _is_object(e) for e in entities):
+    if name not in ("under", "ontop", "touching", "attached", "inside") or len(entities) != 2 or any(e is None or not _is_object(e) for e in entities):
         _log(name, entities, "omnigibson", ok)
         return ok
     if ok:
         _log(name, entities, "omnigibson", True)
         return True
+    if name == "inside":
+        if has_container_link(entities[1]):
+            _log(name, entities, "omnigibson", False)
+            return False
+        try:
+            r = inside_rays(entities[0], entities[1])
+        except Exception as e:  # noqa: BLE001 - a raycast failure must not turn into a verdict
+            r = {"ok": False, "error": repr(e)}
+        _log(name, entities, "rays" if r.get("ok") else "none", bool(r.get("ok")), r)
+        return bool(r.get("ok"))
     if name == "attached":
         # attached(child, parent): the BEHAVIOR joint does not exist yet — align modulo the child's symmetry and create it
         try:
@@ -993,6 +1016,57 @@ def touching_geometry(a: Any, b: Any) -> Dict[str, Any]:
 
 def _link_paths(obj: Any) -> List[str]:
     return [link.prim_path for link in getattr(obj, "links", {}).values()]
+
+
+def has_container_link(obj: Any) -> bool:
+    """Whether ``obj`` has a fillable / openfillable meta link - the volume OmniGibson's ``Inside`` tests (it judges such a container)."""
+    try:
+        from omnigibson.object_states.contains import m as contains_m
+
+        types = set(contains_m.CONTAINER_META_LINK_TYPES)
+    except Exception:  # noqa: BLE001 - the macro moved: the types of this OmniGibson version
+        types = set(CONTAINER_META_LINK_TYPES)
+    return any(getattr(link, "is_meta_link", False) and getattr(link, "meta_link_type", None) in types for link in getattr(obj, "links", {}).values())
+
+
+def inside_both_sides(sides: Dict[str, Sequence[bool]], min_axes: int = INSIDE_MIN_AXES) -> Tuple[bool, List[str]]:
+    """BEHAVIOR's kinematic ``inside``: the axes (``{"z": (+, -), "x": ..., "y": ...}``) with the container on both sides of the inner
+    object; True when there are at least ``min_axes`` of them."""
+    axes = [k for k, v in sides.items() if len(v) == 2 and bool(v[0]) and bool(v[1])]
+    return len(axes) >= int(min_axes), axes
+
+
+def inside_rays(inner: Any, container: Any) -> Dict[str, Any]:
+    """The ``inside`` rays branch (module docstring): the inner object's AABB centre in the container's AABB, then six rays from it -
+    up / down and both ways along the container's own x / y axes, ``INSIDE_RAY_MARGIN_M`` beyond the container's AABB diagonal, the inner
+    object's bodies ignored - and :func:`inside_both_sides` on the sides where a ray meets the container."""
+    from omnigibson.utils.sampling_utils import raytest_batch
+
+    lo_i, hi_i = _aabb(inner)
+    lo_c, hi_c = _aabb(container)
+    c = (lo_i + hi_i) / 2
+    centre = [round(float(v), 4) for v in c]
+    if not bool(((c >= lo_c) & (c <= hi_c)).all()):
+        return {"ok": False, "why": "the inner object's AABB centre is outside the container's AABB", "centre": centre}
+    _, q = container.get_position_orientation()
+    x, y, z, w = [float(v) for v in th.as_tensor(q).float()]
+    yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+    ca, sa = math.cos(yaw), math.sin(yaw)
+    reach = float(th.linalg.norm(hi_c - lo_c)) + INSIDE_RAY_MARGIN_M
+    keys, starts, ends = [], [], []
+    for k, a in (("z", (0.0, 0.0, 1.0)), ("x", (ca, sa, 0.0)), ("y", (-sa, ca, 0.0))):
+        for sgn in (1.0, -1.0):
+            keys.append((k, 0 if sgn > 0 else 1))
+            starts.append([float(c[0]), float(c[1]), float(c[2])])
+            ends.append([float(c[i]) + sgn * reach * a[i] for i in range(3)])
+    hits = raytest_batch(starts, ends, only_closest=False, ignore_bodies=_link_paths(inner) or None)
+    paths = tuple(_link_paths(container))
+    sides: Dict[str, List[bool]] = {"z": [False, False], "x": [False, False], "y": [False, False]}
+    for (k, i), hs in zip(keys, hits):
+        hs = hs if isinstance(hs, list) else [hs]
+        sides[k][i] = any(h.get("hit") and str(h.get("rigidBody", "")).startswith(paths) for h in hs)
+    ok, axes = inside_both_sides(sides)
+    return {"ok": ok, "axes_both_sides": axes, "sides": sides, "centre": centre}
 
 
 def _aabb(obj: Any) -> Tuple[th.Tensor, th.Tensor]:
