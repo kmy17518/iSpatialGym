@@ -64,6 +64,13 @@ drop cell up to 0.80 m ahead, 0.68 m preferred, the trunks (2.0, 0) / (1.75, 0),
 overridable). The record carries ``push_hand: "pitched_far"``, ``pitch_deg``, ``palm_clear`` and the contact / centre-of-mass heights; the palm
 key is ignored as with the flat hand.
 
+**The heel-first yaw lock (owner 2026-10-13 ~02:55, under_large#01; ``generation.push_under_yaw`` = ``"heel_first"``, default none).** The push
+tries the carried yaws by the contact offset, the largest first; at a B whose F_init holds no heel-first yaw that is the sandal's toe (0.117 m
+against the heel's 0.128 m), and a toe-pushed sandal turned 86° on its way in (placed_orientation 1.50 rad). With the lock the B pre-screen,
+the chain-first screen and the F draws keep only the yaws at which the heel - the end of the footprint's long axis farther from the root -
+points back at the robot within one yaw step (``push_under_yaw_tol_deg``) and the push meets the heel's half; the yaw drawn at B is checked
+again before the place IK. One INFO line 'push-under yaw lock heel_first: kept N of M yaws' per C whose yaws it narrows.
+
 **The arm of the segment (owner 2026-09-27, first-demo v2.2).** Grasp at B → carry → place / drop at C (→ the push-under blade:
 ``programs.py`` wants the grasp arm) is one single-arm segment; the other arm idles in its recorded posture (A6, re-derived per
 working arm). ``tabletop.offered_arms`` offers both arms (the other arm has no role, the target is free); the other arm's bands
@@ -160,6 +167,14 @@ PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face 
 #: ``"pitched_far"`` the hand pitched 60-70 deg toward the push from stances farther out (owner ~20:55 item C,
 #: :meth:`IORSLarge._push_under_pitched_chain`)
 PUSH_UNDER_HANDS = ("blade", "flat", "pitched_far")
+#: ``generation.push_under_yaw`` (owner 2026-10-13 ~02:55, under_large#01): default none = every carried yaw, in the
+#: :meth:`IORSLarge.push_yaw_rank` order; ``"heel_first"`` = only the yaws at which the push meets the target's heel
+#: (:func:`footprint_heel`, :meth:`IORSLarge.push_yaw_kept`)
+PUSH_UNDER_YAW_LOCKS = ("heel_first",)
+#: heel_first: the heel must lie at least this much farther from the root than the toe (the sandal chgcrm: 0.128 vs 0.117 m)
+PUSH_HEEL_MIN_ASYM_M = 0.005
+#: heel_first: the push's contact at least this fraction of the heel's extent behind the root (the heel's half, not the strap)
+PUSH_HEEL_CONTACT_FRAC = 0.5
 #: the flat hand's lowest collision sphere this far above the floor (``generation.push_flat_floor_clearance_m``)
 PUSH_FLAT_FLOOR_CLEARANCE_M = 0.01
 #: the flat hand's fingertip ladder (owner 2026-10-12 ~20:55): the lowest tip height the arm reaches per floor trunk - offline FK of the
@@ -402,6 +417,22 @@ def band_back_offset(pts: th.Tensor, direction_xy, z_lo: float, z_hi: float, sec
     if not back:
         return None
     return float(th.cat(back).max())
+
+
+def footprint_heel(pts: th.Tensor, step_deg: float = 1.0) -> Tuple[th.Tensor, float, float]:
+    """The heel of a footprint (``generation.push_under_yaw`` = ``"heel_first"``): ``(h, heel, toe)`` - the unit xy direction from the root
+    to the heel and how far the heel / the toe lie from the root along it. The long axis runs across the narrowest width of the points
+    ``pts`` (N, 2+; xy relative to the root, searched in ``step_deg`` steps); its end farther from the root is the heel (the sandal chgcrm:
+    0.128 m behind its root, the toe 0.117 m ahead)."""
+    xy = th.as_tensor(pts, dtype=th.float32)[:, :2]
+    ang = th.arange(0.0, 180.0, float(step_deg)) * (math.pi / 180.0)
+    n = th.stack([th.cos(ang), th.sin(ang)], dim=1)
+    proj = xy @ n.T
+    k = int(th.argmin(proj.max(dim=0).values - proj.min(dim=0).values))
+    u = th.stack([-n[k, 1], n[k, 0]])
+    p = xy @ u
+    ahead, behind = float(p.max()), float(-p.min())
+    return (u, ahead, behind) if ahead >= behind else (-u, behind, ahead)
 
 
 def pitched_palm_gap(pts: th.Tensor, direction_xy, eef_pos, eef_quat) -> Tuple[float, str]:
@@ -1265,6 +1296,71 @@ class IORSLarge(SamplerV2):
         ``off`` = the blade's contact offset there): the push-under's LARGEST offset first (the blade goal nearest the base,
         2026-09-20 19:20). Orders the chain-first screen's yaws and the F draws."""
         return -float(off)
+
+    def push_yaw_lock(self) -> Optional[str]:
+        """``generation.push_under_yaw`` (:data:`PUSH_UNDER_YAW_LOCKS`; default None or ``"none"`` = every carried yaw)."""
+        v = self.gp.gen("push_under_yaw")
+        if v is None or str(v) == "none":
+            return None
+        if str(v) not in PUSH_UNDER_YAW_LOCKS:
+            raise Reject("spec", f"generation.push_under_yaw {v!r} is not one of {PUSH_UNDER_YAW_LOCKS}")
+        return str(v)
+
+    def push_yaw_tol_deg(self) -> float:
+        """heel_first's largest angle between the heel's direction and the push's reverse (``generation.push_under_yaw_tol_deg``; default one
+        step of the yaw grid, :meth:`yaws`: 22.5 deg at 16 - the two grid yaws on either side of the exact heel-first yaw)."""
+        return float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
+
+    def push_heel(self) -> Tuple[th.Tensor, float, float]:
+        """The target's heel for ``heel_first``: ``(h, heel, toe)`` - :func:`footprint_heel` of its footprint at the rest orientation, ``h``
+        turned into the root frame (the yaw at C turns it with the target); memoised per bound target and recorded in
+        ``template_facts.push_under_yaw``. ``Reject("spec")`` when the ends lie within :data:`PUSH_HEEL_MIN_ASYM_M` of each other."""
+        name = getattr(self.target, "name", None)
+        memo = self.__dict__.get("_push_heel")
+        if memo is not None and memo[0] == name:
+            return memo[1]
+        h, heel, toe = footprint_heel(G.local_points_world(self.hull, (th.zeros(3), G.t(self.rest))))
+        if heel - toe < PUSH_HEEL_MIN_ASYM_M:
+            raise Reject("spec", f"generation.push_under_yaw 'heel_first': {name}'s long axis ends {heel:.3f} / {toe:.3f} m from its root - no heel")
+        h_local = G.local_points_world(th.tensor([[float(h[0]), float(h[1]), 0.0]]), (th.zeros(3), G.qinv(self.rest)))[0]
+        self._push_heel = (name, (h_local, heel, toe))
+        self.template_facts["push_under_yaw"] = {"lock": "heel_first", "heel_m": round(heel, 4), "toe_m": round(toe, 4),
+                                                 "heel_dir_local": [round(float(v), 4) for v in h_local], "tol_deg": round(self.push_yaw_tol_deg(), 2)}
+        return self._push_heel[1]
+
+    def push_yaw_kept(self, quat, d2, off: Optional[float] = None) -> bool:
+        """Whether ``generation.push_under_yaw`` lets the push along ``d2`` meet the target at orientation ``quat`` (always without the key).
+        ``"heel_first"`` (owner 2026-10-13 ~02:55, under_large#01): the heel (:meth:`push_heel`) points back at the robot - its direction at
+        ``quat`` within :meth:`push_yaw_tol_deg` of the push's reverse: the long axis along the push, the toes ahead - and the push's contact
+        (:meth:`push_contact_offset`, the rearmost point in the hand's height band; ``off`` when the caller has it) lies on the heel's half,
+        at least :data:`PUSH_HEEL_CONTACT_FRAC` of the heel's extent behind the root. The yaw order alone takes the largest offset left: at a
+        B whose F_init held no heel-first yaw it pushed the sandal toe first (0.117 m, c1_k1 at 27ee9069), and fingertips above the heel's
+        face (3.5 cm) meet the strap 2.7 cm behind the root."""
+        if self.push_yaw_lock() is None:
+            return True
+        h_local, heel, _ = self.push_heel()
+        h = G.local_points_world(h_local.reshape(1, 3), (th.zeros(3), G.t(quat)))[0, :2]
+        d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
+        cos = -float(h @ d) / max(float(th.linalg.norm(h)) * float(th.linalg.norm(d)), 1e-9)
+        if cos < math.cos(math.radians(self.push_yaw_tol_deg())) - 1e-6:
+            return False
+        if off is None:
+            off = self.push_contact_offset(quat, d2)
+        return off is not None and float(off) >= PUSH_HEEL_CONTACT_FRAC * heel
+
+    def push_yaws_locked(self, yaws: Sequence[float], d_yaw: float, d2, offs: Dict[float, float], place: Stance) -> List[float]:
+        """The init yaws of ``yaws`` (the target at ``yaw + d_yaw`` at C, ``offs`` their contact offsets) that :meth:`push_yaw_kept` keeps for the
+        push along ``d2`` from ``place``, in order; all of them without ``generation.push_under_yaw``. One INFO line 'push-under yaw lock
+        heel_first: kept N of M yaws' when it removes any."""
+        lock = self.push_yaw_lock()
+        if lock is None:
+            return list(yaws)
+        kept = [y for y in yaws if self.push_yaw_kept(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), d2, offs.get(y))]
+        if len(kept) < len(yaws):
+            TT._count(self, "push_yaw_lock.removed")
+            log.info("%s: push-under yaw lock %s: kept %d of %d yaws at C (d %.2f λ %+.2f, carry yaw offset %+.2f): %s, offsets %s m", self.gp.alias, lock, len(kept),
+                     len(yaws), place.stand_off or 0.0, place.lateral, d_yaw, [round(y, 2) for y in kept], [round(float(offs.get(y, -1.0)), 3) for y in kept])
+        return kept
 
     def push_drop_ahead_pref(self) -> Optional[float]:
         """The drop cell's preferred distance ahead of the base in the C order (``generation.push_under_drop_ahead_pref_m``; the pitched
@@ -2866,8 +2962,9 @@ class IORSLarge(SamplerV2):
                         for c_yaw, pd in _faces(a):
                             d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(c_yaw - m.yaw)
                             for y in sorted({float(yy) for yy, _ in F_a}):
-                                o = self.push_contact_offset(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), th.as_tensor(pd))
-                                if o is not None:
+                                q = G.qmul(G.quat_from_yaw(y + d_yaw), self.rest)
+                                o = self.push_contact_offset(q, th.as_tensor(pd))
+                                if o is not None and self.push_yaw_kept(q, pd, o):  # generation.push_under_yaw: the yaws it keeps
                                     best = max(best, o)
                     pushable[idx] = best
             _offsets()
@@ -2877,7 +2974,9 @@ class IORSLarge(SamplerV2):
                     break
                 _screen(n_pre)
                 _offsets()
-            log.info("%s: pre-screen blade contact offsets at C per B: %s", self.gp.alias, [round(pushable[i], 3) for i in range(len(pre))])
+            lock = self.push_yaw_lock()
+            log.info("%s: pre-screen blade contact offsets at C per B%s: %s", self.gp.alias, f" (push-under yaw lock {lock})" if lock else "",
+                     [round(pushable[i], 3) for i in range(len(pre))])
         min_off = float(self.num("push_min_contact_m", 0.10))
         idx_of = {id(t): i for i, t in enumerate(pre)}
         push_rank = (lambda t: 0 if pushable.get(idx_of[id(t)], 1.0) >= min_off else 1) if pushable else (lambda t: 0)  # noqa: E731
@@ -3364,8 +3463,13 @@ class IORSLarge(SamplerV2):
                 for y in yaws:
                     o = self.push_contact_offset(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), d_push)
                     offs[y] = -1.0 if o is None else o
+                # generation.push_under_yaw (owner 2026-10-13 ~02:55): only the yaws it keeps are chained and drawn at this C
+                yaws_c = self.push_yaws_locked(yaws, d_yaw, d_push, offs, place)
+                if yaws and not yaws_c:
+                    errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): the push-under yaw lock {self.push_yaw_lock()} keeps none of the {len(yaws)} yaws")
+                    continue
                 pst0 = push_st if push_st is not None else place
-                best = sorted(yaws, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
+                best = sorted(yaws_c, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
                 found = False
                 for y in best:
                     ck = (int(kc), int(round(y / yaw_step)))
@@ -3381,7 +3485,9 @@ class IORSLarge(SamplerV2):
                                  [round(float(v), 2) for v in P0.to_base_frame(ch["goal"][0], pst.base_pose2d, P0.base_z(self)).tolist()], ch["pitch_deg"], ch["fingertip_z_m"])
                         break
                 if not found:
-                    errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): no push chain at the {self.PUSH_YAW_ORDER} yaws ({', '.join(f'{offs[y]:.2f}' for y in best)} m)")
+                    lock = self.push_yaw_lock()
+                    errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): no push chain at the {self.PUSH_YAW_ORDER}{' ' + lock if lock else ''} yaws "
+                                  f"({', '.join(f'{offs[y]:.2f}' for y in best)} m)")
                     continue
             ignore_place = [partner] if self.relation == "ontop" else [self.obj("floor")]
             # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
@@ -3420,6 +3526,11 @@ class IORSLarge(SamplerV2):
                 # (2026-09-20 19:20: ordered by the blade's CONTACT offset at its height band - a sandal toe-first before its strap)
                 rank = {i: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(float(F[i][0]) + d_yaw), self.rest), offs.get(float(F[i][0]), -1.0)) for i in range(len(F))}
                 draw_order.sort(key=lambda i: round(rank[i], 2))
+                if len(yaws_c) < len(yaws):  # the push-under yaw lock: the pairs at the yaws it keeps
+                    kept_b = {int(round(y / yaw_step)) for y in yaws_c}
+                    draw_order = [i for i in draw_order if int(round(float(F[i][0]) / yaw_step)) in kept_b]
+                    if not draw_order:
+                        fails[f"C: the push-under yaw lock {self.push_yaw_lock()} keeps none of F's yaws"] = len(F)
             for i in draw_order[:int(self.num("f_draws_max", 8))]:  # failed B pairs are cached and skipped, so 8 draws cost little
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
@@ -3532,6 +3643,11 @@ class IORSLarge(SamplerV2):
                     fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
                     continue
                 level_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
+                if push and not self.push_yaw_kept(level_quat, place.extras["push_dir"]):  # the yaw drawn at B (jittered on a retry) off the lock's
+                    why_l = f"C: push-under yaw lock {self.push_yaw_lock()}: the drawn yaw is not kept"
+                    fails[why_l] = fails.get(why_l, 0) + 1
+                    seg.failed.setdefault(bk, why_l)
+                    continue
                 # the release tilts the pair passed at F_goal in order (the level release alone without them); per tilt the recorded finger
                 # assignment first, the other one (its B chain passed as well) only when the first fails here
                 g_row = g
