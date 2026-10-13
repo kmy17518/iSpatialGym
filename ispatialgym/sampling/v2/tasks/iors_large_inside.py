@@ -14,7 +14,10 @@ Stance C faces the opening: base square to a side of the interior raster (``insi
 ``"+y"``; default every side, pooled nearest first), stand-offs ``inside_stand_offs_m`` (default :data:`STAND_OFFS`) + the partner's AABB overhang,
 laterals along the side, trunks from the goal-side band (without one: the :data:`NO_BAND_TRUNKS` trunks per base pose
 with the most reach margin to the goal cell); the goal cell = the band-admitted goal cell nearest the base; the target at the goal in frame
-(5 %). Release (the small-scale drop): the target's bottom ``drop_height_m`` above the surface, raised until the open gripper's lowest point
+(5 %). The collision check tries the arm postures ``inside_stance_postures`` in order (:func:`free_in_postures`; default ``untucked``: the
+working arm untucked, the idle arm's A6 retry; ``ready`` / ``tucked``: both arms, as the goal-side band's ``trunk_config`` checks) and a
+candidate keeps the first that is free.
+Release (the small-scale drop): the target's bottom ``drop_height_m`` above the surface, raised until the open gripper's lowest point
 clears the surface by ``release_clearance_m`` for every library grasp; the partner stays in the collision world (the oracle's drop keeps its
 container). Goal check: teleport to the release, settle (the drop test), ``inside`` (the BDDL goal; ``predicates.inside_rays`` decides for a
 container without a fillable meta link) and the target's top at most ``max_protrusion_fraction`` of its height above the rim. The oracle
@@ -56,6 +59,10 @@ MAX_PROTRUSION_FRACTION = 0.5
 #: the collision-free ones with the goal in frame (the most margin = the deepest lean, which the counter run in front of a basin blocks)
 NO_BAND_TRUNKS = 3
 SIDE_MAX_DEG = 45.0
+#: ``generation.inside_stance_postures``: the arm postures stance C's collision check tries in order (the goal-side band's ``trunk_config``
+#: tries untucked -> ready -> tucked, both arms in one posture)
+STANCE_POSTURES = ("untucked",)
+POSTURE_NAMES = ("untucked", "ready", "tucked")
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -95,6 +102,18 @@ def side_vector(side: Any) -> Optional[th.Tensor]:
     if n < 1e-9:
         raise ValueError(f"inside_stance_side {side!r}: zero vector")
     return v / n
+
+
+def stance_postures(value: Any) -> List[str]:
+    """``generation.inside_stance_postures``: a posture name or a list of them (:data:`POSTURE_NAMES`) -> the names in order, repeats
+    dropped; None -> :data:`STANCE_POSTURES`."""
+    if value is None:
+        return list(STANCE_POSTURES)
+    names = [value] if isinstance(value, str) else list(value)
+    bad = [p for p in names if p not in POSTURE_NAMES]
+    if bad or not names:
+        raise ValueError(f"inside_stance_postures {value!r}: expected a non-empty list of {list(POSTURE_NAMES)}")
+    return list(dict.fromkeys(names))
 
 
 def edges_facing(edges: Sequence[EdgeFrame], side: Optional[th.Tensor], max_deg: float = SIDE_MAX_DEG) -> List[EdgeFrame]:
@@ -153,6 +172,32 @@ def best_per_base(stances: Sequence[Stance], k: int) -> List[Stance]:
 # ----------------------------------------------------------------------------------------------------------------
 # the mode
 # ----------------------------------------------------------------------------------------------------------------
+
+
+def free_in_postures(s, cands: Sequence[Stance], postures: Sequence[str]) -> Tuple[List[Stance], Dict[str, int]]:
+    """Stance C's collision check: each candidate in the first posture of ``postures`` that is free, the candidates' order kept -
+    ``untucked``: :func:`prompt0.body_free`'s default (the working arm untucked, the idle arm's A6 retry, which records the idle posture
+    that passed); ``ready`` / ``tucked``: both arms in that posture. A survivor in ``ready`` / ``tucked`` records it as its
+    ``idle_posture`` - the posture of its sidecar record (``idle_posture`` / ``arms_q``), of the drive-in and of the carried drive after
+    B's departure transition (:meth:`InsideMode.carry_drive_arms`) - and in ``extras["stance_posture"]``; its working arm at C is the
+    carry configuration, then the exact IK with the target attached. Returns the survivors and the number per posture."""
+    passed: Dict[int, str] = {}
+    todo = list(range(len(cands)))
+    for name in postures:
+        if not todo:
+            break
+        part = [cands[i] for i in todo]
+        free = P0.body_free(s, part) if name == "untucked" else P0.body_free(s, part, posture=name)
+        passed.update({i: name for i, f in zip(todo, free.tolist()) if f})
+        todo = [i for i in todo if i not in passed]
+    out = []
+    for i in sorted(passed):
+        st = cands[i]
+        if passed[i] != "untucked":
+            st.idle_posture = passed[i]
+            st.extras["stance_posture"] = passed[i]
+        out.append(st)
+    return out, {name: sum(1 for p in passed.values() if p == name) for name in postures}
 
 
 class InsideMode:
@@ -272,11 +317,16 @@ class InsideMode:
     # ------------------------------------------------------------------ stance C
 
     def _placement_candidates_at(self, edge: EdgeFrame, init_xy, arm: Optional[str] = None) -> List[Stance]:
-        """Stance C at one side of the interior raster (module docstring): stand-off x lateral x trunk, collision-free, the target at the
-        goal cell in frame (without a band: then the :data:`NO_BAND_TRUNKS` per base pose with the most reach margin); each survivor
-        carries ``goal_cell`` (and ``reach_margin_m`` without a band)."""
+        """Stance C at one side of the interior raster (module docstring): stand-off x lateral x trunk, collision-free in the first free
+        posture of ``inside_stance_postures`` (:func:`free_in_postures`), the target at the goal cell in frame (without a band: then the
+        :data:`NO_BAND_TRUNKS` per base pose with the most reach margin); each survivor carries ``goal_cell`` (and ``reach_margin_m``
+        without a band)."""
         arm = arm or self.seg_arm
         partner = self.partner
+        try:
+            postures = stance_postures(self.gp.gen("inside_stance_postures"))
+        except ValueError as e:
+            raise Reject("spec", f"{self.gp.alias}: {e}")
         half, height = float(self.place["half"]), float(self.place["height"])
         rb = self.inside_band(arm)
         self.place["band"] = rb
@@ -319,9 +369,10 @@ class InsideMode:
         if not cands:
             log.info("%s: inside stance C at %s side %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
             return []
-        free = P0.body_free(self, cands)
-        cands = [st for st, f in zip(cands, free.tolist()) if f]
+        cands, by_posture = free_in_postures(self, cands, postures)
         stats["collision_free"] = len(cands)
+        if postures != list(STANCE_POSTURES):
+            stats["postures"] = by_posture
         if not cands:
             log.info("%s: inside stance C at %s side %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
             return []
@@ -347,6 +398,16 @@ class InsideMode:
         out = P0.best_class(classed)
         log.info("%s: inside stance C at %s side %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out), stats)
         return out
+
+    def carry_drive_arms(self, place: Stance, tname: str, arm: str) -> Optional[Dict[str, th.Tensor]]:
+        """The arms the carried drive after B's departure transition is checked with: the oracle's departure transition puts the idle arm
+        in C's recorded posture (``move_idle_arms``) and the carried drive keeps it there, so a C kept in ``ready`` / ``tucked`` by
+        :func:`free_in_postures` is driven to with C's arms and the holding arm at its carry configuration; otherwise IORSLarge's."""
+        q_carry = self.carry_arm_q.get(tname)
+        if not place.extras.get("stance_posture") or q_carry is None:
+            return super().carry_drive_arms(place, tname, arm)
+        r, l, _ = IK.stance_arm_vectors(self.kit, place)
+        return {"right": r, "left": l, arm: q_carry}
 
     # ------------------------------------------------------------------ the release (the small-scale drop)
 

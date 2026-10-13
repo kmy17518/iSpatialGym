@@ -1635,7 +1635,12 @@ three collision-free trunks per base pose with the goal in frame and the most re
 that distance: a plate as wide as the basin floor rests with its rim over the flaring walls). **Stance C** faces the opening:
 square to the side of the raster facing `inside_stance_side` (world direction, e.g. `"+y"`; default every side), stand-offs
 `inside_stand_offs_m` (default 0.35 / 0.45 / 0.55 / 0.65) + the AABB overhang, laterals along the side, the goal cell = the band
-cell nearest the base, the target at the goal in frame (5 %; `inside_axis_cone_deg` optional). **Release** (the small-scale drop):
+cell nearest the base, the target at the goal in frame (5 %; `inside_axis_cone_deg` optional). The collision check tries the arm
+postures `inside_stance_postures` in order (default `["untucked"]`: the working arm untucked, the idle arm's A6 retry; `ready` /
+`tucked`: both arms in that posture, as the goal-side band's `trunk_config` checks) and a candidate keeps the first that is free; a
+`ready` / `tucked` survivor records it as its `idle_posture` (and `extras.stance_posture`): the sidecar's `idle_posture` / `arms_q`,
+the drive-in and the carried B → C drive after B's departure transition use it, while the working arm at C holds the carry
+configuration, then the exact IK with the target attached (owner 2026‑10‑12 ~20:00, inside_large_scale#02). **Release** (the small-scale drop):
 the target's bottom `drop_height_m` (0.005) above the surface, raised until the open gripper's lowest point clears it by
 `release_clearance_m` (0.02) for every library grasp; the partner stays in the collision world. **Goal check**: teleport to the
 release, settle (drop test); `(inside ?target ?partner)` — for a container without a fillable / openfillable meta link the robust

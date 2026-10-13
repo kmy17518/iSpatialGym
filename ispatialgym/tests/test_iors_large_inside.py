@@ -16,7 +16,7 @@ from ispatialgym.oracle.sidecar import Sidecar
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import predicates as PRED
 from ispatialgym.sampling.sim_utils import Reject, SupportInterior
-from ispatialgym.sampling.v2.stances import EdgeFrame
+from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 from ispatialgym.sampling.v2.tasks import iors_large_inside as IN  # noqa: E402
@@ -282,6 +282,187 @@ def test_no_band_stance_c_keeps_the_free_trunks_with_the_most_reach_margin(monke
     assert {(c.translate, c.tilt) for c in out if c.stand_off == 0.55} == {(0.5, -0.6), (0.95, -0.3), (0.75, -0.3)}
     # inside_no_band_trunks still sets the number kept
     assert len(_StanceCStub(inside_no_band_trunks=1)._placement_candidates_at(edge, (8.25, 0.64), "right")) == 4
+
+
+def test_stance_postures_key():
+    assert IN.stance_postures(None) == ["untucked"] and IN.stance_postures("ready") == ["ready"]
+    assert IN.stance_postures(["untucked", "ready", "tucked", "ready"]) == ["untucked", "ready", "tucked"]
+    for bad in ([], ["crouched"], ["untucked", "reset"]):
+        with pytest.raises(ValueError):
+            IN.stance_postures(bad)
+
+
+#: the trunks of the fridge's goal-side band (tband 17832286 / 17832291: a trunk is free only with the arms ready or tucked); the
+#: deepest needs tucked arms here
+FRIDGE_BAND_TRUNKS = [(0.25, 0.0), (0.5, -0.3), (0.75, -0.3), (0.95, -0.6)]
+POSTURE_Q = {"untucked": 0.0, "ready": 1.0, "tucked": 2.0}
+
+
+class _BandStanceCStub(_StanceCStub):
+    """:class:`_StanceCStub` with a goal-side band whose cells admit every goal cell (inside_large#02: fridge_petcxr_0's +y side)."""
+
+    def inside_band(self, arm):
+        return SimpleNamespace(trunks=lambda: list(FRIDGE_BAND_TRUNKS), meta={"lattice": 0.08})
+
+    def band_cells_world(self, rb, st):
+        return self.place["cells"]
+
+    def _snap(self, cells, goal_cells, lattice):
+        return goal_cells
+
+
+def _fridge_body_free(calls):
+    """``prompt0.body_free`` at the open fridge: the untucked check (working arm untucked, the idle arm's A6 retry) collides everywhere,
+    both arms ready are free up to translate 0.75, both tucked everywhere."""
+
+    def body_free(s, cands, posture=None, **kw):
+        calls.append((posture, [(c.stand_off, c.translate) for c in cands]))
+        if posture is None:
+            return th.zeros(len(cands), dtype=th.bool)
+        return th.tensor([posture == "tucked" or c.translate <= 0.75 for c in cands])
+
+    return body_free
+
+
+def _visible_everywhere(monkeypatch):
+    monkeypatch.setattr(IN.P0, "base_ok", lambda s, xy: True)
+    monkeypatch.setattr(IN.P0, "camera_poses", lambda s, cands: list(cands))
+    monkeypatch.setattr(IN.P0, "in_frame", lambda s, cam, pts: True)
+    monkeypatch.setattr(IN.P0, "axis_angle", lambda s, cam, point: 0.3)
+
+
+def test_stance_c_keeps_the_first_free_posture(monkeypatch):
+    """inside_large#02 (owner 2026-10-12 ~20:00): the band admitted stance C with the arms ready / tucked only, while the stance-C check
+    held the working arm untucked - every candidate collided. With ``inside_stance_postures`` [untucked, ready, tucked] a candidate keeps
+    the first free posture and records it as its idle posture (the sidecar record, the drive-in); untucked survivors are unchanged."""
+    edge = EdgeFrame.from_edge("+u", th.tensor([5.683, -1.752]), th.tensor([0.0025, 1.0]), 0.18, 0.09)
+    _visible_everywhere(monkeypatch)
+    calls = []
+    monkeypatch.setattr(IN.P0, "body_free", _fridge_body_free(calls))
+    assert _BandStanceCStub()._placement_candidates_at(edge, (8.25, 0.64), "right") == []  # the 19:32 run: every candidate collides
+    calls.clear()
+    s = _BandStanceCStub(inside_stance_postures=["untucked", "ready", "tucked"])
+    out = s._placement_candidates_at(edge, (8.25, 0.64), "right")
+    lattice = [(so, tr) for so in IN.STAND_OFFS for tr, _ in FRIDGE_BAND_TRUNKS]
+    assert [(c.stand_off, c.translate) for c in out] == lattice  # the lattice order
+    assert [c.idle_posture for c in out] == [c.extras["stance_posture"] for c in out] == ["ready" if tr <= 0.75 else "tucked" for _, tr in lattice]
+    # each posture is tried on what the earlier ones left
+    assert [(p, len(c)) for p, c in calls] == [(None, 16), ("ready", 16), ("tucked", 4)] and all(tr > 0.75 for _, tr in calls[2][1])
+    stats = s.template_facts["placement_stats"]
+    assert stats["collision_free"] == 16 and stats["postures"] == {"untucked": 0, "ready": 12, "tucked": 4} and stats["visible"] == 16
+    # the placement stance _couple builds from a survivor keeps the posture: its sidecar record and the arms of every check from C
+    c = out[0]
+    place = c.with_trunk(c.translate, c.tilt, "placement")
+    place.arms, place.extras = ["right"], dict(c.extras)
+    rec = place.to_sidecar()
+    assert rec["arms"] == ["right"] and rec["idle_posture"] == "ready" and rec["stance_posture"] == "ready"
+    kit = SimpleNamespace(robot=None, arm_q=lambda name, arm: th.full((7,), POSTURE_Q[name]))
+    r, l, _ = IN.IK.stance_arm_vectors(kit, place)
+    assert bool((l == POSTURE_Q["ready"]).all()) and bool((r == POSTURE_Q["untucked"]).all())  # the working arm: the carry / the exact IK
+    # an untucked survivor stays as the untucked check left it (the A6 retry's idle posture, no stance_posture)
+
+    def a6(s_, cands, posture=None, **kw):
+        if posture is None:
+            for c_ in cands:
+                c_.idle_posture = "tucked" if c_.translate == 0.25 else None
+            return th.tensor([c_.translate == 0.25 for c_ in cands])
+        return th.ones(len(cands), dtype=th.bool)
+
+    monkeypatch.setattr(IN.P0, "body_free", a6)
+    s = _BandStanceCStub(inside_stance_postures=["untucked", "ready", "tucked"])
+    out = s._placement_candidates_at(edge, (8.25, 0.64), "right")
+    assert [(c.idle_posture, c.extras.get("stance_posture")) for c in out if c.translate == 0.25] == [("tucked", None)] * 4
+    assert {c.extras.get("stance_posture") for c in out if c.translate != 0.25} == {"ready"}
+    assert s.template_facts["placement_stats"]["postures"] == {"untucked": 4, "ready": 12, "tucked": 0}
+
+
+def test_stance_c_default_postures_are_the_untucked_check(monkeypatch):
+    """Without ``inside_stance_postures``: one ``prompt0.body_free`` call with today's arguments, the survivors as it left them, the
+    placement stats without ``postures``; an unknown posture name is a ``spec`` rejection."""
+    edge = EdgeFrame.from_edge("+u", th.tensor([5.683, -1.752]), th.tensor([0.0025, 1.0]), 0.18, 0.09)
+    _visible_everywhere(monkeypatch)
+    calls = []
+    monkeypatch.setattr(IN.P0, "body_free", lambda s, cands, **kw: (calls.append(kw), th.tensor([c.translate <= 0.5 for c in cands]))[1])
+    for gen in ({}, {"inside_stance_postures": ["untucked"]}):
+        calls.clear()
+        s = _BandStanceCStub(**gen)
+        out = s._placement_candidates_at(edge, (8.25, 0.64), "right")
+        assert calls == [{}] and [(c.stand_off, c.translate) for c in out] == [(so, tr) for so in IN.STAND_OFFS for tr, _ in FRIDGE_BAND_TRUNKS if tr <= 0.5]
+        assert all(c.idle_posture is None and "stance_posture" not in c.extras for c in out)
+        stats = s.template_facts["placement_stats"]
+        assert stats["collision_free"] == 8 and "postures" not in stats
+    with pytest.raises(Reject) as e:
+        _BandStanceCStub(inside_stance_postures=["untucked", "crouched"])._placement_candidates_at(edge, (8.25, 0.64), "right")
+    assert e.value.reason == "spec"
+
+
+def test_carry_drive_arms_follow_the_posture_stance_c_kept():
+    """The oracle's departure transition at B puts the idle arm in C's recorded posture and the carried drive keeps it: a C kept in
+    ready / tucked has the B -> C drive checked with C's arms and the holding arm at its carry configuration; else IORSLarge's default."""
+    cls = type("IORSLarge_InsideMode", (IN.InsideMode, IL.IORSLarge), {})
+    s = cls.__new__(cls)
+    s.kit = SimpleNamespace(robot=None, arm_q=lambda name, arm: th.full((7,), POSTURE_Q[name]))
+    place = Stance("placement", (5.68, -1.2, -1.57), 0.5, -0.3, 0.45, None, None, 0.0, None, ["right"])
+    place.idle_posture, place.extras["stance_posture"] = "tucked", "tucked"
+    assert s.carry_drive_arms(place, "jar", "right") is None  # no carry configuration recorded
+    q_carry = th.full((7,), 9.0)
+    s.record_carry_arm_q("jar", "right", q_carry)
+    arms = s.carry_drive_arms(place, "jar", "right")
+    assert sorted(arms) == ["left", "right"] and bool((arms["right"] == q_carry).all()) and bool((arms["left"] == POSTURE_Q["tucked"]).all())
+    place.idle_posture = None
+    del place.extras["stance_posture"]
+    assert s.carry_drive_arms(place, "jar", "right") is None and IL.IORSLarge.carry_drive_arms(s, place, "jar", "right") is None
+
+
+class _CarryLegStub:
+    """What :meth:`IORSLarge.record_carry_leg` reads; ``record_path`` records its keyword arguments (``collide`` first calls fail)."""
+
+    record_carry_leg = IL.IORSLarge.record_carry_leg
+    num = IL.IORSLarge.num
+
+    def __init__(self, drive_q, travel, collide=0):
+        self.gp, self.seg_arm, self.template_facts = _GP(), "right", {}
+        self.drive_q, self.travel, self.collide, self.paths = drive_q, travel, collide, []
+
+    def record_carry_arm_q(self, carried, arm, q):
+        pass
+
+    def travel_trunks(self, init, manip):
+        return list(self.travel)
+
+    def record_departure_transition(self, frm, to, tt, carried=None, arm=None):
+        return SimpleNamespace(stand_off=0.65)
+
+    def carry_drive_arms(self, place, tname, arm):
+        return self.drive_q
+
+    def record_path(self, frm, to, **kw):
+        self.paths.append(kw)
+        if len(self.paths) <= self.collide:
+            raise Reject("path_collision", "stride 4/35")
+        return SimpleNamespace(length_m=3.2)
+
+    def record_transition(self, frm, to, **kw):
+        pass
+
+    def _drop_leg_records(self, to):
+        pass
+
+
+def test_record_carry_leg_drives_after_the_departure_with_the_carry_drive_arms():
+    manip = Stance("manipulation", (2.0, 1.0, 0.0), 0.75, -0.3, 0.45, None, None, 0.0, None, ["right"])
+    place = Stance("placement", (5.68, -1.2, -1.57), 0.5, -0.3, 0.45, None, None, 0.0, None, ["right"])
+    drive_q = {"right": th.zeros(7), "left": th.ones(7)}
+    s = _CarryLegStub(drive_q, [(0.75, 0.0)], collide=1)  # the local path collides: the eroded global map, same arms
+    s.record_carry_leg(None, manip, place, "jar", th.zeros(7), 6.0)
+    assert [(kw["arm_q"] is drive_q, kw["trunk"], kw.get("force_global", False)) for kw in s.paths] == [(True, (0.75, 0.0), False), (True, (0.75, 0.0), True)]
+    assert s._leg_bc["order"] == "straighten_then_navigate" and place.carried == "jar"
+    s = _CarryLegStub(None, [(0.75, 0.0)])
+    s.record_carry_leg(None, manip, place, "jar", th.zeros(7), 6.0)
+    assert [kw["arm_q"] for kw in s.paths] == [None]  # IORSLarge's default: record_path's own arms
+    s = _CarryLegStub(drive_q, [(0.75, -0.3)])  # B already straight: the drive at B's trunk keeps B's arms (no departure re-poses them)
+    s.record_carry_leg(None, manip, place, "jar", th.zeros(7), 6.0)
+    assert [("arm_q" in kw, "trunk" in kw) for kw in s.paths] == [(False, False)] and s._leg_bc["order"] == "drive_at_grasp_trunk"
 
 
 # ----------------------------------------------------------------------------------------------------------------

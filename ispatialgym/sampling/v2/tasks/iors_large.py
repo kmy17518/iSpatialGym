@@ -2087,8 +2087,9 @@ class IORSLarge(SamplerV2):
             try:
                 dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm)
                 start = NAV.departure_pose(manip, dep.stand_off)
+                drive_q = self.carry_drive_arms(place, tname, arm)
                 try:
-                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start)
+                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start, arm_q=drive_q)
                 except Reject as e:
                     if e.reason != "path_collision":
                         raise
@@ -2096,7 +2097,8 @@ class IORSLarge(SamplerV2):
                     # at the table end); the eroded global map keeps the body's distance
                     self._drop_leg_records(place.name)
                     dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm)
-                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start, force_global=True)
+                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start, force_global=True,
+                                            arm_q=drive_q)
                 # a carry into a deep crouch backs off further before the sweep (the hand frozen at the lift pose swings ~0.5 m
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
                 self.record_transition(manip, place, carried=tname, arm=arm, trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
@@ -2128,6 +2130,11 @@ class IORSLarge(SamplerV2):
         except Reject as e:
             self._drop_leg_records(place.name)
             raise Reject(e.reason, f"{e}; straighten-then-navigate: " + "; ".join(errors))
+
+    def carry_drive_arms(self, place: Stance, tname: str, arm: str) -> Optional[Dict[str, th.Tensor]]:
+        """The arms (arm -> 7 joints) the carried drive after B's departure transition is checked with; None = :meth:`record_path`'s
+        default (the departing stance's arms, the holding arm at its carry configuration). The inside mode overrides it."""
+        return None
 
     #: carry pose candidates in B's base frame: (ahead, lateral, raise above the lift) — beside the body first (owner 2026-09-20
     #: 06:40: a pose in front of the chest swings INTO the base when the torso tilts 54 deg into the push-under crouch; a hand
