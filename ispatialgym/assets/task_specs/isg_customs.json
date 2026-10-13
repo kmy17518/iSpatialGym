@@ -43416,7 +43416,63 @@
    "init_support_fallback": true,
    "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)",
    "carry_collision_margin_m": 0.01,
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "push_tip_frac": 0.3,
+   "push_under_stand_offs_m": [
+    0.78,
+    0.76,
+    0.8
+   ],
+   "push_under_drop_ahead_pref_m": 0.58,
+   "push_under_drop_extra_m": 0.1,
+   "push_under_inside_m": 0.07,
+   "drop_height_m": 0.15,
+   "drop_trunks": [
+    [
+     0.95,
+     -1.2
+    ],
+    [
+     0.75,
+     -0.9
+    ],
+    [
+     0.75,
+     -0.6
+    ],
+    [
+     0.75,
+     -1.2
+    ],
+    [
+     0.5,
+     -0.9
+    ]
+   ],
+   "push_goal_extra_m": 0.01,
+   "carry_transition_extra_m": 1.0,
+   "travel_trunks": [
+    [
+     2.0,
+     0.0
+    ],
+    [
+     1.5,
+     0.0
+    ],
+    [
+     1.0,
+     0.0
+    ],
+    [
+     0.5,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ]
   },
   "constraints": []
  },
@@ -43866,7 +43922,63 @@
    "init_support_fallback": true,
    "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)",
    "carry_collision_margin_m": 0.01,
-   "attempt_budget_s": 3000
+   "attempt_budget_s": 3000,
+   "push_tip_frac": 0.3,
+   "push_under_stand_offs_m": [
+    0.78,
+    0.76,
+    0.8
+   ],
+   "push_under_drop_ahead_pref_m": 0.58,
+   "push_under_drop_extra_m": 0.1,
+   "push_under_inside_m": 0.07,
+   "drop_height_m": 0.15,
+   "drop_trunks": [
+    [
+     0.95,
+     -1.2
+    ],
+    [
+     0.75,
+     -0.9
+    ],
+    [
+     0.75,
+     -0.6
+    ],
+    [
+     0.75,
+     -1.2
+    ],
+    [
+     0.5,
+     -0.9
+    ]
+   ],
+   "push_goal_extra_m": 0.01,
+   "carry_transition_extra_m": 1.0,
+   "travel_trunks": [
+    [
+     2.0,
+     0.0
+    ],
+    [
+     1.5,
+     0.0
+    ],
+    [
+     1.0,
+     0.0
+    ],
+    [
+     0.5,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ]
   },
   "constraints": []
  },
