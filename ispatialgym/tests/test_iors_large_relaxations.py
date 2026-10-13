@@ -185,6 +185,75 @@ def test_init_support_fallback_floor_for_ontop_and_own_top_for_under(monkeypatch
     assert s.init_support_fallback("floor") is None and s.init_support_fallback("partner") is None
 
 
+def _kitchen_kit():
+    """OmniGibson's own traversability map (0.1 m cells, world x = (column - 40) * 0.1, y = (row - 40) * 0.1; the R1Pro erosion: 7 cells)
+    of a 6 m kitchen: an L-shaped counter run along the south and west walls (south arm y < -2.2, west arm x < -2.2), an island, and a
+    closet east of the wall at x = 3.1..3.4. The kit's geodesic is ``RobotKit.geodesic``'s call."""
+    from omnigibson.maps.traversable_map import TraversableMap
+
+    def cells(x0, x1, y0, y1):
+        return slice(int(round(y0 / 0.1)) + 40, int(round(y1 / 0.1)) + 40), slice(int(round(x0 / 0.1)) + 40, int(round(x1 / 0.1)) + 40)
+
+    floor = th.zeros(80, 80, dtype=th.uint8)
+    floor[cells(-3.0, 3.1, -3.0, 3.1)] = 255
+    floor[cells(3.4, 5.4, -3.0, 3.1)] = 255
+    for box in ((-3.0, 3.1, -3.0, -2.2), (-3.0, -2.2, -3.0, 1.0), (-1.0, 2.0, -0.5, 0.5), (4.6, 5.2, 2.0, 2.5)):
+        floor[cells(*box)] = 0
+    trav = TraversableMap(map_resolution=0.1)
+    trav.map_size, trav.floor_map, trav.floor_heights = 80, [floor], [0.0]
+    robot = SimpleNamespace(reset_joint_pos_aabb_extent=th.tensor([0.728, 0.684, 1.478]))
+    world = SimpleNamespace(scene=SimpleNamespace(trav_map=trav))
+
+    def geodesic(a, b):
+        path, dist = trav.get_shortest_path(0, G.t(a)[:2], G.t(b)[:2], entire_path=True, robot=robot)
+        return path, (None if dist is None else float(dist))
+
+    return SimpleNamespace(world=world, robot=robot, eroded_trav_map=lambda floor=0: trav._erode_trav_map(th.clone(trav.floor_map[0]), robot=robot),
+                           geodesic=geodesic)
+
+
+class _GeoStub:
+    geodesic_between = IL.IORSLarge.geodesic_between
+    _geodesic = IL.IORSLarge._geodesic
+    free_cell_near = IL.IORSLarge.free_cell_near
+    near_side_point = IL.IORSLarge.near_side_point
+
+    def __init__(self, kit):
+        self.kit = kit
+
+
+def _obj(name, lo, hi):
+    lo, hi = th.tensor(lo, dtype=th.float32), th.tensor(hi, dtype=th.float32)
+    return SimpleNamespace(name=name, aabb=(lo, hi), aabb_center=(lo + hi) / 2)
+
+
+def test_geodesic_between_moves_off_map_anchors_onto_the_eroded_map():
+    """inside_large#03: the drop-in sink sits in the counter run, so the counter's anchor (the sink's centre + 0.5 m) is on the counter,
+    the L-joined counter's anchor on the south arm, the sink's anchor toward it in the erosion band - OmniGibson's A* has no path and the
+    2b cap dropped both counters as "no geodesic". Anchors on free floor keep the plain geodesic; disconnected floor stays None."""
+    kit = _kitchen_kit()
+    s = _GeoStub(kit)
+    sink = _obj("drop_in_sink_awvzkn_0", (-0.4, -2.9, 0.7), (0.4, -2.35, 1.1))
+    south, west = _obj("countertop_kelzer_0", (-2.2, -3.0, 0.85), (3.0, -2.2, 0.89)), _obj("countertop_kelker_0", (-3.0, -3.0, 0.85), (-2.2, 1.0, 0.89))
+    island, shelf = _obj("bar_udatjt_0", (-1.0, -0.5, 0.0), (2.0, 0.5, 1.05)), _obj("shelf_0", (4.6, 2.0, 0.0), (5.2, 2.5, 1.5))
+
+    def plain(a, b):
+        return kit.geodesic(s.near_side_point(a, b.aabb_center[:2]), s.near_side_point(b, a.aabb_center[:2]))[1]
+
+    assert plain(south, sink) is None and plain(west, sink) is None  # the bug: both counters had no geodesic
+    d_south, d_west = s.geodesic_between(south, sink), s.geodesic_between(west, sink)
+    assert d_south is not None and d_south < 1.0 and d_west is not None and d_west < 1.5
+    assert s.geodesic_between(island, sink) == pytest.approx(float(plain(island, sink)))  # anchors on the map: unchanged
+    assert s.geodesic_between(shelf, sink) is None  # the closet's floor does not connect to the kitchen
+    # the snapped end is the centre of a free cell of the eroded map, which world_to_map takes back to that cell
+    c = s.free_cell_near(th.tensor([0.5, -2.625]))
+    free = kit.eroded_trav_map() == 255
+    assert bool(free[tuple(int(v) for v in kit.world.scene.trav_map.world_to_map(c).tolist())]) and float(c[1]) > -2.2 + 0.3
+    # the 2b cap keeps the counters now
+    ns = SimpleNamespace(support_drops={}, partner=sink, geodesic_between=s.geodesic_between)
+    assert IL.IORSLarge._support_near_partner(ns, south, 10.0) and IL.IORSLarge._support_near_partner(ns, west, 10.0) and ns.support_drops == {}
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # 2c: the place-under (generation.under_mode != "push") end to end
 # ----------------------------------------------------------------------------------------------------------------

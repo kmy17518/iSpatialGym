@@ -1597,6 +1597,9 @@ stays as above. The keys an alias sets are recorded in `template_facts.relaxatio
   near-edge line (2 points).
 - `init_support_max_geodesic_m` (float, default unset = named supports as bound, category supports within
   `max_partner_geodesic`): a support, named or by category, whose geodesic to the partner is None or larger is dropped.
+  The geodesic runs between points 0.5 m outside the two AABBs' facing sides; when one of them lies off the robot-eroded map
+  (in a support whose AABB holds the partner, as the counter of a drop-in sink, on a neighbour, in the erosion band) both move
+  to their nearest eroded-free cell first.
 - `init_support_fallback` (bool, default false = A5's no runtime class switching): when no support is left (too far,
   missing from the scene, none of the category) ontop falls back to the floor init and under to the partner's own top;
   recorded as `template_facts.init_surface.fallback = {from, to, reason}` (and in the instance summary's `init_surface`).

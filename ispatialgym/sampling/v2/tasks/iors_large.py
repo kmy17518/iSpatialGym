@@ -555,13 +555,34 @@ class IORSLarge(SamplerV2):
         return near + (d / n if n > 1e-6 else th.tensor([1.0, 0.0])) * off
 
     def geodesic_between(self, a, b) -> Optional[float]:
+        """``kit.geodesic`` (OmniGibson's A* on the robot-eroded map) between the :meth:`near_side_point` anchors of ``a`` and ``b``. That
+        A* finds no path when an anchor lies off the eroded map - in a support whose AABB holds the partner (a drop-in sink set in the
+        counter run), on a neighbour (an L-joined counter), in the erosion band in front of a counter -, so then both anchors move to
+        their nearest eroded-free cell (:meth:`free_cell_near`) and the geodesic is taken between those."""
         ca, cb = a.aabb_center[:2].float(), b.aabb_center[:2].float()
         pa, pb = self.near_side_point(a, cb), self.near_side_point(b, ca)
+        dist = self._geodesic(pa, pb)
+        if dist is None:
+            ends = [self.free_cell_near(p) for p in (pa, pb)]
+            if all(e is not None for e in ends):
+                dist = self._geodesic(*ends)
+        return dist
+
+    def _geodesic(self, pa, pb) -> Optional[float]:
         try:
             _, dist = self.kit.geodesic(pa, pb)
         except Exception:  # noqa: BLE001
             return None
         return dist
+
+    def free_cell_near(self, xy, max_cells: int = 20) -> Optional[th.Tensor]:
+        """Centre (world xy) of the eroded-free traversability cell nearest ``xy`` (``navigation.nearest_free_cell``: ``xy``'s own cell when
+        free, None beyond ``max_cells``). The centre, not the corner ``map_to_world`` gives: ``world_to_map`` truncates, and a corner can
+        come back as the blocked neighbour."""
+        ij = NAV.nearest_free_cell(NAV.eroded_map(self.kit), NAV._to_map(self.kit, xy), max_cells)
+        if ij is None:
+            return None
+        return NAV._to_world(self.kit, ij) + 0.5 * float(self.kit.world.scene.trav_map.map_resolution)
 
     def prepare_bindings(self):
         try:
