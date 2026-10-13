@@ -394,6 +394,15 @@ item 2b; default None = off, the owner's value 0.06) also plans a brace / push p
 that far above every support near it (inside the footprints, over the tops — a desk, not a wall); grasp pre-poses keep the
 8 cm rule. The program check follows the knob.
 
+**A straight push's lowered pre-contact** (owner 2026‑09‑18; corrected 2026‑10‑12, touching#02). A straight push (no `mid`,
+not a pitched blade class) whose recorded pre-contact lies farther than `push_pre_dist_m` (4 cm) + 5 mm before its first
+contact pose — the recorded `contacts.push.init` — is reached at `push_pre_dist_m` before the init along the recorded approach,
+without the witness; the pad then finishes the approach to the init and pushes along the recorded line
+(`execute.push_lowered_pre`, the same decision in `program_check.push_keeps_recorded_pre`). The lowered pose and its leg lie on
+the approach the sampler tracked from the recorded pre-contact to the init. The first push waypoint is not the init: the line
+(`actions._line`) leaves its start out and begins a third of the push past it — a top-down blade lowered over it stood that far
+toward the object (touching#02, 7.85 cm push: 3.5 mm inside the box's face, the fingers on its top).
+
 **One chain, as the oracle runs it** (owner 2026-09-24). The targets of an action are checked in the order the arm
 moves through them, and every leg leaves from the configuration the arm is actually in: a chain whose first pose is
 where the previous motion left the arm (the retreat off the place configuration, the lift off the grasp, a `Retreat`

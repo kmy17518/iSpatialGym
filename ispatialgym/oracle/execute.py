@@ -3560,6 +3560,8 @@ def _pitched_blade(motions: Motions, state, arm: str, targets: Dict[str, Any], p
                 return None
         out = dict(targets)
         out["pre"], out["waypoints"] = pre, wps
+        if "init" in targets:
+            out["init"] = Pose(position=[float(v) for v in re_origin(targets["init"]).tolist()], orientation=[float(v) for v in quat.tolist()])
         return out
     except Exception as e:  # noqa: BLE001 - the pitch is an option, never a failure
         log.info("push: pitched blade unavailable (%r)", e)
@@ -3760,6 +3762,32 @@ def _push_goal_follow(action: Push, state, ctx: Dict[str, Any], cfg: ExecuteConf
     return d if dist >= cfg.push_goal_follow_min_m else None
 
 
+def _pitched_push_class(contact) -> bool:
+    """A recorded pitched blade class (``push_blade_30`` and steeper, the sampler's palm-away candidates)."""
+    try:
+        cls = str((getattr(contact, "extra", None) or {}).get("pose_class") or "")
+        return cls.startswith("push_blade_") and float(cls[len("push_blade_"):].rstrip("-")) >= 30.0
+    except (TypeError, ValueError):
+        return False
+
+
+def push_lowered_pre(contact, pre, first, cfg: ExecuteConfig) -> Optional[Pose]:
+    """The pre-contact a straight push is reached at instead of the recorded ``pre`` (owner 2026-09-18 12:42 (1)): ``push_pre_dist_m``
+    before the first contact pose ``first`` along the recorded approach, when ``pre`` lies farther than that (+ 5 mm) before it.
+    None keeps the recorded pre-contact: an arc (``mid``), a pitched blade class (its shortened pre-pose sits at the table),
+    ``push_pre_dist_m`` None, no ``first``. ``first`` must be the recorded ``contact.init``, not the first push waypoint: a straight
+    push's waypoints (``actions._line``) leave the start out and begin a third of the push past it, which put a lowered top-down
+    blade that far toward the object - over its top once the third exceeds the blade's stand-off from the face."""
+    if getattr(contact, "mid", None) is not None or cfg.push_pre_dist_m is None or first is None or _pitched_push_class(contact):
+        return None
+    p_pre, q_pre = as_world_pose(pre)
+    p_first, _ = as_world_pose(first)
+    a_dir = C.approach_axis(q_pre)
+    if float(th.dot(p_first - p_pre, a_dir)) <= cfg.push_pre_dist_m + 0.005:
+        return None
+    return Pose(position=[float(v) for v in (p_first - a_dir * cfg.push_pre_dist_m).tolist()], orientation=[float(v) for v in q_pre.tolist()])
+
+
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.contact.arm
@@ -3778,6 +3806,10 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     except Exception:  # noqa: BLE001
         through = []
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in list(supports) + through]
+    if action.contact.mid is None and getattr(action.contact, "init", None) is not None:
+        # the first contact pose, moved with the pad below like pre / waypoints (a straight push's waypoints start past it)
+        targets = dict(targets)
+        targets["init"] = action.contact.init
     # rush 2026-09-17: a straight push is re-centred on the object's ACTUAL planar position - the recorded pad poses
     # assume the object at goal - direction x distance_m (the recorded place); a box placed 1-3 cm off is met off-centre
     # and yaws under the push (touching 0917-215342: 35 deg, orientation tolerance 0.2 rad)
@@ -3801,6 +3833,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             targets = dict(targets)
             targets["pre"] = _shifted(targets["pre"])
             targets["waypoints"] = [_shifted(w) for w in targets["waypoints"]]
+            if "init" in targets:
+                targets["init"] = _shifted(targets["init"])
             ctx["push_recentre_m"] = [round(float(v), 4) for v in off.tolist()]
             log.info("push(%s): object %.1f cm off its recorded start position -> pad pre-pose and waypoints shifted by %s", obj, float(th.linalg.norm(off)) * 100, ctx["push_recentre_m"])
             # a place moved away from the partner for the release (clear_release_of_partner) moved the start back along the line by
@@ -3825,12 +3859,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         ctx["push_q0"] = float(state.joint_position(obj, ctx["push_articulation"]["joint"]))
     tip_z = extra.get("fingertip_z")
     # a pitched blade class (push_blade_30 / 45 / 60, the sampler's palm-away candidates) already keeps its palm off the face
-    pitched_class = False
-    try:
-        cls = str(extra.get("pose_class") or "")
-        pitched_class = cls.startswith("push_blade_") and float(cls[len("push_blade_"):].rstrip("-")) >= 30.0
-    except (TypeError, ValueError):
-        pitched_class = False
+    pitched_class = _pitched_push_class(action.contact)
     if cfg.push_palm_clear_m >= 0 and tip_z is not None and extra.get("blade_half_thickness_m") is not None and not extra.get("palm_clear") and not pitched_class:
         try:
             top_z = float(C.as_tensor(state.object(obj).aabb[1]).reshape(-1)[2])
@@ -3861,6 +3890,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
                 targets = dict(targets)
                 targets["pre"] = _lifted(targets["pre"])
                 targets["waypoints"] = [_lifted(w) for w in targets["waypoints"]]
+                if "init" in targets:
+                    targets["init"] = _lifted(targets["init"])
                 ctx["push_palm_lift_m"] = round(dz, 4)
                 log.info("push(%s): the blade's palm line (%.3f) would overlap the object's top (%.3f) -> pad raised %.1f cm, palm %.0f mm clear", obj, palm_z, top_z, dz * 100, cfg.push_palm_clear_m * 1000)
             else:
@@ -3871,15 +3902,13 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     # the box, so the long pre-pose descent was a redundant "down, then down again" (0918-014040)
     pre_pose = targets["pre"]
     q_hint_pre = _witness(ctx, "pre")
-    if action.contact.mid is None and cfg.push_pre_dist_m is not None and not pitched_class:  # a pitched blade keeps its recorded pre-pose (the shortened one sits at the table)
-        p_pre, q_pre = as_world_pose(targets["pre"])
-        p_init, _ = as_world_pose(targets["waypoints"][0])
-        a_dir = C.approach_axis(q_pre)
-        along = float(th.dot(p_init - p_pre, a_dir))  # the recorded pre distance along the approach (positive: pre before init)
-        if along > cfg.push_pre_dist_m + 0.005:
-            pre_pose = Pose(position=[float(v) for v in (p_init - a_dir * cfg.push_pre_dist_m).tolist()], orientation=[float(v) for v in q_pre.tolist()])
-            q_hint_pre = None  # the recorded witness belongs to the recorded pre-pose; cuRobo plans the lowered one
-            ctx["push_pre_dist_m"] = cfg.push_pre_dist_m
+    lowered = push_lowered_pre(action.contact, targets["pre"], targets.get("init"), cfg)
+    if lowered is not None:
+        pre_pose = lowered
+        q_hint_pre = None  # the recorded witness belongs to the recorded pre-pose; cuRobo plans the lowered one
+        ctx["push_pre_dist_m"] = cfg.push_pre_dist_m
+        ctx["push_pre_lowered"] = {"pre": [round(float(v), 4) for v in as_world_pose(lowered)[0].tolist()],
+                                   "init": [round(float(v), 4) for v in as_world_pose(targets["init"])[0].tolist()], "dist_m": cfg.push_pre_dist_m}
     hold_here = getattr(motions, "press_hold", None)
     if extra.get("approach_is_slide") and hold_here and hold_here.get("arm") == arm:
         # the lever's lift (two-flap v4, owner 2026-09-20 15:21): this pre-contact IS the press's end pose where the fist already is,
@@ -3951,7 +3980,12 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     if closed_loop:
         yield from _push_arc_closed_loop(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
     else:
-        yield from _push_leg(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
+        # from a lowered pre-contact the pad finishes the recorded approach at the first contact pose, then pushes: a top-down blade
+        # sent from there straight to the first push waypoint would sweep down onto the object's top edge
+        leg = list(targets["waypoints"])
+        if lowered is not None and not ctx.get("push_pre_skipped"):
+            leg = [targets["init"]] + leg
+        yield from _push_leg(motions, state, arm, obj, leg, geom, pose0, cfg, ctx, "push")
     # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
     yield from _hold_until_still(motions, state, obj, cfg)
     residual, source = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))

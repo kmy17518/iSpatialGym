@@ -539,6 +539,8 @@ NOTE_KEYS = NOTE_KEYS + ("may_touch",)
 #: owner 2026-10-12 (IORS touching large-scale): where a push stopped (goal reached / leg end, the object's position, the residual) and
 #: how far a followed partner moved (execute.push_stop_facts)
 NOTE_KEYS = NOTE_KEYS + ("push_stop",)
+#: a straight push's lowered pre-contact (``execute.push_lowered_pre``): where the transit went and the first contact pose under it
+NOTE_KEYS = NOTE_KEYS + ("push_pre_lowered",)
 
 
 @dataclass

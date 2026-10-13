@@ -321,6 +321,108 @@ def test_program_check_models_the_pre_contact_the_oracle_keeps_its_witness_for()
     assert not PC.push_keeps_recorded_pre(SimpleNamespace(mid=None, extra={"pose_class": "push_blade_15"}), far, init)
 
 
+# ------------------------------------------------------------------------------------------------ touching#02: the lowered pre-contact
+
+#: touching#02 c4_k0 (2026-10-12): the raised vertical blade (approach -z, closing along the push) beside the box's +x face, 2.3 cm off
+#: it, pushing it 7.85 cm along -x
+BLADE_Q = [0.7071074843406677, 0.7071061134338379, 0.0, 0.0]
+BLADE_INIT = [-9.185616493225098, -4.6257853507995605, 1.1170214414596558]
+BLADE_DIST = 0.0785
+
+
+def _blade_push(pre_up: float = 0.10, mid=None, pose_class: str = "push_blade_0_high"):
+    from ispatialgym.oracle.actions import Push
+    from ispatialgym.oracle.sidecar import Pose, PushContact
+
+    x, y, z = BLADE_INIT
+    contact = PushContact(arm=ARM, object="box__of__cereal.n.01_1", pre=Pose([x, y, z + pre_up], list(BLADE_Q)), init=Pose([x, y, z], list(BLADE_Q)),
+                          goal=Pose([x - BLADE_DIST, y, z], list(BLADE_Q)), direction=[-1.0, 0.0, 0.0], distance_m=BLADE_DIST, mid=mid,
+                          extra={"pose_class": pose_class, "blade_standoff_m": 0.023, "palm_clear": True})
+    return Push(contact=contact)
+
+
+def test_a_straight_push_is_lowered_over_its_first_contact_pose_not_its_first_waypoint():
+    """c2 / c4 / c7 / c12: the lowered pre-contact stood over the first line waypoint - a third of the push (2.6 cm) toward the box,
+    3.5 mm inside its face with the fingertips 5 mm under its top. It lies push_pre_dist_m above the recorded init, and the program
+    check reads the same decision from the same pose."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    cfg = EX.ExecuteConfig()
+    c = _blade_push().contact
+    wps = _blade_push().targets(None, None)["waypoints"]
+    assert float(wps[0].position[0]) == pytest.approx(BLADE_INIT[0] - BLADE_DIST / 3, abs=1e-6)  # the line leaves the start out
+    p, q = EX.as_world_pose(EX.push_lowered_pre(c, c.pre, c.init, cfg))
+    assert th.allclose(p, th.tensor([BLADE_INIT[0], BLADE_INIT[1], BLADE_INIT[2] + cfg.push_pre_dist_m]), atol=1e-5) and th.allclose(q, th.tensor(BLADE_Q))
+    assert not PC.push_keeps_recorded_pre(c, c.pre, c.init)
+    # kept: an arc, a pitched class, a pre-contact within push_pre_dist_m + 5 mm, the lowering off
+    assert EX.push_lowered_pre(_blade_push(mid=c.goal).contact, c.pre, c.init, cfg) is None
+    assert EX.push_lowered_pre(_blade_push(pose_class="push_blade_45-").contact, c.pre, c.init, cfg) is None
+    near = _blade_push(pre_up=0.045).contact
+    assert EX.push_lowered_pre(near, near.pre, near.init, cfg) is None and PC.push_keeps_recorded_pre(near, near.pre, near.init)
+    assert EX.push_lowered_pre(c, c.pre, c.init, EX.ExecuteConfig(push_pre_dist_m=None)) is None
+    # a fingertip-front push (approach along the push) with a 4 cm pre-contact keeps it; measured from the first waypoint it read 6.6 cm
+    tip_q = th.tensor([0.0, -0.7071068, 0.0, 0.7071068])
+    assert th.allclose(C.approach_axis(tip_q), th.tensor([-1.0, 0.0, 0.0]), atol=1e-6)
+    tip = SimpleNamespace(mid=None, extra={"pose_class": "push_tip_h"})
+    tip_init = (th.tensor(BLADE_INIT), tip_q)
+    tip_pre = (th.tensor(BLADE_INIT) + th.tensor([0.04, 0.0, 0.0]), tip_q)
+    tip_wp0 = (th.tensor(BLADE_INIT) - th.tensor([BLADE_DIST / 3, 0.0, 0.0]), tip_q)
+    assert EX.push_lowered_pre(tip, tip_pre, tip_init, cfg) is None and EX.push_lowered_pre(tip, tip_pre, tip_wp0, cfg) is not None
+
+
+class _PushMotions:
+    """The motions surface ``execute_push`` touches with no supports, no protect context and no backend: records the transit
+    (``arm_to``) and the Cartesian legs (``arm_along``)."""
+
+    def __init__(self):
+        self.cfg = MotionsConfig()
+        self.press_hold = None
+        self.calls: List[Any] = []
+
+    def gripper(self, arm, close=True, **kw):
+        yield th.zeros(3)
+
+    def arm_to(self, arm, pose=None, q=None, ignore_objects=(), q_hint=None, max_excursion=None, ignore_links=(), accept_other_branch=False):
+        self.calls.append(("arm_to", EX.as_world_pose(pose), q_hint))
+        yield th.zeros(3)
+
+    def arm_along(self, arm, waypoints, **kw):
+        self.calls.append(("arm_along", [EX.as_world_pose(w) for w in waypoints]))
+        yield th.zeros(3)
+
+    def hold(self, n=1):
+        for _ in range(n):
+            yield th.zeros(3)
+
+
+def _run_push(push, witness=None):
+    box = SimpleNamespace(name="target_box_of_cereal_iucshm_0", category="box_of_cereal", model="iucshm")
+    state = SimpleNamespace(object=lambda name: box, object_pose=lambda name: (th.tensor([-9.235, -4.6258, 1.0069]), th.tensor(QUAT)), pose_target=lambda name: None)
+    m = _PushMotions()
+    ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(push_base_nudge_max_m=0.0), "witnesses": {} if witness is None else {"pre": witness}}
+    list(EX.execute_push(push, m, state, push.targets(None, None), ctx))
+    return m.calls, ctx
+
+
+def test_from_a_lowered_pre_contact_the_pad_descends_to_the_first_contact_pose_before_it_pushes():
+    """The transit ends push_pre_dist_m above the recorded init (no witness), the push leg goes down to the init and then along the
+    line; a recorded pre-contact that is kept is reached with its witness and the leg is the line as before."""
+    cfg = EX.ExecuteConfig()
+    push = _blade_push()
+    line = [EX.as_world_pose(w) for w in push.targets(None, None)["waypoints"]]
+    init = EX.as_world_pose(push.contact.init)
+    calls, ctx = _run_push(push, witness=_witness())
+    (go, goal, hint), (leg, wps) = calls[0], calls[1]
+    assert go == "arm_to" and hint is None and th.allclose(goal[0], init[0] + th.tensor([0.0, 0.0, cfg.push_pre_dist_m]), atol=1e-5)
+    assert leg == "arm_along" and len(wps) == 1 + len(line) and _same_pose(wps[0], init) and all(_same_pose(a, b) for a, b in zip(wps[1:], line))
+    assert ctx["push_pre_lowered"]["init"] == pytest.approx(BLADE_INIT, abs=1e-4) and ctx["push_pre_dist_m"] == cfg.push_pre_dist_m
+    calls, ctx = _run_push(_blade_push(pre_up=0.045), witness=_witness())
+    (go, goal, hint), (leg, wps) = calls[0], calls[1]
+    assert th.allclose(goal[0], init[0] + th.tensor([0.0, 0.0, 0.045]), atol=1e-5) and hint is not None and th.allclose(hint, _witness())
+    assert len(wps) == len(line) and all(_same_pose(a, b) for a, b in zip(wps, line)) and "push_pre_lowered" not in ctx
+
+
 # ------------------------------------------------------------------------------------------------ 2b: the skip-above knob (default off)
 
 

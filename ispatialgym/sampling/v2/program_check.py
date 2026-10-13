@@ -254,22 +254,11 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
 def push_keeps_recorded_pre(contact, pre_pose, first_contact_pose) -> bool:
     """Whether the oracle reaches a push's RECORDED pre-contact with its witness (``execute_push``): an arc push (``mid``), a pitched
     blade class (``push_blade_30`` and steeper) or a recorded pre-contact within ``push_pre_dist_m`` + 5 mm of the first contact pose
-    along the approach. A straight push's longer pre-contact is lowered to ``push_pre_dist_m`` and planned without a witness."""
+    (the recorded ``contact.init``) along the approach. A straight push's longer pre-contact is lowered to ``push_pre_dist_m``
+    before it (``execute.push_lowered_pre``) and planned without a witness."""
     from ispatialgym.oracle import execute as E
-    from ispatialgym.robot import conventions as C
 
-    cfg = E.ExecuteConfig()
-    if getattr(contact, "mid", None) is not None or cfg.push_pre_dist_m is None:
-        return True
-    cls = str((getattr(contact, "extra", None) or {}).get("pose_class") or "")
-    try:
-        if cls.startswith("push_blade_") and float(cls[len("push_blade_"):].rstrip("-")) >= 30.0:
-            return True
-    except ValueError:
-        pass
-    p_pre, q_pre = th.as_tensor(pre_pose[0]).float(), th.as_tensor(pre_pose[1]).float()
-    along = float(th.dot(th.as_tensor(first_contact_pose[0]).float() - p_pre, C.approach_axis(q_pre)))
-    return along <= cfg.push_pre_dist_m + 0.005
+    return E.push_lowered_pre(contact, pre_pose, first_contact_pose, E.ExecuteConfig()) is None
 
 
 def push_pre_standoff(sampler, arm: str, q_pre: th.Tensor, pre_pose, supports: Sequence[Any], through: Sequence[Any]) -> Tuple[bool, str, Dict[str, Any]]:
@@ -2167,8 +2156,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             extra_ = getattr(c_, "extra", None) or {}
             pre_poses = next((p_ for k_, p_ in pose_targets if k_ == "pre"), None)
             wp_poses = next((p_ for k_, p_ in pose_targets if k_ == "waypoints"), None)
+            first_ = getattr(c_, "init", None)
             if (pre_poses and wp_poses and not isinstance(extra_.get("articulation"), dict) and not extra_.get("approach_is_slide")
-                    and push_keeps_recorded_pre(c_, pre_poses[0], wp_poses[0])):
+                    and push_keeps_recorded_pre(c_, pre_poses[0], first_ if first_ is not None else wp_poses[0])):
                 sup_ = list(sampler.support_objects())
                 through_ = [o for o in list(ignore_all) + list(ignore_last) if not any(o is s for s in sup_)]
                 ok_s, why_s, rep_s = push_pre_standoff(sampler, arm, single_q["pre"], pre_poses[0], sup_, through_)
