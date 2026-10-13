@@ -78,7 +78,7 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     # registered 2026-10-12 ahead of their modes (each mode may adjust its blocks): inside as ontop, touching + the push, nextto no grasp
     "inter_object_relation_satisfaction-inside_large_scale": _TABLE + ("stances.placement", "grasps", "paths"),
     "inter_object_relation_satisfaction-touching_large_scale": _TABLE + ("stances.placement", "grasps", "paths", "contacts.push"),
-    "inter_object_relation_satisfaction-nextto_large_scale": _TABLE + ("paths",),
+    "inter_object_relation_satisfaction-nextto_large_scale": _TABLE + ("stances.placement", "contacts.push", "paths"),  # the base push (no grasp), ending at placement
     "inter_object_relation_satisfaction-ontop_small_scale": _TABLE + ("grasps",),
     "inter_object_relation_satisfaction-under_small_scale": _TABLE + ("grasps",),
     "inter_object_relation_satisfaction-inside": _TABLE + ("grasps",),

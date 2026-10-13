@@ -32,7 +32,7 @@ EXPECTED = {
     "inter_object_relation_satisfaction-under_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-inside_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-touching_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
-    "inter_object_relation_satisfaction-nextto_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
+    "inter_object_relation_satisfaction-nextto_large_scale": (["target", "partner", "support"], [], ["target", "partner", "support"], {}),  # base push: no grasp
 }
 
 

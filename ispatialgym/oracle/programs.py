@@ -32,10 +32,12 @@ from dataclasses import replace
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from ispatialgym.oracle.actions import (
+    BASE_PUSH_KIND,
     RETREAT_DIST,
     RETREAT_LITTLE,
     Action,
     BaseFollow,
+    BasePush,
     Brace,
     Grasp,
     Lift,
@@ -1062,9 +1064,22 @@ def program_iors_large_touching(sc: Sidecar) -> List[Action]:
 
 def program_iors_large_nextto(sc: Sidecar) -> List[Action]:
     """IORS nextto, large-scale (``program_iors_large`` with relation ``nextto``): the program of the nextto mode, written with
-    that mode; until then a sidecar of the subtask has no program. The target ends next to the partner (``nextto`` read in the
-    epilogue)."""
-    raise NotImplementedError("relation_not_implemented: IORS large-scale 'nextto' has no oracle program yet")
+    that mode (owner 2026-10-12): init A → push stance ``manipulation`` (recorded path / transition) → ``base_push`` (``contacts.push``
+    with ``kind: "base_push"``: the closed hand on the floor-standing target's push face, the base drives it along the recorded line
+    ``base_start → base_end`` and stops once the partner is NextTo it) → retreat from where the push leaves the hand; no grasp. The base
+    ends at the recorded stance ``contacts.push.end_stance`` (default ``placement``: the push stance moved ``distance_m`` along the line,
+    same trunk and arms). The target ends next to the partner (``nextto`` read in the epilogue)."""
+    push = sc.contacts.push if sc.contacts is not None else None
+    if push is None or push.kind != BASE_PUSH_KIND:
+        raise SidecarError("contacts.push: IORS nextto large-scale records the base push (kind 'base_push')")
+    if sc.grasps:
+        raise SidecarError("grasps: the nextto base push grasps nothing")
+    end = str(push.extra.get("end_stance") or "placement")
+    if end not in sc.stances:
+        raise SidecarError(f"stances: the base push ends at the recorded stance {end!r}")
+    partner = push.extra.get("partner")
+    p = BasePush(contact=push, base_yaw=sc.stance("manipulation").base_pose2d[2], partner=partner if isinstance(partner, str) and partner else None, end_stance=end)
+    return _travel(sc, "init", "manipulation") + [p, Retreat(arm=push.arm, object=push.object, after=p)]
 
 
 def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:

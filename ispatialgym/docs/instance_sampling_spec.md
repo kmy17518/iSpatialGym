@@ -1421,6 +1421,31 @@ init-surface chain support → floor (nextto: the target is a floor-standing spa
 the oracle program `program_iors_large` with the relation. The sampler mode and the program of each relation come next;
 until its mode lands the relation's hook rejects every template with `relation_not_implemented`.
 
+**nextto (large-scale): the base push (owner 2026‑10‑12; `iors_large_nextto.NextToMode`).** A floor-standing spawned target
+(nextto_large#02: `serving_cart/heqtlk`, one rigid link) is pushed next to the partner by the base; no grasp (the iddl has no
+`:require`). Per attempt: the **goal** beside one side of the partner's AABB — push direction d = the side's inward normal turned by
+`push_angles_deg` (0, ±15°), the target turned so that one of its four side faces (those across its longer horizontal extent first)
+faces the robot, its AABB `goal_gap` off the side (`goal_gap_frac` 0.45 of OmniGibson's NextTo bound mean(dims_a + dims_b) / 6,
+clamped to [0.06, 0.15] m), its centre within the side's span less 0.10 m, the footprint on free floor 0.05 m clear of every obstacle,
+NextTo read true there (the goal check's own state) and at 3 of 4 probes (±3 cm sideways, ±3°); the **init** `push_distance_m`
+U(1.5, 2.5) back along d (free floor, the AABB gap beyond the bound + 0.20 m, the swept footprint free every 5 cm); the **push face**
+at `push_heights_m` (0.45, 0.40, 0.50, 0.55, 0.35, 0.60 m) from the target's convex collision pieces (the outermost material on the
+face's centre line, flat within 3 cm across ±3 cm / ±2 cm probes, ≤ 0.15 m inside the AABB; twice that tolerance and 10 cm more
+when no height passes); the **push stance** `manipulation` behind the face facing d, the face `push_stand_offs_m` (0.55, 0.50, 0.60,
+0.65, 0.45) ahead, the base `push_lateral_offsets_m` (0.15, 0.08, 0, 0.22; mirrored for the left arm) left of the line so that the
+working hand is on the target's centre line, trunk from `push_trunks`, shoulder reach margin in [0.03, 0.45] m, the contact in the
+camera frame, collision-free with the target placed; the closed hand's pre-contact (`push_pre_m` 0.10 m back along d, target present)
+and the straight approach to the fingertips on the face (approach pitched down 0 / 20 / 35°, either wrist turn, the target ignored at
+the contact only) by the exact IK as the program check runs it, their fingertips in the camera frame; the whole body swept along the
+line with the arm at its contact configuration (the target out of the world); the **push end** `placement` = the push stance moved
+the distance along d (collision-free with the target at init); **stance A** 1.4–2.4 m from the target within 60° of the line's back
+direction, the most upright straight trunk that sees the target and the goal, and A → B as the ontop / under modes record it.
+Recorded: `contacts.push` with `kind: "base_push"` (pre / init (contact) / goal eef poses, `direction`, `distance_m`, `base_start` /
+`base_end`, `push_height_m`, `stand_off_m`, `contact_point`, `contact_in_object`, `face`, `partner`, `end_stance`, `goal_gap_m`,
+`nextto_bound_m`, `drift_tol_m` 0.10, `nextto_push_on_m` 0.05, `push_speed_m_s` 0.08); the program is travel → `base_push` → retreat
+(oracle doc 6.2). Every key above is read by this mode only (defaults `iors_large_nextto.DEFAULTS`; also `goal_tries` 24,
+`distance_draws` 3, `push_ik_max` 16, `init_distance_m`, `init_bearing_max_deg`).
+
 **Init surface** — an explicit choice of `ground_isg` (it is in the alias), never a runtime fallback. Selection order
 (owner decision 2026‑09‑16, A5; minimise floor inits): under — (a) a support object whose near AABB side lies within
 `max_partner_geodesic` (3.0 m, eroded map) of the partner's near AABB side → (b) **the partner's own top** ("take it

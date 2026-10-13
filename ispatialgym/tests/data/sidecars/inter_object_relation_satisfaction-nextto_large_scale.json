@@ -1,0 +1,218 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "inter_object_relation_satisfaction-nextto_large_scale-0000",
+  "tro_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+  "task_family": "inter_object_relation_satisfaction",
+  "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        3.05,
+        2.4,
+        -0.3
+      ],
+      "translate": 0.0,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "bearing_deg": 18.0,
+      "distance": 1.9
+    },
+    "manipulation": {
+      "base_pose2d": [
+        4.25,
+        2.15,
+        0.0
+      ],
+      "translate": 0.75,
+      "tilt": -0.3,
+      "arms": [
+        "right"
+      ],
+      "stand_off": 0.55,
+      "lateral": 0.15,
+      "focus": [
+        4.8,
+        2.0,
+        0.452
+      ],
+      "contacts": [
+        "push"
+      ],
+      "idle_posture": "untucked"
+    },
+    "placement": {
+      "base_pose2d": [
+        6.05,
+        2.15,
+        0.0
+      ],
+      "translate": 0.75,
+      "tilt": -0.3,
+      "arms": [
+        "right"
+      ],
+      "stand_off": 0.55,
+      "lateral": 0.15,
+      "idle_posture": "untucked",
+      "push_from": "manipulation",
+      "push_distance_m": 1.8
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.75,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "mode": "local",
+      "waypoints": [
+        [
+          3.05,
+          2.4,
+          -0.3
+        ],
+        [
+          3.8,
+          2.15,
+          0.0
+        ],
+        [
+          4.05,
+          2.15,
+          0.0
+        ]
+      ],
+      "length_m": 1.0,
+      "posture": "untucked",
+      "carried": null
+    }
+  ],
+  "contacts": {
+    "push": {
+      "arm": "right",
+      "object": "serving_cart.n.01_1",
+      "pre": {
+        "position": [
+          4.682333946228027,
+          2.0,
+          0.4584299623966217
+        ],
+        "orientation": [
+          0.0,
+          0.8191520571708679,
+          0.0,
+          0.5735764503479004
+        ]
+      },
+      "init": {
+        "position": [
+          4.782333850860596,
+          2.0,
+          0.4584299623966217
+        ],
+        "orientation": [
+          0.0,
+          0.8191520571708679,
+          0.0,
+          0.5735764503479004
+        ]
+      },
+      "goal": {
+        "position": [
+          6.582333564758301,
+          2.0,
+          0.4584299623966217
+        ],
+        "orientation": [
+          0.0,
+          0.8191520571708679,
+          0.0,
+          0.5735764503479004
+        ]
+      },
+      "direction": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "distance_m": 1.8,
+      "stance": "manipulation",
+      "kind": "base_push",
+      "base_start": [
+        4.25,
+        2.15,
+        0.0
+      ],
+      "base_end": [
+        6.05,
+        2.15,
+        0.0
+      ],
+      "push_height_m": 0.45,
+      "stand_off_m": 0.55,
+      "lateral_offset_m": 0.15,
+      "contact_point": [
+        4.8,
+        2.0,
+        0.452
+      ],
+      "contact_in_object": [
+        -0.219,
+        0.0,
+        0.0
+      ],
+      "face": "-y",
+      "face_inset_m": 0.0,
+      "pitch_deg": 20.0,
+      "wrist_sign": 1.0,
+      "partner": "breakfast_table.n.01_1",
+      "end_stance": "placement",
+      "goal_gap_m": 0.12,
+      "nextto_bound_m": 0.27,
+      "drift_tol_m": 0.1,
+      "nextto_push_on_m": 0.05,
+      "push_speed_m_s": 0.08,
+      "ignore_last": [
+        "serving_cart.n.01_1"
+      ],
+      "ignore_every": []
+    }
+  },
+  "goal": {
+    "base_pose2d": [
+      6.05,
+      2.15,
+      0.0
+    ],
+    "translate": 0.75,
+    "tilt": -0.3,
+    "arms": "same"
+  },
+  "language": {
+    "objects": {
+      "serving_cart.n.01_1": {
+        "display_name": "serving cart",
+        "descriptor": "the serving cart"
+      },
+      "breakfast_table.n.01_1": {
+        "display_name": "table",
+        "descriptor": "the dining table"
+      }
+    },
+    "goal_numbers": {
+      "push_distance_cm": 180.0
+    }
+  },
+  "waypoint_policy": "checked"
+}

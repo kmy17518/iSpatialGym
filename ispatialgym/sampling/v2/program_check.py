@@ -369,7 +369,7 @@ PROGRAM_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "inter_object_relation_satisfaction-inside_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths"),
     "inter_object_relation_satisfaction-touching_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths",
                                                                 "contacts.push"),
-    "inter_object_relation_satisfaction-nextto_large_scale": ("stances.init", "stances.manipulation", "transitions", "paths"),
+    "inter_object_relation_satisfaction-nextto_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "paths", "contacts.push"),
 }
 
 

@@ -35,7 +35,8 @@ def test_iddls_are_ontop_large_with_the_relation_as_goal():
         d = iddls[st]
         assert d.family == IORS and d.alias_template == st + "-{target}-{partner}-{support}"
         assert [rel, "?target", "?partner"] in d.goal and ["not", [rel, "target", "partner"]] in d.init
-        assert d.roles == o.roles and d.require == o.require and d.measure == o.measure
+        assert d.roles == o.roles and d.measure == o.measure
+        assert d.require == ([] if rel == "nextto" else o.require)  # nextto's target is pushed by the base: no grasp
         assert [a for a in d.goal if a[0] != rel] == [a for a in o.goal if a[0] != "ontop"]
 
 
@@ -54,7 +55,7 @@ def test_program_check_stance_lists():
     ontop = PC.subtask_blocks(ONTOP)
     assert PC.subtask_blocks(NEW["inside"]) == ontop
     assert PC.subtask_blocks(NEW["touching"]) == ontop + ("contacts.push",)
-    assert PC.subtask_blocks(NEW["nextto"]) == ("stances.init", "stances.manipulation", "transitions", "paths")
+    assert PC.subtask_blocks(NEW["nextto"]) == ("stances.init", "stances.manipulation", "stances.placement", "transitions", "paths", "contacts.push")
     # ``...-inside_large_scale`` also starts with ``...-inside``: the small-scale lists are unchanged
     assert PC.subtask_blocks(f"{IORS}-inside") == ("stances.init", "stances.manipulation", "transitions", "grasps")
     assert PC.subtask_blocks(f"{IORS}-touching") == ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.push")

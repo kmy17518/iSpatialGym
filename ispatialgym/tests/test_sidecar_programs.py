@@ -83,6 +83,7 @@ EXPECTED_SEQUENCE = {
     "inter_object_relation_satisfaction-under_large_scale": ["transition"] + _PICK + ["navigate"] + _PLACE,  # B and C share the floor-band trunk
     # the drop from stance C, the deep push crouch entered with empty hands (trunk-only transition), the floor push against the face
     "inter_object_relation_satisfaction-touching_large_scale": ["transition"] + _PICK + ["navigate"] + _PLACE + ["transition", "push", "retreat"],
+    "inter_object_relation_satisfaction-nextto_large_scale": _WALL_IN + ["base_push", "retreat"],  # no grasp: the base pushes the floor-standing target
     "inter_object_relation_satisfaction-ontop_small_scale": _TABLE_IN + _PICK + _PLACE,
     "inter_object_relation_satisfaction-under_small_scale": _TABLE_IN + _PICK + _PLACE,
     "inter_object_relation_satisfaction-inside": _TABLE_IN + _PICK + _PLACE,
@@ -273,7 +274,7 @@ def test_actions_follow_the_contract(subtask):
         assert action.TARGET_KEYS
         assert set(action.arms) <= set(ARMS)
         assert set(action.objects) <= set(sc.language.objects), action.summary()
-        if action.name in ("push", "brace"):
+        if action.name in ("push", "brace", "base_push"):
             assert action.qa_exempt == frozenset({A.QA_FAILED_GRASP})
         else:
             assert action.qa_exempt == frozenset()
@@ -612,7 +613,7 @@ def _check_value(key, value, where):
     elif isinstance(value, list) and value and isinstance(value[0], Pose):
         for p in value:
             assert len(p.position) == 3 and len(p.orientation) == 4, where
-    elif key in ("waypoints", "base_poses"):
+    elif key in ("waypoints", "base_poses", "base_path"):
         assert value and all(len(w) == 3 for w in value), where
     elif key in ("goal", "base", "drive_back", "drive_in", "pivot", "direction"):
         assert len(value) == 3, where
