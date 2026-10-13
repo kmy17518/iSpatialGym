@@ -1450,6 +1450,39 @@
    "pick": "inter_object_relation_satisfaction-inside_large_scale#02~c4",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl",
+   "id": 131,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-75 with the iors_large keys, owner ~19:20 under_large#01)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#01",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk_iorsl",
+   "id": 132,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-27 with the iors_large keys, owner ~19:20 under_large#01)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#01",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl",
+   "id": 133,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-74 with the iors_large keys, owner ~19:20 under_large#01)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#01",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }

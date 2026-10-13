@@ -41853,6 +41853,122 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 133,
+  "fallback_of": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
+  "fallback_rank": 1,
+  "fallback_kind": "init_surface",
+  "fallback_params": {
+   "init_surface": "partner"
+  },
+  "roles": {
+   "target": {
+    "category": "sandal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "chgcrm",
+    "orientation_equivalences": {
+     "sandal/chgcrm": []
+    },
+    "grasp_keys": {
+     "sandal/chgcrm": "sandal__chgcrm"
+    }
+   },
+   "partner": {
+    "category": "bed",
+    "sampleable": false
+   },
+   "support": {
+    "category": "bed",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "childs_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "bed_rrcvaq_0"
+     ],
+     "support": [
+      "bed_rrcvaq_0"
+     ],
+     "floor": {
+      "room": "childs_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "sandal": [
+       "chgcrm"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "sandal": {
+       "shdahi": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)"
+  },
+  "constraints": []
+ },
  "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk": {
   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
   "definition_id": 27,
@@ -41960,6 +42076,116 @@
     "target",
     "partner"
    ]
+  },
+  "constraints": []
+ },
+ "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk_iorsl": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 132,
+  "roles": {
+   "target": {
+    "category": "sandal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "chgcrm",
+    "orientation_equivalences": {
+     "sandal/chgcrm": []
+    },
+    "grasp_keys": {
+     "sandal/chgcrm": "sandal__chgcrm"
+    }
+   },
+   "partner": {
+    "category": "bed",
+    "sampleable": false
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "childs_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "bed_rrcvaq_0"
+     ],
+     "support": [
+      "desk_xhjsub_0"
+     ],
+     "floor": {
+      "room": "childs_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "sandal": [
+       "chgcrm"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "sandal": {
+       "shdahi": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)"
   },
   "constraints": []
  },
@@ -42072,6 +42298,122 @@
     "target",
     "partner"
    ]
+  },
+  "constraints": []
+ },
+ "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 131,
+  "fallback_of": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
+  "fallback_rank": 2,
+  "fallback_kind": "init_surface",
+  "fallback_params": {
+   "init_surface": "floor"
+  },
+  "roles": {
+   "target": {
+    "category": "sandal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "chgcrm",
+    "orientation_equivalences": {
+     "sandal/chgcrm": []
+    },
+    "grasp_keys": {
+     "sandal/chgcrm": "sandal__chgcrm"
+    }
+   },
+   "partner": {
+    "category": "bed",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "childs_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "bed_rrcvaq_0"
+     ],
+     "support": {
+      "room": "childs_room_0"
+     },
+     "floor": {
+      "room": "childs_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "sandal": [
+       "chgcrm"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "sandal": {
+       "shdahi": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 10.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "partner_view_min_points": 1,
+   "init_support_max_geodesic_m": 10.0,
+   "init_support_fallback": true,
+   "_iors_large_note": "owner 2026-10-12 ~19:20: under_large#01 (sandal under bed_rrcvaq_0, childs_room_0; the sheet's held-out bed, accepted) in the iors_large tag - a copy of inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor (a ground_isg representative a re-ground would rewrite) with the ~15:55 relaxation keys (partner_view_min_points 1, init_support_max_geodesic_m 10, init_support_fallback, max_partner_geodesic_m 10 -> drive cap 20 m; floor_init.max_geodesic_m stays 3.0)"
   },
   "constraints": []
  },
