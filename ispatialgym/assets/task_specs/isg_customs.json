@@ -40602,7 +40602,8 @@
    "target_max_height_m": 0.35,
    "touching_goal_gap_m": 0.002,
    "partner_view_min_points": 1,
-   "_iors_large_touching_note": "owner 2026-10-12 ~16:05 touching_large#03: touching_goal_gap_m 0.002 (the goal 2 mm short of the bookcase's face, the goal check nudges it to contact; the code default, written out); partner_view_min_points 1 (iors_large relaxation 2a: stance A sees at least one of the bookcase's three nearest bottom-edge points)"
+   "_iors_large_touching_note": "owner 2026-10-12 ~16:05 touching_large#03: touching_goal_gap_m 0.002 (the goal 2 mm short of the bookcase's face, the goal check nudges it to contact; the code default, written out); partner_view_min_points 1 (iors_large relaxation 2a: stance A sees at least one of the bookcase's three nearest bottom-edge points)",
+   "carry_collision_margin_m": 0.01
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c1 (sheet ~T2): the tray storage_box/eicujj starts on coffee_table_osroux_0 (top 0.36 m); partner bookcase_otwukr_1 (house_double_floor_upper/living_room_0), the target ends on the floor touching its face nearest the init (dropped in front of it and pushed along the floor, iors_large_touching); hand-made (the subtask has no roles/candidates.csv rows for the grounder), registry mode test, so a re-ground leaves it alone"
@@ -40709,7 +40710,13 @@
    "target_max_height_m": 0.35,
    "touching_goal_gap_m": 0.002,
    "partner_view_min_points": 1,
-   "_iors_large_touching_note": "owner 2026-10-12 ~16:05 touching_large#03: touching_goal_gap_m 0.002 (the goal 2 mm short of the bookcase's face, the goal check nudges it to contact; the code default, written out); partner_view_min_points 1 (iors_large relaxation 2a: stance A sees at least one of the bookcase's three nearest bottom-edge points)"
+   "_iors_large_touching_note": "owner 2026-10-12 ~16:05 touching_large#03: touching_goal_gap_m 0.002 (the goal 2 mm short of the bookcase's face, the goal check nudges it to contact; the code default, written out); partner_view_min_points 1 (iors_large relaxation 2a: stance A sees at least one of the bookcase's three nearest bottom-edge points)",
+   "carry_collision_margin_m": 0.01,
+   "remove_objects": {
+    "house_double_floor_upper": [
+     "coffee_table_osroux_0"
+    ]
+   }
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c2 (sheet ~T5): the tray storage_box/eicujj starts on the floor of living_room_0; partner bookcase_otwukr_1 (house_double_floor_upper/living_room_0), the target ends on the floor touching its face nearest the init (dropped in front of it and pushed along the floor, iors_large_touching); hand-made (the subtask has no roles/candidates.csv rows for the grounder), registry mode test, so a re-ground leaves it alone"
