@@ -35,6 +35,8 @@ Modes::
     python -m ispatialgym.sampling.reach_bands --scene S --support bookcase_x_0 --surface-z 0.73 --object C/M --grasp-key K
         # interior surface (a shelf inside the support, SimWorld.support_interior): board cells whose headroom fits the object,
         # stance at an open side, only the board ignored at the grasp pose; ReachBands.load(..., surface_z=0.73) reads it
+    python -m ispatialgym.sampling.reach_bands ... --surface-z 1.20 --support-joints '{"j_left_door": 2.3}'
+        # the support's joints set first (a fridge door open; generation.partner_joint_init); ReachBands.load(..., support_joints=...)
     python -m ispatialgym.sampling.reach_bands ... --stand-offs 0.35,0.45,0.55
         # multi-distance band: every stand-off's stance on the same edge; rb.band(tr, ti, stand_off=0.55) (nearest stored)
     python -m ispatialgym.sampling.reach_bands --scene S --support floor --room R --object C/M [--under PARTNER]
@@ -103,6 +105,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch as th
 
+from ispatialgym.sampling import object_joints as OJ
 from ispatialgym.sampling.eef_reach_volume import GROUND_TRUNKS, TILTS, TRANSLATES
 
 log = logging.getLogger("ispatialgym.sampling.reach_bands")
@@ -158,6 +161,8 @@ UNDER_EDGE_CLEARANCE_EXTRA_M = 0.03  # a cell under the partner needs clearance 
 #: ``--headroom-margin``); ``ReachBands.find(surface_z=...)`` matches the requested height within SURFACE_MATCH_TOL
 INTERIOR_HEADROOM_MARGIN = 0.02
 SURFACE_MATCH_TOL = 0.03
+#: ``--support-joints``: physics steps after the support's joints are set (as the sampler's ``generation.partner_joint_init``)
+SUPPORT_JOINT_SETTLE_STEPS = 30
 STRIP_MAX_DEPTH = 0.95  # m into the support from the edge; deeper cells are never reachable
 STRIP_HALF_WIDTH = 0.80
 CACHE_DEFAULT = os.path.expanduser("~/.cache/ispatialgym/reach_bands")
@@ -458,11 +463,15 @@ class ReachBands:
     def find(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
              mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
-             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None, surface_z: Optional[float] = None) -> List[str]:
+             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None, surface_z: Optional[float] = None,
+             support_joints: Optional[Dict[str, float]] = None) -> List[str]:
         """Paths (``.npz``) of the cached bands matching the given factors, best match first.
 
         ``surface_z`` (m above the floor): an interior-surface band (``--surface-z``, a shelf inside the support) requested
         within :data:`SURFACE_MATCH_TOL` of that height; ``None`` = the support's top, interior bands are never returned.
+
+        ``support_joints`` (``--support-joints``, a fridge door open): the bands computed with those support joints (the same joints,
+        each within ``object_joints.SPEC_MATCH_TOL``); ``None`` = the bands of the support as the scene file has it.
 
         ``object`` = ``CATEGORY/MODEL`` (``None`` for object-less generic bands); ``grasp_key`` = the library key,
         ``"generic"`` for ``--generic-pinch`` bands, ``None`` = any grasp set; ``placed`` = the ``--placed`` objects
@@ -486,6 +495,8 @@ class ReachBands:
                 if (srf.get("mode") == "interior") != (surface_z is not None):
                     continue
                 if surface_z is not None and abs(float(srf.get("z_requested_above_floor", -9.0)) - float(surface_z)) > SURFACE_MATCH_TOL:
+                    continue
+                if not OJ.specs_match(support_joints, meta.get("support_joints")):
                     continue
                 if mode is not None and meta.get("mode") != mode:
                     continue
@@ -527,7 +538,8 @@ class ReachBands:
     def load(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
              mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
-             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None, surface_z: Optional[float] = None) -> "ReachBands":
+             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None, surface_z: Optional[float] = None,
+             support_joints: Optional[Dict[str, float]] = None) -> "ReachBands":
         """Load the cached band for the given factors (see :meth:`find`); ``FileNotFoundError`` on a cache miss.
 
         Left-arm contact band of an object of height ``h`` on ``support``::
@@ -539,11 +551,11 @@ class ReachBands:
             ReachBands.load(scene, "floor", obj, "generic", under=partner, under_edge=True)
         """
         paths = ReachBands.find(scene, support, object, grasp_key, placed=placed, under=under, scale=scale, target=target, joint=joint, mode=mode, arm=arm,
-                                contact_set=contact_set, height=height, under_edge=under_edge, dirs=dirs, surface_z=surface_z)
+                                contact_set=contact_set, height=height, under_edge=under_edge, dirs=dirs, surface_z=surface_z, support_joints=support_joints)
         if not paths:
             raise FileNotFoundError(f"no reach band for scene={scene} support={support} object={object} grasp_key={grasp_key} placed={list(placed)} "
                                     f"under={under} under_edge={under_edge} scale={scale} target={target} joint={joint} arm={arm} contact_set={contact_set} height={height} "
-                                    f"surface_z={surface_z} in {list(dirs) if dirs is not None else default_dirs()}")
+                                    f"surface_z={surface_z}{f' support_joints={support_joints}' if support_joints else ''} in {list(dirs) if dirs is not None else default_dirs()}")
         if len(paths) > 1:
             log.debug("%d reach bands match (%s ...); using %s", len(paths), object or target or contact_set, paths[0])
         return ReachBands.from_files(paths[0])
@@ -1152,6 +1164,10 @@ class BandComputer:
         #: ``time.time()`` value) - :meth:`compute` raises :class:`BandDeadline` before the next trunk or IK round once it has
         #: passed. ``None`` (the CLI) = no limit
         self.deadline: Optional[float] = None
+        #: ``--support-joints`` (:func:`apply_support_joints`): the support's AABB without the links the joints moved (the edge stances'
+        #: overhang; ``None`` = ``support.aabb``) and the collision pieces of its doors (cleared from an interior raster)
+        self.support_aabb: Optional[Tuple[th.Tensor, th.Tensor]] = None
+        self.support_part_boxes: List[Tuple[th.Tensor, th.Tensor]] = []
 
     def check_deadline(self, where: str) -> None:
         """:class:`BandDeadline` once :attr:`deadline` has passed."""
@@ -1372,7 +1388,7 @@ class BandComputer:
         """Base pose at the midpoint of one edge of the top (preferred: named edge; else the longest edge whose stance is on
         free floor and whole‑body collision free at trunk (0.5, 0))."""
         G, kit = self.G, self.kit
-        lo, hi = support.aabb
+        lo, hi = self.support_aabb if self.support_aabb is not None else support.aabb
         aabb_xy = G.aabb_corners(lo, hi)[:, :2]
         cands = []
         for name, mid, normal, length in top.edges():
@@ -1433,7 +1449,7 @@ class BandComputer:
         free floor and collision-free at trunk (0.5, 0), then the number of such stand-offs, then the number on free floor,
         then the edge length. ``RuntimeError`` when no stand-off of any edge is on free floor."""
         G, kit = self.G, self.kit
-        lo, hi = support.aabb
+        lo, hi = self.support_aabb if self.support_aabb is not None else support.aabb
         aabb_xy = G.aabb_corners(lo, hi)[:, :2]
         best = None
         for name, mid, normal, length in top.edges():
@@ -2247,6 +2263,10 @@ def build_parser() -> argparse.ArgumentParser:
                     "Cells = the board at that height whose headroom fits the object + --headroom-margin; the stance at an open side; the rest of the support "
                     "(board above, side walls, back panel) stays an obstacle for the pre-grasp and the grasp pose, only the board under the cells is ignored at the grasp pose")
     ap.add_argument("--surface-tol", type=float, default=0.03, help="--surface-z: a board hit counts within this of the requested height (m)")
+    ap.add_argument("--support-joints", default=None, help="JSON {joint: position}: the support's joints set before anything else (a fridge door open, "
+                    "IORS large-scale generation.partner_joint_init), clamped to their limits, 30 physics steps, the robot re-parked 1 m away; the edge "
+                    "stance's overhang leaves the moved links out and an interior raster loses the cells under the support's doors; meta support_joints "
+                    "(+ _settled / support_moved_links), part of the file name and key; ReachBands.find(support_joints=...)")
     ap.add_argument("--stand-offs", default=None, help="multi-distance band, e.g. 0.35,0.45,0.55 (must contain --stand-off): the trunk collision check and the "
                     "pre-grasp / grasp IK at the stance of every stand-off (same edge, + the same AABB overhang); meta stand_offs / stances, trunks[] entries "
                     "carry stand_off, the npz keeps the plain t*_k* keys for --stand-off and adds so<so>__t*_k* keys per stand-off; part of the cache key")
@@ -2485,6 +2505,46 @@ def band_kit(world, kit, kit_cls=None):
     return bk
 
 
+def apply_support_joints(world, kit, bc: "BandComputer", support_name: str, value: Any, rooms: Sequence[str], meta: Dict[str, Any]) -> Dict[str, float]:
+    """``--support-joints``: the support's joints set (clamped to their limits; JSON or a mapping), the robot re-parked 1 m away from the
+    support as it now stands, :data:`SUPPORT_JOINT_SETTLE_STEPS` physics steps with the robot held, one full step, the collision world
+    re-synced - the state the sampler's ``generation.partner_joint_init`` gives its partner. Sets ``bc.support_aabb`` (the AABB without
+    the moved links) and ``bc.support_part_boxes`` (the pieces of every link but the root: the doors) and the meta fields
+    ``support_joints`` (the request as applied: the lookup key), ``support_joints_settled``, ``support_moved_links``. Returns the request."""
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    support = world.obj(support_name)
+    try:
+        spec, clamped = OJ.parse_joint_spec(json.loads(value) if isinstance(value, str) else value, list(support.joints), OJ.joint_limits(support))
+    except (ValueError, json.JSONDecodeError) as e:
+        raise SystemExit(f"--support-joints {value!r} on {support_name}: {e}")
+    before = OJ.link_poses(support)
+    OJ.set_joints(support, spec)
+    try:
+        xy = NAV.park_pose(kit, list(rooms) or list(world.loaded_rooms or []), keep_away=[support])
+        world.park_robot(xy, floor_z=world.floor_z)
+    except Exception as e:  # noqa: BLE001 - a park that fails leaves the robot where it was loaded
+        log.warning("--support-joints: robot not re-parked away from %s (%r)", support_name, e)
+    world.step_physics(SUPPORT_JOINT_SETTLE_STEPS, still=[world.robot])
+    world.full_step()
+    support.set_joint_velocities(th.zeros_like(support.get_joint_positions()))
+    support.keep_still()
+    settled = OJ.joint_dict(support)
+    moved = OJ.moved_links(before, OJ.link_poses(support))
+    kit.sync_world()
+    root = getattr(support, "root_link_name", "base_link")
+    bc.support_aabb = OJ.static_aabb(support, moved)
+    bc.support_part_boxes = OJ.link_piece_aabbs(support, [n for n in support.links if n != root])
+    meta["support_joints"] = {k: round(float(v), 4) for k, v in spec.items()}
+    meta["support_joints_settled"] = {k: round(settled[k], 4) for k in spec}
+    meta["support_moved_links"] = list(moved)
+    if clamped:
+        meta["support_joints_clamped"] = clamped
+    log.info("--support-joints on %s: %s -> settled %s, moved links %s%s", support_name, spec, meta["support_joints_settled"], moved,
+             f" (clamped {clamped})" if clamped else "")
+    return spec
+
+
 def band_schedule(kit, sampler_kit) -> Dict[str, Any]:
     """``meta.schedule`` of an in-process band: the mesh-store capacity it was computed with and whose kit that was."""
     return {"mesh_cache": int(kit.backend.mesh_cache_size), "kit": "sampler" if kit is sampler_kit else "band"}
@@ -2597,15 +2657,27 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         meta["shoulder_fk_check"] = verify_shoulder_fk(world, kit, bc, SMOKE_FK_TRUNKS, arm="right")
         log.info("shoulder FK check done in %.1fs", time.time() - t_fk)
         kit.sync_world()
+    support_joints = None
+    if getattr(args, "support_joints", None):
+        if floor_mode or args.brace:
+            raise SystemExit("--support-joints sets a support object's joints (tabletop / interior / contact bands; not --support floor or --brace)")
+        support_joints = apply_support_joints(world, kit, bc, args.support, args.support_joints, rooms, meta)
+        key_extra["support_joints"] = sorted([k, round(float(v), 3)] for k, v in support_joints.items())
     # ---- support geometry and stance
     placed_objs = []
     placed_specs = [PlacedSpec.parse(s) for s in args.placed]
     under_edge_parts = None  # --under-edge: (outside cells, under cells near the edge, their clearances), finalized with the object height
     itop = board_key = None
+    n_door_cells = 0
     if interior:
         # interior surface (owner 2026-10-11 05:04): the shelf at --surface-z above the floor; only its board is ignored at
         # the grasp pose, the rest of the support (board above, side walls, back panel) stays an obstacle for both poses
         itop = world.support_interior(world.obj(args.support), world.floor_z + float(args.surface_z), z_margin=float(args.surface_tol))
+        n_door_cells = OJ.mask_out_boxes(itop, bc.support_part_boxes, pad=0.5 * float(itop.resolution))
+        if n_door_cells:
+            log.info("%s: %d interior cells at z %.3f under the support's doors left out (--support-joints)", args.support, n_door_cells, itop.z)
+            if not bool(itop.mask.any()):
+                raise RuntimeError(f"{args.support}: every interior cell at z {itop.z:.3f} lies under the support's doors")
         board_key = f"{args.support}::board@{itop.z:.2f}"
     if grid_mode:
         # the stance search below runs whole-body checks at candidate base poses: the layers are built around each of them
@@ -2695,6 +2767,7 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         meta["surface"] = {"mode": "interior", "z_requested_above_floor": float(args.surface_z), "z_world": round(top.z, 4),
                            "z_above_floor": round(top.z - world.floor_z, 4), "tol": float(args.surface_tol), "board_key": board_key,
                            "board_pieces": list(top.board_pieces), "board_ignored_at_grasp": bool(top.board_pieces), "open_edges": list(top.open_edges),
+                           **({"cells_under_doors": n_door_cells} if support_joints else {}),
                            "collision": "pre-grasp and grasp pose: the whole support is an obstacle except, at the grasp pose only, the board pieces under the cells"}
         if not top.board_pieces:
             log.warning("%s: no board piece found under the interior cells at z %.3f; the board stays an obstacle at the grasp pose", args.support, top.z)
@@ -3053,7 +3126,7 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         mode_name = "contact" if args.generic_contact else meta["mode"]
         under_tag = ("-under-edge-" if args.under_edge else "-under-") + args.under if args.under else ""
         surface_tag = ((f"-interior-z{z_support - world.floor_z:.2f}" if interior else "") + ("-so" + "_".join(f"{s:.2f}" for s in stand_offs) if stand_offs else "")
-                       + (TRUNK_CHECK_IDLE_TAG if trunk_idle else ""))
+                       + (TRUNK_CHECK_IDLE_TAG if trunk_idle else "") + "".join(f"-{k}{float(v):.2f}" for k, v in sorted((support_joints or {}).items())))
         if trunk_idle:
             meta["trunk_check"] = trunk_check_meta(band_arm)
         name = f"{mode_name}__{args.scene}__{args.support}{surface_tag}{under_tag}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"

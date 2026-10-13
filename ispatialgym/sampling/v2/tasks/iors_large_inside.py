@@ -249,9 +249,11 @@ class InsideMode:
             return memo[arm]
         c = self.choice.models["target"]
         z = float(self.place["z_requested"])
+        joints = (self.template_facts.get("partner_joint_init") or {}).get("applied") or None  # the band of the partner with its door open
         rb, why = None, ""
         try:
-            rb = RB.ReachBands.load(self.world.scene_model, self.partner.name, f"{c.category}/{c.model}", self.grasp_key, scale=c.scale, arm=arm, surface_z=z)
+            rb = RB.ReachBands.load(self.world.scene_model, self.partner.name, f"{c.category}/{c.model}", self.grasp_key, scale=c.scale, arm=arm, surface_z=z,
+                                    support_joints=joints)
             if int(rb.meta.get("n_reachable_total", 1) or 0) == 0:
                 rb, why = None, "empty band"
         except FileNotFoundError:
@@ -261,7 +263,8 @@ class InsideMode:
             base = self.inside_band(arm0)
             if base is not None and RB.mirrorable(base.meta):
                 rb, why = base.mirrored(), f"the {arm0} arm's band mirrored"
-        log.info("%s: inside goal-side band (%s arm, surface_z %.2f): %s", self.gp.alias, arm, z, rb.path if rb is not None and not why else why or "none")
+        log.info("%s: inside goal-side band (%s arm, surface_z %.2f%s): %s", self.gp.alias, arm, z, f", support joints {joints}" if joints else "",
+                 rb.path if rb is not None and not why else why or "none")
         self.template_facts.setdefault("inside_bands", {})[arm] = None if rb is None else {**(TT.band_facts(rb) or {}), "n_cells": int(rb.meta.get("n_reachable_total", 0) or 0)}
         memo[arm] = rb
         return rb

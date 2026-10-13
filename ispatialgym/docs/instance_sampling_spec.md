@@ -1655,7 +1655,10 @@ reset as the articulation targets, and writes them at the end of the episode (`m
 `end`) — and in `summary.partner_joints`. The links the request moved stay an obstacle and nothing more: the parked robot keeps 1 m
 from the partner, every recorded path plans around their floor footprints (+ 2 cm), and the inside mode measures the stance-C
 overhang without them and clears the interior raster's cells under the partner's doors, open or closed (every link but its root:
-a bin in a fridge door is no part of the shelf behind it).
+a bin in a fridge door is no part of the shelf behind it). The goal-side band of such a partner is computed with the same joints
+(`reach_bands --support-joints '{"j": q}'`: the same set / re-park / settle, the stance overhang and the raster as above; meta
+`support_joints`, a `-<joint><q>` file-name tag); `ReachBands.find(support_joints=...)` matches the request within 0.02 and without
+one finds only the bands of the support as the scene file has it.
 
 ## 6. Per-task rules
 

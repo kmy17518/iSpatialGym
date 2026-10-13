@@ -69,6 +69,23 @@ def test_find_matches_placed_specs_through_canonical_form():
         assert rb.meta["placed"][0]["mode"] == FOCUS
 
 
+def test_find_matches_support_joints():
+    """``--support-joints`` (inside_large_scale#02, the fridge door open): a band computed with the support's joints set is found only
+    when the same joints are asked for (within 0.02); without a request only the bands of the support as the scene file has it."""
+    with tempfile.TemporaryDirectory() as d:
+        _write_band(d, "closed", {})
+        _write_band(d, "door_open", {"support_joints": {"j_left_door": 2.3}})
+        find = lambda **kw: [os.path.basename(p)[:-4] for p in RB.ReachBands.find("s", "t", "mug/ycbmug", "mug__ycbmug__t", dirs=[d], **kw)]  # noqa: E731
+        assert find() == ["closed"] and find(support_joints={}) == ["closed"]
+        assert find(support_joints={"j_left_door": 2.3}) == ["door_open"] and find(support_joints={"j_left_door": 2.31}) == ["door_open"]
+        assert find(support_joints={"j_left_door": 1.57}) == [] and find(support_joints={"j_right_door": 2.3}) == []
+        with pytest.raises(FileNotFoundError, match="support_joints"):
+            RB.ReachBands.load("s", "t", "mug/ycbmug", "mug__ycbmug__t", support_joints={"j_left_door": 1.0}, dirs=[d])
+    args = RB.build_parser().parse_args(["--scene", "s", "--support", "fridge_petcxr_0", "--surface-z", "1.20", "--support-joints", '{"j_left_door": 2.3}'])
+    assert json.loads(args.support_joints) == {"j_left_door": 2.3}
+    assert RB.build_parser().parse_args(["--scene", "s", "--support", "t"]).support_joints is None
+
+
 # ----------------------------------------------------------------------------------------------- --jobs worker (no simulator)
 
 #: a stable-scene stub: the ``in_rooms`` of the supports decide the loaded rooms; the chair models are unknown to the

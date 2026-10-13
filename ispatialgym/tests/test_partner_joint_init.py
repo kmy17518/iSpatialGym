@@ -239,6 +239,57 @@ def test_core_park_and_path_hooks(monkeypatch):
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# the goal-side band of the partner with its door open
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_band_cli_sets_the_support_joints(monkeypatch):
+    """``reach_bands --support-joints``: the support's joints set and clamped, the robot re-parked away from it, a settle, the world
+    re-synced; the meta keys (the lookup key = the request as applied), the stance AABB without the moved door, the doors' pieces."""
+    RB = pytest.importorskip("ispatialgym.sampling.reach_bands")
+    fridge, log = _Fridge(), []
+    world = SimpleNamespace(obj=lambda name: fridge, robot="robot", floor_z=0.0, loaded_rooms=["kitchen_0"],
+                            park_robot=lambda xy, floor_z=0.0: log.append(("park", [round(float(v), 2) for v in xy])),
+                            step_physics=lambda n, still=(): log.append(("steps", n, list(still))), full_step=lambda render=True: log.append(("full",)))
+    kit = SimpleNamespace(sync_world=lambda: log.append(("sync",)))
+    monkeypatch.setattr(NAV, "park_pose", lambda kit, rooms, keep_away=(), **kw: log.append(("away_from", [o.name for o in keep_away], rooms)) or th.tensor([3.0, 1.0]))
+    bc = SimpleNamespace(support_aabb=None, support_part_boxes=[])
+    meta = {}
+    spec = RB.apply_support_joints(world, kit, bc, "fridge_petcxr_0", '{"j_left_door": 2.3}', ["kitchen_0"], meta)
+    assert spec == {"j_left_door": pytest.approx(2.3)} and fridge.q.tolist() == pytest.approx([2.3, 0.0])
+    assert log == [("away_from", ["fridge_petcxr_0"], ["kitchen_0"]), ("park", [3.0, 1.0]), ("steps", RB.SUPPORT_JOINT_SETTLE_STEPS, ["robot"]), ("full",), ("sync",)]
+    assert meta["support_joints"] == {"j_left_door": 2.3} and meta["support_joints_settled"] == {"j_left_door": 2.3} and meta["support_moved_links"] == ["left_door"]
+    assert bc.support_aabb[1].tolist() == pytest.approx([0.5, 0.5, 2.0]) and len(bc.support_part_boxes) == 2  # both doors leave an interior raster
+    meta2 = {}
+    RB.apply_support_joints(world, kit, SimpleNamespace(), "fridge_petcxr_0", {"j_left_door": 9.0}, ["kitchen_0"], meta2)
+    assert meta2["support_joints"] == {"j_left_door": 2.356} and "support_joints_clamped" in meta2
+    with pytest.raises(SystemExit):
+        RB.apply_support_joints(world, kit, bc, "fridge_petcxr_0", '{"j_nope": 1.0}', ["kitchen_0"], {})
+    with pytest.raises(SystemExit):
+        RB.apply_support_joints(world, kit, bc, "fridge_petcxr_0", "not json", ["kitchen_0"], {})
+
+
+def test_inside_band_asks_for_the_partner_joints(monkeypatch):
+    """The inside mode looks its goal-side band up with the joints ``partner_joint_init`` applied (no request: the plain band)."""
+    RB = pytest.importorskip("ispatialgym.sampling.reach_bands")
+    from ispatialgym.sampling.v2.tasks import iors_large_inside as IN
+
+    asked = []
+
+    def load(*a, **kw):
+        asked.append(kw.get("support_joints"))
+        raise FileNotFoundError("no band")
+
+    monkeypatch.setattr(RB.ReachBands, "load", staticmethod(load))
+    for facts, want in (({"partner_joint_init": {"applied": {"j_left_door": 2.3}}}, {"j_left_door": 2.3}), ({}, None)):
+        s = SimpleNamespace(choice=SimpleNamespace(models={"target": SimpleNamespace(category="jar_of_spaghetti_sauce", model="exmsmm", scale=None)}),
+                            place={"z_requested": 1.20}, world=SimpleNamespace(scene_model="house_double_floor_lower"), partner=SimpleNamespace(name="fridge_petcxr_0"),
+                            grasp_key="jar_of_spaghetti_sauce__exmsmm__t", template_facts=dict(facts), gp=_GP())
+        assert IN.InsideMode.inside_band(s, "right") is None
+        assert asked[-1] == want and s.template_facts["inside_bands"] == {"right": None}
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # the loader
 # ----------------------------------------------------------------------------------------------------------------
 
