@@ -34,7 +34,7 @@ One draw per attempt (generation keys in :data:`DEFAULTS`, read by this mode onl
 ``contacts.push`` (``kind: "base_push"``): ``pre`` / ``init`` (contact) / ``goal`` (= contact + distance x d) eef poses, ``direction``,
 ``distance_m`` and the extras ``base_start`` / ``base_end``, ``push_height_m``, ``stand_off_m``, ``lateral_offset_m``, ``contact_point``,
 ``contact_in_object`` (the contact point in the target's root frame), ``face``, ``face_inset_m``, ``pitch_deg``, ``partner``, ``end_stance``,
-``goal_gap_m``, ``nextto_bound_m``, ``drift_tol_m``, ``nextto_push_on_m``, ``push_speed_m_s``, ``ignore_last`` / ``ignore_every``
+``goal_gap_m``, ``nextto_bound_m``, ``drift_tol_m``, ``yaw_tol_rad``, ``nextto_push_on_m``, ``push_speed_m_s``, ``ignore_last`` / ``ignore_every``
 (the program check's ignores: the target at the contact). The oracle's ``BasePush`` reads them.
 """
 
@@ -92,6 +92,7 @@ DEFAULTS: Dict[str, Any] = {
     "push_reach_margin_m": [0.03, 0.45],
     "push_ik_max": 16,
     "drift_tol_m": 0.10,
+    "yaw_tol_rad": 0.61,
     "nextto_push_on_m": 0.05,
     "push_speed_m_s": 0.08,
     "init_distance_m": [1.4, 2.4],
@@ -767,7 +768,8 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
               "contact_point": [round(float(v), 5) for v in info["point"].tolist()], "contact_in_object": [round(float(v), 5) for v in p_loc.tolist()],
               "face": face, "face_inset_m": round(float(f["inset"]), 4), "face_spread_m": round(float(f["spread"]), 4), "face_relaxed": bool(f.get("relaxed")), "pitch_deg": chain["pitch_deg"],
               "wrist_sign": chain["wrist"], "partner": pname, "end_stance": END_STANCE, "goal_gap_m": round(gap, 4), "nextto_bound_m": round(bound, 4),
-              "drift_tol_m": float(knob(s, "drift_tol_m")), "nextto_push_on_m": float(knob(s, "nextto_push_on_m")), "push_speed_m_s": float(knob(s, "push_speed_m_s")),
+              "drift_tol_m": float(knob(s, "drift_tol_m")), "yaw_tol_rad": float(knob(s, "yaw_tol_rad")), "nextto_push_on_m": float(knob(s, "nextto_push_on_m")),
+              "push_speed_m_s": float(knob(s, "push_speed_m_s")),
               "reach_margin_m": round(float(info["reach_margin"]), 4), "ignore_last": [tname], "ignore_every": []}
     s.sidecar.add_contact(ContactRecord("push", arm, pre=chain["pre"], contact=chain["contact"], mid=None, goal=goal_eef, direction=d3, distance_m=float(dist),
                                         object=tname, stance="manipulation", extras=extras))

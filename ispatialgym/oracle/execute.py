@@ -5437,7 +5437,7 @@ BASE_PUSH_DEFAULTS: Dict[str, float] = {
     "lag_m": 0.04,  # the object lags the hand's progress by more than this: the drive stops for a re-contact
     "recontacts": 2,
     "drift_tol_m": 0.10,  # sideways drift of the object off the line that stops the drive
-    "yaw_tol_rad": 0.35,  # turn of the object that stops the drive
+    "yaw_tol_rad": 0.61,  # turn of the object that stops the drive (35 deg; a single-hand push turns the cart ~20 deg by mid-push)
     "nextto_push_on_m": 0.05,  # once NextTo holds the drive goes on this far (the object well inside the bound), then stops
     "nextto_hold_checks": 2,  # NextTo must read true at this many consecutive checks
     "nextto_check_every": 5,  # steps between NextTo reads

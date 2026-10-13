@@ -123,6 +123,14 @@ def test_knobs_default_unless_the_alias_sets_them():
     assert NT.knob(s, "drift_tol_m") == 0.2 and NT.knob(s, "push_distance_m") == [1.5, 2.5] and NT.knob(None, "push_pre_m") == 0.10
 
 
+def test_the_recorded_turn_limit_defaults_to_the_oracle_s():
+    from ispatialgym.oracle import execute as EX
+
+    assert NT.knob(None, "yaw_tol_rad") == EX.BASE_PUSH_DEFAULTS["yaw_tol_rad"] == 0.61
+    s = SimpleNamespace(gp=SimpleNamespace(gen=lambda k: {"yaw_tol_rad": 0.5}.get(k)))
+    assert NT.knob(s, "yaw_tol_rad") == 0.5
+
+
 def test_the_nextto_hook_returns_the_mode():
     s = IL.IORSLarge.__new__(IL.IORSLarge)
     assert s._sample_nextto() is NT.NextToMode

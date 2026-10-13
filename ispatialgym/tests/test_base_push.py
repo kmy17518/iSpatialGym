@@ -187,6 +187,14 @@ def test_base_push_recontacts_a_lagging_cart_and_gives_up_without_contact():
     assert ctx["base_push"]["result"].startswith("no contact") and post == "no_motion" and not [c for c in motions.calls if c[0] == "track_path"]
 
 
+def test_base_push_turn_limit_is_35_deg_unless_the_record_sets_it():
+    """A single-hand push turns the cart ~20 deg by mid-push: the drive stops at 35 deg (0.61 rad) unless the record's contacts.push
+    extra sets yaw_tol_rad."""
+    assert EX.BASE_PUSH_DEFAULTS["yaw_tol_rad"] == pytest.approx(0.61)
+    assert EX.base_push_knobs({"yaw_tol_rad": 0.35})["yaw_tol_rad"] == pytest.approx(0.35)
+    assert EX.base_push_knobs({"drift_tol_m": 0.1})["yaw_tol_rad"] == pytest.approx(0.61)
+
+
 def test_nextto_now_reads_the_state_or_gives_none():
     w = _World(cart_x=3.0)
     assert EX.nextto_now(_State(w), CART, TABLE) is True
