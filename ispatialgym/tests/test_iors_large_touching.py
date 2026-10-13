@@ -21,7 +21,7 @@ from ispatialgym.oracle.sidecar import Sidecar, SidecarError
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
-from ispatialgym.sampling.v2.stances import SidecarDraft, Stance
+from ispatialgym.sampling.v2.stances import EdgeFrame, SidecarDraft, Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 TM = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large_touching")
@@ -147,7 +147,25 @@ def _mode(**gen):
     s._adopt_mode(TM.TouchingMode)
     s.gp = _GP(**gen)
     s.hull = _rect(0.29, 0.31)
+    s.rest, s.floor_z, s.seg_arm = G.IDENTITY_QUAT.clone(), 0.0, "left"
+    s.place = {"height": 0.07, "half": 0.155, "faces": {}, "chain_failed": set()}
     return s
+
+
+#: bookcase_otwukr_1's -y AABB edge (house_double_floor_upper), the face 6 mm behind it (touching#03)
+EDGE = EdgeFrame("-y", th.tensor([-4.053, -0.817]), th.tensor([0.0, 1.0]), 0.769)
+FACE_OFFSET = 0.006
+
+
+def _stance_c(s, so: float, lane: float = -0.2, trunk=(2.0, 0.0)) -> Stance:
+    """A frontal touching stance C ``so`` m off the edge, the lane 0.25 m to the left arm's side, with the mode's extras."""
+    lat_b = IL.frontal_lane_lateral(lane, 0.25, "left")
+    xy = EDGE.base_xy(so, lat_b)
+    st = Stance("push", (float(xy[0]), float(xy[1]), EDGE.yaw), trunk[0], trunk[1], so, EDGE, None, lat_b, None, ["left"])
+    face = EDGE.mid + EDGE.tangent * lane + EDGE.inward * FACE_OFFSET
+    drop = TM.touching_drop_xy(face, EDGE.inward, 0.155, 0.10)
+    st.extras.update({"face_point": [float(v) for v in face], "push_dir": [0.0, 1.0], "drop_cell": [float(v) for v in drop]})
+    return st
 
 
 def test_goal_per_yaw_and_the_push_chain(monkeypatch):
@@ -165,13 +183,79 @@ def test_goal_per_yaw_and_the_push_chain(monkeypatch):
         return {"distance_m": 0.1}
 
     monkeypatch.setattr(IL.IORSLarge, "_push_under_chain", chain)
-    place = SimpleNamespace(extras={"face_point": face})
-    drop = TM.touching_drop_xy(face, d2, 0.155, 0.10)
+    place = _stance_c(s, 0.90)
+    face, drop = place.extras["face_point"], place.extras["drop_cell"]
+    g0 = s.touching_goal_at(face, d2, th.tensor(Q0))
     ch = s._push_under_chain(place, th.tensor(Q0), drop, [9.0, 9.0], d2)
     assert seen[-1] == pytest.approx(g0.tolist(), abs=1e-6) and ch["goal_cell"] == pytest.approx(g0.tolist(), abs=1e-6)  # the nominal goal is replaced
+    assert ch["blade_span_m"] == pytest.approx([0.472, 0.60], abs=0.002)  # the blade 0.47 -> 0.60 m ahead: inside the floor reach
     assert s._push_under_chain(place, th.tensor(Q0), g0 + th.tensor([0.0, 0.005]), [9.0, 9.0], d2) is None  # nothing left to push
     assert s._push_under_chain(SimpleNamespace(extras={}), th.tensor(Q0), drop, [9.0, 9.0], d2) == {"distance_m": 0.1}  # no face: as recorded
     assert seen[-1] == [9.0, 9.0]
+
+
+def test_push_chain_skips_a_blade_off_the_floor_reach_and_a_chain_that_failed(monkeypatch):
+    """touching#03 eval 2026-10-12: from the push-under's stand-offs (0.75 / 0.80 m) the tray's blade started 0.27-0.32 m ahead of
+    the base and all 252-498 chains of each attempt failed their pre-pose; such a yaw is not solved, and a chain that failed is
+    not solved again from the same stance at the same orientation (the next B candidate reaches the same C)."""
+    s = _mode()
+    calls = []
+
+    def chain(self, place, quat, drop_xy, goal_xy, d2_):
+        calls.append((place.stand_off, [round(float(v), 4) for v in G.t(quat).tolist()]))
+        return None
+
+    monkeypatch.setattr(IL.IORSLarge, "_push_under_chain", chain)
+    q45, q0 = G.quat_from_yaw(math.pi / 4), th.tensor(Q0)
+    for so in (0.75, 0.80):  # the eval's C: the corner-first yaw (the push-under's largest offset) and the aligned one
+        st = _stance_c(s, so)
+        for q in (q45, q0):
+            span = s.blade_span_at(st, q, st.extras["drop_cell"], s.touching_goal_at(st.extras["face_point"], [0.0, 1.0], q), [0.0, 1.0])
+            assert span[0] < TM.BLADE_AHEAD_M[0] - 0.02  # on the base rim
+        assert s._push_under_chain(st, q45, st.extras["drop_cell"], [9.0, 9.0], [0.0, 1.0]) is None
+    assert calls == []  # skipped without an IK
+    st = _stance_c(s, 0.90)
+    assert s._push_under_chain(st, q45, st.extras["drop_cell"], [9.0, 9.0], [0.0, 1.0]) is None and len(calls) == 1  # in reach: solved (and failed)
+    assert s._push_under_chain(st, q45, st.extras["drop_cell"], [9.0, 9.0], [0.0, 1.0]) is None and len(calls) == 1  # failed before: not again
+    assert s._push_under_chain(st.with_trunk(0.95, -1.2, "push"), q45, st.extras["drop_cell"], [9.0, 9.0], [0.0, 1.0]) is None and len(calls) == 2  # another trunk
+    assert s._push_under_chain(st, q0, st.extras["drop_cell"], [9.0, 9.0], [0.0, 1.0]) is None and len(calls) == 3  # another orientation
+    s.seg_arm = "right"
+    assert s._push_under_chain(st, q45, st.extras["drop_cell"], [9.0, 9.0], [0.0, 1.0]) is None and len(calls) == 4  # another arm
+    assert _mode(touching_blade_ahead_m=[0.25, 0.85]).blade_window == (0.25, 0.85)
+
+
+def test_blade_span_and_the_frontal_stand_offs():
+    # the chain's geometry ahead of a frontal base: start = drop - back - stand-off; goal = face - gap - front - back - stand-off + 3 cm
+    assert TM.blade_span(0.65, 0.906, 0.155, 0.155, 0.023, 0.002, 0.03) == pytest.approx((0.472, 0.601))
+    assert TM.span_violation((0.472, 0.601), (0.40, 0.85)) == 0.0 and TM.span_violation((0.315, 0.385), (0.40, 0.85)) == pytest.approx(0.085)
+    assert TM.span_violation((0.60, 0.90), (0.40, 0.85)) == pytest.approx(0.05)
+    inside = sorted([(0.415, 0.485), (0.472, 0.601), (0.30, 0.40)], key=lambda sp: TM.blade_rank(sp, (0.40, 0.85)))
+    assert inside == [(0.472, 0.601), (0.415, 0.485), (0.30, 0.40)]  # in reach, middle nearest 0.55 first; off the reach last
+    s = _mode()
+    assert s.blade_standoff_m() == pytest.approx(0.018 + IL.PUSH_UNDER_CLEARANCE_M)  # the closed finger's upper section: the tray's back face reaches it
+    prof = s.blade_profile()
+    assert len(prof) == TM.PROFILE_YAWS and min(b for b, _ in prof) == pytest.approx(0.145, abs=1e-4)
+    assert max(b for b, _ in prof) == pytest.approx(math.hypot(0.145, 0.155), abs=2e-3)  # corner-first
+    kw = dict(face_offset=FACE_OFFSET, half=0.155, extra=0.10, profile=prof, standoff=s.blade_standoff_m(), gap=0.002, goal_extra=0.03,
+              window=TM.BLADE_AHEAD_M, drop_max=TM.DROP_AHEAD_MAX_M)
+    fits = [so for so in TM.STAND_OFFS_M if TM.stand_off_fits(so, **kw)]
+    assert fits == [0.85, 0.9, 0.95, 1.0]  # the push-under's 0.5-0.8 m put every blade start on the base rim; 1.05+ drops > 0.80 m ahead
+    # the C order: the nearest drop from which every yaw's blade start clears 0.41 m (stand-off 0.90 m)
+    assert s.push_drop_ahead_pref() == pytest.approx(0.41 + math.hypot(0.145, 0.155) + 0.023, abs=2e-3)
+    assert _mode(push_under_drop_ahead_pref_m=0.5).push_drop_ahead_pref() == 0.5
+
+
+def test_touching_yaw_rank_puts_the_blade_in_reach_first():
+    s = _mode()
+    q0, q45 = th.tensor(Q0), G.quat_from_yaw(math.pi / 4)
+    assert IL.IORSLarge.push_yaw_rank(s, None, q0, 0.21) == -0.21  # push-under: the largest contact offset first
+    assert IL.IORSLarge.PUSH_YAW_ORDER == "largest-offset" and s.PUSH_YAW_ORDER == "blade-window"
+    st = _stance_c(s, 0.90)
+    assert s.push_yaw_rank(st, q0, 0.155) < s.push_yaw_rank(st, q45, 0.213) < 1.0  # both in reach, the aligned blade nearer the middle
+    st = _stance_c(s, 0.85)
+    assert s.push_yaw_rank(st, q0, 0.155) < 1.0 < s.push_yaw_rank(st, q45, 0.213)  # the corner-first blade starts on the base rim
+    assert s.push_yaw_rank(Stance("push", (0.0, 0.0, 0.0), 2.0, 0.0), q45, 0.213) == -0.213  # no face point: the push-under rule
+    assert IL.IORSLarge.push_drop_ahead_pref(_mode()) is None and IL.IORSLarge.push_drop_ahead_pref(_mode(push_under_drop_ahead_pref_m=0.3)) == 0.3
 
 
 def test_touching_records_turn_the_push_under_records(monkeypatch):

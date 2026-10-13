@@ -18,12 +18,17 @@ hands, a straight floor push of the closed gripper from stance C, exact IK on th
   push-under drop.
 * **Stance C**: the push-under's frontal / side stances at the face (the deep floor trunks, the drop footprint and the face's
   bottom point in frame), the lanes centred on the face so that the goal footprint stays in front of it; the nearest face that
-  admits a stance (``generation.placement_pool_edges`` pools them as for ontop / under).
+  admits a stance (``generation.placement_pool_edges`` pools them as for ontop / under). The frontal stand-offs (0.5-1.1 m) are
+  those from which some yaw puts the floor blade's span in its reach, 0.40-0.85 m ahead of the base (:func:`stand_off_fits`):
+  the blade starts a contact offset + stand-off behind the drop centre, so a 0.3 m tray's drop sits 0.6-0.75 m ahead, past the
+  push-under's 0.25-0.6 m drop window, which put every blade start on the base rim (touching#03 eval 2026-10-12).
 * **The push**: the push-under chain to the touching goal - floor and target ignored, the partner present (the IK's stopping
-  contact for the target, never for the hand); recorded as ``contacts.push`` with ``kind: "push_touching"``, ``relation:
-  "touching"``, ``partner``, ``face_point`` / ``face_offset_m`` / ``gap_m``. The oracle program
-  (``programs.program_iors_large_touching``) pushes with ``Push(follow=partner)``: the pad stops when the target reaches its goal
-  (``execute_push``'s stop rule), the partner may be touched.
+  contact for the target, never for the hand), tried at the yaws whose blade span lies in the reach first (:func:`blade_rank`);
+  a yaw whose blade lies more than 3 cm outside it, or a chain that already failed from the same stance at the same orientation,
+  is not solved again. Recorded as ``contacts.push`` with ``kind: "push_touching"``, ``relation: "touching"``, ``partner``,
+  ``face_point`` / ``face_offset_m`` / ``gap_m``. The oracle program (``programs.program_iors_large_touching``) pushes with
+  ``Push(follow=partner)``: the pad stops when the target reaches its goal (``execute_push``'s stop rule), the partner may be
+  touched.
 * **Goal check**: the target nudged 1 mm at a time along ``d`` until ``touching(target, partner)`` holds (the small-scale
   touching rule, ``generation.nudge_m`` / ``max_nudges``); the TRO goal is the touching pose.
 """
@@ -41,6 +46,7 @@ from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.v2 import prompt0 as P0
+from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 from ispatialgym.sampling.v2.tasks import iors_large as IL
 
@@ -68,6 +74,23 @@ LANE_END_MARGIN_M = 0.02
 SIDE_STANDOFFS_M = (0.45, 0.55)
 #: the goal footprint clears every other object's AABB by this much
 GOAL_CLEARANCE_M = 0.005
+#: the floor blade's reach ahead of the base centre (probe 2026-09-21 on the floor blade at pitch 30, tips 5.2 cm - a 7 cm tray's
+#: own blade height: (0.95, -1.2) 0.40-0.70 m, (1.75, 0) 0.40-0.80, (2.0, 0) 0.40-0.85; ``eef_reach_volume.GROUND_TRUNKS``); nearer
+#: than 0.40 m the blade's pre-pose stands over the base rim (touching#03 eval 2026-10-12: every chain with the blade start
+#: 0.27-0.32 m ahead failed "exact IK failed at pose 1 of 4"); ``generation.touching_blade_ahead_m`` overrides
+BLADE_AHEAD_M = (0.40, 0.85)
+#: a chain is not solved when its blade lies farther than this outside that reach (the probe's lattice is 5 cm)
+BLADE_TOL_M = 0.03
+#: the blade span's middle the yaws are ranked toward (the middle of the (0.95, -1.2) reach)
+BLADE_PREF_M = 0.55
+#: frontal stand-offs (``generation.push_under_stand_offs_m`` overrides): the push-under's 0.5-0.8 m and on to 1.1 m - the short
+#: push to a face lets the drop sit farther out, where the blade start clears the base rim
+STAND_OFFS_M = tuple(round(0.5 + 0.05 * k, 2) for k in range(13))
+#: the drop cell at most this far ahead of the base (``generation.touching_drop_ahead_max_m``; the tray's floor band holds its
+#: centre up to 0.80 m ahead at (0.95, -1.2))
+DROP_AHEAD_MAX_M = 0.80
+#: yaws of the blade profile (the carried yaw at C is any init yaw turned by the B -> C base yaw)
+PROFILE_YAWS = 16
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -131,6 +154,38 @@ def square_hits_box(c, half: float, lo, hi, margin: float = 0.0) -> bool:
             and float(c[1]) + half > float(lo[1]) - margin and float(c[1]) - half < float(hi[1]) + margin)
 
 
+def blade_span(drop_ahead: float, face_ahead: float, back: float, front: float, standoff: float, gap: float, goal_extra: float) -> Tuple[float, float]:
+    """The floor blade's distance ahead of a frontal stance's base at the push start and goal (the chain's geometry): the start
+    ``back + standoff`` behind the drop centre (``back`` = the contact offset behind the root), the goal as far behind the goal
+    root (its front ``gap`` short of the face, ``front`` ahead of the root) and ``goal_extra`` (``push_goal_extra_m``) beyond."""
+    start = float(drop_ahead) - float(back) - float(standoff)
+    return start, float(face_ahead) - float(gap) - float(front) - float(back) - float(standoff) + float(goal_extra)
+
+
+def span_violation(span: Sequence[float], window: Sequence[float]) -> float:
+    """How far (m) a blade span lies outside ``window`` = (nearest, farthest) reach ahead of the base; 0 inside."""
+    return max(float(window[0]) - float(span[0]), float(span[1]) - float(window[1]), 0.0)
+
+
+def blade_rank(span: Sequence[float], window: Sequence[float], pref: float = BLADE_PREF_M) -> float:
+    """Rank of a yaw by its blade span (smaller first): the spans inside the window first, by their middle's distance from
+    ``pref``; the others after them, by how far they lie outside."""
+    v = span_violation(span, window)
+    return (1.0 + v if v > 0.0 else 0.0) + abs(0.5 * (float(span[0]) + float(span[1])) - float(pref))
+
+
+def stand_off_fits(so: float, face_offset: float, half: float, extra: float, profile: Sequence[Tuple[float, float]], standoff: float, gap: float,
+                   goal_extra: float, window: Sequence[float], drop_max: float) -> bool:
+    """Whether a frontal stance ``so`` m outside the AABB edge line (the face ``face_offset`` behind that line, the drop cell
+    ``half + extra`` in front of the face, at most ``drop_max`` ahead of the base) has a yaw of ``profile`` (``(back, front)`` per
+    yaw) whose blade span lies in ``window``."""
+    face_ahead = float(so) + float(face_offset)
+    drop_ahead = face_ahead - float(half) - float(extra)
+    if drop_ahead > float(drop_max):
+        return False
+    return any(span_violation(blade_span(drop_ahead, face_ahead, b, fr, standoff, gap, goal_extra), window) <= 0.0 for b, fr in profile)
+
+
 class PushTouchingRecord(IL.PushUnderRecord):
     """``contacts.push`` of the touching push (the push-under record's fields): ``kind: "push_touching"``, ``relation:
     "touching"``, ``partner`` (the instance the target ends touching; the oracle's push follows it and may touch it)."""
@@ -187,7 +242,7 @@ class TouchingMode:
         half, height = self.target_dims()
         lo, hi = partner.aabb
         self.place = {"cells": th.zeros(0, 2), "edges": IL.aabb_edges(lo, hi), "z": self.floor_z, "height": height, "half": half, "clearance": None,
-                      "need": 0.0, "faces": {}}
+                      "need": 0.0, "faces": {}, "chain_failed": set()}
         self.template_facts["partner"] = {"name": partner.name, "relation": "touching", "edges": [e.to_json() for e in self.place["edges"]],
                                           "aabb": [[round(float(v), 3) for v in lo.tolist()], [round(float(v), 3) for v in hi.tolist()]]}
 
@@ -257,6 +312,79 @@ class TouchingMode:
         memo[key] = (f, why, facts)
         return memo[key]
 
+    # ------------------------------------------------------------------ the floor blade's reach
+
+    PUSH_YAW_ORDER = "blade-window"
+
+    @property
+    def blade_window(self) -> Tuple[float, float]:
+        """The floor blade's reach ahead of the base (``generation.touching_blade_ahead_m``, default ``BLADE_AHEAD_M``)."""
+        w = self.gp.gen("touching_blade_ahead_m")
+        return (float(w[0]), float(w[1])) if w else BLADE_AHEAD_M
+
+    def blade_standoff_m(self) -> float:
+        """The blade's stand-off behind the target's back face: ``tabletop.blade_standoff`` over the target's height at the chain's
+        pitches, the smallest; 0 when every pitch's face reaches the palm (the chain has no blade either). Memoised per template."""
+        if "blade_standoff" not in self.place:
+            height = float(self.place["height"])
+            vals = [so[0] for so in (TT.blade_standoff((self.floor_z, self.floor_z + height), self.push_height(p)[1], p, IL.PUSH_UNDER_CLEARANCE_M)
+                                     for p in TT.approach_pitch_order(None)) if so is not None]
+            self.place["blade_standoff"] = float(min(vals)) if vals else 0.0
+        return self.place["blade_standoff"]
+
+    def blade_back(self, quat, d2) -> Optional[float]:
+        """The blade's contact offset behind the target's root along ``d2`` at orientation ``quat`` (the chain's: the
+        ``generation.push_contact_offset_m`` override, else ``contact_offset_along`` at the blade's height band)."""
+        off_cfg = self.gp.gen("push_contact_offset_m")
+        if off_cfg is not None:
+            return float(off_cfg)
+        z_lo = self.push_height(30.0)[1] - self.floor_z
+        return self.contact_offset_along(quat, unit_xy(d2), z_lo, z_lo + self.BLADE_SPAN_M)
+
+    def blade_profile(self) -> List[Tuple[float, float]]:
+        """``(back, front)`` of the target at ``PROFILE_YAWS`` yaws along one push direction: the blade's contact offset behind the
+        root (:meth:`blade_back`) and the target's extent ahead of the root; memoised per template."""
+        if "blade_profile" not in self.place:
+            prof = []
+            for k in range(PROFILE_YAWS):
+                q = G.qmul(G.quat_from_yaw(2.0 * math.pi * k / PROFILE_YAWS), self.rest)
+                back = self.blade_back(q, (1.0, 0.0))
+                if back is not None:
+                    prof.append((float(back), extent_along(G.local_points_world(self.hull, (th.zeros(3), G.t(q)))[:, :2], (1.0, 0.0))[1]))
+            self.place["blade_profile"] = prof
+        return self.place["blade_profile"]
+
+    def blade_span_at(self, stance: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Tuple[float, float]]:
+        """The floor blade's distance ahead of ``stance``'s base (x in its base frame) at the chain's start and goal for the target at
+        orientation ``quat`` (``_push_under_chain``'s geometry: the contact offset + the blade stand-off behind the target's back,
+        ``push_goal_extra_m`` past the goal cell); None when nothing of the target lies in the blade's height band."""
+        back = self.blade_back(quat, d2)
+        if back is None:
+            return None
+        d = unit_xy(d2)
+        sb, extra = self.blade_standoff_m(), float(self.num("push_goal_extra_m", 0.03))
+        start = th.as_tensor([float(drop_xy[0]), float(drop_xy[1])], dtype=th.float32) - d * (back + sb)
+        goal = th.as_tensor([float(goal_xy[0]), float(goal_xy[1])], dtype=th.float32) - d * (back + sb - extra)
+        return float(stance.world_to_base(start)[0]), float(stance.world_to_base(goal)[0])
+
+    def push_yaw_rank(self, stance: Stance, quat, off: float) -> float:
+        """The yaws whose blade span lies in the floor reach first (:func:`blade_rank`): the push-under's largest contact offset
+        first is a tray's corner-first yaw, the blade start nearest the base (touching#03: on the base rim at every C)."""
+        face, d2, cd = stance.extras.get("face_point"), stance.extras.get("push_dir"), stance.extras.get("drop_cell")
+        if face is None or d2 is None or cd is None:
+            return super().push_yaw_rank(stance, quat, off)
+        span = self.blade_span_at(stance, quat, cd, self.touching_goal_at(face, d2, quat), d2)
+        return 9.0 if span is None else blade_rank(span, self.blade_window)
+
+    def push_drop_ahead_pref(self) -> Optional[float]:
+        """The C order's drop distance ahead of the base (``generation.push_under_drop_ahead_pref_m`` when set): the nearest drop
+        from which every yaw's blade start clears the floor reach's near end by 1 cm."""
+        v = super().push_drop_ahead_pref()
+        if v is not None:
+            return v
+        prof = self.blade_profile()
+        return self.blade_window[0] + 0.01 + max(b for b, _ in prof) + self.blade_standoff_m() if prof else None
+
     def touching_goal_free(self, g: th.Tensor, half: float) -> Optional[str]:
         """Why the goal footprint (a square of the half extent around ``g``) is not free floor: outside the task rooms or over an
         object's AABB (the partner excluded: the footprint lies in front of its face by construction); None when free."""
@@ -288,14 +416,19 @@ class TouchingMode:
         gap = self.touching_gap
         extra = float(self.num("push_under_drop_extra_m", IL.PUSH_UNDER_DROP_EXTRA_M))
         lanes = centred_lanes(edge.length / 2 - half - LANE_END_MARGIN_M)
-        stand_offs = [float(v) for v in (self.gp.gen("push_under_stand_offs_m") or IL.PUSH_UNDER_STAND_OFFS)]
+        stand_offs = [float(v) for v in (self.gp.gen("push_under_stand_offs_m") or STAND_OFFS_M)]
         trunks = [tuple(t) for t in (self.gp.gen("floor_trunks") or IL.FLOOR_TRUNKS)]
         lo_ahead, hi_ahead = IL.PUSH_UNDER_DROP_AHEAD_M
+        # the frontal stand-offs from the floor blade's reach (the push-under's drop window 0.25-0.6 m ahead put a tray's blade start
+        # 0.27-0.38 m ahead, on the base rim); a target without blade contact keeps the drop window
+        profile, blade_so = self.blade_profile(), self.blade_standoff_m()
+        window, goal_extra = self.blade_window, float(self.num("push_goal_extra_m", 0.03))
+        drop_max = float(self.num("touching_drop_ahead_max_m", DROP_AHEAD_MAX_M))
         side_ahead = [float(v) for v in (self.gp.gen("push_under_side_ahead_m") or (0.45, 0.55, 0.6))]
         side_b = [float(v) for v in (self.gp.gen("push_under_side_standoff_m") or SIDE_STANDOFFS_M)]
         stats: Dict[str, Any] = {"lanes": len(lanes), "face": 0, "face_why": {}, "goal_free": 0, "goal_blocked": {}, "drop_free": 0, "drop_blocked": {}, "base_ok": 0,
                                  "candidates": 0, "side_candidates": 0, "edge": edge.name, "edge_mid": [round(float(v), 2) for v in mid.tolist()],
-                                 "inward": [round(float(v), 2) for v in d2.tolist()], "gap_m": gap}
+                                 "inward": [round(float(v), 2) for v in d2.tolist()], "gap_m": gap, "blade_window": list(window), "frontal_stand_offs": []}
         cands: List[Stance] = []
         for lat in lanes:
             f, why, facts = self.touching_face(edge, lat)
@@ -322,8 +455,13 @@ class TouchingMode:
             for off in [float(v) for v in (self.gp.gen("frontal_lane_offset_m") or (0.25, 0.0))]:
                 for so in stand_offs:
                     ahead = so - out
-                    if ahead < lo_ahead or ahead > hi_ahead:
+                    if profile:
+                        if not stand_off_fits(so, float(f), half, extra, profile, blade_so, gap, goal_extra, window, drop_max):
+                            continue
+                    elif ahead < lo_ahead or ahead > hi_ahead:
                         continue
+                    if round(so, 3) not in stats["frontal_stand_offs"]:
+                        stats["frontal_stand_offs"].append(round(so, 3))
                     lat_b = IL.frontal_lane_lateral(float(lat), off, arm)
                     xy = edge.base_xy(so, lat_b)
                     if not P0.base_ok(self, xy):
@@ -395,16 +533,38 @@ class TouchingMode:
 
     def _push_under_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
         """The push-under chain to the touching goal of this yaw (:meth:`touching_goal_at` at the C candidate's face point); the
-        passed (nominal) goal cell is replaced. The chain facts carry ``goal_cell``."""
+        passed (nominal) goal cell is replaced. Not solved (None) when the blade's span at this yaw lies more than ``BLADE_TOL_M``
+        outside the floor reach (:meth:`blade_span_at`), or when the chain failed from the same stance at the same orientation
+        earlier in the template (the B candidates of an attempt share a base pose, so every coupling reaches the same C stances with
+        the same carried yaws: touching#03's jobs logged 290-1068 failed chains over 112-123 distinct ones). The chain facts carry
+        ``goal_cell`` and ``blade_span_m``."""
         face = place.extras.get("face_point")
         if face is None:
             return super()._push_under_chain(place, quat, drop_xy, goal_xy, d2)
         g = self.touching_goal_at(face, d2, quat)
         if float((g - th.as_tensor([float(drop_xy[0]), float(drop_xy[1])], dtype=th.float32)) @ unit_xy(d2)) < 0.01:
             return None  # at this yaw the target's front reaches the face from the drop cell: nothing to push
+        span = self.blade_span_at(place, quat, drop_xy, g, d2)
+        window = self.blade_window
+        if span is not None and span_violation(span, window) > BLADE_TOL_M:
+            TT._count(self, "touching.chain_outside_blade_reach")
+            log.info("%s: touching push chain not solved from stance C (d %.2f λ %+.2f trunk %s): the blade runs %.2f -> %.2f m ahead of the base, outside the "
+                     "floor reach %.2f-%.2f m", self.gp.alias, place.stand_off or 0.0, place.lateral, (place.translate, round(place.tilt, 2)), span[0], span[1], *window)
+            return None
+        key = (self.seg_arm, tuple(round(float(v), 3) for v in place.base_pose2d), round(float(place.translate), 3), round(float(place.tilt), 3),
+               getattr(place, "idle_posture", None), tuple(round(float(v), 4) for v in G.t(quat).tolist()), round(float(drop_xy[0]), 3), round(float(drop_xy[1]), 3),
+               round(float(g[0]), 3), round(float(g[1]), 3))
+        failed = self.place.setdefault("chain_failed", set())
+        if key in failed:
+            TT._count(self, "touching.chain_failed_before")
+            return None
         ch = super()._push_under_chain(place, quat, drop_xy, g, d2)
-        if ch is not None:
-            ch["goal_cell"] = [float(g[0]), float(g[1])]
+        if ch is None:
+            failed.add(key)
+            return None
+        ch["goal_cell"] = [float(g[0]), float(g[1])]
+        if span is not None:
+            ch["blade_span_m"] = [round(span[0], 3), round(span[1], 3)]
         return ch
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:

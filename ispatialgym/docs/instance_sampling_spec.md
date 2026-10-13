@@ -1561,7 +1561,13 @@ another object first or a deeper cavity → the lane is not used). Goal cell = t
 ≤ 5 mm) short of that face, the front taken at the goal orientation (per yaw), the footprint outside the partner and clear of
 every other object; drop cell = half‑extent + 0.10 m back from the face. Stance C, drop, trunks and the push chain as push‑under
 (side stances 0.45 / 0.55 m off the face; the floor mesh out of the stance / program checks for any init surface; the
-`init_support_fallback` goes to the floor init); the chain's partner is the target's stopping contact, never the hand's. Recorded as
+`init_support_fallback` goes to the floor init); the chain's partner is the target's stopping contact, never the hand's. The frontal
+stand‑offs (0.5–1.1 m) are those from which some yaw puts the floor blade's span in its reach, 0.40–0.85 m ahead of the base
+(`touching_blade_ahead_m`; floor‑blade probe 2026‑09‑21), with the drop ≤ 0.80 m ahead (`touching_drop_ahead_max_m`): a 0.3 m
+tray's drop sits 0.6–0.75 m ahead, past push‑under's 0.25–0.6 m window, which put every blade start on the base rim (touching#03,
+2026‑10‑12). The C order prefers the nearest drop from which every yaw's blade start clears that reach; the chain's yaws are tried
+in the order of the blade's fit, and a yaw whose blade lies > 3 cm outside the reach, or a chain that already failed from the same
+stance at the same orientation, is not solved again. Recorded as
 `contacts.push` with `kind: push_touching`, `relation: touching`, `partner`, `face_point`, `face_offset_m`, `gap_m`. Goal check:
 the settled target nudged 1 mm at a time (`nudge_m`, ≤ `max_nudges` 25) along the push until `touching(target, partner)` holds;
 the TRO goal is that pose. Program (`program_iors_large_touching`): `… → place(drop) → retreat → [push stance] → push → retreat`,

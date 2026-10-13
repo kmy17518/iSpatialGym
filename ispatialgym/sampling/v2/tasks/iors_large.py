@@ -833,6 +833,20 @@ class IORSLarge(SamplerV2):
         drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
         return z_tip + drop, z_tip
 
+    #: the order of the carried yaws the push chain is tried at (named by the chain-first screen's error)
+    PUSH_YAW_ORDER = "largest-offset"
+
+    def push_yaw_rank(self, stance: Stance, quat, off: float) -> float:
+        """Rank of a carried yaw for the push chain from ``stance`` (smaller first; ``quat`` = the target's orientation at C,
+        ``off`` = the blade's contact offset there): the push-under's LARGEST offset first (the blade goal nearest the base,
+        2026-09-20 19:20). Orders the chain-first screen's yaws and the F draws."""
+        return -float(off)
+
+    def push_drop_ahead_pref(self) -> Optional[float]:
+        """The drop cell's preferred distance ahead of the base in the C order (``generation.push_under_drop_ahead_pref_m``)."""
+        v = self.gp.gen("push_under_drop_ahead_pref_m")
+        return None if v is None else float(v)
+
     def _push_under_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
         """The straight floor-level push from the drop position to the goal cell, exact IK from stance C (closed gripper,
         floor and target ignored, partner present): blade behind the target along the push direction (stand-off from
@@ -2382,7 +2396,7 @@ class IORSLarge(SamplerV2):
             # its PRE-pose - the blade start sits on the base rim there; the two instances that were written (0919-211642 /
             # 221909) used d 0.80 with the goal ~0.8 m ahead, which the deep crouch does reach. Default = the old order, largest
             # drop_ahead first; ``generation.push_under_drop_ahead_pref_m`` switches to the nearest-to-preference order.)
-            ahead_pref = self.gp.gen("push_under_drop_ahead_pref_m")
+            ahead_pref = self.push_drop_ahead_pref()
             # the lane to the robot's RIGHT first (frontal_lane_offset_m 0.25): B3's under-edge probe reaches the floor strip at
             # lateral -0.40..-0.16 only, and the one chain that ever solved (0919-211642) ran at lateral -0.25; the centred lane
             # (offset 0) tied with it in the order and 482 centred chains failed their pre-pose in 0920-040824
@@ -2508,7 +2522,8 @@ class IORSLarge(SamplerV2):
                 for y in yaws:
                     o = self.contact_offset_along(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), d_push, z_lo, z_lo + self.BLADE_SPAN_M)
                     offs[y] = -1.0 if o is None else o
-                best = sorted(yaws, key=lambda y: -offs[y])[:2]
+                pst0 = push_st if push_st is not None else place
+                best = sorted(yaws, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
                 found = False
                 for y in best:
                     ck = (int(kc), int(round(y / yaw_step)))
@@ -2524,7 +2539,7 @@ class IORSLarge(SamplerV2):
                                  [round(float(v), 2) for v in P0.to_base_frame(ch["goal"][0], pst.base_pose2d, P0.base_z(self)).tolist()], ch["pitch_deg"], ch["fingertip_z_m"])
                         break
                 if not found:
-                    errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): no push chain at the largest-offset yaws ({', '.join(f'{offs[y]:.2f}' for y in best)} m)")
+                    errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): no push chain at the {self.PUSH_YAW_ORDER} yaws ({', '.join(f'{offs[y]:.2f}' for y in best)} m)")
                     continue
             ignore_place = [partner] if self.relation == "ontop" else [self.obj("floor")]
             # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
@@ -2557,8 +2572,8 @@ class IORSLarge(SamplerV2):
                 # closer to the base (sandal: 0.72 vs 0.78-0.80 m ahead - the chain solved only at the long-axis yaws, 0919-211642;
                 # every short-axis chain of 0920-052659 had no IK at its goal) - longest extent first, random within a bucket
                 # (2026-09-20 19:20: ordered by the blade's CONTACT offset at its height band - a sandal toe-first before its strap)
-                ext = {i: offs.get(float(F[i][0]), -1.0) for i in range(len(F))}
-                draw_order.sort(key=lambda i: -round(ext[i], 2))
+                rank = {i: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(float(F[i][0]) + d_yaw), self.rest), offs.get(float(F[i][0]), -1.0)) for i in range(len(F))}
+                draw_order.sort(key=lambda i: round(rank[i], 2))
             for i in draw_order[:int(self.num("f_draws_max", 8))]:  # failed B pairs are cached and skipped, so 8 draws cost little
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
