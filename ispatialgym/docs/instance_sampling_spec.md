@@ -1641,7 +1641,10 @@ goal surface is its **interior surface**: `SimWorld.support_interior` at `inside
 three collision-free trunks per base pose with the goal in frame and the most reach margin to the goal cell are kept.
 **Goal cells**: free board cells with headroom
 ≥ target height + 0.02, farther than half extent + `opening_margin_m` (0.02) from the board's outline (`inside_erosion_m` replaces
-that distance: a plate as wide as the basin floor rests with its rim over the flaring walls). **Stance C** faces the opening:
+that distance: a plate as wide as the basin floor rests with its rim over the flaring walls); `inside_goal_region`
+(`{"frame": "world" | "partner", "x": [lo, hi], "y": [lo, hi]}`, default none; owner 2026‑10‑13 ~03:15, inside_large_scale#02: the
+fridge's 0.97 m shelf spans both compartments) keeps those inside an xy box — the world's or the partner's root frame (its position,
+turned by its yaw), an axis left out unbounded; a box that keeps none of them is `Reject("spec")`. **Stance C** faces the opening:
 square to the side of the raster facing `inside_stance_side` (world direction, e.g. `"+y"`; default every side), stand-offs
 `inside_stand_offs_m` (default 0.35 / 0.45 / 0.55 / 0.65) + the AABB overhang, laterals along the side, the goal cell = the band
 cell nearest the base, the target at the goal in frame (5 %; `inside_axis_cone_deg` optional). The collision check tries the arm

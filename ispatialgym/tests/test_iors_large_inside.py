@@ -205,6 +205,92 @@ def test_prepare_partner_rejects_without_height_room_or_side():
     assert e.value.reason == "spec"
 
 
+def test_goal_region_key():
+    assert IN.goal_region(None) is None
+    assert IN.goal_region({"x": [5.27, 5.8], "y": (-0.8, -0.2)}) == {"frame": "world", "x": [5.27, 5.8], "y": [-0.8, -0.2]}
+    assert IN.goal_region({"frame": " Partner ", "y": [0, 1]}) == {"frame": "partner", "x": None, "y": [0.0, 1.0]}  # x unbounded
+    assert IN.goal_region({"x": [0.1, 0.1], "y": None})["x"] == [0.1, 0.1]
+    for bad in ([5.27, 5.8], "left", {}, {"frame": "world"}, {"x": None, "y": None}, {"x": [1.0, 0.0]}, {"x": [0.0]}, {"x": [0, 1, 2]},
+                {"x": "01"}, {"x": ["a", 1]}, {"x": 5.3}, {"frame": "door", "x": [0, 1]}, {"x": [0, 1], "z": [0, 1]}, {"x": [float("nan"), 1.0]}):
+        with pytest.raises(ValueError):
+            IN.goal_region(bad)
+
+
+def test_in_goal_region_world_and_partner_frame():
+    cells = th.tensor([[5.30, -0.50], [5.60, -0.30], [5.10, -0.50], [5.70, -0.50], [5.40, -0.10]])
+    world = IN.goal_region({"x": [5.27, 5.66], "y": [-0.75, -0.25]})
+    assert IN.in_goal_region(cells, world).tolist() == [True, True, False, False, False]
+    assert IN.in_goal_region(cells, IN.goal_region({"x": [5.27, 5.66]})).tolist() == [True, True, False, False, True]  # y unbounded
+    # the partner frame: origin (5.0, -0.5), yaw +90 deg (its x axis = world +y, its y axis = world -x)
+    partner = IN.goal_region({"frame": "partner", "x": [-0.1, 0.1], "y": [-0.45, -0.25]})
+    assert IN.in_goal_region(cells, partner, origin=(5.0, -0.5), yaw=math.pi / 2).tolist() == [True, False, False, False, False]
+    assert IN.in_goal_region(th.zeros(0, 2), world).tolist() == []
+
+
+def _two_compartments(res: float = 0.02) -> SupportInterior:
+    """inside_large#02's 0.97 m shelf (the world frame): the right compartment x -0.56..-0.06 and the left one x 0.00..0.34 (cell centres;
+    the divider's 2 cells between them are no board cells), y -0.40..0.00, the opening facing +y."""
+    xs, ys = (th.arange(46) - 28) * res, (th.arange(21) - 20) * res
+    gx, _ = th.meshgrid(xs, ys, indexing="ij")
+    mask = (gx <= -0.06 + 1e-6) | (gx >= -1e-6)
+    return SupportInterior("fridge_petcxr_0", xs, ys, mask, th.zeros_like(mask), 0.97, 0.0, [], res, headroom=th.full(mask.shape, 0.30), z_requested=0.97,
+                           board_pieces=["/World/fridge/base_link/collisions/left", "/World/fridge/base_link/collisions/right"])
+
+
+def _fridge_stub(**gen):
+    s = _Stub(interior=_two_compartments(), half=0.045, height=0.13, inside_surface_z_m=0.97, inside_stance_side="+y", **gen)
+    s.partner = SimpleNamespace(name="fridge_petcxr_0", aabb=(th.tensor([-0.60, -0.45, 0.0]), th.tensor([0.40, 0.25, 1.80])),
+                                get_position_orientation=lambda: (th.tensor([-0.10, 0.25, 0.0]), th.tensor([0.0, 0.0, 0.7071068, 0.7071068])))
+    return s
+
+
+def test_prepare_partner_goal_region_keeps_one_compartment(caplog):
+    """``generation.inside_goal_region`` (owner 2026-10-13 ~03:15 item 2): the shelf spans both compartments; the box keeps the goal cells
+    of the left one (after the erosion, which keeps them off the divider already); the stance side stays the whole raster's."""
+    s0 = _fridge_stub()
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        s0.prepare_partner()
+    assert "inside goal region" not in caplog.text and "goal_region" not in s0.template_facts["inside_surface"]  # default: every goal cell
+    cells0 = s0.place["cells"]
+    left0 = cells0[cells0[:, 0] > -0.03]
+    # eroded by 0.045 + 0.02 from each compartment's outline: left x 0.08..0.26 (10) x y -0.32..-0.08 (13), right x -0.48..-0.14 (18) x 13
+    assert len(cells0) == 130 + 234 and len(left0) == 130
+    caplog.clear()
+    s = _fridge_stub(inside_goal_region={"frame": "world", "x": [-0.03, 0.40], "y": [-0.45, 0.05]})
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        s.prepare_partner()
+    cells = s.place["cells"]
+    assert len(cells) == 130 and th.equal(cells, left0)
+    assert float(cells[:, 0].min()) == pytest.approx(0.08) and float(cells[:, 0].max()) == pytest.approx(0.26)
+    (line,) = [r.getMessage() for r in caplog.records if "inside goal region" in r.getMessage()]
+    assert "fridge_petcxr_0 (world frame, x [-0.03, 0.4], y [-0.45, 0.05]): 364 -> 130 goal cells" in line
+    assert "-> x 0.080..0.260 y -0.320..-0.080)" in line
+    facts = s.template_facts["inside_surface"]
+    assert facts["goal_region"] == {"frame": "world", "x": [-0.03, 0.40], "y": [-0.45, 0.05], "n_before": 364, "n_after": 130}
+    assert facts["n_goal_cells"] == 130 and s.template_facts["partner"]["n_goal_cells"] == 130
+    assert [e.name for e in s.place["edges"]] == ["+v"] and s.place["edges"][0].length == pytest.approx(0.90)  # the whole raster's side
+    assert float(s.place["edges"][0].mid[0]) == pytest.approx(float(s0.place["edges"][0].mid[0]))
+    # the partner frame (origin (-0.10, 0.25), yaw +90 deg: its x = world y - 0.25, its y = -0.10 - world x): the same compartment
+    sp = _fridge_stub(inside_goal_region={"frame": "partner", "y": [-0.45, 0.0]})
+    caplog.clear()
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        sp.prepare_partner()
+    assert th.equal(sp.place["cells"], left0) and "(partner frame, x any, y [-0.45, 0.0]): 364 -> 130 goal cells" in caplog.text
+    assert sp.template_facts["inside_surface"]["goal_region"]["partner_yaw"] == pytest.approx(math.pi / 2, abs=1e-4)
+
+
+def test_prepare_partner_goal_region_rejects():
+    with pytest.raises(Reject) as e:
+        _fridge_stub(inside_goal_region={"x": [0.27, 0.40]}).prepare_partner()  # the left compartment's wall side: no goal cell after the erosion
+    assert e.value.reason == "spec" and "keeps none of the 364 goal cells of fridge_petcxr_0 (world x -0.480..0.260 y -0.320..-0.080)" in str(e.value)
+    with pytest.raises(Reject) as e:
+        _fridge_stub(inside_goal_region={"x": [0.4, 0.3]}).prepare_partner()
+    assert e.value.reason == "spec" and "lo <= hi" in str(e.value)
+    with pytest.raises(Reject) as e:  # no goal cell before the box either: the erosion's reject, not the box's
+        _Stub(half=0.40, inside_surface_z_m=0.80, inside_goal_region={"x": [-1.0, 1.0]}).prepare_partner()
+    assert e.value.reason == "inside_no_goal_cell"
+
+
 def _top_down_grasp(eef_above_origin: float, name: str = "g"):
     """A top-down pinch: the eef ``eef_above_origin`` above the object origin, approach straight down."""
     q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))

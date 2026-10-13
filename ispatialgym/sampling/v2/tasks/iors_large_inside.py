@@ -36,6 +36,12 @@ only as far as the drawn grasp's own open gripper needs (its lowest point ``rele
 orientation, level or tilted): the F_goal screen poses each library row at its own release (``ik.feasible_sets(..., pose_per_grasp=True)``),
 the C exact IK, the goal / settle (the drop test's release) use the drawn grasp's, and ``summary.release`` carries its ``release_above_m``
 with ``release_above_max_m`` (the default's height) beside it.
+
+Goal region (owner 2026-10-13 ~03:15 item 2, inside_large#02: the fridge's 0.97 m shelf spans both compartments, the right one behind its
+closed door): ``generation.inside_goal_region`` ``{"frame": "world" | "partner", "x": [lo, hi], "y": [lo, hi]}`` (m; default none = every
+goal cell) keeps the goal cells (after the erosion) inside an xy box - in the world frame, or the partner's root frame (its position, turned
+by its yaw); an axis left out is unbounded. One INFO line ``inside goal region ...: N -> M goal cells``; a box that keeps none of the cells
+is ``Reject("spec")``.
 """
 
 from __future__ import annotations
@@ -98,6 +104,56 @@ def erode_from(cells: th.Tensor, rim: th.Tensor, margin: float) -> th.Tensor:
     if len(cells) == 0 or len(rim) == 0:
         return cells
     return cells[th.cdist(cells.float(), rim.float()).min(dim=1).values > float(margin)]
+
+
+def goal_region(value: Any) -> Optional[Dict[str, Any]]:
+    """``generation.inside_goal_region``: ``{"frame": "world" | "partner", "x": [lo, hi], "y": [lo, hi]}`` (m; ``frame`` default
+    ``"world"``; an axis left out or None is unbounded, at least one bounded) -> ``{"frame", "x", "y"}``; None -> None (every goal cell)."""
+    if value is None:
+        return None
+    form = '{"frame": "world" | "partner", "x": [lo, hi], "y": [lo, hi]}'
+    if not isinstance(value, dict) or set(value) - {"frame", "x", "y"}:
+        raise ValueError(f"inside_goal_region {value!r}: expected {form}")
+    frame = str(value.get("frame", "world")).strip().lower()
+    if frame not in ("world", "partner"):
+        raise ValueError(f"inside_goal_region {value!r}: frame must be world or partner")
+    out: Dict[str, Any] = {"frame": frame, "x": None, "y": None}
+    for ax in ("x", "y"):
+        b = value.get(ax)
+        if b is None:
+            continue
+        try:
+            lo, hi = float(b[0]), float(b[1])
+            ok = isinstance(b, (list, tuple)) and len(b) == 2 and lo <= hi
+        except (TypeError, ValueError, IndexError, KeyError):
+            ok = False
+        if not ok:
+            raise ValueError(f"inside_goal_region {value!r}: {ax} must be [lo, hi] (m) with lo <= hi")
+        out[ax] = [lo, hi]
+    if out["x"] is None and out["y"] is None:
+        raise ValueError(f"inside_goal_region {value!r}: bound x or y ({form})")
+    return out
+
+
+def in_goal_region(cells: th.Tensor, region: Dict[str, Any], origin=(0.0, 0.0), yaw: float = 0.0) -> th.Tensor:
+    """Which world cells (N, 2) lie in ``region`` (:func:`goal_region`), its x / y taken in the frame at world ``origin`` turned by ``yaw``
+    (the defaults: the world frame) -> bool (N,)."""
+    d = G.t(cells).float().reshape(-1, 2) - th.tensor([float(origin[0]), float(origin[1])])
+    c, s = math.cos(float(yaw)), math.sin(float(yaw))
+    local = th.stack([c * d[:, 0] + s * d[:, 1], -s * d[:, 0] + c * d[:, 1]], dim=1)
+    keep = th.ones(len(local), dtype=th.bool)
+    for i, ax in enumerate(("x", "y")):
+        if region.get(ax) is not None:
+            keep &= (local[:, i] >= region[ax][0] - 1e-6) & (local[:, i] <= region[ax][1] + 1e-6)
+    return keep
+
+
+def cell_span(cells: th.Tensor) -> str:
+    """``"x lo..hi y lo..hi"`` of the cells (N, 2), ``"none"`` without any."""
+    if len(cells) == 0:
+        return "none"
+    lo, hi = cells.min(dim=0).values, cells.max(dim=0).values
+    return f"x {float(lo[0]):.3f}..{float(hi[0]):.3f} y {float(lo[1]):.3f}..{float(hi[1]):.3f}"
 
 
 def side_vector(side: Any) -> Optional[th.Tensor]:
@@ -267,6 +323,29 @@ def free_in_postures(s, cands: Sequence[Stance], postures: Sequence[str]) -> Tup
     return out, {name: sum(1 for p in passed.values() if p == name) for name in postures}
 
 
+def restrict_to_goal_region(s, cells: th.Tensor) -> Tuple[th.Tensor, Optional[Dict[str, Any]]]:
+    """``generation.inside_goal_region`` (module docstring; default none = every cell): the goal cells (world xy) inside the box, one INFO
+    line with the counts. ``Reject("spec")`` for a malformed key or a box that keeps none of the cells. Returns (cells, facts or None)."""
+    try:
+        region = goal_region(s.gp.gen("inside_goal_region"))
+    except ValueError as e:
+        raise Reject("spec", f"{s.gp.alias}: {e}")
+    if region is None:
+        return cells, None
+    origin, yaw = (0.0, 0.0), 0.0
+    if region["frame"] == "partner":
+        p, q = s.partner.get_position_orientation()
+        origin, yaw = (float(p[0]), float(p[1])), float(G.yaw_of(q))
+        region.update({"partner_origin": [round(v, 4) for v in origin], "partner_yaw": round(yaw, 4)})
+    kept = cells[in_goal_region(cells, region, origin, yaw)] if len(cells) else cells
+    log.info("%s: inside goal region of %s (%s frame, x %s, y %s): %d -> %d goal cells (world %s -> %s)", s.gp.alias, s.partner.name, region["frame"],
+             region["x"] or "any", region["y"] or "any", len(cells), len(kept), cell_span(cells), cell_span(kept))
+    if len(cells) and not len(kept):
+        raise Reject("spec", f"{s.gp.alias}: generation.inside_goal_region {s.gp.gen('inside_goal_region')} keeps none of the {len(cells)} goal cells of "
+                             f"{s.partner.name} (world {cell_span(cells)})")
+    return kept, {**region, "n_before": int(len(cells)), "n_after": int(len(kept))}
+
+
 class InsideMode:
     """The inside mode of :class:`~ispatialgym.sampling.v2.tasks.iors_large.IORSLarge` (module docstring): the partner's interior surface
     as the goal geometry, stance C at the opening, the release above the surface and the drop test. Every other stage is IORSLarge's."""
@@ -282,7 +361,8 @@ class InsideMode:
 
     def prepare_partner(self):
         """The interior raster of the partner at the alias's height, the goal cells (headroom, the opening shrunk by the half extent +
-        ``opening_margin_m``), the raster's sides as the stance-C edges (``inside_stance_side``) and the rim of the drop test."""
+        ``opening_margin_m``, ``inside_goal_region``), the raster's sides as the stance-C edges (``inside_stance_side``) and the rim of the
+        drop test."""
         partner = self.partner
         half, height = self.target_dims()
         spec = self.inside_surface_spec()
@@ -304,7 +384,7 @@ class InsideMode:
         margin = half + float(self.num("opening_margin_m", OPENING_MARGIN_M))
         if self.gp.gen("inside_erosion_m") is not None:  # a wide flat target in a basin whose walls flare (the plate's rim above them)
             margin = float(self.gp.gen("inside_erosion_m"))
-        goal_cells = erode_from(cells, raster_rim(itop.mask, itop.xs, itop.ys), margin)
+        goal_cells, region = restrict_to_goal_region(self, erode_from(cells, raster_rim(itop.mask, itop.xs, itop.ys), margin))
         try:
             side = side_vector(self.gp.gen("inside_stance_side"))
         except ValueError as e:
@@ -323,6 +403,8 @@ class InsideMode:
                  "erosion_m": round(margin, 4), "open_edges": list(itop.open_edges), "board_pieces": len(itop.board_pieces), "cells_under_doors": n_part_cells,
                  "headroom_m": (itop.to_json() or {}).get("headroom_m"), "rim_z": round(rim_z, 4), "rim_source": rim_src,
                  "stance_side": None if side is None else [round(float(v), 3) for v in side], "stance_edges": [e.name for e in edges]}
+        if region is not None:
+            facts["goal_region"] = region
         self.place = {"top": itop, "cells": goal_cells, "edges": edges, "z": float(itop.z), "height": height, "half": half, "surface": facts, "rim_z": rim_z,
                       "z_requested": spec["z_m"]}
         self.template_facts["inside_surface"] = facts
