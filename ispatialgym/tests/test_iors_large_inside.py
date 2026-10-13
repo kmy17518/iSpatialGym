@@ -4,6 +4,7 @@ meta link and the oracle program (``pytest ispatialgym/tests/test_iors_large_ins
 
 from __future__ import annotations
 
+import contextlib
 import math
 import os
 from types import SimpleNamespace
@@ -125,6 +126,7 @@ class _Stub:
     inside_surface_spec = IN.InsideMode.inside_surface_spec
     release_above = IN.InsideMode.release_above
     _log_release_lift = IN.InsideMode._log_release_lift
+    release_lift_per_grasp = IN.InsideMode.release_lift_per_grasp
     goal_pose_at = IN.InsideMode.goal_pose_at
     num = IL.IORSLarge.num
 
@@ -203,10 +205,10 @@ def test_prepare_partner_rejects_without_height_room_or_side():
     assert e.value.reason == "spec"
 
 
-def _top_down_grasp(eef_above_origin: float):
+def _top_down_grasp(eef_above_origin: float, name: str = "g"):
     """A top-down pinch: the eef ``eef_above_origin`` above the object origin, approach straight down."""
     q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))
-    return SimpleNamespace(name="g", pose=(th.tensor([0.0, 0.0, eef_above_origin]), q))
+    return SimpleNamespace(name=name, pose=(th.tensor([0.0, 0.0, eef_above_origin]), q))
 
 
 def test_release_above_clears_the_surface_with_every_grasp():
@@ -413,6 +415,251 @@ def test_oracle_drop_reaches_a_tilted_release_from_the_level_carry():
         off = th.tensor(w.position) - place_eef[0]
         assert float(th.linalg.norm(th.linalg.cross(off, a))) < 1e-4 and C.quat_angle(th.tensor(w.orientation), place_eef[1]) < 1e-4
     assert t["retreat"][-1].position[2] > float(place_eef[0][2]) + 0.09
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the per-grasp release height (owner 2026-10-13 ~00:50 item 3, inside_large#02: the jar into the fridge's lower shelf)
+# ----------------------------------------------------------------------------------------------------------------
+
+LEVEL = th.tensor([0.0, 0.0, 0.0, 1.0])
+#: top-down pinches whose open fingertips, at the plain drop height, stay clear (no lift), end 0.7 cm above the surface and 0.3 cm below it
+#: (lifts 1.3 / 2.3 cm for the 2 cm clearance)
+LIFT_GRASPS = [_top_down_grasp(0.10, "grasp_0"), _top_down_grasp(0.01, "grasp_1"), _top_down_grasp(0.0, "grasp_2")]
+#: grasp_5 turned half way round the plate's axis: the same rim pinch from the opposite side (its rim goes down when grasp_5's goes up)
+GRASP_5_OPPOSITE = SimpleNamespace(name="grasp_5o", pose=(IN.G.rotate(IN.G.quat_from_yaw(math.pi), GRASP_5.pose[0]),
+                                                          IN.G.qmul(IN.G.quat_from_yaw(math.pi), GRASP_5.pose[1])))
+
+
+class _GoalCheckMixin:
+    """IORSLarge's F_goal screen / goal / settle and :meth:`InsideMode.after_goal_check` with what they read but the sidecar draft and the
+    IK checker (:func:`_goal_check_release`)."""
+
+    release_feasible = IL.IORSLarge.release_feasible
+    goal = IL.IORSLarge.goal
+    after_settle = IL.IORSLarge.after_settle
+    goal_quat_of = IL.IORSLarge.goal_quat_of
+    release_eef_in_object = IL.IORSLarge.release_eef_in_object
+    after_goal_check = IN.InsideMode.after_goal_check
+    tname, kit, target = "jar", None, SimpleNamespace(name="jar")
+
+    def tol(self, key, default):
+        return default
+
+    def record_partner_joints(self, draft):
+        pass
+
+    def obj(self, role):
+        return SimpleNamespace(name=role)
+
+    def camera_pose_at(self, stance):
+        return None
+
+
+class _LiftStub(_GoalCheckMixin, _Stub):
+    pass
+
+
+class _TiltLiftStub(_GoalCheckMixin, _TiltStub):
+    pass
+
+
+def _goal_check_release(s, drawn, quat, monkeypatch, gc=(0.05, -0.02)):
+    """``IORSLarge._couple``'s record of the drawn grasp - the C exact IK's release ``goal_pose_at(gc, quat, drawn.pose)``, the place eef
+    from it, the grasp record with ``eef_in_object`` - then IORSLarge's goal / settle and :meth:`InsideMode.after_goal_check` on the draft
+    (the exact IK and the frame tests pass). Returns (the C release, the draft, the grasp record, the release goal() posed)."""
+    from ispatialgym.sampling.tasks.base import Draft
+    from ispatialgym.sampling.v2.stances import GraspRecord, SidecarDraft
+
+    monkeypatch.setattr(IN, "attached", lambda *a, **kw: contextlib.nullcontext())
+    s.ikc = SimpleNamespace(exact=lambda *a, **kw: SimpleNamespace(ok=True), eef_in_frame=lambda eef, cam: True)
+    release = s.goal_pose_at(gc, quat, drawn.pose)
+    place_eef = IN.IK.grasp_pose(release, drawn.pose)
+    s.sidecar = SidecarDraft(s.gp.alias, "iors")
+    for name in ("manipulation", "placement"):
+        s.sidecar.add_stance(Stance(name, (5.4, -0.9, 1.57), 0.5, -0.3, 0.55, None, None, 0.0, None, ["right"]))
+    rec = s.sidecar.add_grasp(GraspRecord("jar", "right", "jar__k", drawn.name, 0.0, None, None, IN.IK.pre_pose(place_eef), place_eef, eef_in_object=drawn.pose))
+    d = Draft()
+    d.summary.update({"goal_cell": list(gc), "goal_quat": [float(v) for v in quat]})
+    s.goal(d)
+    posed = d.goal_poses["jar"]
+    s.after_settle(d)
+    s.after_goal_check(d)
+    return release, d, rec, posed
+
+
+def test_release_lift_per_grasp_key():
+    assert [IN.lift_per_grasp(v) for v in (None, False, "off", "false", 0)] == [False] * 5
+    assert [IN.lift_per_grasp(v) for v in (True, "on", "true", 1)] == [True] * 4
+    for bad in ("max", 2, [True]):
+        with pytest.raises(ValueError):
+            IN.lift_per_grasp(bad)
+    assert _Stub(release_lift_per_grasp=True).release_lift_per_grasp() is True and _Stub().release_lift_per_grasp() is False
+    with pytest.raises(Reject) as e:
+        _Stub(release_lift_per_grasp="max").release_lift_per_grasp()
+    assert e.value.reason == "spec"
+    assert IL.IORSLarge.release_lift_per_grasp(SimpleNamespace()) is False  # ontop / under / push-under: one release pose per cell
+
+
+def test_release_lift_per_grasp_log_line_lists_the_lifts_used(caplog):
+    """With the key the once-per-template line (owner item 2) lists every library row's lift - each grasp's release is ``drop_height_m`` +
+    its listed lift - and names the per-grasp use with the default's max beside it, also when the first computation is a per-grasp one."""
+    s = _Stub(inside_surface_z_m=0.80, grasps=LIFT_GRASPS, release_lift_per_grasp=True)
+    s.prepare_partner()
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        own = [s.release_above(LEVEL, g.pose) for g in LIFT_GRASPS]
+    (line,) = [r.getMessage() for r in caplog.records if "inside release lift per grasp" in r.getMessage()]
+    assert "{grasp_0: 0.000 m, grasp_1: 0.013 m, grasp_2: 0.023 m}, used per grasp (release_lift_per_grasp: the drawn grasp's own; max 0.023 m)" in line
+    assert [round(h - IN.DROP_HEIGHT_M, 3) for h in own] == [0.0, 0.013, 0.023] and "used (max)" not in line
+
+
+def test_release_lift_per_grasp_default_is_one_height_for_every_grasp():
+    """Without ``release_lift_per_grasp`` (or false): every grasp's release at the one height the highest lift over the library sets - a
+    grasp passed to :meth:`release_above` / :meth:`goal_pose_at` changes nothing (today's release)."""
+    for gen in ({}, {"release_lift_per_grasp": False}):
+        s = _Stub(inside_surface_z_m=0.80, grasps=LIFT_GRASPS, **gen)
+        s.prepare_partner()
+        top = s.release_above(LEVEL)
+        assert top == pytest.approx(IN.DROP_HEIGHT_M + 0.023, abs=1e-5)  # grasp_2's fingertips 1.88 cm below its eef at the origin
+        assert [s.release_above(LEVEL, g.pose) for g in LIFT_GRASPS] == [top] * 3
+        pose = s.goal_pose_at([0.05, -0.02], LEVEL)
+        assert all(bool(th.equal(s.goal_pose_at([0.05, -0.02], LEVEL, g.pose)[0], pose[0])) for g in LIFT_GRASPS)
+
+
+def test_release_lift_per_grasp_lifts_the_release_for_the_drawn_grasp_alone():
+    """``release_lift_per_grasp`` true: the release rises only as far as the drawn grasp's own open gripper needs - never above the
+    default's height (the highest lift), the plain drop height for a grasp whose fingers end above the target's bottom, every grasp's open
+    gripper still ``release_clearance_m`` above the surface (exactly, when it was lifted); without a grasp (stance C's frame test, before a
+    grasp is drawn) the default's height."""
+    s = _Stub(inside_surface_z_m=0.80, grasps=LIFT_GRASPS, release_lift_per_grasp=True)
+    s.prepare_partner()
+    top = s.release_above(LEVEL)
+    own = [s.release_above(LEVEL, g.pose) for g in LIFT_GRASPS]
+    assert top == pytest.approx(IN.DROP_HEIGHT_M + 0.023, abs=1e-5)
+    assert own == [pytest.approx(IN.DROP_HEIGHT_M), pytest.approx(IN.DROP_HEIGHT_M + 0.013, abs=1e-5), pytest.approx(top)]
+    assert all(h <= top + 1e-9 for h in own)
+    for g, h in zip(LIFT_GRASPS, own):
+        pose = s.goal_pose_at([0.05, -0.02], LEVEL, g.pose)
+        assert float(pose[0][2]) == pytest.approx(0.70 + 0.0108 + h)
+        low = float(gripper_corners_world(IN.IK.grasp_pose(pose, g.pose))[:, 2].min())
+        assert low >= 0.70 + IN.RELEASE_CLEARANCE_M - 1e-5
+        if h > IN.DROP_HEIGHT_M + 1e-6:
+            assert low == pytest.approx(0.70 + IN.RELEASE_CLEARANCE_M, abs=1e-5)
+
+
+def test_release_lift_per_grasp_at_the_tilted_release():
+    """The drawn grasp's own lift at its release orientation: at grasp_5's 45 deg tilt the opposite rim pinch's open fingers hang 3.7 cm
+    below the basin floor, so by default (one height for every row at that orientation) grasp_5's tilted release rises 5.65 cm; with the key
+    the tilt screen poses each row at its own tilt and lift (none: the low rim ``drop_height_m`` above the floor)."""
+    for per, lift in ((False, 0.0565), (True, 0.0)):
+        s = _TiltStub(admit=lambda deg, i: True, inside_surface_z_m=0.80, drop_height_m=0.02, release_tilt_deg=[45], release_lift_per_grasp=per)
+        s.grasps = [GRASP_5, GRASP_5_OPPOSITE]
+        s.screen_release_tilts([], [0.05, -0.02], [0.0], 0.0, PLACE_C, "right", [], math.pi / 8)
+        assert [(deg, names) for deg, _, names, _ in s.screened] == [(45, ["grasp_5"]), (45, ["grasp_5o"])]
+        z_s = float(s.place["z"])
+        for (_, _, _, pose_at), g in zip(s.screened, s.grasps):
+            pose = pose_at([0.05, -0.02], 0.4)
+            assert float(IN.G.local_points_world(s.hull, pose)[:, 2].min()) == pytest.approx(z_s + 0.02 + lift, abs=1e-3)
+            assert float(gripper_corners_world(IN.IK.grasp_pose(pose, g.pose))[:, 2].min()) >= z_s + IN.RELEASE_CLEARANCE_M - 1e-5
+
+
+def test_release_lift_per_grasp_f_goal_screen():
+    """IORSLarge.release_feasible, the level F_goal screen of a C candidate: by default ``pose_at(cell, yaw)`` with the call's arguments as
+    before; with the key one batch with ``pose_per_grasp`` and ``pose_at(cell, yaw, row)`` at the row's own release height."""
+    calls = []
+
+    def feasible_sets(cells, yaws, grasps, pose_at, stance, arm, ignore, **kw):
+        calls.append((pose_at, kw))
+        return {0: [(yaws[0], grasps[0])]}
+
+    for per in (False, True):
+        calls.clear()
+        s = _LiftStub(inside_surface_z_m=0.80, grasps=LIFT_GRASPS, release_lift_per_grasp=per)
+        s.prepare_partner()
+        s.rest, s.ikc = LEVEL, SimpleNamespace(feasible_sets=feasible_sets)
+        out = s.release_feasible([0.05, -0.02], [0.3], lambda xy, quat, eio=None: s.goal_pose_at(xy, quat, eio), PLACE_C, "right", [])
+        (pose_at, kw), = calls
+        assert out == [(0.3, LIFT_GRASPS[0])]
+        if per:
+            heights = [float(pose_at([0.05, -0.02], 0.3, g)[0][2]) - 0.70 - 0.0108 for g in LIFT_GRASPS]
+            assert kw == {"pose_per_grasp": True} and heights == [pytest.approx(s.release_above(LEVEL, g.pose), abs=1e-6) for g in LIFT_GRASPS]
+            assert max(heights) == pytest.approx(s.release_above(LEVEL), abs=1e-6) and heights[0] < heights[1] < heights[2]
+        else:
+            assert kw == {} and float(pose_at([0.05, -0.02], 0.3)[0][2]) == pytest.approx(0.70 + 0.0108 + s.release_above(LEVEL), abs=1e-6)
+
+
+def test_feasible_sets_pose_per_grasp(monkeypatch):
+    """``IKChecker.feasible_sets(..., pose_per_grasp=True)``: every pair's eef from ``pose_at(cell, yaw, grasp)`` in one screening batch, the
+    cache key over the yaw-0 poses per grasp plus the flag; without it ``pose_at(cell, yaw)`` once per (cell, yaw) and the key as before."""
+    IKM = IN.IK
+    payloads, batches = [], []
+    monkeypatch.setattr(IKM, "cache_key", lambda kind, payload: payloads.append(payload) or "feasible_sets_v2-test")
+    monkeypatch.setattr(IKM, "cache_get", lambda key: None)
+    monkeypatch.setattr(IKM, "cache_put", lambda key, value: None)
+    ikc = IKM.IKChecker.__new__(IKM.IKChecker)
+    ikc.cache_scope = {}
+    ikc.screen_pairs = lambda pairs, stance, arm, ignore_for_last=(): (batches.append(pairs), th.tensor([i % 2 == 0 for i in range(len(pairs))]))[1]
+    place = Stance("placement", (5.4, -0.9, 1.57), 0.5, -0.3, 0.55, None, None, 0.0, None, ["right"])
+    grasps, cell, yaws = LIFT_GRASPS[:2], [5.39, -0.37], [0.0, 0.4]
+    raised = {"grasp_0": 0.0, "grasp_1": 0.05}
+    per_calls = []
+
+    def pose_at(c, yaw, g):
+        per_calls.append((yaw, g.name))
+        return th.tensor([c[0], c[1], 0.9 + raised[g.name]]), IN.G.quat_from_yaw(yaw)
+
+    out = ikc.feasible_sets([cell], yaws, grasps, pose_at, place, "right", [], pose_per_grasp=True)
+    assert {i: [(y, g.name) for y, g in lst] for i, lst in out.items()} == {0: [(0.0, "grasp_0"), (0.4, "grasp_0")]}
+    (pairs,) = batches
+    assert [(y, n) for y, n in per_calls[-4:]] == [(0.0, "grasp_0"), (0.0, "grasp_1"), (0.4, "grasp_0"), (0.4, "grasp_1")]
+    by_name = {g.name: g for g in grasps}
+    for (pre, eef), (y, n) in zip(pairs, per_calls[-4:]):
+        want = IKM.grasp_pose((th.tensor([cell[0], cell[1], 0.9 + raised[n]]), IN.G.quat_from_yaw(y)), by_name[n].pose)
+        assert th.allclose(eef[0], want[0]) and th.allclose(eef[1], want[1]) and th.allclose(pre[0], IKM.pre_pose(want)[0])
+    assert payloads[-1]["pose_per_grasp"] is True and len(payloads[-1]["poses0"]) == len(grasps)
+    batches.clear()
+    out = ikc.feasible_sets([cell], yaws, grasps, lambda c, yaw: pose_at(c, yaw, grasps[0]), place, "right", [])
+    assert {i: [(y, g.name) for y, g in lst] for i, lst in out.items()} == {0: [(0.0, "grasp_0"), (0.4, "grasp_0")]}
+    assert len(batches) == 1 and len(batches[0]) == 4 and "pose_per_grasp" not in payloads[-1]
+    assert sorted(payloads[-1]) == ["arm", "base", "cells", "grasps", "ignore", "poses0", "scale", "seeds", "trunk", "yaws"]
+    assert payloads[-1]["poses0"] == [pytest.approx([cell[0], cell[1], 0.9] + [float(v) for v in IN.G.quat_from_yaw(0.0)], abs=1e-6)]
+
+
+@pytest.mark.parametrize("per", [False, True])
+def test_release_lift_per_grasp_record_and_drop_test_release(monkeypatch, per):
+    """The drawn grasp's release through the goal check: IORSLarge's goal / settle re-derive the release the C exact IK used (from the
+    recorded grasp's ``eef_in_object``) - the pose the drop test teleports the target to -, and ``summary.release`` / ``grasps[0]`` carry
+    its height: grasp_1's own lift (1.3 cm, below grasp_2's 2.3 cm) with ``release_above_max_m`` beside it; without the key today's record
+    (the highest lift, no new field)."""
+    s = _LiftStub(inside_surface_z_m=0.80, grasps=LIFT_GRASPS, release_lift_per_grasp=per)
+    s.prepare_partner()
+    release, d, rec, posed = _goal_check_release(s, LIFT_GRASPS[1], LEVEL, monkeypatch)
+    top = IN.DROP_HEIGHT_M + 0.023
+    want = IN.DROP_HEIGHT_M + 0.013 if per else top
+    assert float(release[0][2]) == pytest.approx(0.70 + 0.0108 + want, abs=1e-5)
+    assert bool(th.equal(posed[0], release[0])) and bool(th.equal(d.goal_poses["jar"][0], release[0]))  # goal(), then the settle
+    assert d.pose_targets["jar"]["position"] == pytest.approx([float(v) for v in release[0]])
+    facts = d.summary["release"]
+    assert facts["release_above_m"] == pytest.approx(want, abs=1e-4) and rec.extras["release_above_m"] == facts["release_above_m"]
+    if per:
+        assert facts["release_lift_per_grasp"] is True and facts["release_above_max_m"] == pytest.approx(top, abs=1e-4)
+        assert facts["finger_clearance_m"] == pytest.approx(IN.RELEASE_CLEARANCE_M, abs=1e-4)  # lifted exactly to the clearance
+    else:
+        assert "release_lift_per_grasp" not in facts and "release_above_max_m" not in facts
+        assert facts["finger_clearance_m"] == pytest.approx(IN.RELEASE_CLEARANCE_M + 0.010, abs=1e-4)  # 1 cm higher than grasp_1 needs
+
+
+def test_release_lift_per_grasp_record_at_a_tilted_release(monkeypatch):
+    """A tilted release (summary.goal_quat = grasp_5's 45 deg orientation): the goal / settle release and the record use grasp_5's own lift at
+    that orientation (none: the plate's low rim ``drop_height_m`` above the floor) with the key, the opposite row's 5.65 cm without it."""
+    q45 = IN.tilted_quat(IN.G.quat_from_yaw(0.4), GRASP_5.pose[0], 45.0)
+    for per, above in ((False, 0.02 + 0.0565), (True, 0.02)):
+        s = _TiltLiftStub(inside_surface_z_m=0.80, drop_height_m=0.02, release_tilt_deg=[45], release_lift_per_grasp=per)
+        s.grasps = [GRASP_5, GRASP_5_OPPOSITE]
+        release, d, rec, posed = _goal_check_release(s, GRASP_5, q45, monkeypatch)
+        z_s = float(s.place["z"])
+        assert float(IN.G.local_points_world(s.hull, d.goal_poses["jar"])[:, 2].min()) == pytest.approx(z_s + above, abs=1e-3)
+        assert d.summary["release"]["release_above_m"] == pytest.approx(above, abs=1e-3)
+        assert bool(th.equal(posed[0], release[0])) and bool(th.equal(d.goal_poses["jar"][0], release[0]))
 
 
 #: the trunks the sink's goal-side band job (tband 17831152, the same base as stance C at stand-off 0.55) found colliding with every

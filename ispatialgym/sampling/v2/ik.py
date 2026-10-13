@@ -1349,32 +1349,37 @@ class IKChecker:
         return C.camera_pose(q, base_pose=base, cam_in_zed=self.kit.cam_in_zed)
 
     # -- bands: feasible sets ------------------------------------------------------------------------------------
-    def feasible_sets(self, cells: Sequence[Any], yaws: Sequence[float], grasps: Sequence[Any], pose_at: Callable[[Any, float], Pose], stance: Stance,
+    def feasible_sets(self, cells: Sequence[Any], yaws: Sequence[float], grasps: Sequence[Any], pose_at: Callable[..., Pose], stance: Stance,
                       arm: str = "right", ignore_for_grasp: Sequence[Any] = (), eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
-                      scale_key: Any = None, cache: bool = True) -> Dict[int, List[Tuple[float, Any]]]:
+                      scale_key: Any = None, cache: bool = True, pose_per_grasp: bool = False) -> Dict[int, List[Tuple[float, Any]]]:
         """§4.6 step 1 over many cells in one batch per trunk: for every cell index the feasible set F of ``(yaw, grasp)``
         pairs whose [pre-grasp, grasp] pass the screening IK from ``stance`` (grasp pose with ``ignore_for_grasp``
-        removed). ``pose_at(cell, yaw) -> object pose``; ``eef_of_grasp(grasp) -> T_obj→eef`` (default ``grasp.pose``).
-        Cached (§3.10 band cache of F) under the stance, cells, yaws, grasp set, object poses at yaw 0 and ``scale_key``;
-        a cell with empty F is absent from the result (the caller removes it from the band)."""
+        removed). ``pose_at(cell, yaw) -> object pose`` (``pose_per_grasp``: ``pose_at(cell, yaw, grasp)``, an object pose that
+        depends on the grasp too - the inside release at the drawn grasp's own height); ``eef_of_grasp(grasp) -> T_obj→eef``
+        (default ``grasp.pose``). Cached (§3.10 band cache of F) under the stance, cells, yaws, grasp set, object poses at yaw 0
+        (per grasp with ``pose_per_grasp``) and ``scale_key``; a cell with empty F is absent from the result (the caller removes it
+        from the band)."""
         eef_of = eef_of_grasp or (lambda g: g.pose)
         by_name = {getattr(g, "name", str(k)): g for k, g in enumerate(grasps)}
         key = None
         if cache:
+            poses0 = ([list(G.t(p[0]).tolist()) + list(G.t(p[1]).tolist()) for c in cells for p in (pose_at(c, 0.0, g) for g in grasps)] if pose_per_grasp else
+                      [list(G.t(pose_at(c, 0.0)[0]).tolist()) + list(G.t(pose_at(c, 0.0)[1]).tolist()) for c in cells])
             key = cache_key("feasible_sets_v2", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
                                                  "cells": [list(G.t(c).tolist()) for c in cells], "yaws": list(yaws), "scale": scale_key,
                                                  "grasps": [(getattr(g, "key", None), getattr(g, "name", None), list(G.t(eef_of(g)[0]).tolist()), list(G.t(eef_of(g)[1]).tolist())) for g in grasps],
-                                                 "poses0": [list(G.t(pose_at(c, 0.0)[0]).tolist()) + list(G.t(pose_at(c, 0.0)[1]).tolist()) for c in cells],
-                                                 "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_grasp), "seeds": SCREEN_SEEDS})
+                                                 "poses0": poses0,
+                                                 "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_grasp), "seeds": SCREEN_SEEDS,
+                                                 **({"pose_per_grasp": True} if pose_per_grasp else {})})
             hit = cache_get(key)
             if hit is not None:
                 return {int(i): [(float(yaw), by_name[gn]) for yaw, gn in lst if gn in by_name] for i, lst in hit.items()}
         pairs, index = [], []
         for i, cell in enumerate(cells):
             for yaw in yaws:
-                obj_pose = pose_at(cell, yaw)
+                obj_pose = None if pose_per_grasp else pose_at(cell, yaw)
                 for g in grasps:
-                    eef = grasp_pose(obj_pose, eef_of(g))
+                    eef = grasp_pose(pose_at(cell, yaw, g) if pose_per_grasp else obj_pose, eef_of(g))
                     pairs.append([pre_pose(eef), eef])
                     index.append((i, yaw, g))
         feas = self.screen_pairs(pairs, stance, arm, ignore_for_last=ignore_for_grasp)

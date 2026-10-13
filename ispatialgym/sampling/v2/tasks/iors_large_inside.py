@@ -29,6 +29,13 @@ screens each tilt as an alternative to the level release - the target at yaw x t
 to the grasp's radial direction (the grasp side up, the far rim down), the release height from the tilted hull's lowest point. The draw tries
 a pair's tilts in order (level first), the records carry ``release_tilt_deg`` and the goal check's up-axis rule measures a tilted release
 against the level orientation. The oracle's drop needs nothing more: the carry leg to the recorded pre-place SLERPs the hand's orientation.
+
+Per-grasp release height (owner 2026-10-13 ~00:50 item 3, inside_large#02: the jar into the fridge's lower shelf, ~0.23 m headroom):
+``generation.release_lift_per_grasp`` (default false = one height for every grasp, the highest lift over the library) raises the release
+only as far as the drawn grasp's own open gripper needs (its lowest point ``release_clearance_m`` above the surface at the release
+orientation, level or tilted): the F_goal screen poses each library row at its own release (``ik.feasible_sets(..., pose_per_grasp=True)``),
+the C exact IK, the goal / settle (the drop test's release) use the drawn grasp's, and ``summary.release`` carries its ``release_above_m``
+with ``release_above_max_m`` (the default's height) beside it.
 """
 
 from __future__ import annotations
@@ -147,6 +154,19 @@ def release_lift(finger_lows: Sequence[float], surface_z: float, clearance: floa
     if not finger_lows:
         return 0.0
     return max(0.0, float(surface_z) + float(clearance) - min(float(v) for v in finger_lows))
+
+
+def lift_per_grasp(value: Any) -> bool:
+    """``generation.release_lift_per_grasp``: true / "on" -> the release height from the drawn grasp's own open gripper; None / false /
+    "off" -> one height for every library grasp (the highest lift)."""
+    if value is None or isinstance(value, bool):
+        return bool(value)
+    s = str(value).strip().lower()
+    if s in ("on", "true", "1", "yes"):
+        return True
+    if s in ("off", "false", "0", "no"):
+        return False
+    raise ValueError(f"release_lift_per_grasp {value!r}: expected true / false")
 
 
 def rim_height(top_z: Optional[float], surface_z: float, height: float, aabb_top: float) -> Tuple[float, str]:
@@ -458,19 +478,31 @@ class InsideMode:
 
     # ------------------------------------------------------------------ the release (the small-scale drop)
 
-    def release_above(self, quat) -> float:
+    def release_lift_per_grasp(self) -> bool:
+        """IORSLarge's hook: ``generation.release_lift_per_grasp`` (module docstring; default false)."""
+        try:
+            return lift_per_grasp(self.gp.gen("release_lift_per_grasp"))
+        except ValueError as e:
+            raise Reject("spec", f"{self.gp.alias}: {e}")
+
+    def release_above(self, quat, eef_in_object=None) -> float:
         """Height of the target's bottom above the interior surface at the release: ``drop_height_m``, raised until the open gripper's
         lowest point clears the surface by ``release_clearance_m`` for every library grasp (one height for every grasp: the F_goal
-        screening poses the target before a grasp is drawn). Memoised per orientation."""
+        screening poses the target before a grasp is drawn) - with ``generation.release_lift_per_grasp`` and a grasp's
+        ``eef_in_object`` (``T_obj→eef``), for that grasp's open gripper alone. Memoised per orientation (and grasp)."""
         quat = G.t(quat).float()
+        own = eef_in_object is not None and self.release_lift_per_grasp()
         key = tuple(round(float(v), 4) for v in quat.tolist())
+        if own:
+            key += tuple(round(float(v), 4) for v in G.t(eef_in_object[0]).tolist() + G.t(eef_in_object[1]).tolist())
         memo = self.__dict__.setdefault("_inside_release", {})
         if key not in memo:
             drop = float(self.num("drop_height_m", DROP_HEIGHT_M))
             z_s = float(self.place["z"])
             pos = th.tensor([0.0, 0.0, z_s + self.world.bottom_offset(self.hull, quat) + drop])
-            lows = [float(gripper_corners_world(IK.grasp_pose((pos, quat), g.pose))[:, 2].min()) for g in self.grasps]
-            memo[key] = drop + release_lift(lows, z_s, float(self.num("release_clearance_m", RELEASE_CLEARANCE_M)))
+            low_of = lambda p: float(gripper_corners_world(IK.grasp_pose((pos, quat), p))[:, 2].min())  # noqa: E731
+            lows = [low_of(g.pose) for g in self.grasps]
+            memo[key] = drop + release_lift([low_of(eef_in_object)] if own else lows, z_s, float(self.num("release_clearance_m", RELEASE_CLEARANCE_M)))
             if not self.__dict__.get("_inside_release_logged"):
                 self.__dict__["_inside_release_logged"] = True
                 self._log_release_lift(lows, z_s, drop)
@@ -478,16 +510,23 @@ class InsideMode:
 
     def _log_release_lift(self, lows: Sequence[float], z_s: float, drop: float) -> None:
         """Once per template (the first release orientation :meth:`release_above` computes): the lift each library grasp needs for its open
-        gripper to clear the surface by ``release_clearance_m`` and the one used, their max (owner 2026-10-13 ~00:50 item 2)."""
+        gripper to clear the surface by ``release_clearance_m`` and the one used, their max - each grasp its own with
+        ``release_lift_per_grasp`` (owner 2026-10-13 ~00:50 items 2 / 3)."""
         clearance = float(self.num("release_clearance_m", RELEASE_CLEARANCE_M))
         per = ", ".join(f"{getattr(g, 'name', i)}: {release_lift([lo], z_s, clearance):.3f} m" for i, (g, lo) in enumerate(zip(self.grasps, lows)))
+        if self.release_lift_per_grasp():
+            log.info("%s: inside release lift per grasp: {%s}, used per grasp (release_lift_per_grasp: the drawn grasp's own; max %.3f m) (drop_height_m %.3f, "
+                     "release_clearance_m %.3f: the target's bottom drop_height_m + the drawn grasp's lift above the surface)", self.gp.alias, per,
+                     release_lift(lows, z_s, clearance), drop, clearance)
+            return
         log.info("%s: inside release lift per grasp: {%s}, used (max) %.3f m (drop_height_m %.3f, release_clearance_m %.3f: the target's bottom %.3f m "
                  "above the surface)", self.gp.alias, per, release_lift(lows, z_s, clearance), drop, clearance, drop + release_lift(lows, z_s, clearance))
 
-    def goal_pose_at(self, goal_cell, quat) -> G.Pose:
-        """The release pose: the goal cell, the target's bottom :meth:`release_above` above the interior surface (the goal check settles it)."""
+    def goal_pose_at(self, goal_cell, quat, eef_in_object=None) -> G.Pose:
+        """The release pose: the goal cell, the target's bottom :meth:`release_above` above the interior surface (the goal check settles it);
+        ``eef_in_object``: the grasp the release is for (:meth:`release_above`)."""
         quat = G.t(quat).float()
-        z = float(self.place["z"]) + self.world.bottom_offset(self.hull, quat) + self.release_above(quat)
+        z = float(self.place["z"]) + self.world.bottom_offset(self.hull, quat) + self.release_above(quat, eef_in_object)
         return th.tensor([float(goal_cell[0]), float(goal_cell[1]), z]), quat
 
     # ------------------------------------------------------------------ the release tilt (owner 2026-10-12 ~22:35, inside_large#03)
@@ -506,7 +545,8 @@ class InsideMode:
     def screen_release_tilts(self, F_goal, release_xy, yaws, d_yaw: float, place: Stance, arm: str, ignore_place, yaw_step: float):
         """IORSLarge's hook after the level F_goal screen of a C candidate: each ``generation.release_tilt_deg`` tilt is an alternative to
         the level release - screened per library row (the tilt axis follows the row's radial direction) at the yaws of the level screen,
-        the release :meth:`goal_pose_at` the tilted orientation (the tilted hull's lowest point :meth:`release_above` the surface). Returns
+        the release :meth:`goal_pose_at` the tilted orientation (the tilted hull's lowest point :meth:`release_above` the surface, the row's
+        own lift with ``release_lift_per_grasp``). Returns
         the level pairs followed by the pairs only a tilt admits, and per pair key (``iors_large.pair_key``) the tilts (deg, 0 = level) it
         passes in the order the draw tries them; one log line per C with F_goal per tilt. Without the key: ``(F_goal, {})``."""
         from ispatialgym.sampling.v2.tasks.iors_large import pair_key
@@ -521,7 +561,7 @@ class InsideMode:
         for t in tilts:
             n = 0
             for g in self.grasps:
-                pose_at = lambda xy, yaw, g=g, t=t: self.goal_pose_at(xy, self.release_quat(G.qmul(G.quat_from_yaw(yaw), self.rest), g, t))  # noqa: E731
+                pose_at = lambda xy, yaw, g=g, t=t: self.goal_pose_at(xy, self.release_quat(G.qmul(G.quat_from_yaw(yaw), self.rest), g, t), g.pose)  # noqa: E731
                 for y, gg in self.ikc.feasible_sets([release_xy], [y_ + d_yaw for y_ in yaws], [g], pose_at, place, arm, ignore_place).get(0, []):
                     k = pair_key(y - d_yaw, gg, yaw_step)
                     if k not in tilts_of:
@@ -584,11 +624,15 @@ class InsideMode:
             raise Reject("release_too_low", f"open gripper lowest point {low:.3f} vs the surface {z_s:.3f} at the recorded release")
         rel = draft.goal_poses.get(tname)
         facts = {"place_kind": "drop", "surface_z": round(z_s, 4), "surface_z_above_floor": round(z_s - self.floor_z, 4),
-                 "release_above_m": None if rel is None else round(self.release_above(rel[1]), 4), "finger_clearance_m": round(low - z_s, 4),
+                 "release_above_m": None if rel is None else round(self.release_above(rel[1], grasp.eef_in_object), 4), "finger_clearance_m": round(low - z_s, 4),
                  "drop_height_m": float(self.num("drop_height_m", DROP_HEIGHT_M)), "release_clearance_m": clearance,
                  "settled_goal_z": round(float(draft.pose_targets[tname]["position"][2]), 4)}
         if "release_tilt_deg" in draft.summary:
             facts["release_tilt_deg"] = draft.summary["release_tilt_deg"]
+        if self.release_lift_per_grasp() and rel is not None:
+            facts.update({"release_lift_per_grasp": True, "release_above_max_m": round(self.release_above(rel[1]), 4)})
+            log.info("%s: inside release at the drawn grasp %s's own lift: %.3f m above the surface (every library grasp: %.3f m)", self.gp.alias,
+                     grasp.grasp_name, facts["release_above_m"], facts["release_above_max_m"])
         grasp.extras.update(facts)
         draft.summary["release"] = facts
         if not self.ikc.eef_in_frame(grasp.grasp, self.camera_pose_at(self.sidecar.stance("manipulation"))):

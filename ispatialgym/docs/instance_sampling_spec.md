@@ -1656,7 +1656,11 @@ default none = the level release only; owner 2026‑10‑12 ~22:35, inside_large
 level release: the target at yaw × tilt × rest, the tilt about the horizontal axis perpendicular to the grasp's radial direction (the
 grasp side up, the far rim down), the release height from the tilted hull's lowest point; the draw tries a pair's tilts in order
 (level first), `grasps[0].release_tilt_deg` / `summary.release_tilt_deg` record the one used and the goal check's up-axis rule
-(`goal_tip_max_deg`) measures a tilted release against its level orientation. **Goal check**: teleport to the
+(`goal_tip_max_deg`) measures a tilted release against its level orientation. `release_lift_per_grasp` (default false = one height
+for every grasp; owner 2026‑10‑13 ~00:50, inside_large_scale#02) raises the release only as far as the drawn grasp's own open gripper
+needs at the release orientation (level or tilted): the F_goal screen poses each library row at its own release, the C exact IK and
+the goal / settle use the drawn grasp's, `summary.release.release_above_m` records it with `release_above_max_m` (the default's
+height) beside it. **Goal check**: teleport to the
 release, settle (drop test); `(inside ?target ?partner)` — for a container without a fillable / openfillable meta link the robust
 predicate's rays branch (`predicates.inside_rays`: the inner AABB centre in the container's AABB, the container on both sides along
 ≥ 2 of z and its own x / y) — and the target's top at most `max_protrusion_fraction` (0.5) of its height above the rim (the

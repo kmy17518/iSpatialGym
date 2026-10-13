@@ -2413,8 +2413,9 @@ class IORSLarge(SamplerV2):
         d = th.cdist(goal_cells.float(), band_world.float())
         return goal_cells[d.min(dim=1).values <= 0.51 * lattice]
 
-    def goal_pose_at(self, goal_cell, quat) -> G.Pose:
-        """§5.6 goal pose: ontop → z = partner face + bottom offset + 1 cm; under → z = floor + bottom offset + 3 mm."""
+    def goal_pose_at(self, goal_cell, quat, eef_in_object=None) -> G.Pose:
+        """§5.6 goal pose: ontop → z = partner face + bottom offset + 1 cm; under → z = floor + bottom offset + 3 mm (``eef_in_object``,
+        the grasp of the inside mode's per-grasp release height, is unused here)."""
         z = self.place["z"] + self.world.bottom_offset(self.hull, quat) + self.num("goal_drop_m", 0.01 if self.relation == "ontop" else 0.003)
         return th.tensor([float(goal_cell[0]), float(goal_cell[1]), z]), quat
 
@@ -2426,6 +2427,29 @@ class IORSLarge(SamplerV2):
     def release_quat(self, level_quat, grasp, tilt_deg: float):
         """The release orientation of ``grasp`` at ``tilt_deg`` (the inside mode's tilt); here the level orientation."""
         return level_quat
+
+    def release_lift_per_grasp(self) -> bool:
+        """Whether the release pose depends on the drawn grasp (the inside mode's ``release_lift_per_grasp``, owner 2026-10-13 ~00:50 item 3);
+        here never."""
+        return False
+
+    def release_feasible(self, release_xy, yaws, release_pose, place: Stance, arm: str, ignore_place) -> List[Tuple[float, Any]]:
+        """F_goal at the release cell for the C yaws ``yaws``: the (yaw, library row) pairs whose [pre-place, place] pass the screening IK
+        with the target at ``release_pose(release_xy, yaw * rest)``; with :meth:`release_lift_per_grasp` each row at its own release
+        (``release_pose(xy, quat, row.pose)``) in the same batch."""
+        q_yaw = lambda yaw: G.qmul(G.quat_from_yaw(yaw), self.rest)  # noqa: E731
+        if self.release_lift_per_grasp():
+            return self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw, g: release_pose(xy, q_yaw(yaw), g.pose), place, arm, ignore_place,
+                                          pose_per_grasp=True).get(0, [])
+        return self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw: release_pose(xy, q_yaw(yaw)), place, arm, ignore_place).get(0, [])
+
+    def release_eef_in_object(self) -> Optional[G.Pose]:
+        """The recorded grasp's ``T_obj→eef`` the release pose is built for when :meth:`release_lift_per_grasp`, else None (the goal and
+        the settle re-derive the release the C exact IK used)."""
+        if not self.release_lift_per_grasp():
+            return None
+        rec = self.sidecar.grasp_of(self.tname)
+        return None if rec is None else rec.eef_in_object
 
     # ------------------------------------------------------------------ template
 
@@ -3227,14 +3251,13 @@ class IORSLarge(SamplerV2):
             ignore_place = [partner] if self.relation == "ontop" else [self.obj("floor")]
             # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
             release_xy = cd if push else gc
-            release_pose = (lambda xy, quat: self.drop_pose_at(xy, quat)) if push else (lambda xy, quat: self.goal_pose_at(xy, quat))
+            release_pose = (lambda xy, quat, eio=None: self.drop_pose_at(xy, quat)) if push else (lambda xy, quat, eio=None: self.goal_pose_at(xy, quat, eio))
             # A carried object keeps its yaw RELATIVE TO THE ROBOT (no re-grasp), so at C its world yaw is the init yaw plus
             # the base-yaw change B -> C: F_goal is screened at yaw + d_yaw and intersected with F_init by the init yaw
             # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
             # only when B and C share a base yaw - countertop-floor 0916-231451: F_init 3-21 / F_goal 0-5 / F empty on
             # every candidate). The goal orientation written to the TRO is the rotated one.
-            F_goal = self.ikc.feasible_sets([release_xy], [y + d_yaw for y in yaws], self.grasps,
-                                            lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, arm, ignore_place).get(0, [])
+            F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
             # owner 2026-10-12 ~22:35 (inside): tilted releases as alternatives to the level one; per pair the tilts (deg, 0 = level) it passed
             tilts_of: Dict[Tuple[int, Any], List[float]] = {}
@@ -3377,7 +3400,7 @@ class IORSLarge(SamplerV2):
                 lift_seeds: Dict[int, Optional[th.Tensor]] = {}
                 for tilt, j_opt, (g, eef, pre, flip) in c_opts:
                     goal_quat = self.release_quat(level_quat, g_row, tilt)
-                    goal = release_pose(release_xy, goal_quat)
+                    goal = release_pose(release_xy, goal_quat, g.pose)
                     place_eef = IK.grasp_pose(goal, g.pose)
                     pre_place = IK.pre_pose(place_eef)
                     # the place / drop IK is seeded with the LIFT configuration (the arm the object is carried with, and the branch the
@@ -3648,7 +3671,7 @@ class IORSLarge(SamplerV2):
 
     def goal(self, draft: Draft):
         tname = self.tname
-        goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft))
+        goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft), self.release_eef_in_object())
         draft.goal_poses[tname] = goal
         draft.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
         end = self.sidecar.stances.get("push") or self.sidecar.stance("placement")  # where the robot ends: the push stance when the drop and the push split
@@ -3656,7 +3679,7 @@ class IORSLarge(SamplerV2):
 
     def after_settle(self, draft: Draft):
         tname = self.tname
-        goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft))
+        goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft), self.release_eef_in_object())
         draft.goal_poses[tname] = goal
         tgt = draft.pose_targets[tname]
         tgt["position"], tgt["orientation"] = [float(v) for v in goal[0]], [float(v) for v in goal[1]]
