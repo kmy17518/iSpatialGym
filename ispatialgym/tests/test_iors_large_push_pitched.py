@@ -484,7 +484,7 @@ def test_the_push_record_keeps_the_sampled_chain_configuration():
 def test_the_goal_check_re_solve_leaves_from_the_sampled_configuration(monkeypatch, caplog):
     s, ch = _sampled_chain()
     rec = _record(ch)
-    n0 = len(s.ikc.calls)
+    n0, nw0 = len(s.ikc.calls), len(s.ikc.witness_calls)
     with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
         _goal_check(monkeypatch, rec, s.ikc)
     calls = _push_calls(s.ikc.calls[n0:])
@@ -495,9 +495,10 @@ def test_the_goal_check_re_solve_leaves_from_the_sampled_configuration(monkeypat
     assert c["stance"] == "push" and c["arm"] == "left" and c["fingers"] == C.FINGER_CLOSED
     assert c["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"] and c["ground"] is True
     assert c["poses"][0] is rec.pre and th.allclose(c["poses"][1][0], ch["start"][0])
-    # the configuration was verified as a witness of the pre-pose first, in the same world
-    w = s.ikc.witness_calls
+    # the configuration was verified as a witness of the pre-pose first, in the same world - the very test the sampler ran when it took the chain
+    w = s.ikc.witness_calls[nw0:]
     assert len(w) == 1 and w[0]["pose"] is rec.pre and th.equal(w[0]["q"], q_first) and w[0]["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"]
+    assert nw0 == 1 and th.equal(s.ikc.witness_calls[0]["q"], q_first) and s.ikc.witness_calls[0]["pose"] is rec.pre
     assert th.allclose(rec.goal[0], c["poses"][3][0]) and rec.extras["goal_cell"] == pytest.approx([1.40, 0.0])
     msgs = [r.getMessage() for r in caplog.records if "push-under goal check re-solve" in r.getMessage()]
     assert len(msgs) == 1 and "push-under goal check re-solve: seeded ok (the sampled chain's wrist-flipped branch, left arm)" in msgs[0]
@@ -538,3 +539,105 @@ def test_the_goal_check_falls_back_to_the_unseeded_solve(monkeypatch, caplog):
     calls, msg = run(ikc, seed=False)
     assert [c["q_first"] for c in calls] == [None] and ikc.witness_calls == []
     assert "push-under goal check re-solve: no seed (the record has no chain_arm_q) -> unseeded ok" in msg
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the pinned-start check when the chain is accepted (owner 2026-10-13 ~03:15 item 1)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+class _PinIKC(_BranchIKC):
+    """``_BranchIKC`` whose goal-check witness test fails for the first ``n_bad`` configurations asked (a wrist-flipped option mapped from a
+    remembered solution of another stance C: its arm joints off the pre-pose on this stance) and whose seeded push chains fail on the calls
+    numbered in ``seeded_fail`` (1-based among the seeded 4-pose calls)."""
+
+    def __init__(self, n_bad=0, seeded_fail=()):
+        super().__init__()
+        self.n_bad, self.seeded_fail, self.n_seeded = n_bad, set(seeded_fail), 0
+
+    def collision_free_at(self, q, pose, arm, ignore=()):
+        super().collision_free_at(q, pose, arm, ignore)
+        return len(self.witness_calls) > self.n_bad
+
+    def exact(self, poses, stance, arm="right", ignore_for_last=(), cache=True, fingers=None, q_first=None, **kw):
+        if len(poses) == 4 and q_first is not None:
+            self.n_seeded += 1
+            if self.n_seeded in self.seeded_fail:
+                self.calls.append({"poses": list(poses), "fingers": fingers, "stance": stance.name, "arm": arm, "q_first": q_first.clone(),
+                                   "memory": dict(self.solutions), **self._world})
+                return SimpleNamespace(ok=False, q=None, reason="approach_untrackable: differential IK did not converge at waypoint 17/19")
+        return super().exact(poses, stance, arm, ignore_for_last=ignore_for_last, cache=cache, fingers=fingers, q_first=q_first, **kw)
+
+
+def _pinned(ikc, caplog, **gen):
+    s = _sampler(push_under_hand="pitched_far", **gen)
+    s.seg_arm, s.ikc, s.kit = "left", ikc, ikc.kit
+    with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
+        ch = _push(s)
+    return s, ch, [r.getMessage() for r in caplog.records if "push-under pinned-start check" in r.getMessage()]
+
+
+def test_the_pinned_start_check_passes_over_an_option_off_the_pre_pose(caplog):
+    s, ch, msgs = _pinned(_PinIKC(n_bad=1), caplog)
+    # the first wrist-flipped option is no witness of its pre-pose on this stance: passed over, the next one is taken and recorded
+    assert ch is not None and ch["orient"]["source"] == "map" and ch["orient"]["chosen"] == "pitch 60 plane-"
+    w = s.ikc.witness_calls
+    assert len(w) == 2 and all(c["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"] and c["ground"] is True and c["arm"] == "left" for c in w)
+    idx = ARM_IDX["left"]
+    for c, call in zip(w, [c for c in _push_calls(s.ikc.calls) if c["q_first"] is not None]):
+        # the configuration as the goal check rebuilds it: the stance's locked joints, the arm's recorded (rounded) joints, at the pre-pose
+        assert float(c["q"][0]) == 5.0 and c["q"][idx].tolist() == pytest.approx(call["q_first"][idx].tolist(), abs=1e-5) and c["pose"] is call["poses"][0]
+    assert ch["seed"]["chain_arm_q"][0] == pytest.approx(w[1]["q"][idx].tolist(), abs=1e-5) and w[1]["pose"] is ch["pre"]
+    assert len(msgs) == 1 and "push-under pinned-start check: pitch 60 lateral [wrist-flipped, left arm] passed over - the recorded pre-pose configuration is off the pre-pose " \
+                               "or collides on this stance (C d 0.95 λ +0.00 trunk (2.0, 0.0))" in msgs[0]
+    bad = [o for o in ch["orient"]["options"] if o["label"] == "pitch 60 lateral" and o["source"] == "map" and not o["ok"]]
+    assert bad and bad[-1]["why"].startswith("downstream: the recorded pre-pose configuration is off the pre-pose")
+
+
+def test_the_pinned_start_check_rejects_the_chain_when_no_option_holds(caplog):
+    s, ch, msgs = _pinned(_PinIKC(n_bad=10 ** 6), caplog)
+    assert ch is None  # every option of every pitch passed over: the goal check's seed test would have failed each
+    n_map = len([c for c in _push_calls(s.ikc.calls) if c["q_first"] is not None])
+    assert n_map == len(s.ikc.witness_calls) == len(msgs) > 0
+    assert "pinned-start check" in caplog.text and "downstream: the recorded pre-pose configuration is off the pre-pose" in caplog.text
+    # generation.push_pinned_start_check "off": today's acceptance, the first wrist-flipped option recorded untested
+    caplog.clear()
+    s, ch, msgs = _pinned(_PinIKC(n_bad=10 ** 6), caplog, push_pinned_start_check="off")
+    assert ch is not None and ch["orient"]["chosen"] == "pitch 60 lateral" and s.ikc.witness_calls == [] and msgs == []
+
+
+def test_the_pinned_start_check_without_a_record_or_a_shift_key_adds_no_solve(caplog):
+    s, ch, msgs = _pinned(_PinIKC(), caplog)
+    assert ch is not None and msgs == [] and len(s.ikc.witness_calls) == 1
+    assert len(_push_calls(s.ikc.calls)) == 5  # the four turns afresh + the wrist-flipped option's own solve: no settle re-solve without the key
+    # a chosen option without every configuration recorded has nothing to pin: it passes untested (the goal check solves afresh then)
+    assert s.push_pinned_check(_stance(), SimpleNamespace(proposal=SimpleNamespace(chain=[None] * 4), qs=None), "left", True) == (True, "")
+    assert len(s.ikc.witness_calls) == 1
+
+
+def test_the_pinned_start_check_on_the_blade_keeps_the_slab_off_below_its_tips(caplog):
+    s = _sampler(height=0.05, com_z=0.02)
+    s.seg_arm, s.ikc = "left", _PinIKC()
+    s.kit = s.ikc.kit
+    ch = _push(s)
+    assert ch is not None and ch["ground_ignored"] is True and s.push_hand == "blade"
+    assert len(s.ikc.witness_calls) == 1 and s.ikc.witness_calls[0]["ground"] is False  # the goal check's world: ground=not ground_ignored
+    assert s.ikc.witness_calls[0]["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"]
+
+
+def test_the_settle_shift_key_re_solves_the_pinned_chain_to_a_farther_goal(caplog):
+    # the first option's re-solve to the goal 4 mm farther fails (seeded call 2): passed over; the second option's passes (call 4)
+    s, ch, msgs = _pinned(_PinIKC(seeded_fail=(2,)), caplog, push_pinned_settle_m=0.004)
+    assert ch is not None and ch["orient"]["chosen"] == "pitch 60 plane-"
+    seeded = [c for c in _push_calls(s.ikc.calls) if c["q_first"] is not None]
+    assert len(seeded) == 4  # option 1: its solve + the shifted re-solve; option 2: the same
+    for own, shifted, w in zip(seeded[0::2], seeded[1::2], s.ikc.witness_calls):
+        assert shifted["poses"][0] is own["poses"][0] and shifted["poses"][1] is own["poses"][1]
+        assert (shifted["poses"][3][0] - own["poses"][3][0]).tolist() == pytest.approx([0.004, 0.0, 0.0], abs=1e-6)  # along the push (+x)
+        assert shifted["poses"][2][0].tolist() == pytest.approx(((own["poses"][1][0] + shifted["poses"][3][0]) / 2).tolist(), abs=1e-6)
+        assert th.equal(shifted["q_first"], w["q"]) and shifted["fingers"] == C.FINGER_CLOSED and shifted["stance"] == "push"
+        assert shifted["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"] and shifted["ground"] is True
+    # the IK memory is left as it was: the shifted goal's solution is not remembered
+    assert ("left", s.ikc._pose_key(seeded[3]["poses"][3])) not in s.ikc.solutions
+    assert len(msgs) == 1 and "pitch 60 lateral [wrist-flipped, left arm] passed over - the seeded re-solve fails with the push goal 4 mm farther: " \
+                               "approach_untrackable: differential IK did not converge at waypoint 17/19" in msgs[0]

@@ -151,10 +151,12 @@ def offered(monkeypatch):
     """The proposals of every ``orient.choose`` call; the first in the generator's order is chosen (the stub IK passes all)."""
     calls = []
 
-    def choose(ikc, arm, props, evaluate, q_start, camera_idx=None, stage=""):
+    def choose(ikc, arm, props, evaluate, q_start, camera_idx=None, stage="", downstream=None):
         calls.append(list(props))
         assert all(evaluate(p)[0] for p in props)
-        return SimpleNamespace(proposal=props[0]), {"options": []}
+        chosen = SimpleNamespace(proposal=props[0])
+        assert downstream is None or downstream(chosen)[0]  # no configurations recorded: the pinned-start check has nothing to pin
+        return chosen, {"options": []}
 
     monkeypatch.setattr(IL.O, "choose", choose)
     return calls

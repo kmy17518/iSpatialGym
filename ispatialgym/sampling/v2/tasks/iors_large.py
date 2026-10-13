@@ -1318,7 +1318,8 @@ class IORSLarge(SamplerV2):
 
             # the two wrist turns by the orientation rule (owner 2026-09-27); the camera is checked at the blade's start, where the
             # target and the floor left the IK's world
-            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitch {pitch:.0f}")
+            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitch {pitch:.0f}",
+                                        downstream=lambda s, ground=not low: self.push_pinned_check(place, s, arm, ground))
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 if palm:
@@ -1400,7 +1401,8 @@ class IORSLarge(SamplerV2):
             if not props:
                 continue
             solved += 1
-            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under flat hand, tips {tip:.3f}")
+            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under flat hand, tips {tip:.3f}",
+                                        downstream=lambda s: self.push_pinned_check(place, s, arm, True))
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 f = chosen.proposal.payload
@@ -1481,7 +1483,8 @@ class IORSLarge(SamplerV2):
                     res = self.ikc.exact(p.chain, place, arm, cache=False, fingers=C.FINGER_CLOSED, q_first=p.q_first)
                 return bool(res.ok), res, None, str(res.reason)
 
-            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitched hand {pitch:.0f}")
+            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitched hand {pitch:.0f}",
+                                        downstream=lambda s: self.push_pinned_check(place, s, arm, True))
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 f = chosen.proposal.payload
@@ -1504,6 +1507,55 @@ class IORSLarge(SamplerV2):
         log.info("%s: push-under pitched-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; eef %s): %s", self.gp.alias, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)), ends, "; ".join(why))
         return None
+
+    def push_pinned_check(self, stance: Stance, scored, arm: str, ground: bool) -> Tuple[bool, str]:
+        """The push-under chain's ``orient.choose`` downstream (owner 2026-10-13 ~03:15 item 1): the configuration the goal check pins
+        (:meth:`_push_under_goal_chain`) checked when the chain is accepted. ``scored``'s pre-pose configuration as the record keeps it
+        (:func:`push_chain_seed`), on ``stance``'s locked joints with the gripper closed, must be a collision-free witness of the pre-pose
+        in the chain's world (the floor object and the target out, the ground slab per ``ground``) - the goal check's own seed test, so
+        an option failing it would fail that test there. A wrist-flipped option mapped from a remembered solution of the same world pose
+        solved from another stance C (the C candidates share the drop cell; ``IKChecker.solutions`` is keyed by the pose alone) keeps that
+        stance's base / trunk joints, and ``exact`` pins it by FK alone: under#02 pitched_c2_k0 recorded such chains on 5 of 7 attempts,
+        each 'seeded failed' at the goal check. A failing option is passed over for the next one in the order. With
+        ``generation.push_pinned_settle_m`` (m, default off) the goal check's seeded re-solve must also pass with the push goal that much
+        farther along the push (the settled goal a few mm out, the chain's reach-limited end). A chain without every configuration
+        (no seed recorded) passes as before, every chain with ``generation.push_pinned_start_check`` = ``"off"``. Returns ``(ok, why)``; one
+        INFO line 'push-under pinned-start check: ...' per rejection."""
+        if str(self.gp.gen("push_pinned_start_check", "on")) == "off":
+            return True, ""
+        seed = push_chain_seed(self.kit, scored, arm)
+        if not seed:
+            return True, ""
+        chain = scored.proposal.chain
+        q_pin = self.ikc.q_locked(stance, fingers=C.FINGER_CLOSED).clone()
+        q_pin[self.kit.robot.arm_control_idx[arm]] = th.as_tensor(seed["chain_arm_q"][0], dtype=q_pin.dtype)
+        shift = self.gp.gen("push_pinned_settle_m")
+        why = ""
+        with self.ikc.ignoring([self.obj("floor"), self.target], ground=ground):
+            if not self.ikc.collision_free_at(q_pin, chain[0], arm):
+                fk = getattr(self.ikc, "fk_residual", None)
+                off = f" (FK {1000.0 * float(fk(q_pin, chain[0], arm)):.1f} mm from the pre-pose)" if fk is not None else ""
+                why = f"the recorded pre-pose configuration is off the pre-pose or collides on this stance{off}"
+            elif shift is not None and float(shift) > 0.0:
+                d = G.t(chain[3][0]).float() - G.t(chain[1][0]).float()
+                d[2] = 0.0
+                goal = G.t(chain[3][0]).float() + float(shift) * d / th.linalg.norm(d).clamp(min=1e-9)
+                saved = dict(self.ikc.solutions)
+                try:
+                    res = self.ikc.exact([chain[0], chain[1], (0.5 * (G.t(chain[1][0]).float() + goal), chain[2][1]), (goal, chain[3][1])], stance, arm, cache=False,
+                                         fingers=C.FINGER_CLOSED, q_first=q_pin)
+                finally:
+                    self.ikc.solutions.clear()
+                    self.ikc.solutions.update(saved)
+                if not res.ok:
+                    why = f"the seeded re-solve fails with the push goal {1000.0 * float(shift):.0f} mm farther: {str(res.reason)[:200]}"
+        if not why:
+            return True, ""
+        TT._count(self, "push_pinned_start.rejected")
+        log.info("%s: push-under pinned-start check: %s [%s, %s arm] passed over - %s (C d %.2f λ %+.2f trunk %s)", self.gp.alias, scored.proposal.label,
+                 "wrist-flipped" if scored.proposal.source == "map" else "solved", arm, why, stance.stand_off or 0.0, stance.lateral,
+                 (stance.translate, round(stance.tilt, 2)))
+        return False, why
 
     def clearance_at(self, xy) -> Optional[float]:
         cm = self.place.get("clearance")
@@ -2819,8 +2871,10 @@ class IORSLarge(SamplerV2):
         order_mode = str(self.gp.gen("b_trunk_order", self.gp.gen("b_prescreen_order", "reach")))
         if order_mode == "reach":
             # W2 (owner 2026-09-20 22:15): the B whose trunk leaves the most reach margin to the target first (5 cm buckets, capped at
-            # 0.30 m so a nearly-folded arm does not outrank a comfortable one), then a usable F_init, the compact grasp, the larger F_init
-            margins = {id(t): min(round(_margin(t) / 0.05) * 0.05, 0.30) for t in pre}
+            # 0.30 m so a nearly-folded arm does not outrank a comfortable one), then a usable F_init, the compact grasp, the larger F_init;
+            # 1 cm buckets with generation.grasp_reach_margin_m (owner 2026-10-13 ~03:15 item 1: the slightly closer B first)
+            bucket = 0.01 if self.grasp_reach_margin() is not None else 0.05
+            margins = {id(t): min(round(_margin(t) / bucket) * bucket, 0.30) for t in pre}
             pre.sort(key=lambda t: (push_rank(t), -margins[id(t)], 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
             log.info("%s: pre-screen reach margins per B (trunk -> margin): %s", self.gp.alias,
                      [(round(float(t[1].translate), 2), round(float(t[1].tilt), 2), round(_margin(t), 3)) for t in pre])
@@ -2967,6 +3021,58 @@ class IORSLarge(SamplerV2):
             opts.append((pick.other[0], pick.other[2], pick.other[3], not pick.twin))
         return opts, pick.facts
 
+    def grasp_reach_margin(self) -> Optional[float]:
+        """``generation.grasp_reach_margin_m`` (m; default None = off, owner 2026-10-13 ~03:15 item 1): the reach margin a grasp at B must
+        keep along its approach (:meth:`grasp_margin_fails`)."""
+        v = self.gp.gen("grasp_reach_margin_m")
+        return float(v) if v is not None and float(v) > 0.0 else None
+
+    def grasp_margin_fails(self, stance: Stance, arm: str, eef: G.Pose, pre: G.Pose) -> Optional[str]:
+        """Why the grasp ``[pre, eef]`` from ``stance`` lacks the reach margin (None: it keeps it, or no margin is asked): the same chain with
+        the eef :meth:`grasp_reach_margin` deeper along its approach axis must pass the exact IK too, with the B solve's ignore set. The
+        sampler's exact IK admits a grasp at the edge of the reach that the program check's tracked approach to the settled target then
+        misses (under#02 pitched_c2_k0, 2 of 2 attempts past the goal check: 'differential IK did not converge at waypoint 2/4: pos_err=7.0mm
+        ...; the end pose has no solution on its own either'). The IK memory is left as it was."""
+        m = self.grasp_reach_margin()
+        if m is None:
+            return None
+        a = C.approach_axis(G.t(eef[1])).float()
+        deep = [(G.t(pre[0]).float() + m * a, G.t(pre[1])), (G.t(eef[0]).float() + m * a, G.t(eef[1]))]
+        saved = dict(self.ikc.solutions)
+        try:
+            res = self.ikc.exact(deep, stance, arm, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+        finally:
+            self.ikc.solutions.clear()
+            self.ikc.solutions.update(saved)
+        TT._count(self, "grasp_reach_margin.checked")
+        if res.ok:
+            return None
+        TT._count(self, "grasp_reach_margin.rejected")
+        return str(res.reason)
+
+    def _b_margin_options(self, opts_facts, stance: Stance, arm: str, where: str) -> Tuple[Optional[Tuple[List[Tuple[Any, G.Pose, G.Pose, bool]], Optional[Dict[str, Any]]]], str]:
+        """:meth:`_b_options`' finger assignments that keep the grasp reach margin (:meth:`grasp_margin_fails`), in their order, and the
+        ``twin_choice`` (``chosen`` follows the first one kept; ``reach_margin_flip`` names the dropped first one); ``(None, why)`` when none
+        does. Unchanged without ``generation.grasp_reach_margin_m``. One INFO line 'grasp reach margin [..]: ...' per grasp checked."""
+        m = self.grasp_reach_margin()
+        if m is None:
+            return opts_facts, ""
+        opts, facts = opts_facts
+        kept, why = [], []
+        for o in opts:
+            w = self.grasp_margin_fails(stance, arm, o[1], o[2])
+            if w is None:
+                kept.append(o)
+            else:
+                why.append(f"{getattr(o[0], 'name', o[0])}: {w[:160]}")
+        log.info("%s: grasp reach margin [%s] %.3f m deeper along the approach (%s arm, stance (%.2f, %.2f)): %s kept%s", self.gp.alias, where, m, arm,
+                 stance.translate, stance.tilt, [getattr(o[0], "name", o[0]) for o in kept] or "none", f"; {'; '.join(why)}" if why else "")
+        if not kept:
+            return None, "; ".join(why)
+        if facts is not None and kept[0] is not opts[0]:
+            facts = dict(facts, chosen="twin" if kept[0][3] else "row", reach_margin_flip=f"the {'twin' if opts[0][3] else 'row'} fails the reach margin: {why[0]}")
+        return (kept, facts), "; ".join(why)
+
     def _regrasp_at_b(self, g, t_pose: G.Pose, stance: Stance, arm: str, z_init: float, twins: bool, bands: Dict[str, Any]):
         """The segment fallback's grasp at B (owner 2026-09-27, first-demo v2.2; ``tabletop.segment_fallback_grasp``'s rule, keeping the
         other finger assignment for the place at C): the library row ``g`` at the target pose the first grasp was drawn at, with ``arm``
@@ -2981,11 +3087,16 @@ class IORSLarge(SamplerV2):
             pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
             res = pick.res
             self._count_mirrored_ik(pick, bands)
+        opts = None
+        if res.ok:
+            opts, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), stance, arm, "B, segment fallback")
+            if opts is None:
+                res = IK.IKResult(False, None, f"grasp reach margin: {why_m}", 2)
         if not res.ok:
             log.info("%s: segment fallback: the %s arm's regrasp of %s at B fails (%s)", self.gp.alias, arm, getattr(g, "name", g), str(res.reason)[:200])
             return None
         TT._count(self, f"segment_fallback_taken.{arm}")
-        return self._b_options(pick, g, eef, pre)
+        return opts
 
     def _count_mirrored_ik(self, pick, bands: Dict[str, Any]) -> None:
         """``arm_band_mirrored.ik_tried`` / ``.ik_failed`` for a grasp's solved options of an arm whose band is a mirror (as
@@ -3311,7 +3422,7 @@ class IORSLarge(SamplerV2):
                     held = seg.arms_of(yaw0, g) or [arm]
                     arms_p = [a for a in held if a not in seg.done] or [arm]
                     a0 = arms_p[0]
-                    res, t_pose, eef, pre, pick = None, None, None, None, None
+                    res, t_pose, eef, pre, pick, b_opts_m = None, None, None, None, None, None
                     why_b: List[str] = []
                     for k_try in range(int(self.num("b_ik_tries", 3))):
                         yaw_k = yaw0 if k_try == 0 else yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
@@ -3339,8 +3450,13 @@ class IORSLarge(SamplerV2):
                             res = pick.res
                             self._count_mirrored_ik(pick, seg.bands)
                         if res.ok:
-                            yaw = yaw_k
-                            break
+                            arm_k = pick.arm if pick is not None else a0
+                            st_k = pick.stance if pick is not None and pick.stance is not None else st_of.get(arm_k, st_of[a0])
+                            b_opts_m, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), st_k, arm_k, "B")
+                            if b_opts_m is not None:
+                                yaw = yaw_k
+                                break
+                            res = IK.IKResult(False, None, f"grasp reach margin: {why_m}", 2)
                         why_b.append(f"try {k_try} yaw {yaw_k:.2f}: {res.reason}")
                     if res is None or not res.ok:
                         b_ik_cache[bk] = None
@@ -3350,7 +3466,7 @@ class IORSLarge(SamplerV2):
                         continue
                     arm_b = pick.arm if pick is not None else a0
                     b_ik_cache[bk] = {"yaw": yaw, "t_pose": t_pose, "arm": arm_b, "viable": O.viable_arms(pick.facts["orient"]) if pick is not None else [arm_b],
-                                      "opts": {arm_b: self._b_options(pick, g, eef, pre)}, "after": [a for a in held if a in seg.done]}
+                                      "opts": {arm_b: b_opts_m}, "after": [a for a in held if a in seg.done]}
                 hit = b_ik_cache[bk]
                 if hit is None:
                     fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
