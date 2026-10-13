@@ -1593,6 +1593,25 @@ def blade_standoff(face_z_range: Tuple[float, float], tip_z: float, pitch_deg: f
     return half + float(clearance), half
 
 
+#: the hand above the finger section, eef frame: the gripper link's cuRobo spheres (palm body r 4 cm, four knuckles r 1.5 cm;
+#: ``r1pro_description_curobo_default.yaml`` mapped through ``EEF_IN_GRIPPER`` as ``iors_small.HAND_SPHERES_EEF``, the same for both
+#: arms) - with the wrist camera's (``WRIST_CAMERA_SPHERES_EEF``) what meets a face that rises past the fingers
+PALM_SPHERES_EEF: Tuple[Tuple[Tuple[float, float, float], float], ...] = (
+    ((0.0, 0.0, -0.097), 0.04),
+    ((-0.015, -0.042, -0.0675), 0.015), ((0.015, -0.042, -0.0675), 0.015), ((-0.015, 0.042, -0.0675), 0.015), ((0.015, 0.042, -0.0675), 0.015),
+)
+
+
+def palm_half_extent(eef_quat, direction) -> float:
+    """How far the hand above the finger section (``PALM_SPHERES_EEF`` and the wrist camera's spheres) reaches from the eef origin
+    along ``direction`` (world) at the eef orientation ``eef_quat``: the largest ``centre · u + radius``, ``u`` = ``direction`` in the
+    eef frame. A vertical blade closing along the push: 5.7 cm (the knuckles) with the camera turned away from the face, 7.5 cm (the
+    camera) toward it; closing across the push: 4.0 cm (the palm body) / 7.4 cm (the camera)."""
+    u = C.quat_to_mat(_t(eef_quat)).T @ C.unit(_t(direction).float())
+    spheres = list(PALM_SPHERES_EEF) + [(c, WRIST_CAMERA_SPHERE_R) for c in WRIST_CAMERA_SPHERES_EEF]
+    return max(float(th.dot(_t(c), u)) + float(r) for c, r in spheres)
+
+
 def blade_sweep_clear(hull: th.Tensor, pose_init: Pose, com_xy, delta: float, blade_xy, radius: float, clearance: float, n: int = 12) -> Tuple[bool, float]:
     """Whether a blade (disc of ``radius`` at ``blade_xy``) stays ``clearance`` clear of the object's footprint while it
     rotates about ``com_xy`` from ``pose_init`` by ``delta`` (rad, about +z) — sampled at ``n`` angles short of the goal

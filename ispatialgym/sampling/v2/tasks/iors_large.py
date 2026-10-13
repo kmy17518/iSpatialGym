@@ -173,6 +173,15 @@ class PushUnderRecord(ContactRecord):
             if k not in d:
                 d[k] = _jsonable(v)
         return d
+
+
+def push_under_palm_flags(chain: Dict[str, Any]) -> Dict[str, Any]:
+    """The push-under record's flags of a chain pushed by the palm (``palm_contact`` from ``_push_under_chain``): ``palm_contact`` and
+    ``palm_clear`` - the oracle raises a top-down blade whose palm would meet the object's top unless its record has ``palm_clear``,
+    and this push runs as recorded."""
+    return {"palm_contact": True, "palm_clear": True} if chain.get("palm_contact") else {}
+
+
 TARGET_JITTER = math.radians(22.5)
 FOCUS_RADIUS = 0.05
 YAWS = [k * math.pi / 4 for k in range(8)]
@@ -970,7 +979,8 @@ class IORSLarge(SamplerV2):
         floor and target ignored, partner present): blade behind the target along the push direction (stand-off from
         ``tabletop.blade_standoff`` over the target's face height), approach pitched toward the push direction (0 / 30 /
         45 / 60°, either wrist turn), poses ``[pre, start, mid, goal]``, with the segment arm (``programs.py``: the push-under blade
-        is the grasp arm). Returns the record fields or None."""
+        is the grasp arm). ``generation.push_under_palm_contact``: a face past the finger section is pushed by the palm of the vertical
+        blade (``palm_contact`` in the fields). Returns the record fields or None."""
         floor, target = self.obj("floor"), self.target
         arm = self.seg_arm
         d2 = th.as_tensor([float(d2[0]), float(d2[1])])
@@ -982,17 +992,23 @@ class IORSLarge(SamplerV2):
         distance = float(th.linalg.norm(gc - cd))
         why: List[str] = []
         half_d: Optional[float] = self.half_extent_along(quat, d2)  # the footprint's, for the log when no pitch gets a blade
+        palm_ok = bool(self.gp.gen("push_under_palm_contact", False))
         for pitch in TT.approach_pitch_order(None):
             z_push, z_tip = self.push_height(pitch)
             so = TT.blade_standoff((self.floor_z, self.floor_z + height), z_tip, pitch, PUSH_UNDER_CLEARANCE_M)
-            if so is None:
+            # owner 2026-10-12 ~19:40: the goal counts, not which part of the hand meets the face - the vertical blade's palm pushes a
+            # face past the finger section, standing off by the palm's half extent along the push (per wrist turn, below)
+            palm = so is None and palm_ok and pitch == 0.0 and self.floor_z + height > z_tip + TT.PALM_FROM_TIP
+            if so is None and not palm:
                 why.append(f"pitch {pitch:.0f}: face reaches the palm")
                 continue
-            standoff = so[0]
+            standoff = 0.0 if palm else so[0]
             # the blade meets the rearmost collision point within its height band (a sandal's strap, a box's face), not the
-            # footprint's rear edge; the (generation) ``push_contact_offset_m`` overrides the model
+            # footprint's rear edge; the (generation) ``push_contact_offset_m`` overrides the model. The palm meets the face anywhere
+            # above the fingertips (and comes down beside it from the pre-pose)
             off_cfg = self.gp.gen("push_contact_offset_m")
-            off_m = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, z_tip - self.floor_z, z_tip - self.floor_z + self.BLADE_SPAN_M)
+            z_hi = height if palm else z_tip - self.floor_z + self.BLADE_SPAN_M
+            off_m = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, z_tip - self.floor_z, z_hi)
             if off_m is None:
                 why.append(f"pitch {pitch:.0f}: nothing of the target within the blade's height band")
                 continue
@@ -1008,6 +1024,9 @@ class IORSLarge(SamplerV2):
             for rank, c_sign in enumerate((1.0, -1.0)):
                 q = C.eef_quat(a_vec, c_sign * d3)
                 poses = [(start, q), (mid, q), (goal, q)]
+                if palm:  # the wrist camera reaches 1.8 cm further toward the face than the knuckles: each turn has its stand-off
+                    back = d3 * (TT.palm_half_extent(q, d3) + PUSH_UNDER_CLEARANCE_M)
+                    poses = [(p - back, q) for p, _ in poses]
                 props.append(O.Proposal(f"pitch {pitch:.0f}{'' if c_sign > 0 else '-'}", rank, c_sign, [C.pre_pose(poses[0])] + poses))
 
             def evaluate(p, low=low):
@@ -1020,9 +1039,13 @@ class IORSLarge(SamplerV2):
             chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitch {pitch:.0f}")
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
+                if palm:
+                    standoff = TT.palm_half_extent(start_p[1], d3) + PUSH_UNDER_CLEARANCE_M
+                    log.info("%s: push-under by the palm (generation.push_under_palm_contact): stand-off %.3f m (wrist %+.0f), contact offset %.3f m over the face "
+                             "above the tips", self.gp.alias, standoff, chosen.proposal.payload, half_d)
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
                         "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": chosen.proposal.payload,
-                        "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low), "orient": decision}
+                        "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low), "orient": decision, **({"palm_contact": True} if palm else {})}
             why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
         log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.alias, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)),
@@ -2985,7 +3008,7 @@ class IORSLarge(SamplerV2):
                                                              push_height_m=chain["push_height_m"], half_extent_m=chain["half_extent_m"], fingertip_z_m=chain["fingertip_z_m"],
                                                              ground_ignored=bool(chain.get("ground_ignored", False)),
                                                              drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname,
-                                                             **({"orient": chain["orient"]} if chain.get("orient") else {})))
+                                                             **({"orient": chain["orient"]} if chain.get("orient") else {}), **push_under_palm_flags(chain)))
                 cam = self.camera_pose_at(init)
                 if not self.frustum_ok(cam, self.hull_corners_world(self.hull, t_pose), 0.05):
                     raise Reject("not_in_frame", "target not in the init image (5 %)")
