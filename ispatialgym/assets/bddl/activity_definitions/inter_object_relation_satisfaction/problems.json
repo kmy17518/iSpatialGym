@@ -1505,6 +1505,17 @@
    "pick": "inter_object_relation_satisfaction-inside_large_scale#03~V3c",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink-commercial_kitchen_table",
+   "id": 136,
+   "grounded": "2026-10-12",
+   "by": "hand-grounded (rendered from inside_large_scale.iddl, alias 121's generation with the V4 inside keys; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V4 V4a/V4b)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#03~V4a/V4b",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }
