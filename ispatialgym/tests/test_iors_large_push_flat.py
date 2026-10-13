@@ -1,6 +1,7 @@
 """Simulator-free tests of the push-under's flat hand (owner 2026-10-12 ~19:40, under_large #02 / #03: ``generation.push_under_hand`` =
-``"flat"``): the wrist turns' quaternions, the fingertip stand-off and chain poses, the height rule (the hand's lowest collision sphere
-above the floor, the tips below the centre of mass), the fingertip band, the record's flags and the precedence over
+``"flat"``; ~20:55: the tips at the lowest height the arm reaches): the wrist turns' quaternions, the fingertip stand-off and chain poses,
+the floor rule and the ladder of tip heights (the trunk's reach floor, the cap below the target's top, the first reachable rung, the
+geometric skips without an IK, no centre-of-mass rule), the fingertip band, the record's flags and heights and the precedence over
 ``push_under_palm_contact`` (``pytest ispatialgym/tests/test_iors_large_push_flat.py``)."""
 
 from __future__ import annotations
@@ -74,11 +75,12 @@ class _IKC:
         return tuple(round(float(v), 3) for v in list(G.t(pose[0])) + list(G.t(pose[1])))
 
 
-def _sampler(height: float = 0.12, com_z: float = 0.06, **gen) -> "IL.IORSLarge":
+def _sampler(height: float = 0.27, com_z: float = 0.115, **gen) -> "IL.IORSLarge":
+    """A briefcase standing on edge (0.12 deep along the push x 0.33 x ``height``), the centre of mass ``com_z`` up."""
     s = IL.IORSLarge.__new__(IL.IORSLarge)
     s.relation, s.template_facts, s.template_meta = "under", {}, {}
     s.gp = _GP(**gen)
-    s.hull = _box(0.33, 0.27, height)
+    s.hull = _box(0.12, 0.33, height)
     s.rest, s.floor_z, s.seg_arm = G.IDENTITY_QUAT.clone(), 0.0, "right"
     s.place = {"height": height, "half": 0.165}
     objs = {"floor": SimpleNamespace(name="floors_jluwuz_0"), "target": SimpleNamespace(name="briefcase.n.01_1")}
@@ -88,13 +90,24 @@ def _sampler(height: float = 0.12, com_z: float = 0.06, **gen) -> "IL.IORSLarge"
     return s
 
 
-def _stance() -> Stance:
-    edge = EdgeFrame("-y", th.tensor([1.5, 0.0]), th.tensor([1.0, 0.0]), 1.2)
-    return Stance("push", (0.5, 0.0, 0.0), 2.0, 0.0, 1.0, edge, None, 0.0, None, ["right"])
+def _stance(x: float = 0.0, trunk=(2.0, 0.0)) -> Stance:
+    """A frontal stance C at the origin facing +x, the right arm's lane 0.25 m to its right."""
+    edge = EdgeFrame("-x", th.tensor([1.0, -0.25]), th.tensor([1.0, 0.0]), 1.2)
+    return Stance("push", (x, 0.0, 0.0), trunk[0], trunk[1], 1.0, edge, None, -0.25, None, ["right"])
 
 
-def _push(s):
-    return s._push_under_chain(_stance(), G.IDENTITY_QUAT.clone(), (1.0, 0.0), (1.40, 0.0), (1.0, 0.0))
+#: the drop 0.70 m ahead on the lane, the goal 0.25 m farther: from the origin at trunk (2.0, 0) every rung passes the wrist checks
+DROP, GOAL = (0.70, -0.25), (0.95, -0.25)
+RUNGS = [round(0.125 + 0.02 * k, 4) for k in range(7)]  # trunk (2.0, 0)'s reach floor up to the cap (0.27 m top - 2 cm)
+
+
+def _push(s, stance=None, goal=GOAL):
+    return s._push_under_chain(stance or _stance(), G.IDENTITY_QUAT.clone(), DROP, goal, (1.0, 0.0))
+
+
+def _tips(s):
+    """The tip height of every chain the IK was asked, in order."""
+    return [round(float(c["poses"][1][0][2]), 4) for c in s.ikc.calls]
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -212,74 +225,122 @@ def test_band_back_offset_meets_a_face_between_the_vertices():
 
 
 # ----------------------------------------------------------------------------------------------------------------
-# the chain
+# the ladder of tip heights
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_flat_chain_stand_off_poses_and_record():
+def test_flat_rungs_per_trunk_cap_and_keys():
+    s = _sampler()
+    assert s.flat_rungs(_stance(), G.IDENTITY_QUAT.clone()) == pytest.approx(RUNGS)  # 0.125 (the reach floor) .. 0.245 (< 0.27 - 0.02)
+    assert s.flat_rungs(_stance(trunk=(0.95, -1.2)), G.IDENTITY_QUAT.clone())[0] == pytest.approx(0.205)  # a higher trunk starts higher
+    assert s.flat_rungs(_stance(trunk=(0.75, -0.9)), G.IDENTITY_QUAT.clone()) == []  # its floor (0.30) lies above the cap: nothing to try
+    assert s.flat_rungs(_stance(trunk=(0.5, 0.0)), G.IDENTITY_QUAT.clone())[0] == pytest.approx(min(IL.FLAT_TIP_FLOOR_M.values()))  # unknown trunk
+    assert _sampler(height=0.20).flat_rungs(_stance(), G.IDENTITY_QUAT.clone())[-1] == pytest.approx(0.165)  # the tips stay 2 cm below the top
+    rungs = _sampler(push_flat_tip_min_m=0.10, push_flat_tip_step_m=0.03, push_flat_tip_max_m=0.20).flat_rungs(_stance(), G.IDENTITY_QUAT.clone())
+    assert rungs == pytest.approx([0.10, 0.13, 0.16, 0.19])
+    assert _sampler(push_flat_tip_min_m=0.0).flat_rungs(_stance(), G.IDENTITY_QUAT.clone())[0] == pytest.approx(DROPS["lateral"] + 0.01)  # the floor rule
+    assert IL.FLAT_TIP_FLOOR_M[(2.0, 0.0)] == 0.125 and IL.FLAT_TIP_FLOOR_M[(0.95, -1.2)] == 0.205  # offline FK: nothing lower is reachable
+
+
+def test_flat_chain_clash_without_ik():
+    s = _sampler()
+    turns = dict(TT.flat_hand_quats((1.0, 0.0)))
+    q = turns["lateral"]
+
+    def chain(x0, x1, z=0.15, y=-0.25):
+        return [(th.tensor([x, y, z]), q) for x in (x0 - 0.04, x0, 0.5 * (x0 + x1), x1)]
+
+    assert s.flat_chain_clash(_stance(), chain(0.62, 0.90), "right") is None  # left to the IK
+    assert s.flat_chain_clash(_stance(), chain(0.45, 0.90), "right") == "wrist in the base"  # the pre's wrist 0.19 m ahead, in the front sphere
+    assert s.flat_chain_clash(_stance(), chain(0.45, 0.88, y=-0.45), "right") is None  # beside the base's front spheres
+    assert s.flat_chain_clash(_stance(), chain(0.62, 1.10), "right") == "wrist beyond the shoulder's reach"
+    assert s.flat_chain_clash(_stance(), chain(0.62, 1.00, z=0.12), "right") == "wrist beyond the shoulder's reach"
+    assert s.flat_chain_clash(_stance(), chain(0.62, 1.00, z=0.22), "right") is None  # the same goal reached from higher up
+
+
+def test_flat_chain_stand_off_poses_and_record(caplog):
     s = _sampler(push_under_hand="flat")
-    ch = _push(s)
-    assert ch is not None and len(s.ikc.calls) == 1  # one turn below the briefcase's centre of mass (6 cm): lateral, the camera up
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        ch = _push(s)
+    assert ch is not None and _tips(s) == [0.125] * 4  # the lowest rung, every wrist turn solved there (the orientation rule picks)
     call = s.ikc.calls[0]
     assert call["ground"] is True and call["ignored"] == ["floors_jluwuz_0", "briefcase.n.01_1"] and call["fingers"] == C.FINGER_CLOSED
     so = TT.flat_hand_standoff(IL.PUSH_UNDER_CLEARANCE_M)
     assert so == pytest.approx(C.FINGERTIP_LENGTH + 0.005) == pytest.approx(ch["blade_standoff_m"])
-    tip = DROPS["lateral"] + IL.PUSH_FLAT_FLOOR_CLEARANCE_M
+    tip = 0.125
     start, mid, goal_p, pre = ch["start"][0], ch["mid"][0], ch["goal"][0], ch["pre"][0]
-    assert start.tolist() == pytest.approx([1.0 - 0.165 - so, 0.0, tip], abs=1e-4)  # the eef origin the fingertip length + 5 mm behind the face
-    assert float(C.fingertip(ch["start"])[0]) == pytest.approx(1.0 - 0.165 - 0.005, abs=1e-4)  # the tips 5 mm short of the back face
-    assert goal_p.tolist() == pytest.approx([1.40 - 0.165 - so + 0.03, 0.0, tip], abs=1e-4)  # push_goal_extra_m past the goal cell
+    assert start.tolist() == pytest.approx([0.70 - 0.06 - so, -0.25, tip], abs=1e-4)  # the eef origin the fingertip length + 5 mm behind the face
+    assert float(C.fingertip(ch["start"])[0]) == pytest.approx(0.70 - 0.06 - 0.005, abs=1e-4)  # the tips 5 mm short of the back face
+    assert goal_p.tolist() == pytest.approx([0.95 - 0.06 - so + 0.03, -0.25, tip], abs=1e-4)  # push_goal_extra_m past the goal cell
     assert mid.tolist() == pytest.approx(((start + goal_p) / 2).tolist(), abs=1e-6)
-    assert pre.tolist() == pytest.approx((start - th.tensor([0.10, 0.0, 0.0])).tolist(), abs=1e-5)  # backed off horizontally at push height
+    assert pre.tolist() == pytest.approx((start - th.tensor([IL.PUSH_FLAT_PRE_DIST_M, 0.0, 0.0])).tolist(), abs=1e-5)  # 4 cm behind, at push height
     assert th.allclose(C.approach_axis(ch["start"][1]), th.tensor([1.0, 0.0, 0.0]), atol=1e-6)
     assert ch["pitch_deg"] == 90.0 and ch["ground_ignored"] is False and ch["wrist_sign"] == "lateral" and "palm_contact" not in ch
-    assert ch["half_extent_m"] == pytest.approx(0.165, abs=1e-6) and ch["push_height_m"] == ch["fingertip_z_m"] == pytest.approx(tip, abs=1e-4)
+    assert ch["half_extent_m"] == pytest.approx(0.06, abs=1e-6) and ch["push_height_m"] == ch["fingertip_z_m"] == pytest.approx(tip)
     rec_x = ch["record"]
-    assert rec_x["push_hand"] == "flat" and rec_x["palm_clear"] is True and rec_x["wrist_turn"] == "lateral" and rec_x["com_height_m"] == pytest.approx(0.06)
+    assert rec_x["push_hand"] == "flat" and rec_x["palm_clear"] is True and rec_x["wrist_turn"] == "lateral"
+    # no centre-of-mass rule: the contact (12.5 cm) above the briefcase's centre of mass (11.5 cm) - logged and recorded, the goal check decides
+    assert rec_x["contact_height_m"] == pytest.approx(0.125) and rec_x["target_com_height_m"] == pytest.approx(0.115) and "com_height_m" not in rec_x
+    assert "flat-hand contact height 0.125 m vs centre of mass 0.115 m" in caplog.text
     assert rec_x["fingertip_band_m"] == pytest.approx([tip - 0.007, tip + 0.007], abs=1e-4) and rec_x["palm_drop_m"] == pytest.approx(DROPS["lateral"], abs=1e-4)
-    # the record as the C loop writes it: push_hand / palm_clear reach the oracle's PushContact (its palm clearance skips palm_clear)
+    # the record as the C loop writes it: push_hand / palm_clear / the heights reach the oracle's PushContact (its palm clearance skips palm_clear)
     rec = IL.PushUnderRecord("right", ch["pre"], ch["start"], ch["mid"], ch["goal"], ch["direction"], ch["distance_m"], "briefcase.n.01_1", stance="push",
                              pitch_deg=ch["pitch_deg"], blade_standoff_m=ch["blade_standoff_m"], push_height_m=ch["push_height_m"], half_extent_m=ch["half_extent_m"],
-                             fingertip_z_m=ch["fingertip_z_m"], ground_ignored=ch["ground_ignored"], drop_cell=[1.0, 0.0], goal_cell=[1.4, 0.0],
+                             fingertip_z_m=ch["fingertip_z_m"], ground_ignored=ch["ground_ignored"], drop_cell=list(DROP), goal_cell=list(GOAL),
                              **IL.push_under_palm_flags(ch), **ch["record"])
     pc = SC.PushContact.from_dict(rec.to_sidecar(), "contacts.push")
     assert pc.kind == "push_under" and pc.extra["push_hand"] == "flat" and pc.extra["palm_clear"] is True and pc.extra["pitch_deg"] == 90.0
+    assert pc.extra["contact_height_m"] == pytest.approx(0.125) and pc.extra["target_com_height_m"] == pytest.approx(0.115)
     assert "palm_contact" not in pc.extra and pc.extra["ground_ignored"] is False
 
 
-def test_flat_chain_turn_order_and_the_centre_of_mass_rule():
-    # a taller object (com 10 cm up): every turn is below it, the generator's order is the fingertips' height
-    s = _sampler(height=0.28, com_z=0.10, push_under_hand="flat")
-    s.ikc = _IKC(ok=lambda chain: False)
-    assert _push(s) is None
-    heights = [round(float(c["poses"][1][0][2]), 4) for c in s.ikc.calls]
-    assert heights == pytest.approx([DROPS[k] + 0.01 for k in ("lateral", "vertical-", "lateral-", "vertical")], abs=1e-4)
-    assert all(c["ground"] is True for c in s.ikc.calls)  # the floor stays in the IK world at every height
-    # the second turn when the first fails
-    s.ikc = _IKC(ok=lambda chain: float(chain[1][0][2]) > 0.06)
+def test_the_first_reachable_rung_wins():
+    # the IK reaches nothing below 16 cm: the third rung's chain is the one returned, every turn tried at each rung below it
+    s = _sampler(push_under_hand="flat")
+    s.ikc = _IKC(ok=lambda chain: float(chain[1][0][2]) > 0.16)
     ch = _push(s)
-    assert ch["wrist_sign"] == "vertical-" and ch["fingertip_z_m"] == pytest.approx(DROPS["vertical-"] + 0.01, abs=1e-4)
-    # no turn below the centre of mass (4.5 cm): no chain and no IK
+    assert ch["fingertip_z_m"] == pytest.approx(0.165) and ch["record"]["contact_height_m"] == pytest.approx(0.165)
+    assert _tips(s) == [0.125] * 4 + [0.145] * 4 + [0.165] * 4
+    # at most push_flat_rungs_max (3) rungs are IK-solved: one more rung needed -> no chain, nothing asked above it
+    s.ikc = _IKC(ok=lambda chain: float(chain[1][0][2]) > 0.18)
+    assert _push(s) is None and _tips(s) == [0.125] * 4 + [0.145] * 4 + [0.165] * 4
+    s = _sampler(push_under_hand="flat", push_flat_rungs_max=5)
+    s.ikc = _IKC(ok=lambda chain: float(chain[1][0][2]) > 0.18)
+    assert _push(s)["fingertip_z_m"] == pytest.approx(0.185)
+    # a goal the wrist reaches only from higher up: the rungs below are skipped without an IK, the first clear rung solves
+    s = _sampler(push_under_hand="flat")
+    far = (0.431 + 0.40 + IL.FLAT_WRIST_FROM_EEF_M + 0.06 + TT.flat_hand_standoff(IL.PUSH_UNDER_CLEARANCE_M) - 0.03, -0.25)  # the goal wrist 0.40 m ahead of the shoulder
+    ch = _push(s, goal=far)
+    assert ch is not None and _tips(s)[0] > 0.165 and ch["fingertip_z_m"] == pytest.approx(_tips(s)[0])
+    # a stance whose pre-pose puts the wrist in the base: no IK at any rung, no chain
+    s = _sampler(push_under_hand="flat")
+    assert _push(s, stance=_stance(x=0.25)) is None and s.ikc.calls == []
+
+
+def test_no_centre_of_mass_rule():
+    # a low centre of mass (4.5 cm, below every rung) no longer drops the turns: the chain is solved and both heights recorded
     s = _sampler(com_z=0.045, push_under_hand="flat")
-    assert _push(s) is None and s.ikc.calls == []
+    ch = _push(s)
+    assert ch is not None and ch["record"]["contact_height_m"] == pytest.approx(0.125) and ch["record"]["target_com_height_m"] == pytest.approx(0.045)
     assert s.com_height(G.IDENTITY_QUAT.clone()) == pytest.approx(0.045)
+    # a target too low for the ladder (13 cm: the cap 11 cm lies below the 12.5 cm reach floor): no rung, no IK
+    s = _sampler(height=0.13, com_z=0.065, push_under_hand="flat")
+    assert _push(s) is None and s.ikc.calls == []
 
 
 def test_blade_stays_the_default_and_flat_takes_precedence_over_the_palm():
-    # under_large #02's evidence: a 13 cm briefcase's face reaches the blade's palm at every pitch - no chain, no IK; the flat hand pushes it
+    # under_large #02's evidence: a 13 cm briefcase's face reaches the blade's palm at every pitch - no chain, no IK
     s = _sampler(height=0.13, com_z=0.065)
     assert s.push_hand == "blade" and _push(s) is None and s.ikc.calls == []
     z_lo = s.push_height(30.0)[1]
     assert s.push_contact_offset(G.IDENTITY_QUAT.clone(), (1.0, 0.0)) == s.contact_offset_along(G.IDENTITY_QUAT.clone(), (1.0, 0.0), z_lo, z_lo + s.BLADE_SPAN_M)
-    s.gp = _GP(push_under_hand="flat")
-    ch = _push(s)
-    assert ch is not None and ch["record"]["push_hand"] == "flat"
-    assert s.push_contact_offset(G.IDENTITY_QUAT.clone(), (1.0, 0.0)) == pytest.approx(0.165, abs=1e-6)  # the tips' band, through the faces
-    # both keys on (115 / 117 / 118): the flat hand, the palm blade not tried
-    s.gp, s.ikc = _GP(push_under_hand="flat", push_under_palm_contact=True), _IKC()
+    s = _sampler(push_under_hand="flat")
+    assert s.push_contact_offset(G.IDENTITY_QUAT.clone(), (1.0, 0.0)) == pytest.approx(0.06, abs=1e-6)  # the tips' band at the lowest rung
+    # both keys on: the flat hand, the palm blade not tried
+    s = _sampler(push_under_hand="flat", push_under_palm_contact=True)
     ch = _push(s)
     assert ch["pitch_deg"] == 90.0 and ch["record"]["push_hand"] == "flat" and "palm_contact" not in ch and IL.push_under_palm_flags(ch) == {}
-    assert [round(float(C.approach_axis(c["poses"][1][1])[2]), 6) for c in s.ikc.calls] == [0.0]  # one horizontal approach, no vertical blade
+    assert {round(float(C.approach_axis(c["poses"][1][1])[2]), 6) for c in s.ikc.calls} == {0.0}  # horizontal approaches only, no vertical blade
     s.gp = _GP(push_under_hand="palm")
     with pytest.raises(IL.Reject):
         s.push_hand

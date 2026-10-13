@@ -44,10 +44,13 @@ teleports the target to the goal cell as before.
 **The flat hand (owner 2026-10-12 ~19:40, under_large #02 / #03: a briefcase / trash can whose back face rises past the blade's 7 cm
 finger section; ``generation.push_under_hand`` = ``"flat"``, default ``"blade"``).** The same contact point and straight push with the hand
 turned flat, the closed fingers forward along the push (the pitched blade at 90°): the closing axis lateral or vertical (each twin), the
-fingertips touching the back face low - the hand's lowest collision sphere 1 cm above the floor (``push_flat_floor_clearance_m``), the tips
-below the target's centre of mass - and the eef origin the fingertip length + 5 mm behind the contact; the ground slab stays in the IK. The
-record carries ``pitch_deg`` 90, ``push_hand: "flat"`` and ``palm_clear`` (the oracle's top-down palm clearance leaves it alone). With
-``generation.push_under_palm_contact`` on as well, the flat hand pushes (the palm blade is not tried).
+fingertips on the back face at the lowest height the arm reaches (owner ~20:55: the R1Pro's wrist centre, 0.22 m behind the eef on the
+approach axis, never comes below 0.135 m, sim check 17833270 - a ladder of tip heights from the trunk's reach floor up to the target's top,
+the first that solves; the hand's lowest collision sphere at least 1 cm above the floor), the eef origin the fingertip length + 5 mm behind
+the contact, the pre-pose 4 cm behind the start; the ground slab stays in the IK; no centre-of-mass rule - the contact height is logged and
+recorded against it, the goal check decides. The record carries ``pitch_deg`` 90, ``push_hand: "flat"`` and ``palm_clear`` (the oracle's
+top-down palm clearance leaves it alone). With ``generation.push_under_palm_contact`` on as well, the flat hand pushes (the palm blade is not
+tried). The flat hand needs the drop cell farther ahead than the blade (``push_under_drop_ahead_m`` / ``push_under_stand_offs_m``).
 
 **The arm of the segment (owner 2026-09-27, first-demo v2.2).** Grasp at B → carry → place / drop at C (→ the push-under blade:
 ``programs.py`` wants the grasp arm) is one single-arm segment; the other arm idles in its recorded posture (A6, re-derived per
@@ -138,13 +141,36 @@ PUSH_UNDER_DROP_HEIGHT_M = 0.15     # object bottom above the floor at the recor
 #: to the floor, then the moderate ones (2026-09-20: (0.5, -0.6) cannot reach the sandal's drop beside the breakfast table)
 PUSH_UNDER_DROP_TRUNKS = ((0.95, -1.2), (0.5, -0.6), (0.5, -0.9), (0.75, -0.6), (0.25, -0.6), (0.75, -0.9))
 PUSH_UNDER_STAND_OFFS = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8)  # base stand-off from the edge: the drop cell 0.25–0.6 m ahead (B3: the floor is reachable 0.24–0.64 m ahead)
-PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)
+PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)  # the frontal stances' drop cell this far ahead of the base (``generation.push_under_drop_ahead_m``)
 PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face at the push start
 #: ``generation.push_under_hand`` (owner 2026-10-12 ~19:40, under_large #02 / #03): ``"blade"`` (default) the closed gripper's pitched
 #: floor blade, ``"flat"`` the flat hand - the closed fingers forward along the push (:meth:`IORSLarge._push_under_flat_chain`)
 PUSH_UNDER_HANDS = ("blade", "flat")
 #: the flat hand's lowest collision sphere this far above the floor (``generation.push_flat_floor_clearance_m``)
 PUSH_FLAT_FLOOR_CLEARANCE_M = 0.01
+#: the flat hand's fingertip ladder (owner 2026-10-12 ~20:55): the lowest tip height the arm reaches per floor trunk - offline FK of the
+#: right arm (URDF limits, the cuRobo spheres against the floor, the base and the torso; 4M configurations per trunk, sim check 17833270
+#: found nothing at 5-10 cm): a collision-free horizontal hand on the frontal lane holds its tips no lower, the wrist centre sitting
+#: ``FLAT_WRIST_FROM_EEF_M`` behind the eef on the approach axis. ``generation.push_flat_tip_min_m`` sets one floor for every trunk
+FLAT_TIP_FLOOR_M = {(2.0, 0.0): 0.125, (1.75, 0.0): 0.15, (0.95, -1.2): 0.205, (0.95, -0.9): 0.215, (0.75, -1.2): 0.265, (0.75, -0.9): 0.30}
+#: the rungs: ``generation.push_flat_tip_step_m`` apart up to ``push_flat_tip_max_m`` and ``push_flat_top_margin_m`` below the target's
+#: top; at most ``push_flat_rungs_max`` rungs per stance and carried yaw are IK-solved
+PUSH_FLAT_TIP_STEP_M = 0.02
+PUSH_FLAT_TIP_MAX_M = 0.25
+PUSH_FLAT_TOP_MARGIN_M = 0.02
+PUSH_FLAT_RUNGS_MAX = 3
+#: the flat hand's pre-pose this far behind the start along the push (``generation.push_flat_pre_dist_m``; the oracle's lowered pre of a
+#: straight push, ``push_pre_dist_m``): the hand's wrist sits 0.22 m behind its fingertips, and a 10 cm back-off put it in the base
+PUSH_FLAT_PRE_DIST_M = 0.04
+#: the wrist centre (where the joint 5 / 6 / 7 axes meet) behind the eef origin on the approach axis (``conventions.twin_arm_q``)
+FLAT_WRIST_FROM_EEF_M = 0.22065
+#: the base's cuRobo spheres in base_link (``r1pro_description_curobo_default.yaml``) and the wrist's (``arm_link6``, r 0.04, at the wrist
+#: centre) with both 2 mm buffers: a flat hand whose wrist sphere meets one collides with the base, whatever the arm does
+FLAT_BASE_SPHERES = (((0.1, -0.205, 0.165), 0.15), ((0.1, 0.0, 0.165), 0.15), ((0.1, 0.205, 0.165), 0.15), ((-0.08, -0.155, 0.175), 0.165),
+                     ((-0.08, 0.155, 0.175), 0.165), ((-0.23, 0.0, 0.185), 0.18))
+FLAT_WRIST_SPHERE_M = 0.044
+#: the shoulder (``<arm>_arm_link1`` origin) -> wrist centre reach: offline FK max 0.649 m + 2 cm
+FLAT_WRIST_REACH_M = 0.67
 #: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9) + the ground half of the
 #: JoyLo curve (W1, owner 2026-09-20 22:15: (2.0, 0) puts the shoulder 8 cm lower than (0.95, -1.2) and reaches the floor blade
 #: 0.40-0.85 m ahead instead of 0.40-0.70; ``eef_reach_volume.GROUND_TRUNKS``)
@@ -174,7 +200,7 @@ class PushUnderRecord(ContactRecord):
     push ``init → mid → goal`` of the closed gripper (blade behind the target along the push direction), from the
     placement stance; ``push_height_m``, ``pitch_deg``, ``blade_standoff_m``, ``half_extent_m`` (target half extent along
     the push), ``drop_cell`` / ``goal_cell`` (target centres, world xy); the flat hand's ``push_hand: "flat"``, ``palm_clear``,
-    ``wrist_turn``, ``palm_drop_m``, ``fingertip_band_m``, ``com_height_m``."""
+    ``wrist_turn``, ``palm_drop_m``, ``fingertip_band_m``, ``contact_height_m``, ``target_com_height_m``."""
 
     def __init__(self, arm: str, pre, start, mid, goal, direction, distance_m: float, object: str, stance: str = "placement", **extras):
         super().__init__("push", arm, pre, start, mid, goal, direction, distance_m, None, object, stance)
@@ -1018,12 +1044,53 @@ class IORSLarge(SamplerV2):
         turns = [(TT.hand_drop_below(q), label, q) for label, q in TT.flat_hand_quats(d2)]
         return [(below + clear, below, label, q) for below, label, q in sorted(turns, key=lambda t: t[0])]
 
+    def flat_tip_floor(self, stance: Optional[Stance] = None) -> float:
+        """The lowest fingertip height a flat hand reaches from ``stance``'s trunk (:data:`FLAT_TIP_FLOOR_M`; the lowest of the table for
+        another trunk or no stance), ``generation.push_flat_tip_min_m`` for every trunk when set."""
+        v = self.gp.gen("push_flat_tip_min_m")
+        if v is not None:
+            return float(v)
+        if stance is None:
+            return min(FLAT_TIP_FLOOR_M.values())
+        return FLAT_TIP_FLOOR_M.get((round(float(stance.translate), 2), round(float(stance.tilt), 2)), min(FLAT_TIP_FLOOR_M.values()))
+
+    def flat_rungs(self, stance: Stance, quat) -> List[float]:
+        """The flat hand's fingertip heights above the floor to try from ``stance`` for the target at orientation ``quat``, lowest first: from
+        the lowest wrist turn's floor rule (:meth:`flat_turns`) or the trunk's reach floor (:meth:`flat_tip_floor`), whichever is higher,
+        ``push_flat_tip_step_m`` apart up to ``push_flat_tip_max_m`` and ``push_flat_top_margin_m`` below the target's top (the tips stay
+        on its back face); empty when the floor lies above that cap."""
+        lo = max(self.flat_turns((1.0, 0.0))[0][0], self.flat_tip_floor(stance))
+        pts = G.local_points_world(self.hull, (th.zeros(3), G.t(quat)))
+        top = float(pts[:, 2].max() - pts[:, 2].min())
+        hi = min(float(self.num("push_flat_tip_max_m", PUSH_FLAT_TIP_MAX_M)), top - float(self.num("push_flat_top_margin_m", PUSH_FLAT_TOP_MARGIN_M)))
+        step = float(self.num("push_flat_tip_step_m", PUSH_FLAT_TIP_STEP_M))
+        n = int(math.floor((hi - lo) / step + 1e-6)) + 1 if hi >= lo else 0
+        return [round(lo + k * step, 4) for k in range(n)]
+
+    def flat_chain_clash(self, stance: Stance, poses: Sequence[G.Pose], arm: str) -> Optional[str]:
+        """Why the flat hand's poses cannot be reached from ``stance`` whatever the arm does, without an IK (None: let the IK decide): the wrist
+        sphere (:data:`FLAT_WRIST_SPHERE_M` around the wrist centre, ``FLAT_WRIST_FROM_EEF_M`` behind an eef pose on its approach axis) in one
+        of the base's spheres (:data:`FLAT_BASE_SPHERES`), or the wrist centre farther than :data:`FLAT_WRIST_REACH_M` from the arm's shoulder
+        at the stance's trunk."""
+        base = th.tensor([c for c, _ in FLAT_BASE_SPHERES], dtype=th.float32)
+        reach = th.tensor([r for _, r in FLAT_BASE_SPHERES], dtype=th.float32) + FLAT_WRIST_SPHERE_M
+        sh = C.torso_fk(C.torso_q(float(stance.translate), float(stance.tilt), C.TORSO_JOINT_LIMITS))[f"{arm}_shoulder"][0].float()
+        bz = P0.base_z(self)
+        for p, q in poses:
+            w = P0.to_base_frame(G.t(p) - FLAT_WRIST_FROM_EEF_M * C.approach_axis(G.t(q)), stance.base_pose2d, bz)
+            if bool((th.linalg.norm(base - w, dim=1) < reach).any()):
+                return "wrist in the base"
+            if float(th.linalg.norm(w - sh)) > FLAT_WRIST_REACH_M:
+                return "wrist beyond the shoulder's reach"
+        return None
+
     def push_contact_offset(self, quat, direction_xy) -> Optional[float]:
         """:meth:`contact_offset_along` in the band the push meets the target in (the yaw orders by contact offset): the blade's, its
-        fingertips at the 30° pitch up to ``BLADE_SPAN_M`` above them; the flat hand's fingertips at its lowest wrist turn (the
+        fingertips at the 30° pitch up to ``BLADE_SPAN_M`` above them; the flat hand's fingertips at the lowest rung any trunk reaches (the
         cross-sections counted)."""
         if self.push_hand == "flat":
             tip, _, _, q = self.flat_turns((1.0, 0.0))[0]
+            tip = max(tip, self.flat_tip_floor())
             band = TT.flat_tip_half_height(q)
             return self.contact_offset_along(quat, direction_xy, tip - band, tip + band, section=True)
         z_lo = self.push_height(30.0)[1] - self.floor_z
@@ -1160,16 +1227,18 @@ class IORSLarge(SamplerV2):
         return None
 
     def _push_under_flat_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
-        """The flat hand's push chain (``generation.push_under_hand`` = ``"flat"``, owner 2026-10-12 ~19:40): the blade's contact point and
-        straight push with the hand turned flat, the closed fingers forward along the push (the pitched blade at 90°). Per wrist turn
-        (:meth:`flat_turns`: the closing axis lateral or vertical, each twin; lowest fingertips first) the fingertips ride the hand's lowest
-        collision sphere + ``push_flat_floor_clearance_m`` above the floor and must stay below the target's centre of mass (no tipping);
-        only the tips touch, so the eef origin stands ``FINGERTIP_LENGTH`` + ``PUSH_UNDER_CLEARANCE_M`` behind the rearmost collision point
-        within the fingertips' height band (:meth:`contact_offset_along`) - no face-reaches-the-palm test. Exact IK from stance C, closed
-        gripper, the floor object and the target ignored, the ground slab kept; the turn by the orientation rule. Returns
-        :meth:`_push_under_chain`'s fields (``pitch_deg`` 90, ``blade_standoff_m`` the fingertip stand-off, ``wrist_sign`` the turn's label)
-        + ``record`` (the push record's flat-hand facts and ``palm_clear``: the oracle's palm clearance of a top-down blade leaves it alone)
-        or None."""
+        """The flat hand's push chain (``generation.push_under_hand`` = ``"flat"``, owner 2026-10-12 ~19:40 / ~20:55): the blade's contact point
+        and straight push with the hand turned flat, the closed fingers forward along the push (the pitched blade at 90°), the fingertips at
+        the lowest height the arm reaches - the rungs of :meth:`flat_rungs` lowest first (the arm's wrist centre never comes below
+        :data:`FLAT_TIP_FLOOR_M`), and at each rung the wrist turns of :meth:`flat_turns` whose floor rule admits it (the closing axis lateral
+        or vertical, each twin); the first rung with a solved chain wins. A turn whose wrist centre would sit in the base or beyond the
+        shoulder's reach (:meth:`flat_chain_clash`) is not IK-solved; at most ``push_flat_rungs_max`` rungs are. Only the tips touch, so the
+        eef origin stands ``FINGERTIP_LENGTH`` + ``PUSH_UNDER_CLEARANCE_M`` behind the rearmost collision point within the fingertips' height
+        band (:meth:`contact_offset_along`) and the pre-pose ``push_flat_pre_dist_m`` behind the start. No centre-of-mass rule: the goal check
+        decides, and the contact height is logged and recorded against the target's centre of mass. Exact IK from stance C, closed gripper,
+        the floor object and the target ignored, the ground slab kept; the turn by the orientation rule. Returns :meth:`_push_under_chain`'s
+        fields (``pitch_deg`` 90, ``blade_standoff_m`` the fingertip stand-off, ``wrist_sign`` the turn's label) + ``record`` (the push
+        record's flat-hand facts and ``palm_clear``: the oracle's palm clearance of a top-down blade leaves it alone) or None."""
         floor, target = self.obj("floor"), self.target
         arm = self.seg_arm
         d2 = th.as_tensor([float(d2[0]), float(d2[1])])
@@ -1181,47 +1250,63 @@ class IORSLarge(SamplerV2):
         turns = self.flat_turns(d2)
         standoff = TT.flat_hand_standoff(PUSH_UNDER_CLEARANCE_M)
         extra = float(self.num("push_goal_extra_m", 0.03))
+        pre_d = float(self.num("push_flat_pre_dist_m", PUSH_FLAT_PRE_DIST_M))
         com_h = self.com_height(quat)
         off_cfg = self.gp.gen("push_contact_offset_m")
-        props: List[O.Proposal] = []
-        why: List[str] = []
-        for tip, below, label, q in turns:
-            if tip >= com_h:
-                why.append(f"{label}: fingertips {tip:.3f} m up, not below the centre of mass ({com_h:.3f} m)")
-                continue
-            band = TT.flat_tip_half_height(q)
-            off = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, tip - band, tip + band, section=True)
-            if off is None:
-                why.append(f"{label}: nothing of the target within the fingertips' band {tip - band:.3f}-{tip + band:.3f} m")
-                continue
-            z = self.floor_z + tip
-            start = th.tensor([float(cd[0]), float(cd[1]), z]) - d3 * (off + standoff)
-            goal = th.tensor([float(gc[0]), float(gc[1]), z]) - d3 * (off + standoff - extra)
-            poses = [(start, q), (0.5 * (start + goal), q), (goal, q)]
-            facts = {"wrist_turn": label, "fingertip_z_m": float(tip), "palm_drop_m": float(below), "half_extent_m": float(off),
-                     "fingertip_band_m": [float(tip - band), float(tip + band)]}
-            props.append(O.Proposal(f"flat {label}", len(props), facts, [C.pre_pose(poses[0])] + poses))
+        rungs = self.flat_rungs(place, quat)
+        n_max = int(self.num("push_flat_rungs_max", PUSH_FLAT_RUNGS_MAX))
 
         def evaluate(p):
             with self.ikc.ignoring([floor, target]):  # the ground slab stays: the hand's lowest sphere rides above the floor
                 res = self.ikc.exact(p.chain, place, arm, cache=False, fingers=C.FINGER_CLOSED, q_first=p.q_first)
             return bool(res.ok), res, None, str(res.reason)
 
-        if props:
-            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage="push-under flat hand")
+        why: List[str] = [] if rungs else [f"no rung from the reach floor {self.flat_tip_floor(place):.3f} m to the cap"]
+        solved = 0
+        for k, tip in enumerate(rungs):
+            props: List[O.Proposal] = []
+            skipped: Dict[str, int] = {}
+            for floor_tip, below, label, q in turns:
+                if tip < floor_tip - 1e-9:
+                    continue  # the hand's lowest sphere would come within the floor clearance
+                band = TT.flat_tip_half_height(q)
+                off = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, tip - band, tip + band, section=True)
+                if off is None:
+                    skipped["nothing of the target within the fingertips' band"] = skipped.get("nothing of the target within the fingertips' band", 0) + 1
+                    continue
+                z = self.floor_z + tip
+                start = th.tensor([float(cd[0]), float(cd[1]), z]) - d3 * (off + standoff)
+                goal = th.tensor([float(gc[0]), float(gc[1]), z]) - d3 * (off + standoff - extra)
+                chain = [(start - d3 * pre_d, q), (start, q), (0.5 * (start + goal), q), (goal, q)]
+                clash = self.flat_chain_clash(place, chain, arm)
+                if clash is not None:
+                    skipped[clash] = skipped.get(clash, 0) + 1
+                    continue
+                facts = {"wrist_turn": label, "fingertip_z_m": float(tip), "palm_drop_m": float(below), "half_extent_m": float(off),
+                         "fingertip_band_m": [float(tip - band), float(tip + band)]}
+                props.append(O.Proposal(f"flat {label}", len(props), facts, chain))
+            why.extend(f"tips {tip:.3f}: {r} ({n} turn{'s' if n > 1 else ''})" for r, n in skipped.items())
+            if not props:
+                continue
+            solved += 1
+            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under flat hand, tips {tip:.3f}")
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 f = chosen.proposal.payload
+                log.info("%s: flat-hand contact height %.3f m vs centre of mass %.3f m (rung %d of %d from %.3f m, wrist turn %s; C d %.2f λ %+.2f trunk %s)",
+                         self.gp.alias, tip, com_h, k + 1, len(rungs), rungs[0], f["wrist_turn"], place.stand_off or 0.0, place.lateral,
+                         (place.translate, round(place.tilt, 2)))
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": 90.0,
                         "blade_standoff_m": float(standoff), "push_height_m": f["fingertip_z_m"], "half_extent_m": f["half_extent_m"], "wrist_sign": f["wrist_turn"],
                         "fingertip_z_m": f["fingertip_z_m"], "ground_ignored": False, "orient": decision,
                         "record": {"push_hand": "flat", "palm_clear": True, "wrist_turn": f["wrist_turn"], "palm_drop_m": f["palm_drop_m"],
-                                   "fingertip_band_m": f["fingertip_band_m"], "com_height_m": float(com_h)}}
-            why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
-        ends = (f"start {[round(float(v), 2) for v in P0.to_base_frame(props[0].chain[1][0], place.base_pose2d, P0.base_z(self)).tolist()]}, goal "
-                f"{[round(float(v), 2) for v in P0.to_base_frame(props[0].chain[3][0], place.base_pose2d, P0.base_z(self)).tolist()]} in base" if props else "no turn")
-        log.info("%s: push-under flat-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; eef %s): %s", self.gp.alias, place.stand_off or 0.0,
-                 place.lateral, (place.translate, round(place.tilt, 2)), ends, "; ".join(why))
+                                   "fingertip_band_m": f["fingertip_band_m"], "contact_height_m": float(tip), "target_com_height_m": float(com_h)}}
+            why.extend(f"tips {tip:.3f} {o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
+            if solved >= n_max:
+                why.append(f"{n_max} rungs IK-solved, the ladder stops")
+                break
+        log.info("%s: push-under flat-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; rungs %s, centre of mass %.3f m): %s", self.gp.alias,
+                 place.stand_off or 0.0, place.lateral, (place.translate, round(place.tilt, 2)), [f"{r:.3f}" for r in rungs], com_h, "; ".join(why)[:1500])
         return None
 
     def clearance_at(self, xy) -> Optional[float]:
@@ -1961,7 +2046,7 @@ class IORSLarge(SamplerV2):
         laterals_side = P0.lattice_values(-half_run_side, half_run_side, 0.10) if half_run_side > 0 else [0.0]
         stand_offs = [float(v) for v in (self.gp.gen("push_under_stand_offs_m") or PUSH_UNDER_STAND_OFFS)]
         trunks = [tuple(t) for t in (self.gp.gen("floor_trunks") or FLOOR_TRUNKS)]
-        lo_ahead, hi_ahead = PUSH_UNDER_DROP_AHEAD_M
+        lo_ahead, hi_ahead = (float(v) for v in (self.gp.gen("push_under_drop_ahead_m") or PUSH_UNDER_DROP_AHEAD_M))
         cells = self.place["cells"]
         mid = th.as_tensor([float(edge.mid[0]), float(edge.mid[1])])
         stats: Dict[str, Any] = {"laterals": len(laterals), "goal_clear": 0, "drop_free": 0, "base_ok": 0, "candidates": 0, "side_candidates": 0, "drop_blocked": {},
