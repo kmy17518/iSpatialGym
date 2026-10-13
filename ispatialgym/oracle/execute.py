@@ -40,7 +40,8 @@ Behaviour per action (§3.6 / §6.1):
   post: joint within the spec §8 tolerance of the lower limit.
 * ``BasePush``   ``gripper(close)`` → ``arm_to(pre)`` → guarded approach → ``track_path`` along the recorded base line with the
   arm held (stopped at NextTo + a push-on, a sideways drift, or the end; a lagging object re-contacted, a turning one realigned
-  onto the line from its centre to its goal) → unload; post: the object moved (``no_motion``).
+  onto the line from its centre to its goal) → unload; a two-hand push does each step with both hands; post: the object moved
+  (``no_motion``).
 * ``Retreat``    ``gripper(open)`` (+ release / detach) when ``release`` → ``arm_along(retreat)``.
 
 Tolerance categories: an eef / base / trunk that did not reach its recorded target is ``execution`` (a motion did
@@ -4965,12 +4966,7 @@ def guarded_approach(motions: Motions, arm: str, approach: th.Tensor, q_of, step
         try:
             yield from motions.arm_along(arm, [target], loaded=True)
         except SkillError as e:
-            det = getattr(e, "details", {}) or {}
-            msg = str(e.message or "")
-            pos_err = float(det.get("pos_err", 0.0) or 0.0)
-            pos_err = pos_err / 1000.0 if pos_err > 1.0 else pos_err  # mm in some diagnostics
-            limit_free = ("at_lower=[]" in msg and "at_upper=[]" in msg) or ("at_lower" not in msg)
-            if limit_free and pos_err >= 0.006:  # the differential IK stalled with no joint at a limit: the hand presses on the surface
+            if _blocked_at_surface(e):
                 return motions.eef_pose(arm), travelled, f"arm blocked at the surface ({e.message or e.reason})"
             how = f"arm stalled: {e.message or e.reason}"
             break
@@ -4982,6 +4978,54 @@ def guarded_approach(motions: Motions, arm: str, approach: th.Tensor, q_of, step
         if d is not None and d >= deflect_m:
             return motions.eef_pose(arm), travelled, f"eef deflected {d * 1000:.0f} mm"
     return None, travelled, how
+
+
+def _blocked_at_surface(e: SkillError) -> bool:
+    """A guarded step's ``arm_along`` failure that means the hand presses on the surface: the differential IK stalled at least 6 mm
+    short with no joint at a limit."""
+    det = getattr(e, "details", {}) or {}
+    msg = str(e.message or "")
+    pos_err = float(det.get("pos_err", 0.0) or 0.0)
+    pos_err = pos_err / 1000.0 if pos_err > 1.0 else pos_err  # mm in some diagnostics
+    limit_free = ("at_lower=[]" in msg and "at_upper=[]" in msg) or ("at_lower" not in msg)
+    return limit_free and pos_err >= 0.006
+
+
+def guarded_approach_hands(motions: Motions, arms: Sequence[str], approach: th.Tensor, moved_of: Dict[str, Callable[[], float]], step_m: float = 0.02,
+                           fine_m: float = 0.005, fine_from_m: float = 0.0, max_m: float = 0.30, move_m: float = 0.003, deflect_m: float = 0.012):
+    """The guarded approach of a two-hand push (owner 2026-10-12 ~20:17 item C): the hands advance along ``approach`` in turn, ``step_m``
+    each up to ``fine_from_m`` of travel and ``fine_m`` beyond, until one touches - during its step the object moves ``move_m`` at that
+    hand's spot (``moved_of[arm]()``, a coordinate along the push), or the hand is blocked at the surface, or it deflects ``deflect_m`` -
+    and holds there; the others go on in ``fine_m`` steps until they touch too (at most ``max_m`` of travel each), so the second touches a
+    few mm after the first. Yields actions; returns ``{arm: (contact pose or None, travelled_m, how)}`` through the generator's return
+    value."""
+    a = C.unit(approach)
+    out: Dict[str, Tuple[Any, float, str]] = {}
+    travelled = {arm: 0.0 for arm in arms}
+    while len(out) < len(arms):
+        for arm in [x for x in arms if x not in out]:
+            coarse = fine_from_m - travelled[arm]
+            step = fine_m if coarse <= 1e-9 or any(r[0] is not None for r in out.values()) else min(step_m, coarse)
+            if travelled[arm] + step > max_m + 1e-6:
+                out[arm] = (None, travelled[arm], "no contact")
+                continue
+            s0 = float(moved_of[arm]())
+            eef = motions.eef_pose(arm)
+            try:
+                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + step * a, C.as_tensor(eef[1]))], loaded=True)
+            except SkillError as e:
+                blocked = _blocked_at_surface(e)
+                out[arm] = (motions.eef_pose(arm) if blocked else None, travelled[arm], f"arm {'blocked at the surface' if blocked else 'stalled'} ({e.message or e.reason})")
+                continue
+            travelled[arm] += step
+            yield from motions.hold(2)
+            if float(moved_of[arm]()) - s0 >= move_m:
+                out[arm] = (motions.eef_pose(arm), travelled[arm], "object moved")
+                continue
+            d = motions._deflection(arm)
+            if d is not None and d >= deflect_m:
+                out[arm] = (motions.eef_pose(arm), travelled[arm], f"eef deflected {d * 1000:.0f} mm")
+    return out
 
 
 def _q_at_base(motions: Motions, q_full: th.Tensor, x: float, y: float, yaw: float) -> th.Tensor:
@@ -5447,6 +5491,9 @@ BASE_PUSH_DEFAULTS: Dict[str, float] = {
     "realigns": 3,
     "realign_clear_m": 0.10,  # the hand backs off this far before the realign's base move (it shifts ~9 cm along a face turned 15 deg, ~2.5 cm closer)
     "realign_margin_m": 0.01,  # whole-body clearance of the realign's base move (the sampler's push sweep margin)
+    # two hands (item C): the last centimetres before the recorded contact and every step after the first hand touched are this short
+    "hands_fine_before_m": 0.03,
+    "hands_fine_step_m": 0.005,
 }
 
 
@@ -5549,7 +5596,14 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
     stands to its contact, the hand to the pre-contact there, the guarded approach, then the drive along that line for the remaining
     distance; at most ``realigns`` times, the ``yaw_tol_rad`` stop on the same turn only after them (none without the record's
     ``contact_in_object``). ``ctx["base_push"]`` records the pushed distance, the sideways drift, NextTo at the end, why the drive
-    stopped and each realign."""
+    stopped and each realign.
+
+    Two hands (``BasePush.second``, owner 2026-10-12 ~20:17 item C): both grippers closed, both hands to their pre-contacts (the first
+    hand first, each planned to its own witness ``pre`` / ``second.pre``; a second hand that cannot get there leaves the push to the
+    first), the guarded approach of :func:`guarded_approach_hands` until both touch (the evidence push per blocked hand), both arms held
+    through the drive, both unloaded, backed off and approached again on a lag or a realign, both unloaded at the end. The realign's line
+    enters the face at the record's ``face_centre_in_object`` (between the spots) and the stance is carried onto it from the midpoint of
+    the two recorded contacts, so both hands keep their places relative to the base."""
     c = action.contact
     arm, obj = c.arm, c.object
     knobs = base_push_knobs(c.extra)
@@ -5559,7 +5613,8 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
     rep: Dict[str, Any] = {"distance_m": round(float(c.distance_m), 4), "drift_tol_m": knobs["drift_tol_m"], "partner": action.partner, "recontacts": 0, "realigns": 0}
     ctx["base_push"] = rep
     _hook(ctx, "fov")(False)
-    yield from motions.gripper(arm, close=True)
+    for h in action.contacts:
+        yield from motions.gripper(h.arm, close=True)
     try:
         target_obj = [state.object(obj)]
     except Exception:  # noqa: BLE001
@@ -5575,44 +5630,98 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
     def along() -> float:
         return push_frame_offset(pose0[0], state.object_pose(obj)[0], leg["a"])[0]
 
-    tries: List[Tuple[str, Dict[str, Any]]] = []
-    if _witness(ctx, "pre") is not None:
-        tries.append(("the recorded witness", {"q_hint": _witness(ctx, "pre"), "accept_other_branch": True}))
-    tries += [("the object present", {"accept_other_branch": True}), ("the object ignored", {"ignore_objects": target_obj, "accept_other_branch": True})]
-    rep["pre"] = None
-    with _transit(ctx, motions, state, action, "pre_contact", target=obj):
-        for how, kw in tries:
-            try:
-                yield from motions.arm_to(arm, pose=targets["pre"], **kw)
-                rep["pre"] = how
-                break
-            except SkillError as e:
-                rep.setdefault("pre_failures", []).append(f"{how}: {(e.message or e.reason)[:140]}")
+    def to_pre(hand: str, pose, key: str) -> Generator[th.Tensor, None, Tuple[Optional[str], List[str]]]:
+        tries: List[Tuple[str, Dict[str, Any]]] = []
+        if _witness(ctx, key) is not None:
+            tries.append(("the recorded witness", {"q_hint": _witness(ctx, key), "accept_other_branch": True}))
+        tries += [("the object present", {"accept_other_branch": True}), ("the object ignored", {"ignore_objects": target_obj, "accept_other_branch": True})]
+        fails: List[str] = []
+        with _transit(ctx, motions, state, action, "pre_contact", target=obj):
+            for how, kw in tries:
+                try:
+                    yield from motions.arm_to(hand, pose=pose, **kw)
+                    return how, fails
+                except SkillError as e:
+                    fails.append(f"{how}: {(e.message or e.reason)[:140]}")
+        return None, fails
+
+    rep["pre"], fails = yield from to_pre(arm, targets["pre"], "pre")
+    if fails:
+        rep["pre_failures"] = fails
     if rep["pre"] is None:
         rep["result"] = "pre-contact unreachable"
         log.warning("base_push(%s): %s (%s)", obj, rep["result"], rep.get("pre_failures"))
         return
+    arms = [arm]
+    sec = targets.get("second") if action.second is not None else None
+    if sec is not None:
+        rep["second_pre"], fails = yield from to_pre(sec["arm"], sec["pre"], "second.pre")
+        if fails:
+            rep["second_pre_failures"] = fails
+        if rep["second_pre"] is None:
+            rep["second_hand"] = f"pre-contact unreachable: the {arm} hand pushes alone"
+            log.warning("base_push(%s): the %s hand's %s (%s)", obj, sec["arm"], rep["second_hand"], fails)
+        else:
+            arms.append(str(sec["arm"]))
+        rep["hands"] = list(arms)
     _hook(ctx, "fov")(True)
     pre_dist = float(th.linalg.norm(as_world_pose(targets["contact"])[0] - as_world_pose(targets["pre"])[0]))
+    # where each hand meets the face, in the object's frame (the record's contact_in_object; a realign moves them with the hands)
+    spots = {h.arm: C.as_tensor(h.extra["contact_in_object"]).reshape(-1)[:3].float() for h in action.contacts
+             if isinstance(h.extra.get("contact_in_object"), (list, tuple)) and len(h.extra["contact_in_object"]) == 3}
 
-    def contact(label: str) -> Generator[th.Tensor, None, bool]:
+    def spot_along(hand: str) -> float:
+        """Where the object's face is at ``hand``'s spot, along the push (its root without the record's ``contact_in_object``)."""
+        p, q = (C.as_tensor(v).reshape(-1).float() for v in state.object_pose(obj))
+        w = p[:3] + (C.quat_rotate(q, spots[hand]) if hand in spots else 0.0)
+        return float(w[:2] @ leg["a"][:2])
+
+    def evidence(hand: str, moved_of: Callable[[], float], rec: Dict[str, Any]) -> Generator[th.Tensor, None, bool]:
+        """A blocked hand is a contact only when a further 1 cm push moves the object (the room door's rule)."""
+        s0 = moved_of()
+        try:
+            eef = motions.eef_pose(hand)
+            yield from motions.arm_along(hand, [(C.as_tensor(eef[0]) + 0.01 * leg["a"], C.as_tensor(eef[1]))], loaded=True)
+        except SkillError:
+            pass
+        yield from motions.hold(3)
+        moved = moved_of() - s0 >= knobs["evidence_m"]
+        rec["evidence"] = {"object_moved_m": round(moved_of() - s0, 4), "contact": moved}
+        if not moved:
+            rec["how"] = "stall at the reach limit (the object did not move under a 1 cm push)"
+        return moved
+
+    def contact(label: str, back_m: Optional[float] = None) -> Generator[th.Tensor, None, bool]:
+        """The guarded approach from ``back_m`` behind the face (default: the pre-contact's distance) and the evidence of a blocked hand."""
+        if len(arms) > 1:
+            return (yield from contact_hands(label, pre_dist if back_m is None else back_m))
         found, travelled, how = yield from guarded_approach(motions, arm, leg["a"], along, max_m=pre_dist + knobs["approach_extra_m"], move_rad=knobs["moved_m"])
         rec: Dict[str, Any] = {"travelled_m": round(travelled, 3), "how": "object moved" if how == "leaf moved" else how}
-        if found is not None and how != "leaf moved":
-            s0 = along()
-            try:
-                eef = motions.eef_pose(arm)
-                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) + 0.01 * leg["a"], C.as_tensor(eef[1]))], loaded=True)
-            except SkillError:
-                pass
-            yield from motions.hold(3)
-            moved = along() - s0 >= knobs["evidence_m"]
-            rec["evidence"] = {"object_moved_m": round(along() - s0, 4), "contact": moved}
-            if not moved:
-                found = None
-                rec["how"] = "stall at the reach limit (the object did not move under a 1 cm push)"
+        if found is not None and how != "leaf moved" and not (yield from evidence(arm, along, rec)):
+            found = None
         rep.setdefault("approaches", []).append({"leg": label, **rec})
         return found is not None
+
+    def contact_hands(label: str, back_m: float) -> Generator[th.Tensor, None, bool]:
+        res = yield from guarded_approach_hands(motions, arms, leg["a"], {h: (lambda h=h: spot_along(h)) for h in arms}, fine_m=knobs["hands_fine_step_m"],
+                                                fine_from_m=max(0.0, back_m - knobs["hands_fine_before_m"]), max_m=pre_dist + knobs["approach_extra_m"],
+                                                move_m=knobs["moved_m"])
+        recs: Dict[str, Dict[str, Any]] = {}
+        for h in arms:
+            found, travelled, how = res[h]
+            recs[h] = {"travelled_m": round(travelled, 3), "how": how}
+            if found is not None and how != "object moved" and not (yield from evidence(h, lambda h=h: spot_along(h), recs[h])):
+                found = None
+            recs[h]["contact"] = found is not None
+        touching = [h for h in arms if recs[h]["contact"]]
+        if len(touching) == len(arms):
+            how = "both hands touch"
+        elif touching:
+            how = "; ".join([f"the {touching[0]} hand touches"] + [f"the {h} hand: {recs[h]['how']}" for h in arms if h not in touching])
+        else:
+            how = "; ".join(f"{h}: {recs[h]['how']}" for h in arms)
+        rep.setdefault("approaches", []).append({"leg": label, "how": how, "hands": recs})
+        return bool(touching)
 
     if not (yield from contact("approach")):
         rep["result"] = f"no contact ({rep['approaches'][-1]['how']})"
@@ -5620,32 +5729,39 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
         _hook(ctx, "fov")(False)
         return
     tcfg = replace(motions.cfg.base_tracker, v_max=(knobs["push_speed_m_s"], knobs["push_speed_m_s"], knobs["push_yaw_rate"]))
-    idx = motions.robot.arm_control_idx[arm]
+    idx = {h: motions.robot.arm_control_idx[h] for h in arms}
     yaw0 = C.yaw_of(C.as_tensor(pose0[1]).float())
     leg["yaw"] = yaw0  # the object's yaw its turn is measured from: the push start, then each realign's re-contact
 
     def realign(k: int) -> Generator[th.Tensor, None, Optional[str]]:
-        """Realign ``k`` (the docstring above); None once the hand pushes again on the new line, else why not."""
+        """Realign ``k`` (the docstring above); None once the hands push again on the new line, else why not."""
         q_was = C.as_tensor(state.object_pose(obj)[1]).float()
         rec: Dict[str, Any] = {"realign": k, "turn_deg": round(math.degrees(abs(C.wrap_angle(C.yaw_of(q_was) - yaw0))), 2),
                                "leg_turn_deg": round(math.degrees(abs(C.wrap_angle(C.yaw_of(q_was) - leg["yaw"]))), 2)}
         rep.setdefault("realign_moves", []).append(rec)
-        yield from motions.unload([arm])
-        try:
-            eef = motions.eef_pose(arm)
-            yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - knobs["realign_clear_m"] * leg["a"], C.as_tensor(eef[1]))],
-                                         soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-        except SkillError as e:
-            rec["back_off_failed"] = (e.message or e.reason)[:120]
+        yield from motions.unload(arms)
+        for h in arms:
+            try:
+                eef = motions.eef_pose(h)
+                yield from motions.arm_along(h, [(C.as_tensor(eef[0]) - knobs["realign_clear_m"] * leg["a"], C.as_tensor(eef[1]))],
+                                             soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+            except SkillError as e:
+                rec["back_off_failed" if h == arm else f"{h}_back_off_failed"] = (e.message or e.reason)[:120]
         yield from motions.settle(max_steps=30)
         p, q = state.object_pose(obj)
         rec["object_pose2d"] = [round(float(p[0]), 4), round(float(p[1]), 4), round(C.yaw_of(C.as_tensor(q).float()), 4)]
-        g = realign_line(pose0, (p, q), loc, d3, float(c.distance_m))
+        # two hands: the line enters the face between the spots, and the stance is carried from between the two recorded contacts
+        centre = c.extra.get("face_centre_in_object")
+        two = len(arms) > 1 and isinstance(centre, (list, tuple)) and len(centre) == 3
+        g = realign_line(pose0, (p, q), centre if two else loc, d3, float(c.distance_m))
         if g is None:
             return "no push line into the face (under 2 cm to the goal, or the face more than 60 deg off the line)"
-        (c_pos, c_quat), (pre_pos, pre_quat) = as_world_pose(targets["contact"]), as_world_pose(targets["pre"])
+        hands = {arm: (targets["contact"], targets["pre"])}
+        if len(arms) > 1:
+            hands[arms[1]] = (sec["contact"], sec["pre"])
+        tips = {h: as_world_pose(cp)[0] + C.FINGERTIP_LENGTH * C.approach_axis(as_world_pose(cp)[1]) for h, (cp, _) in hands.items()}  # on the face
         rot = C.quat_from_yaw(g["line_rad"])
-        p_rec = c_pos + C.FINGERTIP_LENGTH * C.approach_axis(c_quat)  # the recorded fingertip point on the face
+        p_rec = 0.5 * (tips[arms[0]] + tips[arms[1]]) if two else tips[arm]
 
         def moved(v) -> th.Tensor:  # a point of the recorded push stance carried with its contact: p_rec onto the new point, turned about +z
             return g["point"] + C.quat_rotate(rot, C.as_tensor(v).reshape(-1)[:3].float() - p_rec)
@@ -5654,11 +5770,14 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
         b_from, b_to = motions.base_pose2d(), (float(b_xy[0]), float(b_xy[1]), C.wrap_angle(start[2] + g["line_rad"]))
         u = g["direction"]
         end_new = (b_to[0] + g["remaining_m"] * float(u[0]), b_to[1] + g["remaining_m"] * float(u[1]), b_to[2])
-        pre = (moved(pre_pos), C.qmul(rot, pre_quat))
+        pres = {h: (moved(as_world_pose(pp)[0]), C.qmul(rot, as_world_pose(pp)[1])) for h, (_, pp) in hands.items()}
+        pre = pres[arm]
         move_m, move_deg = _base_error(b_from, b_to)[0], math.degrees(C.wrap_angle(b_to[2] - b_from[2]))
         rec.update({"point": [round(float(v), 4) for v in g["point"]], "line_deg": round(math.degrees(g["line_rad"]), 2), "hand_offset_m": round(g["offset_m"], 4),
                     "remaining_m": round(g["remaining_m"], 4), "pre": [round(float(v), 4) for v in pre[0]],
                     "base_move": {"from": [round(float(v), 4) for v in b_from], "to": [round(v, 4) for v in b_to], "m": round(move_m, 4), "deg": round(move_deg, 2)}})
+        if len(arms) > 1:
+            rec["pres"] = {h: [round(float(v), 4) for v in pp[0]] for h, pp in pres.items()}
         blocked = realign_base_clear(motions, b_from, b_to, knobs["realign_margin_m"])
         if blocked is not None:
             return blocked
@@ -5669,10 +5788,14 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
             return f"the base move: {(e.message or e.reason)[:140]}"
         finally:
             motions.follow_phase = "arm"
-        try:
-            yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-        except SkillError as e:
-            rec["pre_failed"] = (e.message or e.reason)[:120]
+        for h in arms:
+            try:
+                yield from motions.arm_along(h, [pres[h]], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+            except SkillError as e:
+                rec["pre_failed" if h == arm else f"{h}_pre_failed"] = (e.message or e.reason)[:120]
+        q_inv = C.qinv(C.as_tensor(q).reshape(-1).float())
+        for h in arms:  # each hand now meets the face where its recorded contact was carried to
+            spots[h] = C.quat_rotate(q_inv, moved(tips[h]) - C.as_tensor(p).reshape(-1)[:3].float())
         leg["a"] = u
         if not (yield from contact(f"realign {k}")):
             return f"no contact ({rep['approaches'][-1]['how']})"
@@ -5688,7 +5811,9 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
     nt = {"first_along": None, "streak": 0, "steps": 0}
     stop_reason = None
     while True:
-        motions.state.arm_target[arm] = motions.robot.get_joint_positions()[idx].clone().float()  # the arm held fixed relative to the base
+        q_now = motions.robot.get_joint_positions()
+        for h in arms:
+            motions.state.arm_target[h] = q_now[idx[h]].clone().float()  # the arms held fixed relative to the base
         b0 = motions.base_pose2d()
         s_obj0 = along()
 
@@ -5747,17 +5872,18 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
             rep["recontacts"] += 1
             rep.setdefault("lags", []).append(why[0])
             log.info("base_push(%s): %s -> re-contact %d", obj, why[0], rep["recontacts"])
-            yield from motions.unload([arm])
-            try:
-                eef = motions.eef_pose(arm)
-                yield from motions.arm_along(arm, [(C.as_tensor(eef[0]) - 0.02 * leg["a"], C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-            except SkillError:
-                pass
-            yield from contact(f"re-contact {rep['recontacts']}")
+            yield from motions.unload(arms)
+            for h in arms:
+                try:
+                    eef = motions.eef_pose(h)
+                    yield from motions.arm_along(h, [(C.as_tensor(eef[0]) - 0.02 * leg["a"], C.as_tensor(eef[1]))], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+                except SkillError:
+                    pass
+            yield from contact(f"re-contact {rep['recontacts']}", back_m=0.02)
             continue
         stop_reason = why[0]
         break
-    un = yield from motions.unload([arm])  # nothing springs back when the hand leaves
+    un = yield from motions.unload(arms)  # nothing springs back when the hands leave
     if any(v > 0.0 for v in un.values()):
         rep["unload_rad"] = {k: round(v, 4) for k, v in un.items()}
     yield from motions.settle(max_steps=30)
@@ -5771,8 +5897,8 @@ def execute_base_push(action: BasePush, motions: Motions, state, targets, ctx) -
     rep["result"] = "pushed"
     _hook(ctx, "fov")(False)
     log.info("base_push(%s): pushed %.3f m of %.3f m, sideways drift %+.3f m (tolerance %.2f), turned %.1f deg, NextTo(%s) at the end: %s; stop: %s; %d re-contacts, "
-             "%d realigns", obj, s, float(c.distance_m), side, knobs["drift_tol_m"], rep["turn_deg"], action.partner, rep.get("nextto_end"), stop_reason, rep["recontacts"],
-             rep["realigns"])
+             "%d realigns%s", obj, s, float(c.distance_m), side, knobs["drift_tol_m"], rep["turn_deg"], action.partner, rep.get("nextto_end"), stop_reason, rep["recontacts"],
+             rep["realigns"], "" if action.second is None else f"; hands {' + '.join(arms)}")
 
 
 def post_base_push(action: BasePush, state, targets, ctx) -> Optional[str]:

@@ -26,6 +26,14 @@ One draw per attempt (generation keys in :data:`DEFAULTS`, read by this mode onl
   pitched down by one of ``push_pitches_deg``, either wrist turn - with the target ignored at the contact only (``program_check``'s
   chain), the fingertips of the pre-contact and the approach in the camera frame, the whole body swept along the line with the arm at
   the contact configuration and the target out of the world.
+* **two hands** (``push_hands`` 2, owner 2026-10-12 ~20:17 item C; default 1 = the one hand above): two push spots on the face,
+  symmetric about its centre line ``push_hand_spacings_m`` apart, each probed like the centre line (flat across the closed hand, inset,
+  the two within ``push_hands_depth_tol_m`` along the normal), at the same ``push_heights_m``; the base centred behind their midpoint
+  (no lateral shift), each hand on the spot on its own side; both reach margins and both contacts in the camera frame; the first arm's
+  chain as above, then the second arm's as the second-arm rule solves a brace (``program_check.second_hand_chain``: its pre-contact with
+  the first hand at its pre-contact, its approach with the first hand locked at its contact, both hands at contact whole-body free);
+  the sweep with both arms at their contact configuration. A face without two spots falls back to the one hand
+  (``two_hand_fallback``).
 * **push end** ``placement``: the push stance moved ``distance`` along d (trunk, arms kept), collision-free with the target at init.
 * **init stance** ``init``: free floor ``init_distance_m`` from the target within ``init_bearing_max_deg`` of the line's back direction,
   facing it, the most upright straight trunk that sees the target and the goal (its footprint centre, the partner's side) in frame;
@@ -35,7 +43,9 @@ One draw per attempt (generation keys in :data:`DEFAULTS`, read by this mode onl
 ``distance_m`` and the extras ``base_start`` / ``base_end``, ``push_height_m``, ``stand_off_m``, ``lateral_offset_m``, ``contact_point``,
 ``contact_in_object`` (the contact point in the target's root frame), ``face``, ``face_inset_m``, ``pitch_deg``, ``partner``, ``end_stance``,
 ``goal_gap_m``, ``nextto_bound_m``, ``drift_tol_m``, ``yaw_tol_rad``, ``nextto_push_on_m``, ``push_speed_m_s``, ``ignore_last`` / ``ignore_every``
-(the program check's ignores: the target at the contact). The oracle's ``BasePush`` reads them.
+(the program check's ignores: the target at the contact), ``push_hands``; with two hands also ``second_hand`` (the other arm's
+``arm`` / ``pre`` / ``init`` / ``goal`` poses, ``contact_point``, ``contact_in_object``, ``pitch_deg``, ``wrist_sign``, its spot's inset /
+spread), ``hand_spacing_m`` and ``face_centre_in_object`` (the midpoint of the two spots). The oracle's ``BasePush`` reads them.
 """
 
 from __future__ import annotations
@@ -44,7 +54,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -58,7 +68,7 @@ from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2 import program_check as PC
 from ispatialgym.sampling.v2 import prompt0 as P0
-from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance
+from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance, pose_to_sidecar
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -101,6 +111,9 @@ DEFAULTS: Dict[str, Any] = {
     "nextto_probe_yaw_deg": 3.0,
     "goal_tries": 24,
     "distance_draws": 3,
+    "push_hands": 1,
+    "push_hand_spacings_m": [0.30, 0.26, 0.34, 0.22],
+    "push_hands_depth_tol_m": 0.03,
 }
 
 
@@ -253,16 +266,18 @@ def outermost_on_line(polys: Sequence[th.Tensor], normal, tangent, t0: float) ->
     return best
 
 
-def face_probe(pieces_local: Sequence[th.Tensor], face: str, lo, hi, height: float, probe_lat: float, probe_z: float) -> Optional[Dict[str, float]]:
+def face_probe(pieces_local: Sequence[th.Tensor], face: str, lo, hi, height: float, probe_lat: float, probe_z: float,
+               lateral: float = 0.0) -> Optional[Dict[str, float]]:
     """The push face of ``face`` at ``height`` above the target's lowest point (root-frame pieces, the target upright): the outermost
-    material along the face's outward normal on the face's centre line, probed at the lateral offsets 0, ±``probe_lat`` and the heights
-    ``height``, ±``probe_z``. Returns ``{"coord", "spread", "t0", "z"}`` (``coord`` along the outward normal from the root, ``spread`` =
-    the largest difference between the probes) or None when a probe meets no material."""
+    material along the face's outward normal on the face's centre line (moved ``lateral`` along the face's tangent: a two-hand spot),
+    probed at the lateral offsets 0, ±``probe_lat`` and the heights ``height``, ±``probe_z``. Returns ``{"coord", "spread", "t0", "z"}``
+    (``coord`` along the outward normal from the root, ``spread`` = the largest difference between the probes) or None when a probe
+    meets no material."""
     nx, ny = FACES[face]
     n = th.tensor([nx, ny])
     tng = th.tensor([-ny, nx])
     ctr = th.tensor([0.5 * (float(lo[0]) + float(hi[0])), 0.5 * (float(lo[1]) + float(hi[1]))])
-    t0 = float(ctr @ tng)
+    t0 = float(ctr @ tng) + float(lateral)
     z0 = float(lo[2]) + float(height)
     vals: List[float] = []
     centre: Optional[float] = None
@@ -276,6 +291,43 @@ def face_probe(pieces_local: Sequence[th.Tensor], face: str, lo, hi, height: flo
                 centre = v
             vals.append(v)
     return {"coord": float(centre), "spread": float(max(vals) - min(vals)), "t0": t0, "z": z0}
+
+
+def face_outer(face: str, lo, hi) -> float:
+    """The coordinate of ``face``'s AABB plane along its outward normal (root frame)."""
+    nx, ny = FACES[face]
+    ctr = th.tensor([0.5 * (float(lo[0]) + float(hi[0])), 0.5 * (float(lo[1]) + float(hi[1]))])
+    return float(th.tensor([nx, ny]) @ ctr) + 0.5 * depth_along(face, lo, hi)
+
+
+def face_half_width(face: str, lo, hi) -> float:
+    """Half the target's extent along ``face``'s tangent."""
+    return 0.5 * (float(hi[1]) - float(lo[1]) if face in ("+x", "-x") else float(hi[0]) - float(lo[0]))
+
+
+def spot_pairs(pieces_local: Sequence[th.Tensor], face: str, lo, hi, heights: Sequence[float], spacings: Sequence[float], probe_lat: float, probe_z: float,
+               flat: float, inset_max: float, depth_tol: float) -> List[Dict[str, Any]]:
+    """The two-hand push spots of ``face`` (item C): per height, the first spacing whose :func:`face_probe` at ±spacing / 2 off the centre
+    line passes on both sides - flat within ``flat``, at most ``inset_max`` inside the AABB, the two ``coord`` within ``depth_tol`` - with
+    both probes on the face's width. ``{"height", "spacing", "spots": [the spot at +spacing / 2 along the tangent, the one at -spacing / 2]}``
+    (each spot a probe dict with ``inset`` and ``height``), in the order of ``heights``."""
+    outer = face_outer(face, lo, hi)
+    half_w = face_half_width(face, lo, hi)
+    out: List[Dict[str, Any]] = []
+    for h in heights:
+        for sp in spacings:
+            if 0.5 * float(sp) + float(probe_lat) > half_w:
+                continue
+            spots = []
+            for sgn in (1.0, -1.0):
+                f = face_probe(pieces_local, face, lo, hi, float(h), probe_lat, probe_z, lateral=sgn * 0.5 * float(sp))
+                if f is None or f["spread"] > flat or outer - f["coord"] > inset_max:
+                    break
+                spots.append({**f, "inset": outer - f["coord"], "height": float(h)})
+            if len(spots) == 2 and abs(spots[0]["coord"] - spots[1]["coord"]) <= depth_tol:
+                out.append({"height": float(h), "spacing": float(sp), "spots": spots})
+                break
+    return out
 
 
 def contact_local(face: str, coord: float, t0: float, z_local: float) -> th.Tensor:
@@ -317,6 +369,13 @@ def push_stance_pose(point_xy, direction_xy, stand_off: float, lateral: float) -
 def arm_lateral(lateral: float, arm: str) -> float:
     """``push_lateral_offsets_m`` are the right arm's (base left of the line); the left arm's are mirrored."""
     return float(lateral) if arm == "right" else -float(lateral)
+
+
+def spots_by_arm(points: Sequence[Any], direction_xy) -> Dict[str, int]:
+    """The index of the world point each hand takes of two push spots: the right hand the one on the robot's right of ``direction``."""
+    left = th.tensor([-float(direction_xy[1]), float(direction_xy[0])])
+    a, b = (float(th.as_tensor(p, dtype=th.float32).reshape(-1)[:2] @ left) for p in points)
+    return {"right": 0, "left": 1} if a <= b else {"right": 1, "left": 0}
 
 
 def shifted_pose2d(pose2d: Sequence[float], direction_xy, distance: float) -> Tuple[float, float, float]:
@@ -497,7 +556,7 @@ def _draw(s, rng: np.random.Generator) -> Draft:
         side, ang = cand["side"], cand["angle"]
         d2 = push_direction(side, ang)
         for face in cand["faces"]:
-            if not _face_candidates(s, face):
+            if not _face_candidates(s, face) and not (two_hands(s) and _face_pairs(s, face)):
                 count(stats, "no_push_face")
                 continue
             yaw = face_yaw(face, d2)
@@ -600,9 +659,39 @@ def _face_candidates_uncached(s, face: str) -> List[Dict[str, float]]:
     return []
 
 
+def two_hands(s) -> bool:
+    """``generation.push_hands`` asks for the two-hand push."""
+    return int(knob(s, "push_hands")) >= 2
+
+
+def _face_pairs(s, face: str) -> List[Dict[str, Any]]:
+    """The two-hand push spots of ``face`` (:func:`spot_pairs`; once per face and template): at ``face_flat_tol_m`` / ``face_max_inset_m``,
+    else at the one hand's relaxed tolerances (each spot then ``relaxed``)."""
+    cache = s.place.setdefault("pair_cache", {})
+    if face not in cache:
+        lo, hi = s.place["local_lo"], s.place["local_hi"]
+        probe_lat, probe_z = (float(v) for v in knob(s, "face_probe_m"))
+        flat, inset = float(knob(s, "face_flat_tol_m")), float(knob(s, "face_max_inset_m"))
+        cache[face] = []
+        for relaxed, fl, ins in ((False, flat, inset), (True, 2.0 * flat, inset + 0.10)):
+            out = spot_pairs(s.place["pieces"], face, lo, hi, [float(h) for h in knob(s, "push_heights_m")], [float(v) for v in knob(s, "push_hand_spacings_m")],
+                             probe_lat, probe_z, fl, ins, float(knob(s, "push_hands_depth_tol_m")))
+            if out:
+                cache[face] = [{**p, "relaxed": relaxed, "spots": [{**sp, "relaxed": relaxed} for sp in p["spots"]]} for p in out]
+                break
+    return cache[face]
+
+
 def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Tensor, init_pose: G.Pose, goal_pose: G.Pose, dist: float, gap: float,
                       bound: float, nt: Optional[bool], stats: Dict[str, int]) -> Draft:
-    """The push face, the push stance with its exact IK, the push end, stance A and the A -> B leg for one (goal, init) pair."""
+    """The push face, the push stance with its exact IK, the push end, stance A and the A -> B leg for one (goal, init) pair; with
+    ``push_hands`` 2 the two-hand push (:func:`_push_two_hands`) when the face has two spots, else the one hand (``two_hand_fallback``)."""
+    fallback = None
+    if two_hands(s):
+        if _face_pairs(s, face):
+            return _push_two_hands(s, rng, side, face, yaw, d2, init_pose, goal_pose, dist, gap, bound, nt, stats)
+        count(stats, "two_hand_no_spots")
+        fallback = f"face {face}: no two spots {list(knob(s, 'push_hand_spacings_m'))} m apart at {list(knob(s, 'push_heights_m'))} m"
     faces = _face_candidates(s, face)
     if not faces:
         raise Reject("no_push_face", f"face {face}: no flat material at {list(knob(s, 'push_heights_m'))} m")
@@ -632,26 +721,76 @@ def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Ten
                         if not P0.in_frame(s, s.camera_pose_at(st), point.reshape(1, 3)):
                             count(stats, "stance_contact_out_of_frame")
                             continue
-                        cands.append((st, {"face": f, "point": point, "arm": arm, "reach_margin": m}))
+                        cands.append((st, {"face": f, "point": point, "arm": arm, "reach_margin": m, "two_hand_fallback": fallback}))
     if not cands:
         raise Reject("no_push_stance", f"face {face}: no stance passes floor / reach / camera ({ {k: v for k, v in stats.items() if k.startswith('stance')} })")
+    pre_m = float(knob(s, "push_pre_m"))
+    return _complete(s, rng, cands, lambda st, info, why: _push_chain(s, st, info["arm"], info["point"], d2, pre_m, why), side, face, yaw, d2, init_pose,
+                     goal_pose, dist, gap, bound, nt, stats)
+
+
+def _push_two_hands(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Tensor, init_pose: G.Pose, goal_pose: G.Pose, dist: float, gap: float,
+                    bound: float, nt: Optional[bool], stats: Dict[str, int]) -> Draft:
+    """The two-hand push of one (goal, init) pair (item C): the spots of :func:`_face_pairs` in the world, each hand on the spot on its
+    own side (:func:`spots_by_arm`), the base centred behind their midpoint (``push_stand_offs_m``, no lateral shift), trunk from
+    ``push_trunks``; both reach margins within ``push_reach_margin_m`` and both contacts in the head-camera frame; then both chains
+    (:func:`_push_chain_pair`) and the rest as the one hand's (:func:`_complete`)."""
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    arm1 = TT.offered_arms(s)[0]
+    arm2 = "left" if arm1 == "right" else "right"
+    rquat, root = G.t(init_pose[1]), G.t(init_pose[0])
+    margin_lo, margin_hi = (float(v) for v in knob(s, "push_reach_margin_m"))
+    cands: List[Tuple[Stance, Dict[str, Any]]] = []
+    for pr in _face_pairs(s, face)[:2]:
+        pts = [G.local_points_world(contact_local(face, sp["coord"], sp["t0"], sp["z"]).reshape(1, 3), (root, rquat))[0] for sp in pr["spots"]]
+        side_of = spots_by_arm(pts, d2)
+        points = {a: pts[side_of[a]] for a in (arm1, arm2)}
+        spots = {a: pr["spots"][side_of[a]] for a in (arm1, arm2)}
+        centre = 0.5 * (pts[0] + pts[1])
+        for so in knob(s, "push_stand_offs_m"):
+            pose2d = push_stance_pose(centre[:2], d2, float(so), 0.0)
+            if not P0.base_ok(s, th.tensor(pose2d[:2])):
+                count(stats, "stance_floor")
+                continue
+            for t, k in knob(s, "push_trunks"):
+                st = Stance("manipulation", pose2d, float(t), float(k), float(so), None, None, 0.0, centre.clone(), [arm1, arm2])
+                m = {a: s.reach_margin(st, points[a], a) for a in (arm1, arm2)}
+                if not all(margin_lo <= v <= margin_hi for v in m.values()):
+                    count(stats, "stance_reach")
+                    continue
+                if not P0.in_frame(s, s.camera_pose_at(st), th.stack([points[arm1], points[arm2]])):
+                    count(stats, "stance_contact_out_of_frame")
+                    continue
+                cands.append((st, {"pair": pr, "face": spots[arm1], "point": points[arm1], "arm": arm1, "arms": [arm1, arm2], "points": points, "spots": spots,
+                                   "reach_margin": min(m.values()), "reach_margins": m}))
+    if not cands:
+        raise Reject("no_push_stance", f"face {face}: no two-hand stance passes floor / reach / camera ({ {k: v for k, v in stats.items() if k.startswith('stance')} })")
+    pre_m = float(knob(s, "push_pre_m"))
+    return _complete(s, rng, cands, lambda st, info, why: _push_chain_pair(s, st, [(a, info["points"][a]) for a in info["arms"]], d2, pre_m, why), side, face,
+                     yaw, d2, init_pose, goal_pose, dist, gap, bound, nt, stats)
+
+
+def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side: EdgeFrame, face: str, yaw: float, d2: th.Tensor, init_pose: G.Pose,
+              goal_pose: G.Pose, dist: float, gap: float, bound: float, nt: Optional[bool], stats: Dict[str, int]) -> Draft:
+    """The push stances that pass floor / reach / camera, whole-body collision-free with the target placed, best reach first; per stance
+    (up to ``push_ik_max``) the chain (``chain_of(stance, info, why)``), the sweep along the line with the pushing arms at contact, the
+    push end, stance A and the A -> B leg; the record of the first that passes them all."""
     free = s.ikc.stances_collision_free([c[0] for c in cands])
     cands = [c for c, ok in zip(cands, free.tolist()) if ok]
     if not cands:
         count(stats, "stance_collision")
         raise Reject("no_push_stance", f"face {face}: every push stance collides (target placed)")
     cands.sort(key=lambda c: -min(round(c[1]["reach_margin"] / 0.05) * 0.05, 0.25))
-    pre_m = float(knob(s, "push_pre_m"))
     why: List[str] = []
     for st, info in cands[: int(knob(s, "push_ik_max"))]:
         s._check_deadline("nextto push stance IK")
-        arm, point = info["arm"], info["point"]
-        chain = _push_chain(s, st, arm, point, d2, pre_m, why)
+        chain = chain_of(st, info, why)
         if chain is None:
             count(stats, "push_ik")
             continue
         end2d = shifted_pose2d(st.base_pose2d, d2, dist)
-        if not _sweep_ok(s, st, end2d, arm, chain["q"], why):
+        if not _sweep_ok(s, st, end2d, info.get("arms") or [info["arm"]], chain.get("q_both", chain["q"]), why):
             count(stats, "push_sweep")
             continue
         end = st.with_trunk(st.translate, st.tilt, END_STANCE)
@@ -680,7 +819,40 @@ def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Ten
 def _push_chain(s, st: Stance, arm: str, point: th.Tensor, d2: th.Tensor, pre_m: float, why: List[str]) -> Optional[Dict[str, Any]]:
     """The closed hand's pre-contact (target present) and approach to the contact (target ignored at the contact only) by the exact IK
     from the push stance, as the program check runs them: the pre-contact's witness first, the chain tracked from it; the fingertips of
-    the pre-contact and the approach in the stance camera's frame (``program_check.fingertips_in_frame``)."""
+    the pre-contact and the approach in the stance camera's frame (``program_check.fingertips_in_frame``). The first of
+    :func:`_hand_chains`."""
+    return next(_hand_chains(s, st, arm, point, d2, pre_m, why), None)
+
+
+def _push_chain_pair(s, st: Stance, hands: Sequence[Tuple[str, th.Tensor]], d2: th.Tensor, pre_m: float, why: List[str]) -> Optional[Dict[str, Any]]:
+    """Both hands' chains from one stance (item C): each chain of the first arm (:func:`_hand_chains`, the second arm at the stance
+    posture), then the second arm's at the same pitch, either wrist turn, its fingertips in the camera frame, solved by
+    ``program_check.second_hand_chain`` (its pre-contact with the first hand at its pre-contact, its approach with the first hand locked
+    at its contact, both hands at contact whole-body free). The first arm's chain with ``second`` (the other hand's poses and witnesses)
+    and ``q_both`` (both hands at contact), or None."""
+    (arm1, p1), (arm2, p2) = hands
+    check_frame = os.environ.get("ISG_FINGERTIP_FRAME_CHECK", "on").lower() not in ("off", "0", "false")
+    for c1 in _hand_chains(s, st, arm1, p1, d2, pre_m, why):
+        for wrist in (c1["wrist"], -c1["wrist"]):
+            pre, contact = push_hand_poses(p2, d2, c1["pitch_deg"], wrist, pre_m)
+            approach = list(C.line_waypoints(pre, contact, 3))
+            tag = (f"{arm2} hand pitch {c1['pitch_deg']:.0f}{'' if wrist > 0 else '-'} with the {arm1} at {c1['pitch_deg']:.0f}{'' if c1['wrist'] > 0 else '-'} "
+                   f"(d {st.stand_off:.2f} trunk ({st.translate}, {st.tilt}))")
+            out = PC.fingertips_in_frame(s, st, "base_push", [("second.pre", [pre]), ("second.approach", approach)]) if check_frame else None
+            if out is not None:
+                why.append(f"{tag}: {out['key']} fingertip out of frame")
+                continue
+            r = PC.second_hand_chain(s, st, arm1, c1["q_pre"], c1["q"], arm2, pre, approach, s.target)
+            if not r["ok"]:
+                why.append(f"{tag}: {r['why']}")
+                continue
+            second = {"arm": arm2, "pre": pre, "contact": contact, "q_pre": r["q_pre"], "q": r["q"], "pitch_deg": c1["pitch_deg"], "wrist": wrist}
+            return {**c1, "q_both": r["q"].clone(), "second": second}
+    return None
+
+
+def _hand_chains(s, st: Stance, arm: str, point: th.Tensor, d2: th.Tensor, pre_m: float, why: List[str]) -> Iterator[Dict[str, Any]]:
+    """Each passing chain of :func:`_push_chain` in turn (pitch, then wrist turn): ``{"pre", "contact", "q", "q_pre", "pitch_deg", "wrist"}``."""
     tgt = s.target
     for pitch in knob(s, "push_pitches_deg"):
         for wrist in (1.0, -1.0):
@@ -700,16 +872,16 @@ def _push_chain(s, st: Stance, arm: str, point: th.Tensor, d2: th.Tensor, pre_m:
             if not r.ok or r.q is None:
                 why.append(f"{tag}: approach {r.reason}")
                 continue
-            return {"pre": pre, "contact": contact, "q": r.q.clone(), "q_pre": r_pre.q.clone(), "pitch_deg": float(pitch), "wrist": wrist}
-    return None
+            yield {"pre": pre, "contact": contact, "q": r.q.clone(), "q_pre": r_pre.q.clone(), "pitch_deg": float(pitch), "wrist": wrist}
 
 
-def _sweep_ok(s, st: Stance, end2d: Tuple[float, float, float], arm: str, q: th.Tensor, why: List[str]) -> bool:
-    """The whole body swept from the push stance to the push end along the line, the arm at its contact configuration, both hands
-    closed, the target out of the world (it moves ahead of the hand)."""
+def _sweep_ok(s, st: Stance, end2d: Tuple[float, float, float], arms: Sequence[str], q: th.Tensor, why: List[str]) -> bool:
+    """The whole body swept from the push stance to the push end along the line, the pushing arms at their contact configuration (``q``),
+    both hands closed, the target out of the world (it moves ahead of the hands)."""
     r_arm, l_arm, _ = s.ikc.arm_vectors(st)
     q_arms = {"right": r_arm, "left": l_arm}
-    q_arms[arm] = q[s.kit.robot.arm_control_idx[arm]].clone()
+    for arm in arms:
+        q_arms[arm] = q[s.kit.robot.arm_control_idx[arm]].clone()
     poses = NAV.stride_poses([tuple(st.base_pose2d), tuple(end2d)], NAV.STRIDE_M)
     if not poses or any(abs(a - b) > 1e-6 for a, b in zip(poses[-1], end2d)):
         poses = list(poses) + [tuple(end2d)]
@@ -771,10 +943,26 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
               "drift_tol_m": float(knob(s, "drift_tol_m")), "yaw_tol_rad": float(knob(s, "yaw_tol_rad")), "nextto_push_on_m": float(knob(s, "nextto_push_on_m")),
               "push_speed_m_s": float(knob(s, "push_speed_m_s")),
               "reach_margin_m": round(float(info["reach_margin"]), 4), "ignore_last": [tname], "ignore_every": []}
+    second = chain.get("second")
+    if second is not None:
+        arm2, f2 = second["arm"], info["spots"][second["arm"]]
+        p2_loc = contact_local(face, f2["coord"], f2["t0"], f2["z"])
+        extras.update({"push_hands": 2, "hand_spacing_m": round(float(info["pair"]["spacing"]), 4),
+                       "face_centre_in_object": [round(float(v), 5) for v in (0.5 * (p_loc + p2_loc)).tolist()],
+                       "reach_margins_m": {a: round(float(v), 4) for a, v in info["reach_margins"].items()},
+                       "second_hand": {"arm": arm2, "pre": pose_to_sidecar(second["pre"]), "init": pose_to_sidecar(second["contact"]),
+                                       "goal": pose_to_sidecar(translated_pose(second["contact"], d3 * dist)),
+                                       "contact_point": [round(float(v), 5) for v in info["points"][arm2].tolist()],
+                                       "contact_in_object": [round(float(v), 5) for v in p2_loc.tolist()], "pitch_deg": second["pitch_deg"], "wrist_sign": second["wrist"],
+                                       "face_inset_m": round(float(f2["inset"]), 4), "face_spread_m": round(float(f2["spread"]), 4)}})
+    elif two_hands(s):
+        extras.update({"push_hands": 1, "two_hand_fallback": info.get("two_hand_fallback")})
     s.sidecar.add_contact(ContactRecord("push", arm, pre=chain["pre"], contact=chain["contact"], mid=None, goal=goal_eef, direction=d3, distance_m=float(dist),
                                         object=tname, stance="manipulation", extras=extras))
     st.contacts = ["push"]
     st.extras.update({"push": {"face": face, "height_m": extras["push_height_m"], "distance_m": round(dist, 4), "pitch_deg": chain["pitch_deg"]}})
+    if second is not None:
+        st.extras["push"]["hands"] = 2
     path_ab = next((p for p in s.sidecar.paths if p.to == "manipulation"), None)
     d = Draft()
     d.object_poses[tname] = init_pose
@@ -790,12 +978,17 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
                            "init_pose": [[float(v) for v in init_pose[0]], [float(v) for v in init_pose[1]]],
                            "goal_pose": [[float(v) for v in goal_pose[0]], [float(v) for v in goal_pose[1]]],
                            "path_length_m": {"A_B": None if path_ab is None else path_ab.length_m}}
+    if "push_hands" in extras:
+        d.summary["nextto"].update({"push_hands": extras["push_hands"], "hand_spacing_m": extras.get("hand_spacing_m"), "two_hand_fallback": extras.get("two_hand_fallback")})
+    if second is not None:
+        d.summary["arm"]["arms"] = [arm, second["arm"]]
     d.pose_targets[tname] = full_pose_target(goal_pose[0], goal_pose[1], s.tol("position", 0.15), s.tol("orientation", 0.35))
     s.sidecar.describe(tname, s.choice.models["target"].category.replace("_", " "))
     s.sidecar.describe(pname, s.partner.category.replace("_", " "), push_distance_cm=100.0 * float(dist))
+    hands = f"{arm} arm" if second is None else f"{arm} + {second['arm']} arms {extras['hand_spacing_m']:.2f} m apart"
     log.info("%s: nextto push drawn: side %s angle %+.0f deg face %s, %.2f m from the goal (gap %.3f, bound %.3f, NextTo at the goal %s), push at %.2f m from "
-             "d %.2f lat %+.2f trunk %s pitch %.0f, %s arm", s.gp.alias, side.name, d.summary["nextto"]["push_angle_deg"], face, dist, gap, bound, nt, f["height"],
-             st.stand_off, st.lateral, (st.translate, st.tilt), chain["pitch_deg"], arm)
+             "d %.2f lat %+.2f trunk %s pitch %.0f, %s", s.gp.alias, side.name, d.summary["nextto"]["push_angle_deg"], face, dist, gap, bound, nt, f["height"],
+             st.stand_off, st.lateral, (st.translate, st.tilt), chain["pitch_deg"], hands)
     return d
 
 

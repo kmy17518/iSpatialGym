@@ -1068,7 +1068,10 @@ def program_iors_large_nextto(sc: Sidecar) -> List[Action]:
     with ``kind: "base_push"``: the closed hand on the floor-standing target's push face, the base drives it along the recorded line
     ``base_start → base_end`` and stops once the partner is NextTo it) → retreat from where the push leaves the hand; no grasp. The base
     ends at the recorded stance ``contacts.push.end_stance`` (default ``placement``: the push stance moved ``distance_m`` along the line,
-    same trunk and arms). The target ends next to the partner (``nextto`` read in the epilogue)."""
+    same trunk and arms). The target ends next to the partner (``nextto`` read in the epilogue).
+
+    Two hands (owner 2026-10-12 ~20:17 item C; ``contacts.push.second_hand``): the ``base_push`` carries both arms (``BasePush.second``)
+    and each hand retreats from where the push leaves it, the first hand first."""
     push = sc.contacts.push if sc.contacts is not None else None
     if push is None or push.kind != BASE_PUSH_KIND:
         raise SidecarError("contacts.push: IORS nextto large-scale records the base push (kind 'base_push')")
@@ -1078,8 +1081,24 @@ def program_iors_large_nextto(sc: Sidecar) -> List[Action]:
     if end not in sc.stances:
         raise SidecarError(f"stances: the base push ends at the recorded stance {end!r}")
     partner = push.extra.get("partner")
-    p = BasePush(contact=push, base_yaw=sc.stance("manipulation").base_pose2d[2], partner=partner if isinstance(partner, str) and partner else None, end_stance=end)
-    return _travel(sc, "init", "manipulation") + [p, Retreat(arm=push.arm, object=push.object, after=p)]
+    second = _second_hand(push)
+    p = BasePush(contact=push, base_yaw=sc.stance("manipulation").base_pose2d[2], partner=partner if isinstance(partner, str) and partner else None, end_stance=end,
+                 second=second)
+    retreats = [Retreat(arm=c.arm, object=push.object, after=p.hand(c.arm)) for c in p.contacts]
+    return _travel(sc, "init", "manipulation") + [p] + retreats
+
+
+def _second_hand(push: PushContact) -> Optional[PushContact]:
+    """The other hand of a two-hand base push (``contacts.push.second_hand``: its ``arm`` and ``pre`` / ``init`` / ``goal`` poses, the
+    push's direction and distance), None for one hand."""
+    rec = push.extra.get("second_hand")
+    if rec is None:
+        return None
+    if not isinstance(rec, dict):
+        raise SidecarError("contacts.push.second_hand: a two-hand base push records the other hand as a dict")
+    if rec.get("arm") != _other_arm(push.arm):
+        raise SidecarError(f"contacts.push.second_hand.arm: the first hand is the {push.arm} one, the second must be {_other_arm(push.arm)!r}, got {rec.get('arm')!r}")
+    return PushContact.from_dict({**rec, "object": push.object, "direction": list(push.direction), "distance_m": push.distance_m}, "contacts.push.second_hand")
 
 
 def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:

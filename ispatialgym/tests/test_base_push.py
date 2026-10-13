@@ -384,3 +384,308 @@ def test_base_push_action_contract():
     push.contact.extra.pop("base_end")
     with pytest.raises(Exception, match="base_end"):
         push.targets(None, None)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# two hands (owner 2026-10-12 ~20:17 item C)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+class _World2(_World):
+    """Two hands on the cart's back face 0.30 m apart (base-frame offsets: the right hand at y -0.15, the left at +0.15, each ``reach`` plus
+    its own x offset ahead of the base): the cart moves ahead of the hand deepest past its face; on a drive it turns ``spin`` about the
+    right hand (the stub's turning cart)."""
+
+    def __init__(self, offsets=(-0.1, -0.1), **kw):
+        super().__init__(**kw)
+        self.arms = {"right": [offsets[0], -0.15], "left": [offsets[1], 0.15]}
+
+    def hand(self, arm: str = "right") -> Tuple[float, float]:
+        bx, by, byaw = self.base
+        ox, oy = self.reach + self.arms[arm][0], self.arms[arm][1]
+        return bx + math.cos(byaw) * ox - math.sin(byaw) * oy, by + math.sin(byaw) * ox + math.cos(byaw) * oy
+
+    def put_hand(self, x: float, y: float, arm: str = "right") -> None:
+        bx, by, byaw = self.base
+        dx, dy = x - bx, y - by
+        self.arms[arm] = [math.cos(byaw) * dx + math.sin(byaw) * dy - self.reach, -math.sin(byaw) * dx + math.cos(byaw) * dy]
+
+    def contact(self, heading=None, drive=False) -> None:
+        c, s = math.cos(self.yaw), math.sin(self.yaw)
+        depth = max(c * (hx - self.cart[0]) + s * (hy - self.cart[1]) + self.half for hx, hy in (self.hand(a) for a in self.arms))
+        if depth <= 0.0:
+            return
+        ux, uy = heading if heading is not None else (c, s)
+        k = depth / max(c * ux + s * uy, 0.1)
+        self.cart = [self.cart[0] + k * ux, self.cart[1] + k * uy]
+        if drive and self.spin:
+            hx, hy = self.hand("right")
+            cs, sn = math.cos(self.spin), math.sin(self.spin)
+            rx, ry = self.cart[0] - hx, self.cart[1] - hy
+            self.cart = [hx + cs * rx - sn * ry, hy + sn * rx + cs * ry]
+            self.yaw += self.spin
+
+
+class _Motions2(_Motions):
+    def __init__(self, w: _World2, fail_pre=(), blocked=False):
+        super().__init__(w, blocked=blocked)
+        self.fail_pre = set(fail_pre)
+
+    def eef_pose(self, arm):
+        hx, hy = self.w.hand(arm)
+        return th.tensor([hx, hy, 0.45]), th.tensor([0.0, 0.0, 0.0, 1.0])
+
+    def gripper(self, arm, close, **kw):
+        self.calls.append(("gripper", arm, close))
+        yield th.zeros(23)
+
+    def arm_to(self, arm, pose=None, **kw):
+        self.calls.append(("arm_to", arm, sorted(kw)))
+        if arm in self.fail_pre:
+            raise EX.SkillError("plan_failed", f"arm_to({arm}): no plan")
+        yield th.zeros(23)
+
+    def arm_along(self, arm, waypoints, loaded=False, **kw):
+        p = as_world_pose(waypoints[-1])[0]
+        self.w.put_hand(float(p[0]), float(p[1]), arm)
+        self.w.contact()
+        self.calls.append(("arm_along", arm, (round(float(p[0]), 3), round(float(p[1]), 3))))
+        yield th.zeros(23)
+
+    def unload(self, arms, steps=None, trunk=True):
+        if False:
+            yield th.zeros(23)
+        self.calls.append(("unload", tuple(arms)))
+        return {a: 0.0 for a in arms}
+
+    def track_path(self, waypoints, tracker_cfg=None, **kw):
+        """:meth:`_Motions.track_path` with both hands staying on a stuck cart."""
+        goal = [float(v) for v in waypoints[-1]]
+        self.calls.append(("track_path", tuple(round(v, 3) for v in goal), tracker_cfg.v_max))
+        x0, y0, yaw0 = self.w.base
+        dx, dy, dyaw = goal[0] - x0, goal[1] - y0, C.wrap_angle(goal[2] - yaw0)
+        length = math.hypot(dx, dy)
+        heading = (dx / length, dy / length) if length > 1e-9 else None
+        n = math.ceil(length / 0.02 - 1e-9) if heading else int(abs(dyaw) > 1e-9)
+        for k in range(1, n + 1):
+            f = min(1.0, k * 0.02 / length) if heading else 1.0
+            hands = {a: self.w.hand(a) for a in self.w.arms}
+            self.w.base = [x0 + f * dx, y0 + f * dy, yaw0 + f * dyaw]
+            if self.w.stick > 0:
+                self.w.stick -= 1
+                for a, h in hands.items():
+                    self.w.put_hand(*h, a)
+            else:
+                self.w.contact(heading, drive=True)
+                self.w.cart[1] += self.w.drift
+            yield th.zeros(23)
+
+
+def _push2(**extra) -> A.BasePush:
+    """Both hands on the cart's back face (local x -0.2), the right one at y -0.15 and the left at +0.15, the face centre between them;
+    the base 0.55 m behind the face centre."""
+    from ispatialgym.oracle.sidecar import Pose, PushContact
+
+    q = list(C.eef_quat(th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 1.0, 0.0])).tolist())
+
+    def hand(arm, y, **x):
+        return PushContact(arm=arm, object=CART, pre=Pose([0.70, y, 0.45], q), init=Pose([0.80, y, 0.45], q), goal=Pose([2.60, y, 0.45], q),
+                           direction=[1.0, 0.0, 0.0], distance_m=1.8, extra={"contact_in_object": [-0.2, y, 0.02], **x})
+
+    first = hand("right", -0.15, kind="base_push", base_start=[0.25, 0.0, 0.0], base_end=[2.05, 0.0, 0.0], face_centre_in_object=[-0.2, 0.0, 0.02], **extra)
+    return A.BasePush(contact=first, base_yaw=0.0, partner=TABLE, end_stance="placement", second=hand("left", 0.15))
+
+
+def _run2(push, w, fail_pre=(), blocked=False):
+    motions, state = _Motions2(w, fail_pre, blocked=blocked), _State(w)
+    ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(), "hooks": {}}
+    list(EX.execute_base_push(push, motions, state, push.targets(None, state), ctx))
+    return ctx, motions, EX.check_postcondition(push, state, {}, ctx)
+
+
+def test_two_hand_base_push_closes_both_approaches_until_both_touch_and_holds_both():
+    """Both grippers closed and both hands at their pre-contacts (the first hand first); the hands step in turn, 2 cm up to 3 cm before
+    the recorded contact and 5 mm from there, until one moves the cart; the other touches 5 mm later; both arms held through the drive,
+    both unloaded at the end."""
+    w = _World2(nextto_x=2.0)
+    ctx, motions, post = _run2(_push2(nextto_push_on_m=0.10), w)
+    rep = ctx["base_push"]
+    assert post is None and rep["result"] == "pushed" and rep["stop"].startswith("nextto") and rep["hands"] == ["right", "left"]
+    assert motions.calls[:4] == [("gripper", "right", True), ("gripper", "left", True), ("arm_to", "right", ["accept_other_branch"]), ("arm_to", "left", ["accept_other_branch"])]
+    assert rep["pre"] == rep["second_pre"] == "the object present"
+    app = rep["approaches"][0]
+    assert app["how"] == "both hands touch" and app["hands"]["right"]["how"] == app["hands"]["left"]["how"] == "object moved"
+    assert app["hands"]["right"]["travelled_m"] == pytest.approx(0.105) and app["hands"]["left"]["travelled_m"] == pytest.approx(0.11)
+    steps = [c for c in motions.calls if c[0] == "arm_along"]
+    assert [(c[1], c[2][0]) for c in steps[:8]] == [(a, pytest.approx(x)) for x in (0.72, 0.74, 0.76, 0.77) for a in ("right", "left")]
+    assert steps[-1][1] == "left" and steps[-1][2] == pytest.approx((0.81, 0.15))
+    assert set(motions.state.arm_target) == {"right", "left"} and ("unload", ("right", "left")) in motions.calls
+
+
+def test_two_hand_base_push_recontacts_with_both_hands_and_survives_one_hand_short():
+    """A lag stops the drive: both arms unloaded, both hands 2 cm back, both approach again. A hand whose spot lies beyond the approach's
+    reach does not touch: the push goes on with the other one. A second hand that cannot reach its pre-contact leaves the push to the
+    first (the one-hand approach)."""
+    w = _World2(nextto_x=99.0, stick=4)
+    ctx, motions, post = _run2(_push2(lag_m=0.05), w)
+    rep = ctx["base_push"]
+    assert rep["recontacts"] == 1 and len(rep["approaches"]) == 2 and rep["approaches"][1]["how"] == "both hands touch" and post is None
+    i = motions.calls.index(("unload", ("right", "left")))
+    backs = [c for c in motions.calls[i + 1:i + 3]]
+    assert [c[:2] for c in backs] == [("arm_along", "right"), ("arm_along", "left")]
+    w = _World2(offsets=(-0.1, -0.35), nextto_x=99.0)
+    ctx, _, post = _run2(_push2(), w)
+    rep = ctx["base_push"]
+    assert post is None and rep["stop"] == "distance done" and not rep["approaches"][0]["hands"]["left"]["contact"]
+    assert rep["approaches"][0]["how"] == "the right hand touches; the left hand: no contact"
+    w = _World2(nextto_x=99.0)
+    ctx, motions, post = _run2(_push2(), w, fail_pre=("left",))
+    rep = ctx["base_push"]
+    assert rep["second_hand"].startswith("pre-contact unreachable") and rep["hands"] == ["right"] and "hands" not in rep["approaches"][0]
+    assert post is None and rep["stop"] == "distance done" and ("unload", ("right",)) in motions.calls
+
+
+def test_two_hand_realign_carries_both_hands_with_the_stance():
+    """A turning cart is realigned with both hands: both unloaded and backed off, the line enters the face at the record's
+    ``face_centre_in_object``, the base moves (collision-checked) to stand to that point as the record stands to the midpoint of the two
+    contacts, each hand to its pre-contact carried with the stance (still 0.30 m apart, side by side across the new line), the two-hand
+    approach along the new line, the drive goes on."""
+    w = _World2(nextto_x=99.0, spin=0.03)
+    ctx, motions, post = _run2(_push2(yaw_tol_rad=0.35, drift_tol_m=1.0, realigns=1), w)
+    rep = ctx["base_push"]
+    mv = rep["realign_moves"][0]
+    assert post is None and rep["realigns"] == 1 and mv["result"] == "pushing on the new line" and len(motions.checked) == 1
+    u = th.tensor([math.cos(math.radians(mv["line_deg"])), math.sin(math.radians(mv["line_deg"]))])
+    r, l = th.tensor(mv["pres"]["right"][:2]), th.tensor(mv["pres"]["left"][:2])
+    assert float(th.linalg.norm(l - r)) == pytest.approx(0.30, abs=1e-3) and abs(float((l - r) @ u)) < 1e-3 and float((l - r) @ th.tensor([-u[1], u[0]])) > 0.0
+    mid = 0.5 * (r + l)
+    assert th.allclose(mid + (0.10 + C.FINGERTIP_LENGTH) * u, th.tensor(mv["point"][:2]), atol=1e-3)  # the stance's centre onto the line's point
+    bx, by, byaw = mv["base_move"]["to"]
+    dx, dy = float(mid[0]) - bx, float(mid[1]) - by
+    rel = (math.cos(byaw) * dx + math.sin(byaw) * dy, -math.sin(byaw) * dx + math.cos(byaw) * dy)
+    assert rel == pytest.approx((0.45, 0.0), abs=1e-3)  # the record's base_start -> the midpoint of the pre-contacts
+    i = motions.calls.index(("unload", ("right", "left")))
+    assert [c[:2] for c in motions.calls[i + 1:i + 3]] == [("arm_along", "right"), ("arm_along", "left")]
+    app = rep["approaches"][1]
+    assert app["leg"] == "realign 1" and set(app["hands"]) == {"right", "left"} and any(h["contact"] for h in app["hands"].values())
+
+
+def test_two_hand_base_push_action():
+    """The push carries both arms; ``second`` must be the other arm; :meth:`BasePush.hand` gives the second hand's own view."""
+    push = _push2()
+    assert push.arms == ("right", "left") and [c.arm for c in push.contacts] == ["right", "left"] and push.hand("right") is push
+    view = push.hand("left")
+    assert view.arms == ("left",) and view.contact is push.second and view.end_pose(None, None) == push.second.goal
+    t = push.targets(None, None)
+    assert t["second"]["arm"] == "left" and t["second"]["contact"] == push.second.init and len(t["second"]["approach"]) == A.N_WAYPOINTS
+    with pytest.raises(Exception, match="other arm"):
+        A.BasePush(contact=push.contact, second=push.contact)
+
+
+class _IKC:
+    """The calls ``program_check.second_hand_chain`` makes, recorded: each solve sets the solving arm's joints to a marker value."""
+
+    WITNESS_RESIDUAL_MAX = 0.002
+    IDX = {"right": th.arange(14, 21), "left": th.arange(7, 14)}
+
+    def __init__(self, fail=None):
+        self.calls: List[Tuple] = []
+        self.out: List[Any] = []
+        self.fail = fail or set()
+
+    def q_locked(self, stance, fingers=None):
+        return th.zeros(28)
+
+    def ignoring(self, objs):
+        ikc = self
+
+        class _Ctx:
+            def __enter__(self):
+                ikc.out.append(list(objs))
+
+            def __exit__(self, *a):
+                ikc.out.pop()
+
+        return _Ctx()
+
+    def exact(self, poses, stance, arm, cache=True, fingers=None, q_seed=None, **kw):
+        self.calls.append(("exact", arm, float(q_seed[self.IDX["right"]][0]), fingers, [list(o) for o in self.out]))
+        if "pre" in self.fail:
+            return PC.IKResult(False, None, "exact IK failed at pose 1 of 1", 1)
+        q = q_seed.clone()
+        q[self.IDX[arm]] = 5.0
+        return PC.IKResult(True, q, "", 1)
+
+    def waypoints_ok(self, wps, stance, arm, cache=True, fingers=None, q_seed=None, q_first=None, **kw):
+        self.calls.append(("waypoints_ok", arm, len(wps), float(q_seed[self.IDX["right"]][0]), float(q_first[self.IDX[arm]][0]), [list(o) for o in self.out]))
+        q = q_first.clone()
+        q[self.IDX[arm]] = 6.0
+        return PC.IKResult(True, q, "checked", len(wps))
+
+    def polish_witness(self, q, pose, arm, ignore=()):
+        return q, 0.0005
+
+    def joint_limit_margin(self, q, arm):
+        return 0.3, f"{arm}_arm_joint2"
+
+    def canonical_q(self, q, stance):
+        return q
+
+    def _collision_blame(self, q, ignored, margin=0.0):
+        return "collides with right_arm_link6"
+
+
+def _sampler2(free=True, fail=None):
+    kit = SimpleNamespace(robot=SimpleNamespace(arm_control_idx=_IKC.IDX), collision_free=lambda q, margin=0.0: th.tensor([bool(free)]), floor_z=0.0,
+                          sync_world=lambda: None)
+    return SimpleNamespace(ikc=_IKC(fail), kit=kit, objects={CART: "cart"}, gp=SimpleNamespace(gen=lambda k, d=None: d))
+
+
+def test_the_second_hand_is_solved_with_the_first_hand_at_its_pre_contact_then_at_its_contact():
+    """The second hand's pre-contact with the first arm at its pre-contact witness (the target in the world), its approach from that
+    witness with the first arm at its contact witness and the target out of the world, then both at contact checked whole-body (the
+    target out); its witnesses recorded as ``second.*`` for the second arm."""
+    push = _push2()
+    t = push.targets(None, None)
+    st = Stance("manipulation", (0.25, 0.0, 0.0), 0.75, -0.3)
+    q_pre1, q_c1 = th.full((28,), 1.0), th.full((28,), 2.0)
+    s = _sampler2()
+    r = PC.second_hand_chain(s, st, "right", q_pre1, q_c1, "left", t["second"]["pre"].tensors(), [p.tensors() for p in t["second"]["approach"]], "cart")
+    assert r["ok"] and s.ikc.calls[0] == ("exact", "left", 1.0, 0.0, []) and s.ikc.calls[1] == ("waypoints_ok", "left", 4, 2.0, 5.0, [["cart"]])
+    assert float(r["q"][_IKC.IDX["right"]][0]) == 2.0 and float(r["q"][_IKC.IDX["left"]][0]) == 6.0 and float(r["q_pre"][_IKC.IDX["right"]][0]) == 1.0
+    assert PC.second_hand_chain(_sampler2(free=False), st, "right", q_pre1, q_c1, "left", t["second"]["pre"].tensors(), [], "cart")["why"].startswith("both hands at contact")
+    assert "pre-contact" in PC.second_hand_chain(_sampler2(fail={"pre"}), st, "right", q_pre1, q_c1, "left", t["second"]["pre"].tensors(), [], "cart")["why"]
+    wit = {"pre": {"q": q_pre1.tolist()}, "contact": {"q": q_c1.tolist()}}
+    n = PC.check_base_push_second_hand(None, s, push, t, st, wit, "test")
+    assert n == 1 + A.N_WAYPOINTS + 1 and {k for k in wit if k.startswith("second.")} == {"second.pre", "second.approach", "second.contact"}
+    assert wit["second.contact"]["arm"] == "left" and wit["second.contact"]["q"][7] == 6.0 and wit["second.contact"]["q"][14] == 2.0
+    assert wit["second.pre"]["chain"] == "the right hand locked at its pre-contact"
+    with pytest.raises(Exception, match="both hands at contact"):
+        PC.check_base_push_second_hand(None, _sampler2(free=False), push, t, st, dict(wit), "test")
+    with pytest.raises(Exception, match="witnesses are missing"):
+        PC.check_base_push_second_hand(None, s, push, t, st, {}, "test")
+    assert "second" in PC._skipped_target_keys("base_push", push, t)
+
+
+def test_program_check_tracker_keeps_the_second_hand_on_the_cart_until_its_retreat():
+    sd = SidecarDraft("inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor", "inter_object_relation_satisfaction")
+    for name, xy in (("init", (0.0, 0.0)), ("manipulation", (1.0, 0.0)), ("placement", (2.8, 0.0))):
+        sd.add_stance(Stance(name, (xy[0], xy[1], 0.0), 0.75, -0.3))
+    cart = SimpleNamespace(p=th.tensor([1.75, 0.0, 0.43]))
+    cart.get_position_orientation = lambda: (cart.p.clone(), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    cart.set_position_orientation = lambda p, q: setattr(cart, "p", th.as_tensor(p).clone())
+    cart.keep_still = lambda: None
+    sampler = SimpleNamespace(objects={CART: cart}, kit=SimpleNamespace(sync_world=lambda: None, robot=SimpleNamespace(arm_control_idx=_IKC.IDX)))
+    push = _push2()
+    tr = PC._Tracker(sd)
+    tr.stance = "manipulation"
+    q2 = th.zeros(28)
+    q2[7:14] = 0.7
+    tr.after(push, {"second.contact": {"q": q2.tolist()}}, sampler)
+    r_right = A.Retreat(arm="right", object=CART, after=push)
+    r_left = A.Retreat(arm="left", object=CART, after=push.hand("left"))
+    assert tr.stance == "placement" and th.allclose(tr.locked_arms(r_right)["left"], th.full((7,), 0.7)) and tr.locked_arms(r_left) == {}
+    tr.after(r_right, {}, sampler)
+    assert "left" in tr.arm_q
+    tr.after(r_left, {}, sampler)
+    assert tr.arm_q == {}

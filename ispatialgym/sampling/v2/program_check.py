@@ -1226,6 +1226,11 @@ class _Tracker:
             self.stance_obj = AH.end_stance_from_witness(witnesses["follow_end"])
         elif name == "base_push":
             self.advance_base_push(action, sampler)
+            second = getattr(action, "second", None)
+            w2 = (witnesses or {}).get("second.contact")
+            if second is not None and sampler is not None and w2 and w2.get("q") is not None:
+                # two hands: the second hand stays on the object until its own retreat, as a brace does
+                self.arm_q[second.arm] = th.tensor(w2["q"], dtype=th.float32)[sampler.kit.robot.arm_control_idx[second.arm]].clone()
         if name == "grasp":
             # a handle grasp does not carry anything: the articulated object stays in the world and only its handle link
             # moves with the hand along the recorded joint trajectory (large articulation, Rs_int drawer bamfsz_1: the
@@ -1717,7 +1722,79 @@ def _skipped_target_keys(name: str, action, targets: Any) -> set:
         skip.add("handle_poses")
     if name == "reorient" and isinstance(targets, dict) and getattr(action, "waypoints", None):
         skip.add("derived")
+    if name == "base_push" and isinstance(targets, dict):
+        skip.add("second")  # the other arm's chain: :func:`check_base_push_second_hand`
     return skip
+
+
+def second_hand_chain(sampler, stance: Stance, arm1: str, q_pre1: th.Tensor, q_c1: th.Tensor, arm2: str, pre, approach: Sequence[Any], target,
+                      fingers: float = 0.0, margin: float = 0.01) -> Dict[str, Any]:
+    """The second closed hand of a two-hand base push (owner 2026-10-12 ~20:17 item C), solved as the second-arm rule solves a brace
+    (``tabletop.brace_second_arm``) - the same steps for the sampler's draw and this check: its pre-contact ``pre`` with the first arm at its
+    pre-contact configuration ``q_pre1`` (the target present: the oracle brings both hands to their pre-contacts before either approaches),
+    the straight ``approach`` from that witness with the first arm locked at its contact configuration ``q_c1`` (the target out of the world:
+    the first hand touches it), then the configuration with both hands at contact whole-body collision-free at ``margin`` (the target out).
+    Only the arm joints of ``q_pre1`` / ``q_c1`` are read. Returns ``{"ok", "why", "q_pre", "q"}`` (28-D; ``q`` = both hands at contact)."""
+    ikc, kit = sampler.ikc, sampler.kit
+    idx1, idx2 = kit.robot.arm_control_idx[arm1], kit.robot.arm_control_idx[arm2]
+    q_seed = ikc.q_locked(stance, fingers=fingers).clone()
+    q_seed[idx1] = th.as_tensor(q_pre1, dtype=th.float32).reshape(-1)[idx1]
+    r_pre = ikc.exact([pre], stance, arm2, cache=False, fingers=fingers, q_seed=q_seed)
+    if not r_pre.ok or r_pre.q is None:
+        return {"ok": False, "why": f"pre-contact with the {arm1} hand at its pre-contact: {r_pre.reason}"}
+    q_lock = ikc.q_locked(stance, fingers=fingers).clone()
+    q_lock[idx1] = th.as_tensor(q_c1, dtype=th.float32).reshape(-1)[idx1]
+    q_first = q_lock.clone()
+    q_first[idx2] = r_pre.q[idx2]
+    with ikc.ignoring([target] if target is not None else []):
+        r = ikc.waypoints_ok([pre] + list(approach), stance, arm2, cache=False, fingers=fingers, q_seed=q_lock, q_first=q_first)
+        if not r.ok or r.q is None:
+            return {"ok": False, "why": f"approach with the {arm1} hand at its contact: {r.reason}"}
+        free = bool(kit.collision_free(r.q, margin=margin)[0])
+    if not free:
+        return {"ok": False, "why": f"both hands at contact: the configuration collides ({ikc._collision_blame(r.q, [target] if target is not None else [], margin=margin)[:160]})"}
+    return {"ok": True, "why": "", "q_pre": r_pre.q.clone(), "q": r.q.clone()}
+
+
+def check_base_push_second_hand(sidecar: SidecarDraft, sampler, action, targets: Dict[str, Any], stance: Stance, witnesses: Dict[str, Any], where: str) -> int:
+    """The second hand of a two-hand base push (``BasePush.second``; targets ``second``), after the first hand's ``pre`` / ``approach`` /
+    ``contact`` were checked: :func:`second_hand_chain` from the first hand's witnesses, the second hand's fingertips in the camera frame,
+    its witnesses ``second.pre``, ``second.approach`` and ``second.contact`` (both hands at contact) recorded as the others. Returns the
+    number of poses checked; ``Reject`` otherwise."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    sec = targets["second"]
+    arm1, arm2 = action.contact.arm, str(sec["arm"])
+    w_pre, w_c = witnesses.get("pre"), witnesses.get("contact") or witnesses.get("approach")
+    if not (w_pre and w_c and w_pre.get("q") is not None and w_c.get("q") is not None):
+        raise Reject("program_check_failed", f"second hand: the {arm1} hand's pre-contact / contact witnesses are missing ({where})", action="base_push")
+    pre = _as_pose(sec["pre"])
+    approach = [_as_pose(p) for p in sec["approach"]]
+    contact = _as_pose(sec["contact"])
+    if os.environ.get("ISG_FINGERTIP_FRAME_CHECK", "on").lower() not in ("off", "0", "false"):
+        out = fingertips_in_frame(sampler, stance, "base_push", [("second.pre", [pre]), ("second.approach", approach)])
+        if out is not None:
+            raise Reject("gripper_not_in_frame", f"base_push.{out['key']}[{out['index']}/{out['n']}]: the fingertip point projects outside the stance camera's image "
+                                                 f"(5 %): u={out['u']}, v={out['v']}, depth={out['depth_m']} m ({where})", action="base_push")
+    target = sampler.objects.get(action.contact.object)
+    r = second_hand_chain(sampler, stance, arm1, th.tensor(w_pre["q"], dtype=th.float32), th.tensor(w_c["q"], dtype=th.float32), arm2, pre, approach, target)
+    if not r["ok"]:
+        raise Reject("program_check_failed", f"second hand ({arm2}): {r['why']} ({where})", action="base_push")
+    limit = float(sampler.gp.gen("witness_residual_max_m", sampler.ikc.WITNESS_RESIDUAL_MAX))
+    for key, q, pose, ign, n_wp in (("second.pre", r["q_pre"], pre, [], 1), ("second.approach", r["q"], contact, [target], len(approach)),
+                                    ("second.contact", r["q"], contact, [target], 1)):
+        lim = float(sampler.gp.gen("witness_residual_pre_m", limit)) if key == "second.pre" else limit
+        q_pol, residual = sampler.ikc.polish_witness(q, pose, arm2, ignore=[o for o in ign if o is not None])
+        if residual > lim:
+            raise Reject("program_check_failed", f"{key}: witness FK residual {residual * 1000:.1f} mm > {lim * 1000:.0f} mm after polishing ({where})", action="base_push")
+        margin, joint = sampler.ikc.joint_limit_margin(q_pol, arm2)
+        witnesses[key] = {"pose": {"position": [round(float(v), 5) for v in pose[0].tolist()], "orientation": [round(float(v), 6) for v in pose[1].tolist()]},
+                          "q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pol, stance).tolist()],
+                          "q_frame": "root at the world origin (identity pose, z = 0): FK(q) puts base_link at base_pose2d on the measured floor",
+                          "base_pose2d": [float(v) for v in stance.base_pose2d], "floor_z": round(float(sampler.kit.floor_z), 4), "arm": arm2,
+                          "fk_residual_m": round(residual, 5), "joint_limit_margin_rad": round(margin, 4), "joint_limit_nearest": joint, "n_waypoints": n_wp,
+                          "chain": f"the {arm1} hand locked at its {'pre-contact' if key == 'second.pre' else 'contact'}"}
+    return 1 + len(approach) + 1
 
 
 def _held_start_q(sampler, stance, grasp, carried: Optional[str], arm: str, fingers: Optional[float], held_since_init: bool, stance_obj,
@@ -2168,6 +2245,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                         witnesses["pre"]["standoff"] = {k_: v_ for k_, v_ in rep_s.items() if k_ in ("clearance_m", "branch")}
                 if not ok_s:
                     raise Reject("approach_untrackable", f"pre: {why_s} ({where})", action=name)
+        if name == "base_push" and isinstance(targets, dict) and targets.get("second"):
+            n += check_base_push_second_hand(sidecar, sampler, action, targets, stance, witnesses, where)
         # base poses: a transition's drive-back pose is visited with the departing trunk (arrival) and the arriving trunk
         # (after the sweep), the drive-in pose with the arriving trunk only; a path's goal with the stance trunk
         checks: List[Tuple[Tuple[float, float, float], Tuple[float, float]]] = []

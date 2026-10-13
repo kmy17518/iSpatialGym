@@ -599,7 +599,13 @@ def test_direction_words():
 
 def _check_value(key, value, where):
     if value is None:
-        assert key in ("base_poses", "carried", "follow_path", "follow_segments", "arms_q"), where  # follow_path / follow_segments: hybrid base-follow only; arms_q: only when the record carries it
+        # follow_path / follow_segments: hybrid base-follow only; arms_q: only when the record carries it; second: a two-hand base push only
+        assert key in ("base_poses", "carried", "follow_path", "follow_segments", "arms_q", "second"), where
+        return
+    if key == "second":
+        assert set(value) == {"arm", "pre", "approach", "contact"} and value["arm"] in ("left", "right"), where
+        for k in ("pre", "approach", "contact"):
+            _check_value(k, value[k], f"{where}.{k}")
         return
     if key == "arms_q":
         # navigate / transition: the arm joints the record was swept with (owner 2026-09-24), arm -> 7 values

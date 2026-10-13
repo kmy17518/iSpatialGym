@@ -61,7 +61,7 @@ regeneration as ``derived`` for the program check to compare.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, ClassVar, Dict, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 from ispatialgym.oracle.sidecar import (
@@ -1320,23 +1320,44 @@ class BasePush(Action):
     NextTo the object, or when the distance is done. Postcondition: the object moved (``no_motion`` otherwise).
 
     targets: ``{"pre": Pose, "approach": [Pose, ...], "contact": Pose, "base_path": [[x, y, yaw], [x, y, yaw]], "direction": [x, y, z],
-    "distance_m": float}`` — the pre-contact and the contact at the push stance (the approach densified with ``line_waypoints``),
-    the base line the drive follows. ``end_stance``: the recorded stance where the base ends (the program check moves there).
+    "distance_m": float, "second": None | {"arm": str, "pre": Pose, "approach": [Pose, ...], "contact": Pose}}`` — the pre-contact and the
+    contact at the push stance (the approach densified with ``line_waypoints``), the base line the drive follows, and the other hand's
+    of a two-hand push. ``end_stance``: the recorded stance where the base ends (the program check moves there).
     :meth:`end_pose` is where the hand is when the state can tell (the drive may stop before the recorded end), else the recorded
-    end contact ``contacts.push.goal``."""
+    end contact ``contacts.push.goal``.
+
+    ``second`` (owner 2026-10-12 ~20:17 item C, ``contacts.push.second_hand``): the other closed hand on the same face (its pre / init /
+    goal poses; the direction and distance are the push's) - both hands are brought to their pre-contacts, approach until both touch
+    and are held through the drive; :meth:`hand` is the push as one hand sees it (that hand's ``Retreat.after``)."""
 
     name: str = "base_push"
     contact: PushContact
     base_yaw: Optional[float] = None
     partner: Optional[str] = None
     end_stance: Optional[str] = None
+    second: Optional[PushContact] = None
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
-    TARGET_KEYS = ("pre", "approach", "contact", "base_path", "direction", "distance_m")
+    TARGET_KEYS = ("pre", "approach", "contact", "base_path", "direction", "distance_m", "second")
 
     def __post_init__(self):
-        self.arms = (self.contact.arm,)
+        if self.second is not None and self.second.arm == self.contact.arm:
+            raise SidecarError(f"base_push: the second hand must be the other arm, both are {self.contact.arm!r}")
+        self.arms = (self.contact.arm,) + ((self.second.arm,) if self.second is not None else ())
         self.objects = (self.contact.object,)
         super().__post_init__()
+
+    @property
+    def contacts(self) -> List[PushContact]:
+        """The hands' records, the first hand first."""
+        return [self.contact] + ([self.second] if self.second is not None else [])
+
+    def hand(self, arm: str) -> "BasePush":
+        """The push as ``arm``'s hand sees it: this action for the first hand, a one-hand copy on the second hand's record for the other."""
+        if arm == self.contact.arm:
+            return self
+        if self.second is None or self.second.arm != arm:
+            raise SidecarError(f"base_push: no {arm} hand on {self.contact.object}")
+        return replace(self, contact=self.second, second=None)
 
     @property
     def base_line(self) -> Tuple[List[float], List[float]]:
@@ -1349,10 +1370,11 @@ class BasePush(Action):
 
     def targets(self, sidecar, state):
         C = _conventions()
-        c = self.contact
+        c, s = self.contact, self.second
         start, end = self.base_line
+        second = None if s is None else {"arm": s.arm, "pre": s.pre, "approach": _line(C, s.pre, s.init), "contact": s.init}
         return {"pre": c.pre, "approach": _line(C, c.pre, c.init), "contact": c.init, "base_path": [start, end], "direction": list(c.direction),
-                "distance_m": c.distance_m}
+                "distance_m": c.distance_m, "second": second}
 
     def end_pose(self, sidecar, state):
         eef = getattr(state, "eef_pose", None)
@@ -1368,10 +1390,11 @@ class BasePush(Action):
         obj = sidecar.language.phrase(c.object)
         to = f" next to {sidecar.language.phrase(self.partner)}" if self.partner else ""
         word = direction_word(c.direction, self.base_yaw)
-        fine = f"push {obj} {word} across the floor{to} by driving the base, the closed {_hand(c.arm)} on it"
+        hands = f"the closed {_hand(c.arm)}" if self.second is None else "both closed hands"
+        fine = f"push {obj} {word} across the floor{to} by driving the base, {hands} on it"
         h = c.extra.get("push_height_m")
         at = f" at {_cm(float(h))} height" if isinstance(h, (int, float)) else ""
-        return fine, f"push {obj} {_cm(c.distance_m)} {word} across the floor{to} by driving the base, the closed {_hand(c.arm)} on it{at} from {_xyz(c.init.position)}"
+        return fine, f"push {obj} {_cm(c.distance_m)} {word} across the floor{to} by driving the base, {hands} on it{at} from {_xyz(c.init.position)}"
 
 
 @dataclass(kw_only=True)

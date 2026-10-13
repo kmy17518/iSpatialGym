@@ -1472,6 +1472,15 @@ Recorded: `contacts.push` with `kind: "base_push"` (pre / init (contact) / goal 
 `nextto_bound_m`, `drift_tol_m` 0.10, `nextto_push_on_m` 0.05, `push_speed_m_s` 0.08); the program is travel → `base_push` → retreat
 (oracle doc 6.2). Every key above is read by this mode only (defaults `iors_large_nextto.DEFAULTS`; also `goal_tries` 24,
 `distance_draws` 3, `push_ik_max` 16, `init_distance_m`, `init_bearing_max_deg`).
+**Two hands** (`push_hands` 2, owner 2026‑10‑12 ~20:17 item C; default 1): two push spots symmetric about the face's centre line,
+`push_hand_spacings_m` (0.30, 0.26, 0.34, 0.22) apart, each probed as the centre line is (flat, inset), the two within
+`push_hands_depth_tol_m` 0.03 m along the normal; the base centred behind their midpoint (no lateral shift), each hand on the spot on
+its side, both reach margins and both contacts in frame; the first arm's chain as above, the second arm's as the second-arm rule solves a
+brace (`program_check.second_hand_chain`: its pre-contact with the first hand at its pre-contact, its approach with the first hand
+locked at its contact, both hands at contact collision-free); the sweep with both arms at contact. Recorded as `contacts.push.second_hand`
+(arm, pre / init / goal, contact point / in object, pitch, wrist) + `hand_spacing_m`, `face_centre_in_object`, `push_hands`; the program
+check verifies the second hand the same way (witnesses `second.*`). A face without two spots falls back to the one hand
+(`two_hand_fallback`). The program is travel → `base_push` (both arms) → retreat (first hand) → retreat (second hand).
 
 **Init surface** — an explicit choice of `ground_isg` (it is in the alias), never a runtime fallback. Selection order
 (owner decision 2026‑09‑16, A5; minimise floor inits): under — (a) a support object whose near AABB side lies within
