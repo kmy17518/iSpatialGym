@@ -991,6 +991,26 @@ def program_alignment_axial(sc: Sidecar) -> List[Action]:
     return _travel(sc, "init", "manipulation") + _brace_push_retreat(sc, brace, push, base_yaw)
 
 
+#: the push-under push's retreat (owner 2026-10-13 ~04:30 item 1a): back along the reversed push direction at the push height first (the
+#: corridor the push just swept, at most its length), then up - straight up from the push goal, the wrist camera of the 'pitch 0-' turn
+#: (7.6 cm above the eef, up to 7.5 cm toward the bed) met bed_rrcvaq_0's edge one step after the retreat (under_large#01 c3_k0)
+PUSH_UNDER_RETREAT_SLIDE_M = 0.10
+PUSH_UNDER_RETREAT_LIFT_M = 0.10
+
+
+def push_under_retreat(push: PushContact) -> Dict[str, Any]:
+    """The ``Retreat`` keywords of a push-under push's retreat, from the recorded contact: ``distance`` =
+    :data:`PUSH_UNDER_RETREAT_SLIDE_M` (at most the blade's travel ``init -> goal``) along ``slide_dir`` = the push direction reversed in
+    the floor plane, then ``lift_after_m`` = :data:`PUSH_UNDER_RETREAT_LIFT_M`."""
+    dx, dy = float(push.direction[0]), float(push.direction[1])
+    n = math.hypot(dx, dy)
+    if n < 1e-6:
+        raise SidecarError(f"contacts.push.direction: a push-under push runs along the floor, got {list(push.direction)!r}")
+    swept = math.hypot(float(push.goal.position[0]) - float(push.init.position[0]), float(push.goal.position[1]) - float(push.init.position[1]))
+    slide = min(PUSH_UNDER_RETREAT_SLIDE_M, swept) if swept > 1e-3 else PUSH_UNDER_RETREAT_SLIDE_M
+    return {"distance": slide, "slide_dir": [-dx / n, -dy / n, 0.0], "lift_after_m": PUSH_UNDER_RETREAT_LIFT_M}
+
+
 def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     """init A → manipulation B (transition) → grasp → lift (orientation kept) → navigate_to placement C with the object
     attached (recorded path; the retreat transition before lowering the trunk toward the floor band for under, where
@@ -1000,7 +1020,7 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     object is dropped on the floor outside the partner's footprint edge and pushed under it with the closed gripper
     along the recorded straight floor push ``contacts.push`` (``kind: "push_under"``, from stance C): ``… → place(drop)
     → retreat → push → retreat``. The push may touch the floor and the target, never the partner; ``under`` is read in
-    the epilogue after the push.
+    the epilogue after the push. The push's retreat backs out along the push at its height, then lifts (:func:`push_under_retreat`).
 
     inside / touching / nextto (registered 2026-10-12 ahead of their modes): each relation's own program,
     :func:`program_iors_large_inside` / :func:`program_iors_large_touching` / :func:`program_iors_large_nextto`."""
@@ -1038,7 +1058,8 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     base_yaw = sc.stance(push_stance).base_pose2d[2]
     p = Push(contact=push, base_yaw=base_yaw, touches=(g.place_on,) if g.place_on else (), avoid=avoid)
     to_push = _travel(sc, "placement", "push") if push_stance == "push" else []
-    return head + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)] + to_push + [p, Retreat(arm=push.arm, object=push.object, after=p)]
+    return (head + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)] + to_push
+            + [p, Retreat(arm=push.arm, object=push.object, after=p, **push_under_retreat(push))])
 
 
 def program_iors_large_inside(sc: Sidecar) -> List[Action]:

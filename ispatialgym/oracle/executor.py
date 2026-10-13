@@ -516,6 +516,7 @@ NOTE_KEYS = NOTE_KEYS + ("repose",)  # block design: the joint-space re-pose bef
 NOTE_KEYS = NOTE_KEYS + ("retreat_planned_fallback",)  # owner 2026-09-26 (axial 0926-061151): a failed retreat leg replaced by a planned transit
 NOTE_KEYS = NOTE_KEYS + ("ag_joint_type",)  # the assisted-grasp joint a handle grasp got (the task's rule for links behind a movable joint)
 NOTE_KEYS = NOTE_KEYS + ("retreat_slide_first",)  # root_moved (2026-09-27, carton lever): the lever fist slides out before it lifts
+NOTE_KEYS = NOTE_KEYS + ("retreat_escape", "retreat_witness_dropped")  # the push-under retreat (owner 2026-10-13 ~04:30): its leg, a stale witness dropped
 #: first-demo v2.1 A3 (bar soap 0927-034001): a library pinch lifted off the support under it, a support place raised for the in-hand pose
 NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
 #: owner audit 2026-10-09: a grasp approach stopped on the support, a free-hanging drop released at once, a next-to / touching place moved
@@ -1288,6 +1289,20 @@ class Executor:
                     out[key] = th.tensor([float(v) for v in q], dtype=th.float32)
         return out
 
+    def witness_poses_for(self, index: int) -> Dict[str, Tuple[th.Tensor, th.Tensor]]:
+        """The eef poses the witnesses of action ``index`` were recorded for (``ik_witnesses[].targets[key].pose``) as ``{target key: (pos,
+        quat)}``; a key without a recorded pose is left out."""
+        entries = (getattr(self.sidecar, "extra", None) or {}).get("ik_witnesses") or []
+        out: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+        for e in entries:
+            if not isinstance(e, dict) or e.get("action") != index:
+                continue
+            for key, w in (e.get("targets") or {}).items():
+                p = w.get("pose") if isinstance(w, dict) else None
+                if isinstance(p, dict) and p.get("position") is not None and p.get("orientation") is not None:
+                    out[key] = (th.tensor([float(v) for v in p["position"]], dtype=th.float32), th.tensor([float(v) for v in p["orientation"]], dtype=th.float32))
+        return out
+
     def next_contact(self, index: int, arm: str) -> Optional[Dict[str, Any]]:
         """The next contact of ``arm`` after the travel legs that follow action ``index`` (``execute.keep_arm_branch``, first-demo v2.1
         A2): the first action past the transitions / navigates, when it moves ``arm``, with its chain - the actions of ``arm`` up to the
@@ -1425,6 +1440,7 @@ class Executor:
             return v, ctx
         ctx["targets_keys"] = sorted(targets.keys())
         ctx["witnesses"] = self.witnesses_for(index)
+        ctx["witness_poses"] = self.witness_poses_for(index)
         ov = self._witness_overrides.get(index)
         if ov:
             ctx["witnesses"].update(ov["witnesses"])
@@ -1902,9 +1918,15 @@ class Executor:
         about its long axis in the ICL symmetry survey (:func:`revolution_axis`) is judged modulo rotation about that
         axis — ``orientation_error`` becomes the angle between the axis now and at the goal (nearest recorded
         equivalence, :meth:`axis_error`), ``full_error`` keeps the evaluator's reading, ``equivalence`` names the axis;
-        every other object keeps the full error."""
+        every other object keeps the full error.
+
+        **Push-under targets** (owner 2026-10-13 ~04:30 item 1c): an object the program pushes under its partner (a ``Push`` of kind
+        ``push_under``, read off the program the record expands to) is judged modulo rotation about the world vertical - the yaw the
+        floor push gives it is free, its tilt stays gated: ``orientation_error`` becomes :meth:`vertical_error` (the smaller of the two
+        readings for a cylinder), ``full_error`` and ``equivalence`` as for the cylinders."""
         errs = (isg.get("errors") or {}).get("pose_errors") or {}
         out: Dict[str, Dict[str, Any]] = {}
+        pushed_under = self.pushed_under_objects()
         for obj in self.placed_objects():
             tgt = self.state.pose_target(obj) if hasattr(self.state, "pose_target") else None
             rep = errs.get(obj) if isinstance(errs.get(obj), dict) else {}
@@ -1925,8 +1947,25 @@ class Executor:
                     entry.update({"orientation_error": ax_err, "within": ax_err <= tol, "full_error": float(err),
                                   "equivalence": f"rotation about the {axis['axis']} axis (revolution, survey tags {axis.get('tags')})",
                                   "revolution_axis": axis["axis"], "model": axis.get("key")})
+            if obj in pushed_under and str(getattr(tgt, "frame", "world")) == "world":
+                v_err = self.vertical_error(obj, tgt)
+                if v_err is not None and ("revolution_axis" not in entry or v_err < float(entry["orientation_error"])):
+                    entry.update({"orientation_error": v_err, "within": v_err <= tol, "full_error": float(err),
+                                  "equivalence": "rotation about the world vertical (push-under: the yaw is free, the tilt is gated)"})
             out[obj] = entry
         return out
+
+    def pushed_under_objects(self) -> set:
+        """The bddl instances the program pushes under their partner (a ``Push`` of kind ``push_under``)."""
+        return {a.contact.object for a in self.program_actions if isinstance(a, Push) and a.kind == "push_under"}
+
+    def vertical_error(self, obj: str, tgt) -> Optional[float]:
+        """:func:`vertical_angle` of a placed object's orientation now against its recorded goal orientation and equivalences."""
+        try:
+            _, q_cur = self.state.object_pose(obj)
+        except Exception:  # noqa: BLE001
+            return None
+        return vertical_angle(q_cur, getattr(tgt, "orientation"), getattr(tgt, "orientation_equivalences", None) or ())
 
     def revolution_axis_of(self, obj: str) -> Optional[Dict[str, Any]]:
         """The :func:`revolution_axis` entry of a placed object's model (``category`` / ``model`` of the scene object,
@@ -2348,7 +2387,8 @@ class Executor:
 
     def goal_override(self, tro_meta, compiled_task=None) -> Dict[str, Any]:
         """Settled values for every TRO target within its override threshold: gating targets use their own tolerance,
-        measured-only targets spec §8's max(0.01 m, 0.25 × smallest horizontal extent) / 0.20 rad. Returns
+        measured-only targets spec §8's max(0.01 m, 0.25 × smallest horizontal extent) / 0.20 rad; a push-under target's orientation is
+        judged modulo rotation about the world vertical (:func:`vertical_angle`, as the ``placed_orientation`` gate). Returns
         ``{"pose_targets": {inst: {...}}, "groups": {...}, "articulation_targets": {...}, "applied": [...]}``; the
         caller writes the TRO."""
         out: Dict[str, Any] = {"pose_targets": {}, "groups": {}, "articulation_targets": {}, "applied": [], "skipped": []}
@@ -2442,6 +2482,9 @@ class Executor:
             cands = [tgt.orientation.float()] + [C.qmul(tgt.orientation.float(), C.qinv(e.float())) for e in (tgt.orientation_equivalences or [])]
             da = min(C.quat_angle(q, c) for c in cands)
             rec.update({"orientation": q.tolist(), "orientation_was": tgt.orientation.tolist(), "orientation_error": da})
+            if inst in self.pushed_under_objects():  # judged as the placed_orientation gate judges it: the yaw is free
+                da = vertical_angle(q, tgt.orientation, tgt.orientation_equivalences or ())
+                rec.update({"orientation_error_full": rec["orientation_error"], "orientation_error": da, "equivalence": "rotation about the world vertical (push-under)"})
             ok = ok and da <= rot_tol
         rec["applied"] = ok
         return rec
@@ -2494,6 +2537,18 @@ def _hold_actions(robot, steps: int) -> Iterator[th.Tensor]:
     st.hold_current()
     for _ in range(int(steps)):
         yield st.action()
+
+
+def vertical_angle(q_cur, goal_q, equivalences: Sequence[Any] = ()) -> float:
+    """The angle (rad) between the world vertical and the object-frame axis that is vertical at ``goal_q``, at the orientation ``q_cur``
+    (minimised over the object-frame ``equivalences``): the orientation error modulo rotation about the world vertical, the tilt off the goal."""
+    up = th.tensor([0.0, 0.0, 1.0])
+    a = C.quat_rotate(C.qinv(C.as_tensor(goal_q).float()), up)
+    best = math.pi
+    for e in [None] + list(equivalences or []):
+        q = C.as_tensor(q_cur).float() if e is None else C.qmul(C.as_tensor(q_cur).float(), C.as_tensor(e).float())
+        best = min(best, math.acos(max(-1.0, min(1.0, float(th.dot(C.quat_rotate(q, a), up))))))
+    return float(best)
 
 
 def _unsatisfied(isg: Dict[str, Any]) -> List[str]:
@@ -2556,5 +2611,5 @@ def apply_goal_override(tro_raw: Dict[str, Any], override: Dict[str, Any], tro_k
 
 
 __all__ = [
-    "ExecutorConfig", "Checkpoint", "ActionRecord", "SimState", "MotionSnapshot", "Executor", "apply_goal_override", "AGENT_INSTANCE",
+    "ExecutorConfig", "Checkpoint", "ActionRecord", "SimState", "MotionSnapshot", "Executor", "apply_goal_override", "AGENT_INSTANCE", "vertical_angle",
 ]

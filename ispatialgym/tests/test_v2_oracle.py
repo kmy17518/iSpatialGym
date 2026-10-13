@@ -3328,9 +3328,9 @@ def test_push_under_retreat_leaves_the_floor_straight_up(kind):
     push combined the partner (the table the object went under is in the contact's support list) and the floor into a
     diagonal escape normal and projected the back-off perpendicular to it - 10 cm back AND 7 cm down, the fingertips into
     the floor, the arm pressing it for ~100 steps while the base rocked. A floor blade (``contacts.push.kind ==
-    "push_under"``, or the large-scale touching push ``"push_touching"``) now leaves straight up along its own approach axis:
-    every waypoint of the executed leg is at or above the hand, the last one at the recorded pre pose, and the escape is
-    recorded as skipped."""
+    "push_under"``, or the large-scale touching push ``"push_touching"``) now leaves straight up along its own approach axis
+    (the push-under retreat backs out along the push at the hand's height first, owner 2026-10-13 ~04:30): every waypoint of
+    the executed leg is at or above the hand, the last one above it, and the escape is recorded as skipped."""
     sc = Sidecar.load(os.path.join(VARIANTS, "inter_object_relation_satisfaction-under_large_scale__push_under.json"))
     actions = expand(sc.alias, sc)
     push = [a for a in actions if isinstance(a, Push)][0]

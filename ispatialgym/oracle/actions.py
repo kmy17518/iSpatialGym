@@ -1403,7 +1403,8 @@ class Retreat(Action):
     ``gripper(open)`` first when ``release`` (a brace or a held handle), then ``arm_along(retreat)``; postcondition:
     eef clear by ``distance`` (``RETREAT_DIST``, or ``RETREAT_LITTLE`` "away a little" after a place).
 
-    targets: ``{"retreat": [Pose, ...]}`` — straight segment to ``pre_pose(start, distance)`` (``line_waypoints``).
+    targets: ``{"retreat": [Pose, ...]}`` — straight segment to ``pre_pose(start, distance)`` (``line_waypoints``); two legs with
+    ``lift_first_m`` (up, then along ``slide_dir``) or ``lift_after_m`` (along ``slide_dir``, then up).
     """
 
     name: str = "retreat"
@@ -1421,12 +1422,29 @@ class Retreat(Action):
     #: the box against the other hand's grasp
     lift_first_m: Optional[float] = None
     slide_dir: Optional[List[float]] = None
+    #: owner 2026-10-13 ~04:30 item 1a (the push-under retreat): the other order - first ``distance`` along ``slide_dir`` at the height of
+    #: the preceding action's recorded end (back out through the corridor the push swept), then straight UP by ``lift_after_m``; both
+    #: legs end at poses taken from that recorded end, the poses the sampler checks and records the witness of
+    lift_after_m: Optional[float] = None
     TARGET_KEYS = ("retreat",)
 
     def __post_init__(self):
         self.arms = (self.arm,)
         self.objects = (self.object,)
         super().__post_init__()
+        if self.lift_after_m is not None and (self.slide_dir is None or self.lift_first_m is not None):
+            raise ValueError("retreat: lift_after_m needs slide_dir and excludes lift_first_m")
+
+    def _slid_path(self, C, start: Pose, recorded: Pose) -> Optional[List[Pose]]:
+        """The slide-then-lift retreat: from where the hand is to ``distance`` along ``slide_dir`` from the recorded end, at its height,
+        then up ``lift_after_m``."""
+        if self.lift_after_m is None:
+            return None
+        d = C.unit(_tensor(self.slide_dir).reshape(-1)[:3].float())
+        p_mid = _tensor(recorded.position).reshape(-1)[:3].float() + d * float(self.distance)
+        mid = Pose([float(v) for v in p_mid.tolist()], list(recorded.orientation))
+        end = Pose([float(v) for v in (p_mid + _tensor([0.0, 0.0, float(self.lift_after_m)])).tolist()], list(recorded.orientation))
+        return _line(C, start, mid) + _line(C, mid, end)
 
     def _lifted_path(self, C, start: Pose, recorded: Pose) -> Optional[List[Pose]]:
         """The two-leg retreat: up ``lift_first_m`` from where the hand is, then ``distance`` along ``slide_dir`` (or -a)."""
@@ -1470,9 +1488,13 @@ class Retreat(Action):
     def targets(self, sidecar, state):
         C = _conventions()
         start, end = self._segment(sidecar, state)
-        lifted = self._lifted_path(C, start, self.after.end_pose(sidecar, state) or start)
+        recorded = self.after.end_pose(sidecar, state) or start
+        lifted = self._lifted_path(C, start, recorded)
         if lifted is not None:
             return {"retreat": lifted}
+        slid = self._slid_path(C, start, recorded)
+        if slid is not None:
+            return {"retreat": slid}
         slide = self._edge_escape(C, start)
         if slide is not None:
             return {"retreat": _line(C, start, slide) + _line(C, slide, end)[1:]}
@@ -1501,10 +1523,11 @@ class Retreat(Action):
         return Pose([float(v) for v in (p + radial * self.EDGE_ESCAPE_M).tolist()], list(start.orientation))
 
     def end_pose(self, sidecar, state):
-        if self.lift_first_m is not None:
+        if self.lift_first_m is not None or self.lift_after_m is not None:
             C = _conventions()
             start, _ = self._segment(sidecar, state)
-            path = self._lifted_path(C, start, self.after.end_pose(sidecar, state) or start)
+            recorded = self.after.end_pose(sidecar, state) or start
+            path = self._lifted_path(C, start, recorded) or self._slid_path(C, start, recorded)
             if path:
                 return path[-1]
         return self._segment(sidecar, state)[1]
@@ -1513,6 +1536,9 @@ class Retreat(Action):
         obj = sidecar.language.phrase(self.object)
         release = f"release {obj} and " if self.release else ""
         fine = f"{release}move the {_hand(self.arm)} away from {obj}"
+        if self.lift_after_m is not None:
+            back = "back along the push" if getattr(self.after, "name", "") == "push" else "sideways"
+            return fine, f"{fine}: {_cm(self.distance)} {back} at its height, then {_cm(self.lift_after_m)} up"
         numbers = f"{fine} by {_cm(self.distance)} along the approach axis"
         return fine, numbers
 

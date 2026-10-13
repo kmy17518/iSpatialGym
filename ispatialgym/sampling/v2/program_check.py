@@ -1305,7 +1305,8 @@ def check_base_follow_handles(sidecar: SidecarDraft, sampler, action, targets: D
 def _ignore_for(action, sampler, carried: Optional[str], sidecar=None) -> Tuple[List[Any], List[Any]]:
     """(objects removed for the final pose only, objects removed for every waypoint) per §3.6: the support for grasp /
     place / contact end poses; the pushed object along a push; the braced object at the brace contact; the object placed
-    on at the place pose (the carried object rests on it 1 cm above).
+    on at the place pose (the carried object rests on it 1 cm above). A push-under leg after the drop (:func:`_push_under_floor`) removes
+    the pushed / released object and the floor only - never the supports, which on a bed-top init are the partner.
 
     Block design (``sidecar.blocks[]``, owner 2026-09-19): a block record's ``ignore_place`` (instance names) is removed for
     the block's final ``place`` and the ``retreat`` after it - the blocks already at their slots beside it, which the sampler
@@ -1336,6 +1337,13 @@ def _ignore_for(action, sampler, carried: Optional[str], sidecar=None) -> Tuple[
     explicit = _explicit_ignores(rec, sampler)
     if explicit is not None:
         return explicit
+    floor = _push_under_floor(action)
+    if floor is not None:
+        # owner 2026-10-13 ~04:30 item 1b: a push-under leg after the drop works on the floor in front of the partner - the pushed / released
+        # object and the floor the blade slides on leave the world, the init surface does not (on a bed-top init it IS the partner: the push
+        # and the retreat were checked with the bed ignored and the wrist camera's contact with it went unseen, under_large#01 c3_k0)
+        obj = getattr(getattr(action, "contact", None), "object", None) if name == "push" else getattr(action, "object", None)
+        return [], [objs[n] for n in (obj, floor) if n in objs]
     # the surface the grasped object rests on: a module may name it (``grasp_ignore_objects``: IORS large-scale's floor class rests
     # the target on the FLOOR, which ``support_objects`` leaves out - its AABB would forbid every parking cell); the lift tracked
     # from the real grasp configuration (2026-09-24) brushed the floor mesh at margin 0 in 1 of 11 configurations with the floor
@@ -1388,6 +1396,35 @@ def _ignore_for(action, sampler, carried: Optional[str], sidecar=None) -> Tuple[
             if n_ in objs and all(objs[n_] is not o for o in every):
                 every.append(objs[n_])
     return last, every
+
+
+def _push_kind(action) -> Optional[str]:
+    """``contacts.push.kind`` of a push action (``Push.kind``), None for anything else."""
+    if getattr(action, "name", "") != "push":
+        return None
+    return str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "push")
+
+
+def _push_under_floor(action) -> Optional[str]:
+    """The floor instance a push-under leg after the drop slides along: the ``push_under`` push (``Push.touches``) and the retreats after
+    it and after the push-under drop (``Place`` of kind ``drop`` under the partner: ``Place.on``); None for every other action."""
+    name = getattr(action, "name", "")
+    after = getattr(action, "after", None) if name == "retreat" else None
+    push = action if name == "push" else after
+    if _push_kind(push) == "push_under":
+        return next(iter(getattr(push, "touches", None) or ()), "")
+    if after is not None and getattr(after, "name", "") == "place" and getattr(after, "kind", None) == "drop" and getattr(after, "relation", None) == "under":
+        return getattr(after, "on", None) or ""
+    return None
+
+
+def _slab_off(action) -> bool:
+    """Whether ``action``'s targets are checked with the cuRobo ground slab off: a floor-level push whose blade runs below the slab's padding
+    (``contacts.push.ground_ignored``, IORS push-under 2026-09-20: the sampler solved the chain with the slab off; the oracle tracks the legs
+    without a veto), and the retreat after it that backs out at the push height before it lifts (``Retreat.lift_after_m``)."""
+    name = getattr(action, "name", "")
+    push = action if name == "push" else (getattr(action, "after", None) if name == "retreat" and getattr(action, "lift_after_m", None) is not None else None)
+    return bool(_push_kind(push) is not None and (getattr(getattr(push, "contact", None), "extra", None) or {}).get("ground_ignored"))
 
 
 def _is_pack_push(sidecar, action) -> bool:
@@ -1962,9 +1999,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         if pre_l and wps_l:
             rest = [(k, p_) for k, p_ in pose_targets if k not in ("pre", "waypoints")]
             pose_targets = [("waypoints", list(pre_l[0][1]) + list(wps_l[0][1]))] + rest
-    # a floor-level push whose blade runs below the cuRobo ground slab's padding (``contacts.push.ground_ignored``, IORS push-under
-    # 2026-09-20): the sampler solved the chain with the slab off, so is it checked; the oracle tracks the legs without a veto
-    slab_off = bool(name == "push" and ((getattr(getattr(action, "contact", None), "extra", None) or {}).get("ground_ignored")))
+    slab_off = _slab_off(action)
     # owner 2026-09-24 (block design 0921-050358 action 15: 'the sidecar's pre-pose and end-pose witnesses are in different IK
     # branches', finish rejected 3.2 rad away): the legs are checked as ONE chain the way the oracle runs them -
     #   * a chain whose first pose is where the arm already IS (the previous action's end configuration, or the end of a chain

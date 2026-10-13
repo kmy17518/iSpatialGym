@@ -327,6 +327,8 @@ class ExecuteConfig:
     #: a retreat leg that fails (plan_failed) short of both the partial acceptance and the contact escape is replaced by a planned
     #: transit to its end pose from where the hand is, before the action fails (owner 2026-09-26, axial 0926-061151 retreat[2])
     retreat_plan_fallback: bool = True
+    #: a slide-then-lift retreat's recorded witness is used only within this of the leg's end pose (m; ``_retreat_witness``)
+    retreat_witness_pose_tol_m: float = 0.02
     #: a pad leaving a brace / push contact first moves this far straight away from the supports (escape_direction) (m; 0 = off)
     contact_retreat_escape_m: float = 0.05
     #: owner 2026-09-22 11:27: a pinching hand that comes from its own brace beside the object reaches the pre-grasp by a tracked
@@ -3178,6 +3180,24 @@ def _start_world_offenders(motions: Motions, state, arm: str, ignore: Sequence[A
         return []
 
 
+def _retreat_witness(action: Retreat, targets, ctx: Dict[str, Any], cfg: ExecuteConfig):
+    """The recorded IK witness the retreat's finish aims at (``_witness``), except for a slide-then-lift retreat (``Retreat.lift_after_m``)
+    whose witness was recorded for another pose than the leg's end (``ctx["witness_poses"]``, beyond ``retreat_witness_pose_tol_m``): a
+    record sampled before the push-under retreat backed out first carries the witness of the straight lift off the push goal, and a
+    finish planned to it would lift the hand into the partner's edge. Dropped: the finish takes cuRobo's IK (``ctx["retreat_witness_dropped"]``)."""
+    q = _witness(ctx, "retreat")
+    if q is None or getattr(action, "lift_after_m", None) is None:
+        return q
+    rec = (ctx.get("witness_poses") or {}).get("retreat")
+    off = None if rec is None else float(th.linalg.norm(C.as_tensor(rec[0]).reshape(-1)[:3].float() - as_world_pose(targets["retreat"][-1])[0].float()))
+    if off is not None and off <= cfg.retreat_witness_pose_tol_m:
+        return q
+    ctx["retreat_witness_dropped"] = {"recorded_pose_off_m": None if off is None else round(off, 4), "tolerance_m": cfg.retreat_witness_pose_tol_m}
+    log.info("retreat(%s): the recorded witness belongs to a pose %s from this leg's end (the record predates the slide-then-lift retreat) - not used",
+             action.arm, "of unknown distance" if off is None else f"{off * 100:.1f} cm")
+    return None
+
+
 def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
@@ -3224,7 +3244,7 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
     if start_off:
         ctx["retreat_start_offenders"] = sorted(getattr(o, "name", str(o)) for o in start_off)
         ignore = ignore + start_off
-    finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
+    finish = _free_leg_finish(state, targets["retreat"][-1], _retreat_witness(action, targets, ctx, cfg), ignore, cfg)
     if links:
         finish.ignore_links = list(links)
     leg = list(targets["retreat"])
@@ -3250,12 +3270,14 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         held_press = bool(after_x.get("straight_retreat"))  # a push-close segment: the fist leaves the tip straight back (no radial slide on the link)
     if after_x.get("kind") in ("push_under", "push_touching"):
         # a FLOOR blade (IORS push-under / large-scale touching) leaves along its own approach axis - straight UP to the recorded pre
-        # pose (the default leg already in ``targets``). The radial escape below combined the partner (the table the object went
-        # under is in the contact's support list) and the floor into a diagonal escape normal (back + up) and projected the back-off
-        # perpendicular to it: 10 cm back AND 7 cm DOWN, the fingertips into the floor within 0.4 s, the arm pressing the
+        # pose (the default leg already in ``targets``); the push-under retreat backs out along the push at its height first, then
+        # lifts (``Retreat.lift_after_m``, the leg in ``targets``). The radial escape below combined the partner (the table the object
+        # went under is in the contact's support list) and the floor into a diagonal escape normal (back + up) and projected the
+        # back-off perpendicular to it: 10 cm back AND 7 cm DOWN, the fingertips into the floor within 0.4 s, the arm pressing the
         # floor for ~100 steps and rocking the base 0.4-0.9 deg (0921-021333 / 021337: the wobble at the end of the push)
         held_press = True
-        ctx["retreat_escape"] = {"skipped": f"{after_x.get('kind')}: straight up along -a"}
+        how = "back along the push at its height, then up" if getattr(action, "lift_after_m", None) is not None else "straight up along -a"
+        ctx["retreat_escape"] = {"skipped": f"{after_x.get('kind')}: {how}"}
     if isinstance(getattr(action, "after", None), (Brace, Push)) and cfg.contact_retreat_escape_m > 0 and not held_press:
         # rush 2026-09-17: a pad leaving a contact first moves straight away from the supports (the wall normal / up from a
         # table: escape_direction, as the pre-pose standoff) before the leg to the recorded clear pose - that single
