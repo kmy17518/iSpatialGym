@@ -583,6 +583,27 @@ def test_annotation_numbers():
     assert "to the left" in fine and "1.8 cm" in numbers  # partner on the robot's left
 
 
+def test_brace_annotation_says_open_for_a_wide_stop():
+    """Owner 2026-10-14 ~04:25 ("fix it"): an open-finger brace (the record's ``fingers_opening_m``: touching's wide stop
+    ``brace_wide_h-``) was annotated "with the closed left hand"; a closed brace keeps its text."""
+    import copy
+
+    sc = load("inter_object_relation_satisfaction-touching")
+    brace = [a for a in expand(sc.alias, sc) if a.name == "brace"][0]
+    assert not A.brace_is_open(brace.contact)
+    fine, numbers = brace.annotate(sc)
+    assert fine.endswith("with the closed left hand") and numbers.startswith(fine + " at x=")
+    wide = copy.deepcopy(brace)
+    wide.contact.extra["fingers_opening_m"] = 0.0315
+    assert A.brace_is_open(wide.contact)
+    fine_w, numbers_w = wide.annotate(sc)
+    assert fine_w == fine.replace("with the closed left hand", "with the open left hand")
+    assert numbers_w == numbers.replace("with the closed left hand", "with the open left hand")
+    for v in (None, 0.0, "x"):
+        wide.contact.extra["fingers_opening_m"] = v
+        assert not A.brace_is_open(wide.contact) and wide.annotate(sc) == (fine, numbers)
+
+
 def test_direction_words():
     yaw = 1.5708  # facing +y: forward = +y, left = -x
     assert A.direction_word([0, 1, 0], yaw) == "forward"

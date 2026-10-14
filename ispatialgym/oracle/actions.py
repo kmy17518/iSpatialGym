@@ -1117,7 +1117,8 @@ _BRACE_WORDS = {
 class Brace(Action):
     """Brace with the closed gripper (``contacts.brace`` / a block's ``brace_row`` / ``brace_col``): ``gripper(close)``
     → ``arm_to(pre)`` → ``arm_along(pre → contact)``; placed before the working arm moves and held (no further
-    command) until that arm's ``Retreat``. ``failed_grasp`` is not checked (``qa_exempt``).
+    command) until that arm's ``Retreat``. ``failed_grasp`` is not checked (``qa_exempt``). A wide stop (the record's
+    ``fingers_opening_m``, :func:`brace_is_open`) pre-shapes the fingers open instead of closing them, and is annotated so.
 
     targets: ``{"pre": Pose, "contact": Pose, "approach": [Pose, ...]}`` (``line_waypoints`` pre → contact).
 
@@ -1149,9 +1150,19 @@ class Brace(Action):
         c = self.contact
         obj = sidecar.language.phrase(c.object)
         where = _BRACE_WORDS.get(c.kind, f"at its {c.kind.replace('_', ' ')}")
-        fine = f"brace {obj} {where} with the closed {_hand(c.arm)}"
+        fine = f"brace {obj} {where} with the {'open' if brace_is_open(c) else 'closed'} {_hand(c.arm)}"
         numbers = f"{fine} at {_xyz(c.contact.position)}, pressing {direction_word(c.direction, self.base_yaw)} ({c.kind})"
         return fine, numbers
+
+
+def brace_is_open(contact) -> bool:
+    """A wide stop: the brace record pre-shapes the fingers to ``fingers_opening_m`` (> 0) so both fingertips meet the braced face
+    (``execute_brace`` opens the gripper to it before the transit); every other brace closes the gripper."""
+    opening = (getattr(contact, "extra", None) or {}).get("fingers_opening_m")
+    try:
+        return opening is not None and float(opening) > 0.0
+    except (TypeError, ValueError):
+        return False
 
 
 @dataclass(kw_only=True)
