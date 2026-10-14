@@ -2304,6 +2304,29 @@ above b / μ ≈ 4.3 cm, μ ≈ 0.5) no leaning or low blade passed the exact IK
 (pair1013_c8_k3 / k4 / k5: every attempt `contact_unreachable`); the mid-height push may tip the box onto the taller partner,
 at most ≈ atan(0.05 / 0.218) = 13° before it rests against it. Aliases without the key are sampled as before.
 
+**Partial-opening release** (owner decision 2026‑10‑14 ~00:43, COMPLAINTS.md nextto#03: "open only as far as the clearance the
+sampler already records, and let go there"; `generation.partial_release`, default unset = off; nextto only; set on
+nextto#03 `tablespoon-chopstick-breakfast_table`). The assisted grasp lets go only at the full open command (+1): side by side
+the spoon's fingertips (at table level, every `tablespoon__yxxfdj__st` grasp closes across it) would open 5.7 cm from the
+handle's centre line while NextTo needs the chopstick within 4.5 cm, so every pair1013 draw was `release_sweep`. With the key
+the oracle releases in three gripper commands (oracle §Place): the pads loosen to `loosen_m` beyond the touch while the weld
+holds, +1 until the weld is gone (one step with the pads clear), then the release opening through the retreat. The sampler
+judges that release instead of the fully open jaw: per finger the touch = half the library row's pinch width (else the hull
+chord between the pads) + `touch_extra_m`, the peak = touch + the 1 mm contact squeeze + `loosen_m` + `overshoot_m`; the two
+fingers' mesh hulls (`r1pro_model.finger_hulls_eef`) swept from the touch to the peak at the place, then held at the release
+opening up through the 10 cm retreat, must keep `partner_margin_m` from the partner's hull (a lower bound of the convex
+distance: each hull's vertices and edge points, 2 mm apart, against the other's facet planes), else the place moves along the
+nextto bound (gap up to g_NT − 3 mm, the yaw kept) and the attempt is rejected (`release_sweep`). Recorded in
+`grasps[k].release_sweep` / `summary.release_sweep`: `partial_release`, `regime`, `pinch_held_m` / `pinch_source`,
+`touch_q_m`, `peak_q_m`, `least_q_m` (touch + `pad_clear_m`), `clearance_peak_m` (and at the recorded place
+`clearance_peak_at_place_m`; below 0 there → `release_sweep`), `release_opening_max_m` (both fingers: the widest opening whose
+fingers keep `partner_margin_m`) and `release_opening_m` (the opening the oracle commands: 2 × `least_q_m`, at most that
+maximum); the regime is copied to `sidecar.extra["partial_release"]`. Defaults (`conventions.PARTIAL_RELEASE_DEFAULTS`):
+`loosen_m` 0.002, `overshoot_m` 0.0085 (from rest at the loosened opening the fingers opened 6.5 / 6.8 mm in the one +1 step on
+the nextto#03 probes 17861714 / 17861713 and none further once the release opening was commanded; their cap is 0.25 m/s, 8.7 mm per step),
+`pad_clear_m` 0.004, `partner_margin_m` 0.005 (the oracle's own sweep check, `place_partner_clear_m`), `touch_extra_m` 0.0035
+(the four nextto#03 demos touched 1.1–3.4 mm beyond half the library width).
+
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 
 - ontop / under(small): the partner's top face admits the target footprint with ≥ 1 cm margin — tier `any_yaw`

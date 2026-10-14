@@ -393,6 +393,28 @@ GRIPPER_MAX_OPENING_M = 0.0969
 HANDLE_EEF_OFFSET = 0.012
 #: pre-grasp / pre-contact / pre-place distance back along -a (spec §3.6).
 PRE_DIST = 0.10
+#: The partial-opening release of a next-to place (owner 2026-10-14 ~00:43, COMPLAINTS.md nextto#03; ``generation.partial_release``,
+#: off by default), per finger (m): the pads first loosen ``loosen_m`` beyond the touch while the weld still holds, so the open
+#: command (+1) lets go in its first physics step (pads pressing on the part kept the weld 4-8 physics steps, up to 17 mm of finger
+#: travel); that one action step of +1 carries the fingers at most ``overshoot_m`` further before the release opening is commanded
+#: (from rest at the loosened opening 6.5 / 6.8 mm on the nextto#03 probes 17861714 / 17861713, none past it once the release
+#: opening was commanded; 8.7 mm per step at their 0.25 m/s cap); the release opening clears the held part by ``pad_clear_m``; the
+#: sampler keeps the swept fingers ``partner_margin_m`` from the partner and predicts the touch as half the library pinch width +
+#: ``touch_extra_m`` (the four nextto#03 demos touched 1.1-3.4 mm beyond it).
+PARTIAL_RELEASE_DEFAULTS = {"loosen_m": 0.002, "overshoot_m": 0.0085, "pad_clear_m": 0.004, "partner_margin_m": 0.005, "touch_extra_m": 0.0035}
+
+
+def partial_release_regime(value: Any) -> Optional[Dict[str, float]]:
+    """``generation.partial_release`` / ``sidecar.extra["partial_release"]`` -> the regime (:data:`PARTIAL_RELEASE_DEFAULTS` with the
+    entry's numbers), None when unset / false."""
+    if value is None or value is False:
+        return None
+    out = dict(PARTIAL_RELEASE_DEFAULTS)
+    if isinstance(value, dict):
+        out.update({k: float(v) for k, v in value.items() if k in PARTIAL_RELEASE_DEFAULTS and v is not None})
+    elif value is not True:
+        raise ValueError(f"partial_release: expected true or a dict of {sorted(PARTIAL_RELEASE_DEFAULTS)}, got {value!r}")
+    return out
 
 
 def pad_clearance(pinch_width: float) -> float:

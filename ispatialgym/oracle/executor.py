@@ -525,6 +525,8 @@ NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
 #: owner audit 2026-10-09: a grasp approach stopped on the support, a free-hanging drop released at once, a next-to / touching place moved
 #: off the partner for the release and the push extended by it
 NOTE_KEYS = NOTE_KEYS + ("approach_support_stop", "partner_release_clearance", "push_place_shift_extended_m", "drop_lowered")
+#: owner 2026-10-14 ~00:43 (COMPLAINTS.md nextto#03): the partial-opening release of a next-to place (execute._partial_release)
+NOTE_KEYS = NOTE_KEYS + ("partial_release",)
 #: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
 NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
 #: first-demo v2.1 (sandal on pods): the arm moved into the pre-grasp witness's posture before an approach that tracks only from there
