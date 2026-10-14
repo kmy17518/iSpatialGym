@@ -33297,18 +33297,34 @@
     2.5
    ],
    "push_heights_m": [
-    0.25,
-    0.22,
-    0.28,
-    0.2,
-    0.3,
-    0.18
+    0.15,
+    0.12,
+    0.1,
+    0.14,
+    0.13,
+    0.16
    ],
-   "_push_heights_note": "user 2026-10-13 ~17:12 / ~17:48: the cart (one rigid link, no wheel joints) pushed at 0.40 m tipped forward where its feet cross the living_room_0 / dining_room_0 floor seam (x 9.37; separate floor objects, no step: their feet catch on the edge), and NextTo needs the upright cart 0.26 m past it. Floor probe 17852422 across the seam: 0.40 m tipped (25 deg), 0.25 m crossed (0.3 deg, no stall), 0.15 / 0.10 m crossed after a 10-14 s stall at ~1 m g; the sampler tries the first two heights with push spots, so 0.25 / 0.22 m",
+   "_push_heights_note": "user 2026-10-13 ~17:12 / ~17:48: the cart (one rigid link, no wheel joints) pushed at 0.40 m tipped forward where its feet cross the living_room_0 / dining_room_0 floor seam (x 9.37; separate floor objects, no step: their feet catch on the edge), and NextTo needs the upright cart 0.26 m past it. Floor probe 17852422 across the seam: 0.40 m tipped (25 deg), 0.15 / 0.10 m crossed upright after a 10-14 s stall at ~1 m g (0.25 m crossed cleanly but the cart has no flat face at 0.18-0.30 m): the bottom shelf's line",
    "push_trunks": [
     [
-     0.95,
+     1.5,
+     0.0
+    ],
+    [
+     1.5,
      -0.3
+    ],
+    [
+     1.25,
+     -0.3
+    ],
+    [
+     1.75,
+     0.0
+    ],
+    [
+     2.0,
+     0.0
     ],
     [
      0.95,
@@ -33316,30 +33332,14 @@
     ],
     [
      1.25,
-     -0.3
-    ],
-    [
-     1.25,
      0.0
-    ],
-    [
-     1.5,
-     0.0
-    ],
-    [
-     1.5,
-     -0.3
     ],
     [
      0.95,
-     0.0
-    ],
-    [
-     0.75,
      -0.3
     ]
    ],
-   "_push_trunks_note": "the default push trunks reach no push line at 0.20 m or below and only (0.95, -0.3) at 0.22-0.30 m (two-hand reach margin within push_reach_margin_m [0.03, 0.45] at the stand-offs); the lower trunks reach 0.10-0.30 m",
+   "_push_trunks_note": "the default push trunks reach no push line at 0.20 m or below (two-hand reach margin within push_reach_margin_m [0.03, 0.45] at the stand-offs); these reach 0.10-0.15 m",
    "push_stand_offs_m": [
     0.55,
     0.5,
