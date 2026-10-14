@@ -937,15 +937,17 @@ class SamplerV2(TaskSampler):
     def record_path(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None, max_length_m: Optional[float] = None,
                     blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None,
                     arm_q: Optional[Dict[str, th.Tensor]] = None, start_pose2d: Optional[Tuple[float, float, float]] = None,
-                    edge_slide: bool = False, edge_slide_back_m: float = 0.0) -> PathRecord:
+                    edge_slide: bool = False, edge_slide_back_m: float = 0.0, axis_leg: Optional[Sequence[float]] = None) -> PathRecord:
         """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
         carried object attached (posed in the hand per its grasp record); ``arm_q`` (per arm) fixes the arm posture of the
         drive (a carry: the lift configuration the oracle drives with; default for a carried object: its recorded
         ``carry_arm_q``); ``start_pose2d`` = where the path starts when it is not ``frm``'s base pose (the drive-back pose
         of a departure transition); ``force_global`` plans on the eroded map end to end; ``edge_slide`` (owner 2026-09-24)
         tries the same-edge slide (``NAV.plan_edge_slide``: body facing the edge, no turns, ``edge_slide_back_m`` extra
-        stand-off for the slide) before the grid planner; ``blocked`` (+ :meth:`path_blocked`) = footprints kept off the local
-        map; ``Reject(no_path | path_collision | path_too_long)``."""
+        stand-off for the slide) before the grid planner; ``axis_leg`` (owner 2026-10-13, the drive-backs to try): the edge
+        slide alone (``NAV.plan_axis_leg``: the heading kept, forward / backward and lateral moves only), no grid planner;
+        ``blocked`` (+ :meth:`path_blocked`) = footprints kept off the local map; ``Reject(no_path | path_collision |
+        path_too_long | place_leg_collision | place_leg_heading)``."""
         blocked = list(blocked) + list(self.path_blocked())
         carried = carried or to.carried or frm.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
@@ -970,10 +972,14 @@ class SamplerV2(TaskSampler):
             # and recorded as the face_travel schedule (recorded fallback when the schedule collides); carried legs stay recorded, the
             # schedule only probed at 1 cm for the morning report
             is_carried = bool(carried and obj is not None)
-            style = "recorded" if is_carried else str(self.gp.gen("base_path_style", "recorded") or "recorded")
-            p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
-                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q, margin=margin,
-                              edge_slide=edge_slide, edge_slide_back_m=edge_slide_back_m, style=style, probe_face_travel=is_carried)
+            if axis_leg is not None:
+                p = NAV.plan_axis_leg(self.kit, start, to, back_offs=list(axis_leg), posture=posture, carried=carried, carried_obj=obj, carried_arm=arm,
+                                      max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, arm_q=arm_q, margin=margin)
+            else:
+                style = "recorded" if is_carried else str(self.gp.gen("base_path_style", "recorded") or "recorded")
+                p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
+                                  blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q,
+                                  margin=margin, edge_slide=edge_slide, edge_slide_back_m=edge_slide_back_m, style=style, probe_face_travel=is_carried)
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

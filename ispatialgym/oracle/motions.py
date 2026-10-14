@@ -207,6 +207,12 @@ class MotionsConfig:
     path_max_lag: float = 0.04
     #: arc-length resolution of the speed profile (m)
     path_profile_ds: float = 0.005
+    #: ``track_path(corner_stop=True)`` (owner 2026-10-13, an axis-aligned leg): the reference holds each interior waypoint this
+    #: long after stopping there, so the base settles before the next move along the other axis (s)
+    corner_dwell_s: float = 0.4
+    #: ... and brakes toward every stop at this deceleration (m/s^2): the tracker's command smoothing runs the base ahead of a
+    #: reference braking at the tracker's own limit (a 0.5 m slide stopped 4 cm past its corner at 0.6 m/s^2 in the fake world)
+    corner_stop_decel: float = 0.2
     #: ``track_path(style="face_travel")`` (camera relocalization, owner 2026-09-22): the shared driven schedule of
     #: ``robot.base_path`` — the polyline simplified within one map cell, corners filleted under a 5 cm deviation budget
     #: with the body turning over a window that keeps cruise speed, the end turns on the spot above 90° and blended
@@ -1866,7 +1872,8 @@ class Motions:
 
     # ------------------------------------------------------------------ base
 
-    def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float, a_max: Optional[float] = None, style: Optional[str] = None) -> th.Tensor:
+    def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float, a_max: Optional[float] = None, style: Optional[str] = None,
+                        corner_stop: bool = False) -> th.Tensor:
         """Time-parameterise the polyline current pose → waypoints.
 
         ``style = "face_travel"`` (owner 2026-09-22, camera relocalization): the shared ``robot.base_path`` schedule —
@@ -1882,10 +1889,13 @@ class Motions:
         waypoint's recorded heading to stay within ``v_ang``; the yaw is blended linearly along each segment. A
         reference the tracker can follow within its acceleration limit is what keeps the base inside the corridor of
         a recorded path (the pilot's obstructed demos cut 45–63° corners by 5–8 cm at constant speed and touched the
-        obstacle; 25 cm off after a 90° turn)."""
+        obstacle; 25 cm off after a 90° turn). ``corner_stop`` (owner 2026-10-13, an axis-aligned leg: forward / backward
+        or left / right moves one after the other): zero speed at every interior waypoint, held ``corner_dwell_s``."""
         a_max = float(self.cfg.base_tracker.a_max[0] if a_max is None else a_max)
         pts = [self.base_pose2d()] + [as_pose2d(w) for w in waypoints]
         if style == BP.FACE_TRAVEL:
+            if corner_stop:
+                raise SkillError("execution", "track_path: corner_stop drives the recorded polyline, not the face_travel schedule")
             path = BP.BasePath.build(pts, self.cfg.face_travel)
             return BP.time_parameterise(path, self.dt, v_lin, v_ang, a_lin=a_max, a_yaw=float(self.cfg.base_tracker.a_max[2]), ds=float(self.cfg.path_profile_ds))
         if style not in (None, BP.RECORDED):
@@ -1917,8 +1927,8 @@ class Motions:
             heads.append(None if float(seg[i]) < 1e-6 else math.atan2(float(d[1]), float(d[0])))
         v_turn = math.sqrt(2.0 * a_max * self.cfg.path_corner_cut)
         for i in range(1, n_seg):
-            if heads[i - 1] is None or heads[i] is None:
-                v_corner[i] = 0.0  # a pure rotation at this node: stop, turn, go on
+            if heads[i - 1] is None or heads[i] is None or corner_stop:
+                v_corner[i] = 0.0  # a pure rotation at this node (or a corner stop): stop, turn, go on
                 continue
             theta = abs(C.wrap_angle(heads[i] - heads[i - 1]))
             if theta > math.radians(5.0):
@@ -1946,10 +1956,11 @@ class Motions:
             v_max_at[j] = min(float(v_max_at[j]), v_corner[i])
         v = v_max_at.clone()
         v[0] = min(float(v[0]), 0.05)  # start from (nearly) rest
+        a_dec = min(a_max, float(self.cfg.corner_stop_decel)) if corner_stop else a_max
         for j in range(1, len(grid)):
             v[j] = min(float(v[j]), math.sqrt(float(v[j - 1]) ** 2 + 2.0 * a_max * (grid[j] - grid[j - 1])))
         for j in range(len(grid) - 2, -1, -1):
-            v[j] = min(float(v[j]), math.sqrt(float(v[j + 1]) ** 2 + 2.0 * a_max * (grid[j + 1] - grid[j])))
+            v[j] = min(float(v[j]), math.sqrt(float(v[j + 1]) ** 2 + 2.0 * a_dec * (grid[j + 1] - grid[j])))
         # -- time along the grid (trapezoid on 1/v)
         t_grid = [0.0]
         for j in range(1, len(grid)):
@@ -1975,7 +1986,10 @@ class Motions:
             n_d = max(1, int(math.ceil(t_yaw / self.dt)))
             return [[float(xy[k][0]), float(xy[k][1]), yaws[k] + (yaws[k + 1] - yaws[k]) * smooth(m / n_d)] for m in range(1, n_d + 1)]
 
-        # -- sample at dt; the pure-rotation segments are inserted as dwell time where the arc length passes them
+        n_hold = int(math.ceil(float(self.cfg.corner_dwell_s) / self.dt)) if corner_stop else 0
+
+        # -- sample at dt; the pure-rotation segments are inserted as dwell time where the arc length passes them, the corner
+        # holds of ``corner_stop`` where it passes an interior waypoint
         samples: List[List[float]] = []
         total_t = t_grid[-1]
         n = max(1, int(math.ceil(total_t / self.dt))) if total_len > 1e-9 else 0
@@ -1990,6 +2004,8 @@ class Motions:
             for m in range(k_prev + 1, k_new):
                 if float(seg[m]) < 1e-6:
                     samples.extend(dwell(m))
+            for m in range(max(k_prev + 1, 1), k_new + 1):
+                samples.extend([[float(xy[m][0]), float(xy[m][1]), yaws[m]]] * n_hold)
             k_prev = max(k_prev, k_new)
             samples.append(pose_at_s(s))
         for m in range(k_prev + 1, n_seg):
@@ -1999,11 +2015,12 @@ class Motions:
         return th.tensor(samples, dtype=th.float32)
 
     def track_path(self, waypoints: Sequence[Any], posture: Optional[str] = None, tracker_cfg: Optional[BaseTrackerConfig] = None,
-                   style: Optional[str] = None) -> Iterator[th.Tensor]:
+                   style: Optional[str] = None, corner_stop: bool = False) -> Iterator[th.Tensor]:
         """Follow a recorded ``[x, y, yaw]`` waypoint list with the joystick-like tracker (feed-forward + pose
         feedback, velocity / acceleration limited, smoothed; translation and rotation simultaneous). ``posture`` is the
         recorded navigation posture (informational: Layer 1 changes no posture). ``style`` (``Navigate.style``): the
-        polyline as recorded (default) or the ``face_travel`` schedule of ``robot.base_path`` (``_base_reference``).
+        polyline as recorded (default) or the ``face_travel`` schedule of ``robot.base_path`` (``_base_reference``);
+        ``corner_stop``: the recorded polyline with a stop and a hold at every interior waypoint (an axis-aligned leg).
         Arm and trunk hold targets stay as they are. Raises ``execution`` when the tracker times out."""
         waypoints = list(waypoints)
         if not waypoints:
@@ -2011,7 +2028,7 @@ class Motions:
         cfg = tracker_cfg or self.cfg.base_tracker
         v_lin = self.cfg.path_speed_fraction * min(cfg.v_max[0], cfg.v_max[1])
         v_ang = self.cfg.path_speed_fraction * cfg.v_max[2]
-        ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]), style=style)
+        ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]), style=style, corner_stop=corner_stop)
         tracker = PathTracker(ref, self.dt, cfg, max_lag=self.cfg.path_max_lag)
         self.tracker = tracker
         try:

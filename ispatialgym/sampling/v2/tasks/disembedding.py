@@ -25,7 +25,8 @@ the target held there too, the whole figure turned by a yaw drawn among those wh
 whole-body checks at init and manipulation with the objects placed; occlusion <= 0.30 (two segmentation renders,
 visible area >= 400 px) with the destination tray confirmed visible; the §4.7 placement stance with the place /
 pre-place IK (object in hand, tray + support ignored for the place pose) and the lateral path with the object at the
-carry height (>= tallest distractor + tray rim + 3 cm above the source floor). The grasp ignores the table, the source tray and
+carry height (>= tallest distractor + tray rim + 3 cm above the source floor), the heading kept and only forward / backward /
+lateral moves (owner 2026-10-13: the edge slide at the first collision-free drive-back, never the grid path). The grasp ignores the table, the source tray and
 every distractor / fixed-layout part, the whole pick (pre-grasp included) the fixed-layout parts (owner 2026-10-12 A2b: the
 grasp may touch or displace them as long as they stay on the source tray). Sidecar: ``init`` / ``manipulation`` / ``placement``
 stances, the transition, the path, one grasp record (pre-grasp, grasp, pre-place, place, carry_height, ``place_on`` = the
@@ -1041,11 +1042,7 @@ class Disembedding(SamplerV2):
             rim_h = src_w.rim_z - src_w.z
             tallest = max([self.height[n] for n in dnames] + [rim_h])
             grasp.carry_height = float(tallest + float(self.g("carry_height_extra_m")))
-            # §3.7 path manipulation -> placement with the object attached: the edge slide (owner 2026-09-24, ``generation.
-            # carry_edge_slide``) - the body keeps facing the table and slides along the edge (drive back / slide / drive in when
-            # the stand-offs differ), the grid path with its turn-drive-turn only when the strip collides
-            self.record_path(manip, place_st, carried=tname, arm=grasp.arm, edge_slide=bool(self.g("carry_edge_slide")),
-                             edge_slide_back_m=float(self.g("carry_edge_slide_back_m") or 0.0))
+            self._record_carry_path(manip, place_st, tname, grasp.arm)
         cam_manip = self.camera_pose_at(manip)
         if not self.ikc.eef_in_frame(grasp.grasp, cam_manip):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
@@ -1384,9 +1381,22 @@ class Disembedding(SamplerV2):
         self.record_stance_travel(init, manip)
         self.sidecar.paths[:] = [p for p in self.sidecar.paths if not (p.frm == manip.name and p.to == place_st.name)]
         with TT.posed_in_hand(self, arm, self.obj("target"), grasp.eef_in_object):
-            self.record_path(manip, place_st, carried=self.tname, arm=arm, edge_slide=bool(self.g("carry_edge_slide")),
-                             edge_slide_back_m=float(self.g("carry_edge_slide_back_m") or 0.0))
+            self._record_carry_path(manip, place_st, self.tname, arm)
         return None
+
+    def _record_carry_path(self, manip: Stance, place_st: Stance, carried: str, arm: str):
+        """§3.7 / §4.7 the carried leg manipulation -> placement (object attached). Owner 2026-10-13 (COMPLAINTS.md global rule,
+        ``generation.place_leg_axis_aligned``, default true): moving to the place pose the robot moves only forward / backward or
+        left / right, keeping its heading - the edge slide alone (``NAV.plan_axis_leg``) at the first extra stand-off of
+        ``place_leg_back_offs_m`` (each + ``carry_edge_slide_back_m``) whose strides clear, else ``Reject(place_leg_collision)``;
+        disembedding#03 c1_k0's slide collided 0.28 m before the placement stance and the grid fallback turned the robot 58 deg on
+        the way. Off: the edge slide (owner 2026-09-24, ``carry_edge_slide``) with the grid path's turn-drive-turn when the strip
+        collides."""
+        base_back = float(self.g("carry_edge_slide_back_m") or 0.0)
+        if self.g("place_leg_axis_aligned"):
+            ladder = [base_back + float(b) for b in (self.g("place_leg_back_offs_m") or [0.0])]
+            return self.record_path(manip, place_st, carried=carried, arm=arm, axis_leg=ladder)
+        return self.record_path(manip, place_st, carried=carried, arm=arm, edge_slide=bool(self.g("carry_edge_slide")), edge_slide_back_m=base_back)
 
     def tro_meta_block(self, draft: Draft, instance_id: str, seed: int) -> Dict[str, Any]:
         """The TRO's scene block carries the fixed layout's yaw (owner 2026-10-12, ``scene.fixed_layout``): the oracle and the evaluator

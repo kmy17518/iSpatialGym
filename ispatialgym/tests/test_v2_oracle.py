@@ -3872,6 +3872,78 @@ def test_navigate_without_arms_q_keeps_the_untucked_rule(tmp_path):
     assert ex.action_records[0].notes["navigate_arms_reposed"] == ["right"]
 
 
+def test_axis_leg_navigate_stops_at_every_corner_and_keeps_the_heading(tmp_path):
+    """Owner 2026-10-13 (disembedding: to the place pose only forward / backward or left / right moves, the heading kept): an
+    axis-aligned leg - drive back 0.1 m, slide 0.5 m to the right, drive in 0.1 m - is tracked with zero speed and a
+    ``corner_dwell_s`` hold at each corner (without corner stops the reference passes them at speed); the driven base keeps the
+    heading and the polyline, the note records it, and a drive that turned the base fails the postcondition."""
+    from ispatialgym.oracle import sidecar as SC
+    from ispatialgym.robot import base_path as BP
+
+    sc, env = iors_world()
+    robot = env.robot
+    x, y = float(robot.pos[0]), float(robot.pos[1])
+    yaw = float(C.yaw_of(robot.quat))
+
+    def at(f, l):
+        return [x + f * math.cos(yaw) - l * math.sin(yaw), y + f * math.sin(yaw) + l * math.cos(yaw), yaw]
+
+    wps = [at(0.0, 0.0), at(-0.1, 0.0), at(-0.1, -0.5), at(0.0, -0.5)]
+    d = {"from": "manipulation", "to": "placement", "mode": "edge_slide", "waypoints": wps, "length_m": 0.7, "posture": "untucked", "carried": None}
+    nav = Navigate(path=SC.Path.from_dict(d, "paths[1]"), axis_leg=True)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    targets = nav.targets(sc, ex.state)
+    assert targets["axis_leg"] is True and targets["style"] == BP.RECORDED
+
+    def longest_hold(ref, corner):
+        at_c = [float(th.linalg.norm(r[:2] - th.tensor(corner[:2]))) < 1e-6 for r in ref]
+        best = run = 0
+        for a in at_c:
+            run = run + 1 if a else 0
+            best = max(best, run)
+        return best
+
+    n_hold = int(math.ceil(motions.cfg.corner_dwell_s / motions.dt))
+    ref = motions._base_reference(wps, 0.4, 0.64, corner_stop=True)
+    assert all(longest_hold(ref, c) >= n_hold for c in wps[1:3])
+    assert float((ref[:, 2] - yaw).abs().max()) < 1e-6
+    plain = motions._base_reference(wps, 0.4, 0.64)
+    assert all(longest_hold(plain, c) < 3 for c in wps[1:3])
+    assert ex.run_action(0, nav) is None
+    note = ex.action_records[0].notes["axis_leg"]
+    assert note["ok"] and note["max_yaw_dev_deg"] < 0.5 and note["max_corridor_mm"] < 10.0, note
+    assert [a for a, _ in note["moves"]] == ["backward", "right", "forward"]
+    # a drive that left the heading (a base turned 5 deg on the way) fails the postcondition
+    ctx = {"axis_leg_poses": [tuple(wps[0]), (wps[1][0], wps[1][1], yaw + math.radians(5.0)), tuple(wps[-1])]}
+    robot.pos = th.tensor([wps[-1][0], wps[-1][1], C.NOMINAL_BASE_Z], dtype=th.float32)
+    robot.quat = C.quat_from_yaw(yaw)
+    assert EX.post_navigate(nav, ex.state, targets, ctx) == "execution" and ctx["axis_leg"]["ok"] is False
+    assert ctx["axis_leg"]["max_yaw_dev_deg"] == pytest.approx(5.0, abs=1e-3)
+
+
+def test_disembedding_carry_is_an_axis_leg_and_a_turning_carry_path_has_no_program():
+    """Owner 2026-10-13: the disembedding program drives its carry manipulation -> placement as an axis-aligned leg; a recorded carry
+    that turns the robot on the way (disembedding#03 c1_k0's grid path: the middle waypoint at the travel heading) or runs
+    diagonally at a constant heading has no program - the sampler's program check rejects such an instance."""
+    from ispatialgym.oracle.sidecar import SidecarError
+
+    d = json.load(open(os.path.join(SIDECARS, "disembedding.json")))
+    actions = expand(d["alias"], Sidecar.from_dict(d))
+    navs = [a for a in actions if isinstance(a, Navigate)]
+    carry = [a for a in navs if a.path.to == "placement"]
+    assert len(carry) == 1 and carry[0].axis_leg and carry[0].targets(None, None)["axis_leg"] is True
+    assert all(not a.axis_leg for a in navs if a.path.to != "placement")
+    p = next(p for p in d["paths"] if p["to"] == "placement")
+    (x0, y0, yaw), (x1, y1, _) = p["waypoints"][0], p["waypoints"][-1]
+    mid = (0.5 * (x0 + x1), y0 - 0.1)
+    for wps, why in (([[x0, y0, yaw], [mid[0], mid[1], math.atan2(y1 - mid[1], x1 - mid[0])], [x1, y1, yaw]], "turns the heading"),
+                     ([[x0, y0, yaw], [mid[0], mid[1], yaw], [x1, y1, yaw]], "off the nearest robot axis")):
+        bad = json.loads(json.dumps(d))
+        next(q for q in bad["paths"] if q["to"] == "placement")["waypoints"] = wps
+        with pytest.raises(SidecarError, match=why):
+            expand(bad["alias"], Sidecar.from_dict(bad))
+
+
 def test_transition_arms_q_replaces_the_stance_posture_for_move_idle_arms(tmp_path):
     """``transitions[].arms_q`` (the arm as the previous motion left it): ``move_idle_arms`` targets those joints instead of
     the arriving stance's ``arms_q`` / posture - an arm already there does not move; the stance's fingers still apply."""

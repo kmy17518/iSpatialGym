@@ -287,6 +287,12 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         # along the edge, drive back / in when the stand-offs differ; the grid path's turn-drive-turn only as the fallback)
         "carry_edge_slide": True,
         "carry_edge_slide_back_m": 0.0,  # extra stand-off for the slide beyond the larger of the two stances' stand-offs
+        # owner 2026-10-13 (COMPLAINTS.md global rule): moving to the place pose the robot moves only forward / backward or left /
+        # right, keeping its heading - the carry is the edge slide alone (drive back / slide / drive in) at the first of these extra
+        # stand-offs (+ carry_edge_slide_back_m) whose strides clear, never the grid path (disembedding#03 c1_k0: the slide collided,
+        # the grid fallback turned the robot 58 deg on the way)
+        "place_leg_axis_aligned": True,
+        "place_leg_back_offs_m": [0.0, 0.1, 0.2, 0.3],
         "release_gap_m": 0.003,  # 2026-09-24: release height of the objects above the tray floor; the §3.2 3 mm measured best (disembedding.RELEASE_GAP_M)
         "tray_release_gap_m": 0.0002,  # 2026-09-25: the trays are released at contact with the table (their 3 mm drop set them chattering)
         # 2026-09-25: mass of both trays (0 = the dataset's category mass, 0.39 kg for the uekqey base link). Under 1 kg

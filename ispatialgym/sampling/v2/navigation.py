@@ -608,6 +608,42 @@ def plan_edge_slide(kit: "RobotKit", stance_from: Stance, stance_to: Stance, pos
     return PathRecord(stance_from.name, stance_to.name, EDGE_SLIDE_MODE, waypoints, length, posture, carried, trunk, stride, len(poses))
 
 
+def plan_axis_leg(kit: "RobotKit", stance_from: Stance, stance_to: Stance, back_offs: Sequence[float] = (0.0,), **kw) -> PathRecord:
+    """Owner 2026-10-13 (disembedding, COMPLAINTS.md global rule: "moving to the place pose, the robot moves only forward /
+    backward or left / right, keeping its heading; it can combine the two"): the leg into the place pose as the edge slide of
+    :func:`plan_edge_slide` (``kw`` passed on) - drive back, slide along the edge, drive in, the stances' heading throughout -
+    at the first extra stand-off of ``back_offs`` whose strides are collision-free; never the grid path, whose intermediate
+    waypoints carry the travel heading. The record's ``axis_leg`` names the drive-back used and the moves. Raises
+    ``NavigationError`` ``place_leg_heading`` (the stances do not face the same edge at the same yaw within
+    ``BP.AXIS_LEG_YAW_TOL_RAD``, or the waypoints break the rule) / ``place_leg_collision`` (every drive-back collides) /
+    ``path_too_long``."""
+    from ispatialgym.robot import base_path as BP
+
+    if not same_edge(stance_from, stance_to, tol_rad=BP.AXIS_LEG_YAW_TOL_RAD):
+        dyaw = math.degrees((float(stance_to.yaw) - float(stance_from.yaw) + math.pi) % (2 * math.pi) - math.pi)
+        raise NavigationError("place_leg_heading", f"{stance_from.name} -> {stance_to.name}: not at the same support edge with the same heading "
+                                                   f"(yaw {dyaw:+.2f} deg; the leg into the place pose keeps the robot's heading)")
+    tried, errors = [], []
+    for b in back_offs:
+        tried.append(round(float(b), 4))
+        try:
+            rec = plan_edge_slide(kit, stance_from, stance_to, back_m=float(b), **kw)
+        except NavigationError as e:
+            if e.reason == "path_too_long":
+                raise
+            errors.append(f"back {float(b):.2f} m: {e}")
+            continue
+        why = BP.axis_leg_violation(rec.waypoints)
+        if why is not None:
+            raise NavigationError("place_leg_heading", f"{stance_from.name} -> {stance_to.name}: {why}")
+        rec.axis_leg = {"back_m": round(float(b), 4), "tried_back_m": tried, "moves": [[a, round(m, 4)] for a, m in BP.axis_leg_moves(rec.waypoints)]}
+        if errors:
+            log.info("%s -> %s: axis-aligned leg at drive-back %.2f m (%s)", stance_from.name, stance_to.name, float(b), "; ".join(errors))
+        return rec
+    raise NavigationError("place_leg_collision", f"{stance_from.name} -> {stance_to.name}: no forward / backward / lateral leg keeping the heading "
+                                                 f"is collision-free ({'; '.join(errors)})"[:1500])
+
+
 def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: str = "untucked", carried: Optional[str] = None,
               carried_obj: Any = None, carried_arm: str = "right", rooms: Optional[Sequence[str]] = None, blocked: Sequence[Any] = (),
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,

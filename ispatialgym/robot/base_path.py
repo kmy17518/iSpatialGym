@@ -38,7 +38,7 @@ from __future__ import annotations
 import bisect
 import math
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import torch as th
 
@@ -589,3 +589,90 @@ def time_parameterise(path: BasePath, dt: float, v_lin: float, v_ang: float, a_l
     for i in range(1, len(ref)):
         ref[i, 2] = ref[i - 1, 2] + wrap_angle(float(ref[i, 2] - ref[i - 1, 2]))
     return ref.to(th.float32)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# axis-aligned legs (owner 2026-10-13, disembedding: "moving to the place pose, the robot moves only forward / backward or
+# left / right, keeping its heading; it can combine the two to reach the place pose")
+# ----------------------------------------------------------------------------------------------------------------
+
+#: a recorded axis-aligned leg: every waypoint's yaw within this of the first waypoint's (rad)
+AXIS_LEG_YAW_TOL_RAD = math.radians(0.5)
+#: ... and every segment within this of the heading's forward / backward / left / right axis (rad)
+AXIS_LEG_DIR_TOL_RAD = math.radians(1.0)
+#: segments up to this long carry no direction (m)
+AXIS_LEG_MIN_SEG_M = 0.001
+_AXIS_NAMES = {0: "forward", 1: "left", 2: "backward", -2: "backward", -1: "right"}
+
+
+def _axis_of(dx: float, dy: float, yaw: float) -> Tuple[str, float, float]:
+    """(robot axis name, angle of the motion (dx, dy) in the frame of heading ``yaw``, its offset from that axis); rad."""
+    rel = wrap_angle(math.atan2(dy, dx) - yaw)
+    k = int(round(rel / (math.pi / 2.0)))
+    return _AXIS_NAMES[k], rel, abs(wrap_angle(rel - k * math.pi / 2.0))
+
+
+def axis_leg_violation(waypoints: Sequence[Sequence[float]], yaw_tol: float = AXIS_LEG_YAW_TOL_RAD, dir_tol: float = AXIS_LEG_DIR_TOL_RAD,
+                       min_seg_m: float = AXIS_LEG_MIN_SEG_M) -> Optional[str]:
+    """Why a recorded ``[x, y, yaw]`` polyline is not an axis-aligned leg, None when it is: every waypoint's yaw within
+    ``yaw_tol`` of the first one's (the heading is kept) and every segment longer than ``min_seg_m`` within ``dir_tol`` of
+    that heading's forward / backward / left / right axis (moves one after the other, no diagonal)."""
+    pts = [tuple(float(v) for v in w) for w in waypoints]
+    if not pts:
+        return None
+    yaw0 = pts[0][2]
+    for i, p in enumerate(pts[1:], 1):
+        d = abs(wrap_angle(p[2] - yaw0))
+        if d > yaw_tol:
+            return f"waypoint {i} turns the heading by {math.degrees(d):.2f} deg (> {math.degrees(yaw_tol):.2f})"
+    for i, (a, b) in enumerate(zip(pts[:-1], pts[1:])):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        if L <= min_seg_m:
+            continue
+        _, rel, off = _axis_of(b[0] - a[0], b[1] - a[1], yaw0)
+        if off > dir_tol:
+            return (f"segment {i} ({L:.3f} m) runs {math.degrees(rel):+.1f} deg from the heading, {math.degrees(off):.1f} deg off the "
+                    f"nearest robot axis (> {math.degrees(dir_tol):.1f})")
+    return None
+
+
+def axis_leg_moves(waypoints: Sequence[Sequence[float]], min_seg_m: float = AXIS_LEG_MIN_SEG_M) -> List[Tuple[str, float]]:
+    """The moves of a polyline in the robot frame of its first waypoint: ``(forward | backward | left | right, metres)`` per
+    segment longer than ``min_seg_m``, consecutive moves along one axis merged."""
+    pts = [tuple(float(v) for v in w) for w in waypoints]
+    out: List[Tuple[str, float]] = []
+    for a, b in zip(pts[:-1], pts[1:]):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        if L <= min_seg_m:
+            continue
+        name = _axis_of(b[0] - a[0], b[1] - a[1], pts[0][2])[0]
+        if out and out[-1][0] == name:
+            out[-1] = (name, out[-1][1] + L)
+        else:
+            out.append((name, L))
+    return out
+
+
+def _point_polyline_dist(x: float, y: float, pts: Sequence[Tuple[float, ...]]) -> float:
+    if len(pts) == 1:
+        return math.hypot(x - pts[0][0], y - pts[0][1])
+    best = float("inf")
+    for a, b in zip(pts[:-1], pts[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-12 else min(1.0, max(0.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        best = min(best, math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy)))
+    return best
+
+
+def axis_leg_tracking(poses: Sequence[Sequence[float]], waypoints: Sequence[Sequence[float]]) -> Dict[str, float]:
+    """How a driven base trajectory (``poses``, ``[x, y, yaw]`` per step) kept to the axis-aligned leg ``waypoints``:
+    ``max_yaw_dev_rad`` = the largest heading difference from the leg's (first waypoint's) yaw, ``max_corridor_m`` = the
+    largest distance from the polyline."""
+    pts = [tuple(float(v) for v in w) for w in waypoints]
+    if not pts or not poses:
+        return {"max_yaw_dev_rad": 0.0, "max_corridor_m": 0.0, "n_poses": len(poses)}
+    yaw0 = pts[0][2]
+    dyaw = max(abs(wrap_angle(float(p[2]) - yaw0)) for p in poses)
+    corridor = max(_point_polyline_dist(float(p[0]), float(p[1]), pts) for p in poses)
+    return {"max_yaw_dev_rad": dyaw, "max_corridor_m": corridor, "n_poses": len(poses)}

@@ -63,13 +63,15 @@ def _other_arm(arm: str) -> str:
     return "left" if arm == "right" else "right"
 
 
-def _travel(sc: Sidecar, frm: str, to: str, carried: Optional[str] = None) -> List[Action]:
+def _travel(sc: Sidecar, frm: str, to: str, carried: Optional[str] = None, axis_leg: bool = False) -> List[Action]:
     """``Navigate`` (recorded path) and / or ``Transition`` (recorded transition) from stance ``frm`` to ``to``.
 
     ``carried`` = the bddl instance in the hand during the travel: a recorded path must carry exactly it
     (``paths[].carried``) and a recorded transition that names what it was swept with (``transitions[].holding``,
     core ``bd10c72``) must name it too — the sampler validated the drive-back / trunk / drive-in with that object
-    attached to the frozen arm, the oracle drives it with the arms as they are (no re-planning of the stance)."""
+    attached to the frozen arm, the oracle drives it with the arms as they are (no re-planning of the stance).
+    ``axis_leg`` (owner 2026-10-13): the recorded path must keep the heading and move only forward / backward or left /
+    right (``robot.base_path.axis_leg_violation``, else ``SidecarError``) and is driven as such (``Navigate.axis_leg``)."""
     s_from, s_to = sc.stance(frm), sc.stance(to)
     path, transition, departure = sc.path(frm, to), sc.transition(frm, to), sc.departure(frm, to)
     actions: List[Action] = []
@@ -83,7 +85,12 @@ def _travel(sc: Sidecar, frm: str, to: str, carried: Optional[str] = None) -> Li
     if path is not None:
         if (path.carried or None) != carried:
             raise SidecarError(f"paths {frm!r} -> {to!r}: recorded carried={path.carried!r}, the program carries {carried!r}")
-        actions.append(Navigate(path=path, objects=(carried,) if carried else ()))
+        if axis_leg:
+            why = BP.axis_leg_violation(path.waypoints)
+            if why is not None:
+                raise SidecarError(f"paths {frm!r} -> {to!r}: {why} - the leg into the place pose keeps the robot's heading and moves only "
+                                   "forward / backward or left / right (owner 2026-10-13)")
+        actions.append(Navigate(path=path, objects=(carried,) if carried else (), axis_leg=axis_leg))
     if transition is not None:
         if transition.holding is not None and transition.holding != carried:
             raise SidecarError(f"transitions {frm!r} -> {to!r}: recorded holding={transition.holding!r}, the program carries {carried!r}")
@@ -301,15 +308,16 @@ def program_held_object_rotation(sc: Sidecar) -> List[Action]:
 
 def program_disembedding(sc: Sidecar) -> List[Action]:
     """init → manipulation stance (transition) → grasp at the recorded pose → lift to the carry height (orientation
-    kept) → drive sideways along the edge to the placement stance (recorded path) → place at the destination centre
-    (orientation kept) → retreat. The grasp may touch the parts / distractors of ``grasps[0].may_touch`` (owner 2026-10-12
-    A2b); after the grasp and after the lift each must still rest on the source tray (``execute.may_touch_verdict``)."""
+    kept) → drive sideways along the edge to the placement stance (recorded path; owner 2026-10-13: the heading kept, only
+    forward / backward or left / right moves - ``_travel(axis_leg=True)``) → place at the destination centre (orientation
+    kept) → retreat. The grasp may touch the parts / distractors of ``grasps[0].may_touch`` (owner 2026-10-12 A2b); after
+    the grasp and after the lift each must still rest on the source tray (``execute.may_touch_verdict``)."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     grasp, lift = _pick(g)
     return (
         _travel(sc, "init", "manipulation")
         + [grasp, lift]
-        + _travel(sc, "manipulation", "placement", carried=g.object)
+        + _travel(sc, "manipulation", "placement", carried=g.object, axis_leg=True)
         + _place_and_retreat(g, "support")
     )
 

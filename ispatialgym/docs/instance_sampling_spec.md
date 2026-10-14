@@ -524,7 +524,22 @@ body facing the edge throughout — drive back along the edge normal to the larg
 at the arriving yaw, so the holonomic base slides without the turn-drive-turn of a grid path whose intermediate waypoints
 carry the travel heading. It is collision-checked like rule 1 (0.1 m strides, carried object attached, the real collision
 world rather than the trav map with its baked footprints of removed chairs); when the strip collides the grid path of
-rules 1–2 is recorded instead.
+rules 1–2 is recorded instead — except for an **axis-aligned leg**.
+
+**Axis-aligned leg** (owner rule 2026-10-13 for every disembedding instance, `generation.place_leg_axis_aligned`, default
+true: "moving to the place pose, the robot moves only forward / backward or left / right, keeping its heading; it can
+combine the two to reach the place pose"): the carry manipulation → placement is the edge slide alone
+(`navigation.plan_axis_leg`) — the two stances must face the same edge at the same yaw (within 0.5°), and the extra
+stand-off of the slide is the first of `place_leg_back_offs_m` (default 0, 0.1, 0.2, 0.3 m, each + `carry_edge_slide_back_m`)
+whose strides are collision-free: a pure lateral slide, or drive back / slide / drive in. No grid path: when every
+drive-back collides the attempt is rejected (`place_leg_collision`; disembedding#03 c1_k0's slide collided 0.28 m before the
+placement stance and the grid fallback turned the robot by 58° on the way). The record carries `axis_leg` (the drive-back
+used, the ones tried, the moves). The rule is checked on the recorded waypoints by `robot.base_path.axis_leg_violation`
+(every waypoint's yaw within 0.5° of the first, every segment within 1° of the heading's forward / backward / left / right
+axis): the oracle's disembedding program refuses a carry path that breaks it (`SidecarError`, so the sampler's program check
+rejects it too), drives it with a stop and a 0.4 s hold at every corner (`track_path(corner_stop=True)`: one move ends
+before the next begins), and its postcondition fails when the driven heading leaves the leg's by more than 2° or the base
+the recorded polyline by more than 3 cm (`ExecuteConfig.axis_leg_yaw_tol` / `axis_leg_corridor_m`; meta `actions[].notes.axis_leg`).
 
 Camera relocalization (owner decision 2026-09-22) records `style = "face_travel"`: its eroded-map path is the
 line-of-sight shortcut of the grid path (as `plan_path` records for every other family; the dense one-waypoint-per-cell
@@ -1037,8 +1052,9 @@ along the edge so that the destination centre is at the focus (same stand-off, t
 place pose (goal target pose ∘ T_obj→eef of the drawn grasp) and its pre-place (10 cm up along −a) pass the exact IK
 from the placement stance (tray and support ignored for the place pose only); the lateral drive between the two
 stances is a straight segment validated per 3.7 with the object attached at the **carry height** (lift ≥ tallest
-distractor + tray rim + 3 cm above the source floor). The drawn `(yaw, grasp)` must pass both the pick and the place
-check (draw the next element of F otherwise).
+distractor + tray rim + 3 cm above the source floor) — an axis-aligned leg (3.7, owner 2026-10-13): the heading kept, only
+forward / backward or left / right moves, a drive back / slide / drive in when the straight slide collides, never a grid
+path. The drawn `(yaw, grasp)` must pass both the pick and the place check (draw the next element of F otherwise).
 
 ## 5. Large-scale initialization (shared robot init for scene targets)
 

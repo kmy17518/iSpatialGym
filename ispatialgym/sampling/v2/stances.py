@@ -399,6 +399,9 @@ class PathRecord:
     #: owner 2026-09-24: the arm joints (arm -> 7 values) the drive was swept with when they are not the stance posture - the arm
     #: left where the previous motion ended it (``program_check.choose_departure_arms``); the oracle re-poses only a deviating arm
     arms_q: Optional[Dict[str, List[float]]] = None
+    #: owner 2026-10-13 (disembedding): the leg into the place pose keeps the heading and moves only forward / backward or left /
+    #: right (``navigation.plan_axis_leg``): ``{"back_m": the drive-back used, "tried_back_m": [...], "moves": [[axis, m], ...]}``
+    axis_leg: Optional[Dict[str, Any]] = None
 
     def to_sidecar(self) -> Dict[str, Any]:
         out = {"from": self.frm, "to": self.to, "mode": self.mode, "waypoints": [[float(a) for a in w] for w in self.waypoints],
@@ -407,6 +410,8 @@ class PathRecord:
             out["style"] = self.style
         if self.arms_q:
             out["arms_q"] = {str(a): [float(v) for v in q] for a, q in self.arms_q.items()}
+        if self.axis_leg:
+            out["axis_leg"] = dict(self.axis_leg)
         return out
 
     @staticmethod

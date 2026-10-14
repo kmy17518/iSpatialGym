@@ -475,19 +475,25 @@ class Navigate(Action):
     relocalization — obstructed) name the objects the path avoids for the annotation; they are deliberately **not** in
     ``objects`` (never touched). ``arms_q`` (sidecar ``paths[].arms_q``, owner 2026-09-24; None when absent): the arm
     joints (arm -> 7) the sampler swept the drive with when it left an arm where the previous motion ended it instead of
-    the stance posture - the executor re-poses only an arm that deviates from them.
+    the stance posture - the executor re-poses only an arm that deviates from them. ``axis_leg`` (owner 2026-10-13, the
+    disembedding leg into the place pose; the program sets it after ``robot.base_path.axis_leg_violation`` passed): the
+    heading is kept and the moves are forward / backward or left / right only - the tracker stops at every corner and the
+    postcondition checks the driven heading and corridor.
     """
 
     name: str = "navigate"
     path: PathRecord
     obstacles: Tuple[str, ...] = ()
     style: Optional[str] = None
-    TARGET_KEYS = ("waypoints", "goal", "posture", "carried", "style", "arms_q")
+    axis_leg: bool = False
+    TARGET_KEYS = ("waypoints", "goal", "posture", "carried", "style", "arms_q", "axis_leg")
 
     def __post_init__(self):
         super().__post_init__()
         if self.style is not None and self.style not in BP.STYLES:
             raise ValueError(f"navigate: unknown style {self.style!r} (one of {BP.STYLES})")
+        if self.axis_leg and self.style not in (None, BP.RECORDED):
+            raise ValueError(f"navigate: an axis-aligned leg is driven as recorded, not {self.style!r}")
 
     def targets(self, sidecar, state):
         return {
@@ -495,8 +501,9 @@ class Navigate(Action):
             "goal": self.path.goal,
             "posture": self.path.posture,
             "carried": self.path.carried,
-            "style": self.style or (self.path.extra or {}).get("style") or BP.RECORDED,
+            "style": BP.RECORDED if self.axis_leg else (self.style or (self.path.extra or {}).get("style") or BP.RECORDED),
             "arms_q": _arms_q_of(self.path.extra),
+            "axis_leg": bool(self.axis_leg),
         }
 
     def annotate(self, sidecar):
@@ -517,8 +524,10 @@ class Navigate(Action):
             fwd = (x - x0) * math.cos(yaw0) + (y - y0) * math.sin(yaw0)
             side = "left" if lat >= 0 else "right"
             fine = fine.replace("carry ", "slide sideways carrying ", 1) if self.path.carried else fine.replace("drive to", "slide sideways to", 1)
+            moves = BP.axis_leg_moves(self.path.waypoints)
             numbers = (f"{fine} ({abs(lat):.2f} m to the {side} along the edge facing the table"
                        + (f", stand-off {'+' if fwd < 0 else '-'}{abs(fwd):.2f} m" if abs(fwd) > 0.005 else "")
+                       + (f", moves {' then '.join(f'{a} {m:.2f} m' for a, m in moves)}" if len(moves) > 1 else "")
                        + f", {self.path.length_m:.2f} m path, yaw held at {math.degrees(yaw):.0f}°)")
             return fine, numbers
         numbers = f"{fine} ({self.path.length_m:.2f} m recorded path to x={x:.2f} m, y={y:.2f} m, yaw={math.degrees(yaw):.0f}°)"

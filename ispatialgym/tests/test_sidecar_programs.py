@@ -631,6 +631,8 @@ def _check_value(key, value, where):
         assert isinstance(value, str) and value, where
     elif key == "style":
         assert value in BP.STYLES, where  # navigate: the recorded polyline or the shared face_travel schedule
+    elif key == "axis_leg":
+        assert isinstance(value, bool), where  # navigate: the heading kept, forward / backward / lateral moves only (owner 2026-10-13)
     elif key == "distance_m":
         assert value > 0, where
     elif key in ("carry", "carry_via"):

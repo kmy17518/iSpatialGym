@@ -436,6 +436,72 @@ def test_edge_slide_waypoints():
     assert not NAV.same_edge(manip, Stance("init", (5.6, 2.55, yaw), 0.25, 0.0, stand_off=0.45))  # no edge frame
 
 
+def test_axis_leg_violation_and_moves():
+    """Owner 2026-10-13 (disembedding: to the place pose only forward / backward or left / right moves, the heading kept): the
+    edge slide and its drive back / slide / drive in pass; disembedding#03 c1_k0's recorded grid path (its middle waypoint turned
+    to the travel heading, 33 deg) and a diagonal at a constant heading do not."""
+    from ispatialgym.robot import base_path as BP
+
+    yaw = math.pi / 2
+    u_leg = [(4.6, 2.55, yaw), (4.6, 2.45, yaw), (5.6, 2.45, yaw), (5.6, 2.55, yaw)]
+    assert BP.axis_leg_violation(u_leg) is None
+    assert BP.axis_leg_violation([(4.6, 2.55, yaw), (5.6, 2.55, yaw)]) is None
+    moves = BP.axis_leg_moves(u_leg)
+    assert [a for a, _ in moves] == ["backward", "right", "forward"] and [m for _, m in moves] == pytest.approx([0.1, 1.0, 0.1])
+    assert BP.axis_leg_moves([(0.0, 0.0, 0.0), (0.0, 0.5, 0.0), (0.0, 0.8, 0.0)]) == [("left", pytest.approx(0.8))]
+    grid_03 = [(15.755, -9.188, yaw), (17.0, -9.3, math.radians(33.08)), (17.172, -9.188, yaw)]
+    assert "turns the heading by 56.92 deg" in BP.axis_leg_violation(grid_03)
+    why = BP.axis_leg_violation([(0.0, 0.0, yaw), (0.3, 0.3, yaw)])
+    assert why is not None and "45.0 deg off the nearest robot axis" in why
+    # within the tolerances: a 0.3 deg heading wobble, a 0.5 deg direction error, a sub-mm jog
+    assert BP.axis_leg_violation([(0.0, 0.0, yaw), (1.0, 0.0087, yaw + math.radians(0.3)), (1.0005, 0.0094, yaw)]) is None
+    # the tracking measure: the driven heading and the distance from the polyline
+    tr = BP.axis_leg_tracking([(4.6, 2.55, yaw), (4.6, 2.47, yaw + 0.01), (5.0, 2.46, yaw - 0.02), (5.6, 2.55, yaw)], u_leg)
+    assert tr["max_yaw_dev_rad"] == pytest.approx(0.02) and tr["max_corridor_m"] == pytest.approx(0.01) and tr["n_poses"] == 4
+
+
+def test_plan_axis_leg_climbs_the_drive_back_ladder_and_never_turns(monkeypatch):
+    """Owner 2026-10-13: the leg into the place pose is the edge slide at the first collision-free extra stand-off of the ladder
+    (an obstacle in the strip at the stances' stand-off: drive back 0.1 m, slide, drive in), recorded with ``axis_leg``; when every
+    drive-back collides it is ``place_leg_collision`` (no grid path), stances that do not share the heading ``place_leg_heading``."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("ISG_ATTACHED_CHECKS", "off")
+    edge = EdgeFrame("-u", th.tensor([5.0, 3.0]), th.tensor([0.0, 1.0]), 2.0)
+    yaw = math.pi / 2
+    manip = Stance("manipulation", (4.6, 2.55, yaw), 0.25, 0.0, stand_off=0.45, edge=edge, lateral=-0.4)
+    place = Stance("placement", (5.6, 2.55, yaw), 0.25, 0.0, stand_off=0.45, edge=edge, lateral=0.6)
+
+    def kit_with(blocked):
+        def free(qs, margin=0.0):
+            return th.tensor([not blocked(float(q[0]), float(q[1])) for q in qs])
+        return SimpleNamespace(q_config=lambda **kw: th.zeros(3), q_at_base_pose=lambda q, x, y, yaw: th.tensor([x, y, yaw]),
+                               collision_free=free, backend=object())
+
+    arm_q = {"right": th.zeros(7), "left": th.zeros(7)}
+    # a chair corner in the strip 0.3 m before the placement stance, within 6 cm of the edge-side stand-off line
+    kit = kit_with(lambda x, y: 5.2 < x < 5.4 and y > 2.49)
+    with pytest.raises(NAV.NavigationError):
+        NAV.plan_edge_slide(kit, manip, place, arm_q=arm_q)
+    rec = NAV.plan_axis_leg(kit, manip, place, back_offs=[0.0, 0.1, 0.2], arm_q=arm_q)
+    assert rec.mode == NAV.EDGE_SLIDE_MODE and rec.axis_leg["back_m"] == pytest.approx(0.1) and rec.axis_leg["tried_back_m"] == [0.0, 0.1]
+    assert [a for a, _ in rec.axis_leg["moves"]] == ["backward", "right", "forward"]
+    assert all(w[2] == pytest.approx(yaw) for w in rec.waypoints)
+    from ispatialgym.robot import base_path as BP
+
+    assert BP.axis_leg_violation(rec.waypoints) is None
+    assert rec.to_sidecar()["axis_leg"]["back_m"] == pytest.approx(0.1)
+    # every drive-back collides: rejected, never the grid path
+    with pytest.raises(NAV.NavigationError) as e:
+        NAV.plan_axis_leg(kit_with(lambda x, y: 5.2 < x < 5.4), manip, place, back_offs=[0.0, 0.1], arm_q=arm_q)
+    assert e.value.reason == "place_leg_collision"
+    # a placement stance turned by 1 deg: the heading would change on the way
+    turned = Stance("placement", (5.6, 2.55, yaw + math.radians(1.0)), 0.25, 0.0, stand_off=0.45, edge=edge, lateral=0.6)
+    with pytest.raises(NAV.NavigationError) as e:
+        NAV.plan_axis_leg(kit, manip, turned, back_offs=[0.0], arm_q=arm_q)
+    assert e.value.reason == "place_leg_heading"
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # stances / sidecar (§7)
 # ----------------------------------------------------------------------------------------------------------------

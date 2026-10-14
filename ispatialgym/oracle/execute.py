@@ -80,6 +80,7 @@ from ispatialgym.oracle.actions import (
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.motions import ApproachFinish, Motions, SkillError, arc_between, as_pose2d, as_world_pose, joint_axis_from_contacts, links_kw
 from ispatialgym.oracle.sidecar import Pose
+from ispatialgym.robot import base_path as BP
 from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
@@ -111,6 +112,10 @@ class ExecuteConfig:
     #: base at the last path waypoint / drive-in pose (m, rad)
     nav_pos_tol: float = 0.05
     nav_yaw_tol: float = 0.08
+    #: an axis-aligned leg (``Navigate.axis_leg``, owner 2026-10-13): the driven heading within this of the leg's (rad) and the
+    #: base within this of the recorded polyline (m) at every step, else the postcondition fails
+    axis_leg_yaw_tol: float = math.radians(2.0)
+    axis_leg_corridor_m: float = 0.03
     #: trunk (translate, tilt) at the recorded pair
     trunk_tol: float = 0.03
     #: eef at the end of a tracked segment (m, rad)
@@ -1442,6 +1447,14 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
         ctx["navigate_arms_reposed"] = sorted(move)
         if move:
             yield from motions.arm_to(tuple(sorted(move)), q=move)
+    if targets.get("axis_leg"):
+        # owner 2026-10-13 (disembedding): the leg into the place pose keeps the heading and moves forward / backward or left / right
+        # one after the other - a stop at every corner, the driven poses kept for post_navigate's check
+        poses = ctx["axis_leg_poses"] = [tuple(float(v) for v in state.base_pose2d())]
+        for a in motions.track_path(targets["waypoints"], posture=posture, style=BP.RECORDED, corner_stop=True):
+            yield a
+            poses.append(tuple(float(v) for v in state.base_pose2d()))
+        return
     yield from motions.track_path(targets["waypoints"], posture=posture, style=targets.get("style"))
 
 
@@ -1449,6 +1462,13 @@ def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:
     cfg = _cfg(ctx)
     d, dyaw = _base_error(state.base_pose2d(), targets["goal"])
     ctx["base_error"] = (d, dyaw)
+    if targets.get("axis_leg"):
+        tr = BP.axis_leg_tracking(ctx.pop("axis_leg_poses", None) or [], targets["waypoints"])
+        ok = tr["max_yaw_dev_rad"] <= cfg.axis_leg_yaw_tol and tr["max_corridor_m"] <= cfg.axis_leg_corridor_m
+        ctx["axis_leg"] = {"max_yaw_dev_deg": round(math.degrees(tr["max_yaw_dev_rad"]), 3), "max_corridor_mm": round(1000.0 * tr["max_corridor_m"], 1),
+                           "n_poses": tr["n_poses"], "moves": [[a, round(m, 3)] for a, m in BP.axis_leg_moves(targets["waypoints"])], "ok": ok}
+        if not ok:
+            return "execution"
     return None if d <= cfg.nav_pos_tol and dyaw <= cfg.nav_yaw_tol else "execution"
 
 

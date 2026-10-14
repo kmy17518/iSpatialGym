@@ -545,6 +545,8 @@ NOTE_KEYS = NOTE_KEYS + ("push_stop",)
 NOTE_KEYS = NOTE_KEYS + ("push_pre_lowered",)
 #: the collision world the transit to a push pre-contact was planned in (``execute.reach_push_pre``): the pushed object present or left out, why
 NOTE_KEYS = NOTE_KEYS + ("push_transit",)
+#: owner 2026-10-13 (disembedding): an axis-aligned leg's driven heading / corridor and its moves (``execute.post_navigate``)
+NOTE_KEYS = NOTE_KEYS + ("axis_leg",)
 
 
 @dataclass
