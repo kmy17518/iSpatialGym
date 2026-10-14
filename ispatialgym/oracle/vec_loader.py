@@ -423,10 +423,13 @@ class VecInstanceLoader:
             raise RuntimeError(f"{tro_path}: template {template_dir} is another world than {self.template_dir}: {bad[:3]}")
         return template_dir
 
-    def restore_batch(self, tro_paths: Sequence[Optional[str]]) -> Tuple[Dict[int, Any], Dict[int, Any]]:
+    def restore_batch(self, tro_paths: Sequence[Optional[str]], settle_eval: bool = True, settle_steps: Optional[Sequence[Optional[int]]] = None,
+                      mode: str = "replay", tolerance_scale: Optional[float] = None) -> Tuple[Dict[int, Any], Dict[int, Any]]:
         """Load ``tro_paths[i]`` into clone ``i`` (None = idle slot, left as it is); returns ``({env_idx: obs}, {env_idx: info})``
         of the loaded envs after the reset. A slot whose §3.14 restore fails (``LoadError``) is recorded in ``self.failed[i]``
-        (``{"reason", "message"}``), left holding, and excluded from the returned dicts."""
+        (``{"reason", "message"}``), left holding, and excluded from the returned dicts. Every loaded env gets the run's
+        ``settle_eval`` and its window ``settle_steps[i]`` (default the task's) before the reset and its ``isg-v2`` tolerances
+        (``mode`` / ``tolerance_scale``, ``slot_reports[i]["tolerance_profile"]``) after it, as ``run_isg`` does."""
         from ispatialgym.sampling.scene_variants import block_trav_map_from_meta
 
         assert len(tro_paths) == self.num_envs, (len(tro_paths), self.num_envs)
@@ -493,7 +496,8 @@ class VecInstanceLoader:
             self._hold_entities(loaded)
         for i in loaded:
             env.scenes[i].update_initial_file()
-        task._reset_tracking(loaded)
+            n = settle_steps[i] if settle_steps is not None and settle_steps[i] is not None else task.settle_steps
+            task.configure_evaluation(settle_eval, int(n), env_indices=[i])  # before the reset activates its pose_settled windows
         idx = th.tensor(loaded, dtype=th.long)
         obs_list, info = env.reset(env_indices=idx)  # the loaded scenes back to their snapshots, pose_settled tracking on, a render
         info_list = info.get("obs_info") or [None] * len(loaded)
@@ -517,6 +521,8 @@ class VecInstanceLoader:
                 continue
             if self.slot_reports[i]["controller_targets_restored"]:
                 self.robots[i].apply_action(sl.hold.action())
+            self.slot_reports[i]["tolerance_profile"] = task.apply_tolerance_profile(mode, scale=tolerance_scale, env_idx=i, scene=env.scenes[i],
+                                                                                     meta=self.tros[i].meta)
             rp, rq = self.robots[i].get_position_orientation()
             t_i = scene_translation(env.scenes[i])
             if t_i is not None:

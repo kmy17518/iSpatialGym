@@ -623,11 +623,13 @@ class Recorder:
         if RECORD_LINK_POSES:
             r["link_poses"].append(np.stack([pose7(*link.get_position_orientation()) for link in self._pose_links()]))
         isg = (info or {}).get("done", {}).get("ispatialgym") or (info or {}).get("ispatialgym") or {}
-        r["eval/binary_success"].append(bool(isg.get("binary_success", False)))
+        # the task's facts of the step (ispatialgym.eval.metrics): G, S, M and the error metric of the (:measure ...) atoms
+        r["eval/symbolic"].append(bool(isg.get("goal", False)))
         r["eval/settled"].append(bool(isg.get("settled", False)))
-        errs = isg.get("errors") or {}
-        for key in ("max_position_error", "max_orientation_error", "max_layout_position_error", "max_layout_orientation_error"):
-            v = errs.get(key)
+        r["eval/geometric_within"].append(bool(isg.get("measure_within", False)))
+        metric = isg.get("error_metric") or {}
+        for key in ("position_error", "orientation_error"):
+            v = metric.get(key)
             r[f"eval/{key}"].append(float("nan") if v is None else float(v))
         robs = self._robot_obs(obs)
         p = self._proprio(robs)

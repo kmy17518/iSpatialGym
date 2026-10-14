@@ -150,6 +150,7 @@ CATEGORIES: Tuple[str, ...] = (
     "not_reached",
     "tolerance",
     "not_settled",
+    "symbolic_only",
     "collision",
     "held_object_drift",
     "stalled",
@@ -167,8 +168,10 @@ CATEGORIES: Tuple[str, ...] = (
 ) + HARD_METRICS
 #: categories the oracle's per-step retry rules can raise (``protected_*``: the transit span of oracle.protection, owner 2026-09-26)
 STEP_CATEGORIES: Tuple[str, ...] = ("collision", "held_object_drift", "stalled", "gripper_out_of_fov", "timeout", "protected_contact", "protected_moved")
-#: categories of the epilogue (the QA hard metrics measured over the episode included)
-EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "jerky_motion", "goal_occlusion")
+#: categories of the epilogue (the QA hard metrics measured over the episode included): the task's metrics give ``not_reached``
+#: (the goal never held), ``not_settled`` (settle-eval on: never through a settled window) and ``symbolic_only`` (symbolic success,
+#: no geometric success: the measured targets never within tolerance at the same step(s)); ``tolerance`` is the push loops'
+EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "not_settled", "symbolic_only", "jerky_motion", "goal_occlusion")
 
 #: contacts with these object categories never count (the robot stands / drives on them)
 GROUND_CATEGORIES = frozenset({"floors", "carpet", "rug", "mat", "gym_mat", "yoga_mat", "lawn", "driveway", "ceramic_tile"})

@@ -93,26 +93,21 @@ def revolution_axis(category: str, model: str, path: str = REVOLUTION_AXES_PATH)
 @dataclass
 class ExecutorConfig:
     n_render_iterations: int = 1
-    #: episode step budget (the QA monitors' own budget is ``QAConfig.max_episode_steps``)
+    #: episode step budget (the QA monitors' own budget is ``QAConfig.max_episode_steps``); a program's actions get
+    #: ``max_steps - settle_steps`` of it, the rest is its epilogue's
     max_steps: int = 20000
-    #: seconds the actions may take (None = no limit): a stream (replay / policy) ends there and the epilogue still judges
+    #: seconds the actions may take (None = no limit): a stream (replay / policy) ends there and the task's metrics judge
     #: the episode, as at the end of its steps; a program gets a ``timeout`` verdict
     max_wall_s: Optional[float] = None
-    #: the epilogue's settling evaluation: off, the binary goal at the end of the settle window alone decides (no motion
-    #: check, no second window, no ``pose_settled`` atoms)
-    settle_eval: bool = True
     #: one retry from the checkpoint (§3.8)
     retries: int = 1
-    #: epilogue no-op window: max(settle_min_steps, settle_fraction * action steps)
-    settle_min_steps: int = 50
-    settle_fraction: float = 0.2
-    #: second chance: when the first window shows motion (or the binary goal is lost), a second no-op window of this
-    #: many times the first runs and *its* motion / end state decide (0 = no second window)
-    settle_second_window_factor: float = 2.0
-    #: motion over the no-op window that counts as "not settled" (robot base / joints / task objects)
-    settled_pos_tol: float = 0.005
-    settled_rot_tol: float = 0.01
-    settled_joint_tol: float = 0.02
+    #: the epilogue of a program: exactly this many no-op steps (``run_isg --settle-steps``, the task's ``pose_settled`` window),
+    #: reserved in ``max_steps``; a stream has none
+    settle_steps: int = 45
+    #: what ``success`` follows (``run_isg --success-metric``): the run mode's ``geometric`` (default) or ``symbolic`` success
+    success_metric: str = "geometric"
+    #: a stream ends at the run mode's geometric success (the episode's termination; policy mode)
+    stop_on_success: bool = False
     #: (2026-09-22, 0918-000750) before the no-op window every arm's hold target is relaxed onto its measured joints over
     #: ``epilogue_relax_steps`` steps (``Motions.relax_arms``; a pressing fist of an open ``press_hold`` is left alone): a
     #: drive still fighting an unseen contact at the end of the program (the folded elbow on its own upper arm: joint
@@ -120,11 +115,6 @@ class ExecutorConfig:
     #: window judges the robot at rest
     epilogue_relax_arms: bool = True
     epilogue_relax_steps: int = 6
-    #: also require the evaluator's own ``settled_success`` (PoseSettled of every settled entity) at the last step.
-    #: Off by default: PoseSettled's 1 mm/s root-velocity threshold is never met by an object held at the end of a
-    #: position-controlled arm (0 / 74 v1 held-object demos ever settled by that measure while being motionless
-    #: within 0.1 mm over the window), so the §6.4 "motion after the final no-op window" is measured here instead.
-    require_task_settled: bool = False
     #: goal image
     goal_image: bool = False
     goal_image_renders: int = 10
@@ -180,10 +170,8 @@ class ExecutorConfig:
     restore_renders_max: int = 40
     restore_frame_tol: float = 1.0
     restore_frame_gain_tol: float = 0.25
-    #: TRO goal override thresholds for measured-only targets (spec §8): max(min_pos, extent_fraction × smallest
-    #: horizontal extent) / rot
+    #: TRO goal override thresholds of a target without a tolerance of its own (every loaded target has the profile's)
     override_min_pos: float = 0.01
-    override_extent_fraction: float = 0.25
     override_rot: float = 0.20
     #: record the serialized sim state every step (needed for the BEHAVIOR-replayable hdf5)
     record_state: bool = True
@@ -348,8 +336,8 @@ class Checkpoint:
     qa: Optional[Dict[str, Any]] = None
 
 
-#: ``ISpatialGymTask`` success-tracking attributes that a rollback must restore (sticky "first success" steps)
-TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_errors_at_first_success", "_last_goal_eval")
+#: ``ISpatialGymTask`` tracking that a rollback must restore (its symbolic / geometric success trackers, a copy)
+TASK_TRACKING_ATTRS = ("metrics_state",)
 
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
@@ -828,6 +816,11 @@ class Executor:
         info = self.last_info or {}
         return (info.get("done") or {}).get("ispatialgym") or info.get("ispatialgym") or {}
 
+    @property
+    def action_budget(self) -> int:
+        """The steps a program's actions may take: ``max_steps`` less its epilogue's ``settle_steps``."""
+        return max(0, int(self.cfg.max_steps) - int(self.cfg.settle_steps))
+
     # ------------------------------------------------------------------ stepping (the only env.step)
 
     def _ag_held(self) -> Dict[str, Optional[str]]:
@@ -913,8 +906,9 @@ class Executor:
                         self.qa.note_rule(v)
             else:
                 verdict = self.monitors.check(self.n, settle=settling)
-        if verdict is None and self.n >= self.cfg.max_steps:
-            verdict = Verdict("timeout", f"episode exceeded max_steps {self.cfg.max_steps}", step=self.n)
+        if verdict is None and not self._stream and phase != PHASE_SETTLE and self.n > self.action_budget:
+            verdict = Verdict("timeout", f"the program exceeded its {self.action_budget} action steps (max_steps {self.cfg.max_steps} less the "
+                                         f"{self.cfg.settle_steps}-step epilogue)", step=self.n)
             self.stats.record(verdict)
         if (verdict is None and phase != PHASE_SETTLE and self._wall_t0 is not None and self.cfg.max_wall_s
                 and time.time() - self._wall_t0 > self.cfg.max_wall_s):
@@ -1604,8 +1598,8 @@ class Executor:
         signed = float(value) * (1.0 if kind == "line" else math.copysign(1.0, float(res.get("angle_sign", 1.0))))
         out["residual"] = signed
         out["in_tolerance"] = abs(signed) <= float(tol)
-        first = int(self.isg.get("first_success_step", -1) or -1)
-        hits = [h for h in (ctx.get("watch_hits") or []) if first < 0 or h < first]
+        first = self.isg.get("goal_first_step")
+        hits = [h for h in (ctx.get("watch_hits") or []) if first is None or h < first]
         out["brace_hits"] = len(hits)
         # rush 2026-09-17: the ladder aims at a fraction of the tolerance (brace_retry_aim_frac) - a two-pad squeeze
         # relaxes by ~0.07 rad when the pads leave (painting 0917-220043: push ended at +0.053 of 0.08, final 0.129);
@@ -1740,9 +1734,9 @@ class Executor:
         return verdict
 
     def run_stream(self, actions: Iterable[th.Tensor], phase: int = PHASE_ORACLE) -> Dict[str, Any]:
-        """Replay / policy modes: step a stream of 23-D actions (no checkpoints, no program), then the epilogue. The
-        epilogue's no-op window repeats the **last streamed action** with the base stopped (the Layer-1 hold targets
-        are not updated by a stream; holding them would drive the robot back to its initial configuration)."""
+        """Replay / policy modes: step a stream of 23-D actions (no checkpoints, no program, no epilogue: a replay streams its
+        demo's settle rows, a policy has none) until it ends, ``max_steps``, the wall clock or - ``stop_on_success`` - the run
+        mode's geometric success; then the task's metrics judge the episode (:meth:`epilogue`)."""
         t0 = time.time()
         verdict: Optional[Verdict] = None
         self._stream = True
@@ -1752,15 +1746,21 @@ class Executor:
         phases = self.stream_phases
         try:
             for k, a in enumerate(actions):
+                if self.n >= self.cfg.max_steps:
+                    log.info("stream: max_steps %d reached; the task's metrics judge the episode", self.cfg.max_steps)
+                    break
                 if self.cfg.max_wall_s and time.time() - t0 > self.cfg.max_wall_s:
                     self.wall_clock_exceeded = True
-                    log.info("stream: wall clock of %.0f s reached after %d steps; the epilogue judges the episode", self.cfg.max_wall_s, self.n)
+                    log.info("stream: wall clock of %.0f s reached after %d steps; the task's metrics judge the episode", self.cfg.max_wall_s, self.n)
                     break
                 a = th.as_tensor(a, dtype=th.float32).reshape(-1)
                 self._last_stream_action = a.clone()
                 settle_row = phases is not None and k < len(phases) and int(phases[k]) == PHASE_SETTLE
-                verdict = self.step(a, phase, 0, 0, acting=False if settle_row else None)
+                verdict = self.step(a, PHASE_SETTLE if settle_row else phase, 0, 0)  # a replayed settle row is recorded as one
                 if verdict is not None:
+                    break
+                if self.cfg.stop_on_success and self.isg.get("official_success"):
+                    log.info("stream: geometric success at step %s; the episode ends", self.isg.get("geometric_success_step"))
                     break
         finally:
             if self.monitors is not None:
@@ -1854,7 +1854,7 @@ class Executor:
             tol = getattr(tgt, "orientation_tolerance", None)
             tol = float(self.cfg.demo_orientation_tolerance_default if tol is None else tol)
             entry: Dict[str, Any] = {"orientation_error": float(err), "tolerance": tol, "within": float(err) <= tol, "metric": getattr(tgt, "orientation_metric", None),
-                                     "target_gating": bool(rep.get("gating", False))}
+                                     "target_in_goal": bool(rep.get("in_goal", False))}
             axis = self.revolution_axis_of(obj) if self.cfg.demo_revolution_axes else None
             if axis is not None and str(getattr(tgt, "frame", "world")) == "world":
                 ax_err = self.axis_error(obj, tgt, axis["axis"])
@@ -1937,25 +1937,6 @@ class Executor:
                 out.add(inst)
         return out
 
-    def _moved(self, motion: Dict[str, float], isg: Dict[str, Any]) -> bool:
-        """The epilogue's motion-window rule: the robot (joints, base) must be still; a tracked object's **position**
-        must be still; its **rotation** only counts when the goal has an orientation target for it (owner rule
-        2026-09-16: a near-spherical brussels sprout spinning in the bowl — 0.245 rad at 0.7 mm — is not a failed
-        IORS goal; the relation and the position decide)."""
-        if motion.get("joint_rad", 0.0) > self.cfg.settled_joint_tol or motion.get("base_m", 0.0) > self.cfg.settled_pos_tol or motion.get("base_rad", 0.0) > self.cfg.settled_rot_tol:
-            return True
-        oriented = self.orientation_targets(isg)
-        for k, v in motion.items():
-            if k in ("joint_rad", "base_m", "base_rad") or not isinstance(v, (int, float)):
-                continue
-            if k.endswith("_m"):
-                if v > self.cfg.settled_pos_tol:
-                    return True
-            elif k.endswith("_rad"):
-                if k[: -len("_rad")] in oriented and v > self.cfg.settled_rot_tol:
-                    return True
-        return False
-
     def _reset_predicate_branches(self) -> None:
         """Clear the D-007 predicate branch log (``ISpatialGymTask.reset_predicate_branches``) so the next evaluations are
         the ones ``_predicate_branches`` reports; a task without the wrapper is left alone."""
@@ -1987,86 +1968,57 @@ class Executor:
                 tail = []
         return branch, tail
 
+    def metric_verdict(self, isg: Dict[str, Any]) -> Optional[Verdict]:
+        """The episode's verdict from the task's metrics (``ispatialgym.eval.metrics``; the run's settle-eval mode): None when the
+        run mode's ``success_metric`` success was reached; ``symbolic_only`` - the goal held (symbolic success) but the measured
+        targets were never within tolerance at the same step(s); ``not_settled`` (settle-eval on) - the goal held but never
+        through a settled window; ``not_reached`` - the goal never held."""
+        geometric, symbolic = bool(isg.get("geometric_success")), bool(isg.get("symbolic_success"))
+        if (geometric if self.cfg.success_metric == "geometric" else symbolic):
+            return None
+        evaluation = isg.get("evaluation") or {}
+        if symbolic:
+            outside = [m["bddl"] for m in (evaluation.get("measured") or []) if not m.get("within_tolerance")]
+            return Verdict("symbolic_only", f"the goal held (symbolic success at step {isg.get('symbolic_success_step')}) but the measured targets were "
+                                            "not within tolerance at the same step(s); at the evaluation step outside: " + (", ".join(outside) or "none"),
+                           step=self.n, details={"outside": outside, "symbolic_success_step": isg.get("symbolic_success_step"),
+                                                 "error_metric": evaluation.get("error_metric")})
+        if isg.get("settle_eval") and isg.get("goal_first_step") is not None:
+            return Verdict("not_settled", f"the goal held (first at step {isg.get('goal_first_step')}) but never through a settled window of "
+                                          f"{isg.get('settle_steps')} steps", step=self.n, details={"goal_first_step": isg.get("goal_first_step")})
+        return Verdict("not_reached", "the goal never held; unsatisfied at the last step: " + ", ".join(_unsatisfied(isg)), step=self.n)
+
     def epilogue(self, verdict: Optional[Verdict], n_action_steps: int) -> Dict[str, Any]:
+        """The end of an episode: a program's settle window (exactly ``settle_steps`` no-op steps, reserved in the step budget;
+        none after a timeout or a hard QA verdict, none for a stream), then the verdict - the first one the actions or the window
+        gave, else the task's metrics (:meth:`metric_verdict`) - the QA metrics and the result."""
         t0 = time.time()
         if self.monitors is not None:
             self.monitors.begin_epilogue(held=self.state.held_objects())
-        window = max(int(self.cfg.settle_min_steps), int(math.ceil(self.cfg.settle_fraction * n_action_steps)))
-        # no window after a timeout, nor after a QA hard metric (the oracle demo stops where it failed)
-        runs_window = verdict is None or (verdict.category != "timeout" and not is_hard_qa(verdict))
-        if runs_window:  # a window that runs stays inside the episode's step budget
-            window = min(window, max(0, self.cfg.max_steps - self.n - 1))
+        window = 0 if self._stream else int(self.cfg.settle_steps)
+        runs_window = window > 0 and (verdict is None or (verdict.category != "timeout" and not is_hard_qa(verdict)))
         before = MotionSnapshot(self.robot, self.tracked)
         settle_verdict = None
-        windows = [window]
         relax_info: Dict[str, Any] = {}
-        self._reset_predicate_branches()  # D-007: the branch log of the final binary evaluation starts with the settle window
+        self._reset_predicate_branches()  # D-007: the branch log of the final evaluation starts with the settle window
         if runs_window:
             settle_verdict = self.run_generator(self._epilogue_hold(window, relax_info), PHASE_SETTLE)
             if self.recorder is not None:
                 self.recorder.commit()
-        after = MotionSnapshot(self.robot, self.tracked)
-        motion = before.delta(after)
+        motion = before.delta(MotionSnapshot(self.robot, self.tracked))
         isg = self.isg
-        moved = self._moved(motion, isg)
-        binary_final = bool(isg.get("binary_success", False))
-        # the second window stays inside the episode's step budget
-        window2 = min(int(math.ceil(self.cfg.settle_second_window_factor * window)), self.cfg.max_steps - self.n - 1)
-        if self.cfg.settle_eval and verdict is None and settle_verdict is None and (moved or not binary_final) and window2 > 0:
-            # second chance (owner rule 2026-09-16): a longer no-op window before the verdict; the motion over *this*
-            # window and the binary goal at its end decide (a near-spherical object still rolling in a bowl, a
-            # released object still relaxing)
-            log.info("epilogue: motion after the first no-op window (%s) - second window of %d steps", {k: round(v, 4) for k, v in motion.items() if (v > 1e-4)}, window2)
-            before2 = MotionSnapshot(self.robot, self.tracked)
-            self._reset_predicate_branches()  # the second window's last evaluation is the final one
-            settle_verdict = self.run_generator(self._noop_actions(window2), PHASE_SETTLE)
-            if self.recorder is not None:
-                self.recorder.commit()
-            motion_first = motion
-            motion = before2.delta(MotionSnapshot(self.robot, self.tracked))
-            motion["first_window"] = motion_first
-            isg = self.isg
-            moved = self._moved(motion, isg)
-            binary_final = bool(isg.get("binary_success", False))
-            windows.append(window2)
-        binary_ever = bool(isg.get("binary_success_ever", isg.get("binary_success", False)))
-        settled_task = bool(isg.get("settled_success", False))
         binary_branch, branch_log = self._predicate_branches()  # D-007: which wrapper branch decided each under / ontop atom at the last step
         if binary_branch:
-            log.info("epilogue: binary goal atoms decided by %s", binary_branch)
-        out_of_tol = _out_of_tolerance(isg)
+            log.info("epilogue: goal atoms decided by %s", binary_branch)
         if self.qa is not None and settle_verdict is not None and settle_verdict.category in RULE_METRICS:
             self.qa.note_rule(settle_verdict, retried=False)  # the settle window has no retry
         if verdict is None and settle_verdict is not None:
             verdict = settle_verdict
-        if verdict is None and not (binary_ever or binary_final):
-            unsatisfied = _unsatisfied(isg)
-            # a goal that never held only because gating pose targets are outside their tolerance is a tolerance
-            # failure (the brace retry ladder ends there), not a relation that was never established
-            only_tolerance = bool(out_of_tol) and all(_pose_reached_of(c) in out_of_tol for c in unsatisfied)
-            if only_tolerance:
-                verdict = Verdict("tolerance", "measured error above tolerance for " + ", ".join(out_of_tol) + " (the goal never held)", step=self.n,
-                                  details={"targets": out_of_tol, "never_reached": True})
-            else:
-                verdict = Verdict("not_reached", "binary goal not reached; unsatisfied: " + ", ".join(unsatisfied), step=self.n)
-            self.stats.record(verdict)
-        if verdict is None and out_of_tol:
-            verdict = Verdict("tolerance", "measured error above tolerance for " + ", ".join(out_of_tol), step=self.n, details={"targets": out_of_tol})
-            self.stats.record(verdict)
-        if verdict is None and not self.cfg.settle_eval and not binary_final:
-            verdict = Verdict("not_reached", "the binary goal does not hold at the end of the settle window; unsatisfied: " + ", ".join(_unsatisfied(isg)),
-                              step=self.n)
-            self.stats.record(verdict)
-        if verdict is None and self.cfg.settle_eval and (moved or not binary_final or (self.cfg.require_task_settled and not settled_task)):
-            if moved:
-                msg = "robot / object motion after the final no-op window"
-            elif not binary_final:
-                msg = "the binary goal no longer holds at the last step"
-            else:
-                msg = "the evaluator's pose_settled atoms do not hold at the last step"
-            verdict = Verdict("not_settled", msg, step=self.n, details={"motion": motion, "task_settled_success": settled_task})
-            self.stats.record(verdict)
-        # -- the placed objects' orientation against their recorded (non-gating) targets: a fact of an oracle demo, no verdict
+        if verdict is None:
+            verdict = self.metric_verdict(isg)
+            if verdict is not None:
+                self.stats.record(verdict)
+        # -- the placed objects' orientation against their recorded targets: a fact of an oracle demo, no verdict
         placed_orientation = self.placed_orientation_report(isg) if (self.program_actions and not self._stream) else None
         self.timings["settle_s"] = time.time() - t0
         goal_obs = None
@@ -2092,15 +2044,25 @@ class Executor:
                 self.stats.record(verdict)
             qa_report = self.qa.report()
         self.verdict = verdict
-        success = verdict is None
-        errors = isg.get("final_errors") or isg.get("errors") or {}
-        last_errors = isg.get("errors") or {}
+        evaluation = isg.get("evaluation") or {}
         self.result = {
-            "success": success,
+            "success": verdict is None,
             "verdict": None if verdict is None else verdict.to_dict(),
             "reason": None if verdict is None else verdict.category,
-            "binary_success_ever": binary_ever,
-            "binary_success_final": binary_final,
+            "success_metric": self.cfg.success_metric,
+            "settle_eval": isg.get("settle_eval"),
+            "settle_steps": isg.get("settle_steps"),
+            "symbolic_success": bool(isg.get("symbolic_success")),
+            "symbolic_success_step": isg.get("symbolic_success_step"),
+            "geometric_success": bool(isg.get("geometric_success")),
+            "geometric_success_step": isg.get("geometric_success_step"),
+            # the errors the run mode is judged by (at its geometric success, else at the last step) and the last step's
+            "errors": evaluation.get("errors") or isg.get("errors") or {},
+            "errors_final_step": isg.get("errors") or {},
+            "error_metric": evaluation.get("error_metric"),
+            "measured": evaluation.get("measured"),
+            "other_mode": isg.get("other_mode"),
+            "goal_first_step": isg.get("goal_first_step"),
             # D-007 (owner 2026-09-16 22:05 item 4): the wrapper branch (omnigibson / rays / geometry / none) that decided every
             # under / ontop atom at the final evaluation; ``binary_branch_fallback`` lists the atoms a fallback branch passed
             "binary_branch": binary_branch,
@@ -2108,24 +2070,14 @@ class Executor:
             "binary_branch_log": branch_log,
             # owner 2026-09-16 23:00 (fact, no verdict): the support's pose drift and the finger-support contact loading
             "support_disturbance": self.support_load.report() if self.support_load is not None else {},
-            "settled_success": settled_task,
-            "settle_eval": bool(self.cfg.settle_eval),
             "wall_clock_exceeded": bool(self.wall_clock_exceeded),
             "pose_settled_config": isg.get("pose_settled_config"),
-            "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
-            "first_success_step": isg.get("first_success_step"),
-            "first_settled_success_step": isg.get("first_settled_success_step"),
-            "settle_latency_steps": isg.get("settle_latency_steps"),
-            "errors": errors,
-            "errors_final_step": last_errors,
             "conditions": isg.get("conditions"),
-            "measured": isg.get("measured"),
             "group_assignments": isg.get("group_assignments"),
             "n_steps": self.n,
             "n_action_steps": n_action_steps,
             "n_settle_steps": self.phase_steps.get(PHASE_SETTLE, 0),
-            "settle_window": window,
-            "settle_windows": windows,
+            "epilogue_steps": window if runs_window else 0,
             "epilogue_relax": relax_info,
             "kept_hold_arms": sorted(getattr(self.motions, "keep_hold_arms", ()) or ()),
             "jams": _jsonable(list(getattr(self.motions, "jams", []) or [])),
@@ -2208,9 +2160,9 @@ class Executor:
     # ------------------------------------------------------------------ TRO goal override (§3.8, spec §8)
 
     def goal_override(self, tro_meta, compiled_task=None) -> Dict[str, Any]:
-        """Settled values for every TRO target within its override threshold: gating targets use their own tolerance,
-        measured-only targets spec §8's max(0.01 m, 0.25 × smallest horizontal extent) / 0.20 rad; a push-under target's orientation is
-        judged modulo rotation about the world vertical (:func:`vertical_angle`, as the ``placed_orientation`` gate). Returns
+        """Settled values for every TRO target within its tolerance (the one tolerance per target of the ``isg-v2`` profile, which
+        the loaded TRO carries in memory); a push-under target's orientation is judged modulo rotation about the world vertical
+        (:func:`vertical_angle`, as the ``placed_orientation`` gate). Returns
         ``{"pose_targets": {inst: {...}}, "groups": {...}, "articulation_targets": {...}, "applied": [...]}``; the
         caller writes the TRO."""
         out: Dict[str, Any] = {"pose_targets": {}, "groups": {}, "articulation_targets": {}, "applied": [], "skipped": []}
@@ -2260,18 +2212,7 @@ class Executor:
         return out
 
     def _override_threshold(self, inst: str, tgt, compiled) -> Tuple[float, float]:
-        gating = bool(compiled.is_gating("pose_reached", inst)) if compiled is not None else True
-        if gating:
-            return float(tgt.position_tolerance or self.cfg.override_min_pos), float(tgt.orientation_tolerance or self.cfg.override_rot)
-        extent = None
-        try:
-            obj = self.state.object(inst)
-            ext = obj.aabb_extent
-            extent = float(min(float(ext[0]), float(ext[1])))
-        except Exception:  # noqa: BLE001
-            pass
-        pos = max(self.cfg.override_min_pos, self.cfg.override_extent_fraction * extent) if extent is not None else self.cfg.override_min_pos
-        return pos, self.cfg.override_rot
+        return float(tgt.position_tolerance or self.cfg.override_min_pos), float(tgt.orientation_tolerance or self.cfg.override_rot)
 
     def _measured_pose(self, inst: str, tgt) -> Tuple[th.Tensor, th.Tensor]:
         if inst == AGENT_INSTANCE:
@@ -2375,27 +2316,6 @@ def vertical_angle(q_cur, goal_q, equivalences: Sequence[Any] = ()) -> float:
 
 def _unsatisfied(isg: Dict[str, Any]) -> List[str]:
     return [c.get("bddl", "?") for c in (isg.get("conditions") or []) if c.get("kind") == "binary" and not c.get("satisfied")]
-
-
-def _pose_reached_of(bddl: str) -> Optional[str]:
-    """The target instance of a ``(pose_reached ?x)`` atom (``?`` and parentheses stripped), None for any other atom."""
-    s = str(bddl).strip().strip("()").split()
-    if len(s) == 2 and s[0] == "pose_reached":
-        return s[1].lstrip("?")
-    return None
-
-
-def _out_of_tolerance(isg: Dict[str, Any]) -> List[str]:
-    """**Gating** targets whose current error report says ``within_tolerance: False`` (pose and layout targets). The
-    measured-only ``(:measure ...)`` targets of disembedding / IORS (``gating: False``) are reported, never a verdict:
-    their tolerance is the reporting / goal-override band of spec §8, the relation predicate is what gates."""
-    errs = isg.get("errors") or {}
-    out = []
-    for kind in ("pose_errors", "layout_errors"):
-        for inst, rep in (errs.get(kind) or {}).items():
-            if isinstance(rep, dict) and rep.get("within_tolerance") is False and rep.get("gating", True):
-                out.append(inst)
-    return out
 
 
 def apply_goal_override(tro_raw: Dict[str, Any], override: Dict[str, Any], tro_key: str = "ispatialgym") -> List[str]:

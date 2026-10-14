@@ -158,8 +158,8 @@ def _pose_values(group: str, change: Dict[str, Optional[float]], components: Lis
 def plan(variant: str, targets: List[Dict[str, Any]], scale: float = 1.0, overrides: Optional[Dict[str, Dict[str, float]]] = None) -> Dict[str, Dict[str, Any]]:
     """The tolerance of every target, simulator-free. ``targets``: ``{"name", "kind", "components": ["position", "orientation"],
     "change": {"position", "orientation"}}`` for a pose / group target, ``{"name", "kind": "joints", "joints": {joint: {"type":
-    "prismatic" | "revolute", "change": |dq|}}}`` for an articulation. Returns ``{name: {"kind", "scale_group", "change",
-    "tolerances", "override"}}``."""
+    "prismatic" | "revolute", "change": |dq|}}}`` for an articulation; ``"instance"`` (default the name): the BDDL instance or group
+    the target belongs to. Returns ``{name: {"kind", "instance", "scale_group", "change", "tolerances", "override"}}``."""
     overrides = validate_overrides(overrides)
     scale = float(scale)
     if not scale > 0:
@@ -181,12 +181,14 @@ def plan(variant: str, targets: List[Dict[str, Any]], scale: float = 1.0, overri
                 change[joint] = dq
                 tol[joint] = max(floor, fraction * dq) * scale
                 overridden[joint] = jtype in ov or "fraction" in ov
-            out[name] = {"kind": kind, "scale_group": group, "change": change, "tolerances": tol, "override": overridden}
+            out[name] = {"kind": kind, "instance": t.get("instance", name), "scale_group": group, "change": change, "tolerances": tol,
+                         "override": overridden}
             continue
         section = "layout" if kind == "group_layout" else "pose"
         tol, overridden = _pose_values(group, t.get("change") or {}, list(t.get("components") or []), overrides.get(section, {}), scale,
                                        relation=kind == "group_layout")
-        out[name] = {"kind": kind, "scale_group": group, "change": dict(t.get("change") or {}), "tolerances": tol, "override": overridden}
+        out[name] = {"kind": kind, "instance": t.get("instance", name), "scale_group": group, "change": dict(t.get("change") or {}), "tolerances": tol,
+                     "override": overridden}
     return out
 
 
@@ -212,11 +214,35 @@ def _components(target) -> List[str]:
     return [c for c, metric in (("position", target.position_metric), ("orientation", target.orientation_metric)) if metric is not None]
 
 
+def target_tolerances(meta, inst: str, predicate: str) -> Optional[Dict[str, Any]]:
+    """The tolerances a target is judged with (the loaded TRO's, which :func:`apply_to_task` overwrites): ``{"position",
+    "orientation"}`` of a pose target (None for a component it does not compare) or of a group's slots / relations,
+    ``{"joints": {joint: tolerance}}`` of an articulation; None for an instance without a target."""
+    if meta is None:
+        return None
+    if predicate == "pose_reached":
+        t = meta.pose_targets.get(inst)
+        if t is not None:
+            return {"position": t.position_tolerance if t.position_metric is not None else None,
+                    "orientation": t.orientation_tolerance if t.orientation_metric is not None else None}
+        g = meta.groups.get(inst)
+        tol = g.pose_tolerances if g is not None else None
+    else:
+        art = meta.articulation_targets.get(inst)
+        if art is not None:
+            return {"joints": {j: float(tol) for j, (_pos, tol) in art.joints.items()}}
+        g = meta.groups.get(inst)
+        tol = g.layout_tolerances if g is not None else None
+    return None if not tol else {"position": float(tol[0]), "orientation": float(tol[1])}
+
+
 def apply_to_task(task, mode: str, scale: Optional[float] = None, customs_path: Optional[str] = None, meta=None, env_idx: Optional[int] = None,
                   scene=None) -> Dict[str, Any]:
     """Compute the profile's tolerances for the task's loaded TRO (``meta``: default ``task._tro.meta``; ``env_idx`` / ``scene``: the
     environment of a ``VecISpatialGymTask``) from the current state - after the loader's settle, before the first step - write them
-    into the TRO in memory and re-configure the targets. Returns the record ``meta.json`` keeps (``tolerance_profile``)."""
+    into the TRO in memory and re-configure the targets. Returns the record ``meta.json`` keeps (``tolerance_profile``; its
+    ``targets`` are keyed by instance for a pose target, ``<group>:pose`` / ``<group>:layout`` for a group, ``<instance>:joints``
+    for an articulation, whose instance may also have a pose target)."""
     meta = meta if meta is not None else task._tro.meta
     variant = meta.task_variant
     family, _ = family_task(variant)
@@ -240,18 +266,18 @@ def apply_to_task(task, mode: str, scale: Optional[float] = None, customs_path: 
     for name, g in meta.groups.items():
         if g.supports_pose_reached:
             rep = pose_errors.get(name) or {}
-            targets.append({"name": f"{name}:pose", "kind": "group_pose", "components": ["position", "orientation"],
+            targets.append({"name": f"{name}:pose", "instance": name, "kind": "group_pose", "components": ["position", "orientation"],
                             "change": {"position": rep.get("position_error"), "orientation": rep.get("orientation_error")}})
         if g.supports_layout_reached:
             rep = layout_errors.get(name) or {}
-            targets.append({"name": f"{name}:layout", "kind": "group_layout", "components": ["position", "orientation"],
+            targets.append({"name": f"{name}:layout", "instance": name, "kind": "group_layout", "components": ["position", "orientation"],
                             "change": {"position": rep.get("position_error"), "orientation": rep.get("orientation_error")}})
     for inst, art in meta.articulation_targets.items():
         joints = (layout_errors.get(inst) or {}).get("joints") or {}
         missing = sorted(set(art.joints) - set(joints))
         if missing:
             raise ToleranceProfileError(f"articulation target {inst!r} of {variant!r}: no error at load for joints {missing}")
-        targets.append({"name": inst, "kind": "joints",
+        targets.append({"name": f"{inst}:joints", "instance": inst, "kind": "joints",
                         "joints": {j: {"type": _joint_type(joints[j]["joint_type"]), "change": joints[j]["error"]} for j in art.joints}})
     overrides = overrides_for(variant, customs_path)
     planned = plan(variant, targets, scale=scale, overrides=overrides)
@@ -269,7 +295,7 @@ def apply_to_task(task, mode: str, scale: Optional[float] = None, customs_path: 
             tol = planned[f"{name}:layout"]["tolerances"]
             g.layout_tolerances = (tol["position"], tol["orientation"])
     for inst, art in meta.articulation_targets.items():
-        tol = planned[inst]["tolerances"]
+        tol = planned[f"{inst}:joints"]["tolerances"]
         art.joints = {j: (pos, tol[j]) for j, (pos, _old) in art.joints.items()}
     _configure(task, meta, env_idx, scene)
     for name, note in notes.items():
@@ -278,4 +304,4 @@ def apply_to_task(task, mode: str, scale: Optional[float] = None, customs_path: 
 
 
 __all__ = ["PROFILE_NAME", "ToleranceProfileError", "KINDS", "default_scale", "family_task", "scale_group", "validate_overrides",
-           "overrides_for", "plan", "apply_to_task"]
+           "overrides_for", "plan", "apply_to_task", "target_tolerances"]

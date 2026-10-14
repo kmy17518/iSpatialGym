@@ -1,5 +1,6 @@
 """``VecISpatialGymTask``: :class:`~ispatialgym.tasks.ispatialgym_task.ISpatialGymTask` for a vectorized ``og.Environment``
-(``num_envs`` cloned scenes), every environment with its own scope, targets and two-level success tracking.
+(``num_envs`` cloned scenes), every environment with its own scope, targets and success tracking (the base class tracks, reports
+and fills ``infos[env_idx]`` per env; this class binds the scopes and targets per env).
 
 Design (BEHAVIOR's ``omnigibson/eval/evaluator.py``): one task object, ``object_scopes[env_idx]`` bound to ``env.scenes[env_idx]``'s
 objects and robot, the goal evaluated per env through ``_evaluate_predicate(env_idx, ...)`` (``PredicateGoal`` passes
@@ -29,6 +30,7 @@ from omnigibson.utils.python_utils import recursively_convert_to_torch
 
 from ispatialgym.activity.problem import AGENT_INSTANCE, is_agent_instance
 from ispatialgym.eval.clone_frames import offset_object_state, offset_targets_meta, scene_translation
+from ispatialgym.eval import tolerance_profile as TP
 from ispatialgym.eval.group_entity import GroupEntity
 from ispatialgym.eval.tro import apply_targets_to_scope, load_tro, physical_instances, validate_tro_against_problem
 from ispatialgym.sampling import predicates as PRED
@@ -41,19 +43,19 @@ class VecISpatialGymTask(ISpatialGymTask):
     """Per-environment iSpatialGym task (see the module docstring)."""
 
     def __init__(self, activity_name, activity_definition_id=0, activity_instance_id=0, activity_definitions_root=None, tro_path=None, object_bindings=None,
-                 require_pose_settled=False, terminate_on_binary_success=False, pose_settled_config=None, highlight_task_relevant_objects=False, termination_config=None,
+                 settle_eval=False, settle_steps=45, pose_settled_config=None, highlight_task_relevant_objects=False, termination_config=None,
                  reward_config=None, include_obs=False):
         # the explicit signature: OmniGibson's registry picks the config keys from it
         self._n = 1
         self._scopes: Optional[List[Dict[str, Any]]] = None
-        self._first_success_steps: List[int] = [-1]
-        self._first_settled_success_steps: List[int] = [-1]
-        self._errors_at_first_success_envs: List[Optional[dict]] = [None]
-        self._last_goal_evals: List[Any] = [None]
         super().__init__(activity_name, activity_definition_id=activity_definition_id, activity_instance_id=activity_instance_id, activity_definitions_root=activity_definitions_root,
-                         tro_path=tro_path, object_bindings=object_bindings, require_pose_settled=require_pose_settled, terminate_on_binary_success=terminate_on_binary_success,
+                         tro_path=tro_path, object_bindings=object_bindings, settle_eval=settle_eval, settle_steps=settle_steps,
                          pose_settled_config=pose_settled_config, highlight_task_relevant_objects=highlight_task_relevant_objects, termination_config=termination_config,
                          reward_config=reward_config, include_obs=include_obs)
+
+    @property
+    def n_envs(self) -> int:
+        return self._n
 
     # ------------------------------------------------------------------ scopes (per env)
 
@@ -102,12 +104,7 @@ class VecISpatialGymTask(ISpatialGymTask):
                     scope[k] = None
             scopes.append(scope)
         self._scopes = scopes
-        self._first_success_steps = [-1] * self._n
-        self._first_settled_success_steps = [-1] * self._n
-        self._errors_at_first_success_envs = [None] * self._n
-        self._last_goal_evals = [None] * self._n
-        self._pose_settled_other_success = [{} for _ in range(self._n)]
-        self._t_other_success = [-1] * self._n
+        self._reset_tracking()
         if self._tro_path is not None:
             self._tro = load_tro(self._tro_path)
             validate_tro_against_problem(self._tro.meta, self.compiled_task, require_bindings=False)
@@ -167,6 +164,7 @@ class VecISpatialGymTask(ISpatialGymTask):
         scope = self._scopes[env_idx]
         apply_targets_to_scope(offset_targets_meta(meta, scene), scope)
         self._targets_configured = True
+        self._target_metas[env_idx] = meta
         for entity in scope.values():
             if isinstance(entity, GroupEntity):
                 entity.invalidate()
@@ -270,32 +268,8 @@ class VecISpatialGymTask(ISpatialGymTask):
     # ------------------------------------------------------------------ termination / tracking (per env)
 
     def _check_goal(self, env_idx=0):
-        _, status = self.compiled_task.check_goal(lambda name, *ents: self._evaluate_predicate(env_idx, name, *ents))
-        satisfied = set(status["satisfied"])
-        binary = set(self._other_goal_head_idxs).issubset(satisfied)
-        settled = set(self._pose_settled_head_idxs).issubset(satisfied)
-        self._last_goal_evals[env_idx] = (binary, settled, status)
-        if not self._pose_settled_head_idxs or self.terminate_on_binary_success:
-            return binary, status
-        return (binary and settled), status
-
-    def _reset_tracking(self, env_indices=None):
-        idx = range(self._n) if env_indices is None else [int(i) for i in env_indices]
-        for i in idx:
-            if i < len(self._first_success_steps):
-                self._first_success_steps[i] = -1
-                self._first_settled_success_steps[i] = -1
-                self._errors_at_first_success_envs[i] = None
-                self._last_goal_evals[i] = None
-        if env_indices is None:
-            self._settled_history = {}
-            self._pose_settled_other_success = [{} for _ in range(self._n)]
-            self._t_other_success = [-1] * self._n
-        # the base class's scalar mirrors (env 0) for its helpers
-        self._first_success_step = self._first_success_steps[0] if self._first_success_steps else -1
-        self._first_settled_success_step = self._first_settled_success_steps[0] if self._first_settled_success_steps else -1
-        self._errors_at_first_success = self._errors_at_first_success_envs[0] if self._errors_at_first_success_envs else None
-        self._last_goal_eval = self._last_goal_evals[0] if self._last_goal_evals else None
+        # per env, without the single-env class's shared goal evaluation (ISPATIALGYM_SHARED_GOAL_EVAL keeps one slot)
+        return self._check_goal_impl(env_idx)
 
     def _reset_variables(self, env, env_indices):
         BaseTask._reset_variables(self, env, env_indices)
@@ -309,120 +283,31 @@ class VecISpatialGymTask(ISpatialGymTask):
             for inst in self._pose_settled_insts:
                 entity = self._scopes[i].get(inst)
                 if entity is not None and not isinstance(entity, GroupEntity) and PoseSettled in entity.states:
-                    entity.states[PoseSettled].activate(**self.pose_settled_config)
-
-    def success_of(self, env_idx: int) -> bool:
-        if self.require_pose_settled:
-            return self._first_settled_success_steps[env_idx] >= 0
-        return self._first_success_steps[env_idx] >= 0
-
-    @property
-    def official_success(self) -> bool:
-        return self.success_of(0)
+                    entity.states[PoseSettled].activate(**self.pose_settled_config_of(i))
 
     @property
     def success(self):
         return th.tensor([self.success_of(i) for i in range(self._n)], dtype=th.bool)
 
-    def _step_termination(self, env, action, infos=None):
-        dones, infos = BaseTask._step_termination(self, env=env, action=action, infos=infos)
-        goal_status = self._termination_conditions["predicate"].goal_status
-        for env_idx in range(self._n):
-            info = infos[env_idx]
-            info["goal_status"] = goal_status[env_idx]
-            self._update_success_tracking_env(env, env_idx)
-            info["success"] = self.success_of(env_idx)
-            info["termination_conditions"]["predicate"]["success"] = self.success_of(env_idx)
-            self._populate_isg_info_env(env, info, env_idx)
-            if self._pose_settled_insts:
-                self._populate_pose_settled_info(info, env_idx)
-        self._first_success_step = self._first_success_steps[0]
-        self._first_settled_success_step = self._first_settled_success_steps[0]
-        self._errors_at_first_success = self._errors_at_first_success_envs[0]
-        self._last_goal_eval = self._last_goal_evals[0]
-        return dones, infos
-
-    def _update_success_tracking_env(self, env, env_idx: int):
-        ev = self._last_goal_evals[env_idx]
-        if ev is None:
-            return
-        binary, settled, _ = ev
-        t = int(env.episode_steps[env_idx])
-        if binary and self._first_success_steps[env_idx] < 0:
-            self._first_success_steps[env_idx] = t
-            self._errors_at_first_success_envs[env_idx] = self.collect_errors(env_idx)
-        if binary and settled and self._first_success_steps[env_idx] >= 0 and self._first_settled_success_steps[env_idx] < 0:
-            self._first_settled_success_steps[env_idx] = t
+    def apply_tolerance_profile(self, mode: str, scale: Optional[float] = None, customs_path: Optional[str] = None, env_idx: int = 0, scene=None,
+                                meta=None) -> Dict[str, Any]:
+        """:meth:`ISpatialGymTask.apply_tolerance_profile` for env ``env_idx`` (its TRO ``meta``, default the last loaded one, and
+        its ``scene``)."""
+        meta = meta if meta is not None else self._target_metas.get(env_idx, getattr(self._tro, "meta", None))
+        self.tolerance_profiles[env_idx] = TP.apply_to_task(self, mode, scale=scale, customs_path=customs_path, meta=meta, env_idx=env_idx, scene=scene)
+        return self.tolerance_profiles[env_idx]
 
     # ------------------------------------------------------------------ errors / info (per env)
-
-    def _is_configured_env(self, inst, state_cls, env_idx: int):
-        entity = (self._scopes[env_idx] or {}).get(inst)
-        if entity is None:
-            return False
-        if isinstance(entity, GroupEntity):
-            if entity.target is None:
-                return False
-            return entity.target.supports_pose_reached if state_cls is PoseReached else entity.target.supports_layout_reached
-        return state_cls in entity.states and entity.states[state_cls].has_goal
-
-    def collect_errors(self, env_idx: int = 0) -> Dict[str, Any]:
-        scope = self._scopes[env_idx]
-        pose_errors, layout_errors = {}, {}
-        if self.compiled_task is not None:
-            for inst in self.compiled_task.all_pose_reached_args:
-                if self._is_configured_env(inst, PoseReached, env_idx):
-                    report = scope[inst].states[PoseReached].get_error_report()
-                    if report is not None:
-                        report["gating"] = self.compiled_task.is_gating("pose_reached", inst)
-                        pose_errors[inst] = report
-            for inst in self.compiled_task.all_layout_reached_args:
-                if self._is_configured_env(inst, LayoutReached, env_idx):
-                    report = scope[inst].states[LayoutReached].get_error_report()
-                    if report is not None:
-                        report["gating"] = self.compiled_task.is_gating("layout_reached", inst)
-                        layout_errors[inst] = report
-
-        def _max(reports, key):
-            vals = [r[key] for r in reports.values() if r.get(key) is not None]
-            return max(vals) if vals else None
-
-        return {"pose_errors": pose_errors, "layout_errors": layout_errors, "max_position_error": _max(pose_errors, "position_error"),
-                "max_orientation_error": _max(pose_errors, "orientation_error"), "max_layout_position_error": _max(layout_errors, "position_error"),
-                "max_layout_orientation_error": _max(layout_errors, "orientation_error")}
-
-    def _populate_isg_info_env(self, env, info, env_idx: int):
-        ev = self._last_goal_evals[env_idx]
-        binary, settled, status = ev if ev else (False, False, info["goal_status"])
-        current_errors = self.collect_errors(env_idx)
-        first, first_settled = self._first_success_steps[env_idx], self._first_settled_success_steps[env_idx]
-        latency = (first_settled - first) if (first >= 0 and first_settled >= 0) else -1
-        dt = og.sim.get_sim_step_dt()
-        at_first = self._errors_at_first_success_envs[env_idx]
-        final_errors = at_first if at_first is not None else current_errors
-        groups = self.group_entities_of(env_idx)
-        info["ispatialgym"] = {
-            "activity": self.activity_name, "activity_definition_id": self.activity_definition_id, "task_variant": self.task_variant,
-            "official_success": self.success_of(env_idx), "require_pose_settled": self.require_pose_settled, "pose_settled_config": dict(self.pose_settled_config),
-            "binary_success": bool(binary), "binary_success_ever": first >= 0, "first_success_step": first, "settled": bool(settled),
-            "settled_success": bool(binary and settled), "first_settled_success_step": first_settled, "settle_latency_steps": latency,
-            "settle_latency_seconds": (latency * dt) if latency >= 0 else None, "step": int(env.episode_steps[env_idx]), "env_idx": env_idx,
-            "conditions": self.goal_conditions_report(status), "measured": self.measured_conditions_report(current_errors), "errors": current_errors,
-            "errors_at_first_success": at_first, "final_errors": final_errors, "max_position_error": final_errors["max_position_error"],
-            "max_orientation_error": final_errors["max_orientation_error"], "max_layout_position_error": final_errors["max_layout_position_error"],
-            "max_layout_orientation_error": final_errors["max_layout_orientation_error"],
-            "group_assignments": {name: (entity.evaluate().assignment if entity.evaluate() is not None else None) for name, entity in groups.items()},
-        }
 
     def measured_pose_instances_of(self, env_idx: int):
         if self.compiled_task is None:
             return []
-        return [inst for inst in self.compiled_task.all_pose_reached_args if self._is_configured_env(inst, PoseReached, env_idx)]
+        return [inst for inst in self.compiled_task.all_pose_reached_args if self._is_configured(inst, PoseReached, env_idx)]
 
     def measured_layout_instances_of(self, env_idx: int):
         if self.compiled_task is None:
             return []
-        return [inst for inst in self.compiled_task.all_layout_reached_args if self._is_configured_env(inst, LayoutReached, env_idx)]
+        return [inst for inst in self.compiled_task.all_layout_reached_args if self._is_configured(inst, LayoutReached, env_idx)]
 
     def reset(self, env, env_indices=None):
         BehaviorTask.reset(self, env, env_indices=env_indices)

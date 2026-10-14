@@ -23,7 +23,8 @@ As in BEHAVIOR, the BDDL problems are not in the dataset: an instance names its 
 the index and the template metadata, ``activity_definition_id`` in the instance file), loaded from the repository's
 ``ispatialgym/assets/bddl/activity_definitions`` (BEHAVIOR's bddl package holds its problems).
 
-``run_isg --task`` gives an instance ``max(300, 2 x`` its demo's length ``)`` steps by default (``step_budget``).
+``run_isg --task`` gives an instance ``max(300, 2 x`` its demo's length ``)`` steps by default and a ``--settle-steps`` window of 45
+steps (oracle, policy) or its demo's settle rows (replay; ``step_budget``).
 
 The goal image is the head camera's last frame (``final_rgb.png``) of a successful replay of the instance's demo: the eval
 run's replay re-run with the current code, else its original replay (``set_goal``). A replay renders the whole episode, and
@@ -65,13 +66,14 @@ TRO_SUFFIX = "-tro_state.json"
 DEMO_SUFFIX = "-demo.hdf5"
 LEVELS = ("subtask", "task", "task_family")
 EVALUATION_PROFILE = "isg-v1"  # run_isg.EVALUATION_PROFILE (run_isg imports the simulator)
-#: step budget of run_isg --task: max(MIN_MAX_STEPS, DEMO_STEP_FACTOR x the demo's length) steps, a settle window of
-#: SETTLE_FRACTION of them, WALL_S_PER_STEP seconds per step; DEFAULT_MAX_STEPS without a demo
+#: step budget of run_isg --task: max(MIN_MAX_STEPS, DEMO_STEP_FACTOR x the demo's length) steps, WALL_S_PER_STEP seconds per
+#: step; DEFAULT_MAX_STEPS without a demo; a settle window (run_isg --settle-steps) of DEFAULT_SETTLE_STEPS (oracle, policy)
 MIN_MAX_STEPS = 300
 DEMO_STEP_FACTOR = 2
-SETTLE_FRACTION = 0.2
 WALL_S_PER_STEP = 1.0
 DEFAULT_MAX_STEPS = 3000
+DEFAULT_SETTLE_STEPS = 45
+MODES = ("oracle", "replay", "policy")
 _INSTANCES_DIR = re.compile(r"^(?P<prefix>.+_task_.+)_instances$")
 
 
@@ -99,19 +101,36 @@ def demos_root(root: Optional[str] = None) -> str:
 
 
 def step_budget(length: Optional[int], max_steps: Optional[int] = None, settle_steps: Optional[int] = None,
-                wallclock_s: Optional[float] = None) -> Dict[str, Any]:
-    """``run_isg``'s step budget: ``max_steps`` (the actions: policy steps, a replay, an oracle program) given, else
-    ``max(300, 2 x length)`` for a demo of ``length`` action steps, else 3000; ``settle_steps`` (the no-op window after
-    them) given, else 0.2 x ``max_steps``; ``wallclock_s`` (seconds the actions may take) given, else 1 s x ``max_steps``.
-    The episode is cut at ``max_steps + settle_steps`` steps."""
+                wallclock_s: Optional[float] = None, mode: str = "oracle", demo_settle_steps: Optional[int] = None) -> Dict[str, Any]:
+    """``run_isg``'s step budget. ``max_steps`` (the actions: policy steps, a replay, an oracle program) given, else
+    ``max(300, 2 x length)`` for a demo of ``length`` steps, else 3000; ``wallclock_s`` (seconds the actions may take) given, else
+    1 s x ``max_steps``. ``settle_steps`` - the ``pose_settled`` and settle-eval window, in every mode - given, else 45 (oracle,
+    policy) or the demo's settle rows (replay: ``demo_settle_steps``). An oracle program's epilogue is exactly ``settle_steps``
+    long and reserved: its episode is cut at ``max_steps + settle_steps``; a replay streams its demo's action rows and the first
+    ``settle_steps`` settle rows, a policy acts until ``max_steps``: theirs at ``max_steps``. Raises ValueError when the window
+    cannot fit: below one step, a replay without settle rows or with fewer than ``settle_steps``, a policy whose ``max_steps``
+    is shorter than it."""
+    if mode not in MODES:
+        raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     if max_steps is None:
         max_steps = max(MIN_MAX_STEPS, DEMO_STEP_FACTOR * int(length)) if length else DEFAULT_MAX_STEPS
+    if mode == "replay" and demo_settle_steps is None:
+        raise ValueError("--mode replay: the demo's settle rows are unknown (isg/phase, or the eval dataset's settle_steps of a LeRobot "
+                         "episode), so the --settle-steps window cannot be placed")
     if settle_steps is None:
-        settle_steps = int(round(SETTLE_FRACTION * max_steps))
+        settle_steps = int(demo_settle_steps) if mode == "replay" else DEFAULT_SETTLE_STEPS
+    settle_steps = int(settle_steps)
+    if settle_steps < 1:
+        raise ValueError(f"--settle-steps must be at least 1 (the pose_settled window), got {settle_steps}")
+    if mode == "replay" and settle_steps > int(demo_settle_steps):
+        raise ValueError(f"--settle-steps {settle_steps} exceeds the demo's {int(demo_settle_steps)} settle rows: a replay streams only "
+                         "recorded rows, so the window cannot fit")
+    if mode == "policy" and settle_steps > int(max_steps):
+        raise ValueError(f"--settle-steps {settle_steps} exceeds --max-steps {int(max_steps)}: the window cannot fit in the episode")
     if wallclock_s is None:
         wallclock_s = WALL_S_PER_STEP * max_steps
-    return {"max_steps": int(max_steps), "settle_steps": int(settle_steps), "wallclock_s": float(wallclock_s), "demo_length": length,
-            "episode_cap": int(max_steps) + int(settle_steps)}
+    return {"mode": mode, "max_steps": int(max_steps), "settle_steps": settle_steps, "wallclock_s": float(wallclock_s), "demo_length": length,
+            "demo_settle_steps": demo_settle_steps, "episode_cap": int(max_steps) + (settle_steps if mode == "oracle" else 0)}
 
 
 @dataclass

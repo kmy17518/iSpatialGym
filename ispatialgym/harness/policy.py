@@ -31,8 +31,8 @@ from ispatialgym.harness.planners import EpisodeContext, make_planner
 
 log = logging.getLogger(__name__)
 
-EPISODE_KEYS = ("success", "reason", "binary_success_ever", "binary_success_final", "settled_success", "settled_success_ever",
-                "first_success_step", "first_settled_success_step", "n_steps", "n_action_steps")
+EPISODE_KEYS = ("success", "reason", "success_metric", "settle_eval", "settle_steps", "symbolic_success", "symbolic_success_step",
+                "geometric_success", "geometric_success_step", "error_metric", "other_mode", "n_steps", "n_action_steps")
 
 
 def task_info(info) -> Dict[str, Any]:

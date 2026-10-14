@@ -24,10 +24,13 @@ What it does
    verified (``--allow-sha-mismatch`` for hand-built sidecars), ``expand(variant, sidecar)`` → the action list.
 3. **Executor** (:class:`~ispatialgym.oracle.executor.Executor`): per action checkpoint → execute under the retry
    rules (:class:`~ispatialgym.oracle.qa.Monitors`) and the ``--qa`` metrics (:class:`~ispatialgym.oracle.qa.QA`: a HARD
-   metric ends the oracle's demo as failed) → postcondition → one retry → annotate; epilogue: binary success → ``max(50, 20 %)`` no-op → settled →
-   goal image (``--goal-image``: ≥ 3 renders, ``goal_observation.camera_pose_world``, profile ``isg-v1``) → TRO goal
-   override with the settled values when within tolerance (written back into the TRO, the sidecar's ``tro_sha256``
-   updated; ``--no-goal-override`` to disable).
+   metric ends the oracle's demo as failed) → postcondition → one retry → annotate; epilogue: exactly ``--settle-steps``
+   no-op steps (reserved in the step budget) → the task's metrics decide (``ispatialgym.eval.metrics``: symbolic / geometric
+   success, ``--settle-eval``, ``--success-metric``) → goal image (``--goal-image``: ≥ 3 renders,
+   ``goal_observation.camera_pose_world``, profile ``isg-v1``) → TRO goal override with the settled values when within
+   tolerance (written back into the TRO, the sidecar's ``tro_sha256`` updated; ``--no-goal-override`` to disable). The
+   tolerances are the ``isg-v2`` profile's (``ispatialgym.eval.tolerance_profile``, ``--tolerance-scale``), computed after the
+   loader's settle and before the first step.
 4. **Recording** (``--record full|hdf5|video``): ``demo.hdf5`` (BEHAVIOR-replayable) + the LeRobot v3 dataset under
    ``lerobot/`` (``full``), ``<view>_rgb.mp4`` per ``--record-view`` view (``tiled``, ``head``, ``external``,
    ``left_wrist``, ``right_wrist``), ``init_rgb.png`` / ``final_rgb.png`` / ``goal_rgb.png``, ``annotations.json`` (the
@@ -36,10 +39,11 @@ What it does
    of ``qa.CATEGORIES``), ``3`` ``no_oracle`` (no sidecar / no program for the variant; the instance is still loaded
    and its init view rendered), ``4`` ``error`` (traceback in ``meta.json``).
 
-``--mode replay`` feeds the actions of a LeRobot episode (``--replay <dataset root> [--episode N]``) or of a
-``demo.hdf5`` through the same executor; ``--mode policy`` calls ``--policy module:callable`` as
-``policy(obs, info) -> 23-D action`` every step (at most ``--max-steps`` steps). Both are thin: no program, no checkpoints,
-the same recorder and epilogue; their ``--qa`` metrics are only logged.
+``--mode replay`` feeds the actions of a ``demo.hdf5`` (or a LeRobot episode, ``--replay <dataset root> [--episode N]``)
+through the same executor: the demo's action rows and the first ``--settle-steps`` of its settle rows (default all);
+``--mode policy`` calls ``--policy module:callable`` as ``policy(obs, info) -> 23-D action`` every step until the geometric
+success or ``--max-steps``. Both are thin: no program, no checkpoints, no epilogue, the same recorder; their ``--qa`` metrics
+are only logged.
 """
 
 from __future__ import annotations
@@ -80,7 +84,7 @@ from ispatialgym.oracle.executor import Executor, ExecutorConfig, SimState, appl
 from ispatialgym.oracle.motions import Motions  # noqa: E402
 from ispatialgym.oracle.programs import expand  # noqa: E402
 from ispatialgym.oracle.qa import Monitors, QAConfig  # noqa: E402
-from ispatialgym.oracle.recorder import VIEWS, EpisodeAnnotations, Recorder, RecorderConfig, dump_json, json_default, save_png  # noqa: E402
+from ispatialgym.oracle.recorder import PHASE_ORACLE, PHASE_SETTLE, VIEWS, EpisodeAnnotations, Recorder, RecorderConfig, dump_json, json_default, save_png  # noqa: E402
 from ispatialgym.eval import instances as INST
 from ispatialgym.oracle import start_state
 from ispatialgym.oracle.sidecar import IDDL_ROOT, Sidecar, SidecarError, family_of_subtask, from_legacy_keys, sha256_of_file  # noqa: E402
@@ -865,6 +869,36 @@ def replay_phases(path: str, episode: int = 0) -> Optional[List[int]]:
         return [int(p) for p in g["isg/phase"][()]] if "isg/phase" in g else None
 
 
+def replay_counts(path: str, episode: int = 0, recorded: Optional[Dict[str, Any]] = None) -> Tuple[int, int]:
+    """``(action rows, settle rows)`` of a demo: a ``demo.hdf5``'s ``isg/phase`` (0 the program's actions, 1 its settle window,
+    in that order), else - a LeRobot episode - the step counts the eval dataset records for the instance's demo (``recorded``:
+    its ``episodes.jsonl`` line); raises ValueError without them."""
+    phases = replay_phases(path, episode)
+    if phases is not None:
+        n_action, n_settle = phases.count(PHASE_ORACLE), phases.count(PHASE_SETTLE)
+        order = [PHASE_ORACLE] * n_action + [PHASE_SETTLE] * n_settle
+        if [p for p in phases if p in (PHASE_ORACLE, PHASE_SETTLE)] != order:
+            raise ValueError(f"{path} episode {episode}: isg/phase does not hold the action rows then the settle rows")
+        return n_action, n_settle
+    if recorded and recorded.get("action_steps") is not None and recorded.get("settle_steps") is not None:
+        return int(recorded["action_steps"]), int(recorded["settle_steps"])
+    raise ValueError(f"--mode replay of {path}: no action / settle row counts (a demo.hdf5 records isg/phase; a LeRobot episode needs the "
+                     "eval dataset's episodes.jsonl counts of its instance)")
+
+
+def replay_rows(path: str, episode: int, n_action: int, n_settle: int) -> Iterator[th.Tensor]:
+    """A demo's ``n_action`` action rows, then the first ``n_settle`` of its settle rows (``run_isg --settle-steps``)."""
+    phases = replay_phases(path, episode)
+    if phases is None:
+        keep = set(range(n_action + n_settle))
+    else:
+        settle = [i for i, p in enumerate(phases) if p == PHASE_SETTLE]
+        keep = {i for i, p in enumerate(phases) if p == PHASE_ORACLE} | set(settle[:n_settle])
+    for i, a in enumerate(replay_actions(path, episode)):
+        if i in keep:
+            yield a
+
+
 def _dataset_record(loader) -> Optional["INST.InstanceRecord"]:
     """The eval dataset's record of the instance ``loader`` loaded (its ``template_meta["_paths"]`` names the dataset)."""
     tro = os.path.abspath(loader.tro_path)
@@ -947,15 +981,28 @@ def parse_args(argv=None):
                    help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
     p.add_argument("--max-steps", type=int, default=None,
                    help="steps of the actions (policy steps, a replay, the oracle program; 30 Hz control steps); default: an eval dataset "
-                        "instance max(300, 2 x its demo's length), else 3000. The episode is cut at --max-steps + --settle-steps")
-    p.add_argument("--settle-steps", type=int, default=None, help="no-op window after the actions; default 0.2 x --max-steps")
+                        "instance max(300, 2 x its demo's length), else 3000. An oracle episode is cut at --max-steps + --settle-steps "
+                        "(its epilogue), a replay / policy episode at --max-steps; without geometric success a policy runs to it")
+    p.add_argument("--settle-steps", type=int, default=None,
+                   help="the pose_settled window and the --settle-eval window, in steps, in every mode: oracle = its epilogue, exactly this "
+                        "long and reserved in the step budget (default 45); replay = the demo's action rows and only the first this-many of "
+                        "its settle rows are streamed (default: all of them; more than the demo has is an error); policy = the window only "
+                        "(default 45)")
     p.add_argument("--wallclock", type=float, default=None,
-                   help="seconds the actions may take (default 1 s x --max-steps): a replay / policy stream ends there and the settle "
-                        "window still judges the episode; the oracle program gets a timeout verdict")
+                   help="seconds the actions may take (default 1 s x --max-steps): a replay / policy stream ends there and the task's "
+                        "metrics judge the episode; the oracle program gets a timeout verdict")
     p.add_argument("--settle-eval", default="auto", choices=["auto", "on", "off"],
-                   help="the settling evaluation after the settle window: on = no robot / object motion over it (else a second, longer "
-                        "window decides) and the binary goal at its end; off = the binary goal (every goal atom but pose_settled) at the "
-                        "end of the settle window alone decides; auto = off for --mode policy, on for oracle / replay")
+                   help="how symbolic and geometric success are decided (ispatialgym.eval.metrics): off = the first step the goal holds "
+                        "(every goal atom but pose_settled; geometric: with every (:measure ...) atom within tolerance at that step); on = "
+                        "the first step every pose_settled atom holds with the goal (geometric: and the measured targets) held at every step "
+                        "of its --settle-steps window; auto = off for --mode policy, on for oracle / replay. The other mode is reported too "
+                        "(meta.other_mode)")
+    p.add_argument("--success-metric", default="geometric", choices=["geometric", "symbolic"],
+                   help="what success, status and the exit code follow: geometric = the BDDL goal plus every (:measure ...) atom within "
+                        "tolerance (default), symbolic = the BDDL goal; the episode ends at the geometric success either way")
+    p.add_argument("--tolerance-scale", type=float, default=None,
+                   help="multiplies every isg-v2 tolerance, overrides included (ispatialgym.eval.tolerance_profile); default 3 with "
+                        "--mode policy, else 1")
     p.add_argument("--retries", type=int, default=1, help="retries per action from its checkpoint")
     p.add_argument("--image-size", type=int, default=DEFAULT_IMAGE_SIZE)
     p.add_argument("--head-aperture", type=float, default=DEFAULT_HEAD_APERTURE_MM)
@@ -1128,9 +1175,17 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         meta.update(names)
         # an eval dataset instance's demo: the default --replay, and its length the step budget
         dataset_rec = _dataset_record(loader) if loader.tmeta.get("_paths") else None
-        budget = INST.step_budget(dataset_rec.episode.get("length") if dataset_rec else None, args.max_steps, args.settle_steps, args.wallclock)
+        replay, replay_n = None, None
+        if args.mode == "replay":
+            replay = args.replay or (dataset_rec.demo_path() if dataset_rec else None)
+            if not replay:
+                raise ValueError("--mode replay needs --replay <dataset root | demo.hdf5> (an eval dataset instance replays its own demo)")
+            replay_n = replay_counts(replay, args.episode, dataset_rec.episode if dataset_rec else None)
+        length = dataset_rec.episode.get("length") if dataset_rec else (sum(replay_n) if replay_n else None)
+        budget = INST.step_budget(length, args.max_steps, args.settle_steps, args.wallclock, mode=args.mode,
+                                  demo_settle_steps=replay_n[1] if replay_n else None)
         settle_eval = args.settle_eval == "on" or (args.settle_eval == "auto" and args.mode != "policy")
-        meta.update({"budget": budget, "settle_eval": settle_eval})
+        meta.update({"budget": budget, "settle_eval": settle_eval, "settle_steps": budget["settle_steps"], "success_metric": args.success_metric})
         result.update({"instance": iid, **names, "activity": loader.activity, "variant": meta["variant"], "out": out_dir})
 
         # ---------------------------------------------------------------- sidecar + program (before the sim: cheap failures first)
@@ -1188,6 +1243,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                 gc.freeze()
         if shared is not None:
             shared["loader"] = loader
+        loader.task.configure_evaluation(settle_eval, budget["settle_steps"])  # before the reset in restore activates pose_settled
         try:
             obs, info = loader.restore()
         except LoadError as e:
@@ -1204,6 +1260,9 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             result.update({"status": "loaded", "success": True, "start_state_sha256": meta["start_state"]["sha256"]})
             exit_code = EXIT_SUCCESS
             return exit_code, result
+        # the isg-v2 tolerances, from the state after the loader's settle, before the first step (the dataset is never written)
+        tolerance_profile = task.apply_tolerance_profile(args.mode, scale=args.tolerance_scale)
+        meta["tolerance_profile"] = tolerance_profile
         rp, rq = robot.get_position_orientation()
         meta["robot_base_init"] = {"position": rp.tolist(), "orientation": rq.tolist()}
         # owner 2026-10-11 11:46: textures stream in after the load - render (never step) until they are loaded, then capture
@@ -1277,8 +1336,9 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
         if sidecar is not None:
             recorder.episode = episode_annotations(sidecar)
-        ex_cfg = ExecutorConfig(max_steps=budget["episode_cap"], max_wall_s=budget["wallclock_s"], settle_eval=settle_eval, retries=args.retries,
-                                settle_min_steps=budget["settle_steps"], goal_image=args.goal_image, record_state=rec_cfg.hdf5, qa=args.qa)
+        ex_cfg = ExecutorConfig(max_steps=budget["episode_cap"], max_wall_s=budget["wallclock_s"], retries=args.retries, settle_steps=budget["settle_steps"],
+                                success_metric=args.success_metric, stop_on_success=args.mode == "policy", goal_image=args.goal_image,
+                                record_state=rec_cfg.hdf5, qa=args.qa)
         from ispatialgym.oracle import execute as _execute
 
         _execute.CONFIG.carry_leg = args.carry_leg
@@ -1327,12 +1387,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         if args.mode == "oracle":
             episode = executor.run_program(actions)
         elif args.mode == "replay":
-            replay = args.replay or (dataset_rec.demo_path() if dataset_rec else None)
-            if not replay:
-                raise ValueError("--mode replay needs --replay <dataset root | demo.hdf5> (an eval dataset instance replays its own demo)")
+            n_action, n_settle = replay_n[0], budget["settle_steps"]
             meta["replay"] = replay
-            executor.stream_phases = replay_phases(replay, args.episode)
-            episode = executor.run_stream(replay_actions(replay, args.episode))
+            meta["replay_rows"] = {"action": n_action, "settle": n_settle, "demo_settle": replay_n[1]}
+            executor.stream_phases = [PHASE_ORACLE] * n_action + [PHASE_SETTLE] * n_settle
+            episode = executor.run_stream(replay_rows(replay, args.episode, n_action, n_settle))
         else:
             if not args.policy:
                 raise ValueError("--mode policy needs --policy module:callable")
@@ -1373,8 +1432,6 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
 
         success = bool(episode["success"])
         reason = episode.get("reason")
-        errors = episode.get("errors") or {}
-        last_errors = episode.get("errors_final_step") or {}
         meta.update({k: v for k, v in episode.items() if k not in ("goal_observation", "timings")})
         meta["status"] = "success" if success else "oracle_failed"
         meta["qa_reason"] = reason
@@ -1386,15 +1443,17 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             meta["attach_join_mode"] = PRED.join_mode()
         exit_code = EXIT_SUCCESS if success else EXIT_ORACLE_FAILED
         result.update({
-            "status": meta["status"], "success": success, "reason": reason, "n_steps": episode["n_steps"], "n_action_steps": episode["n_action_steps"],
-            "max_position_error": errors.get("max_position_error"), "max_orientation_error": errors.get("max_orientation_error"),
-            "final_step_max_position_error": last_errors.get("max_position_error"), "final_step_max_orientation_error": last_errors.get("max_orientation_error"),
-            "settled_success": episode.get("settled_success"), "binary_branch": episode.get("binary_branch"),
+            "status": meta["status"], "success": success, "reason": reason, "success_metric": args.success_metric, "settle_eval": settle_eval,
+            "settle_steps": budget["settle_steps"],
+            **{k: episode.get(k) for k in ("symbolic_success", "symbolic_success_step", "geometric_success", "geometric_success_step", "error_metric",
+                                            "errors", "errors_final_step", "measured", "other_mode")},
+            "tolerance_profile": tolerance_profile,
+            "n_steps": episode["n_steps"], "n_action_steps": episode["n_action_steps"], "binary_branch": episode.get("binary_branch"),
             "collisions": (episode.get("monitors") or {}).get("collisions", {}).get("n_events"),
             "qa_by_category": (episode.get("monitors") or {}).get("stats", {}).get("by_category"),
             "qa_hard": (episode.get("qa") or {}).get("hard_triggered"), "qa_soft": (episode.get("qa") or {}).get("soft_triggered"),
             "goal_override": None if override is None else override.get("applied"),
-            "max_steps": budget["max_steps"], "settle_steps": budget["settle_steps"], "wallclock_s": budget["wallclock_s"], "settle_eval": settle_eval,
+            "max_steps": budget["max_steps"], "wallclock_s": budget["wallclock_s"],
             "wall_clock_exceeded": episode.get("wall_clock_exceeded"),
             **({"joint_positions": {k: {"init": v["init"], "end": v["end"]} for k, v in joints_end.items()}} if joints_end else {}),
         })

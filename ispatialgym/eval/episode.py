@@ -17,38 +17,35 @@ def isg_info(step_info: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def summarize_episode(last_info: Dict[str, Any], steps: int, terminated: bool, truncated: bool) -> Dict[str, Any]:
-    """Two-level episode result from the last ``env.step`` info dict.
+    """Episode result from the last ``env.step`` info dict (``ispatialgym.eval.metrics``).
 
     Keys:
-        ``success`` -- official success (binary success, or settled success when ``require_pose_settled``).
-        ``binary_success`` / ``first_success_step`` -- level 1.
-        ``settled_success`` / ``first_settled_success_step`` / ``settle_latency_steps`` / ``settle_latency_seconds``
-        -- level 2 (``-1`` / ``None`` when the goal never settled after the first binary success).
-        ``position_error`` / ``orientation_error`` -- max over the pose targets, taken at the first binary success
-        or, if it never happened, at the terminal step. ``layout_position_error`` / ``layout_orientation_error`` --
-        the same for layout targets (group relations, articulation joints). ``errors`` holds the per-target detail.
+        ``success`` -- the run mode's geometric success (the BDDL goal plus every ``(:measure ...)`` atom within tolerance at
+        the same step(s); ``settle_eval``: through a settled window of ``settle_steps`` steps).
+        ``symbolic_success`` / ``symbolic_success_step``, ``geometric_success`` / ``geometric_success_step`` -- the run mode's
+        (steps: 0-based, None when not reached); ``other_mode`` -- the same for the other settle-eval mode.
+        ``errors`` / ``error_metric`` / ``measured`` -- at the run mode's geometric success, else at the terminal step;
+        ``errors_final_step`` -- at the terminal step.
     """
     isg = isg_info(last_info)
+    evaluation = isg.get("evaluation") or {}
     return {
         "activity": isg["activity"],
         "activity_definition_id": isg["activity_definition_id"],
         "task_variant": isg["task_variant"],
         "success": bool(isg["official_success"]),
-        "require_pose_settled": isg["require_pose_settled"],
-        "binary_success": bool(isg["binary_success_ever"]),
-        "first_success_step": isg["first_success_step"],
-        "settled_success": isg["first_settled_success_step"] >= 0,
-        "first_settled_success_step": isg["first_settled_success_step"],
-        "settle_latency_steps": isg["settle_latency_steps"],
-        "settle_latency_seconds": isg["settle_latency_seconds"],
-        "position_error": isg["max_position_error"],
-        "orientation_error": isg["max_orientation_error"],
-        "layout_position_error": isg["max_layout_position_error"],
-        "layout_orientation_error": isg["max_layout_orientation_error"],
-        "errors": isg["final_errors"],
-        "errors_at_termination": isg["errors"],
+        "settle_eval": isg["settle_eval"],
+        "settle_steps": isg["settle_steps"],
+        "symbolic_success": bool(isg["symbolic_success"]),
+        "symbolic_success_step": isg["symbolic_success_step"],
+        "geometric_success": bool(isg["geometric_success"]),
+        "geometric_success_step": isg["geometric_success_step"],
+        "other_mode": isg["other_mode"],
+        "errors": evaluation.get("errors"),
+        "error_metric": evaluation.get("error_metric"),
+        "measured": evaluation.get("measured"),
+        "errors_final_step": isg["errors"],
         "conditions": isg["conditions"],
-        "measured": isg["measured"],
         "group_assignments": isg["group_assignments"],
         "steps": steps,
         "terminated": bool(terminated),
