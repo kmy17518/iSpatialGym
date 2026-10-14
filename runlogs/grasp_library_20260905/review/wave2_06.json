@@ -35,6 +35,43 @@
      "note": "face pinch at 30 deg tilt, fingers 43/0"
     }
    ]
+  },
+  {
+   "key": "video_game__ceaxsd",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "in-plane edge pinch, fingers 43/22"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "in-plane edge pinch, fingers 42/22"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "in-plane edge pinch, fingers 45/20, tilt 30"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "in-plane edge pinch, fingers 41/24, tilt 30"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "in-plane edge pinch, fingers 42/22, tilt 30"
+    }
+   ],
+   "object_note": "flat case held by its long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
   }
  ]
 }

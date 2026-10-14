@@ -1,6 +1,42 @@
 {
  "models": [
   {
+   "key": "canned_food__ycbspm",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 53 mm narrow side from bottom, full pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 54 mm narrow side from bottom, full pads"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch across 54 mm narrow side, full pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch across 55 mm narrow side, full pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 54 mm narrow side from bottom, CoM 15 mm"
+    }
+   ]
+  },
+  {
    "key": "bell_pepper__ukkycp",
    "n_rows": 5,
    "grasps": [

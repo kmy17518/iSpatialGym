@@ -1,0 +1,47 @@
+{
+ "models": [
+  {
+   "key": "box_of_cereal__iucshm__s080",
+   "n_rows": 6,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch across the 43 mm thickness near the top, centred; box hangs straight"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across the thickness, approach 15 deg along the width, centred; box hangs tilted"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across the thickness, approach 30 deg along the width, centred; box hangs tilted"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch across the thickness, centred; box hangs straight"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across the thickness, approach 15 deg along the width, centred; box hangs tilted"
+    },
+    {
+     "rank": 6,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across the thickness, approach 30 deg along the width, centred; box hangs tilted"
+    }
+   ],
+   "object_note": "x0.8 (21.8 cm); both pads on the 43 mm faces at the top, fingers 21-22 mm each, no gap, no penetration"
+  }
+ ]
+}

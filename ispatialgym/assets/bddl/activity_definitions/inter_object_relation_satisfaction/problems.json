@@ -159,15 +159,15 @@
       "mode": "test"
     },
     {
-      "variant": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor",
+      "variant": "inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table",
       "id": 14,
-      "grounded": "2026-10-12",
-      "by": "hand-grounded (copy of inter_object_relation_satisfaction-89 with the target serving_cart/heqtlk and the relation nextto, owner ~16:05 nextto_large#02)",
-      "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
-      "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
-      "pick": "inter_object_relation_satisfaction-nextto_large_scale#02",
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+      "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
+      "pick": "inter_object_relation_satisfaction-nextto#01~T1",
       "slot": "representative",
-      "mode": "test"
+      "mode": "representative"
     },
     {
       "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl",
@@ -200,6 +200,61 @@
       "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
       "pick": "inter_object_relation_satisfaction-under_large_scale#03~c1_pitched",
       "slot": "representative",
+      "mode": "test"
+    },
+    {
+      "variant": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-commercial_kitchen_table",
+      "id": 18,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "inter_object_relation_satisfaction-under_small_scale",
+      "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
+      "pick": "inter_object_relation_satisfaction-under_small_scale#04~T3",
+      "slot": "representative",
+      "mode": "representative"
+    },
+    {
+      "variant": "inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table",
+      "id": 19,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+      "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
+      "pick": "inter_object_relation_satisfaction-nextto#03~T4",
+      "slot": "representative",
+      "mode": "representative"
+    },
+    {
+      "variant": "inter_object_relation_satisfaction-nextto_small_scale-gym_shoe-gym_shoe-bench",
+      "id": 20,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+      "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
+      "pick": "inter_object_relation_satisfaction-nextto#04~T3",
+      "slot": "representative",
+      "mode": "representative"
+    },
+    {
+      "variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar",
+      "id": 21,
+      "grounded": "2026-10-12",
+      "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
+      "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+      "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
+      "pick": "inter_object_relation_satisfaction-touching#02~B3",
+      "slot": "representative",
+      "mode": "test"
+    },
+    {
+      "variant": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-coffee_table-floor",
+      "id": 22,
+      "grounded": "2026-10-13",
+      "by": "hand-grounded (copy of inter_object_relation_satisfaction-123 with the partner coffee_table.n.01 (coffee_table_rlsebe_0), owner ~20:34 nextto_large#02)",
+      "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
+      "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+      "pick": "inter_object_relation_satisfaction-nextto_large_scale#02~coffee_table",
+      "slot": "variation_geometry",
       "mode": "test"
     }
   ]

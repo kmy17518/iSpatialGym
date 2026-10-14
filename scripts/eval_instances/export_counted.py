@@ -271,7 +271,7 @@ def readme(index, tasks) -> str:
 {len(index)} eval instances, one per subtask, laid out like BEHAVIOR-1K's `2026-challenge-task-instances` and kept next to it
 in OmniGibson's data folder, with their demos in the sibling dataset `ispatialgym-eval-demos`. Written by
 `scripts/eval_instances/export_counted.py` from the eval runs that `scripts/eval_instances/release_runs.tsv` lists (the
-counted instances of 2026-10-13 ~20:40, frozen), each with its goal image.
+counted instances of 2026-10-14 ~10:37, frozen), each with its goal image.
 
 ## Hierarchy
 

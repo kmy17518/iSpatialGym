@@ -1,0 +1,1168 @@
+{
+ "task": "disembedding",
+ "subtask": "disembedding",
+ "pick": "disembedding#01",
+ "slot": "representative",
+ "category": "jigsaw_puzzle_piece",
+ "model": "isgefa",
+ "key": "jigsaw_puzzle_piece__isgefa__t",
+ "pipeline": "layout",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.124936,
+  0.066064,
+  0.02
+ ],
+ "ready": true,
+ "dataset": "ispatialgym-assets",
+ "mesh_key": "jigsaw_puzzle_piece__isgefa__t",
+ "note": "12 mm build (2026-10-11); candidates from the whole layout (isgefa_layout/proposals.json)",
+ "candidates_meta": {
+  "object": {
+   "category": "jigsaw_puzzle_piece",
+   "model": "isgefa"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "layout",
+  "gripper": "r1pro_right",
+  "source": "layout_proposals",
+  "generator": "gen_candidates_isgefa.py",
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "log": {
+   "n_samples": 650,
+   "n_no_bar": 0,
+   "n_context": 125,
+   "n_target": 226,
+   "n_body": 0,
+   "n_sweep": 0,
+   "n_kept": 299
+  },
+  "layout": {
+   "assembly": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval/ispatialgym/assets/objects/embedded_figure/model/assembly.json",
+   "proposals": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/isgefa_layout/proposals.json",
+   "preshape_margin_m": 0.01,
+   "tip_above_floor_m": 0.004,
+   "ctx_clear_m": 0.002,
+   "target_clear_m": 0.005,
+   "com": [
+    0.0057,
+    -0.011,
+    0.01
+   ]
+  }
+ },
+ "validation": "ag_validate_layout.py",
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "score": -0.5885,
+   "meta": {
+    "width": 0.012,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0438,
+    "clear_context_m": 0.0055,
+    "clear_target_other_m": 0.0052,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": 0.0,
+    "pinch_xy_figure_mm": [
+     18.65,
+     50.58
+    ],
+    "closing_dir_xy": [
+     0.9683,
+     0.2499
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g0_v5.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "valid": false,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0138,
+    0.0
+   ],
+   "placement_push_m": 0.04558,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.09,
+     "closing_axis_mm": 0.09
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.03465,
+     "isgefc": 0.04558,
+     "isgefd": 0.03635
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.03553,
+     "isgefc": 0.04495,
+     "isgefd": 0.04493
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.1058,
+     "isgefc": 0.25218,
+     "isgefd": 0.24081
+    },
+    "max_other_disp_m": 0.25218,
+    "other_moved_over_limit": true,
+    "rise_object_m": -0.6871,
+    "rise_eef_m": 0.1
+   },
+   "t_s": 123.27
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "score": -0.5886,
+   "meta": {
+    "width": 0.012,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0438,
+    "clear_context_m": 0.0055,
+    "clear_target_other_m": 0.0051,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": 0.0,
+    "pinch_xy_figure_mm": [
+     18.65,
+     50.58
+    ],
+    "closing_dir_xy": [
+     0.9683,
+     0.2499
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g1_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g1_wrist.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.013,
+    0.0
+   ],
+   "placement_push_m": 0.0,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.09,
+     "closing_axis_mm": 0.01
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0,
+     "isgefc": 0.0,
+     "isgefd": 0.0
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00578,
+     "isgefc": 0.00091,
+     "isgefd": 0.00053
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.00565,
+     "isgefc": 0.00091,
+     "isgefd": 0.00045
+    },
+    "max_other_disp_m": 0.00578,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.1001,
+    "rise_eef_m": 0.0999
+   },
+   "t_s": 11.45
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "score": -0.6469,
+   "meta": {
+    "width": 0.01207,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0442,
+    "clear_context_m": 0.006,
+    "clear_target_other_m": 0.0054,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": -6.0,
+    "pinch_xy_figure_mm": [
+     19.15,
+     48.65
+    ],
+    "closing_dir_xy": [
+     0.9891,
+     0.1473
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g2_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g2_wrist.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.013,
+    0.0
+   ],
+   "placement_push_m": 0.00357,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.04,
+     "closing_axis_mm": -0.03
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.00248,
+     "isgefc": 0.00357,
+     "isgefd": 0.00268
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00239,
+     "isgefc": 0.02043,
+     "isgefd": 0.00975
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.08451,
+     "isgefc": 0.03221,
+     "isgefd": 0.05412
+    },
+    "max_other_disp_m": 0.08451,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.1002,
+    "rise_eef_m": 0.0999
+   },
+   "t_s": 11.59
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "score": -0.6469,
+   "meta": {
+    "width": 0.01207,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0442,
+    "clear_context_m": 0.006,
+    "clear_target_other_m": 0.0053,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": -6.0,
+    "pinch_xy_figure_mm": [
+     19.15,
+     48.65
+    ],
+    "closing_dir_xy": [
+     0.9891,
+     0.1473
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g3_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g3_wrist.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0134,
+    0.0
+   ],
+   "placement_push_m": 0.00275,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.36,
+     "closing_axis_mm": 0.24
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.00121,
+     "isgefc": 0.00275,
+     "isgefd": 0.00205
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00843,
+     "isgefc": 0.00374,
+     "isgefd": 0.00205
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.02624,
+     "isgefc": 0.02187,
+     "isgefd": 0.02821
+    },
+    "max_other_disp_m": 0.02821,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.1005,
+    "rise_eef_m": 0.1
+   },
+   "t_s": 11.36
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "score": -0.886,
+   "meta": {
+    "width": 0.01207,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0438,
+    "clear_context_m": 0.0055,
+    "clear_target_other_m": 0.0073,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": -6.0,
+    "pinch_xy_figure_mm": [
+     18.65,
+     50.58
+    ],
+    "closing_dir_xy": [
+     0.9891,
+     0.1473
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g4_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g4_wrist.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.013,
+    0.0
+   ],
+   "placement_push_m": 0.0,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.17,
+     "closing_axis_mm": -0.14
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0,
+     "isgefc": 0.0,
+     "isgefd": 0.0
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00344,
+     "isgefc": 0.0152,
+     "isgefd": 0.00964
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.00451,
+     "isgefc": 0.01522,
+     "isgefd": 0.00983
+    },
+    "max_other_disp_m": 0.01522,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.0999,
+    "rise_eef_m": 0.1
+   },
+   "t_s": 11.45
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "score": -0.886,
+   "meta": {
+    "width": 0.01207,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0438,
+    "clear_context_m": 0.0055,
+    "clear_target_other_m": 0.0072,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": -6.0,
+    "pinch_xy_figure_mm": [
+     18.65,
+     50.58
+    ],
+    "closing_dir_xy": [
+     0.9891,
+     0.1473
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g5_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g5_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g5_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g5_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g5_wrist.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.013,
+    0.0
+   ],
+   "placement_push_m": 0.0,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.08,
+     "closing_axis_mm": -0.0
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0,
+     "isgefc": 0.0,
+     "isgefd": 0.0
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.01147,
+     "isgefc": 0.00823,
+     "isgefd": 0.00337
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.0221,
+     "isgefc": 0.0124,
+     "isgefd": 0.00875
+    },
+    "max_other_disp_m": 0.0221,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.1,
+    "rise_eef_m": 0.1
+   },
+   "t_s": 11.25
+  },
+  {
+   "grasp": "grasp_6",
+   "idx": 6,
+   "score": -0.9432,
+   "meta": {
+    "width": 0.01202,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0436,
+    "clear_context_m": 0.005,
+    "clear_target_other_m": 0.0061,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": 3.0,
+    "pinch_xy_figure_mm": [
+     18.15,
+     52.52
+    ],
+    "closing_dir_xy": [
+     0.9539,
+     0.3002
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g6_v5.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "valid": false,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "placement_push_m": 0.05447,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 31.22,
+     "closing_axis_mm": 18.8
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0393,
+     "isgefc": 0.02477,
+     "isgefd": 0.05447
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.039,
+     "isgefc": 0.02462,
+     "isgefd": 0.0542
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.00142,
+     "isgefc": 0.05311,
+     "isgefd": 0.02319
+    },
+    "max_other_disp_m": 0.05447,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.0,
+    "rise_eef_m": 0.0836
+   },
+   "t_s": 13.36
+  },
+  {
+   "grasp": "grasp_7",
+   "idx": 7,
+   "score": -0.9433,
+   "meta": {
+    "width": 0.01202,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0436,
+    "clear_context_m": 0.005,
+    "clear_target_other_m": 0.006,
+    "bar": "side_C",
+    "proposal_rank": 1,
+    "yaw_offset_deg": 3.0,
+    "pinch_xy_figure_mm": [
+     18.15,
+     52.52
+    ],
+    "closing_dir_xy": [
+     0.9539,
+     0.3002
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g7_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g7_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g7_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g7_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g7_wrist.png"
+   },
+   "dip_rule": {
+    "dips": false,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "no dip"
+   },
+   "ik": {
+    "grasp": "right_arm_torso",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0131,
+    0.0
+   ],
+   "placement_push_m": 0.0,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.06,
+     "closing_axis_mm": 0.01
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0,
+     "isgefc": 0.0,
+     "isgefd": 0.0
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00477,
+     "isgefc": 0.00332,
+     "isgefd": 0.00209
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.00364,
+     "isgefc": 0.00332,
+     "isgefd": 0.00209
+    },
+    "max_other_disp_m": 0.00477,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.1001,
+    "rise_eef_m": 0.1
+   },
+   "t_s": 11.33
+  },
+  {
+   "grasp": "grasp_8",
+   "idx": 8,
+   "score": -2.3636,
+   "meta": {
+    "width": 0.012,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.032,
+    "clear_context_m": 0.0052,
+    "clear_target_other_m": 0.0052,
+    "bar": "side_E",
+    "proposal_rank": 2,
+    "yaw_offset_deg": 0.0,
+    "pinch_xy_figure_mm": [
+     0.67,
+     27.33
+    ],
+    "closing_dir_xy": [
+     0.0,
+     -1.0
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g8_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g8_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g8_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g8_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g8_wrist.png"
+   },
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "lifted 0.0 mm, 9.5 mm of pad on the object"
+   },
+   "ik": {
+    "grasp": "right_arm",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0127,
+    0.0
+   ],
+   "placement_push_m": 0.0,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.64,
+     "closing_axis_mm": 0.53
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0,
+     "isgefc": 0.0,
+     "isgefd": 0.0
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00685,
+     "isgefc": 0.00715,
+     "isgefd": 0.00885
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.00319,
+     "isgefc": 0.00586,
+     "isgefd": 0.00717
+    },
+    "max_other_disp_m": 0.00885,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.0998,
+    "rise_eef_m": 0.0996
+   },
+   "t_s": 10.9
+  },
+  {
+   "grasp": "grasp_9",
+   "idx": 9,
+   "score": -2.3909,
+   "meta": {
+    "width": 0.012,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.032,
+    "clear_context_m": 0.0051,
+    "clear_target_other_m": 0.0052,
+    "bar": "side_E",
+    "proposal_rank": 2,
+    "yaw_offset_deg": 0.0,
+    "pinch_xy_figure_mm": [
+     0.67,
+     27.33
+    ],
+    "closing_dir_xy": [
+     0.0,
+     -1.0
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g9_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g9_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g9_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g9_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g9_wrist.png"
+   },
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "lifted 0.0 mm, 9.5 mm of pad on the object"
+   },
+   "ik": {
+    "grasp": "right_arm",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0128,
+    0.0
+   ],
+   "placement_push_m": 0.0,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 1.79,
+     "closing_axis_mm": -1.29
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0,
+     "isgefc": 0.0,
+     "isgefd": 0.0
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00486,
+     "isgefc": 0.0043,
+     "isgefd": 0.00491
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.01006,
+     "isgefc": 0.00734,
+     "isgefd": 0.0098
+    },
+    "max_other_disp_m": 0.01006,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.0989,
+    "rise_eef_m": 0.099
+   },
+   "t_s": 10.74
+  },
+  {
+   "grasp": "grasp_10",
+   "idx": 10,
+   "score": -2.8386,
+   "meta": {
+    "width": 0.01207,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0336,
+    "clear_context_m": 0.0049,
+    "clear_target_other_m": 0.0055,
+    "bar": "side_E",
+    "proposal_rank": 2,
+    "yaw_offset_deg": 6.0,
+    "pinch_xy_figure_mm": [
+     2.67,
+     27.33
+    ],
+    "closing_dir_xy": [
+     0.1045,
+     -0.9945
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g10_v5.png",
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g10_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g10_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g10_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g10_wrist.png"
+   },
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "lifted 0.0 mm, 9.5 mm of pad on the object"
+   },
+   "ik": {
+    "grasp": "right_arm",
+    "pre": "ok"
+   },
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "valid": true,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0126,
+    0.0
+   ],
+   "placement_push_m": 0.0,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 1.32,
+     "closing_axis_mm": 1.12
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.0,
+     "isgefc": 0.0,
+     "isgefd": 0.0
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.00831,
+     "isgefc": 0.01447,
+     "isgefd": 0.00844
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.00462,
+     "isgefc": 0.01166,
+     "isgefd": 0.00504
+    },
+    "max_other_disp_m": 0.01447,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.099,
+    "rise_eef_m": 0.0993
+   },
+   "t_s": 10.71
+  },
+  {
+   "grasp": "grasp_11",
+   "idx": 11,
+   "score": -2.8809,
+   "meta": {
+    "width": 0.01207,
+    "preshape_q": 0.016,
+    "tilt_deg": 0.0,
+    "com_perp": 0.0336,
+    "clear_context_m": 0.0049,
+    "clear_target_other_m": 0.0055,
+    "bar": "side_E",
+    "proposal_rank": 2,
+    "yaw_offset_deg": 6.0,
+    "pinch_xy_figure_mm": [
+     2.67,
+     27.33
+    ],
+    "closing_dir_xy": [
+     0.1045,
+     -0.9945
+    ],
+    "lower_finger": null,
+    "context": "layout"
+   },
+   "frames": {
+    "v5": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/jigsaw_puzzle_piece__isgefa__t/g11_v5.png"
+   },
+   "dip_rule": {
+    "dips": true,
+    "dip_m": 0.0,
+    "lift_m": 0.0,
+    "overlap_m": 0.0095,
+    "finger_low_m": 0.004,
+    "pad_end_m": 0.0105,
+    "pad_end_lifted_m": 0.0105,
+    "pinch_top_m": 0.02,
+    "object_top_m": 0.02,
+    "oracle_top_refusal": false,
+    "face_slope": 0.0,
+    "oracle_slope_refusal": false,
+    "next_place": "support",
+    "pass": true,
+    "reason": "lifted 0.0 mm, 9.5 mm of pad on the object"
+   },
+   "ik": {
+    "grasp": "right_arm",
+    "pre": "ok"
+   },
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "valid": false,
+   "preshape_q": 0.016,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "placement_push_m": 0.06753,
+   "layout": {
+    "eef_error_at_grasp": {
+     "total_mm": 0.97,
+     "closing_axis_mm": -0.8
+    },
+    "disp_after_descent_m": {
+     "isgefb": 0.05579,
+     "isgefc": 0.0431,
+     "isgefd": 0.06753
+    },
+    "disp_after_close_m": {
+     "isgefb": 0.05579,
+     "isgefc": 0.04307,
+     "isgefd": 0.06753
+    },
+    "disp_after_lift_m": {
+     "isgefb": 0.04208,
+     "isgefc": 0.08657,
+     "isgefd": 0.07471
+    },
+    "max_other_disp_m": 0.08657,
+    "other_moved_over_limit": true,
+    "rise_object_m": 0.0,
+    "rise_eef_m": 0.0995
+   },
+   "t_s": 12.45
+  }
+ ],
+ "n_valid": 9,
+ "error": null,
+ "layout": {
+  "figure_xy": [
+   0.6,
+   -0.12
+  ],
+  "figure_yaw_rad": -1.5707963267948966,
+  "floor_z": 0.7,
+  "tray": "tray/uekqey x1.25",
+  "settled": {
+   "isgefa": [
+    0.6575,
+    -0.0893,
+    0.7
+   ],
+   "isgefb": [
+    0.6,
+    -0.12,
+    0.7
+   ],
+   "isgefc": [
+    0.6377,
+    -0.0549,
+    0.7
+   ],
+   "isgefd": [
+    0.6515,
+    -0.1027,
+    0.7
+   ]
+  }
+ },
+ "dip_rule_skipped": [],
+ "t_model_s": 260.7
+}

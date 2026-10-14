@@ -1,0 +1,40 @@
+{
+ "models": [
+  {
+   "key": "marker__xakoic",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle, cap side"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along marker; fine"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along marker; fine"
+    }
+   ]
+  }
+ ]
+}

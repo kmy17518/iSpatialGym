@@ -1,0 +1,202 @@
+{
+ "task": "mental_rotation",
+ "subtask": "mental_rotation",
+ "pick": "mental_rotation#01",
+ "slot": "representative",
+ "category": "classroom_mock_up",
+ "model": "isgsma",
+ "key": "classroom_mock_up__isgsma__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.0762,
+  0.0508,
+  0.0762
+ ],
+ "ready": true,
+ "dataset": "ispatialgym-assets",
+ "key_exists": false,
+ "candidates_meta": {
+  "object": {
+   "category": "classroom_mock_up",
+   "model": "isgsma"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 478,
+   "n_lever": 290,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0073,
+    0.0091,
+    0.0345
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0271,
+    0.0
+   ],
+   "score": 17.9528,
+   "meta": {
+    "com_perp": 0.00908,
+    "width": 0.02543,
+    "antipodal": 0.99901,
+    "coverage": 1.0,
+    "clearance": 0.01902,
+    "tilt_deg": 88.74073,
+    "graspgen_conf": 0.94917
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g0_wrist.png"
+   },
+   "t_s": 18.81
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0271,
+    0.0
+   ],
+   "score": 17.6692,
+   "meta": {
+    "com_perp": 0.01063,
+    "width": 0.02541,
+    "antipodal": 0.99969,
+    "coverage": 1.0,
+    "clearance": 0.01803,
+    "tilt_deg": 178.11363,
+    "graspgen_conf": 0.95293
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g1_wrist.png"
+   },
+   "t_s": 3.78
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0271,
+    0.0
+   ],
+   "score": 17.4375,
+   "meta": {
+    "com_perp": 0.00988,
+    "width": 0.02541,
+    "antipodal": 0.99959,
+    "coverage": 1.0,
+    "clearance": 0.01148,
+    "tilt_deg": 175.38319,
+    "graspgen_conf": 0.944
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g2_wrist.png"
+   },
+   "t_s": 3.69
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0004
+   ],
+   "score": 16.8553,
+   "meta": {
+    "com_perp": 0.0171,
+    "width": 0.02542,
+    "antipodal": 0.99939,
+    "coverage": 1.0,
+    "clearance": 0.01841,
+    "tilt_deg": 86.89813,
+    "graspgen_conf": 0.94898
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g3_wrist.png"
+   },
+   "t_s": 3.65
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0271,
+    0.0
+   ],
+   "score": 16.7122,
+   "meta": {
+    "com_perp": 0.01706,
+    "width": 0.02541,
+    "antipodal": 0.99953,
+    "coverage": 1.0,
+    "clearance": 0.01551,
+    "tilt_deg": 150.36404,
+    "graspgen_conf": 0.94761
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/grasp_newsheet/frames/classroom_mock_up__isgsma__f/g4_wrist.png"
+   },
+   "t_s": 3.82
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 42.5
+}

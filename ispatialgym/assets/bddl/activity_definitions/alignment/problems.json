@@ -77,6 +77,28 @@
       "pick": "alignment-world_vertical#05~T5",
       "slot": "representative",
       "mode": "representative"
+    },
+    {
+      "variant": "alignment-axial-magazine-desk",
+      "id": 7,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "alignment-axial",
+      "iddl": "alignment/axial.iddl",
+      "pick": "alignment-axial#04~T1",
+      "slot": "representative",
+      "mode": "representative"
+    },
+    {
+      "variant": "alignment-world_vertical-wall_clock-walls",
+      "id": 8,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "alignment-world_vertical",
+      "iddl": "alignment/world_vertical.iddl",
+      "pick": "alignment-world_vertical#02~T5",
+      "slot": "representative",
+      "mode": "representative"
     }
   ]
 }

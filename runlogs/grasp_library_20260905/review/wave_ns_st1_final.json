@@ -36,6 +36,31 @@
     }
    ],
    "object_note": "scale [1.0, 1.0, 1.25] (height_only, search key carving_knife__awvoox__st125); rank 1 V1 frame is blank (render glitch); judged from V2-V4"
+  },
+  {
+   "key": "tablespoon__yxxfdj__st",
+   "n_rows": 3,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across neck next to bowl, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilted pinch across neck next to bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across handle near neck, clean"
+    }
+   ],
+   "object_note": "scale [1.0, 1.0, 1.75] (height_only, search key tablespoon__yxxfdj__st175); "
   }
  ]
 }

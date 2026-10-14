@@ -1,6 +1,46 @@
 {
  "models": [
   {
+   "key": "marker__xakoic",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near middle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch beside cap"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, tilted approach"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "6 mm closure on tip; body hangs"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "1 mm closure on very tip, CoM 48 mm away"
+    }
+   ]
+  },
+  {
    "key": "garlic_clove__xotobt__s",
    "n_rows": 5,
    "grasps": [

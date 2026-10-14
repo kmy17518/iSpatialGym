@@ -88,6 +88,28 @@
       "pick": "mental_rotation#10",
       "slot": "representative",
       "mode": "representative"
+    },
+    {
+      "variant": "mental_rotation-classroom_mock_up",
+      "id": 8,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "mental_rotation",
+      "iddl": "mental_rotation/mental_rotation.iddl",
+      "pick": "mental_rotation#01",
+      "slot": "representative",
+      "mode": "representative"
+    },
+    {
+      "variant": "mental_rotation-walker",
+      "id": 9,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "mental_rotation",
+      "iddl": "mental_rotation/mental_rotation.iddl",
+      "pick": "mental_rotation#05",
+      "slot": "representative",
+      "mode": "representative"
     }
   ]
 }

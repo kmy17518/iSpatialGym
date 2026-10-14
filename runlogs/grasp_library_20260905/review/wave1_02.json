@@ -1,0 +1,40 @@
+{
+ "models": [
+  {
+   "key": "bottle_of_pop__ubazru",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  }
+ ]
+}

@@ -1,7 +1,7 @@
 # AGENTS.md — the iSpatialGym eval release
 
 This checkout (`/vision/u/minyeong/projects/ispatialgym-eval`, branch `ispatialgym-eval`) is the eval release: the
-iSpatialGym code plus the 70 eval instances, and only the data that loading, replaying and the oracle need for them.
+iSpatialGym code plus the 83 eval instances, and only the data that loading, replaying and the oracle need for them.
 Development (the sampler's grounding, new tasks, demo production) happens in the main `ispatialgym` checkout and its
 worktrees.
 
@@ -20,14 +20,14 @@ the main checkout's samples) spell the variant the old way; the readers marked "
 
 | path | what |
 |---|---|
-| `Behavior-1K/datasets/ispatialgym-eval-instances/` (untracked) | the 70 instances, laid out like `2026-challenge-task-instances` next to it; `metadata/episodes.jsonl` = each instance's demo and its length; no BDDL (an instance names its problem in `ispatialgym/assets/bddl/`); its `README.md` describes the layout |
+| `Behavior-1K/datasets/ispatialgym-eval-instances/` (untracked) | the 83 instances, laid out like `2026-challenge-task-instances` next to it; `metadata/episodes.jsonl` = each instance's demo and its length; no BDDL (an instance names its problem in `ispatialgym/assets/bddl/`); its `README.md` describes the layout |
 | `Behavior-1K/datasets/ispatialgym-eval-demos/` (untracked) | the instances' demos (`demo.hdf5`), the paths of the instances' |
 | `ispatialgym/eval/instances.py` | the dataset index: name + instance indices → instance files, demo, step budget (`list`, `show`); goal images (`set-goal`) |
 | `ispatialgym/eval/names.py` | task family / task / subtask names from a variant |
 | `ispatialgym/oracle/run_isg.py` | load / replay / oracle / policy runs (`--task NAME --instance-indices ...`) |
 | `scripts/eval_instances/` | the exporter (`export_counted.py`), the release's runs (`release_runs.tsv`), `env.sh` and the GPU job script |
-| `ispatialgym/assets/` | BDDL problems (numbered from 0 per activity), iddl files, `isg_customs.json`, `icl/revolution_axes.json` and the custom assets of the 70 |
-| `runlogs/grasp_library_20260905/` | the grasp library entries of the 70, plus 7 the oracle unit tests use (`cands`, `results`, `review`) |
+| `ispatialgym/assets/` | BDDL problems (numbered from 0 per activity), iddl files, `isg_customs.json`, `icl/revolution_axes.json` and the custom assets of the 83 |
+| `runlogs/grasp_library_20260905/` | the grasp library entries of the 83, plus 7 the oracle unit tests use (`cands`, `results`, `review`) |
 | `datasets/conversions/` (untracked) | records of the conversions (BDDL re-indexing, subtask names, the dataset index before them; the rename to "variant": tool, notes, diff) |
 | `datasets/release_records/` (untracked, internal) | where each goal image came from (`goal_images/<instance id>-goal.json`: replay, success, sha256, size, camera); not published with the dataset |
 | `ispatialgym/harness/`, `scripts/harness/` | the policy harness (separate work in progress) |

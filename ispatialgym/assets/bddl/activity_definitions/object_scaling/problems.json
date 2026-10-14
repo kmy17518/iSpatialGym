@@ -77,6 +77,28 @@
       "pick": "object_scaling#10",
       "slot": "representative",
       "mode": "representative"
+    },
+    {
+      "variant": "object_scaling-canned_food",
+      "id": 7,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "object_scaling",
+      "iddl": "object_scaling/object_scaling.iddl",
+      "pick": "object_scaling#01",
+      "slot": "representative",
+      "mode": "representative"
+    },
+    {
+      "variant": "object_scaling-bottle_of_pop",
+      "id": 8,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "object_scaling",
+      "iddl": "object_scaling/object_scaling.iddl",
+      "pick": "object_scaling#02",
+      "slot": "representative",
+      "mode": "representative"
     }
   ]
 }

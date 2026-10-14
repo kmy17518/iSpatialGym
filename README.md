@@ -6,7 +6,7 @@ iSpatialGym builds on [BEHAVIOR-1K](https://github.com/StanfordVL/BEHAVIOR-1K)
 backend from the StanfordVL cuRobo fork (v1 API) to upstream **NVlabs cuRobo
 v0.8.0 (cuRoboV2)**.
 
-This checkout is the eval release: the code and the 70 counted eval instances (one per subtask; 7 task families,
+This checkout is the eval release: the code and the 83 counted eval instances (one per subtask; 7 task families,
 23 tasks), with only the data that loading, replaying and the oracle need for them.
 
 ## Eval instances

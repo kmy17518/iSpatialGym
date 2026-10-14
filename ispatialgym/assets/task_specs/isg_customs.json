@@ -279,6 +279,120 @@
    }
   ]
  },
+ "alignment_axial_magazine": {
+  "iddl": "alignment/axial.iddl",
+  "definition_id": 7,
+  "roles": {
+   "target": {
+    "category": "magazine",
+    "sampleable": true,
+    "require": {
+     "contacts": true
+    },
+    "representative": "tfovwy",
+    "orientation_equivalences": {
+     "magazine/tfovwy": []
+    }
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_upper": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "desk_iotfzl_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "desk_iotfzl_0",
+       "init": "ontop",
+       "top_z": 0.74,
+       "row": "alignment-axial#04~T1"
+      }
+     ],
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "magazine": [
+       "tfovwy"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "magazine": {
+       "ehdwsd": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "orientation": 0.1
+   },
+   "groups": {},
+   "path_buckets": null,
+   "deviation_range_deg": [
+    20.0,
+    70.0
+   ],
+   "hinge_sink_m": 0.001,
+   "hinge_drift_max": {
+    "position_m": 0.001,
+    "orientation_rad": 0.005,
+    "steps": 60
+   },
+   "edge_visibility": {
+    "points": 9,
+    "min_visible": 3,
+    "window_m": 0.3,
+    "in_frame_margin": 0.05
+   },
+   "scale_hint_steps": [
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5
+   ]
+  },
+  "constraints": [
+   {
+    "scope": {
+     "scene": "house_double_floor_upper",
+     "target": "magazine/tfovwy"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   }
+  ]
+ },
  "alignment_axial_tablespoon": {
   "iddl": "alignment/axial.iddl",
   "definition_id": 2,
@@ -2063,6 +2177,406 @@
     "scope": {
      "scene": "house_double_floor_lower",
      "target": "signpost/vvjtkv"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   }
+  ]
+ },
+ "alignment_vertical_wall_clock": {
+  "iddl": "alignment/world_vertical.iddl",
+  "definition_id": 8,
+  "roles": {
+   "target": {
+    "category": "wall_clock",
+    "sampleable": true,
+    "require": {
+     "contacts": true
+    },
+    "representative": "jerval",
+    "orientation_equivalences": {
+     "wall_clock/jerval": []
+    }
+   },
+   "support": {
+    "category": "walls",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_upper": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "walls_ynhwyn_0"
+     ],
+     "support_regions": [
+      {
+       "id": "living_room_0/walls_ynhwyn_0/r01",
+       "wall": "walls_ynhwyn_0",
+       "room": "living_room_0",
+       "p0": [
+        0.815,
+        1.149
+       ],
+       "p1": [
+        1.715,
+        1.149
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 1.15,
+       "max_object_m": 0.9
+      }
+     ],
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "wall_clock": [
+       "jerval"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "wall_clock": {
+       "fnwzqj": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   },
+   "office_cubicles_right": {
+    "rooms": [
+     "lobby_0",
+     "meeting_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "walls_wcngqp_0",
+      "walls_dmcumz_0"
+     ],
+     "support_regions": [
+      {
+       "id": "lobby_0/walls_wcngqp_0/r02",
+       "wall": "walls_wcngqp_0",
+       "room": "lobby_0",
+       "p0": [
+        -2.87,
+        -14.03
+       ],
+       "p1": [
+        -2.87,
+        -13.73
+       ],
+       "normal": [
+        1.0,
+        0.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.55,
+       "max_object_m": 1.1
+      },
+      {
+       "id": "meeting_room_0/walls_dmcumz_0/r00",
+       "wall": "walls_dmcumz_0",
+       "room": "meeting_room_0",
+       "p0": [
+        4.9,
+        17.162
+       ],
+       "p1": [
+        7.039,
+        17.162
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 2.39,
+       "max_object_m": 0.9
+      }
+     ],
+     "floor": {
+      "room": "lobby_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "wall_clock": [
+       "jerval"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "wall_clock": {
+       "fnwzqj": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   },
+   "house_single_floor": {
+    "rooms": [
+     "corridor_0",
+     "living_room_0",
+     "childs_room_1"
+    ],
+    "bindings": {
+     "support": [
+      "walls_bpbucg_0",
+      "walls_dhsptd_0",
+      "walls_urngpl_0",
+      "walls_snssjy_0"
+     ],
+     "support_regions": [
+      {
+       "id": "corridor_0/walls_bpbucg_0/r00",
+       "wall": "walls_bpbucg_0",
+       "room": "corridor_0",
+       "p0": [
+        18.083,
+        9.58
+       ],
+       "p1": [
+        18.083,
+        11.621
+       ],
+       "normal": [
+        1.0,
+        0.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 2.54,
+       "max_object_m": 0.7
+      },
+      {
+       "id": "living_room_0/walls_dhsptd_0/r00",
+       "wall": "walls_dhsptd_0",
+       "room": "living_room_0",
+       "p0": [
+        17.637,
+        2.109
+       ],
+       "p1": [
+        17.637,
+        1.59
+       ],
+       "normal": [
+        -1.0,
+        0.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.77,
+       "max_object_m": 0.5
+      },
+      {
+       "id": "living_room_0/walls_urngpl_0/r01",
+       "wall": "walls_urngpl_0",
+       "room": "living_room_0",
+       "p0": [
+        16.847,
+        3.947
+       ],
+       "p1": [
+        17.507,
+        3.947
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.91,
+       "max_object_m": 0.5
+      },
+      {
+       "id": "living_room_0/walls_urngpl_0/r02",
+       "wall": "walls_urngpl_0",
+       "room": "living_room_0",
+       "p0": [
+        14.207,
+        3.947
+       ],
+       "p1": [
+        14.507,
+        3.947
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.55,
+       "max_object_m": 0.7
+      },
+      {
+       "id": "childs_room_1/walls_snssjy_0/r01",
+       "wall": "walls_snssjy_0",
+       "room": "childs_room_1",
+       "p0": [
+        22.953,
+        15.136
+       ],
+       "p1": [
+        22.953,
+        15.136
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.25,
+       "max_object_m": 0.7
+      }
+     ],
+     "floor": {
+      "room": "corridor_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "wall_clock": [
+       "jerval"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "wall_clock": {
+       "fnwzqj": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "orientation": 0.08
+   },
+   "groups": {},
+   "path_buckets": null,
+   "hang_height_m": 1.45,
+   "wall_gap_m": 0.003,
+   "wall_contact_tilt_deg": [
+    0.0,
+    25.0,
+    -25.0
+   ],
+   "deviation_range_deg": [
+    15.0,
+    25.0
+   ],
+   "max_deviation_deg": 25.0,
+   "stance_arm_posture": "tucked",
+   "hinge_drift_max_rad": 0.03,
+   "hinge_stop_decel_rad_s2": 10.0,
+   "hinge_viscous_tau_s": 0.02,
+   "hinge_brake_omega_rad_s": 0.0025,
+   "min_visible_objects": 5,
+   "min_object_pixels": 200,
+   "region_seed_step_m": 0.25,
+   "spot_search_rays": 24,
+   "flat_patch_rays": [
+    5,
+    5
+   ],
+   "flat_patch_tolerance_m": 0.01,
+   "flat_patch_margin_m": 0.1,
+   "front_clearance_m": 0.35,
+   "in_room_test_m": 0.8,
+   "prompt0": {
+    "beta_max_deg": 35.0,
+    "d_min_m": 0.5,
+    "d_max_m": 1.5
+   },
+   "lateral_range_m": [
+    -0.4,
+    0.4
+   ],
+   "contact_extreme_band_m": 0.03,
+   "brace_offset_m": 0.005,
+   "brace_clearance_m": 0.02,
+   "brace_kinds": [
+    "below_high",
+    "above_low",
+    "side_high"
+   ],
+   "template_filter_deviation_deg": 25.0,
+   "scale_hint_steps": [
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5
+   ],
+   "settle_free": [],
+   "goal": "upright",
+   "front_axis": {
+    "wall_clock/jerval": "+x"
+   },
+   "up_axis": {
+    "wall_clock/jerval": "+z"
+   }
+  },
+  "constraints": [
+   {
+    "scope": {
+     "scene": "house_single_floor",
+     "target": "wall_clock/jerval"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   },
+   {
+    "scope": {
+     "scene": "office_cubicles_right",
+     "target": "wall_clock/jerval"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-10-11"
+    }
+   },
+   {
+    "scope": {
+     "scene": "house_double_floor_upper",
+     "target": "wall_clock/jerval"
     },
     "type": "blacklist",
     "reason": "missing_contacts_pending_B6",
@@ -6065,6 +6579,161 @@
   },
   "constraints": []
  },
+ "disembedding_jigsaw_puzzle_piece_jigsaw_puzzle_piece_3": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 7,
+  "roles": {
+   "target": {
+    "category": "jigsaw_puzzle_piece",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "isgefa",
+    "dataset": "ispatialgym-assets",
+    "grasp_keys": {
+     "jigsaw_puzzle_piece/isgefa": "jigsaw_puzzle_piece__isgefa__t"
+    }
+   },
+   "distractors": {
+    "category": "jigsaw_puzzle_piece",
+    "sampleable": true,
+    "dataset": "ispatialgym-assets"
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "disembedding#01~T1"
+      }
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "jigsaw_puzzle_piece": [
+       "isgefa"
+      ]
+     },
+     "distractors": {
+      "jigsaw_puzzle_piece": [
+       "isgefb",
+       "isgefc",
+       "isgefd"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "jigsaw_puzzle_piece": 3
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "distractor_budget": {
+    "fixed_layout": "ispatialgym/assets/objects/embedded_figure/model/assembly.json",
+    "n_distractors": 3,
+    "rule": "not drawn from a pool, outside the distractor budget (owner 2026-10-10)"
+   },
+   "fixed_layout": {
+    "file": "ispatialgym/assets/objects/embedded_figure/model/assembly.json",
+    "sha256": "27e7a46cc3c821f0dbb06b16846a3cbe0fa04db5562ccd2e3e8899f919f05bcf",
+    "target": "jigsaw_puzzle_piece/isgefa",
+    "parts": [
+     "jigsaw_puzzle_piece/isgefb",
+     "jigsaw_puzzle_piece/isgefc",
+     "jigsaw_puzzle_piece/isgefd"
+    ]
+   },
+   "destination_side": "right"
+  },
+  "constraints": []
+ },
  "disembedding_pencil_case_sunglasses_1_pencil_1_pen_1": {
   "iddl": "disembedding/disembedding.iddl",
   "definition_id": 3,
@@ -6813,6 +7482,256 @@
     "dropped": []
    },
    "destination_side": "left"
+  },
+  "constraints": []
+ },
+ "disembedding_video_game_video_game_2_board_game_1": {
+  "iddl": "disembedding/disembedding.iddl",
+  "definition_id": 8,
+  "roles": {
+   "target": {
+    "category": "video_game",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "ceaxsd",
+    "orientation_equivalences": {
+     "video_game/ceaxsd": []
+    },
+    "grasp_keys": {
+     "video_game/ceaxsd": "video_game__ceaxsd"
+    }
+   },
+   "distractors": {
+    "category": [
+     "video_game",
+     "board_game"
+    ],
+    "sampleable": true
+   },
+   "support": {
+    "category": "desk",
+    "sampleable": false
+   },
+   "source": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "uekqey"
+   },
+   "destination": {
+    "category": "tray",
+    "sampleable": true,
+    "representative": "hvlfig"
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "office_cubicles_right": {
+    "rooms": [
+     "private_office_0",
+     "private_office_3",
+     "private_office_1",
+     "private_office_2"
+    ],
+    "bindings": {
+     "support": [
+      "desk_mdhelw_2",
+      "desk_mdhelw_0",
+      "desk_mdhelw_3",
+      "desk_mdhelw_1"
+     ],
+     "support_surfaces": [
+      {
+       "name": "desk_mdhelw_2",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "disembedding#03~T5"
+      },
+      {
+       "name": "desk_mdhelw_0",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "disembedding#03~T4"
+      },
+      {
+       "name": "desk_mdhelw_3",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "disembedding#03~T3"
+      },
+      {
+       "name": "desk_mdhelw_1",
+       "init": "ontop",
+       "top_z": 0.79,
+       "row": "disembedding#03~T1"
+      }
+     ],
+     "floor": {
+      "room": "private_office_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "video_game": [
+       "ceaxsd"
+      ]
+     },
+     "distractors": {
+      "video_game": [
+       "apjpos",
+       "ckugyi",
+       "pujfzk",
+       "qsyyql",
+       "quzjuo",
+       "rzaxlj"
+      ],
+      "board_game": [
+       "eoywpy",
+       "frgdqh",
+       "fzyuip"
+      ]
+     },
+     "source": {
+      "tray": [
+       "uekqey"
+      ]
+     },
+     "destination": {
+      "tray": [
+       "hvlfig"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "video_game": {
+       "lfdpse": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "distractors": {
+      "board_game": {
+       "iqfvfl": "ground_isg 2026-10-12: heldout"
+      },
+      "video_game": {
+       "lfdpse": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {
+    "distractors": {
+     "size": 3,
+     "draw": "unique",
+     "members": {
+      "video_game": 2,
+      "board_game": 1
+     }
+    }
+   },
+   "path_buckets": null,
+   "tray_budget": 0.85,
+   "source_tray_scale": 1.0,
+   "source_tray_inner_floor_m2": {
+    "tray/uekqey": 0.1673,
+    "tray/gsxbym": 0.107
+   },
+   "tray_raster_m": 0.01,
+   "tray_footprint_margin_m": 0.01,
+   "distractor_spacing_extra_m": 0.01,
+   "distractor_place_tries": 400,
+   "max_occlusion_ratio": 0.3,
+   "min_visible_pixels": 400,
+   "occlusion_reload_tolerance": 0.05,
+   "image_margin": 0.05,
+   "destination_visible_width_m": 0.04,
+   "destination_gap_min_m": 0.04,
+   "destination_floor_visible_fraction": 0.3,
+   "lateral_margin_m": 0.437,
+   "carry_height_extra_m": 0.03,
+   "carry_edge_slide": true,
+   "carry_edge_slide_back_m": 0.0,
+   "release_gap_m": 0.003,
+   "tray_release_gap_m": 0.0002,
+   "tray_mass_kg": 2.0,
+   "distractor_budget": {
+    "tray": "tray/uekqey",
+    "tray_scale": 1.0,
+    "tray_floor_m2": 0.1673,
+    "budget_fraction": 0.85,
+    "pad_clearance_m": 0.0,
+    "footprint_rule": "rectangle",
+    "pose": "canonical",
+    "source": "representatives.csv same_category / other_category rows",
+    "draw_rule": {
+     "size_max": 3,
+     "same_category_max": 2,
+     "other_category_max": 1,
+     "lookalike_group_max": 1
+    },
+    "count_rule": "every admissible draw fits",
+    "model_footprints_m2": {
+     "video_game/apjpos": 0.0052,
+     "video_game/ckugyi": 0.004,
+     "video_game/pujfzk": 0.0043,
+     "video_game/quzjuo": 0.0039,
+     "video_game/qsyyql": 0.0016,
+     "video_game/rzaxlj": 0.001,
+     "board_game/eoywpy": 0.0296,
+     "board_game/frgdqh": 0.0264,
+     "board_game/fzyuip": 0.0216
+    },
+    "n_draws": 39,
+    "worst_draw_m2": 0.0392,
+    "used_m2": 0.0392,
+    "n_distractors": 3,
+    "draw": [
+     "video_game/ckugyi",
+     "video_game/rzaxlj",
+     "board_game/eoywpy"
+    ],
+    "dropped": []
+   },
+   "destination_side": "right",
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "fixed_layout_yaw_step_deg": 22.5
   },
   "constraints": []
  },
@@ -7603,6 +8522,341 @@
   "constraints": [],
   "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: plate/luhkiz into drop_in_sink_lkklqs_0 (set in bar_egwapq_0) from bar_egwapq_0 (the sink's own bar, ~0.3-1.2 m along it) / bar_byvbuc_0 (the L-joined bar along -y, ~1.7 m); the order pins one per step; the partner is the sheet's held-out drop_in_sink_lkklqs_0 (house_double_floor_lower kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V3 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
  },
+ "inter_object_relation_satisfaction_nextto_large_scale_serving_cart_coffee_table": {
+  "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+  "definition_id": 22,
+  "roles": {
+   "target": {
+    "category": "serving_cart",
+    "sampleable": true,
+    "representative": "heqtlk",
+    "orientation_equivalences": {
+     "serving_cart/heqtlk": []
+    }
+   },
+   "partner": {
+    "category": "coffee_table",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "coffee_table_rlsebe_0"
+     ],
+     "support": {
+      "room": "living_room_0"
+     },
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "serving_cart": [
+       "heqtlk"
+      ]
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.15,
+    "orientation": 0.35
+   },
+   "_tolerances_note": "pose_reached is measured, not the goal: the push stops nextto_push_on_m after NextTo first holds, short of the recorded goal (the goal's AABB gap is under half the NextTo bound), and the cart may turn a little under the hand",
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.9,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "remove_objects": {},
+   "push_distance_m": [
+    1.5,
+    2.5
+   ],
+   "push_heights_m": [
+    0.45,
+    0.4,
+    0.5,
+    0.55,
+    0.35,
+    0.6
+   ],
+   "push_stand_offs_m": [
+    0.55,
+    0.5,
+    0.6,
+    0.65,
+    0.45
+   ],
+   "drift_tol_m": 0.1,
+   "nextto_push_on_m": 0.05,
+   "push_speed_m_s": 0.08,
+   "push_hands": 2,
+   "_push_hands_note": "owner 2026-10-12 ~20:17 item C: both closed hands on the cart's push face (iors_large_nextto: two spots ~0.3 m apart symmetric about the face's centre line, the base centred behind them, the second arm solved with the first locked; one hand when a face has no two spots) - both demos stopped with the cart turned 20 deg under the single hand, ~1 m short",
+   "attempt_budget_s": 1500,
+   "_nextto_note": "owner 2026-10-12 ~16:05 items 3 / 4: nextto_large#02 - the serving cart heqtlk (one rigid link, 0.39 x 0.44 x 0.85 m, spawned) pushed next to breakfast_table_rhjoby_0 by the base (oracle base_push, no grasp); hand-made from the sandal's under alias of the same table (scene, room, floor init, the six chairs removed); the base-push keys are the sampler's defaults (iors_large_nextto.DEFAULTS), written out to be tuned here",
+   "_partner_copy_note": "owner 2026-10-13 ~20:34 (nextto_large#02, partners beyond the breakfast tables): copy of inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor with the partner coffee_table_rlsebe_0 (coffee_table.n.01, house_single_floor living_room_0; lane screen: the longest 0.75 m wide straight free lane in the room beside it 4.45 m); its instances count for nextto#02 only with the owner's OK"
+  },
+  "constraints": []
+ },
+ "inter_object_relation_satisfaction_nextto_small_scale_gym_shoe_gym_shoe": {
+  "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
+  "definition_id": 20,
+  "roles": {
+   "target": {
+    "category": "gym_shoe",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "kmcbym",
+    "grasp_keys": {
+     "gym_shoe/kmcbym": "gym_shoe__kmcbym__t"
+    }
+   },
+   "partner": {
+    "category": "gym_shoe",
+    "sampleable": true,
+    "representative": "mcfcwq"
+   },
+   "support": {
+    "category": "bench",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "bedroom_0"
+    ],
+    "bindings": {
+     "support": [
+      "bench_pfjnnj_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "bench_pfjnnj_0",
+       "init": "ontop",
+       "top_z": 0.35,
+       "row": "inter_object_relation_satisfaction-nextto#04~T3"
+      }
+     ],
+     "floor": {
+      "room": "bedroom_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "gym_shoe": [
+       "kmcbym"
+      ]
+     },
+     "partner": {
+      "gym_shoe": [
+       "mcfcwq"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "gym_shoe": {
+       "pblxfp": "ground_isg 2026-10-11: heldout",
+       "rcozpq": "ground_isg 2026-10-11: heldout"
+      }
+     },
+     "partner": {
+      "gym_shoe": {
+       "pblxfp": "ground_isg 2026-10-11: heldout",
+       "rcozpq": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "nextto_gap_extra_m": 0.03,
+   "nextto_divisor": 6.0,
+   "handedness": {
+    "gym_shoe/kmcbym": "right",
+    "gym_shoe/mcfcwq": "left"
+   },
+   "partner_side": "left"
+  },
+  "constraints": []
+ },
+ "inter_object_relation_satisfaction_nextto_small_scale_marker_colored_pencil": {
+  "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
+  "definition_id": 14,
+  "roles": {
+   "target": {
+    "category": "marker",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "xakoic",
+    "orientation_equivalences": {
+     "marker/xakoic": []
+    },
+    "grasp_keys": {
+     "marker/xakoic": "marker__xakoic"
+    }
+   },
+   "partner": {
+    "category": "colored_pencil",
+    "sampleable": true,
+    "representative": "acumgp",
+    "orientation_equivalences": {
+     "colored_pencil/acumgp": [
+      "xinf"
+     ]
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "inter_object_relation_satisfaction-nextto#01~T1"
+      }
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "marker": [
+       "xakoic"
+      ]
+     },
+     "partner": {
+      "colored_pencil": [
+       "acumgp"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "marker": {
+       "qemval": "ground_isg 2026-10-11: heldout"
+      }
+     },
+     "partner": {
+      "colored_pencil": {
+       "deuvcx": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "nextto_gap_extra_m": 0.03,
+   "nextto_divisor": 6.0,
+   "partner_side": "left"
+  },
+  "constraints": []
+ },
  "inter_object_relation_satisfaction_nextto_small_scale_salt_shaker_pepper_shaker": {
   "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
   "definition_id": 11,
@@ -7714,24 +8968,35 @@
   },
   "constraints": []
  },
- "inter_object_relation_satisfaction_nextto_large_scale_serving_cart_breakfast_table": {
-  "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
-  "definition_id": 14,
+ "inter_object_relation_satisfaction_nextto_small_scale_tablespoon_chopstick": {
+  "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
+  "definition_id": 19,
   "roles": {
    "target": {
-    "category": "serving_cart",
+    "category": "tablespoon",
     "sampleable": true,
-    "representative": "heqtlk",
-    "orientation_equivalences": {
-     "serving_cart/heqtlk": []
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "yxxfdj",
+    "scale": {
+     "tablespoon/yxxfdj": [
+      1.0,
+      1.0,
+      1.75
+     ]
+    },
+    "grasp_keys": {
+     "tablespoon/yxxfdj": "tablespoon__yxxfdj__st"
     }
    },
    "partner": {
-    "category": "breakfast_table",
-    "sampleable": false
+    "category": "chopstick",
+    "sampleable": true,
+    "representative": "bcwuwv"
    },
    "support": {
-    "category": "floors",
+    "category": "breakfast_table",
     "sampleable": false
    },
    "floor": {
@@ -7741,25 +9006,91 @@
   "scenes": {
    "house_single_floor": {
     "rooms": [
-     "living_room_0",
      "dining_room_0"
     ],
     "bindings": {
-     "partner": [
+     "support": [
       "breakfast_table_rhjoby_0"
      ],
-     "support": {
-      "room": "living_room_0"
+     "floor": {
+      "room": "dining_room_0"
      },
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_rhjoby_0",
+       "init": "ontop",
+       "top_z": 0.81,
+       "row": "inter_object_relation_satisfaction-nextto#03~T1"
+      }
+     ]
+    },
+    "whitelist": {
+     "target": {
+      "tablespoon": [
+       "yxxfdj"
+      ]
+     },
+     "partner": {
+      "chopstick": [
+       "bcwuwv"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "tablespoon": {
+       "ubuhoz": "ground_isg 2026-10-11: heldout"
+      }
+     },
+     "partner": {
+      "chopstick": {
+       "ahmhza": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   },
+   "Rs_int": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_skczfi_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "breakfast_table_skczfi_0",
+       "init": "ontop",
+       "top_z": 0.76,
+       "row": "inter_object_relation_satisfaction-nextto#03~T4"
+      }
+     ],
      "floor": {
       "room": "living_room_0"
      }
     },
     "whitelist": {
      "target": {
-      "serving_cart": [
-       "heqtlk"
+      "tablespoon": [
+       "yxxfdj"
       ]
+     },
+     "partner": {
+      "chopstick": [
+       "bcwuwv"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "tablespoon": {
+       "ubuhoz": "ground_isg 2026-10-11: heldout"
+      }
+     },
+     "partner": {
+      "chopstick": {
+       "ahmhza": "ground_isg 2026-10-11: heldout"
+      }
      }
     }
    }
@@ -7767,75 +9098,28 @@
   "generation": {
    "templates_max": 20,
    "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
    "tolerances": {
-    "position": 0.15,
-    "orientation": 0.35
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
    },
-   "_tolerances_note": "pose_reached is measured, not the goal: the push stops nextto_push_on_m after NextTo first holds, short of the recorded goal (the goal's AABB gap is under half the NextTo bound), and the cart may turn a little under the hand",
    "groups": {},
    "path_buckets": null,
-   "max_partner_geodesic_m": 3.0,
-   "path_max_extra_m": 1.0,
-   "goal_cell_margin_m": 0.05,
-   "goal_drop_m": 0.003,
-   "partner_corners_in_frame_min": 4,
-   "floor_init": {
-    "distance_range_m": [
-     0.6,
-     1.5
-    ],
-    "cell_m": 0.02,
-    "clearance_m": 0.02,
-    "max_geodesic_m": 3.0
-   },
-   "stand_offs_m": [
-    0.35,
-    0.45,
-    0.55
-   ],
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
-   "target_max_height_m": 0.9,
-   "argument_order": [
-    "target",
-    "partner"
-   ],
-   "remove_objects": {
-    "house_single_floor": [
-     "straight_chair_jgoolz_0",
-     "straight_chair_jgoolz_1",
-     "straight_chair_jgoolz_2",
-     "straight_chair_jgoolz_3",
-     "straight_chair_jgoolz_4",
-     "straight_chair_jgoolz_5"
-    ]
-   },
-   "_remove_objects_note": "the six chairs around breakfast_table_rhjoby_0 removed as in the sandal's floor aliases of this table: they stand at its sides, where the cart's goal is",
-   "push_distance_m": [
-    1.5,
-    2.5
-   ],
-   "push_heights_m": [
-    0.45,
-    0.4,
-    0.5,
-    0.55,
-    0.35,
-    0.6
-   ],
-   "push_stand_offs_m": [
-    0.55,
-    0.5,
-    0.6,
-    0.65,
-    0.45
-   ],
-   "drift_tol_m": 0.1,
-   "nextto_push_on_m": 0.05,
-   "push_speed_m_s": 0.08,
-   "push_hands": 2,
-   "_push_hands_note": "owner 2026-10-12 ~20:17 item C: both closed hands on the cart's push face (iors_large_nextto: two spots ~0.3 m apart symmetric about the face's centre line, the base centred behind them, the second arm solved with the first locked; one hand when a face has no two spots) - both demos stopped with the cart turned 20 deg under the single hand, ~1 m short",
-   "attempt_budget_s": 1500,
-   "_nextto_note": "owner 2026-10-12 ~16:05 items 3 / 4: nextto_large#02 - the serving cart heqtlk (one rigid link, 0.39 x 0.44 x 0.85 m, spawned) pushed next to breakfast_table_rhjoby_0 by the base (oracle base_push, no grasp); hand-made from the sandal's under alias of the same table (scene, room, floor init, the six chairs removed); the base-push keys are the sampler's defaults (iors_large_nextto.DEFAULTS), written out to be tuned here"
+   "goal_drop_m": 0.01,
+   "nextto_gap_extra_m": 0.03,
+   "nextto_divisor": 6.0,
+   "partner_side": "right"
   },
   "constraints": []
  },
@@ -8358,6 +9642,158 @@
    "partner_side": "right"
   },
   "constraints": []
+ },
+ "inter_object_relation_satisfaction_touching_small_scale_box_of_cereal_s080_box_of_cereal": {
+  "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
+  "definition_id": 21,
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "iucshm",
+    "scale": {
+     "box_of_cereal/iucshm": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "grasp_keys": {
+     "box_of_cereal/iucshm": "box_of_cereal__iucshm__s080"
+    }
+   },
+   "partner": {
+    "category": "box_of_cereal",
+    "sampleable": true,
+    "representative": "dkhgxn"
+   },
+   "support": {
+    "category": "bar",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "bar_udatjt_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "bar_udatjt_0",
+       "init": "ontop",
+       "top_z": 1.05,
+       "row": "inter_object_relation_satisfaction-touching#02~B3"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "box_of_cereal": [
+       "iucshm"
+      ]
+     },
+     "partner": {
+      "box_of_cereal": [
+       "dkhgxn"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "box_of_cereal": {
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     },
+     "partner": {
+      "box_of_cereal": {
+       "hcwbzw": "pilot 2026-10-12: owner B2 - touching partner height / footprint 5.10 > partner_max_aspect 3.2",
+       "ihedod": "ground_isg 2026-10-12: heldout",
+       "pfwgkm": "ground_isg 2026-10-12: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "partner_side": "left",
+   "nudge_m": 0.001,
+   "max_nudges": 25,
+   "partner_stability": {
+    "base_contact_fraction": 0.25,
+    "foot_width_fractions": [
+     0.6,
+     0.45
+    ],
+    "max_height_over_extent": 2.5
+   },
+   "target_pushability": {
+    "max_min_extent_m": 0.089,
+    "max_long_side_m": 0.3,
+    "max_height_m": 0.3
+   },
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
+   "partner_max_aspect": 3.2,
+   "phase2_split_cone": true,
+   "init_view_class_deg": [
+    20.0,
+    30.0
+   ],
+   "phase2_lateral_shifts_m": [
+    0.0,
+    0.1,
+    -0.1,
+    0.2,
+    -0.2,
+    0.3,
+    -0.3
+   ],
+   "phase2_tight_class_deg": 8.0,
+   "phase2_loose_class_deg": 20.0,
+   "phase2_split_fallback_classes_deg": [
+    20.0,
+    30.0
+   ],
+   "table_end_margin_m": 0.1
+  },
+  "constraints": [],
+  "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bar_udatjt_0 (row inter_object_relation_satisfaction-touching#02~B3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T3 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
  },
  "inter_object_relation_satisfaction_touching_small_scale_box_of_sanitary_napkins_box_of_tissues": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -9295,6 +10731,149 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction_under_small_scale_spatula_paper_sheet": {
+  "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
+  "definition_id": 18,
+  "roles": {
+   "target": {
+    "category": "spatula",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "hkvsep",
+    "scale": {
+     "spatula/hkvsep": [
+      0.76,
+      0.76,
+      0.76
+     ]
+    },
+    "grasp_keys": {
+     "spatula/hkvsep": "spatula__hkvsep__t076"
+    }
+   },
+   "partner": {
+    "category": "paper_sheet",
+    "sampleable": true,
+    "representative": "uqbipw"
+   },
+   "support": {
+    "category": "commercial_kitchen_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "support": [
+      "commercial_kitchen_table_vxvtec_0"
+     ],
+     "support_surfaces": [
+      {
+       "name": "commercial_kitchen_table_vxvtec_0",
+       "init": "ontop",
+       "top_z": 0.87,
+       "row": "inter_object_relation_satisfaction-under_small_scale#04~T3"
+      }
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "spatula": [
+       "hkvsep"
+      ]
+     },
+     "partner": {
+      "paper_sheet": [
+       "uqbipw"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "spatula": {
+       "pxwpuw": "ground_isg 2026-10-11: heldout"
+      }
+     },
+     "partner": {
+      "paper_sheet": {
+       "afdjfk": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2,
+    "settled_override_position_min_m": 0.01,
+    "settled_override_position_extent_fraction": 0.25,
+    "settled_override_orientation": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_footprint_margin_m": 0.01,
+   "footprint_gap_min_m": 0.03,
+   "partner_gap_extra_m": 0.03,
+   "partner_moved_max_m": 0.005,
+   "goal_drop_m": 0.01,
+   "fit_tiers": [
+    "any_yaw",
+    "aligned",
+    "centred"
+   ],
+   "target_fit_scale_min": 0.5,
+   "argument_order": [
+    "partner",
+    "target"
+   ],
+   "target_fit": {
+    "spatula/hkvsep": {
+     "rule": "on_partner",
+     "scale": 0.76,
+     "partner": "paper_sheet/uqbipw",
+     "limit": "partner_long_side",
+     "target_footprint_m": [
+      0.0758,
+      0.3512
+     ],
+     "partner_footprint_m": [
+      0.21,
+      0.29
+     ],
+     "margin_m": 0.01,
+     "base_scale": null,
+     "spawn_scale": [
+      0.76,
+      0.76,
+      0.76
+     ],
+     "status": "scaled",
+     "grasp_key": "spatula__hkvsep__t076"
+    }
+   },
+   "partner_side": "right"
+  },
+  "constraints": []
+ },
  "inter_object_relation_satisfaction_under_small_scale_teacup_saucer": {
   "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
   "definition_id": 4,
@@ -9505,6 +11084,84 @@
       }
      }
     }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "orientation": 0.15
+   },
+   "groups": {},
+   "path_buckets": null,
+   "hold": {
+    "depth_m": 0.5,
+    "trunk": [
+     0.5,
+     0.0
+    ],
+    "roll_deg": 15.0
+   },
+   "min_visible_fraction": 0.4,
+   "in_frame_margin": 0.05,
+   "waypoints": 3,
+   "grasp_finger_advance_m_per_step": 0.001,
+   "grasp_press_m": 0.004,
+   "goal_angle_range_deg": [
+    30.0,
+    120.0
+   ],
+   "init_angle_range_deg": [
+    0.0,
+    180.0
+   ],
+   "reject_symmetric_targets": true
+  },
+  "constraints": []
+ },
+ "mental_rotation_classroom_mock_up": {
+  "iddl": "mental_rotation/mental_rotation.iddl",
+  "definition_id": 8,
+  "roles": {
+   "target": {
+    "category": "classroom_mock_up",
+    "sampleable": true,
+    "require": {
+     "grasps": "floating"
+    },
+    "representative": "isgsma",
+    "dataset": "ispatialgym-assets",
+    "grasp_keys": {
+     "classroom_mock_up/isgsma": "classroom_mock_up__isgsma__f"
+    }
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "classroom_mock_up": [
+       "isgsma"
+      ]
+     }
+    },
+    "blacklist": {}
    }
   },
   "generation": {
@@ -10154,6 +11811,92 @@
   },
   "constraints": []
  },
+ "mental_rotation_walker": {
+  "iddl": "mental_rotation/mental_rotation.iddl",
+  "definition_id": 9,
+  "roles": {
+   "target": {
+    "category": "walker",
+    "sampleable": true,
+    "require": {
+     "grasps": "floating"
+    },
+    "representative": "glrsok",
+    "orientation_equivalences": {
+     "walker/glrsok": []
+    },
+    "grasp_keys": {
+     "walker/glrsok": "walker__glrsok"
+    }
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "walker": [
+       "glrsok"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "walker": {
+       "dgewyj": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "orientation": 0.15
+   },
+   "groups": {},
+   "path_buckets": null,
+   "hold": {
+    "depth_m": 0.5,
+    "trunk": [
+     0.5,
+     0.0
+    ],
+    "roll_deg": 15.0
+   },
+   "min_visible_fraction": 0.4,
+   "in_frame_margin": 0.05,
+   "waypoints": 3,
+   "grasp_finger_advance_m_per_step": 0.001,
+   "grasp_press_m": 0.004,
+   "goal_angle_range_deg": [
+    30.0,
+    120.0
+   ],
+   "init_angle_range_deg": [
+    0.0,
+    180.0
+   ],
+   "reject_symmetric_targets": true
+  },
+  "constraints": []
+ },
  "object_scaling_apple": {
   "iddl": "object_scaling/object_scaling.iddl",
   "definition_id": 1,
@@ -10589,6 +12332,93 @@
   },
   "constraints": []
  },
+ "object_scaling_bottle_of_pop": {
+  "iddl": "object_scaling/object_scaling.iddl",
+  "definition_id": 8,
+  "roles": {
+   "target": {
+    "category": "bottle_of_pop",
+    "sampleable": true,
+    "require": {
+     "grasps": "floating"
+    },
+    "representative": "jnoksl",
+    "grasp_keys": {
+     "bottle_of_pop/jnoksl": "bottle_of_pop__jnoksl"
+    }
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "bottle_of_pop": [
+       "jnoksl"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "bottle_of_pop": {
+       "iynssk": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "depth_min_m": 0.02,
+    "depth_fraction": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "hold": {
+    "depth_m": 0.5,
+    "trunk": [
+     0.5,
+     0.0
+    ],
+    "roll_deg": 90.0
+   },
+   "min_visible_fraction": 0.4,
+   "in_frame_margin": 0.05,
+   "waypoints": 3,
+   "grasp_finger_advance_m_per_step": 0.001,
+   "grasp_press_m": 0.004,
+   "depth_search_range_m": [
+    0.15,
+    0.55
+   ],
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05,
+   "requested_direction": "away",
+   "start_depth_band": [
+    0.4,
+    0.6
+   ]
+  },
+  "constraints": []
+ },
  "object_scaling_can_of_soda": {
   "iddl": "object_scaling/object_scaling.iddl",
   "definition_id": 3,
@@ -10672,6 +12502,93 @@
    "start_depth_band": [
     0.4,
     0.6
+   ]
+  },
+  "constraints": []
+ },
+ "object_scaling_canned_food": {
+  "iddl": "object_scaling/object_scaling.iddl",
+  "definition_id": 7,
+  "roles": {
+   "target": {
+    "category": "canned_food",
+    "sampleable": true,
+    "require": {
+     "grasps": "floating"
+    },
+    "representative": "ycbspm",
+    "grasp_keys": {
+     "canned_food/ycbspm": "canned_food__ycbspm"
+    }
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "canned_food": [
+       "ycbspm"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "canned_food": {
+       "byakrm": "ground_isg 2026-10-11: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tremble_frames": 45,
+   "tremble_pos_tol_m": 0.0005,
+   "tremble_ang_tol_rad": 0.0087,
+   "tremble_drift_pos_tol_m": 0.001,
+   "tremble_drift_ang_tol_rad": 0.01,
+   "tolerances": {
+    "depth_min_m": 0.02,
+    "depth_fraction": 0.2
+   },
+   "groups": {},
+   "path_buckets": null,
+   "hold": {
+    "depth_m": 0.5,
+    "trunk": [
+     0.5,
+     0.0
+    ],
+    "roll_deg": 90.0
+   },
+   "min_visible_fraction": 0.4,
+   "in_frame_margin": 0.05,
+   "waypoints": 3,
+   "grasp_finger_advance_m_per_step": 0.001,
+   "grasp_press_m": 0.004,
+   "depth_search_range_m": [
+    0.15,
+    0.55
+   ],
+   "depth_search_grid_m": 0.01,
+   "depth_margin_m": 0.02,
+   "min_depth_change_m": 0.05,
+   "requested_direction": "toward",
+   "start_depth_band": [
+    0.0,
+    0.2
    ]
   },
   "constraints": []

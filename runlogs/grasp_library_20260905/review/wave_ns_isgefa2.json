@@ -1,0 +1,65 @@
+{
+ "models": [
+  {
+   "key": "jigsaw_puzzle_piece__isgefa__t",
+   "n_rows": 9,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Mid side_C bar pinch; 13/0 close but both pads on bar"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Side_C bar pinch, pads on bar; frame lifted along (accepted)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Side_C bar pinch; 6\u00b0 yaw wedge at one pad, still closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Side_C bar pinch, both pads on bar; outer slit is perspective"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Side_C bar pinch; sub-mm sliver at fully closed finger only"
+    },
+    {
+     "rank": 6,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Side_C bar pinch, 3\u00b0 yaw; both pads on bar"
+    },
+    {
+     "rank": 7,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Base bar pinch, both pads on bar; 26 mm swing lever acceptable"
+    },
+    {
+     "rank": 8,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Base bar pinch (gripper flipped), both pads on bar"
+    },
+    {
+     "rank": 9,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Base bar pinch, 6\u00b0 yaw; top slit is perspective, contact closed"
+    }
+   ],
+   "object_note": "All 13/0 closes, bar fills pad gap (firm). Side_C jaw axis 4-7 mm from CoM; no end grasps."
+  }
+ ]
+}

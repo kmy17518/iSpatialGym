@@ -1,0 +1,59 @@
+{
+ "models": [
+  {
+   "key": "gym_shoe__kmcbym__t",
+   "n_rows": 1,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap",
+      "one_finger"
+     ],
+     "note": "Instep pinch; left pad (V2) ~1 cm off upper; right pad touches"
+    }
+   ],
+   "object_note": "Collision hull ~1 cm wider than visual upper at instep; single candidate only; V4 saturated"
+  },
+  {
+   "key": "classroom_mock_up__isgsma__f",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Firm pinch across top cube (V2); V1 blank"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Firm pinch across cube column; both pads flush"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Firm pinch across cube column; both pads flush"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: left finger near open; pads span 2 cubes, ~1 cm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Firm pinch across cube column; both pads flush"
+    }
+   ],
+   "object_note": "V1 blank in rank 1; V1 column is the oblique view, not a profile (likely render lag)"
+  }
+ ]
+}

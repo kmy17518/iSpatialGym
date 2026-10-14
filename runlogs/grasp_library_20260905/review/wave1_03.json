@@ -38,6 +38,43 @@
    "object_note": "Red can; all centred body grasps."
   },
   {
+   "key": "canned_food__ycbspm",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "axial grasp across narrow side, from bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "axial grasp across narrow side, from bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp across narrow side"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp across narrow side"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "axial grasp across narrow side, from bottom"
+    }
+   ],
+   "object_note": "SPAM-style can; all grasps across 53-55 mm width, full coverage."
+  },
+  {
    "key": "carving_knife__alekva",
    "n_rows": 5,
    "grasps": [

@@ -1,0 +1,495 @@
+{
+ "task": "IORS",
+ "relation": "touching",
+ "subtask": "inter_object_relation_satisfaction-touching",
+ "pick": "inter_object_relation_satisfaction-touching#02",
+ "slot": "representative",
+ "category": "box_of_cereal",
+ "model": "iucshm",
+ "key": "box_of_cereal__iucshm__s080",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.05343557739257813,
+  0.1958340072631836,
+  0.2727191147810481
+ ],
+ "ready": true,
+ "dataset": "behavior-1k-assets",
+ "base_key": "box_of_cereal__iucshm",
+ "scale": [
+  0.8,
+  0.8,
+  0.8
+ ],
+ "scale_rule": "uniform_owner_variant",
+ "bbox_scaled": [
+  0.0427,
+  0.1567,
+  0.2182
+ ],
+ "two_finger": {
+  "center_tol_m": 0.003,
+  "min_pad_cover": 0.5,
+  "tilt_bins": [
+   [
+    0,
+    8
+   ],
+   [
+    8,
+    22
+   ],
+   [
+    22,
+    40.01
+   ]
+  ],
+  "top_k": 12
+ },
+ "n_cand": 24000,
+ "n_orient": 24,
+ "n_need": 6,
+ "provenance": {
+  "decision": "owner 2026-10-12 ~10:25 item 4 B (touching#02, target box_of_cereal/iucshm 27 cm, top-grasped): small lift + shorter box - target scale 0.8 (21.8 cm) as a new alias; the scaled grasp set gets its sim grasp verification. A grasps:tabletop key for box_of_cereal/iucshm at spawn scale [0.8, 0.8, 0.8], same flow as spatula__hkvsep__t076 / beer_glass__mxsliu__t2f / lid__pbmsji__s065",
+  "isg_commit": "0539c2ed",
+  "b1k_commit": "6a6194600",
+  "scripts": "isg_home/eval85/touchdata_work/grasp_s080/scripts = scratch_lid065/scripts (runlogs/grasp_library_20260905/scripts + multi_hit / two_finger / finger_clear options and the oracle-closure AG test of scratch_beerB6) with this worker's paths; export at the spawn scale (DatasetObject scale), gen_candidates.py a1 with the two_finger option (both pads meet the box within 3 mm of each other, >= 50 % of each pad's footprint on it; width = the pads' span; picks spread over approach-tilt bins 0-8 / 8-22 / 22-40 deg), GLIB_N_CAND 24000 / GLIB_N_ORIENT 24; ag_validate_render.py with GLIB_CLOSURE=oracle (per candidate the stock step close first, kept as step_close, then the record: the demo controller's closure - pre-shape width / 2 + 10 mm, smooth command ramped 2.25 mm per step, held 1 mm inside the contact once both pads touch - attach, 30 steps under gravity)",
+  "pipeline": "a1 / tabletop = the pipeline and constraint of the base key box_of_cereal__iucshm (round 1): touching.iddl requires (grasps target tabletop); approach <= 40 deg from vertical (the a1 tilt filter); the a1 width / antipodal / table / collision / sweep / lever filters unchanged; multi_hit off (a solid carton); finger_clear off (the box is convex: nothing below the pinch for the unscaled fingers to reach); the key sorts after box_of_cereal__iucshm, so every alias that does not name it keeps the unscaled key",
+  "why_two_finger": "4 of the base key's 5 rows are flagged one_finger (the stock step close shoves the 53 mm box into the open-limit finger, fingers 50/3-4 mm); the demo controller closes with a contact hold, so the record is that closure and the candidates are centred pinches",
+  "closure": "GLIB_CLOSURE=oracle (scripts/ag_validate_render.py of scratch_beerB6 / scratch_lid065): each candidate closed twice from the same placement. Record = the demo controller's closure (pre-shape to width / 2 + 10 mm = 31.4 mm per finger, smooth command ramped 2.25 mm per step, held 1 mm inside the contact once both pads touch): all 6 reached two-pad contact after 5 ramp steps, attached at step 15 and held 30 steps under gravity; fingers 22.2-22.4 / 20.7-21.3 mm (pads' span 39.8-40.5 mm on the 42.75 mm thickness), off-centre 0.5-0.7 mm, placement push 0, box shift at attach 0.3-1.7 mm. Stock step close (step_close): all attached at step 13 and held, but finger 1 stayed near its open limit (fingers 44.5-44.6 / 0 mm, box shoved 22.3-22.5 mm: the one_finger picture of the base key's rows)",
+  "jobs": {
+   "17826412": "this file: export at [0.8, 0.8, 0.8] (1 collision piece, 42.8 x 156.6 x 218.2 mm) + cands (a1, two_finger; 16392 sampled, 970 two-finger, 12 selected over the 0-8 / 8-22 / 22-40 deg tilt bins) + AG (oracle closure as the record, step close kept) in rank order until 6 held (6 tested); exploration pass glib_all: all 12 candidates, 12 attached at step 15 and held two-finger (fingers 22.1-22.5 / 20.7-21.3 mm, box shift <= 1.7 mm)"
+  },
+  "review": "review/wave7_boxofcerealiucshms080.json (6 ok)",
+  "patch_base": "patch against 0539c2ed; job run from the private snapshot code_0539c2ed_6a6194600_touchdata (clean 0539c2ed + Behavior-1K 6a6194600)"
+ },
+ "candidates_meta": {
+  "object": {
+   "category": "box_of_cereal",
+   "model": "iucshm"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 16392,
+   "n_tilt": 3415,
+   "n_width_antipodal": 3415,
+   "n_table": 3415,
+   "n_collision": 1016,
+   "n_sweep": 1016,
+   "n_two_finger": 970,
+   "n_lever": 888,
+   "n_selected": 12,
+   "com": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   0.8,
+   0.8,
+   0.8
+  ],
+  "job_options": {
+   "two_finger": {
+    "center_tol_m": 0.003,
+    "min_pad_cover": 0.5,
+    "tilt_bins": [
+     [
+      0,
+      8
+     ],
+     [
+      8,
+      22
+     ],
+     [
+      22,
+      40.01
+     ]
+    ],
+    "top_k": 12
+   }
+  }
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0222,
+    0.0213
+   ],
+   "score": 12.11,
+   "meta": {
+    "com_perp": 0.00011,
+    "width": 0.04275,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.0124,
+    "tilt_deg": 0.0,
+    "width_ray": 0.04275,
+    "pad_offset": 0.0,
+    "pad_cover": 1.0
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g0_wrist.png"
+   },
+   "shift_at_attach_m": 0.0003,
+   "pads_span_m": 0.0405,
+   "off_centre_m": 0.0005,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0314,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0234,
+     0.0211
+    ],
+    "contact_hold_q": 0.0213,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 13,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.0446,
+     0.0
+    ],
+    "shift_at_attach_m": 0.0224,
+    "pads_span_m": 0.0416,
+    "off_centre_m": 0.0223,
+    "two_finger": false
+   },
+   "t_s": 14.89
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0223,
+    0.0209
+   ],
+   "score": 12.0226,
+   "meta": {
+    "com_perp": 0.00138,
+    "width": 0.04275,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02346,
+    "tilt_deg": 15.0,
+    "width_ray": 0.04275,
+    "pad_offset": 0.0,
+    "pad_cover": 0.75
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g1_wrist.png"
+   },
+   "shift_at_attach_m": 0.0015,
+   "pads_span_m": 0.0402,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0314,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0229,
+     0.021
+    ],
+    "contact_hold_q": 0.0209,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 13,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.0446,
+     0.0
+    ],
+    "shift_at_attach_m": 0.0225,
+    "pads_span_m": 0.0416,
+    "off_centre_m": 0.0223,
+    "two_finger": false
+   },
+   "t_s": 11.2
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0222,
+    0.0207
+   ],
+   "score": 11.8151,
+   "meta": {
+    "com_perp": 0.00109,
+    "width": 0.04275,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01966,
+    "tilt_deg": 30.0,
+    "width_ray": 0.04275,
+    "pad_offset": 0.0,
+    "pad_cover": 0.83333
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g2_wrist.png"
+   },
+   "shift_at_attach_m": 0.0011,
+   "pads_span_m": 0.0399,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0314,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0222,
+     0.0207
+    ],
+    "contact_hold_q": 0.0204,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 13,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.0446,
+     0.0
+    ],
+    "shift_at_attach_m": 0.0223,
+    "pads_span_m": 0.0416,
+    "off_centre_m": 0.0223,
+    "two_finger": false
+   },
+   "t_s": 10.98
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0222,
+    0.0208
+   ],
+   "score": 12.0613,
+   "meta": {
+    "com_perp": 0.0021,
+    "width": 0.04275,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02708,
+    "tilt_deg": 0.0,
+    "width_ray": 0.04275,
+    "pad_offset": 0.0,
+    "pad_cover": 0.75
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g3_wrist.png"
+   },
+   "shift_at_attach_m": 0.0006,
+   "pads_span_m": 0.04,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0314,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0224,
+     0.0207
+    ],
+    "contact_hold_q": 0.0205,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 13,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.0446,
+     0.0
+    ],
+    "shift_at_attach_m": 0.0224,
+    "pads_span_m": 0.0416,
+    "off_centre_m": 0.0223,
+    "two_finger": false
+   },
+   "t_s": 10.83
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0222,
+    0.0207
+   ],
+   "score": 11.8967,
+   "meta": {
+    "com_perp": 0.00281,
+    "width": 0.04275,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02708,
+    "tilt_deg": 15.0,
+    "width_ray": 0.04275,
+    "pad_offset": 0.0,
+    "pad_cover": 0.75
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g4_wrist.png"
+   },
+   "shift_at_attach_m": 0.0004,
+   "pads_span_m": 0.0398,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0314,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0223,
+     0.0206
+    ],
+    "contact_hold_q": 0.0204,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 13,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.0445,
+     0.0
+    ],
+    "shift_at_attach_m": 0.0224,
+    "pads_span_m": 0.0415,
+    "off_centre_m": 0.0222,
+    "two_finger": false
+   },
+   "t_s": 11.17
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "closure": "oracle",
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0224,
+    0.0209
+   ],
+   "score": 11.7603,
+   "meta": {
+    "com_perp": 0.00097,
+    "width": 0.04275,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02228,
+    "tilt_deg": 30.0,
+    "width_ray": 0.04275,
+    "pad_offset": 0.0,
+    "pad_cover": 0.75
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g5_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g5_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g5_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/eval85/touchdata_work/grasp_s080/glib/frames/box_of_cereal__iucshm__s080/g5_wrist.png"
+   },
+   "shift_at_attach_m": 0.0017,
+   "pads_span_m": 0.0403,
+   "off_centre_m": 0.0007,
+   "two_finger": true,
+   "oracle_close": {
+    "preshape_q": 0.0314,
+    "ramp_steps": 5,
+    "touch_q": [
+     0.0227,
+     0.0208
+    ],
+    "contact_hold_q": 0.0207,
+    "fallback_full_close": false
+   },
+   "step_close": {
+    "ag_attached": true,
+    "attached_step": 13,
+    "held_after_gravity": true,
+    "placement_push_m": 0.0,
+    "finger_q": [
+     0.0445,
+     0.0
+    ],
+    "shift_at_attach_m": 0.0224,
+    "pads_span_m": 0.0415,
+    "off_centre_m": 0.0222,
+    "two_finger": false
+   },
+   "t_s": 11.01
+  }
+ ],
+ "n_valid": 6,
+ "error": null,
+ "ag_closure": "oracle: per candidate the stock step close first (step_close), then the record: pre-shape to width / 2 + 10 mm, the smooth command ramped 2.25 mm per step, held 1 mm inside the contact once both pads touch (Motions.gripper), attach, 30 steps under gravity",
+ "t_model_s": 74.7
+}

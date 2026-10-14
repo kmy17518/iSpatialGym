@@ -36,6 +36,43 @@
     }
    ],
    "object_note": ""
+  },
+  {
+   "key": "walker__glrsok",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "boat shoe pinch near CoM, fingers 46/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near CoM, fingers 30/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near CoM, fingers 31/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near CoM, fingers 43/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near CoM, fingers 30/0"
+    }
+   ],
+   "object_note": ""
   }
  ]
 }

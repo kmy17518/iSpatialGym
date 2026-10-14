@@ -77,6 +77,28 @@
       "pick": "disembedding#02~T5",
       "slot": "representative",
       "mode": "representative"
+    },
+    {
+      "variant": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-breakfast_table",
+      "id": 7,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "disembedding",
+      "iddl": "disembedding/disembedding.iddl",
+      "pick": "disembedding#01~T1",
+      "slot": "representative",
+      "mode": "representative"
+    },
+    {
+      "variant": "disembedding-video_game-video_game_2_board_game_1-desk",
+      "id": 8,
+      "grounded": "2026-10-11",
+      "by": "ground_isg 2.0.0",
+      "subtask": "disembedding",
+      "iddl": "disembedding/disembedding.iddl",
+      "pick": "disembedding#03~T5",
+      "slot": "representative",
+      "mode": "representative"
     }
   ]
 }

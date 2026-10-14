@@ -1,0 +1,41 @@
+{
+ "models": [
+  {
+   "key": "marker__xakoic",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near cap"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, tilt 23"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "cap/body junction"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "cap/body junction, tilt 22"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch about 30% from cap end"
+    }
+   ],
+   "object_note": ""
+  }
+ ]
+}
