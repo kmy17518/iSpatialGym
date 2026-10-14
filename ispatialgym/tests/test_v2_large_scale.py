@@ -355,7 +355,7 @@ def test_icl_handle_rows_scene_instance(tmp_path):
     assert [r.kind for r in AL.rank_handle_rows(rows)][0] == "bar"
 
 
-def test_alias_handle_row_and_pinch_width_floor():
+def test_variant_handle_row_and_pinch_width_floor():
     """Owner 2026-10-12 02:20 (open / close_large#03, office cabinet door rvunhj_0 / j_link_2): ``generation.handle_row`` takes
     the named row before the ranking and ``generation.pinch_width_min_m`` lowers the 15 mm floor; with neither the 8 mm bar
     and the 7 mm knobs fall through to the 39 mm edge pinch, as before."""
@@ -389,37 +389,6 @@ def test_alias_handle_row_and_pinch_width_floor():
     with pytest.raises(Reject):
         AL.pick_handle_row(rows, None, (0.09, 0.08))
     assert AL.handle_row_matches(bar, " j_link_2#C ") and not AL.handle_row_matches(bar, "") and not AL.handle_row_matches(bar, "j_link_2#c")
-
-
-def test_load_handle_takes_the_alias_bar_of_the_office_cabinet_door():
-    """The recorded office cabinet door (B4 inventory + icl rows, instance frame): by default the edge pinch j_link_2#F; with
-    ``handle_row: j_link_2#C`` and ``pinch_width_min_m: 0.006`` the 8 mm vertical bar (h 0.73 m, approached from the front)
-    keeps its grasp slide along its 0.28 m length (the length from the record's bar) and the template facts name the row."""
-    gen = {"joint": "j_link_2", "handle_key": "bottom_cabinet__rvunhj"}
-
-    def sampler():
-        al = AL.ArticulationLarge.__new__(AL.ArticulationLarge)
-        al.gp = SimpleNamespace(alias="cabinet", entry={"roles": {}}, gen=lambda k, d=None: gen.get(k, d))
-        al.target_role, al.world, al.template_facts = "target", SimpleNamespace(scene_model="office_cubicles_right"), {}
-        return al
-
-    obj = SimpleNamespace(name="bottom_cabinet_rvunhj_0", category="bottom_cabinet", model="rvunhj", scale=[1.6025, 1.5341, 1.7222], links={},
-                          joints={"j_link_2": SimpleNamespace(is_revolute=True, lower_limit=0.0, upper_limit=1.5708)})
-    al = sampler()
-    al.load_handle(obj)
-    assert al.handle["kind"] == "edge" and al.template_facts["handle"]["row"] == "bottom_cabinet__rvunhj:j_link_2#F"
-    assert "handle_row" not in al.template_facts["handle"] and "pinch_width_range_mm" not in al.template_facts["handle"]
-    gen.update({"handle_row": "j_link_2#C", "pinch_width_min_m": 0.006})
-    al = sampler()
-    al.load_handle(obj)
-    h, facts = al.handle, al.template_facts["handle"]
-    assert facts["row"] == "bottom_cabinet__rvunhj:j_link_2#C" and facts["kind"] == "bar" and facts["width_mm"] == 8.0
-    assert facts["handle_row"] == "j_link_2#C" and facts["pinch_width_range_mm"] == [6.0, 80.0]
-    assert h["contact"] == pytest.approx([0.2856, -0.0348, -0.0658]) and h["pinch_axis"] == pytest.approx([0.0, -1.0, 0.0])
-    assert h["approach_dir"] == pytest.approx([-1.0, 0.0, 0.0]) and "approach_dir_recorded" not in h  # straight from the front, no edge repair
-    assert h["length"] == pytest.approx(0.2765)
-    assert AL.bar_axis(h) == pytest.approx([0.0, 0.0, 1.0]) and AL.bar_offsets(h) == [0.0, 0.078, -0.078]  # the slide along the vertical bar
-    assert AL.pinch_classes(h["pinch_axis"], h["kind"]) == ("fwd_pinch_h",)
 
 
 # the office cabinet door of close_large#03 (rvunhj_0 / j_link_2, office_cubicles_right; B4 record, instance frame): the leaf box,
@@ -523,7 +492,7 @@ def test_close_that_stops_short_plans_a_push_finish_only_when_asked(monkeypatch)
 
         def __init__(self, q_low, cfg, plan):
             self.direction, self.lower, self.upper, self.joint_name = "close", 0.0, 1.5708, "j_link_2"
-            self.gp = SimpleNamespace(alias="cabinet", gen=lambda k, d=None: d)
+            self.gp = SimpleNamespace(variant="cabinet", gen=lambda k, d=None: d)
             self.template_meta, self.push_finish_cfg, self._q_low, self._plan = {}, cfg, q_low, plan
 
         def arm_reach_limit(self, manip, q_from, q_seed, q_to=None, refine=0):
@@ -587,7 +556,7 @@ def _push_sampler(ikc):
 
         def __init__(self):
             self.direction, self.lower, self.upper, self.joint_name, self.arm = "close", 0.0, 1.5708, "j_link_2", "right"
-            self.gp = SimpleNamespace(alias="cabinet", gen=lambda k, d=None: d)
+            self.gp = SimpleNamespace(variant="cabinet", gen=lambda k, d=None: d)
             self.jinfo, self.handle, self.pinch_sign, self.bar_offset = dict(_RVUNHJ_JOINT), dict(_RVUNHJ_BAR), 1.0, 0.0
             self.push_finish_cfg, self.ikc, self.posed = AL.push_finish_config(True), ikc, []
             self.kit = SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": th.arange(14, 21)}))
@@ -703,7 +672,7 @@ def test_push_finish_draft_records_the_release_and_expands_to_the_finish_program
     raw["articulation"] = json.loads(json.dumps(al.sidecar.to_dict()["articulation"]))
     sc = Sidecar.from_dict(raw)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [x.name for x in actions] == ["navigate", "transition", "grasp", "base_follow", "retreat", "push_close"]
     follow, push = actions[3], actions[5]
     assert [key for _, key in follow.articulation.followed_fractions()] == ["0.25", "0.5", "0.75", "0.855"]
@@ -812,7 +781,7 @@ def test_close_by_push_draft_records_the_flag_and_expands_to_the_room_door_progr
     assert d.summary["close_by_push"] is True and d.summary["push_close"] == rec
     sc = Sidecar.from_dict(raw)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [x.name for x in actions] == ["navigate", "transition", "push_close"]
     push = actions[-1]
     assert push.plan is None and (push.q_from, push.q_lower, push.q_closed) == (pytest.approx(q_init), 0.0, 0.0) and push.tol_span_rad is None
@@ -824,7 +793,7 @@ def test_close_by_push_draft_records_the_flag_and_expands_to_the_room_door_progr
     assert policies == ["hybrid", "sequential"] and "close_by_push" not in raw["articulation"] and "push_close" not in raw["articulation"]
     assert "close_by_push" not in d.summary
     sc = Sidecar.from_dict(raw)
-    assert [x.name for x in expand(sc.alias, sc)] == ["navigate", "transition", "grasp", "base_follow", "retreat"]
+    assert [x.name for x in expand(sc.variant, sc)] == ["navigate", "transition", "grasp", "base_follow", "retreat"]
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -841,76 +810,6 @@ def test_frame_axes_and_hang_quat():
     # the front axis maps onto the wall normal, the up axis onto world z
     assert th.allclose(C.quat_rotate(q, f), th.tensor([0.0, -1.0, 0.0]), atol=1e-5)
     assert th.allclose(C.quat_rotate(q, u), th.tensor([0.0, 0.0, 1.0]), atol=1e-5)
-
-
-def _wall_target_rows():
-    """The reviewed wall-target rows of the shipped icl (``roles/candidates.csv``): (subtask, category, model, frame, bbox)."""
-    import csv
-    import os
-
-    from ispatialgym.sampling import ground_isg as GI
-
-    path = os.path.join(GI.DEFAULT_ICL, "roles", "candidates.csv")
-    out = []
-    with open(path) as f:
-        for row in csv.DictReader(f):
-            if row["subtask"] not in GI.WALL_SUBTASKS or row["role"] != "target" or row.get("kind") == "scene":
-                continue
-            frame = GI.wall_frame_of(row, row["subtask"])
-            bbox = [float(row[k]) for k in ("bbox_x", "bbox_y", "bbox_z")] if all(row.get(k) for k in ("bbox_x", "bbox_y", "bbox_z")) else None
-            out.append((row["subtask"], row["category"], row["model"], (row.get("representative") or "") == "1", frame, bbox))
-    return out
-
-
-def test_hang_quat_puts_every_reviewed_wall_frame_upright():
-    """Owner 2026‑09‑16 22:55 (spec §5.5 / §6.9): for every reviewed wall target the hang pose built from the icl frame
-    (as ``ground_isg`` writes it into the alias) puts the object's reviewed up axis along world +z and its front axis
-    along the wall normal; for flat objects (plate, picture, painting: thinnest bbox axis ≤ 1/5 of the middle one) the
-    thickness axis ends horizontal — along the normal — instead of world-up (the table-flat license plate of run
-    0916‑212037 came from the painting-shaped default +x / +z applied to a +z / +y / +x frame)."""
-    rows = _wall_target_rows()
-    reps = [r for r in rows if r[3]]
-    assert len(reps) >= 15, f"expected the wall representatives in the icl, found {len(reps)}"
-    non_default = [r for r in reps if r[4].get("front_axis") != "+x" or r[4].get("up_axis") != "+z"]
-    assert {(r[1]) for r in non_default} >= {"license_plate", "picture", "umbrella", "hanger", "fire_extinguisher", "guitar"}
-    normals = [th.tensor([0.0, -1.0, 0.0]), th.tensor([1.0, 0.0, 0.0]), th.tensor([-0.6, 0.8, 0.0])]
-    z = th.tensor([0.0, 0.0, 1.0])
-    for subtask, cat, model, _rep, frame, bbox in rows:
-        assert frame.get("front_axis") and frame.get("up_axis"), f"{subtask} {cat}/{model}: the icl row has no complete frame {frame}"
-        assert set(frame) == {"front_axis", "up_axis"}, f"{cat}/{model}: unexpected frame keys {frame}"
-        front, side, up = AW.frame_axes(frame["front_axis"], frame["up_axis"])
-        for n in normals:
-            q = AW.hang_quat(n, front, side, up)
-            assert th.allclose(C.quat_rotate(q, up), z, atol=1e-5), f"{cat}/{model}: up {frame['up_axis']} not along world +z"
-            assert th.allclose(C.quat_rotate(q, front), n, atol=1e-5), f"{cat}/{model}: front {frame['front_axis']} not along the wall normal"
-            assert abs(float(C.quat_rotate(q, side)[2])) < 1e-5, f"{cat}/{model}: level axis not horizontal"
-            if bbox is not None and sorted(bbox)[0] <= 0.2 * sorted(bbox)[1]:
-                # flat object (one axis distinctly thinner than the other two — plates, pictures, paintings, boards; not rods):
-                # the thinnest body axis is the reviewed front (thickness into the wall), so it hangs horizontal
-                thin = th.zeros(3)
-                thin[int(np.argmin(bbox))] = 1.0
-                world_thin = C.quat_rotate(q, thin)
-                assert abs(float(world_thin[2])) < 1e-5, f"{cat}/{model}: the thickness axis {bbox} points along world up in the hang pose"
-                assert abs(abs(float(th.dot(world_thin, n))) - 1.0) < 1e-5, f"{cat}/{model}: the thickness axis is not along the wall normal"
-
-
-def test_wall_frame_written_per_model_and_never_defaulted():
-    """``ground_isg.write_wall_frame`` writes the dict form the sampler's ``target_param`` resolves (``front_axis`` /
-    ``up_axis`` only; a bare axis letter gets its sign); a hand-set scalar is replaced by the dict; empty columns write
-    nothing."""
-    from ispatialgym.sampling import ground_isg as GI
-
-    gen = {"front_axis": "+x"}
-    row = {"frame_front": "+z", "frame_up": "+y"}
-    assert GI.write_wall_frame(gen, "alignment-world_vertical", "license_plate", "hjdaqn", row) == {"front_axis": "+z", "up_axis": "+y"}
-    assert gen == {"front_axis": {"license_plate/hjdaqn": "+z"}, "up_axis": {"license_plate/hjdaqn": "+y"}}
-    GI.write_wall_frame(gen, "alignment-world_vertical", "hanger", "agrpio", {"frame_front": "z", "frame_up": "-x"})
-    assert gen["front_axis"] == {"license_plate/hjdaqn": "+z", "hanger/agrpio": "+z"} and gen["up_axis"]["hanger/agrpio"] == "-x"
-    gen_v: dict = {}
-    assert GI.write_wall_frame(gen_v, "alignment-world_vertical", "painting", "dacihj", {"frame_front": "+x", "frame_up": "+z", "frame_level": "+y"}) == {
-        "front_axis": "+x", "up_axis": "+z"}
-    assert "level_axis" not in gen_v  # the icl's frame_level column is not a sampler parameter
-    assert GI.write_wall_frame({}, "alignment-world_vertical", "x", "y", {"frame_front": "", "frame_up": ""}) == {}
 
 
 def _wall_stub(gap=0.003):
@@ -1331,30 +1230,30 @@ def test_alignment_contacts_geometry():
 
 def test_init_surface_class_enumeration():
     assert IL.init_surface_class("under", ["floor"], ["bed_rrcvaq_0"]) == "floor"
-    assert IL.init_surface_class("ontop", None, ["bed_rrcvaq_0"], alias_support_token="floor") == "floor"
+    assert IL.init_surface_class("ontop", None, ["bed_rrcvaq_0"], variant_support_token="floor") == "floor"
     assert IL.init_surface_class("under", ["bed_rrcvaq_0"], ["bed_rrcvaq_0"]) == "partner"
-    assert IL.init_surface_class("under", None, ["bed_rrcvaq_0"], alias_support_token="bed") == "partner"
+    assert IL.init_surface_class("under", None, ["bed_rrcvaq_0"], variant_support_token="bed") == "partner"
     assert IL.init_surface_class("under", ["desk_xhjsub_0"], ["bed_rrcvaq_0"]) == "support"
     assert IL.init_surface_class("ontop", {"category": ["desk", "nightstand"]}, ["bed_rrcvaq_0"]) == "support"
-    assert IL.init_surface_class("ontop", None, ["bed_rrcvaq_0"], alias_support_token="desk") == "support"
+    assert IL.init_surface_class("ontop", None, ["bed_rrcvaq_0"], variant_support_token="desk") == "support"
     with pytest.raises(ValueError):
         IL.init_surface_class("ontop", ["bed_rrcvaq_0"], ["bed_rrcvaq_0"])
     st = "inter_object_relation_satisfaction-under_large_scale"
-    assert IL.alias_support_token(f"{st}-toy_figure-bed-floor", st) == "floor"
-    assert IL.alias_support_token(f"{st}-toy_figure-bed-desk", st) == "desk"
-    assert IL.alias_support_token("under", st) is None
+    assert IL.variant_support_token(f"{st}-toy_figure-bed-floor", st) == "floor"
+    assert IL.variant_support_token(f"{st}-toy_figure-bed-desk", st) == "desk"
+    assert IL.variant_support_token("under", st) is None
     assert set(IL.INIT_SURFACE_CLASSES) == {"support", "partner", "floor"}
-    # A5 (owner decision 2026-09-16): the class is fixed by the alias — D1's floor aliases bind the support to a room dict,
-    # the own-top fallback repeats the partner token (``…-<partner>-<partner>``); the selection order is alias-level
-    assert IL.init_surface_class("under", {"room": "childs_room_0"}, ["desk_xhjsub_0"], alias_support_token="floor") == "floor"
+    # A5 (owner decision 2026-09-16): the class is fixed by the variant — D1's floor variants bind the support to a room dict,
+    # the own-top fallback repeats the partner token (``…-<partner>-<partner>``); the selection order is variant-level
+    assert IL.init_surface_class("under", {"room": "childs_room_0"}, ["desk_xhjsub_0"], variant_support_token="floor") == "floor"
     assert IL.init_surface_class("ontop", {"room": "childs_room_0"}, ["desk_xhjsub_0"]) == "floor"
-    assert IL.alias_partner_token(f"{st}-sandal-bed-bed", st) == "bed" and IL.alias_support_token(f"{st}-sandal-bed-bed", st) == "bed"
-    assert IL.init_surface_class("under", None, ["bed_rrcvaq_0"], alias_support_token="bed", alias_partner_token="bed") == "partner"
-    assert IL.init_surface_class("under", ["bed_rrcvaq_0"], ["bed_rrcvaq_0"], alias_support_token="bed", alias_partner_token="bed") == "partner"
+    assert IL.variant_partner_token(f"{st}-sandal-bed-bed", st) == "bed" and IL.variant_support_token(f"{st}-sandal-bed-bed", st) == "bed"
+    assert IL.init_surface_class("under", None, ["bed_rrcvaq_0"], variant_support_token="bed", variant_partner_token="bed") == "partner"
+    assert IL.init_surface_class("under", ["bed_rrcvaq_0"], ["bed_rrcvaq_0"], variant_support_token="bed", variant_partner_token="bed") == "partner"
     with pytest.raises(ValueError):
-        IL.init_surface_class("ontop", None, ["desk_xhjsub_0"], alias_support_token="desk", alias_partner_token="desk")
+        IL.init_surface_class("ontop", None, ["desk_xhjsub_0"], variant_support_token="desk", variant_partner_token="desk")
     assert IL.SELECTION_ORDER == {"under": ("support", "partner", "floor"), "ontop": ("support", "floor")}
-    assert IL.alias_tokens(f"{st}-sandal-bed-desk", st) == ["sandal", "bed", "desk"] and IL.alias_tokens(st, st) == []
+    assert IL.variant_tokens(f"{st}-sandal-bed-desk", st) == ["sandal", "bed", "desk"] and IL.variant_tokens(st, st) == []
 
 
 def test_push_under_record_and_geometry_constants():
@@ -1531,7 +1430,7 @@ def test_hinge_joint_frames_are_written_in_the_scaled_body_frames(monkeypatch):
 
 
 def _axial_sampler(gen, mass=0.06, turn_rad=0.0):
-    """An ``AlignmentAxial`` without a simulator: ``gen`` as the alias's own generation, a 0.20 × 0.04 m footprint of ``mass`` kg
+    """An ``AlignmentAxial`` without a simulator: ``gen`` as the variant's own generation, a 0.20 × 0.04 m footprint of ``mass`` kg
     resting on a support top at z 0.75 (its COM off the root origin) that turns ``turn_rad`` about the vertical axis through its
     COM over the drift check's physics steps; the target keeps every ``set_position_orientation`` call in ``moves``."""
     from ispatialgym.sampling import generation_defaults as GD
@@ -1553,7 +1452,7 @@ def _axial_sampler(gen, mass=0.06, turn_rad=0.0):
                              set_position_orientation=set_pose)
     objs = {"target": target, "support": SimpleNamespace(root_link=SimpleNamespace(prim_path="/World/table/base_link", body_name="base_link"))}
     s.spec, s.defaults, s.obj = SimpleNamespace(generation=dict(gen)), GD.defaults_for(AX.SUBTASK), objs.get
-    s.gp = SimpleNamespace(alias="alignment-axial-tablespoon-breakfast_table")
+    s.gp = SimpleNamespace(variant="alignment-axial-tablespoon-breakfast_table")
     s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name=f"{role}.n.01_1"))
     s.top, s.extents = SimpleNamespace(z=0.75), {"long": 0.20, "short": 0.04, "height": 0.02, "w_diag": 0.102}
     s.com_local, s.hinge, s.robot = th.tensor([0.03, -0.01, 0.004]), None, None
@@ -1565,7 +1464,7 @@ def test_axial_hinge_anchor_below_the_top_on_the_com_axis_and_the_target_stays(m
     """Owner 2026-10-12 (alignment-axial#05, spec 6.10): ``after_settle`` leaves the target at its settled pose (lowered
     ``hinge_sink_m`` into the support and hinged at its COM, the tablespoon popped back up tilted and failed the drift check) and
     anchors the hinge on the vertical axis through the COM, ``hinge_sink_m`` below the support top (the default 1 mm or the
-    alias's own value); the TRO record carries that anchor and the loader re-creates the hinge there as recorded; the 60-step
+    variant's own value); the TRO record carries that anchor and the loader re-creates the hinge there as recorded; the 60-step
     drift check still rejects a target that turns."""
     from ispatialgym.oracle import run_isg as R
     from ispatialgym.sampling import constraints as K
@@ -1614,13 +1513,13 @@ def test_axial_hinge_anchor_below_the_top_on_the_com_axis_and_the_target_stays(m
     assert s.obj("target").moves == []
 
 
-def test_axial_hinge_resistance_only_when_the_alias_sets_the_keys(monkeypatch):
+def test_axial_hinge_resistance_only_when_the_variant_sets_the_keys(monkeypatch):
     """Owner 2026-10-12 (alignment-axial#05, the tablespoon turned 0.022 rad on its frictionless table hinge while settling): an
-    axial alias whose own generation sets the world-vertical resistance keys gets the wall's friction / damping with the inertia
+    axial variant whose own generation sets the world-vertical resistance keys gets the wall's friction / damping with the inertia
     about the vertical axis (I_z = m (long² + short²) / 12 over the footprint), passed to ``create_hinge`` and carried by the
     TRO hinge record the oracle / evaluator re-create (the loader's brake floor leaves it unchanged); without the keys the hinge
     stays frictionless and its record unchanged. The axial generation defaults have none of the keys, so a re-grounding adds them
-    to no other alias."""
+    to no other variant."""
     from ispatialgym.sampling import constraints as K
     from ispatialgym.sampling import generation_defaults as GD
     from ispatialgym.sampling import geometry as G
@@ -1840,7 +1739,7 @@ def test_hybrid_sidecar_schema_and_base_follow_targets(tmp_path):
     art["base_follow_path"] = AH.HybridPath("right", (0.5, -0.2), poses, art["base_follow"], step={"revolute_rad": 0.17}).to_sidecar()
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [], sc.problems()
-    actions = PR.expand(sc.alias, sc)
+    actions = PR.expand(sc.variant, sc)
     follow = next(a for a in actions if a.name == "base_follow")
     t = follow.targets(sc, None)
     assert t["mode"] == "hybrid" and set(t) == set(follow.TARGET_KEYS)

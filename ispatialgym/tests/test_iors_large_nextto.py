@@ -119,7 +119,7 @@ def test_push_hand_poses_put_the_fingertips_on_the_face():
     assert NT.shifted_pose2d((1.0, 2.0, 0.3), (0.0, -1.0), 1.5) == pytest.approx((1.0, 0.5, 0.3))
 
 
-def test_knobs_default_unless_the_alias_sets_them():
+def test_knobs_default_unless_the_variant_sets_them():
     s = SimpleNamespace(gp=SimpleNamespace(gen=lambda k: {"drift_tol_m": 0.2}.get(k)))
     assert NT.knob(s, "drift_tol_m") == 0.2 and NT.knob(s, "push_distance_m") == [1.5, 2.5] and NT.knob(None, "push_pre_m") == 0.10
 
@@ -160,7 +160,7 @@ def _sidecar() -> Sidecar:
 def test_program_is_travel_base_push_retreat():
     sc = _sidecar()
     assert sc.problems() == []
-    acts = expand(sc.alias, sc)
+    acts = expand(sc.variant, sc)
     assert [a.name for a in acts] == ["navigate", "transition", "base_push", "retreat"]
     push, retreat = acts[2], acts[3]
     assert isinstance(push, A.BasePush) and push.partner == TABLE and push.end_stance == "placement" and push.arms == ("right",) and push.objects == (CART,)
@@ -188,11 +188,11 @@ def test_program_refuses_a_push_without_the_base_push_record():
     sc = _sidecar()
     sc.contacts.push.extra["kind"] = "push"
     with pytest.raises(Exception, match="base push"):
-        expand(sc.alias, sc)
+        expand(sc.variant, sc)
     sc = _sidecar()
     sc.contacts.push.extra["end_stance"] = "push_end"
     with pytest.raises(Exception, match="push_end"):
-        expand(sc.alias, sc)
+        expand(sc.variant, sc)
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -269,7 +269,7 @@ def test_the_two_hand_record_carries_both_hands():
 
     sd = SidecarDraft("inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor", "inter_object_relation_satisfaction")
     gens = {"push_hands": 2}
-    s = SimpleNamespace(tname=CART, pname=TABLE, sidecar=sd, gp=SimpleNamespace(gen=lambda k: gens.get(k), alias=sd.alias), stance_q=lambda st: th.zeros(28),
+    s = SimpleNamespace(tname=CART, pname=TABLE, sidecar=sd, gp=SimpleNamespace(gen=lambda k: gens.get(k), variant=sd.variant), stance_q=lambda st: th.zeros(28),
                         partner=SimpleNamespace(get_position_orientation=lambda: (th.tensor([3.0, 0.0, 0.4]), th.tensor([0.0, 0.0, 0.0, 1.0])), category="breakfast_table"),
                         tol=lambda k, v: v, choice=SimpleNamespace(models={"target": SimpleNamespace(category="serving_cart")}))
     d2 = th.tensor([1.0, 0.0])
@@ -296,7 +296,7 @@ def test_the_two_hand_record_carries_both_hands():
     assert push["face_centre_in_object"] == pytest.approx([-0.19, 0.0, 0.05], abs=1e-5) and push["contact_in_object"] == pytest.approx([-0.19, -0.15, 0.05], abs=1e-5)
     assert d.summary["arm"] == {"arm": "right", "arms": ["right", "left"]} and d.summary["nextto"]["push_hands"] == 2 and st.extras["push"]["hands"] == 2
     sc = Sidecar.from_dict({**json.load(open(FIXTURE)), "contacts": {"push": push}})
-    assert expand(sc.alias, sc)[2].second.goal.position == pytest.approx(sec["goal"]["position"])
+    assert expand(sc.variant, sc)[2].second.goal.position == pytest.approx(sec["goal"]["position"])
 
 
 def test_the_two_hand_stance_stands_centred_behind_the_spots(monkeypatch):
@@ -313,7 +313,7 @@ def test_the_two_hand_stance_stands_centred_behind_the_spots(monkeypatch):
             "spots": [{"coord": 0.2, "t0": t0, "z": 0.45, "inset": 0.0, "spread": 0.0, "height": 0.45, "relaxed": False} for t0 in (0.15, -0.15)]}
     gens = {"push_hands": 2, "push_stand_offs_m": [0.55], "push_trunks": [[0.75, -0.3]], "push_reach_margin_m": [0.03, 0.45]}
     stances, swept = [], []
-    s = SimpleNamespace(place={"local_lo": lo, "local_hi": hi, "pair_cache": {"-x": [pair]}, "face_cache": {"-x": []}}, gp=SimpleNamespace(gen=lambda k: gens.get(k), alias=sd.alias),
+    s = SimpleNamespace(place={"local_lo": lo, "local_hi": hi, "pair_cache": {"-x": [pair]}, "face_cache": {"-x": []}}, gp=SimpleNamespace(gen=lambda k: gens.get(k), variant=sd.variant),
                         sidecar=sd, target="cart", tname=CART, pname=TABLE, stance_q=lambda st: th.zeros(28), tol=lambda k, v: v, _check_deadline=lambda msg: None,
                         reach_margin=lambda st, p, arm: 0.2, camera_pose_at=lambda st: None, record_leg_a_b=lambda init, st: {"order": "x"},
                         ikc=SimpleNamespace(stances_collision_free=lambda sts: (stances.extend(sts), th.ones(len(sts), dtype=th.bool))[1]),
@@ -371,7 +371,7 @@ def test_two_hand_program_pushes_with_both_arms_and_retreats_each():
     the push leaves it - the first hand first, the second from its own recorded end; the annotation names both hands."""
     sc = _two_hand_sidecar()
     assert sc.problems() == []
-    acts = expand(sc.alias, sc)
+    acts = expand(sc.variant, sc)
     assert [a.name for a in acts] == ["navigate", "transition", "base_push", "retreat", "retreat"]
     push, r1, r2 = acts[2:]
     assert push.arms == ("right", "left") and push.objects == (CART,) and push.second.arm == "left" and push.second.distance_m == pytest.approx(1.8)
@@ -387,7 +387,7 @@ def test_two_hand_program_pushes_with_both_arms_and_retreats_each():
     fine, numbers = push.annotate(sc)
     assert fine.endswith("by driving the base, both closed hands on it") and "180 cm" in numbers
     with pytest.raises(Exception, match="second must be 'left'"):
-        expand(sc.alias, _two_hand_sidecar("right"))
+        expand(sc.variant, _two_hand_sidecar("right"))
     with pytest.raises(Exception, match="no left hand"):
-        _sidecar_one = expand(_sidecar().alias, _sidecar())[2]
+        _sidecar_one = expand(_sidecar().variant, _sidecar())[2]
         _sidecar_one.hand("left")

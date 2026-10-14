@@ -1,1 +1,0 @@
-{"key": "bell_pepper__ihctxa", "category": "bell_pepper", "model": "ihctxa", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x6": {"mad": 0.009332920519727513, "p95": 0.018300653594771243, "p99": 0.13856209150326798, "mad_union": 0.09660414439289038, "iou": 0.881868713605082, "worst": "x60"}}, "render_s": 0.106}

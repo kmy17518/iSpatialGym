@@ -1,7 +1,0 @@
-{
-  "category": "beaker",
-  "pages_opened": ["grids/pool_other/beaker__p1.png", "grids/pool_other/beaker__p2.png"],
-  "n_models": 21,
-  "exclude": [],
-  "notes": "All 21 drinkware models are upright, textured and read as glasses, cups or mugs. Borderline but kept: teacup/tfzfam (plain grey, low detail, tilt 1.7 deg) and paper_cup/guobeq (tan block under the cup is most likely its reflected underside on the tray)."
-}

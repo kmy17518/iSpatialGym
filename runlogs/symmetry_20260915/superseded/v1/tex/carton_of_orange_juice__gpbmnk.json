@@ -1,1 +1,0 @@
-{"key": "carton_of_orange_juice__gpbmnk", "category": "carton_of_orange_juice", "model": "gpbmnk", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.030801555903663312, "p95": 0.11764705882352941, "p99": 0.17647058823529413, "mad_union": 0.030382982077010432, "iou": 1.0, "worst": "z180"}}, "render_s": 0.111}

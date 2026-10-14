@@ -190,7 +190,7 @@ def _world(tmp_path, record, relation="next to"):
 
     backend.update_world, motions.arm_along, motions.arm_to = update_world, arm_along, arm_to
     env.after_step = lambda a: trace["steps"].append(a.clone())
-    actions = [replace(a, relation=relation) if isinstance(a, Place) else a for a in expand(sc.alias, sc)]
+    actions = [replace(a, relation=relation) if isinstance(a, Place) else a for a in expand(sc.variant, sc)]
     return sc, env, ex, motions, backend, shelf, actions, trace
 
 

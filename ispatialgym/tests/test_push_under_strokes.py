@@ -323,7 +323,7 @@ def test_without_the_keys_the_push_is_unchanged():
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl", dict(gen)
+        self.variant, self.generation = "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl", dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)

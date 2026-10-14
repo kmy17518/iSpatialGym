@@ -6,7 +6,7 @@ the language descriptors. It never carries the action sequence — that is the p
 :mod:`ispatialgym.oracle.programs` (``oracle_primitives_design.md`` §3.7, §6.2).
 
 This module is pure Python (no simulator, no torch at import time): dataclasses mirroring spec §7, JSON I/O,
-structural + semantic validation, the TRO sha256 check and the alias → subtask resolution from the iddl alias
+structural + semantic validation, the TRO sha256 check and the variant → subtask resolution from the iddl variant
 templates (``ispatialgym/assets/iddl/*/*.iddl``).
 
 Conventions: poses are ``{"position": [x, y, z], "orientation": [x, y, z, w]}`` (quaternion **xyzw**) in the world
@@ -139,6 +139,13 @@ def _list(v: Any, where: str) -> List[Any]:
 
 
 _MISSING = object()
+
+LEGACY_KEYS = {"alias": "variant", "bddl_alias": "bddl_variant"}  # legacy spelling of sidecars / template metadata
+
+
+def from_legacy_keys(d: Dict[str, Any]) -> Dict[str, Any]:
+    """``d`` with the keys of :data:`LEGACY_KEYS` renamed, in order (files written before the rename)."""
+    return {LEGACY_KEYS.get(k, k): v for k, v in d.items()}
 
 
 def _get(d: Dict[str, Any], key: str, where: str, default: Any = _MISSING) -> Any:
@@ -953,7 +960,7 @@ class Language:
 
 
 # ----------------------------------------------------------------------------------------------------------------
-# Alias → subtask (iddl alias templates)
+# Variant → subtask (iddl variant templates)
 # ----------------------------------------------------------------------------------------------------------------
 
 IDDL_ROOT = os.path.join(ASSETS_ROOT, "iddl")
@@ -962,34 +969,34 @@ _TOKEN_RE = re.compile(r"^[a-z0-9_]+$")
 
 
 @functools.lru_cache(maxsize=None)
-def alias_templates(root: str = IDDL_ROOT) -> Dict[str, Tuple[str, str]]:
-    """``{subtask_id: (family, alias_template)}`` read from every ``*.iddl`` under ``root``."""
+def variant_templates(root: str = IDDL_ROOT) -> Dict[str, Tuple[str, str]]:
+    """``{subtask_id: (family, variant_template)}`` read from every ``*.iddl`` under ``root``."""
     out: Dict[str, Tuple[str, str]] = {}
     for path in sorted(glob.glob(os.path.join(root, "*", "*.iddl"))):
         with open(path) as f:
             text = "\n".join(line.split(";", 1)[0] for line in f.read().splitlines())
         m_id = re.search(r"\(define\s+\(iddl\s+([^\s()]+)\s*\)", text)
         m_family = re.search(r"\(:family\s+([^\s()]+)\s*\)", text)
-        m_alias = re.search(r"\(:alias\s+([^\s()]+)\s*\)", text)
-        if not (m_id and m_family and m_alias):
-            raise SidecarError(f"{path}: cannot read the iddl id / family / alias template")
-        out[m_id.group(1)] = (m_family.group(1), m_alias.group(1))
+        m_variant = re.search(r"\(:variant\s+([^\s()]+)\s*\)", text)
+        if not (m_id and m_family and m_variant):
+            raise SidecarError(f"{path}: cannot read the iddl id / family / variant template")
+        out[m_id.group(1)] = (m_family.group(1), m_variant.group(1))
     if not out:
         raise SidecarError(f"no iddl files under {root}")
     return out
 
 
-def subtask_of_alias(alias: str, root: str = IDDL_ROOT) -> str:
-    """Resolve a grounded alias (``inter_object_relation_satisfaction-inside-apple-bowl-breakfast_table``) or an alias
+def subtask_of_variant(variant: str, root: str = IDDL_ROOT) -> str:
+    """Resolve a grounded variant (``inter_object_relation_satisfaction-inside-apple-bowl-breakfast_table``) or a variant
     template itself to the iddl subtask id (``inter_object_relation_satisfaction-inside``). Slots ``{role}`` match one
     ``-``-separated token of ``[a-z0-9_]+`` (category names, group tokens such as ``block_4``)."""
-    if not isinstance(alias, str) or not alias:
-        raise SidecarError(f"alias must be a non-empty string, got {alias!r}")
-    templates = alias_templates(root)
-    tokens = alias.split("-")
+    if not isinstance(variant, str) or not variant:
+        raise SidecarError(f"variant must be a non-empty string, got {variant!r}")
+    templates = variant_templates(root)
+    tokens = variant.split("-")
     matches = []
     for subtask, (_family, template) in templates.items():
-        if alias == template:
+        if variant == template:
             return subtask
         t_tokens = template.split("-")
         if len(t_tokens) != len(tokens):
@@ -1006,15 +1013,15 @@ def subtask_of_alias(alias: str, root: str = IDDL_ROOT) -> str:
         if ok:
             matches.append(subtask)
     if not matches:
-        raise SidecarError(f"alias {alias!r} matches no iddl alias template")
+        raise SidecarError(f"variant {variant!r} matches no iddl variant template")
     if len(matches) > 1:
-        raise SidecarError(f"alias {alias!r} is ambiguous: {matches}")
+        raise SidecarError(f"variant {variant!r} is ambiguous: {matches}")
     return matches[0]
 
 
 def family_of_subtask(subtask: str, root: str = IDDL_ROOT) -> str:
     try:
-        return alias_templates(root)[subtask][0]
+        return variant_templates(root)[subtask][0]
     except KeyError:
         raise SidecarError(f"unknown subtask {subtask!r}") from None
 
@@ -1042,7 +1049,7 @@ class Sidecar:
     instance_id: str
     tro_sha256: str
     task_family: str
-    alias: str
+    variant: str
     language: Language
     schema: str = SCHEMA
     path_bucket_m: Optional[float] = None
@@ -1058,7 +1065,7 @@ class Sidecar:
     extra: Dict[str, Any] = field(default_factory=dict)
 
     KNOWN = (
-        "schema", "instance_id", "tro_sha256", "task_family", "alias", "path_bucket_m", "stances", "transitions",
+        "schema", "instance_id", "tro_sha256", "task_family", "variant", "path_bucket_m", "stances", "transitions",
         "paths", "grasps", "contacts", "articulation", "blocks", "goal", "language", "waypoint_policy",
     )
 
@@ -1067,7 +1074,7 @@ class Sidecar:
     @classmethod
     def from_dict(cls, d: Any) -> "Sidecar":
         where = "sidecar"
-        d = _dict(d, where)
+        d = from_legacy_keys(_dict(d, where))
         schema = _get(d, "schema", where)
         if schema != SCHEMA:
             raise SidecarError(f"{where}.schema: expected {SCHEMA!r}, got {schema!r}")
@@ -1077,7 +1084,7 @@ class Sidecar:
             instance_id=_str(_get(d, "instance_id", where), f"{where}.instance_id"),
             tro_sha256=_str(_get(d, "tro_sha256", where), f"{where}.tro_sha256"),
             task_family=_str(_get(d, "task_family", where), f"{where}.task_family"),
-            alias=_str(_get(d, "alias", where), f"{where}.alias"),
+            variant=_str(_get(d, "variant", where), f"{where}.variant"),
             path_bucket_m=_opt(d.get("path_bucket_m"), _num, f"{where}.path_bucket_m"),
             stances={_str(k, f"{where}.stances key"): Stance.from_dict(v, f"{where}.stances[{k!r}]") for k, v in stances.items()},
             transitions=[Transition.from_dict(t, f"{where}.transitions[{i}]") for i, t in enumerate(_list(_get(d, "transitions", where, []), f"{where}.transitions"))],
@@ -1098,7 +1105,7 @@ class Sidecar:
             "instance_id": self.instance_id,
             "tro_sha256": self.tro_sha256,
             "task_family": self.task_family,
-            "alias": self.alias,
+            "variant": self.variant,
             "path_bucket_m": self.path_bucket_m,
         }
         if self.stances:
@@ -1143,7 +1150,7 @@ class Sidecar:
 
     @property
     def subtask(self) -> str:
-        return subtask_of_alias(self.alias)
+        return subtask_of_variant(self.variant)
 
     def stance(self, name: str) -> Stance:
         try:
@@ -1196,7 +1203,7 @@ class Sidecar:
 
     def problems(self, check_program: bool = True) -> List[str]:
         """Every validation problem found (empty = valid). Semantic checks on top of the structural ones
-        ``from_dict`` already enforced; with ``check_program`` the alias's program is expanded and every action's
+        ``from_dict`` already enforced; with ``check_program`` the variant's program is expanded and every action's
         objects must have language entries and annotate without error."""
         out: List[str] = []
         if self.schema != SCHEMA:
@@ -1210,7 +1217,7 @@ class Sidecar:
             return out
         family = family_of_subtask(subtask)
         if self.task_family != family:
-            out.append(f"task_family: {self.task_family!r} but the alias belongs to {family!r}")
+            out.append(f"task_family: {self.task_family!r} but the variant belongs to {family!r}")
         for name in REQUIRED_BLOCKS[subtask]:
             if not self.has_block(name):
                 out.append(f"{subtask}: required block '{name}' is missing")
@@ -1307,7 +1314,7 @@ class Sidecar:
         from ispatialgym.oracle import programs  # lazy: programs imports this module
 
         try:
-            actions = programs.expand(self.alias, self)
+            actions = programs.expand(self.variant, self)
         except SidecarError as e:
             return [f"program: {e}"]
         out: List[str] = []
@@ -1496,6 +1503,6 @@ def _block_problems(blocks: List[BlockRecord]) -> List[str]:
 __all__ = [
     "SCHEMA", "ARMS", "SUBTASKS", "REQUIRED_BLOCKS", "SidecarError", "Pose", "Stance", "Transition", "Path",
     "GraspRecord", "PushContact", "BraceContact", "Contacts", "HandleWaypoint", "Articulation", "BlockRecord", "Goal",
-    "ObjectLanguage", "Language", "Sidecar", "alias_templates", "subtask_of_alias", "family_of_subtask",
-    "sha256_of_file",
+    "ObjectLanguage", "Language", "Sidecar", "variant_templates", "subtask_of_variant", "family_of_subtask",
+    "sha256_of_file", "LEGACY_KEYS", "from_legacy_keys",
 ]

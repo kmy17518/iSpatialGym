@@ -1,1 +1,0 @@
-{"key": "soap_dispenser__jmulpc", "category": "soap_dispenser", "model": "jmulpc", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.003432021793012921, "p95": 0.006535947712418301, "p99": 0.13333333333333333, "mad_union": 0.04164736576633231, "iou": 0.9471913329833437, "worst": "z180"}}, "render_s": 0.143}

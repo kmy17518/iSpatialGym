@@ -3,7 +3,7 @@
   "instance_id": "configuration_matching-articulation_open_large_scale-fridge__house_single_floor__target-fridge-dszchb__0000",
   "tro_sha256": "951c9781bfdcb1a51a617a39d4b1cd8b2b9d08b1dc8db2390e0b71ebf1ddba97",
   "task_family": "configuration_matching",
-  "alias": "configuration_matching-articulation_open_large_scale-fridge",
+  "variant": "configuration_matching-articulation_open_large_scale-fridge",
   "path_bucket_m": null,
   "stances": {
     "init": {

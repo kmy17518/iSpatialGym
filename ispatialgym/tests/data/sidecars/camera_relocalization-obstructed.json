@@ -3,7 +3,7 @@
   "instance_id": "camera_relocalization-obstructed-hamper_1__house_single_floor__obstacles-hamper-clziqw__0000",
   "tro_sha256": "664259079a7412a73c34a0deafc7caf7af3fabe65c6b5e0d93d1edabb5183c11",
   "task_family": "camera_relocalization",
-  "alias": "camera_relocalization-obstructed-hamper_1",
+  "variant": "camera_relocalization-obstructed-hamper_1",
   "path_bucket_m": 5.0,
   "stances": {
     "init": {

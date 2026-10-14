@@ -3,7 +3,7 @@
 ; partner must not move (> 5 mm) at the goal.
 (define (iddl inter_object_relation_satisfaction-touching)
     (:family inter_object_relation_satisfaction)
-    (:alias inter_object_relation_satisfaction-touching-{target}-{partner}-{support})
+    (:variant inter_object_relation_satisfaction-touching-{target}-{partner}-{support})
     (:require
         (grasps target tabletop)
     )

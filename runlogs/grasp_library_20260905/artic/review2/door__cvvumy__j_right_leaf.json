@@ -1,6 +1,0 @@
-{"key": "door__cvvumy", "joint": "j_right_leaf", "feasible": false,
- "proposal": {"face": "outer", "a": 0.84, "b": 0.41, "pinch": "horizontal", "approach": "front", "depth_mm": 25,
-              "expected_motion": "pull"},
- "alternative": null,
- "note": "Pull door; only a ~100x290 mm recessed pull pocket near the meeting edge. No lip to pinch, all edges enclosed; finger would slip out.",
- "confidence": "medium"}

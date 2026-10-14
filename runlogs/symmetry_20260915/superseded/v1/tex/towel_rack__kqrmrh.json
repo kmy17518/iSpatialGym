@@ -1,1 +1,0 @@
-{"key": "towel_rack__kqrmrh", "category": "towel_rack", "model": "kqrmrh", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.002172987922980926, "p95": 0.00522875816993464, "p99": 0.011764705882352941, "mad_union": 0.002266780544364779, "iou": 0.99959132241256, "worst": "x180"}}, "render_s": 0.328}

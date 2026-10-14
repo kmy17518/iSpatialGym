@@ -1,348 +1,113 @@
 {
-  "batch": "wave3_01",
-  "models": [
+ "models": [
+  {
+   "key": "toy_figure__zuntus",
+   "n_rows": 5,
+   "grasps": [
     {
-      "key": "toy_figure__orunry",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm pinch on dinosaur body, both pads touching"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm body pinch, floating-mode x/0 finger pattern only"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm body pinch, visually centred"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads in contact"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads in contact"}
-      ],
-      "object_note": "Floating mode: one finger always reads 0; treated as artifact when object visually centred"
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid pinch on T-rex body"
     },
     {
-      "key": "toy_figure__zuntus",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid pinch on T-rex body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"}
-      ]
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
     },
     {
-      "key": "toy_figure__gnofgv",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm pinch on cow body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads touching"}
-      ]
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
     },
     {
-      "key": "toy_figure__txgpxx",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "leg/shoe pinch, whole body hangs 37mm away"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "thin 12mm leg pinch, body hangs 34mm away"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "wide pinch on head/cap, 63mm contact"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "leg pinch, body hangs 39mm away"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "small fist pinch, entire figure hangs from it"}
-      ],
-      "object_note": "Rigid Mario figure; only the head pinch is a body grasp"
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
     },
     {
-      "key": "toy_figure__wvpqbf",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid pinch on Yoshi body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch; low antipodal but pads visibly both on"}
-      ]
-    },
-    {
-      "key": "toy_figure__jddrck",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "top figurine pinched, heavy base hangs 55mm away"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "fingers 50/2 off-centre; base hangs 54mm away"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "upper rings pinched, base hangs 58mm away"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "fingers 50/3 off-centre on rings; base 53mm away"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "figurine pinched, coverage 0, base hangs 56mm away"}
-      ],
-      "object_note": "Stacking-ring toy held horizontally by top end; heavy blue base always hangs far from pinch"
-    },
-    {
-      "key": "toy_figure__krmxjk",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on chunky arm cylinder next to body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "arm cylinder pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "arm cylinder pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "arm cylinder pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "arm cylinder pinch, both pads touching"}
-      ]
-    },
-    {
-      "key": "toy_figure__tjchdg",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "front fuselage pinch, light foam plane"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "rear fuselage pinch near tail, light foam"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch on thin tail fin tip, 50mm from CoM"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "rear fuselage pinch, light foam plane"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "nose fuselage pinch, light foam plane"}
-      ],
-      "object_note": "Thin profile-foam toy plane, 5-7mm sheet everywhere"
-    },
-    {
-      "key": "toy_figure__jwjrza",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid torso pinch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid torso pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid torso pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid torso pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "solid torso pinch"}
-      ]
-    },
-    {
-      "key": "toy_figure__ukalmn",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "plush body pinch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "plush pinch, soft high-friction material"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "plush ear/limb pinch, deformable, holds"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "plush pinch, soft high-friction material"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "plush limb pinch, deformable, holds"}
-      ],
-      "object_note": "Soft plush monster; extremity pinches acceptable because material deforms and grips"
-    },
-    {
-      "key": "toy_figure__vcmcoi",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid pinch on unicorn body/neck"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid body/neck pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid body/neck pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid body/neck pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "solid body/neck pinch"}
-      ]
-    },
-    {
-      "key": "toy_figure__fnueyn",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid pinch on lion mane/body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid mane/body pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid mane/body pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid mane/body pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "solid mane/body pinch"}
-      ]
-    },
-    {
-      "key": "carving_knife__awvoox",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch, natural knife grasp"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"}
-      ]
-    },
-    {
-      "key": "carving_knife__fqqbop",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch, natural knife grasp"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"}
-      ]
-    },
-    {
-      "key": "carving_knife__zaihmr",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch, natural knife grasp"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"}
-      ]
-    },
-    {
-      "key": "carving_knife__alekva",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch, natural knife grasp"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"}
-      ]
-    },
-    {
-      "key": "carving_knife__gixmnd",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch, natural knife grasp"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle/bolster pinch"}
-      ]
-    },
-    {
-      "key": "statue__tuldri",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid pinch on elephant body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"}
-      ],
-      "object_note": "Reported width often differs from pad gap; centreline measurement through thin section, pads on wider body"
-    },
-    {
-      "key": "statue__wrtqik",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid pinch on statue body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"}
-      ]
-    },
-    {
-      "key": "statue__oxgpfk",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "solid pinch on bird body"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "solid body pinch, both pads touching"}
-      ]
-    },
-    {
-      "key": "statue__ihagjy",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-down pinch on box base sides"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-down pinch on box base sides"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-down pinch on box base sides"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-down pinch on box base sides"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-down pinch on box base sides"}
-      ]
-    },
-    {
-      "key": "statue__cxsvwj",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "figure torso pinched, heavy block base 82mm away"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "figure body pinched, base hangs 89mm away"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "fragile"], "note": "thin 15mm limb pinched, base 100mm away"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "figure limbs pinched, base hangs 84mm away"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "fragile"], "note": "7mm limb pinched, low antipodal, base 94mm away"}
-      ],
-      "object_note": "Thin metallic figure on heavy rectangular block; no grasp on the block itself"
-    },
-    {
-      "key": "statue__noykhv",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "tentacle pinch, fingers 49/0, mantle 118mm away"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "tentacle pinch 122mm from mantle CoM"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "fragile"], "note": "12mm tentacle tip, antipodal 0.49, CoM 118mm"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp", "fragile"], "note": "15mm tentacle pinch, mantle 127mm away"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "fragile"], "note": "15mm tentacle pinch, mantle 125mm away"}
-      ],
-      "object_note": "Octopus statue; all grasps on tentacles far from heavy mantle"
-    },
-    {
-      "key": "statue__ponfvo",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "edge of thin base plate, branch 96mm away"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "edge of thin base plate, CoM 92mm away"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "edge of thin base plate, CoM 102mm away"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "plate corner pinch, CoM 111mm away"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "plate edge pinch, CoM 115mm away"}
-      ],
-      "object_note": "Branch mounted on thin 14mm plate; every grasp pinches the plate edge at long lever arm"
-    },
-    {
-      "key": "statue__qbfkek",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "small lobe pinched, heavy body 132mm away"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "small lobe pinched, body 132mm away"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "small lobe pinched, body 134mm away"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "small lobe pinched, body 143mm away"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "small lobe pinched, body 147mm away"}
-      ],
-      "object_note": "Large grey statue; all grasps on one 31mm protrusion 130+mm from CoM"
-    },
-    {
-      "key": "mouse__oydobn",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "tiny object fully between pads, both touching"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "tiny object between pads, both touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "pads ~30mm apart vs 9mm width; object spans gap"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "tiny object between pads, both touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "tiny object between pads, both touching"}
-      ],
-      "object_note": "Very small mouse model (~11mm); hard to see but pads visibly close on it"
-    },
-    {
-      "key": "mouse__fjljxp",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "mouse body pinch, both pads touching"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "mouse body pinch, both pads touching"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "mouse body pinch, both pads touching"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "mouse body pinch, both pads touching"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "mouse body pinch, both pads touching"}
-      ]
-    },
-    {
-      "key": "mouse__ihpnjx",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across mouse height, CoM 3mm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across mouse height, CoM 3mm"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across mouse height, CoM 10mm"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across mouse height, CoM 11mm"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across mouse height, CoM 14mm"}
-      ]
-    },
-    {
-      "key": "mouse__eosngb",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat head panel pinched near CoM"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat head panel pinched, CoM 19mm"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "curved arc pinched, antipodal 0.47, light object"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "curved arc pinched, CoM 29mm, light object"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "curved arc pinched, CoM 29mm, firm"}
-      ],
-      "object_note": "Arc-style thin curved mouse shell; light object, pinches not at the tail tip"
-    },
-    {
-      "key": "mouse__wwyopp",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "tail end pinch 16mm wide, CoM 33mm, light"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "tail end pinch 16mm wide, CoM 34mm, light"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "tail end pinch 16mm wide, CoM 35mm, light"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "very tip of thin tail (11mm), body 39mm away"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "very tip of thin tail (11mm), body 42mm away"}
-      ],
-      "object_note": "Arc-style curved mouse; all grasps on the tail end, ranks 4-5 on the extreme tip"
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
     }
-  ]
+   ]
+  },
+  {
+   "key": "carving_knife__alekva",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, natural knife grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    }
+   ]
+  },
+  {
+   "key": "statue__tuldri",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid pinch on elephant body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    }
+   ],
+   "object_note": "Reported width often differs from pad gap; centreline measurement through thin section, pads on wider body"
+  }
+ ]
 }

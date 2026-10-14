@@ -1,5 +1,0 @@
-{"key": "sliding_door__lrvyvc", "joint": "j_movingpart", "feasible": false,
- "proposal": {"face": "left_edge", "a": 0.25, "b": 0.4, "pinch": "thickness", "approach": "left", "depth_mm": 70, "expected_motion": "slide"},
- "alternative": null,
- "note": "Leaf end face ~160 mm and frame members ~120-160 mm wide both exceed the 97 mm opening; small hook at left belongs to fixed jamb.",
- "confidence": "medium"}

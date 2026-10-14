@@ -1,65 +1,41 @@
 {
-  "batch": "wave_ns2_c",
-  "models": [
+ "models": [
+  {
+   "key": "trash_can__jlawet__t",
+   "n_rows": 5,
+   "grasps": [
     {
-      "key": "storage_box__aqdbdu__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Vertical rim pinch on ~3 mm wall; pads touch both faces"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch; V1 blocked by wall, V2 shows clean straddle"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Vertical rim pinch; pads touch both faces of wall"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Rim pinch; V1 blocked by wall, V2 shows clean straddle"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Rim pinch; V1 blocked by wall, V2 shows clean straddle"}
-      ],
-      "object_note": "Open fabric bin; all five are rim pinches on the thin wall, no gaps"
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch on rolled lip; outer pad hairline seam, inner hidden"
     },
     {
-      "key": "trash_can__dnvpag__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch through folded liner; both pads touch, hairline seam"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch through folded liner; both pads in contact"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rim pinch through folded liner; both pads in contact"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Vertical rim pinch on liner fold; both pads in contact"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "30 deg tilted rim pinch on liner fold; pads in contact"}
-      ],
-      "object_note": "Wire-mesh bin with fabric liner folded over rim; pinches grip fold and rim"
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch on rolled lip; outer pad hairline seam, inner hidden"
     },
     {
-      "key": "trash_can__jlawet__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch on rolled lip; outer pad hairline seam, inner hidden"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch on rolled lip; outer pad hairline seam, inner hidden"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rim pinch on rolled lip; pads straddle wall cleanly"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Rim wall pinch; pads straddle wall cleanly in V1/V2"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Rim wall pinch; V1 blocked, V2 shows clean straddle"}
-      ],
-      "object_note": "~8 mm rolled rim. Collision chords sit 3-5 mm inside inner face at ranks 1-2 (hidden)"
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch on rolled lip; pads straddle wall cleanly"
     },
     {
-      "key": "umbrella__cqfbku__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "gap"], "note": "End-on crook pinch, 50/10; daylight at hook tip in V3"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger", "gap"], "note": "Crook pinch, 50/15; daylight at hook tip in V2/V3"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger", "gap"], "note": "Crook pinch, 50/13; ~4 mm daylight at hook tip (V2)"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger", "gap"], "note": "Crook pinch, 50/16; daylight at hook tip in V2/V3"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger", "gap"], "note": "Crook pinch, 50/16; small daylight at hook tip (V2/V3)"}
-      ],
-      "object_note": "Pads squeeze J-handle crook end to end; outer finger stays at 50, inner stops short"
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim wall pinch; pads straddle wall cleanly in V1/V2"
     },
     {
-      "key": "umbrella__frpfnc__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "Mid-canopy body pinch, but fingers 50/12: pushed onto open finger"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "Canopy body pinch, 50/16: canopy pushed onto open finger"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "Tilted canopy pinch, 50/19: pushed onto open finger"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "Canopy body pinch, 50/12: pushed onto open finger"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "Canopy pinch 21 mm from CoM, 50/14: pushed onto open finger"}
-      ],
-      "object_note": "Furled-canopy body grasps, no visible daylight, but one finger stays fully open (50) in all rows"
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim wall pinch; V1 blocked, V2 shows clean straddle"
     }
-  ]
+   ],
+   "object_note": "~8 mm rolled rim. Collision chords sit 3-5 mm inside inner face at ranks 1-2 (hidden)"
+  }
+ ]
 }

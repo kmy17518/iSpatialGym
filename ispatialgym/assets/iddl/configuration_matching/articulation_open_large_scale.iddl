@@ -4,7 +4,7 @@
 ; opening primarily by base / trunk motion (base-follow), arm secondary.
 (define (iddl configuration_matching-articulation_open_large_scale)
     (:family configuration_matching)
-    (:alias configuration_matching-articulation_open_large_scale-{target})
+    (:variant configuration_matching-articulation_open_large_scale-{target})
     (:require
         (handle target)
     )

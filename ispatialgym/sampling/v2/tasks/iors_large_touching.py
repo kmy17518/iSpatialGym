@@ -264,7 +264,7 @@ class TouchingMode:
                 for st in out:
                     st.extras["edge_rank"] = rank
                 if tried:
-                    log.info("%s: touching stance C: face(s) %s nearest the init pose admit no stance; %s taken", self.gp.alias, tried, edge.name)
+                    log.info("%s: touching stance C: face(s) %s nearest the init pose admit no stance; %s taken", self.gp.variant, tried, edge.name)
                 return out
             tried.append(edge.name)
         return []
@@ -488,14 +488,14 @@ class TouchingMode:
                         stats["side_candidates"] += 1
         self.template_facts["placement_stats"] = stats
         if not cands:
-            log.info("%s: touching stance C at %s face %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: touching stance C at %s face %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         with self.ikc.ignoring([self.obj("floor")]):
             free = P0.body_free(self, cands)
         cands = [st for st, ok in zip(cands, free.tolist()) if ok]
         stats["collision_free"] = len(cands)
         if not cands:
-            log.info("%s: touching stance C at %s face %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: touching stance C at %s face %s: every candidate collides (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         cams = P0.camera_poses(self, cands)
         z_bottom = float(partner.aabb[0][2])
@@ -520,7 +520,7 @@ class TouchingMode:
         out_ = P0.best_class(classed)
         stats["survivor_kinds"] = {k: sum(1 for st in out_ if st.extras.get("stance_kind") == k) for k in ("side", "frontal")}
         stats["survivor_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in out_})
-        log.info("%s: touching stance C at %s face %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out_), stats)
+        log.info("%s: touching stance C at %s face %s: %d survivors (%s)", self.gp.variant, partner.name, edge.name, len(out_), stats)
         return out_
 
     # ------------------------------------------------------------------ the push chain and its records
@@ -549,7 +549,7 @@ class TouchingMode:
         if span is not None and span_violation(span, window) > BLADE_TOL_M:
             TT._count(self, "touching.chain_outside_blade_reach")
             log.info("%s: touching push chain not solved from stance C (d %.2f λ %+.2f trunk %s): the blade runs %.2f -> %.2f m ahead of the base, outside the "
-                     "floor reach %.2f-%.2f m", self.gp.alias, place.stand_off or 0.0, place.lateral, (place.translate, round(place.tilt, 2)), span[0], span[1], *window)
+                     "floor reach %.2f-%.2f m", self.gp.variant, place.stand_off or 0.0, place.lateral, (place.translate, round(place.tilt, 2)), span[0], span[1], *window)
             return None
         key = (self.seg_arm, tuple(round(float(v), 3) for v in place.base_pose2d), round(float(place.translate), 3), round(float(place.tilt), 3),
                getattr(place, "idle_posture", None), tuple(round(float(v), 4) for v in G.t(quat).tolist()), round(float(drop_xy[0]), 3), round(float(drop_xy[1]), 3),
@@ -580,7 +580,7 @@ class TouchingMode:
         place = self.sidecar.stance("placement")
         face, d2 = place.extras.get("face_point"), place.extras.get("push_dir")
         if rec is None or face is None or d2 is None:
-            raise Reject("spec", f"{self.gp.alias}: the touching coupling recorded no push / face point")
+            raise Reject("spec", f"{self.gp.variant}: the touching coupling recorded no push / face point")
         gc = self.touching_goal_at(face, d2, self.goal_quat_of(d))
         drop = th.as_tensor(rec.extras.get("drop_cell"), dtype=th.float32)
         dist = float(th.linalg.norm(gc - drop))
@@ -600,7 +600,7 @@ class TouchingMode:
         floor = self.bindings.one("floor").name if self.bindings.has("floor") else None
         if floor:
             self.sidecar.describe(floor, "floor", push_distance_cm=100.0 * dist)
-        log.info("%s: touching push %.3f m from the drop %s to the goal %s against %s's face %s (offset %.3f m behind its AABB edge, gap %.0f mm)", self.gp.alias,
+        log.info("%s: touching push %.3f m from the drop %s to the goal %s against %s's face %s (offset %.3f m behind its AABB edge, gap %.0f mm)", self.gp.variant,
                  dist, [round(float(v), 3) for v in drop.tolist()], [round(float(v), 3) for v in gc.tolist()], self.pname, place.extras.get("edge"),
                  float(place.extras.get("face_offset_m") or 0.0), 1000.0 * float(place.extras.get("gap_m") or 0.0))
 

@@ -1,7 +1,0 @@
-{
-  "category": "tortilla_chips",
-  "pages_opened": ["grids/pool_other/tortilla_chips__p1.png", "grids/pool_other/tortilla_chips__p2.png"],
-  "n_models": 24,
-  "exclude": [],
-  "notes": "All 24 are intact snack/bakery foods lying flat in natural poses (cookies, bars, bread, buns, bacon, candy). hamburger_bun/fqxumh renders fine but its render check reports 'seg label missing'. peppermint/pbrxfe (342 px) and candy_cane/qfomjj (304 px) are tiny yet recognisable."
-}

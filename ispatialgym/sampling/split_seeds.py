@@ -1,16 +1,16 @@
-"""Per-alias, per-split seeds and the scene / room draw of the held-object tasks (owner 2026-10-11: distinct eval init / goal
+"""Per-variant, per-split seeds and the scene / room draw of the held-object tasks (owner 2026-10-11: distinct eval init / goal
 and scenes, train policy). Pure module: no simulator, the room measurement reads the layout PNGs only.
 
 Seeds
 -----
-``split_seed(split, alias, k)`` is the sampler seed (``sample_isg --seed-split``, ``multiply_isg --split``) of ``alias`` in
-``split`` (``eval`` / ``train``): ``2 * h + parity`` with ``h`` the first 8 bytes of SHA-256 of ``"<split>:<alias>"``
-(``k = 0``) or ``"<split>:<alias>:<k>"`` (``k > 0``: the k-th next seed, for an eval offender re-sampled) modulo 2**29, and
+``split_seed(split, variant, k)`` is the sampler seed (``sample_isg --seed-split``, ``multiply_isg --split``) of ``variant`` in
+``split`` (``eval`` / ``train``): ``2 * h + parity`` with ``h`` the first 8 bytes of SHA-256 of ``"<split>:<variant>"``
+(``k = 0``) or ``"<split>:<variant>:<k>"`` (``k > 0``: the k-th next seed, for an eval offender re-sampled) modulo 2**29, and
 parity 0 for eval, 1 for train. Guarantees:
 
-* a train seed never equals an eval seed (any alias, any k): eval seeds are even, train seeds odd;
-* no two aliases share a stream: within a split the seeds of ``(alias, k)`` are pairwise distinct for every alias of the
-  shipped customs list and k < ``CHECKED_INDICES`` (:func:`check_unique`, run by the unit tests; a new alias collides with
+* a train seed never equals an eval seed (any variant, any k): eval seeds are even, train seeds odd;
+* no two variants share a stream: within a split the seeds of ``(variant, k)`` are pairwise distinct for every variant of the
+  shipped customs list and k < ``CHECKED_INDICES`` (:func:`check_unique`, run by the unit tests; a new variant collides with
   probability ~1e-5), and distinct seeds give disjoint attempt-seed streams - the samplers derive
   ``(seed * 7919 + t) * 1000003 + index * 1009 + attempt`` (t = template ordinal / multiply offset < 7919, index <= 990,
   attempt < 1009), an injective map;
@@ -25,18 +25,18 @@ floor - free floor of the robot-eroded navigation map, the cells the held-object
 house_double_floor_lower 5, house_double_floor_upper 5, Rs_int 1 (living_room_0), restaurant_diner 5, hotel_suite_large 2,
 office_cubicles_right 12; out: the closets and Rs_int's bedroom / kitchen / entryway / bathroom (< 1 m^2), both gardens.
 
-``draw_scene_room(split, alias, k)``; the eval and the train rooms both come from ``eligible_rooms``:
+``draw_scene_room(split, variant, k)``; the eval and the train rooms both come from ``eligible_rooms``:
 
-* eval: the alias's entry of ``EVAL_ROOMS``, whatever k (a re-sampled offender keeps its room; only its seed changes). The
-  table is :func:`eval_assignment` of the 10 + 10 aliases, frozen so that a new alias never moves an existing eval instance
+* eval: the variant's entry of ``EVAL_ROOMS``, whatever k (a re-sampled offender keeps its room; only its seed changes). The
+  table is :func:`eval_assignment` of the 10 + 10 variants, frozen so that a new variant never moves an existing eval instance
   (the unit tests recompute it). Per task, in hash-seeded orders (SHA-256, as the seeds): 10 distinct rooms covering all 7
   scenes - one room per scene, one more in each of the 3 scenes with the most eligible rooms (house_single_floor,
   office_cubicles_right and a 5-room scene, ties in the task's order); mental rotation avoids object scaling's rooms, so the
-  tasks share only Rs_int's single room. An alias that cannot be sampled in its room moves to its task's next unused room in
+  tasks share only Rs_int's single room. A variant that cannot be sampled in its room moves to its task's next unused room in
   the task's order (``EVAL_ROOM_MOVES``, reported). The 1 m separation check stays as a guard; it cannot fire within a task.
 * train (``multiply_isg --split train``, one draw per train instance g): one room among all eligible rooms, no scene-first
   step, weighted by its reachable floor capped at ``TRAIN_CAP_X_MEDIAN`` (3) x the median eligible room (7.23 -> 21.69 m^2:
-  six rooms capped, ~5.1 % of train each; the smallest ~3 per 1000), from SHA-256 of ``"scene:train:<alias>[:<g>]"``.
+  six rooms capped, ~5.1 % of train each; the smallest ~3 per 1000), from SHA-256 of ``"scene:train:<variant>[:<g>]"``.
 
 The numbers (``ROOM_FLOOR_M2``, every room of the candidate scenes) are measured without the simulator by :func:`measure_rooms`
 from the scene's layout maps the way OmniGibson reads them: room instances from ``floor_insseg_0`` / ``floor_semseg_0``
@@ -48,8 +48,8 @@ on the sampler's eroded map) stay on free floor of house_single_floor's map for 
 cross blocked floor, at 10 cells 8 of 10; their minimum clearance to blocked floor is 0.32 m. (The earlier 10-cell kernel
 took the R1Pro extent with the arms, 0.8165 x 1.2688 m.) The kernel only feeds this measurement, not the samplers. The table
 is frozen here so that the draws never change with the data. ``python -m ispatialgym.sampling.split_seeds rooms`` prints the
-measured table, ``... assign`` the eval assignment, ``... shares`` the train shares, ``... seed <split> <alias> [k]`` and
-``... draw <split> <alias> [k]`` one seed / draw.
+measured table, ``... assign`` the eval assignment, ``... shares`` the train shares, ``... seed <split> <variant> [k]`` and
+``... draw <split> <variant> [k]`` one seed / draw.
 """
 
 from __future__ import annotations
@@ -162,8 +162,8 @@ ROOM_FLOOR_M2: Dict[str, Dict[str, Tuple[float, float, float]]] = {
     },
 }
 
-#: the eval (scene, room) of every held-object alias: :func:`eval_assignment` of these aliases with ``EVAL_ROOM_MOVES``, frozen
-#: (owner 2026-10-11 ~13:50) so that a new alias never moves an existing eval instance; the unit tests recompute it
+#: the eval (scene, room) of every held-object variant: :func:`eval_assignment` of these variants with ``EVAL_ROOM_MOVES``, frozen
+#: (owner 2026-10-11 ~13:50) so that a new variant never moves an existing eval instance; the unit tests recompute it
 EVAL_ROOMS: Dict[str, Tuple[str, str]] = {
     "object_scaling-apple": ("house_double_floor_lower", "living_room_0"),
     "object_scaling-beefsteak_tomato": ("restaurant_diner", "bathroom_0"),
@@ -186,7 +186,7 @@ EVAL_ROOMS: Dict[str, Tuple[str, str]] = {
     "mental_rotation-toy_figure": ("house_double_floor_lower", "kitchen_0"),
     "mental_rotation-walker": ("house_double_floor_upper", "living_room_0"),
 }
-#: aliases that could not be sampled in their eval room, in move order: each went to its task's next unused room (reported)
+#: variants that could not be sampled in their eval room, in move order: each went to its task's next unused room (reported)
 EVAL_ROOM_MOVES: Tuple[str, ...] = ()
 
 
@@ -195,12 +195,12 @@ EVAL_ROOM_MOVES: Tuple[str, ...] = ()
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def _key(prefix: str, split: str, alias: str, k: int) -> str:
+def _key(prefix: str, split: str, variant: str, k: int) -> str:
     if split not in SPLITS:
         raise ValueError(f"split must be one of {SPLITS}, got {split!r}")
     if int(k) < 0:
         raise ValueError(f"seed index must be >= 0, got {k}")
-    base = f"{prefix}{split}:{alias}"
+    base = f"{prefix}{split}:{variant}"
     return base if int(k) == 0 else f"{base}:{int(k)}"
 
 
@@ -208,23 +208,23 @@ def _hash_int(text: str) -> int:
     return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
 
 
-def split_seed(split: str, alias: str, k: int = 0) -> int:
-    """The sampler seed of ``alias`` in ``split`` (``k``: the k-th next seed); see the module docstring for the guarantees."""
-    h = _hash_int(_key("", split, alias, k)) % (1 << HASH_BITS)
+def split_seed(split: str, variant: str, k: int = 0) -> int:
+    """The sampler seed of ``variant`` in ``split`` (``k``: the k-th next seed); see the module docstring for the guarantees."""
+    h = _hash_int(_key("", split, variant, k)) % (1 << HASH_BITS)
     return 2 * h + _PARITY[split]
 
 
-def check_unique(aliases: Iterable[str], indices: Sequence[int] = range(CHECKED_INDICES)) -> Dict[int, Tuple[str, str, int]]:
-    """Every ``split_seed(split, alias, k)`` of ``aliases`` x ``SPLITS`` x ``indices``, keyed by seed; ``ValueError`` on a
+def check_unique(variants: Iterable[str], indices: Sequence[int] = range(CHECKED_INDICES)) -> Dict[int, Tuple[str, str, int]]:
+    """Every ``split_seed(split, variant, k)`` of ``variants`` x ``SPLITS`` x ``indices``, keyed by seed; ``ValueError`` on a
     collision (two keys, one seed)."""
     seen: Dict[int, Tuple[str, str, int]] = {}
-    for alias in sorted(set(aliases)):
+    for variant in sorted(set(variants)):
         for split in SPLITS:
             for k in indices:
-                s = split_seed(split, alias, k)
+                s = split_seed(split, variant, k)
                 if s in seen:
-                    raise ValueError(f"split seed collision: {(split, alias, k)} and {seen[s]} -> {s}")
-                seen[s] = (split, alias, int(k))
+                    raise ValueError(f"split seed collision: {(split, variant, k)} and {seen[s]} -> {s}")
+                seen[s] = (split, variant, int(k))
     return seen
 
 
@@ -250,9 +250,9 @@ def scene_draw_applies(subtask: str) -> bool:
     return any(subtask == s or subtask.startswith(s + "-") for s in SCENE_DRAW_SUBTASKS)
 
 
-def scene_draw_task(alias: str) -> Optional[str]:
-    """The held-object task (``SCENE_DRAW_SUBTASKS``) of an alias, else None."""
-    return next((s for s in SCENE_DRAW_SUBTASKS if alias == s or alias.startswith(s + "-")), None)
+def scene_draw_task(variant: str) -> Optional[str]:
+    """The held-object task (``SCENE_DRAW_SUBTASKS``) of a variant, else None."""
+    return next((s for s in SCENE_DRAW_SUBTASKS if variant == s or variant.startswith(s + "-")), None)
 
 
 def eligible_rooms(scene: Optional[str] = None, table: Optional[Dict[str, Dict[str, Tuple[float, float, float]]]] = None,
@@ -276,15 +276,15 @@ def _hash_order(items: Iterable[str], salt: str) -> List[str]:
     return sorted(items, key=lambda x: (_hash_int(f"{salt}:{x}"), x))
 
 
-def eval_assignment(aliases: Iterable[str], table: Optional[Dict[str, Dict[str, Tuple[float, float, float]]]] = None,
+def eval_assignment(variants: Iterable[str], table: Optional[Dict[str, Dict[str, Tuple[float, float, float]]]] = None,
                     moves: Sequence[str] = ()) -> Tuple[Dict[str, Tuple[str, str]], Dict[str, List[Tuple[str, str]]]]:
-    """``{alias: (scene, room)}`` of the held-object ``aliases`` (the others are ignored) and ``{task: the task's room order}``.
+    """``{variant: (scene, room)}`` of the held-object ``variants`` (the others are ignored) and ``{task: the task's room order}``.
 
-    Per task, in ``SCENE_DRAW_SUBTASKS`` order, with its aliases, its scenes and the eligible rooms each in a hash-seeded order
+    Per task, in ``SCENE_DRAW_SUBTASKS`` order, with its variants, its scenes and the eligible rooms each in a hash-seeded order
     keyed by the task: scene quotas of one room per scene, then one more per scene in order of decreasing eligible rooms (ties:
-    the task's scene order) until every alias has a slot; the rooms, walked in the task's room order, fill the quotas, skipping
-    an earlier task's rooms unless nothing else fills a quota (Rs_int); the i-th alias gets the i-th room taken. ``moves``: each
-    alias in turn goes to the first room of its task's order that no alias holds or has left."""
+    the task's scene order) until every variant has a slot; the rooms, walked in the task's room order, fill the quotas, skipping
+    an earlier task's rooms unless nothing else fills a quota (Rs_int); the i-th variant gets the i-th room taken. ``moves``: each
+    variant in turn goes to the first room of its task's order that no variant holds or has left."""
     rooms = eligible_rooms(table=table)
     by_scene: Dict[str, List[str]] = {}
     for sc, r in rooms:
@@ -292,11 +292,11 @@ def eval_assignment(aliases: Iterable[str], table: Optional[Dict[str, Dict[str, 
     out: Dict[str, Tuple[str, str]] = {}
     orders: Dict[str, List[Tuple[str, str]]] = {}
     for task in SCENE_DRAW_SUBTASKS:
-        als = _hash_order(sorted({a for a in aliases if scene_draw_task(a) == task}), f"eval-room:{task}:alias")
+        als = _hash_order(sorted({a for a in variants if scene_draw_task(a) == task}), f"eval-room:{task}:variant")
         if not als:
             continue
         if len(als) > len(rooms):
-            raise ValueError(f"{task}: {len(als)} aliases but {len(rooms)} eligible rooms")
+            raise ValueError(f"{task}: {len(als)} variants but {len(rooms)} eligible rooms")
         order = [tuple(x.split("/", 1)) for x in _hash_order([f"{sc}/{r}" for sc, r in rooms], f"eval-room:{task}:room")]
         orders[task] = order
         ranked = sorted(_hash_order(by_scene, f"eval-room:{task}:scene"), key=lambda sc: -len(by_scene[sc]))
@@ -316,7 +316,7 @@ def eval_assignment(aliases: Iterable[str], table: Optional[Dict[str, Dict[str, 
     held, left = set(out.values()), set()
     for a in moves:
         if a not in out:
-            raise KeyError(f"moved alias {a} has no eval room")
+            raise KeyError(f"moved variant {a} has no eval room")
         left.add(out[a])
         free = [x for x in orders[scene_draw_task(a)] if x not in held and x not in left]
         if not free:
@@ -326,12 +326,12 @@ def eval_assignment(aliases: Iterable[str], table: Optional[Dict[str, Dict[str, 
     return out, orders
 
 
-def eval_scene_room(alias: str) -> Tuple[str, str]:
-    """The alias's frozen eval (scene, room) (``EVAL_ROOMS``); ``KeyError`` for an alias the table does not list."""
-    if alias not in EVAL_ROOMS:
-        raise KeyError(f"{alias} has no eval room in split_seeds.EVAL_ROOMS: give a new held-object alias its task's next unused room "
+def eval_scene_room(variant: str) -> Tuple[str, str]:
+    """The variant's frozen eval (scene, room) (``EVAL_ROOMS``); ``KeyError`` for a variant the table does not list."""
+    if variant not in EVAL_ROOMS:
+        raise KeyError(f"{variant} has no eval room in split_seeds.EVAL_ROOMS: give a new held-object variant its task's next unused room "
                        f"(split_seeds assign) and add it to the table")
-    return EVAL_ROOMS[alias]
+    return EVAL_ROOMS[variant]
 
 
 def train_weights(table: Optional[Dict[str, Dict[str, Tuple[float, float, float]]]] = None) -> Tuple[List[Tuple[str, str]], List[int], int]:
@@ -346,12 +346,12 @@ def train_weights(table: Optional[Dict[str, Dict[str, Tuple[float, float, float]
     return rooms, [min(n, cap) for n in navs], cap
 
 
-def draw_scene_room(split: str, alias: str, k: int = 0) -> Tuple[str, str]:
-    """The (scene, room) of ``alias`` in ``split``. eval: its frozen room (:func:`eval_scene_room`) whatever ``k``; train: the k-th
+def draw_scene_room(split: str, variant: str, k: int = 0) -> Tuple[str, str]:
+    """The (scene, room) of ``variant`` in ``split``. eval: its frozen room (:func:`eval_scene_room`) whatever ``k``; train: the k-th
     draw, one eligible room weighted by its capped reachable floor (:func:`train_weights`)."""
-    h = _hash_int(_key("scene:", split, alias, k))
+    h = _hash_int(_key("scene:", split, variant, k))
     if split == "eval":
-        return eval_scene_room(alias)
+        return eval_scene_room(variant)
     rooms, weights, _ = train_weights()
     x = h % sum(weights)
     for room, w in zip(rooms, weights):
@@ -418,18 +418,18 @@ def main(argv=None) -> int:
     for name in ("seed", "draw"):
         p = sub.add_parser(name)
         p.add_argument("split", choices=SPLITS)
-        p.add_argument("alias")
+        p.add_argument("variant")
         p.add_argument("k", type=int, nargs="?", default=0)
     p = sub.add_parser("rooms", help="measure every candidate scene's rooms and list the eligible ones")
     p.add_argument("--erode-px", type=int, default=NAV_ERODE_PX)
     p.add_argument("--min-nav-free-m2", type=float, default=MIN_NAV_FREE_M2)
-    sub.add_parser("assign", help="the eval rooms of the held-object aliases (frozen vs recomputed) and each task's unused rooms")
+    sub.add_parser("assign", help="the eval rooms of the held-object variants (frozen vs recomputed) and each task's unused rooms")
     sub.add_parser("shares", help="the train draw's room and scene shares")
     args = parser.parse_args(argv)
     if args.cmd == "seed":
-        print(split_seed(args.split, args.alias, args.k))
+        print(split_seed(args.split, args.variant, args.k))
     elif args.cmd == "draw":
-        print("\t".join(draw_scene_room(args.split, args.alias, args.k)))
+        print("\t".join(draw_scene_room(args.split, args.variant, args.k)))
     elif args.cmd == "assign":
         got, orders = eval_assignment(EVAL_ROOMS, moves=EVAL_ROOM_MOVES)
         held = set(EVAL_ROOMS.values())

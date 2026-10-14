@@ -1,5 +1,0 @@
-{"key": "recycling_bin__pdmzhv", "joint": "j_link_2", "feasible": false,
- "proposal": {"face": "outer", "a": 0.5, "b": 0.06, "pinch": "vertical", "approach": "above", "depth_mm": 0, "expected_motion": "lift"},
- "alternative": null,
- "note": "Front lip flush with body face; only relief is the raised lid border with a shallow recess, a friction pinch on ~10 mm step, unreliable.",
- "confidence": "medium"}

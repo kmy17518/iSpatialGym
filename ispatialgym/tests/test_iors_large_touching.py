@@ -136,7 +136,7 @@ def test_touching_hook_adopts_the_mode(monkeypatch):
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = f"{SUBTASK}-storage_box-bookcase-coffee_table", dict(gen)
+        self.variant, self.generation = f"{SUBTASK}-storage_box-bookcase-coffee_table", dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)
@@ -260,7 +260,7 @@ def test_touching_yaw_rank_puts_the_blade_in_reach_first():
 
 def test_touching_records_turn_the_push_under_records(monkeypatch):
     s = _mode()
-    s.sidecar = SidecarDraft(s.gp.alias, "inter_object_relation_satisfaction")
+    s.sidecar = SidecarDraft(s.gp.variant, "inter_object_relation_satisfaction")
     names = {"target": "storage_box.n.01_1", "partner": "bookcase.n.01_1", "floor": "floor.n.01_1"}
     s.bindings = SimpleNamespace(one=lambda r: SimpleNamespace(name=names[r]), has=lambda r: r in names)
     face, d2 = [-4.053, -0.781], [0.0, 1.0]
@@ -300,7 +300,7 @@ def test_touching_records_turn_the_push_under_records(monkeypatch):
 def test_touching_large_program_chain():
     sc = Sidecar.load(FIXTURE)
     assert sc.problems() == [] and sc.contacts.push.kind == "push_touching"
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == ["transition", "grasp", "lift", "navigate", "place", "retreat", "transition", "push", "retreat"]
     place, ret1, to_push, push, ret2 = actions[4:]
     assert place.kind == "drop" and place.on == "floor.n.01_1" and place.avoid == () and ret1.after is place

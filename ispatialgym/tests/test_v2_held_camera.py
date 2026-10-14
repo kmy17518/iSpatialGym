@@ -248,7 +248,7 @@ def _fake_camera_sampler(trav: _FakeTrav, fov_deg: float = 80.0, reach_m: float 
     cr = object.__new__(CR.CameraRelocalizationV2)
     cr.kit, cr.world = kit, world
     cr.q_reset_rel = th.zeros(3)
-    cr.gp = SimpleNamespace(alias="camera_relocalization-test")
+    cr.gp = SimpleNamespace(variant="camera_relocalization-test")
     cr.g = lambda key, default=None: {"init_pose": {"trunk": 0.5, "arms": "untucked"}}[key]
 
     def frustum_ok(cam, corners, margin):
@@ -604,7 +604,7 @@ def test_generation_waypoints_default_is_three():
         assert d["min_visible_fraction"] == pytest.approx(0.40)
     osc = GD.defaults_for("object_scaling")
     assert (osc["depth_search_range_m"], osc["depth_search_grid_m"], osc["depth_margin_m"], osc["min_depth_change_m"]) == ([0.15, 0.55], 0.01, 0.02, 0.05)
-    assert osc["requested_direction"] is None and osc["start_depth_band"] is None  # eval aliases set them in the customs
+    assert osc["requested_direction"] is None and osc["start_depth_band"] is None  # eval variants set them in the customs
     assert "goal_depth_range_m" not in osc and "goal_depth_grid_m" not in osc
     mr = GD.defaults_for("mental_rotation")
     assert "depth_search_range_m" not in mr and "goal_draws_per_start" not in osc
@@ -897,7 +897,7 @@ def _mr_sampler(monkeypatch, kit, base_seed=0):
     s.whole_in_frame = lambda cam, pose: True
     s.in_room = lambda xy: True
     s.template_facts, s.template_meta = {}, {}
-    s.gp = SimpleNamespace(alias="mental_rotation-test")
+    s.gp = SimpleNamespace(variant="mental_rotation-test")
     s.choice = SimpleNamespace(models={"target": SimpleNamespace(scale=None, category="classroom_mock_up")})
     s.ikc = SimpleNamespace(waypoints_ok=lambda poses, stance, arm, q_seed=None, scale_key=None: SimpleNamespace(ok=True, q=q_seed.clone(), reason=""))
     s.robot = SimpleNamespace(arm_control_idx={"right": th.arange(10, 17)})

@@ -29,7 +29,7 @@ Each benchmark instance consists of:
    goals — grounded by `ground_isg` from the subtask's **iddl** (role-level
    definition, `ispatialgym/assets/iddl/`) and the **icl** (candidate list,
    `ispatialgym/assets/icl/`); one problem per category combination, named by
-   its alias.
+   its variant.
 2. A versioned TRO record containing the materialized scene state and numeric
    evaluation targets.
 3. A task spec entry (iSpatialGym's version of the BEHAVIOR task-custom list)
@@ -72,7 +72,7 @@ iSpatialGym therefore keeps one file (`task_custom_lists.json` in its own
 metadata directory, never BEHAVIOR's) with a different entry structure
 (schema and example in `instance_sampling_spec.md` §2.3):
 
-- **Key by alias** (`inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`):
+- **Key by variant** (`inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`):
   one entry per grounded BDDL problem. The definition id is recorded inside
   (`definition_id`, from `activity_definitions/<activity>/problems.json`).
 - **`roles`**: the roles of the grounded problem (from the icl `roles/candidates.csv`, the
@@ -97,7 +97,7 @@ metadata directory, never BEHAVIOR's) with a different entry structure
   distractors `{[1, 3], unique}`, obstacles `{1, unique}`), and the
   camera-relocalization `path_buckets` (`[{"max_m": 3, "n": 10}, ...]`,
   half-open geodesic ranges, overridable on the `multiply_isg` command line).
-  `ground_isg` seeds it from the existing entry of the alias or from the
+  `ground_isg` seeds it from the existing entry of the variant or from the
   per-subtask defaults (`ispatialgym/sampling/generation_defaults.py`, the
   numbers of `instance_sampling_spec.md`); the samplers hold no defaults of
   their own.
@@ -302,10 +302,10 @@ explicitly labeled variants:
 
 All variants live in one activity directory,
 `activity_definitions/configuration_matching/problemN.bddl`, and each problem
-names its variant with an `(:alias ...)` section. Two problems share the
-`articulation` alias, one per direction. The alias is recorded as
+names its variant with an `(:variant ...)` section. Two problems share the
+`articulation` variant, one per direction. The variant is recorded as
 `task_variant`, and results are reported both for the aggregate task and per
-alias.
+variant.
 
 Because BEHAVIOR's sampler hard-codes definition `0` and keys task-custom lists
 by activity, iSpatialGym generation must take the definition id and read the
@@ -633,7 +633,7 @@ The concrete BDDL for each variant is in `task_bddl_formats.md`.
 Implemented (see "Implementation status" in `task_bddl_formats.md` for the
 file-level map):
 
-- The `ispatialgym` BDDL domain without `inroom`, parser support for `:alias`
+- The `ispatialgym` BDDL domain without `inroom`, parser support for `:variant`
   and `:groups`, group expansion, and compilation into the stock `bddl` trees.
 - Versioned TRO evaluation metadata (`isg-tro-v1`) with validation, and
   TRO-to-`PoseReached.set_goal()` / `LayoutReached.set_goal()` / group-target

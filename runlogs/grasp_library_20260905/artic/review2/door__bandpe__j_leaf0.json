@@ -1,5 +1,0 @@
-{"key": "door__bandpe", "joint": "j_leaf0", "feasible": true,
- "proposal": {"face": "outer", "a": 0.49, "b": 0.72, "pinch": "vertical", "approach": "front", "depth_mm": 10,
-              "expected_motion": "push"},
- "alternative": {"face": "outer", "a": 0.7, "b": 0.77, "pinch": "horizontal", "approach": "front", "depth_mm": 10, "expected_motion": "push"},
- "note": "Radial pinch on the ~33 mm raised porthole bezel ring (bottom segment), then push; leaf hinged right, swings away. Needs bezel >=15 mm proud.", "confidence": "low"}

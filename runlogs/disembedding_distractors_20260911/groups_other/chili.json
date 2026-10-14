@@ -1,7 +1,0 @@
-{
-  "category": "chili",
-  "pages_opened": ["grids/pool_other/chili__p1.png", "grids/pool_other/chili__p2.png"],
-  "n_models": 26,
-  "exclude": [],
-  "notes": "All 26 read as their produce/food item lying flat (natural resting pose; higher tilts on bacon/carrot are resting rolls). Several are small (candy_cane 304 px, radish 383 px, dates ~430 px) but recognisable. pickle/gytwes and asparagus/eodozo report missing segmentation labels yet render fine. cigar and candy_cane are non-produce shape matches, kept."
-}

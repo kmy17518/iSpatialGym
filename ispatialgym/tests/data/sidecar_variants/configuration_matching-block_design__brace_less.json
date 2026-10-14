@@ -3,7 +3,7 @@
   "instance_id": "configuration_matching-block_design-block_4-breakfast_table__house_single_floor__targets-toy_dice-isgblk__brace_less__0000",
   "tro_sha256": "98cf08d1032bc4f4d818064a610b428550e389c26e79f5b391f0530234c2f517",
   "task_family": "configuration_matching",
-  "alias": "configuration_matching-block_design-block_4-breakfast_table",
+  "variant": "configuration_matching-block_design-block_4-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

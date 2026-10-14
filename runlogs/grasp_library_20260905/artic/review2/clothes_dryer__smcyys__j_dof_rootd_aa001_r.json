@@ -1,5 +1,0 @@
-{"key": "clothes_dryer__smcyys", "joint": "j_dof_rootd_aa001_r", "feasible": true,
- "proposal": {"face": "outer", "a": 0.5, "b": 0.92, "pinch": "vertical", "approach": "front", "depth_mm": 10,
-              "expected_motion": "pull"},
- "alternative": {"face": "outer", "a": 0.5, "b": 0.08, "pinch": "vertical", "approach": "front", "depth_mm": 10, "expected_motion": "pull"},
- "note": "Radial pinch across raised ring rim at 12 o'clock: outer pad on rim edge, inner pad on step to recessed centre; needs step >=15 mm.", "confidence": "low"}

@@ -1,14 +1,14 @@
-"""v1_bridge (formerly ground_isg v1 bridge): iddl + icl (+ the representative selection) -> one v1 task spec per grounded alias
+"""v1_bridge (formerly ground_isg v1 bridge): iddl + icl (+ the representative selection) -> one v1 task spec per grounded variant
 + a job manifest for ``sample_instances.py``.
 
 The v2 sampler (`docs/instance_sampling_spec.md` §9) is not implemented yet; until it is, this module grounds every
 representative pick of ``ispatialgym/assets/icl/roles/representatives.csv`` into the **v1 spec schema**
 (``ispatialgym/sampling/spec.py``) so the existing samplers can produce templates + instances today:
 
-* one spec JSON per grounded alias under ``<out>/specs/<alias>.json`` with a single entry keyed by the v1 problem key
-  (``<activity>-<def_id>``: the v1 dispatch is by key, so aliases that share a key live in separate files);
-* ``<out>/jobs.json`` (one sampling job per alias: spec, problem key, scene, weight) for
-  ``scripts/runpod/dispatch_samp.py`` / a local loop, ``<out>/problems.json`` (alias <-> v1 key <-> pick <-> slots),
+* one spec JSON per grounded variant under ``<out>/specs/<variant>.json`` with a single entry keyed by the v1 problem key
+  (``<activity>-<def_id>``: the v1 dispatch is by key, so variants that share a key live in separate files);
+* ``<out>/jobs.json`` (one sampling job per variant: spec, problem key, scene, weight) for
+  ``scripts/runpod/dispatch_samp.py`` / a local loop, ``<out>/problems.json`` (variant <-> v1 key <-> pick <-> slots),
   ``<out>/README.md``.
 
 Grounding rules kept from the spec: categories -> synsets happen in the sampler (``knowledge``); ``:require`` grasp
@@ -87,12 +87,12 @@ def read_csv(path: str) -> List[dict]:
 
 
 def parse_iddl(path: str) -> dict:
-    """Alias template + :require forms (the literals are rendered by the v1 bddl_writer for now)."""
+    """Variant template + :require forms (the literals are rendered by the v1 bddl_writer for now)."""
     text = open(path).read()
-    alias = re.search(r"\(:alias\s+([^\s)]+)\)", text)
+    variant = re.search(r"\(:variant\s+([^\s)]+)\)", text)
     req = re.findall(r"\((grasps|contacts|handle)\s+(\w+)(?:\s+(\w+))?\)", re.search(r"\(:require(.*?)\n\s*\)", text, re.S).group(1)) \
         if ":require" in text else []
-    return {"alias": alias.group(1) if alias else None,
+    return {"variant": variant.group(1) if variant else None,
             "require": [{"kind": k, "role": r, "pipeline": p or None} for k, r, p in req]}
 
 
@@ -193,8 +193,8 @@ class Grounder:
                 return slots[slot]
             return slots.get("representative") if slot != "representative" else None
 
-        alias_fill: Dict[str, str] = {}
-        entry: dict = {"alias": v1_entry.get("alias"), "roles": {}, "scenes": {}, "generation": self.gen_from_v1(v1_key)}
+        variant_fill: Dict[str, str] = {}
+        entry: dict = {"variant": v1_entry.get("variant"), "roles": {}, "scenes": {}, "generation": self.gen_from_v1(v1_key)}
         scene, rooms, fixed = TEST_SCENE, [], {}
         note = []
         req = {r["role"]: r for r in iddl["require"]}
@@ -238,13 +238,13 @@ class Grounder:
             fixed["floor"] = {"room": HELD_ROOM}
             entry["roles"]["floor"] = {"fixed": True}
             spawned("obstacles", target, None, count=1)
-            alias_fill["obstacles"] = f"{target['category']}_1"
+            variant_fill["obstacles"] = f"{target['category']}_1"
         elif subtask in ("object_scaling", "mental_rotation"):
             rooms = [HELD_ROOM]
             fixed["floor"] = {"room": HELD_ROOM}
             entry["roles"]["floor"] = {"fixed": True}
             spawned("target", target, "floating")
-            alias_fill["target"] = target["category"]
+            variant_fill["target"] = target["category"]
         elif subtask == "disembedding":
             spawned("target", target, "tabletop")
             entry["roles"]["tray_source"] = dict(v1_entry["roles"]["tray_source"])
@@ -264,32 +264,32 @@ class Grounder:
                     groups.append({**grp, "members": keep} if isinstance(grp, dict) else keep)
             dis["lookalike_groups"] = groups
             entry["distractors"] = dis
-            alias_fill["target"] = target["category"]
-            alias_fill["distractors"] = "distractors"
+            variant_fill["target"] = target["category"]
+            variant_fill["distractors"] = "distractors"
         elif subtask == f"{CM}-block_design":
             entry["roles"]["blocks"] = dict(v1_entry["roles"]["blocks"])
-            alias_fill["targets"] = "block_4"
+            variant_fill["targets"] = "block_4"
         elif subtask.startswith(f"{CM}-articulation") and "small" in subtask:
             joint = self.joint_for(target["category"], target["model"], target.get("joint", ""))
             spawned("artic", target, None, extra={"joint": joint, "handle_key": f"{target['category']}__{target['model']}"})
-            alias_fill["target"] = target["category"]
+            variant_fill["target"] = target["category"]
         elif subtask.startswith(f"{CM}-articulation"):
             scene = target["scene"]
             rooms = self.rooms_of(scene, target["name"])
             fixed["artic"] = [target["name"]]
             entry["roles"]["artic"] = {"fixed": True, "joint": target["joint"], "handle_key": f"{target['category']}__{target['model']}",
                                        "handle_file": os.path.relpath(os.path.join(os.path.dirname(SCENE_INVENTORY), scene, "artic", target["name"] + ".json"), REPO_ROOT)}
-            alias_fill["target"] = target["category"]
+            variant_fill["target"] = target["category"]
             if target.get("status", "").startswith("incomplete"):
                 note.append("handle from the B4 heuristic (no canonical annotation)")
         elif subtask == f"{CM}-attachment":
             spawned("male", target, "attachment")
             spawned("female", partner, None)
-            alias_fill["target"], alias_fill["partner"] = target["category"], partner["category"]
+            variant_fill["target"], variant_fill["partner"] = target["category"], partner["category"]
         elif subtask == "alignment-axial":
             spawned("target", target, None)
             self.axis_dicts(subtask, target["category"], target["model"], entry["generation"])
-            alias_fill["target"] = target["category"]
+            variant_fill["target"] = target["category"]
         elif subtask == "alignment-world_vertical":
             rooms = [HELD_ROOM]
             fixed["floor"] = {"room": HELD_ROOM}
@@ -301,20 +301,20 @@ class Grounder:
             if regions:
                 fixed["wall_regions"] = regions
                 fixed["wall"] = sorted({r["wall"] for r in regions})
-            alias_fill["target"], alias_fill["support"] = target["category"], "walls"
+            variant_fill["target"], variant_fill["support"] = target["category"], "walls"
         elif subtask.startswith(IORS):
             pipeline = "insert" if subtask.endswith("inside") else "tabletop"
             spawned("target", target, pipeline)
-            alias_fill["target"] = target["category"]
+            variant_fill["target"] = target["category"]
             if partner is not None and partner.get("kind") == "scene":
                 scene = partner["scene"]
                 rooms = self.rooms_of(scene, partner["name"])
                 entry["roles"]["partner"] = {"fixed": True}
                 fixed["partner"] = [partner["name"]]
-                alias_fill["partner"] = partner["category"]
+                variant_fill["partner"] = partner["category"]
             elif partner is not None:
                 spawned("partner", partner, None)
-                alias_fill["partner"] = partner["category"]
+                variant_fill["partner"] = partner["category"]
         else:
             self.skipped.append(f"{pick}: unknown subtask")
             return
@@ -325,12 +325,12 @@ class Grounder:
             entry["roles"]["table"] = {"fixed": True}
             fixed["table"] = [support["name"]]
             rooms = rooms or self.rooms_of(scene, support["name"]) or [TABLE_ROOM]
-            alias_fill["support"] = support["category"]
+            variant_fill["support"] = support["category"]
             if partner is not None and partner.get("kind") == "scene":
                 # large-scale IORS: the init support must be near the partner; rooms = both
                 rooms = sorted(set(rooms) | set(self.rooms_of(scene, partner["name"])))
         elif support is not None and support["category"] == "floor":
-            alias_fill["support"] = "floor"
+            variant_fill["support"] = "floor"
             # v1 IORS picks a table of the task rooms (defaults) - large-scale under may fall back to the partner's top
             note.append("init surface = floor requested; v1 uses a table of the task rooms / the partner top (under)")
         if "floor" not in entry["roles"]:
@@ -341,17 +341,17 @@ class Grounder:
             rooms = [TABLE_ROOM]
         entry["scenes"] = {scene: {"rooms": rooms, "fixed": fixed}}
 
-        # ---- alias / ids ----------------------------------------------------------------------------------------------------
-        alias = iddl["alias"]
-        for k, v in alias_fill.items():
-            alias = alias.replace("{" + k + "}", v)
-        alias = re.sub(r"\{\w+\}", "x", alias)
+        # ---- variant / ids ----------------------------------------------------------------------------------------------------
+        variant = iddl["variant"]
+        for k, v in variant_fill.items():
+            variant = variant.replace("{" + k + "}", v)
+        variant = re.sub(r"\{\w+\}", "x", variant)
         models = "__".join(f"{r}-{roles[r][slot if slot in roles[r] else 'representative']['model'] or roles[r]['representative'].get('name', '')}"
                            for r in ("target", "targets", "obstacles", "partner") if r in roles and roles[r])
-        pid = safe(f"{alias}__{slot}__{models}")
-        entry["_isg"] = {"subtask": subtask, "alias": alias, "pick": pick, "slot": slot, "iddl": iddl_file, "require": iddl["require"],
+        pid = safe(f"{variant}__{slot}__{models}")
+        entry["_isg"] = {"subtask": subtask, "variant": variant, "pick": pick, "slot": slot, "iddl": iddl_file, "require": iddl["require"],
                          "scene": scene, "note": note}
-        self.problems.append({"id": pid, "alias": alias, "subtask": subtask, "pick": pick, "slot": slot, "v1_key": v1_key, "scene": scene,
+        self.problems.append({"id": pid, "variant": variant, "subtask": subtask, "pick": pick, "slot": slot, "v1_key": v1_key, "scene": scene,
                               "roles": {r: {"category": roles[r][s]["category"], "model": roles[r][s]["model"], "name": roles[r][s].get("name", "")}
                                         for r in roles for s in roles[r] if s == slot or (slot != "representative" and s == "representative" and slot not in roles[r])},
                               "note": note, "entry": entry})
@@ -374,17 +374,17 @@ class Grounder:
         for p in self.problems:
             path = os.path.join(out, "specs", p["id"] + ".json")
             with open(path, "w") as f:
-                json.dump({"_comment": f"v1_bridge: {p['alias']} ({p['pick']}, slot {p['slot']})", p["v1_key"]: p["entry"]}, f, indent=1)
+                json.dump({"_comment": f"v1_bridge: {p['variant']} ({p['pick']}, slot {p['slot']})", p["v1_key"]: p["entry"]}, f, indent=1)
             self.jobs.append({"id": p["id"], "spec": os.path.relpath(path, REPO_ROOT), "problem": p["v1_key"], "scene": p["scene"],
                               "n_instances": self.n_instances, "max_templates": 1, "weight": WEIGHT.get(p["subtask"], 3.0), "subtask": p["subtask"],
-                              "slot": p["slot"], "alias": p["alias"]})
+                              "slot": p["slot"], "variant": p["variant"]})
         with open(os.path.join(out, "jobs.json"), "w") as f:
             json.dump(self.jobs, f, indent=1)
         with open(os.path.join(out, "problems.json"), "w") as f:
             json.dump([{k: v for k, v in p.items() if k != "entry"} for p in self.problems], f, indent=1)
         by = collections.Counter(p["subtask"] for p in self.problems)
         lines = ["# ground_isg (v1 bridge) output", "", f"{len(self.problems)} grounded problems (slots: {', '.join(self.slots)}); "
-                 f"one spec per alias under `specs/`, jobs in `jobs.json`.", "", "| subtask | problems |", "|---|---|"]
+                 f"one spec per variant under `specs/`, jobs in `jobs.json`.", "", "| subtask | problems |", "|---|---|"]
         lines += [f"| {k} | {v} |" for k, v in sorted(by.items())]
         if self.skipped:
             lines += ["", "Skipped:", ""] + [f"- {s}" for s in self.skipped]

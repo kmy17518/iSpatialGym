@@ -20,13 +20,13 @@ IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 from ispatialgym.sampling.v2 import core as CORE  # noqa: E402
 from ispatialgym.sampling.v2 import navigation as NAV  # noqa: E402
 
-ALIAS = "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-bar"
+VARIANT = "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-bar"
 IDENT = th.tensor([0.0, 0.0, 0.0, 1.0])
 
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = ALIAS, dict(gen)
+        self.variant, self.generation = VARIANT, dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)

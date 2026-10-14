@@ -457,6 +457,9 @@ class Motions:
         self.tracker: Optional[BaseTrajectoryTracker] = None
         #: steps emitted by the last motion (diagnostics)
         self.last_steps = 0
+        #: the last emitted action is a hold / settle wait (:meth:`hold`, :meth:`settle`): the executor does not count it as a
+        #: pause or a stall
+        self.settling = False
         #: gripper bookkeeping (executor state, exported with the checkpoints): the intended open / closed state per arm (a
         #: pre-shaped opening emits a command < 0 while the fingers are meant to be open) and the release events for the record
         self.gripper_intent_closed: Dict[str, bool] = {}
@@ -536,15 +539,16 @@ class Motions:
 
     # ------------------------------------------------------------------ emitters
 
-    def _emit(self) -> th.Tensor:
+    def _emit(self, settling: bool = False) -> th.Tensor:
         self.last_steps += 1
+        self.settling = settling
         return self.state.action()
 
     def hold(self, steps: int = 1) -> Iterator[th.Tensor]:
         """Emit hold actions (zero base velocity, current targets)."""
         self.state.stop_base()
         for _ in range(int(steps)):
-            yield self._emit()
+            yield self._emit(settling=True)
 
     def settle(self, max_steps: Optional[int] = None, vel_tol: Optional[float] = None) -> Iterator[th.Tensor]:
         """Hold until every joint velocity is below ``vel_tol`` (or ``max_steps`` elapsed; never raises)."""
@@ -552,7 +556,7 @@ class Motions:
         max_steps = self.cfg.settle_max_steps if max_steps is None else int(max_steps)
         vel_tol = self.cfg.settle_vel_tol if vel_tol is None else float(vel_tol)
         for _ in range(max_steps):
-            yield self._emit()
+            yield self._emit(settling=True)
             if float(self.robot.get_joint_velocities().abs().max()) < vel_tol:
                 return
 

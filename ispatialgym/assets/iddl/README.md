@@ -10,20 +10,20 @@ no object counts. Everything concrete lives elsewhere:
   (`constraints_conflicting.csv`); `require/` — one compact row per computed grasp / handle pinch / contact
   (`grasps.csv`, `handles.csv`, `contacts.csv`), the artefacts the `:require` block points at, with `lib/` symlinks to
   the libraries.
-- **task customs list** (one entry per grounded alias, `docs/instance_sampling_spec.md` §2.3): how models are drawn
+- **task customs list** (one entry per grounded variant, `docs/instance_sampling_spec.md` §2.3): how models are drawn
   (group sizes, identical vs unique members, spawn scales, chosen joints), the per‑scene whitelists / blacklists and
   every constraint sampling learned.
 - **initialization rules** (`docs/instance_sampling_spec.md` §3–6): how the objects and the robot are placed, which
   constraints the sampler installs (hinges), which IK checks gate an instance.
 
 `ground_isg` grounds an iddl file with the icl into concrete BDDL problems — one per admitted category combination,
-named by the `:alias` template — and into the task customs list; `sample_isg` then binds models per template.
+named by the `:variant` template — and into the task customs list; `sample_isg` then binds models per template.
 
 ```
 (define (iddl <subtask-id>)
     (:family <family>)                       ; camera_relocalization | object_scaling | mental_rotation | disembedding |
                                              ; configuration_matching | alignment | inter_object_relation_satisfaction
-    (:alias <template>)                      ; alias of the grounded BDDL; {role} slots are filled with category names
+    (:variant <template>)                    ; variant of the grounded BDDL; {role} slots are filled with category names
     (:groups                                 ; optional: composite groups made of other roles (attachment assembly)
         <role> <role> - <group-role>
     )
@@ -41,9 +41,9 @@ implicit ones must have rows in `roles/candidates.csv` for that subtask, and the
 
 | `roles/candidates.csv` kind | grounded to | notes |
 |---|---|---|
-| `sampleable` | one spawned instance `<synset>_k` | category from the alias slot `{role}`, model drawn per template from the customs whitelist |
-| `group` | a BDDL group `<role>_group.n.01_1` with N spawned members | N and identical‑vs‑unique members from the customs list (`generation.groups.<role>`); the alias slot lists `<category>_<count>` tokens (e.g. `bottle_of_beer_3_bottle_of_sake_1`); goal assignment of a group with goal literals is `exchangeable` (one‑to‑one matching, `docs/task_bddl_formats.md`) |
-| `scene` | a scene object bound per scene | supports (tables, wall regions), scene articulated objects, big partners; the alias slot carries the scene object's category; `room` rows bound a subtask to one scene / room |
+| `sampleable` | one spawned instance `<synset>_k` | category from the variant slot `{role}`, model drawn per template from the customs whitelist |
+| `group` | a BDDL group `<role>_group.n.01_1` with N spawned members | N and identical‑vs‑unique members from the customs list (`generation.groups.<role>`); the variant slot lists `<category>_<count>` tokens (e.g. `bottle_of_beer_3_bottle_of_sake_1`); goal assignment of a group with goal literals is `exchangeable` (one‑to‑one matching, `docs/task_bddl_formats.md`) |
+| `scene` | a scene object bound per scene | supports (tables, wall regions), scene articulated objects, big partners; the variant slot carries the scene object's category; `room` rows bound a subtask to one scene / room |
 
 Implicit roles: `agent` (`agent.n.01_1`, the only fixed synset) and `floor` (the task room's floor; bounded by the
 subtask's `room` rows where they exist — camera relocalization and the held‑object tasks are `house_single_floor` /
@@ -93,23 +93,23 @@ for under(small‑scale) (the partner ends under the manipulated target).
 
 ## Grounding rules (what `ground_isg` does with a file)
 
-1. Collect the roles from the alias slots and the literals (the wall `support` of the two world‑alignment subtasks
-   appears only in the alias: the target hangs on it through the sampler's hinge, not through a literal, but the
+1. Collect the roles from the variant slots and the literals (the wall `support` of the two world‑alignment subtasks
+   appears only in the variant: the target hangs on it through the sampler's hinge, not through a literal, but the
    BDDL still declares it); look up their kind and candidates in `roles/candidates.csv` (subtask, role); `agent` and `floor` are
    implicit, `room` rows only bound the scene. A role without rows is an error, not a fallback.
 2. Enumerate the admitted category combinations from `roles/constraints_compatible.csv` (only correlated pairs;
    `--test-only` keeps the combinations of `test = 1` candidates, `--representative-only` those of `representative = 1`
    candidates — there is no separate combinations sheet); apply the `:require` filters to the candidate models,
-   `roles/constraints_conflicting.csv` to the pairs and sets. Fill every alias slot: `{target}`,
+   `roles/constraints_conflicting.csv` to the pairs and sets. Fill every variant slot: `{target}`,
    `{partner}`, `{support}` → category names; `{distractors}` / `{targets}` / `{obstacles}` → `<category>_<count>`
    tokens with the count from the customs seed (`generation.groups.<role>.size`); the result is the BDDL
-   `(:alias ...)` and the problem's id.
+   `(:variant ...)` and the problem's id.
 3. Declare `<synset>_k` instances for sampleable roles and group members (synset = KB synset of the category), one
    `:groups` entry per group role and per `:groups` composite, the scene roles' synsets from the bound scene objects,
    the floor, `agent.n.01_1`.
 4. Copy `:init`, `:goal`, `:measure` with roles replaced by instances / group names.
 5. Write the customs list entry: `roles` (category, `sampleable` flag, `require`, representative), per‑scene
    `bindings` of the scene roles and `whitelist` / `blacklist` (full icl pools minus the `:require` rejects),
-   `generation` (seeded from the existing entry when the alias was grounded before, else from the per‑subtask defaults
+   `generation` (seeded from the existing entry when the variant was grounded before, else from the per‑subtask defaults
    in `ispatialgym/sampling/generation_defaults.py`, whose values are the numbers of the spec), `constraints`;
    representative‑model test → template + instance 0.

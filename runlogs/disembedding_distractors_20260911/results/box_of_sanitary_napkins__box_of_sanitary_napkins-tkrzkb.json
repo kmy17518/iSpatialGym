@@ -1,9 +1,0 @@
-{
- "target_category": "box_of_sanitary_napkins",
- "category": "box_of_sanitary_napkins",
- "model": "tkrzkb",
- "kind": "same",
- "status": "is_target",
- "error": "the category's test target itself: it is the target of every other validated pair of the category (stands on the tray, graspable, placeable), not re-validated as a distractor",
- "n_written": 0
-}

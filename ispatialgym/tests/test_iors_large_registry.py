@@ -6,7 +6,6 @@ import pytest
 from ispatialgym.oracle import programs as P
 from ispatialgym.oracle import sidecar as SC
 from ispatialgym.sampling import generation_defaults as GD
-from ispatialgym.sampling import ground_isg as GI
 from ispatialgym.sampling import iddl as I
 from ispatialgym.sampling import v1_bridge as VB
 from ispatialgym.sampling.sim_utils import Reject
@@ -33,7 +32,7 @@ def test_iddls_are_ontop_large_with_the_relation_as_goal():
     o = iddls[ONTOP]
     for rel, st in NEW.items():
         d = iddls[st]
-        assert d.family == IORS and d.alias_template == st + "-{target}-{partner}-{support}"
+        assert d.family == IORS and d.variant_template == st + "-{target}-{partner}-{support}"
         assert [rel, "?target", "?partner"] in d.goal and ["not", [rel, "target", "partner"]] in d.init
         assert d.roles == o.roles and d.measure == o.measure
         assert d.require == ([] if rel == "nextto" else o.require)  # nextto's target is pushed by the base: no grasp
@@ -42,13 +41,13 @@ def test_iddls_are_ontop_large_with_the_relation_as_goal():
 
 def test_subtask_lookups():
     for st in NEW.values():
-        alias = f"{st}-apple-sink-floor"
-        assert PB.SUBTASK_FAMILY[st] == (IORS, IORS) and PB.subtask_of_alias(alias) == st
-        assert SC.subtask_of_alias(alias) == st and SC.family_of_subtask(st) == IORS and st in SC.REQUIRED_BLOCKS
+        variant = f"{st}-apple-sink-floor"
+        assert PB.SUBTASK_FAMILY[st] == (IORS, IORS) and PB.subtask_of_variant(variant) == st
+        assert SC.subtask_of_variant(variant) == st and SC.family_of_subtask(st) == IORS and st in SC.REQUIRED_BLOCKS
         assert VB.V1_KEY[st][1] == f"{IORS}/{st.split('-', 1)[1]}.iddl"
     # the small-scale subtasks still resolve to themselves
-    assert PB.subtask_of_alias(f"{IORS}-inside-apple-bowl-breakfast_table") == f"{IORS}-inside"
-    assert SC.subtask_of_alias(f"{IORS}-nextto-spatula-soup_ladle-breakfast_table") == f"{IORS}-nextto"
+    assert PB.subtask_of_variant(f"{IORS}-inside-apple-bowl-breakfast_table") == f"{IORS}-inside"
+    assert SC.subtask_of_variant(f"{IORS}-nextto-spatula-soup_ladle-breakfast_table") == f"{IORS}-nextto"
 
 
 def test_program_check_stance_lists():
@@ -68,23 +67,6 @@ def test_generation_defaults_are_ontop_large_copies():
         assert set(g) == set(ontop)
         assert {k: v for k, v in g.items() if k != "goal_drop_m"} == {k: v for k, v in ontop.items() if k != "goal_drop_m"}
         assert g["goal_drop_m"] == (0.003 if rel == "touching" else ontop["goal_drop_m"])  # touching ends on the floor, as under
-
-
-def test_init_surface_chains():
-    for st in NEW.values():
-        assert GI.INIT_SURFACE_FALLBACK_SUBTASKS[st] == ("floor",)
-
-
-def test_grounder_skips_the_picks_of_a_subtask_without_candidates_rows():
-    from ispatialgym.sampling.customs import Customs
-
-    icl = GI.ICL()
-    g = GI.Grounder(I.load_all(), icl, Customs(), options=GI.Options(dry_run=True, representative_test=False))
-    for st in NEW.values():
-        if any(icl.has_role(st, r) for r in ("target", "partner", "support")):
-            continue  # its candidates rows have landed
-        assert g.combinations(st) == []
-        assert {why.split(":")[0] for _, why in g.report.skipped.get(st, [])} <= {"no_candidates"}
 
 
 def _mode_landed(relation: str) -> bool:

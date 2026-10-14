@@ -5,7 +5,7 @@
 ; contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
 (define (iddl alignment-world_vertical)
     (:family alignment)
-    (:alias alignment-world_vertical-{target}-{support})
+    (:variant alignment-world_vertical-{target}-{support})
     (:require
         (contacts target)
     )

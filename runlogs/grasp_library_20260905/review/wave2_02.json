@@ -1,357 +1,158 @@
 {
-  "batch": "wave2_02",
-  "models": [
+ "models": [
+  {
+   "key": "briefcase__lwbctq",
+   "n_rows": 5,
+   "grasps": [
     {
-      "key": "box_of_tissues__xwstls",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Side pinch across 75 mm box, both pads contact, tips above bottom"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Near-symmetric pinch (41/36) across box width"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Side pinch across box width, both pads on faces"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Side pinch across box width, both pads on faces"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Pinch 29 mm off CoM along box, still well held"}
-      ],
-      "object_note": "Fingers 50/26: box off-centre in gripper but firmly pinched by both pads (sum matches width)."
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Handle pinch, fingers 22/0 match 20 mm strap"
     },
     {
-      "key": "box_of_tissues__zutrxn",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Side pinch across 75 mm box, both pads contact"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Side pinch across box width, tips above bottom face"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Side pinch across box width, both pads on faces"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Side pinch across box width, both pads on faces"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Pinch 32 mm off CoM along box, light box, fine"}
-      ],
-      "object_note": "Fingers 50/26: box off-centre in gripper but pinched by both pads."
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Handle pinch, 31 deg tilt, both pads on strap"
     },
     {
-      "key": "box_of_yogurt__jkemqc",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, fingertips above cup bottom"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, both pads on tapered wall"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, both pads on tapered wall"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, both pads on tapered wall"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, 10 deg tilt, fine"}
-      ],
-      "object_note": "Fingers 50/15: cup pushed against one finger but both pads contact (cup tapers)."
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "Pads 78 mm apart on 22 mm handle; daylight both sides"
     },
     {
-      "key": "box_of_yogurt__znhjgm",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, fingertips above cup bottom"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, both pads on tapered wall"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, both pads on tapered wall"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, both pads on tapered wall"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Cup pinched mid-height, both pads on tapered wall"}
-      ],
-      "object_note": "Fingers 50/15: cup off-centre in gripper but both pads contact."
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "Pads 66 mm apart on 22 mm handle; visible daylight"
     },
     {
-      "key": "briefcase__fdpjtj",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["gap", "end_grasp"], "note": "Top-edge pinch, 120 mm lever; pads 61 mm vs 32 mm width"}
-      ],
-      "object_note": "Only 1/12 valid; hard briefcase body grasped at extreme top edge, handle not used."
-    },
-    {
-      "key": "briefcase__lwbctq",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Handle pinch, fingers 22/0 match 20 mm strap"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Handle pinch, 31 deg tilt, both pads on strap"},
-        {"rank": 3, "verdict": "flag", "flags": ["gap"], "note": "Pads 78 mm apart on 22 mm handle; daylight both sides"},
-        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "Pads 66 mm apart on 22 mm handle; visible daylight"},
-        {"rank": 5, "verdict": "flag", "flags": ["gap"], "note": "Pads 73 mm apart on 19 mm handle; visible daylight"}
-      ],
-      "object_note": "Handle collision hull much larger than visual strap; ranks 3-5 float between pads (V4)."
-    },
-    {
-      "key": "briefcase__psvdau",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp", "gap"], "note": "Top-ridge pinch, pads 93 mm vs 31 mm ridge; wedge slip"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "Top pinch of heavy body at near-max opening; 104 mm lever"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "gap"], "note": "Pads 93 mm vs 33 mm ridge; 139 mm lever, tapered top"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "Top pinch at 93 mm, 113 mm lever; antipodal 0.80"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "gap"], "note": "Pads 87 mm vs 35 mm ridge; corner of top edge"}
-      ],
-      "object_note": "Hard briefcase pinched at tapered top edge near max opening; hull seems larger than body; handle natural."
-    },
-    {
-      "key": "briefcase__uquevd",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Top flap pinch across 77 mm, both pads flat on flanks"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Top flap pinch across 76 mm, both pads contact"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Top flap pinch across 77 mm, both pads contact"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Top flap pinch, 6 deg tilt, both pads contact"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Top flap pinch, 18 deg tilt, both pads contact"}
-      ],
-      "object_note": "Soft felt bag; thick top flap pinched, flanks taper inward below so grasp self-locks."
-    },
-    {
-      "key": "cap__hbafeb",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Side rim pinch, fingers 34/0 both touch, underside free"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Side rim pinch across cap, both pads touch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Side rim pinch across cap, both pads touch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Side rim pinch across cap, both pads touch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "31 deg tilt, rim pinch still on both pads"}
-      ],
-      "object_note": "Width inf: pinch line ~20 mm off cap centre, pads still pinch rim; mating side free."
-    },
-    {
-      "key": "cap__iqeyba",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch across 75 mm lid, fingertips at rim, top free"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch across 75 mm lid, both fingertips on rim"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rim pinch across 75 mm lid, both fingertips on rim"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "More centred pinch (45/30), both fingertips on rim"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "More centred pinch (45/30), both fingertips on rim"}
-      ],
-      "object_note": "Width inf because pinch line lies above thin lid; fingertip edges pinch rim, underside free."
-    },
-    {
-      "key": "cap__vnpjfn",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch at 30 deg; cap pivoted about pinch axis, pads touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "30 deg tilt rim pinch across 76 mm cap"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "30 deg tilt rim pinch across 76 mm cap"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "30 deg tilt rim pinch across 76 mm cap"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "30 deg tilt rim pinch across 76 mm cap"}
-      ],
-      "object_note": "Chrome cap; width inf since pinch line above cap; fingers 50/26 match diameter."
-    },
-    {
-      "key": "cap__xxqyrt",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch, fingers 50/0 span ~48 mm cap, both touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch at 30 deg, both fingertips on rim"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rim pinch at 30 deg, both fingertips on rim"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Vertical rim pinch, both fingertips on rim"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Vertical rim pinch, both fingertips on rim"}
-      ],
-      "object_note": "Fingers 50/0: cap sits at gripper edge (both joint limits) yet V2 shows both pads on rim."
-    },
-    {
-      "key": "carton_of_milk__kklgxk",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Top pinch across 45 mm carton, fingers 47/0 both touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Top pinch across carton width, both pads flat"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Top pinch across carton width, both pads flat"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Top pinch across carton width, both pads flat"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Top pinch across carton width, both pads flat"}
-      ],
-      "object_note": "Carton off-centre in gripper (47/0) but firmly pinched across full width near top."
-    },
-    {
-      "key": "cellulose_tape__gchdhk",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch across flat roll (~48 mm), both fingertips"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch across flat roll at 30 deg"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rim pinch across flat roll at 30 deg"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Rim pinch across flat roll at 30 deg"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Vertical rim pinch, fingers 48/0 both touch"}
-      ],
-      "object_note": "Width inf: pinch line above flat roll; fingertip pads pinch rim."
-    },
-    {
-      "key": "cellulose_tape__kavsnx",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch across 60 mm roll, both pads touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch across 60 mm roll, both pads touch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rim pinch at 30 deg, both pads touch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Rim pinch at 30 deg, both pads touch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Off-centre chord pinch (CoM 21 mm off axis), pad corners"}
-      ],
-      "object_note": "Rank 5 pinches a chord near roll edge; would self-centre or hold, non-optimal only."
-    },
-    {
-      "key": "cellulose_tape__sklkyc",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Rim pinch across flat roll at 30 deg, fingers 50/1"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Rim pinch across flat roll at 30 deg"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Rim pinch across flat roll at 30 deg"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Rim pinch, roll seen edge-on between fingertips"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Rim pinch, roll seen edge-on between fingertips"}
-      ],
-      "object_note": "Width inf: pinch line above flat roll; fingers 50/0 span roll diameter."
-    },
-    {
-      "key": "cherry_tomato__dqjuub",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Diameter pinch, fingers 35/0 match 33 mm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Diameter pinch, both pads on tomato"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Diameter pinch, both pads on tomato"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Diameter pinch, both pads on tomato"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Diameter pinch, both pads on tomato"}
-      ],
-      "object_note": "Round tomato; all rows equivalent 30 deg side pinches."
-    },
-    {
-      "key": "cherry_tomato__dqvtgm",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Pinch across 18 mm width of upright oval tomato"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Pinch across short axis, 34 deg tilt, both pads"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Pinch across short axis, both pads touch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Pinch line near top; pads contact widest part (19 mm)"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Pinch line near top; pads contact widest part (19 mm)"}
-      ],
-      "object_note": "Low antipodal scores in rows 4-5 reflect pinch line, actual pad contact is at body."
-    },
-    {
-      "key": "cherry_tomato__eukpfb",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Short-axis pinch, pads 22 mm apart, both touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Lengthwise pinch at rounded ends (35 mm); antipodal"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Short-axis pinch with pad lower edges, both touch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Short-axis pinch at 33 deg, both pads touch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Lengthwise pinch at rounded ends (35 mm); antipodal"}
-      ],
-      "object_note": "Width inf rows: pinch line above tomato, pad lower edges contact; small light object."
-    },
-    {
-      "key": "cherry_tomato__hmsqrh",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Lengthwise pinch at rounded ends (36 mm), both pads"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Diagonal pinch of oval, pads 32 mm, both touch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Short-axis pinch, pads 27 mm, both touch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Lengthwise pinch at rounded ends, both pads"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Lengthwise pinch at rounded ends, both pads"}
-      ],
-      "object_note": "Low antipodal scores are pinch-line metrics; pads contact widest extremes of oval."
-    },
-    {
-      "key": "cherry_tomato__iydznu",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Diagonal pinch of oval, pads 29 mm, both touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Diagonal pinch, vertical approach, both pads touch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Short-axis pinch, pads 24 mm, both touch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Short-axis pinch, vertical approach, both touch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Lengthwise pinch at rounded ends (32 mm)"}
-      ],
-      "object_note": "Width inf: pinch line above tomato, pad lower edges contact."
-    },
-    {
-      "key": "chili__agecro",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Mid-body pinch across 20 mm chili, both pads"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Mid-body pinch at 31 deg, both pads"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Pinch near shoulder below stem, both pads"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Pinch near shoulder, 27 deg tilt, both pads"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Pinch upper body, ~13 mm off CoM on long chili"}
-      ],
-      "object_note": "Long green chili; width inf because pinch line sits above thin body."
-    },
-    {
-      "key": "chili__pbbkpz",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Mid-body pinch across 10 mm chili"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Mid-body pinch at 29 deg, both pads"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Mid-body pinch at 30 deg, both pads"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Pinch ~15 mm toward end; light chili, still holds"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "Pinched tip-to-stem along length (39 mm); point contacts"}
-      ],
-      "object_note": "Small curved chili ~45 mm; rank 5 squeezes it end to end, would rotate out."
-    },
-    {
-      "key": "chili__rafkbt",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Mid-body pinch at 31 deg, pads 19 mm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Mid-body pinch, vertical approach, both pads"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Pinch near shoulder at 30 deg, both pads"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Upper-body pinch, ~15 mm off CoM, fine"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Pinch toward tip (15 mm thick), still on body"}
-      ],
-      "object_note": "Red chili ~70 mm; all pinches across body thickness."
-    },
-    {
-      "key": "cinnamon_stick__qmlyim",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "Fingers fully closed (1/0); stick tip barely caught, 28 mm lever"}
-      ],
-      "object_note": "Only 1/12 valid; hollow bark roll pinched at very end, rest of stick hangs free."
-    },
-    {
-      "key": "cookie_cutter__fvxiun",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Side pinch across heart walls, both pads touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Non-antipodal walls (0.31) but rigid cutter held both sides"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Non-antipodal walls (0.31) but rigid cutter held both sides"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Side pinch across heart walls, both pads touch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Side pinch, cutter edge-on between fingertips"}
-      ],
-      "object_note": "Heart cutter lying flat; pads on outer walls, fingertips at table level."
-    },
-    {
-      "key": "cookie_cutter__jpscvj",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Side pinch across star points, both pads touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Side pinch across star points, both pads touch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Side pinch, star edge-on between fingertips"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Side pinch (50/7), both pads on star points"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Side pinch (50/8), both pads on star points"}
-      ],
-      "object_note": "Star cutter lying flat; pads bridge points on each side."
-    },
-    {
-      "key": "cookie_cutter__lqrfzo",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Side pinch across lobes, both pads touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Side pinch across lobes, both pads touch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Side pinch, cutter edge-on between fingertips"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Off-centre pinch (CoM 21 mm), lobes stick out, holds"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Off-centre pinch (CoM 22 mm), lobes stick out, holds"}
-      ],
-      "object_note": "Flower cutter lying flat; rows 4-5 off-centre but light rigid part."
-    },
-    {
-      "key": "cork__lseuwf",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"}
-      ],
-      "object_note": "Fingers 20/0 match 18 mm cork; attach point 48 mm away at top, unobstructed in V4."
-    },
-    {
-      "key": "cork__ncxgpe",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Diameter pinch of standing cork; top mating end free"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Diameter pinch (18/0) of standing cork; top end free"}
-      ],
-      "object_note": "Fingers 19/0 match 17 mm cork; attach point 50 mm away at top, unobstructed."
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "Pads 73 mm apart on 19 mm handle; visible daylight"
     }
-  ]
+   ],
+   "object_note": "Handle collision hull much larger than visual strap; ranks 3-5 float between pads (V4)."
+  },
+  {
+   "key": "cap__xxqyrt",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch, fingers 50/0 span ~48 mm cap, both touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch at 30 deg, both fingertips on rim"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch at 30 deg, both fingertips on rim"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Vertical rim pinch, both fingertips on rim"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Vertical rim pinch, both fingertips on rim"
+    }
+   ],
+   "object_note": "Fingers 50/0: cap sits at gripper edge (both joint limits) yet V2 shows both pads on rim."
+  },
+  {
+   "key": "cellulose_tape__kavsnx",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across 60 mm roll, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across 60 mm roll, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch at 30 deg, both pads touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch at 30 deg, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Off-centre chord pinch (CoM 21 mm off axis), pad corners"
+    }
+   ],
+   "object_note": "Rank 5 pinches a chord near roll edge; would self-centre or hold, non-optimal only."
+  },
+  {
+   "key": "cork__ncxgpe",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch (18/0) of standing cork; top end free"
+    }
+   ],
+   "object_note": "Fingers 19/0 match 17 mm cork; attach point 50 mm away at top, unobstructed."
+  }
+ ]
 }

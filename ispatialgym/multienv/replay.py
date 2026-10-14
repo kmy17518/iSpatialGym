@@ -1,12 +1,12 @@
 """Kinematic replayer: BEHAVIOR LeRobot v3 shards from physics-only ``demo.hdf5`` files (``ISPATIALGYM_PHYSICS_ONLY=1``
 collection, :mod:`ispatialgym.oracle.physics_only`).
 
-    python -m ispatialgym.multienv.replay --demos <demo dir>[,<demo dir>...] --root <lerobot root> --task <alias>
+    python -m ispatialgym.multienv.replay --demos <demo dir>[,<demo dir>...] --root <lerobot root> --task <variant>
         [--batched-usd-edits] [--slots 1] [--tiled] [--repo-prefix replay] [--async-flush] [--first-renders 10]
         [--renders 1] [--warmup-s 60] [--proprio recorded|loaded] [--results <jsonl>]
     python -m ispatialgym.multienv.replay --watch <demo root> --done-file <path> ...   (a pipeline stage: see below)
 
-One process per alias, ``--slots`` scenes of the alias's scene in one simulator, each slot playing a different demo (a
+One process per variant, ``--slots`` scenes of the variant's scene in one simulator, each slot playing a different demo (a
 slot takes the next demo of the list when its demo ends). The demos must share a template (the same scene objects), as
 production's one-world replay (``replay_obs_isg.py --one-world``). Per tick every slot loads its demo's next recorded
 state into its scene (no physics step), the cameras render once, and each slot's cameras feed that slot's BEHAVIOR
@@ -296,7 +296,7 @@ def main(argv=None) -> int:
     ap.add_argument("--claims", default=None, help="--watch: claim directory shared by several replayers of one demo root")
     ap.add_argument("--poll-s", type=float, default=5.0)
     ap.add_argument("--root", required=True, help="LeRobot root dir: one dataset per slot, <root>/<repo prefix>_slot<k>")
-    ap.add_argument("--task", required=True, help="task name written into the datasets (the alias)")
+    ap.add_argument("--task", required=True, help="task name written into the datasets (the variant)")
     ap.add_argument("--slots", type=int, default=1)
     ap.add_argument("--tiled", action="store_true",
                     help="with several slots, one tiled render product per camera name. Depth matches collection, rgb does not: the "

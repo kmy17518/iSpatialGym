@@ -1,5 +1,0 @@
-{"key": "cooler__pnkiag", "joint": "j_lid", "feasible": true,
- "proposal": {"face": "outer", "a": 0.5, "b": 0.25, "pinch": "horizontal", "approach": "above", "depth_mm": 15,
-              "expected_motion": "lift"},
- "alternative": {"face": "outer", "a": 0.5, "b": 0.75, "pinch": "horizontal", "approach": "above", "depth_mm": 15, "expected_motion": "lift"},
- "note": "Fingers into the two front cup-holder recesses, pinch the ~70 mm bridge between them, lift; lid hinges on right edge. Needs cups >=15 mm deep.", "confidence": "low"}

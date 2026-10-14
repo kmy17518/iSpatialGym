@@ -1,7 +1,0 @@
-{
-  "category": "box_of_tissues",
-  "pages_opened": ["grids/pool_other/box_of_tissues__p1.png", "grids/pool_other/box_of_tissues__p2.png"],
-  "n_models": 24,
-  "exclude": [],
-  "notes": "All 24 intact and upright/flat as expected. tissue_dispenser/frdbld is a plain white cube with a tissue protruding, i.e. a target lookalike (kept, category chosen upstream); nflhrf is a tall grey dispenser. bag_of_cream_cheese/dxrsol (7.5 deg) lies flat with an abstract wrapper, readable as a packet. Bag-of-food items lie flat by design."
-}

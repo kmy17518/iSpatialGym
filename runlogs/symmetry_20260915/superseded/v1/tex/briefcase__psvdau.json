@@ -1,1 +1,0 @@
-{"key": "briefcase__psvdau", "category": "briefcase", "model": "psvdau", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.002298578499235412, "p95": 0.00392156862745098, "p99": 0.06013071895424837, "mad_union": 0.07113384522041769, "iou": 0.9217910547063423, "worst": "z180"}}, "render_s": 0.125}

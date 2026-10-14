@@ -3,7 +3,7 @@
   "instance_id": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table__house_single_floor__target-teacup-zdvgol__partner-saucer-hwqivo__0000",
   "tro_sha256": "6ea16dc2d499d1c54e7bb9b949d996adce87961e08e9caddfb8cfa68aa9a062e",
   "task_family": "inter_object_relation_satisfaction",
-  "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

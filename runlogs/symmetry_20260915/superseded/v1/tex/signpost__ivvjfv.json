@@ -1,1 +1,0 @@
-{"key": "signpost__ivvjfv", "category": "signpost", "model": "ivvjfv", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.01363679455228785, "p95": 0.09542483660130718, "p99": 0.26405228758169935, "mad_union": 0.013753792480738441, "iou": 0.9984840239446474, "worst": "x180"}}, "render_s": 0.108}

@@ -1,1 +1,0 @@
-{"key": "hamper__drgdfh", "category": "hamper", "model": "drgdfh", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.00017086294064030627, "p95": 0.00130718954248366, "p99": 0.00392156862745098, "mad_union": 0.0001804694431040744, "iou": 1.0, "worst": "z180"}}, "render_s": 0.108}

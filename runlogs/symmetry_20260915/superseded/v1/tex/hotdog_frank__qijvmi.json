@@ -1,1 +1,0 @@
-{"key": "hotdog_frank__qijvmi", "category": "hotdog_frank", "model": "qijvmi", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"y2": {"mad": 0.00767014574662904, "p95": 0.02091503267973856, "p99": 0.09963398692810371, "mad_union": 0.11022108463089844, "iou": 0.8541257628018042, "worst": "y180"}}, "render_s": 0.12}

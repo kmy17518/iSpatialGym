@@ -3,7 +3,7 @@
 Pure module (no simulator): ``ground_isg`` (D1) and the CLIs import it, the tests exercise the draw rules without a
 scene. The inputs are the D1 artefacts only (README contract 1):
 
-* the customs entry ``task_custom_lists.json[alias]`` — ``iddl``, ``definition_id``, ``roles.<role>.{category,
+* the customs entry ``task_custom_lists.json[variant]`` — ``iddl``, ``definition_id``, ``roles.<role>.{category,
   sampleable, require, representative, scale, joint, dataset}``, ``scenes.<scene>.{rooms, bindings, whitelist,
   blacklist}``, ``generation`` (``templates_max``, ``instances_per_template``, ``tolerances``, ``groups.<role>.{size,
   draw}``, ``path_buckets``, task numbers), ``constraints`` (typed, scoped records);
@@ -47,7 +47,7 @@ DEFAULT_ICL_ROOT = os.path.join(ASSETS_ROOT, "icl")
 SCENE_CANDIDATES = ("house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large",
                     "restaurant_diner", "office_cubicles_right")
 
-#: subtask id -> (activity directory, task family) for the aliases ``<subtask>-<categories...>``
+#: subtask id -> (activity directory, task family) for the variants ``<subtask>-<categories...>``
 SUBTASK_FAMILY = {
     "camera_relocalization-standard": ("camera_relocalization", "camera_relocalization"),
     "camera_relocalization-obstructed": ("camera_relocalization", "camera_relocalization"),
@@ -60,7 +60,7 @@ SUBTASK_FAMILY = {
     "configuration_matching-articulation_close_large_scale": ("configuration_matching", "configuration_matching"),
     "configuration_matching-articulation_open_small_scale": ("configuration_matching", "configuration_matching"),
     "configuration_matching-articulation_close_small_scale": ("configuration_matching", "configuration_matching"),
-    # ... and the spelling the first task modules registered under (kept as aliases)
+    # ... and the spelling the first task modules registered under (kept as variants)
     "configuration_matching-articulation_large_scale-open": ("configuration_matching", "configuration_matching"),
     "configuration_matching-articulation_large_scale-close": ("configuration_matching", "configuration_matching"),
     "configuration_matching-articulation_small_scale-open": ("configuration_matching", "configuration_matching"),
@@ -85,7 +85,7 @@ class GroundingError(ValueError):
     pass
 
 
-def subtask_of_alias(alias: str, iddl: Optional[str] = None) -> str:
+def subtask_of_variant(variant: str, iddl: Optional[str] = None) -> str:
     """``inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table`` -> the subtask id (longest
     known prefix); the iddl path (``<family>/<subtask>.iddl``) decides when it is given."""
     if iddl:
@@ -95,10 +95,10 @@ def subtask_of_alias(alias: str, iddl: Optional[str] = None) -> str:
             return cand
     best = ""
     for st in SUBTASK_FAMILY:
-        if (alias == st or alias.startswith(st + "-")) and len(st) > len(best):
+        if (variant == st or variant.startswith(st + "-")) and len(st) > len(best):
             best = st
     if not best:
-        raise GroundingError(f"alias {alias!r} matches no known subtask id {sorted(SUBTASK_FAMILY)}")
+        raise GroundingError(f"variant {variant!r} matches no known subtask id {sorted(SUBTASK_FAMILY)}")
     return best
 
 
@@ -282,10 +282,10 @@ class RoleEntry:
 class GroundedProblem:
     """One customs entry, its grounded BDDL and the scene bindings (README module map: ``v2/problem.py``)."""
 
-    def __init__(self, alias: str, entry: Dict[str, Any], bddl=None, iddl_path: Optional[str] = None, customs_path: Optional[str] = None,
+    def __init__(self, variant: str, entry: Dict[str, Any], bddl=None, iddl_path: Optional[str] = None, customs_path: Optional[str] = None,
                  bddl_root: Optional[str] = None, lookalikes: Optional[LookalikeIndex] = None, subtask: Optional[str] = None,
                  bddl_text: Optional[str] = None):
-        self.alias = alias
+        self.variant = variant
         self.entry = entry
         self.customs_path = customs_path
         self.bddl_root = bddl_root or DEFAULT_BDDL_ROOT
@@ -293,7 +293,7 @@ class GroundedProblem:
         self.iddl = None  # ``sampling.iddl`` object once D1 lands (see :meth:`load`)
         self.bddl = bddl  # ISGProblem of the grounded BDDL (None for the v1 facade until it is rendered)
         self.bddl_text = bddl_text
-        self.subtask = subtask or subtask_of_alias(alias, entry.get("iddl"))
+        self.subtask = subtask or subtask_of_variant(variant, entry.get("iddl"))
         self.activity, self.family = SUBTASK_FAMILY[self.subtask]
         self.definition_id = int(entry.get("definition_id", 0))
         self.lookalikes = lookalikes or LookalikeIndex()
@@ -315,40 +315,44 @@ class GroundedProblem:
 
     # -- loading ------------------------------------------------------------------------------------------------
     @classmethod
-    def load(cls, alias: str, customs_path: Optional[str] = None, bddl_root: Optional[str] = None, icl_root: Optional[str] = None,
+    def load(cls, variant: str, customs_path: Optional[str] = None, bddl_root: Optional[str] = None, icl_root: Optional[str] = None,
              iddl_root: Optional[str] = None) -> "GroundedProblem":
-        """Load ``customs_path[alias]`` (default ``assets/task_specs/task_custom_lists.json``), the grounded BDDL
-        ``<bddl_root>/<activity>/problem<definition_id>.bddl`` and, when ``sampling.iddl`` exists (D1), the parsed iddl."""
+        """Load the customs entry of ``variant``'s subtask (``customs_path[ispatialgym.eval.names.subtask_name(variant)]``, default
+        ``assets/task_specs/isg_customs.json``), the grounded BDDL ``<bddl_root>/<activity>/problem<definition_id>.bddl`` and,
+        when ``sampling.iddl`` exists (D1), the parsed iddl."""
+        from ispatialgym.eval.names import subtask_name
+
         customs_path = customs_path or DEFAULT_CUSTOMS
         with open(customs_path) as f:
             data = json.load(f)
-        if alias not in data:
-            raise GroundingError(f"alias {alias!r} not in {customs_path}; have {sorted(k for k in data if not k.startswith('_'))[:20]}...")
-        entry = data[alias]
-        gp = cls(alias, entry, customs_path=customs_path, bddl_root=bddl_root, lookalikes=LookalikeIndex.load(icl_root))
+        key = subtask_name(variant)
+        if key not in data:
+            raise GroundingError(f"subtask {key!r} ({variant}) not in {customs_path}; have {sorted(k for k in data if not k.startswith('_'))[:20]}...")
+        entry = data[key]
+        gp = cls(variant, entry, customs_path=customs_path, bddl_root=bddl_root, lookalikes=LookalikeIndex.load(icl_root))
         gp.iddl_path = os.path.join(iddl_root or DEFAULT_IDDL_ROOT, entry["iddl"]) if entry.get("iddl") else None
         gp.iddl = _load_iddl(gp.iddl_path)
         from ispatialgym.activity.problem import load_problem, problem_path
 
         path = problem_path(gp.activity, gp.definition_id, gp.bddl_root)
         if not os.path.isfile(path):
-            raise GroundingError(f"grounded BDDL missing: {path} (alias {alias}, definition_id {gp.definition_id})")
+            raise GroundingError(f"grounded BDDL missing: {path} (variant {variant}, definition_id {gp.definition_id})")
         gp.bddl = load_problem(gp.activity, gp.definition_id, gp.bddl_root)
         with open(path) as f:
             gp.bddl_text = f.read()
-        if gp.bddl.alias and gp.bddl.alias != alias and not alias.startswith(gp.bddl.alias):
-            # the BDDL alias may be the short variant name (v1 style); the customs alias is authoritative
+        if gp.bddl.variant and gp.bddl.variant != variant and not variant.startswith(gp.bddl.variant):
+            # the BDDL variant may be the short variant name (v1 style); the customs variant is authoritative
             pass
         return gp
 
     @classmethod
-    def from_v1_spec(cls, problem_spec, subtask: str, alias: Optional[str] = None, scene: Optional[str] = None) -> "GroundedProblem":
+    def from_v1_spec(cls, problem_spec, subtask: str, variant: Optional[str] = None, scene: Optional[str] = None) -> "GroundedProblem":
         """v1 facade (the smoke path until D1 lands): build a customs-shaped entry from a v1 ``ProblemSpec``
         (``sampling.spec``): spawned roles -> sampleable roles with a one-model whitelist, fixed roles -> scene roles
         bound per scene (``table`` is renamed ``support``), ``generation`` copied. The BDDL is rendered per template by
         ``core`` through the v1 ``bddl_writer`` (``bddl`` stays None here)."""
         isg = (problem_spec.raw or {}).get("_isg") or {}
-        alias = alias or isg.get("alias") or f"{subtask}-v1-{problem_spec.name}"
+        variant = variant or isg.get("variant") or f"{subtask}-v1-{problem_spec.name}"
         roles: Dict[str, Any] = {}
         for r in problem_spec.roles.values():
             role_name = "support" if r.name == "table" else r.name
@@ -382,13 +386,13 @@ class GroundedProblem:
         for role, pipe in pipelines.items():
             roles.setdefault(role, {}).setdefault("require", {})["grasps"] = pipe
         entry = {"iddl": isg.get("iddl"), "definition_id": problem_spec.definition_id, "roles": roles, "scenes": scenes,
-                 "generation": dict(problem_spec.generation), "constraints": [], "_v1": {"name": problem_spec.name, "alias": problem_spec.alias}}
-        return cls(alias, entry, subtask=subtask)
+                 "generation": dict(problem_spec.generation), "constraints": [], "_v1": {"name": problem_spec.name, "variant": problem_spec.variant}}
+        return cls(variant, entry, subtask=subtask)
 
     # -- v1-compatible facade -----------------------------------------------------------------------------------
     @property
     def name(self) -> str:
-        return self.alias
+        return self.variant
 
     @property
     def generation(self) -> Dict[str, Any]:
@@ -453,17 +457,17 @@ class GroundedProblem:
         return dict(self.entry["scenes"][scene].get("bindings") or {})
 
     def floor_only(self) -> bool:
-        """The only scene role is the floor (held-object tasks, camera relocalization): the alias can be sampled in any room."""
+        """The only scene role is the floor (held-object tasks, camera relocalization): the variant can be sampled in any room."""
         return set(self.scene_roles()) <= {"floor"}
 
     def override_scene_room(self, scene: str, room: str, note: str = "") -> bool:
         """Sample ``scene`` in ``room`` (``sample_isg --room`` / ``--scene-from-split``, ``multiply_isg --split train``): the scene's
         block becomes ``rooms [room]``, ``bindings.floor {room}``, the whitelist / blacklist of the entry's block for the scene (else
         of its first scene) and ``_synthesized = note``; asking for the room of the entry's own block restores that block. Only for
-        aliases whose only scene role is the floor (``GroundingError`` otherwise). The entry's own block is what the source customs
+        variants whose only scene role is the floor (``GroundingError`` otherwise). The entry's own block is what the source customs
         file gets back (:meth:`save_customs`). Returns True when the block is synthesized."""
         if not self.floor_only():
-            raise GroundingError(f"{self.alias}: a room override needs an alias whose only scene role is the floor (scene roles {self.scene_roles()})")
+            raise GroundingError(f"{self.variant}: a room override needs a variant whose only scene role is the floor (scene roles {self.scene_roles()})")
         scenes = self.entry["scenes"]
         own = self.scene_overrides[scene] if scene in self.scene_overrides else scenes.get(scene)
         if own is not None and _block_room(own) == room:
@@ -492,21 +496,21 @@ class GroundedProblem:
         touches, ``edges`` when it keeps only some edges of the top); ``GroundingError`` when the scene, the support or the row is not
         in the block."""
         if "support" not in self.roles:
-            raise GroundingError(f"{self.alias}: no support role to select (roles {sorted(self.roles)})")
+            raise GroundingError(f"{self.variant}: no support role to select (roles {sorted(self.roles)})")
         own = self.scene_overrides[scene] if scene in self.scene_overrides else self.entry["scenes"].get(scene)
         if own is None:
-            raise GroundingError(f"{self.alias}: no scene block {scene!r} (scenes {self.scene_names()})")
+            raise GroundingError(f"{self.variant}: no scene block {scene!r} (scenes {self.scene_names()})")
         b = copy.deepcopy(own.get("bindings") or {})
         req = b.get("support")
         surfaces: List[Dict[str, Any]] = []
         regions: List[Dict[str, Any]] = []
         if isinstance(req, dict):
             if support != "floor" or row is not None:
-                raise GroundingError(f"{self.alias}: the support of {scene} is the floor ({req}): select it as 'floor', without a row")
+                raise GroundingError(f"{self.variant}: the support of {scene} is the floor ({req}): select it as 'floor', without a row")
         else:
             names = [n for n in (req or []) if isinstance(n, str)]
             if support not in names:
-                raise GroundingError(f"{self.alias}: {support!r} is not a support of {scene} (bindings.support {names})")
+                raise GroundingError(f"{self.variant}: {support!r} is not a support of {scene} (bindings.support {names})")
             b["support"] = [support]
             surfaces = [e for e in b.get("support_surfaces") or [] if isinstance(e, dict) and e.get("name") == support]
             regions = [r for r in b.get("support_regions") or [] if isinstance(r, dict) and r.get("wall") == support]
@@ -516,10 +520,10 @@ class GroundedProblem:
                 elif any(r.get("id") == row for r in regions):
                     regions = [r for r in regions if r.get("id") == row]
                 else:
-                    raise GroundingError(f"{self.alias}: {row!r} is neither a support_surfaces row of {support} in {scene} "
+                    raise GroundingError(f"{self.variant}: {row!r} is neither a support_surfaces row of {support} in {scene} "
                                          f"({[e.get('row') for e in surfaces]}) nor one of its support_regions ({[r.get('id') for r in regions]})")
             elif len(surfaces) > 1:
-                raise GroundingError(f"{self.alias}: {support} has {len(surfaces)} support_surfaces rows in {scene} "
+                raise GroundingError(f"{self.variant}: {support} has {len(surfaces)} support_surfaces rows in {scene} "
                                      f"({[e.get('row') for e in surfaces]}): name one")
             for key, kept in (("support_surfaces", surfaces), ("support_regions", regions)):
                 if kept:
@@ -661,11 +665,13 @@ class GroundedProblem:
         entry = self.entry
         if self.scene_overrides and (self.customs_path is None or os.path.abspath(path) == os.path.abspath(self.customs_path)):
             entry = {**self.entry, "scenes": self.own_scenes()}
+        from ispatialgym.eval.names import subtask_name
+
         data = {}
         if os.path.exists(path):
             with open(path) as f:
                 data = json.load(f)
-        data[self.alias] = entry
+        data[subtask_name(self.variant)] = entry
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f, indent=1)
@@ -835,8 +841,8 @@ def draw_group(problem: GroundedProblem, role: str, scene: str, rng, taken: Set[
                pools: Optional[Dict[str, List[str]]] = None) -> Optional[List[ModelChoice]]:
     """Members of group ``role`` per ``generation.groups.<role>``: ``size`` drawn, ``draw = same_model`` (one model, N
     copies) or ``unique`` (pairwise distinct, at most one model per look-alike group, none a look-alike of the target,
-    none in ``taken``). ``members`` (D1: ``{category: count}`` in alias order, mixed-category distractor / obstacle
-    aliases) fixes how many members each category contributes — the grounded BDDL declares exactly those instances.
+    none in ``taken``). ``members`` (D1: ``{category: count}`` in variant order, mixed-category distractor / obstacle
+    variants) fixes how many members each category contributes — the grounded BDDL declares exactly those instances.
     ``pools`` overrides the whitelist (disembedding distractor pools). None when a pool is short."""
     spec = problem.group_spec(role)
     wl = pools if pools is not None else problem.whitelist(scene, role)
@@ -871,7 +877,7 @@ def draw_group(problem: GroundedProblem, role: str, scene: str, rng, taken: Set[
     members_spec = spec.get("members")
     chosen: List[Tuple[str, str]] = []
     if isinstance(members_spec, dict) and members_spec:
-        for cat, n in members_spec.items():  # alias order = BDDL instance order
+        for cat, n in members_spec.items():  # variant order = BDDL instance order
             part = draw(admissible([cat]), int(n), chosen)
             if part is None:
                 return None
@@ -999,7 +1005,7 @@ def new_run_summary(sampler_version: str, customs_path: Optional[str], out_root:
 
 
 def template_summary(n_written: int, time_s: float, rejections: RejectionLog, seeds: Sequence[int] = (), extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """``problems.<alias>.<template_id>`` entry: the v1 keys ``n_written`` / ``time_s`` (read by ``bench_report.py``) plus
+    """``problems.<variant>.<template_id>`` entry: the v1 keys ``n_written`` / ``time_s`` (read by ``bench_report.py``) plus
     the per-reason ``rejections`` (attempts rejected, with examples), ``counters`` (bookkeeping such as ``scene_reset``
     — not rejections; ``extra["counters"]``), and the seeds."""
     counts = {k: v for k, v in rejections.counts.items() if k != "scene_reset"}

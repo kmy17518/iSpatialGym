@@ -1,1 +1,0 @@
-{"key": "guitar__cybisc", "category": "guitar", "model": "cybisc", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.06526931280598791, "p95": 0.09934640522875816, "p99": 0.19215686274509805, "mad_union": 0.18655040304947793, "iou": 0.8406997624978277, "worst": "x180"}}, "render_s": 0.122}

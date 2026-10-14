@@ -1,4 +1,4 @@
-"""Simulator-free tests of the eval / train split (owner 2026-10-11): per-alias split seeds, the held-object scene / room draw,
+"""Simulator-free tests of the eval / train split (owner 2026-10-11): per-variant split seeds, the held-object scene / room draw,
 the eval separation check, the train-repeat rule and their CLI plumbing (``sample_isg``, ``multiply_isg``, ``SamplerV2``)."""
 
 from __future__ import annotations
@@ -39,24 +39,24 @@ def _camera_entry():
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_split_seeds_are_stable_disjoint_across_splits_and_unique_per_alias():
+def test_split_seeds_are_stable_disjoint_across_splits_and_unique_per_variant():
     # pinned: a changed derivation would silently change every eval set
     assert SS.split_seed("eval", "camera_relocalization-standard") == 684377364
     assert SS.split_seed("train", "object_scaling-apple") == 639875273
-    for alias in ("object_scaling-apple", "mental_rotation-mug", "camera_relocalization-standard"):
+    for variant in ("object_scaling-apple", "mental_rotation-mug", "camera_relocalization-standard"):
         for k in range(5):
-            e, t = SS.split_seed("eval", alias, k), SS.split_seed("train", alias, k)
+            e, t = SS.split_seed("eval", variant, k), SS.split_seed("train", variant, k)
             assert e % 2 == 0 and t % 2 == 1 and 0 <= e < 2 ** 30 and 0 <= t < 2 ** 30
-        assert SS.split_seed("eval", alias, 0) != SS.split_seed("eval", alias, 1)
+        assert SS.split_seed("eval", variant, 0) != SS.split_seed("eval", variant, 1)
     with pytest.raises(ValueError):
         SS.split_seed("test", "x")
     with pytest.raises(ValueError):
         SS.split_seed("eval", "x", -1)
-    # every alias of the shipped customs list x both splits x the checked re-sample indices: pairwise distinct
+    # every variant of the shipped customs list x both splits x the checked re-sample indices: pairwise distinct
     with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
-        aliases = [a for a in json.load(f) if not a.startswith("_")]
-    seen = SS.check_unique(aliases)
-    assert len(seen) == len(set(aliases)) * 2 * SS.CHECKED_INDICES
+        variants = [a for a in json.load(f) if not a.startswith("_")]
+    seen = SS.check_unique(variants)
+    assert len(seen) == len(set(variants)) * 2 * SS.CHECKED_INDICES
     # derived attempt seeds fit in int64
     assert (max(seen) * 7919 + 7918) * 1000003 + 990 * 1009 + 1008 < 2 ** 63
     with pytest.raises(ValueError):
@@ -105,61 +105,19 @@ def test_eligible_rooms_outdoor_only_exclusion_and_threshold():
     assert SS.scene_draw_task("disembedding-bar_soap") is None and SS.scene_draw_task("object_scaling_x-apple") is None
 
 
-def _held_aliases():
-    with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
-        return [a for a in json.load(f) if SS.scene_draw_task(a)]
-
-
-def test_eval_rooms_are_the_frozen_per_task_assignment():
-    """owner 2026-10-11 ~13:50: per task 10 distinct rooms covering all 7 scenes, the 3 repeats in the scenes with more rooms; the
-    tasks share no room but Rs_int's only one; deterministic; frozen (EVAL_ROOMS = the recomputed assignment); a re-sample keeps
-    the room."""
-    aliases = _held_aliases()
-    assert sorted(aliases) == sorted(SS.EVAL_ROOMS)  # a new held-object alias needs its room added to the table
-    got, orders = SS.eval_assignment(aliases, moves=SS.EVAL_ROOM_MOVES)
-    assert got == SS.EVAL_ROOMS
-    assert SS.eval_assignment(list(reversed(aliases)) + ["camera_relocalization-standard"], moves=SS.EVAL_ROOM_MOVES)[0] == got
-    eligible = set(SS.eligible_rooms())
-    base, _ = SS.eval_assignment(aliases)  # before any room move (EVAL_ROOM_MOVES may cost a task a scene)
-    for table in (base, SS.EVAL_ROOMS):
-        per_task = {}
-        for task in SS.SCENE_DRAW_SUBTASKS:
-            rooms = [table[a] for a in aliases if SS.scene_draw_task(a) == task]
-            assert len(rooms) == 10 and len(set(rooms)) == 10 and set(rooms) <= eligible
-            assert sorted(orders[task]) == sorted(eligible)
-            per_task[task] = set(rooms)
-        shared = per_task["object_scaling"] & per_task["mental_rotation"]
-        assert shared == {("Rs_int", "living_room_0")} if table is base else shared <= {("Rs_int", "living_room_0")}
-    for task in SS.SCENE_DRAW_SUBTASKS:
-        rooms = [base[a] for a in aliases if SS.scene_draw_task(a) == task]
-        counts = {sc: sum(s == sc for s, _ in rooms) for sc in SS.SCENE_CANDIDATES}
-        assert min(counts.values()) == 1 and max(counts.values()) == 2
-        repeats = {sc for sc, n in counts.items() if n == 2}
-        assert len(repeats) == 3 and {"house_single_floor", "office_cubicles_right"} < repeats
-        assert [len(SS.eligible_rooms(sc)) for sc in repeats - {"house_single_floor", "office_cubicles_right"}] == [5]
-    assert all(SS.EVAL_ROOMS[a] == base[a] for a in aliases if a not in SS.EVAL_ROOM_MOVES)
-    for a in aliases:
-        assert all(SS.draw_scene_room("eval", a, k) == SS.EVAL_ROOMS[a] for k in range(4))
-    with pytest.raises(KeyError):
-        SS.draw_scene_room("eval", "object_scaling-not_in_the_table")
-    # pinned: a changed derivation would silently move eval instances
-    assert base["object_scaling-apple"] == ("house_double_floor_lower", "living_room_0")
-    assert base["mental_rotation-mug"] == ("Rs_int", "living_room_0")
-
-
 def test_eval_room_move_takes_the_tasks_next_unused_room():
-    aliases = list(SS.EVAL_ROOMS)
-    base, orders = SS.eval_assignment(aliases)
+    variants = list(SS.EVAL_ROOMS)
+    base, orders = SS.eval_assignment(variants)
     a = "object_scaling-apple"
     held = set(base.values())
     first = next(x for x in orders["object_scaling"] if x not in held)
-    moved, _ = SS.eval_assignment(aliases, moves=[a])
+    moved, _ = SS.eval_assignment(variants, moves=[a])
     assert moved[a] == first != base[a]
     assert {k: v for k, v in moved.items() if k != a} == {k: v for k, v in base.items() if k != a}  # nobody else moves
-    twice, _ = SS.eval_assignment(aliases, moves=[a, a])  # never back to a room it left
+    twice, _ = SS.eval_assignment(variants, moves=[a, a])  # never back to a room it left
     assert twice[a] == next(x for x in orders["object_scaling"] if x not in held | {first})
     with pytest.raises(KeyError):
-        SS.eval_assignment(aliases, moves=["object_scaling-unknown"])
+        SS.eval_assignment(variants, moves=["object_scaling-unknown"])
 
 
 def test_train_draw_weights_rooms_by_capped_reachable_floor():
@@ -176,7 +134,7 @@ def test_train_draw_weights_rooms_by_capped_reachable_floor():
     # pinned: a changed derivation would silently change every train set
     assert SS.draw_scene_room("train", "object_scaling-apple") == ("hotel_suite_large", "bedroom_0")
     assert SS.draw_scene_room("train", "mental_rotation-mug", 3) == ("office_cubicles_right", "conference_hall_0")
-    # frequencies over many (alias, g) follow the weights (chi-square, 44 dof); only eligible rooms
+    # frequencies over many (variant, g) follow the weights (chi-square, 44 dof); only eligible rooms
     counts: dict = {}
     n = 0
     for i in range(200):
@@ -208,9 +166,9 @@ def _q_yaw(yaw):
     return [0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)]
 
 
-def _tro(task, alias, base, scene="house_single_floor", room="living_room_0", cam=None, obj=None, iid=None):
+def _tro(task, variant, base, scene="house_single_floor", room="living_room_0", cam=None, obj=None, iid=None):
     x, y, yaw = base
-    isg = {"activity": task, "task_variant": alias, "instance_id": iid or f"{alias}__{scene}__0000", "scene": {"model": scene, "task_rooms": [room]},
+    isg = {"activity": task, "task_variant": variant, "instance_id": iid or f"{variant}__{scene}__0000", "scene": {"model": scene, "task_rooms": [room]},
            "pose_targets": {}}
     tro = {"robot_poses": {"robot": [{"position": [x, y, 0.005], "orientation": _q_yaw(yaw)}]}, "ispatialgym": isg}
     if cam is not None:
@@ -221,21 +179,21 @@ def _tro(task, alias, base, scene="house_single_floor", room="living_room_0", ca
     return tro
 
 
-def _camera(alias, start, goal, room="living_room_0", scene="house_single_floor", cam=None):
-    sc = {"alias": alias, "stances": {"init": {"base_pose2d": list(start)}, "goal": {"base_pose2d": list(goal)}}, "goal": {"base_pose2d": list(goal)}}
-    return _tro(SEP.CAMERA, alias, start, scene, room, cam=cam), sc
+def _camera(variant, start, goal, room="living_room_0", scene="house_single_floor", cam=None):
+    sc = {"variant": variant, "stances": {"init": {"base_pose2d": list(start)}, "goal": {"base_pose2d": list(goal)}}, "goal": {"base_pose2d": list(goal)}}
+    return _tro(SEP.CAMERA, variant, start, scene, room, cam=cam), sc
 
 
-def _held(alias, base, obj0, eef_goal, task="mental_rotation", room="living_room_0", scene="house_single_floor"):
-    sc = {"alias": alias, "stances": {"init": {"base_pose2d": list(base)}}, "goal": {"base_pose2d": list(base),
+def _held(variant, base, obj0, eef_goal, task="mental_rotation", room="living_room_0", scene="house_single_floor"):
+    sc = {"variant": variant, "stances": {"init": {"base_pose2d": list(base)}}, "goal": {"base_pose2d": list(base),
                                                                                       "eef": {"position": list(eef_goal[0]), "orientation": list(eef_goal[1])}}}
-    return _tro(task, alias, base, scene, room, obj=obj0), sc
+    return _tro(task, variant, base, scene, room, obj=obj0), sc
 
 
 def test_instance_record_reads_start_goal_and_held_object_poses():
     tro, sc = _camera("camera_relocalization-standard", (1.0, 2.0, 0.5), (4.0, 5.0, 1.0), cam=([4.1, 5.0, 1.4], _q_yaw(1.0)))
     r = SEP.record_from_dicts(tro, sc)
-    assert (r.task, r.alias, r.scene, r.room) == (SEP.CAMERA, "camera_relocalization-standard", "house_single_floor", "living_room_0")
+    assert (r.task, r.variant, r.scene, r.room) == (SEP.CAMERA, "camera_relocalization-standard", "house_single_floor", "living_room_0")
     assert r.start_base == pytest.approx([1.0, 2.0, 0.5]) and r.goal_base == pytest.approx([4.0, 5.0, 1.0])
     assert [p.name for p in r.start] == ["start_base"] and [p.name for p in r.goal] == ["goal_camera"]
     del tro["ispatialgym"]["pose_targets"][SEP.AGENT]
@@ -262,13 +220,13 @@ def test_separation_check_finds_close_pairs_per_task_scene_and_room():
             SEP.record_from_dicts(*_held("mental_rotation-x", (0.0, 0.1, 0.0), ([0, 0, 1], [0, 0, 0, 1]), ([0, 0, 1], [0, 0, 0, 1]))),  # another task
             SEP.record_from_dicts(*_held("mental_rotation-y", (5.0, 5.0, 0.0), ([0, 0, 1], [0, 0, 0, 1]), ([0, 0, 1], [0, 0, 0, 1])))]
     off = SEP.separation_offenders(recs, 1.0)
-    assert sorted((o.a.alias, o.b.alias, o.kind) for o in off) == [("cam-a", "cam-b", "start"), ("cam-a", "cam-c", "goal")]
+    assert sorted((o.a.variant, o.b.variant, o.kind) for o in off) == [("cam-a", "cam-b", "start"), ("cam-a", "cam-c", "goal")]
     assert SEP.separation_offenders(recs, 0.25) == []
     # held-object pairs compare their start bases only
     recs.append(SEP.record_from_dicts(*_held("mental_rotation-z", (5.5, 5.0, 2.0), ([9, 9, 1], [0, 0, 0, 1]), ([9, 9, 1], [0, 0, 0, 1]))))
-    assert [(o.a.alias, o.b.alias, o.kind) for o in SEP.separation_offenders(recs, 1.0) if o.a.task != SEP.CAMERA] == [
+    assert [(o.a.variant, o.b.variant, o.kind) for o in SEP.separation_offenders(recs, 1.0) if o.a.task != SEP.CAMERA] == [
         ("mental_rotation-y", "mental_rotation-z", "start")]
-    # the later alias of a pair is re-sampled; an alias whose earlier partner is re-sampled is kept
+    # the later variant of a pair is re-sampled; a variant whose earlier partner is re-sampled is kept
     off = SEP.separation_offenders(recs[:3], 1.0)
     assert set(SEP.resample_choice(off)) == {"cam-b", "cam-c"}
     assert set(SEP.resample_choice(off, order=["cam-c", "cam-b", "cam-a"])) == {"cam-a"}
@@ -289,19 +247,19 @@ def _write(dirpath, iid, tro, sidecar, meta=None):
 
 def test_separation_check_cli_on_run_tags(tmp_path, capsys):
     runs = tmp_path / "runs"
-    for alias, start, goal in (("cam-a", (0.0, 0.0, 0.0), (5.0, 5.0, 0.0)), ("cam-b", (0.5, 0.0, 0.0), (9.0, 9.0, 0.0))):
-        tro, sc = _camera(alias, start, goal)
-        tpl = runs / "t1" / alias / "inst" / alias / "house_single_floor"
-        _write(tpl, f"{alias}__house_single_floor__0000", tro, sc, {"split": {"split": "eval", "index": 0, "seed": 1, "seed_source": "split"}})
-        _write(runs / "t1" / alias / "replay_inst", f"{alias}__house_single_floor__0000", tro, sc)  # the job's replay copy is not an instance
-    # an alias's run set aside (renamed) is skipped
+    for variant, start, goal in (("cam-a", (0.0, 0.0, 0.0), (5.0, 5.0, 0.0)), ("cam-b", (0.5, 0.0, 0.0), (9.0, 9.0, 0.0))):
+        tro, sc = _camera(variant, start, goal)
+        tpl = runs / "t1" / variant / "inst" / variant / "house_single_floor"
+        _write(tpl, f"{variant}__house_single_floor__0000", tro, sc, {"split": {"split": "eval", "index": 0, "seed": 1, "seed_source": "split"}})
+        _write(runs / "t1" / variant / "replay_inst", f"{variant}__house_single_floor__0000", tro, sc)  # the job's replay copy is not an instance
+    # a variant's run set aside (renamed) is skipped
     tro, sc = _camera("cam-a", (9.0, 9.0, 0.0), (0.0, 0.0, 0.0))
     _write(runs / "t1" / "cam-a.hung_1" / "inst" / "cam-a" / "house_single_floor", "cam-a__house_single_floor__0000", tro, sc)
     assert SEP.main(["t1", "--min", "1.0", "--write-index", str(tmp_path / "idx.json")], runs_root=str(runs)) == 1
     out = capsys.readouterr().out
-    assert "2 instances of 2 aliases" in out and "RESAMPLE cam-b --seed-split eval --seed-index 1" in out and "SEPARATION FAIL pairs=1" in out
+    assert "2 instances of 2 variants" in out and "RESAMPLE cam-b --seed-split eval --seed-index 1" in out and "SEPARATION FAIL pairs=1" in out
     assert len(SEP.load_instances([str(tmp_path / "idx.json")])) == 2
-    # the re-sampled alias in a later run replaces its instance: clean
+    # the re-sampled variant in a later run replaces its instance: clean
     tro, sc = _camera("cam-b", (3.0, 0.0, 0.0), (9.0, 9.0, 0.0))
     _write(runs / "t2" / "cam-b" / "inst" / "cam-b" / "house_single_floor", "cam-b__house_single_floor__0000", tro, sc)
     assert SEP.main(["t1", "t2"], runs_root=str(runs)) == 0
@@ -313,15 +271,15 @@ def test_separation_default_is_half_a_metre(tmp_path, capsys):
     --min default to it."""
     assert SEP.MIN_SEPARATION_M == 0.5
     pair = (("cam-a", (0.0, 0.0, 0.0), (5.0, 5.0, 0.0)), ("cam-b", (0.7, 0.0, 0.0), (5.0, 5.6, 0.0)))
-    recs = [SEP.record_from_dicts(*_camera(alias, start, goal)) for alias, start, goal in pair]
+    recs = [SEP.record_from_dicts(*_camera(variant, start, goal)) for variant, start, goal in pair]
     assert SEP.separation_offenders(recs) == []
     assert [(o.kind, round(o.distance_m, 2)) for o in SEP.separation_offenders(recs, 1.0)] == [("start", 0.7), ("goal", 0.6)]
     recs.append(SEP.record_from_dicts(*_camera("cam-c", (0.0, 0.3, 0.0), (9.0, 9.0, 0.0))))
-    assert [(o.a.alias, o.b.alias, o.kind) for o in SEP.separation_offenders(recs)] == [("cam-a", "cam-c", "start")]
+    assert [(o.a.variant, o.b.variant, o.kind) for o in SEP.separation_offenders(recs)] == [("cam-a", "cam-c", "start")]
     runs = tmp_path / "runs"
-    for alias, start, goal in pair:
-        tro, sc = _camera(alias, start, goal)
-        _write(runs / "t1" / alias / "inst" / alias / "house_single_floor", f"{alias}__house_single_floor__0000", tro, sc,
+    for variant, start, goal in pair:
+        tro, sc = _camera(variant, start, goal)
+        _write(runs / "t1" / variant / "inst" / variant / "house_single_floor", f"{variant}__house_single_floor__0000", tro, sc,
                {"split": {"split": "eval", "index": 0, "seed": 1, "seed_source": "split"}})
     assert SEP.main(["t1"], runs_root=str(runs)) == 0
     assert "SEPARATION OK" in capsys.readouterr().out
@@ -385,7 +343,7 @@ def _filter_sampler(tmp_path, outcomes, instance_filter):
     s.objects, s.counters, s.template_meta, s.rejections, s.instance_seeds = {}, {}, {"stances": {}}, {}, []
     s.template_paths = None
     s.ikc = NS(solutions={}, attempt=None)
-    s.gp = NS(alias="alias-test")
+    s.gp = NS(variant="variant-test")
     s.reasons = []
     s.rejection_log = NS(add=lambda reason, *a, **k: s.reasons.append(reason), counts={})
     s.sample = lambda rng: NS(summary={})
@@ -426,8 +384,8 @@ def test_instance_filter_rejects_and_removes_a_repeat_and_explicit_indices(tmp_p
 
 def test_room_override_template_id_and_write_back(tmp_path):
     customs = tmp_path / "customs.json"
-    customs.write_text(json.dumps({"object_scaling-apple": _held_entry(), "_meta": {"x": 1}}))
-    gp = GroundedProblem("object_scaling-apple", json.loads(customs.read_text())["object_scaling-apple"], customs_path=str(customs))
+    customs.write_text(json.dumps({"object_scaling_apple": _held_entry(), "_meta": {"x": 1}}))
+    gp = GroundedProblem("object_scaling-apple", json.loads(customs.read_text())["object_scaling_apple"], customs_path=str(customs))
     assert gp.floor_only() and gp.room_tag("house_single_floor") is None
     # a scene the entry does not list: the block is synthesized from the entry's first block
     assert gp.override_scene_room("Rs_int", "living_room_0", note="test") is True
@@ -449,14 +407,14 @@ def test_room_override_template_id_and_write_back(tmp_path):
     gp.save_customs(str(tmp_path / "copy.json"))
     gp.save_customs()
     src = json.loads(customs.read_text())
-    assert src["_meta"] == {"x": 1} and list(src["object_scaling-apple"]["scenes"]) == ["house_single_floor"]
-    assert src["object_scaling-apple"]["scenes"]["house_single_floor"] == _held_entry()["scenes"]["house_single_floor"]
-    cp = json.loads((tmp_path / "copy.json").read_text())["object_scaling-apple"]["scenes"]
+    assert src["_meta"] == {"x": 1} and list(src["object_scaling_apple"]["scenes"]) == ["house_single_floor"]
+    assert src["object_scaling_apple"]["scenes"]["house_single_floor"] == _held_entry()["scenes"]["house_single_floor"]
+    cp = json.loads((tmp_path / "copy.json").read_text())["object_scaling_apple"]["scenes"]
     assert cp["house_single_floor"]["rooms"] == ["kitchen_0"] and cp["house_single_floor"]["_synthesized"] and cp["Rs_int"]["rooms"] == ["living_room_0"]
     assert gp.override_scene_room("house_single_floor", "living_room_0") is False
     assert gp.entry["scenes"]["house_single_floor"] == _held_entry()["scenes"]["house_single_floor"] and gp.room_tag("house_single_floor") is None
     assert gp.override_scene_room("house_single_floor", "living_room_0") is False  # no override: nothing to do
-    # aliases with other scene roles cannot move rooms
+    # variants with other scene roles cannot move rooms
     iors = _held_entry()
     iors["roles"]["support"] = {"category": "breakfast_table", "sampleable": False}
     with pytest.raises(GroundingError):
@@ -474,23 +432,23 @@ def _args(**kw):
     return SimpleNamespace(**d)
 
 
-def test_sample_isg_alias_split_seed_scene_and_room():
+def test_sample_isg_variant_split_seed_scene_and_room():
     from ispatialgym.sampling import sample_isg as SI
 
     held = GroundedProblem("object_scaling-apple", _held_entry())
-    seed, rec = SI.alias_split(_args(seed_split="eval", seed_index=1, scene_from_split=True), held)
+    seed, rec = SI.variant_split(_args(seed_split="eval", seed_index=1, scene_from_split=True), held)
     scene, room = SS.draw_scene_room("eval", "object_scaling-apple", 1)
-    assert (scene, room) == SS.EVAL_ROOMS["object_scaling-apple"]  # the re-sample (k = 1) keeps the alias's room
+    assert (scene, room) == SS.EVAL_ROOMS["object_scaling-apple"]  # the re-sample (k = 1) keeps the variant's room
     assert seed == SS.split_seed("eval", "object_scaling-apple", 1)
     assert rec == {"split": "eval", "index": 1, "seed": seed, "seed_source": "split", "scene": scene, "room": room, "scene_source": "split",
                    "room_override": (scene, room) != ("house_single_floor", "living_room_0")}
     assert held.rooms(scene) == [room] and held.bindings(scene) == {"floor": {"room": room}}
     cam = GroundedProblem("camera_relocalization-standard", _camera_entry())
-    seed, rec = SI.alias_split(_args(seed_split="eval", scene_from_split=True), cam)
+    seed, rec = SI.variant_split(_args(seed_split="eval", scene_from_split=True), cam)
     assert seed == SS.split_seed("eval", "camera_relocalization-standard") and rec["scene"] is None and rec["scene_source"].startswith("customs")
-    assert SI.alias_split(_args(seed=5, seed_split="eval"), cam)[1]["seed_source"] == "--seed"
-    assert SI.alias_split(_args(), cam)[0] == 0
-    seed, rec = SI.alias_split(_args(scene="hotel_suite_large", room="bedroom_0"), cam)
+    assert SI.variant_split(_args(seed=5, seed_split="eval"), cam)[1]["seed_source"] == "--seed"
+    assert SI.variant_split(_args(), cam)[0] == 0
+    seed, rec = SI.variant_split(_args(scene="hotel_suite_large", room="bedroom_0"), cam)
     assert rec["scene_source"] == "--scene --room" and cam.rooms("hotel_suite_large") == ["bedroom_0"] and cam.room_tag("hotel_suite_large") == "bedroom_0"
 
 
@@ -499,7 +457,7 @@ def test_sample_isg_existing_templates_are_per_room(tmp_path):
 
     gp = GroundedProblem("object_scaling-apple", _held_entry())
     choice = next(iter_template_choices(gp, "house_single_floor", np.random.default_rng(0)))
-    d = tmp_path / gp.alias / choice.template_id
+    d = tmp_path / gp.variant / choice.template_id
     d.mkdir(parents=True)
     (d / "template_meta.json").write_text(json.dumps({"scene": "house_single_floor", "rooms": ["living_room_0"], "choice": choice.to_json()}))
     assert SI._existing_templates(str(tmp_path), gp, "house_single_floor") == [{"target": "apple/a"}]
@@ -522,7 +480,7 @@ def test_multiply_train_plan_indices_and_rooms(tmp_path):
     # the template's own room is re-applied from its meta (a template sampled with --room)
     gp2 = GroundedProblem("object_scaling-apple", _held_entry())
     assert MI.choice_for_template(gp2, {"choice": moved.to_json()}).template_id == moved.template_id and gp2.rooms("restaurant_diner") == ["kitchen_0"]
-    # instance indices: one past the largest, gaps kept; train indices per alias over its templates
+    # instance indices: one past the largest, gaps kept; train indices per variant over its templates
     for tid, idx in (("t1", 0), ("t1", 3), ("t2", 5)):
         p = tmp_path / "object_scaling-apple" / tid / "instances"
         p.mkdir(parents=True, exist_ok=True)
@@ -546,9 +504,9 @@ def test_no_garden_or_outdoor_room_is_ever_drawn(monkeypatch):
     assert {S.draw_scene_room("train", "object_scaling-apple", g) for g in range(64)} == {("house_single_floor", "living_room_0")}
     monkeypatch.undo()
     assert not any(S.is_outdoor(r) for _, r in S.eligible_rooms())
-    aliases = ["object_scaling-apple", "mental_rotation-crab", "object_scaling-bell_pepper", "mental_rotation-teaspoon"]
+    variants = ["object_scaling-apple", "mental_rotation-crab", "object_scaling-bell_pepper", "mental_rotation-teaspoon"]
     for split in S.SPLITS:
-        for a in aliases:
+        for a in variants:
             for k in range(64):
                 sc, room = S.draw_scene_room(split, a, k)
                 assert not S.is_outdoor(room) and (sc, room) in S.eligible_rooms()

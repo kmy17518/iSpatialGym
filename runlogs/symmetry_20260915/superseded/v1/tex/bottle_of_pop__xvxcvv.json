@@ -1,1 +1,0 @@
-{"key": "bottle_of_pop__xvxcvv", "category": "bottle_of_pop", "model": "xvxcvv", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0455003539604434, "p95": 0.17124183006535948, "p99": 0.23529411764705882, "mad_union": 0.04491547557780591, "iou": 0.9993661586332075, "worst": "z180"}}, "render_s": 0.108}

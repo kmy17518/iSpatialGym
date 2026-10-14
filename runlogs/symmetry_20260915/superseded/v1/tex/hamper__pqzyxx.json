@@ -1,1 +1,0 @@
-{"key": "hamper__pqzyxx", "category": "hamper", "model": "pqzyxx", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.006211870724338145, "p95": 0.01437908496732026, "p99": 0.05620915032679739, "mad_union": 0.028160674771444478, "iou": 0.9720782017052795, "worst": "z180"}}, "render_s": 0.107}

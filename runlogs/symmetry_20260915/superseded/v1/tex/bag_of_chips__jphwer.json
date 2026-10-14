@@ -1,1 +1,0 @@
-{"key": "bag_of_chips__jphwer", "category": "bag_of_chips", "model": "jphwer", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.03374899836623558, "p95": 0.15163398692810456, "p99": 0.22665359477124106, "mad_union": 0.11058733870187598, "iou": 0.9045966868557218, "worst": "x180"}}, "render_s": 0.113}

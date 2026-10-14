@@ -1,1 +1,0 @@
-{"key": "letter__bswqmq", "category": "letter", "model": "bswqmq", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.024836220297579394, "p95": 0.07581699346405228, "p99": 0.1084967320261438, "mad_union": 0.052451718553748375, "iou": 0.9493995907177883, "worst": "z180"}}, "render_s": 0.116}

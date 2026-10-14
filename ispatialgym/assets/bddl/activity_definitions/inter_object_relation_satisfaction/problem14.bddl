@@ -1,38 +1,34 @@
 (define (problem inter_object_relation_satisfaction-14)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-flat_top_grill)
+    (:variant inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-flat_top_grill (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#02~T5/representative)
-    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
-    ; its init orientation; the partner stays where it was. Both poses measured.
+    ; hand-grounded (owner 2026-10-12 ~16:05 items 3 / 4, nextto_large#02): problem89 (inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor) copied with the target
+    ; serving_cart.n.01 (serving_cart/heqtlk, spawned on the floor of house_single_floor/dining_room_0) and the relation nextto
+    ; (inter_object_relation_satisfaction/nextto_large_scale.iddl). The cart starts on the floor away from breakfast_table_rhjoby_0 and ends next to it, pushed by the base (no grasp).
 
     (:objects
-        steak.n.01_1 - steak.n.01
-        frying_pan.n.01_1 - frying_pan.n.01
-        grill.n.02_1 - grill.n.02
+        serving_cart.n.01_1 - serving_cart.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop steak.n.01_1 grill.n.02_1)
-        (ontop frying_pan.n.01_1 grill.n.02_1)
+        (ontop serving_cart.n.01_1 floor.n.01_1)
+        (not (nextto serving_cart.n.01_1 breakfast_table.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?steak.n.01_1 ?frying_pan.n.01_1)
-            (not (grasped ?agent.n.01_1 ?steak.n.01_1))
-            (not (grasped ?agent.n.01_1 ?frying_pan.n.01_1))
-            (pose_settled ?steak.n.01_1)
-            (pose_settled ?frying_pan.n.01_1)
+            (nextto ?serving_cart.n.01_1 ?breakfast_table.n.01_1)
+            (not (grasped ?agent.n.01_1 ?serving_cart.n.01_1))
+            (pose_settled ?serving_cart.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?steak.n.01_1)
-        (pose_reached ?frying_pan.n.01_1)
+        (pose_reached ?serving_cart.n.01_1)
     )
 )

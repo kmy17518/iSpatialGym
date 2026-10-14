@@ -1,1 +1,0 @@
-{"key": "bottle_of_milk__debqen", "category": "bottle_of_milk", "model": "debqen", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.04274524432343316, "p95": 0.17254901960784313, "p99": 0.17908496732026144, "mad_union": 0.0419646683187364, "iou": 0.9999767506742304, "worst": "x180"}}, "render_s": 0.103}

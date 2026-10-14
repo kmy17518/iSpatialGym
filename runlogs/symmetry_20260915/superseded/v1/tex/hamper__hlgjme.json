@@ -1,1 +1,0 @@
-{"key": "hamper__hlgjme", "category": "hamper", "model": "hlgjme", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0011106885371268168, "p95": 0.006535947712418301, "p99": 0.0196078431372549, "mad_union": 0.0012145660647023043, "iou": 0.9997667967695215, "worst": "z180"}}, "render_s": 0.111}

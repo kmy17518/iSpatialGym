@@ -1,1 +1,0 @@
-{"key": "bottle_of_shampoo__dvrzmy", "category": "bottle_of_shampoo", "model": "dvrzmy", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.03814968466392096, "p95": 0.1477124183006536, "p99": 0.17647058823529413, "mad_union": 0.11920078773682166, "iou": 0.8791383735663927, "worst": "z180"}}, "render_s": 0.106}

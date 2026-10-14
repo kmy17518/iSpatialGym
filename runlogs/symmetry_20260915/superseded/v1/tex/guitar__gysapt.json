@@ -1,1 +1,0 @@
-{"key": "guitar__gysapt", "category": "guitar", "model": "gysapt", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.029266458232919738, "p95": 0.09934640522875816, "p99": 0.20261437908496732, "mad_union": 0.32258845223003346, "iou": 0.5924858822173562, "worst": "x180"}}, "render_s": 0.146}

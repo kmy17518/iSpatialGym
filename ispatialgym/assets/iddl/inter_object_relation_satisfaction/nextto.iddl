@@ -2,7 +2,7 @@
 ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
 (define (iddl inter_object_relation_satisfaction-nextto)
     (:family inter_object_relation_satisfaction)
-    (:alias inter_object_relation_satisfaction-nextto-{target}-{partner}-{support})
+    (:variant inter_object_relation_satisfaction-nextto-{target}-{partner}-{support})
     (:require
         (grasps target tabletop)
     )

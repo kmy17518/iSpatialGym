@@ -1,6 +1,0 @@
-{"key": "bottom_cabinet__cjcyed", "joint": "j_link_1", "feasible": true,
- "proposal": {"face": "outer", "a": 0.95, "b": 0.8, "pinch": "horizontal", "approach": "right", "depth_mm": 385,
-              "expected_motion": "slide"},
- "alternative": null,
- "note": "Vertical bar pull on door front near trailing (+y) edge, ~80% height; approach from cabinet front, close across bar along slide axis, slide door.",
- "confidence": "medium"}

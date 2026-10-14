@@ -4,7 +4,7 @@
 ; not gated. Joint from the customs list (roles.target.joint / handle_key).
 (define (iddl configuration_matching-articulation_open_small_scale)
     (:family configuration_matching)
-    (:alias configuration_matching-articulation_open_small_scale-{target}-{support})
+    (:variant configuration_matching-articulation_open_small_scale-{target}-{support})
     (:require
         (handle target)
     )

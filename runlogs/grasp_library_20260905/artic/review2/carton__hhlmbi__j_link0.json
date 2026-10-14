@@ -1,6 +1,0 @@
-{"key": "carton__hhlmbi", "joint": "j_link0", "feasible": false,
- "proposal": {"face": "bottom_edge", "a": 0.5, "b": 0.0, "pinch": "thickness", "approach": "front", "depth_mm": 4,
-              "expected_motion": "lift"},
- "alternative": null,
- "note": "Only spot: front skirt edge, lid top vs skirt bottom; skirt overhangs box wall ~4 mm so lower pad gets ~4 mm purchase. Marginal.",
- "confidence": "low"}

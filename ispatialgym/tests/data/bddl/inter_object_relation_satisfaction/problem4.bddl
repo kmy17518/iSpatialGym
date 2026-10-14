@@ -1,0 +1,37 @@
+(define (problem inter_object_relation_satisfaction-4)
+    (:domain ispatialgym)
+
+    (:variant touching)
+
+    (:objects
+        apple.n.01_1 - apple.n.01
+        bowl.n.01_1 - bowl.n.01
+        table.n.02_1 - table.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop apple.n.01_1 table.n.02_1)
+        (ontop bowl.n.01_1 table.n.02_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    ; Binary success: the pictured relation holds and both objects are released.
+    (:goal
+        (and
+            (touching ?apple.n.01_1 ?bowl.n.01_1)
+            (not (grasped ?agent.n.01_1 ?apple.n.01_1))
+            (not (grasped ?agent.n.01_1 ?bowl.n.01_1))
+            (pose_settled ?apple.n.01_1)
+            (pose_settled ?bowl.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    ; Non-gating: the exact pictured poses (TRO pose_targets) are reported only.
+    (:measure
+        (pose_reached ?apple.n.01_1)
+        (pose_reached ?bowl.n.01_1)
+    )
+)

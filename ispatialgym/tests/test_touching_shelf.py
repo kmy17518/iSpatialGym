@@ -66,7 +66,7 @@ def _sampler(lean_side=1.0, **extra):
     fields = dict(shelf_start=None if lean_side is None else {"lean_side": float(lean_side), "lean_deg": 10.0}, relation="touching",
                   hull={"target": _book_hull(), "partner": _book_hull()}, world=SimpleNamespace(hull_at=_hull_at),
                   gen=lambda key, default=None: default, tol=lambda key, default=None: default, pair={"g_NT": 0.044},
-                  gp=SimpleNamespace(alias="inter_object_relation_satisfaction-touching-hardback-hardback-shelf"))
+                  gp=SimpleNamespace(variant="inter_object_relation_satisfaction-touching-hardback-hardback-shelf"))
     fields.update(extra)
     s = SimpleNamespace(**fields)
     for name in ("shelf_push_sign", "shelf_push_arm", "shelf_push_direction", "touching_points", "push_stance_for", "brace_gate_at", "push_chain_feasible",
@@ -467,7 +467,7 @@ def test_the_oracle_program_runs_the_recorded_left_push_of_the_shelf_layout():
     d = _shelf_record()
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.validate() is sc
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == ["transition", "grasp", "lift", "place", "retreat", "push", "retreat"]
     assert all(a.arms == ("left",) for a in actions[1:]), [(a.name, a.arms) for a in actions]
     push = actions[-2]

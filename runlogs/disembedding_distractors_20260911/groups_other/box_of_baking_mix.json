@@ -1,7 +1,0 @@
-{
-  "category": "box_of_baking_mix",
-  "pages_opened": ["grids/pool_other/box_of_baking_mix__p1.png", "grids/pool_other/box_of_baking_mix__p2.png"],
-  "n_models": 26,
-  "exclude": [],
-  "notes": "All 26 are printed, intact food boxes/tins/bags standing upright. pack_of_pasta/gwqhko and the two cookie boxes lie flat by design (wide packs), not toppled. The two can_of_baking_mix renders are upright cylinders sharing the same mesh (identical 10085 px) with different labels."
-}

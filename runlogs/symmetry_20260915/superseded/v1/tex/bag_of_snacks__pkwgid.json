@@ -1,1 +1,0 @@
-{"key": "bag_of_snacks__pkwgid", "category": "bag_of_snacks", "model": "pkwgid", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.012704770832504594, "p95": 0.05359477124183006, "p99": 0.06522875816993655, "mad_union": 0.07233362131537717, "iou": 0.9151644796911278, "worst": "z180"}}, "render_s": 0.155}

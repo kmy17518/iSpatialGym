@@ -59,7 +59,7 @@ def _sampler(relation="ontop", L=3.0, gen=None, pair=None):
     """An ``IORSSmall`` without a simulator: a 0.10 m target, a 0.20 m partner (w_t 0.05, w_p 0.10, D_p 0.23) on the synthetic table."""
     s = IS.IORSSmall.__new__(IS.IORSSmall)
     s.top, s.edge = _table(L)
-    s.relation, s.pair, s.spec, s.gp, s.world = relation, dict(pair or {}), types.SimpleNamespace(generation=dict(gen or {})), types.SimpleNamespace(alias="a"), _world()
+    s.relation, s.pair, s.spec, s.gp, s.world = relation, dict(pair or {}), types.SimpleNamespace(generation=dict(gen or {})), types.SimpleNamespace(variant="a"), _world()
     s.hull = {"target": _box(0.05, 0.05, 0.05), "partner": _box(0.10, 0.10, 0.02)}
     s.rest = {"target": C.IDENTITY_QUAT.clone(), "partner": C.IDENTITY_QUAT.clone()}
     s.bands, s.arm_bands, s.segment_arms, s.template_facts = _Band(), {}, ["right"], {}

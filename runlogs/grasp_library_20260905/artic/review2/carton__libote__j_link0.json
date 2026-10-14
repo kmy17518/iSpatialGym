@@ -1,6 +1,0 @@
-{"key": "carton__libote", "joint": "j_link0", "feasible": false,
- "proposal": {"face": "bottom_edge", "a": 0.5, "b": 0.0, "pinch": "thickness", "approach": "front", "depth_mm": 2,
-              "expected_motion": "lift"},
- "alternative": null,
- "note": "Only spot: front skirt edge between lid top and skirt bottom; rim overhangs box wall ~2 mm, no real purchase for lower pad.",
- "confidence": "medium"}

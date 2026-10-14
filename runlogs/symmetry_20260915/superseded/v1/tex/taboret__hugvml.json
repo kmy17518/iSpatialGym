@@ -1,1 +1,0 @@
-{"key": "taboret__hugvml", "category": "taboret", "model": "hugvml", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z3": {"mad": 0.012975925389677173, "p95": 0.06274509803921569, "p99": 0.14248366013071898, "mad_union": 0.05419742465481887, "iou": 0.9459915915052642, "worst": "z120"}}, "render_s": 0.098}

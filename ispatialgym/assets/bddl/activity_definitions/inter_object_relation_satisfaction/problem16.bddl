@@ -1,36 +1,38 @@
 (define (problem inter_object_relation_satisfaction-16)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor (inter_object_relation_satisfaction/ontop_large_scale.iddl; inter_object_relation_satisfaction-ontop_large_scale#03/representative)
-    ; IORS - ontop (large-scale). The target starts on a support (a table within 3 m of the partner, or the floor beside it -
-    ; an explicit support choice made by ground_isg, never a runtime fallback) and ends on top of a large scene partner
-    ; (bed, sofa, desk, breakfast table, countertop; roles/candidates.csv kind scene). Three recorded stances: init A, manipulation B,
-    ; placement C.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#03~V3a/representative)
+    ; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: hand-made (rendered from the iddl; the subtask has no candidates rows) - plate/luhkiz into drop_in_sink_lkklqs_0 (set in bar_egwapq_0) from bar_egwapq_0 (the sink's own bar, ~0.3-1.2 m along it) / bar_byvbuc_0 (the L-joined bar along -y, ~1.7 m); the order pins one per step; registry mode test
+    ; IORS - inside (large-scale). The target starts on a support (a table near the partner, or the floor beside it - an
+    ; explicit support choice made by ground_isg, never a runtime fallback) and ends inside a large scene partner (a copy of
+    ; ontop_large_scale with the goal predicate inside; registered 2026-10-12, the sampler mode comes next). Three recorded
+    ; stances: init A, manipulation B, placement C.
 
     (:objects
-        pencil.n.01_1 - pencil.n.01
-        desk.n.01_1 - desk.n.01
+        plate.n.04_1 - plate.n.04
+        sink.n.01_1 - sink.n.01
+        countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop pencil.n.01_1 floor.n.01_1)
-        (not (ontop pencil.n.01_1 desk.n.01_1))
+        (ontop plate.n.04_1 countertop.n.01_1)
+        (not (inside plate.n.04_1 sink.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?pencil.n.01_1 ?desk.n.01_1)
-            (not (grasped ?agent.n.01_1 ?pencil.n.01_1))
-            (pose_settled ?pencil.n.01_1)
+            (inside ?plate.n.04_1 ?sink.n.01_1)
+            (not (grasped ?agent.n.01_1 ?plate.n.04_1))
+            (pose_settled ?plate.n.04_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?pencil.n.01_1)
+        (pose_reached ?plate.n.04_1)
     )
 )

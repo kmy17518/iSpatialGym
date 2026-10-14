@@ -1,1 +1,0 @@
-{"key": "hamper__iofciz", "category": "hamper", "model": "iofciz", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.010522132039159904, "p95": 0.06274509803921569, "p99": 0.1843137254901961, "mad_union": 0.13022100766648428, "iou": 0.7362568817291786, "worst": "z180"}}, "render_s": 0.117}

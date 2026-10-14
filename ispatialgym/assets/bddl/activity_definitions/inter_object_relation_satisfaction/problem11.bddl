@@ -1,39 +1,39 @@
 (define (problem inter_object_relation_satisfaction-11)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table)
+    (:variant inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#01~T1/representative)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#02~T1/representative)
     ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
     ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
 
     (:objects
-        marker.n.03_1 - marker.n.03
-        pencil.n.01_1 - pencil.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        pepper__shaker.n.01_1 - pepper__shaker.n.01
         breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop marker.n.03_1 breakfast_table.n.01_1)
-        (ontop pencil.n.01_1 breakfast_table.n.01_1)
-        (not (nextto marker.n.03_1 pencil.n.01_1))
+        (ontop salt__shaker.n.01_1 breakfast_table.n.01_1)
+        (ontop pepper__shaker.n.01_1 breakfast_table.n.01_1)
+        (not (nextto salt__shaker.n.01_1 pepper__shaker.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (nextto ?marker.n.03_1 ?pencil.n.01_1)
-            (not (grasped ?agent.n.01_1 ?marker.n.03_1))
-            (not (grasped ?agent.n.01_1 ?pencil.n.01_1))
-            (pose_settled ?marker.n.03_1)
-            (pose_settled ?pencil.n.01_1)
+            (nextto ?salt__shaker.n.01_1 ?pepper__shaker.n.01_1)
+            (not (grasped ?agent.n.01_1 ?salt__shaker.n.01_1))
+            (not (grasped ?agent.n.01_1 ?pepper__shaker.n.01_1))
+            (pose_settled ?salt__shaker.n.01_1)
+            (pose_settled ?pepper__shaker.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?marker.n.03_1)
-        (pose_reached ?pencil.n.01_1)
+        (pose_reached ?salt__shaker.n.01_1)
+        (pose_reached ?pepper__shaker.n.01_1)
     )
 )

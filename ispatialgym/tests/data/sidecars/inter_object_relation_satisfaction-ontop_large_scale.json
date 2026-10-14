@@ -3,7 +3,7 @@
   "instance_id": "inter_object_relation_satisfaction-ontop_large_scale-canned_food-sofa-floor__house_single_floor__target-canned_food-ycbspm__0000",
   "tro_sha256": "f9b7692db4dace591b7e668684ddaa970a6ec9381eb50e7b0e39e8b9f5f26142",
   "task_family": "inter_object_relation_satisfaction",
-  "alias": "inter_object_relation_satisfaction-ontop_large_scale-canned_food-sofa-floor",
+  "variant": "inter_object_relation_satisfaction-ontop_large_scale-canned_food-sofa-floor",
   "path_bucket_m": null,
   "stances": {
     "init": {

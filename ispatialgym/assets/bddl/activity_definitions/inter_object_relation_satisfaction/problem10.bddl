@@ -1,38 +1,41 @@
 (define (problem inter_object_relation_satisfaction-10)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-commercial_kitchen_table)
+    (:variant inter_object_relation_satisfaction-inside-garlic_clove-saucepot-commercial_kitchen_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-commercial_kitchen_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#02~T2/representative)
-    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
-    ; its init orientation; the partner stays where it was. Both poses measured.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside-garlic_clove-saucepot-commercial_kitchen_table (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#04~T3/representative)
+    ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is
+    ; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured. The
+    ; insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container; flowers held
+    ; by the upper stem) is required.
 
     (:objects
-        steak.n.01_1 - steak.n.01
-        frying_pan.n.01_1 - frying_pan.n.01
+        clove.n.03_1 - clove.n.03
+        saucepot.n.01_1 - saucepot.n.01
         countertop.n.01_1 - countertop.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop steak.n.01_1 countertop.n.01_1)
-        (ontop frying_pan.n.01_1 countertop.n.01_1)
+        (ontop clove.n.03_1 countertop.n.01_1)
+        (ontop saucepot.n.01_1 countertop.n.01_1)
+        (not (inside clove.n.03_1 saucepot.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?steak.n.01_1 ?frying_pan.n.01_1)
-            (not (grasped ?agent.n.01_1 ?steak.n.01_1))
-            (not (grasped ?agent.n.01_1 ?frying_pan.n.01_1))
-            (pose_settled ?steak.n.01_1)
-            (pose_settled ?frying_pan.n.01_1)
+            (inside ?clove.n.03_1 ?saucepot.n.01_1)
+            (not (grasped ?agent.n.01_1 ?clove.n.03_1))
+            (not (grasped ?agent.n.01_1 ?saucepot.n.01_1))
+            (pose_settled ?clove.n.03_1)
+            (pose_settled ?saucepot.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?steak.n.01_1)
-        (pose_reached ?frying_pan.n.01_1)
+        (pose_reached ?clove.n.03_1)
+        (pose_reached ?saucepot.n.01_1)
     )
 )

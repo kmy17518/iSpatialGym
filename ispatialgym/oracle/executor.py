@@ -56,9 +56,10 @@ from ispatialgym import ASSETS_ROOT
 from ispatialgym import single_env as SE
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action, Brace, Grasp, Navigate, Place, Push, Transition
-from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
+from ispatialgym.oracle.execute import (aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace,
+                                        run_action, shorten_push)
 from ispatialgym.oracle.motions import Motions, SkillError
-from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
+from ispatialgym.oracle.qa import QA, RULE_METRICS, CameraModel, Monitors, QAStats, Verdict, category_of, is_hard_qa
 from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
 from ispatialgym.robot import conventions as C
 
@@ -94,6 +95,12 @@ class ExecutorConfig:
     n_render_iterations: int = 1
     #: episode step budget (the QA monitors' own budget is ``QAConfig.max_episode_steps``)
     max_steps: int = 20000
+    #: seconds the actions may take (None = no limit): a stream (replay / policy) ends there and the epilogue still judges
+    #: the episode, as at the end of its steps; a program gets a ``timeout`` verdict
+    max_wall_s: Optional[float] = None
+    #: the epilogue's settling evaluation: off, the binary goal at the end of the settle window alone decides (no motion
+    #: check, no second window, no ``pose_settled`` atoms)
+    settle_eval: bool = True
     #: one retry from the checkpoint (§3.8)
     retries: int = 1
     #: epilogue no-op window: max(settle_min_steps, settle_fraction * action steps)
@@ -137,39 +144,17 @@ class ExecutorConfig:
     #: (owner 2026-09-26) the mirror for a short with no brace catch: out of tolerance -> the arc is lengthened and the pad aims
     #: past the goal by the measured sag (aim_push_past_goal); in tolerance -> accepted as it is (the epilogue's settled check decides)
     push_extend_on_free_short: bool = True
-    #: demo-collection gates applied after the epilogue (``run_isg --demo-gating``; oracle mode: ``placed_orientation``):
-    #: ``placed_orientation`` = every placed object (place / drop / attach, not pushes) must end within its recorded
-    #: orientation target's tolerance (``orientation_tolerance``, 0.2 rad default; nearest equivalence, the evaluator's
-    #: own error) — the TRO target keeps ``gating: false`` for the policy evaluation, position stays non-gating.
-    #: Cylinders (owner decision 2026-09-16 17:10 item 4, fallback applied after the closure investigation): an object
+    #: ``run_isg --qa`` (``ispatialgym.oracle.qa.QA``): the demo QA metrics, logged in ``result.qa``; a hard metric fails an
+    #: oracle demo at once (no retry), a stream only logs them. The oracle's retry rules (``Monitors``) run either way.
+    qa: bool = True
+    #: the placed-orientation fact of an oracle demo (``result.placed_orientation``, no verdict): every placed object (place /
+    #: drop / attach, not pushes) against its recorded orientation target's tolerance (``orientation_tolerance``, 0.2 rad
+    #: default; nearest equivalence, the evaluator's own error). Cylinders (owner decision 2026-09-16 17:10 item 4): an object
     #: with a continuous symmetry about its long axis per the ICL symmetry survey (``assets/icl/revolution_axes.json``:
-    #: marker, pencil, bottles, cans ...) is compared **modulo rotation about that axis** — the angle between its long
-    #: axis now and at the recorded goal (nearest equivalence) against the same tolerance; every other object keeps the
-    #: full error. ``demo_revolution_axes`` switches that equivalence off (full error for everything).
-    #: ``release_commanded``: an assisted-grasp release that did not come from a gripper command of exactly +1 fails the
-    #: episode (``release_not_commanded``); ``result.release_check`` records the releases whether the gate is on or not.
-    demo_gating: Tuple[str, ...] = ()
-    #: replay / policy streams: ``stop`` = a QA monitor verdict (collision, ghost hand, ...) ends the episode as it does an
-    #: oracle action; ``log`` = it is recorded (``result.stream_qa``) and the stream goes on, so the episode is judged by its
-    #: goal as an evaluator judges a policy (a stream has no program, so its grasps and pushes have no intended contacts);
-    #: ``off`` = only the timeout is checked (``Monitors.check_timeout_only``: the collision monitor keeps its statistics)
-    stream_qa: str = "stop"
+    #: marker, pencil, bottles, cans ...) is compared **modulo rotation about that axis**; ``demo_revolution_axes`` switches
+    #: that equivalence off (full error for everything)
     demo_orientation_tolerance_default: float = 0.2
     demo_revolution_axes: bool = True
-    #: ``placed_tilt`` (retracted as the default, owner 2026-09-16 17:10 item 4; the code path stays unused): the tilt of
-    #: a placed object's principal axis against the recorded goal's (rad)
-    demo_tilt_tolerance: float = math.radians(15.0)
-    #: ``root_moved`` gate (owner 2026-09-27, blender 0926-073955 tipped 2.6 deg and left 7.8 mm / 2.3 deg off by the first
-    #: open): the root of a free-standing articulated object whose joint the program works (:class:`RootWatch`) must end within
-    #: the executor's own "moved" band of its pose at the first step (``ExecuteConfig.moved_pos`` / ``moved_rot``) and stay
-    #: within ``root_transient_factor`` x that band at every step (10 mm = ``protection.MOVE_TOL_M``; 0.04 rad of up-axis
-    #: tilt). The 25 clean small-articulation demos of 0918-0926 peak at 4.1 mm / 1.11 deg tilt / 3.0 mm and 0.96 deg at the end
-    root_moved_pos: float = 0.005
-    root_moved_rot: float = 0.02
-    root_transient_factor: float = 2.0
-    #: ``robot_wobble`` gate (owner 2026-10-09: "too much push at the end makes the robot wobble ... door case is unacceptable ... if
-    #: unpreventable discard"): a demo whose torso a load bent more than this off its command (:class:`TorsoLoad`, deg) is discarded
-    demo_torso_deflection_max_deg: float = 1.0
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
     #: survives in the video / dataset (:meth:`Executor.render_restored`). ``restore_renders`` frames are always
     #: rendered; from then on the head camera is read after every render until its image is **fresh** - closer to the
@@ -211,51 +196,6 @@ class ExecutorConfig:
     #: Fabric's transforms synced after every step and after a rollback's load (camera poses read as in a rendered run),
     #: and a rollback does not re-render. Default: ISPATIALGYM_PHYSICS_ONLY=1 (off when unset)
     physics_only: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_PHYSICS_ONLY", "").lower() in ("1", "true", "yes"))
-
-
-class TorsoLoad:
-    """QA fact and ``robot_wobble`` demo gate (owner 2026-10-09, audit of the v3.0-reconciled demos: "too much push at the end makes
-    the robot wobble ... door case is unacceptable ... if unpreventable discard"): how far a load the hands bear bends the torso off
-    its command - per control step the largest |trunk command - measured trunk joint| (deg), recorded from ``NOTE_DEG`` on with its
-    action, so the report has the peak, when and in which action, and the peak per action. The free torso tracks within 0.01 deg
-    (0.09 deg while it moves); the 28 v3.0-reconciled demos of 1008 peaked at 4.24 deg (door push-close: the head lunged 78 mm when
-    the fist let go), 0.81 (brussels sprouts: fingertips on the table), 0.41 (blender open), 0.38 (door open), 0.24 (dishwasher
-    close). A rolled-back attempt's steps leave the record (:meth:`trim`)."""
-
-    NOTE_DEG = 0.05
-
-    def __init__(self, robot):
-        self.robot = robot
-        self.idx_action = th.as_tensor(robot.controller_action_idx["trunk"]).long()
-        self.idx_joint = th.as_tensor(robot.trunk_control_idx).long()
-        self.steps: Dict[int, Tuple[float, Optional[str]]] = {}
-
-    def observe(self, step: int, action: th.Tensor, action_name: Optional[str]) -> None:
-        cmd = th.as_tensor(action).reshape(-1)[self.idx_action].float()
-        q = th.as_tensor(self.robot.get_joint_positions()).reshape(-1)[self.idx_joint].float()
-        dev = math.degrees(float(th.max(th.abs(cmd - q))))
-        if dev >= self.NOTE_DEG:
-            self.steps[int(step)] = (dev, action_name)
-        else:
-            self.steps.pop(int(step), None)
-
-    def trim(self, step: int) -> None:
-        self.steps = {s: v for s, v in self.steps.items() if s <= step}
-
-    def peak(self) -> Tuple[float, Optional[int], Optional[str]]:
-        if not self.steps:
-            return 0.0, None, None
-        s, (d, n) = max(self.steps.items(), key=lambda kv: kv[1][0])
-        return d, s, n
-
-    def report(self) -> Dict[str, Any]:
-        d, s, n = self.peak()
-        per: Dict[str, float] = {}
-        for _s, (dv, nm) in self.steps.items():
-            per[nm or "epilogue"] = max(per.get(nm or "epilogue", 0.0), dv)
-        return {"max_deg": round(d, 3), "at_step": s, "action": None if s is None else (n or "epilogue"),
-                "per_action_deg": {k: round(v, 3) for k, v in sorted(per.items(), key=lambda kv: -kv[1])},
-                "steps_over_note": len(self.steps), "note_deg": self.NOTE_DEG}
 
 
 class SupportLoad:
@@ -387,80 +327,6 @@ class SupportLoad:
         }
 
 
-class RootWatch:
-    """QA fact and ``root_moved`` demo gate (owner 2026-09-27): the root pose of every free-standing articulated object whose
-    joint the program works (:meth:`Executor.operated_roots` - a lid, a flap, a door leaf; the body is meant to stay put)
-    against its pose at the first step: displacement, up-axis tilt and full rotation, the peak of each (with the action and
-    step) and the value at the end. Written as ``meta.articulated_root``; :meth:`exceeded` is the gate's reading."""
-
-    def __init__(self, objects: Dict[str, Any], skipped: Optional[Dict[str, str]] = None):
-        self.objects = dict(objects)
-        self.skipped = dict(skipped or {})
-        self.pose0: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
-        self.peak: Dict[str, Dict[str, Dict[str, Any]]] = {}
-        self.end: Dict[str, Dict[str, float]] = {}
-        self.steps = 0
-
-    def observe(self, action_name: Optional[str], step: int) -> None:
-        self.steps += 1
-        z = th.tensor([0.0, 0.0, 1.0])
-        for name, obj in self.objects.items():
-            try:
-                p, q = (x.float().clone() for x in obj.get_position_orientation())
-            except Exception:  # noqa: BLE001
-                continue
-            if name not in self.pose0:
-                self.pose0[name] = (p, q)
-            p0, q0 = self.pose0[name]
-            cur = {"displacement_m": float(th.linalg.norm(p - p0)),
-                   "tilt_rad": math.acos(max(-1.0, min(1.0, float(th.dot(C.quat_rotate(q, z), C.quat_rotate(q0, z)))))),
-                   "rotation_rad": float(C.quat_angle(q, q0))}
-            peak = self.peak.setdefault(name, {})
-            for k, v in cur.items():
-                if k not in peak or v > peak[k]["value"]:
-                    peak[k] = {"value": v, "action": action_name or "epilogue", "step": int(step)}
-            self.end[name] = cur
-
-    def exceeded(self, pos_tol: float, rot_tol: float, transient_factor: float) -> Dict[str, List[str]]:
-        """``{object: [reasons]}``: a peak displacement / tilt above ``transient_factor`` x the band, or an end displacement /
-        rotation above the band."""
-        out: Dict[str, List[str]] = {}
-        for name, peak in self.peak.items():
-            end = self.end.get(name, {})
-            why = []
-            if peak["displacement_m"]["value"] > transient_factor * pos_tol:
-                why.append(f"moved {peak['displacement_m']['value'] * 1000:.1f} mm in {peak['displacement_m']['action']} (> {transient_factor * pos_tol * 1000:.0f})")
-            if peak["tilt_rad"]["value"] > transient_factor * rot_tol:
-                why.append(f"tipped {math.degrees(peak['tilt_rad']['value']):.2f} deg in {peak['tilt_rad']['action']} (> {math.degrees(transient_factor * rot_tol):.2f})")
-            if end.get("displacement_m", 0.0) > pos_tol:
-                why.append(f"ended {end['displacement_m'] * 1000:.1f} mm off (> {pos_tol * 1000:.0f})")
-            if end.get("rotation_rad", 0.0) > rot_tol:
-                why.append(f"ended {math.degrees(end['rotation_rad']):.2f} deg turned (> {math.degrees(rot_tol):.2f})")
-            if why:
-                out[name] = why
-        return out
-
-    def snapshot(self) -> Dict[str, Any]:
-        """The readings so far (a checkpoint's copy: a rolled-back attempt leaves no trace in the demo, nor in the gate)."""
-        return {"peak": {n: {k: dict(v) for k, v in p.items()} for n, p in self.peak.items()}, "end": {n: dict(e) for n, e in self.end.items()}, "steps": self.steps}
-
-    def load(self, snap: Optional[Dict[str, Any]]) -> None:
-        if snap is not None:
-            self.peak = {n: {k: dict(v) for k, v in p.items()} for n, p in snap["peak"].items()}
-            self.end = {n: dict(e) for n, e in snap["end"].items()}
-            self.steps = int(snap["steps"])
-
-    def report(self, pos_tol: float, rot_tol: float, transient_factor: float) -> Dict[str, Any]:
-        bad = self.exceeded(pos_tol, rot_tol, transient_factor)
-        objects = {}
-        for name in self.objects:
-            peak, end = self.peak.get(name, {}), self.end.get(name, {})
-            objects[name] = {"peak": {k: {**v, "value": round(v["value"], 5)} for k, v in peak.items()}, "end": {k: round(v, 5) for k, v in end.items()},
-                             "exceeded": bad.get(name, [])}
-        return {"objects": objects, "skipped": dict(self.skipped), "steps_observed": int(self.steps),
-                "band": {"pos_m": pos_tol, "rot_rad": rot_tol, "transient_factor": transient_factor}}
-
-
 @dataclass
 class Checkpoint:
     action_index: int
@@ -476,11 +342,10 @@ class Checkpoint:
     recorder_steps: int = 0
     env_step: Optional[int] = None
     task_tracking: Dict[str, Any] = field(default_factory=dict)
-    #: the gripper-in-FOV spans open at the checkpoint (rule (b): a span runs from the pre-grasp to the release across
-    #: actions; a retry re-runs the action with the spans as they were)
+    #: the gripper-in-FOV rule's spans open at the checkpoint (``Monitors.fov_spans``)
     fov_spans: Dict[str, bool] = field(default_factory=dict)
-    #: the operated articulated roots' readings (``RootWatch.snapshot``)
-    root_watch: Optional[Dict[str, Any]] = None
+    #: ``QA.snapshot``: the gripper-in-view spans open at the checkpoint, the articulated roots' readings, the step streaks
+    qa: Optional[Dict[str, Any]] = None
 
 
 #: ``ISpatialGymTask`` success-tracking attributes that a rollback must restore (sticky "first success" steps)
@@ -881,6 +746,8 @@ class Executor:
         self.last_obs = None
         self.last_info: Dict[str, Any] = {}
         self.phase_steps: Dict[int, int] = {PHASE_ORACLE: 0, PHASE_SETTLE: 0, PHASE_GOAL: 0}
+        self._wall_t0: Optional[float] = None  # program mode: when the program started (cfg.max_wall_s)
+        self.wall_clock_exceeded = False
         #: every assisted-grasp release of the episode: it must come from OmniGibson's rule at a recorded gripper command of
         #: exactly +1 (what an evaluated policy can do); a release between steps (a direct call) is a violation - rollbacks
         #: reset the tracking
@@ -891,9 +758,7 @@ class Executor:
         self.last_ctx: Dict[str, Any] = {}
         self._defer_commit = False
         self.brace_retries: List[Dict[str, Any]] = []
-        self.stream_qa: List[Dict[str, Any]] = []
-        self._qa_log = False
-        self._qa_off = False
+        self._stream = False  # a replay / policy stream: the retry rules are off (only the step budget)
         # oracle.protection (owner 2026-09-26): the goal objects protected during transits ([(bddl name, scene object)], set by
         # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
         self.protected_goal: List[Tuple[str, Any]] = []
@@ -910,8 +775,14 @@ class Executor:
         self.result: Dict[str, Any] = {}
         self.verdict: Optional[Verdict] = None
         self.support_load: Optional[SupportLoad] = None  # the support loading fact (meta.support_disturbance), built by run_program
-        self.torso_load: Optional[TorsoLoad] = None  # the torso deflection fact (meta.torso_load, gate robot_wobble), built per episode
-        self.root_watch: Optional[RootWatch] = None  # the operated articulated roots (meta.articulated_root, gate root_moved), built by run_program
+        #: ``--qa`` (``cfg.qa``): the episode's QA metrics, built by run_program / run_stream
+        self.qa: Optional[QA] = None
+        #: a stream's program (the sidecar's expanded actions, set by run_isg): its operated articulated roots are what
+        #: ``object_tilt`` watches in a replay / policy episode
+        self.qa_program: Optional[Sequence[Action]] = None
+        #: the recorded phase of each streamed action (a replayed demo's ``isg/phase``): its settle rows are no action steps
+        #: for the QA metrics and the stalled rule
+        self.stream_phases: Optional[Sequence[int]] = None
 
     # ------------------------------------------------------------------ sim access
 
@@ -986,12 +857,23 @@ class Executor:
                     self.release_check["violations"].append({"step": self.n, "arm": arm, "object": obj, "kind": "gripper_command_below_open",
                                                              "gripper_command": round(cmd, 4)})
 
-    def step(self, action: th.Tensor, phase: int = PHASE_ORACLE, action_index: int = -1, attempt: int = 0, monitor: bool = True) -> Optional[Verdict]:
+    def step(self, action: th.Tensor, phase: int = PHASE_ORACLE, action_index: int = -1, attempt: int = 0, monitor: bool = True,
+             acting: Optional[bool] = None) -> Optional[Verdict]:
+        """One control step. ``acting``: whether it is an action step for the QA metrics and the stalled rule (default: not a
+        settle-window step; False for a settle row of a replayed demo)."""
+        settling = False
+        if not self._stream and self.motions is not None:
+            settling = bool(getattr(self.motions, "settling", False))
+            self.motions.settling = False
+        if acting is None:
+            acting = phase != PHASE_SETTLE
         ag_before = self._ag_held()
         obs, reward, terminated, truncated, info = SE.step(self.env, action, n_render_iterations=self.cfg.n_render_iterations)
         self.n += 1
         ag_after = self._ag_held()
+        n_violations = len(self.release_check["violations"])
         self._check_releases(ag_before, ag_after, action)
+        new_violations = self.release_check["violations"][n_violations:]
         self._ag_last = ag_after
         self.phase_steps[phase] = self.phase_steps.get(phase, 0) + 1
         self.last_obs, self.last_info = obs, info
@@ -1002,14 +884,6 @@ class Executor:
             except Exception as e:  # noqa: BLE001  (a fact, never a failure)
                 log.warning("support load monitor failed (%r); disabled", e)
                 self.support_load = None
-        if self.torso_load is not None:
-            try:
-                self.torso_load.observe(self.n, action, self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None)
-            except Exception as e:  # noqa: BLE001  (a fact; the gate then has nothing to judge)
-                log.warning("torso load monitor failed (%r); disabled", e)
-                self.torso_load = None
-        if self.root_watch is not None:
-            self.root_watch.observe(self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None, self.n)
         if self.recorder is not None:
             state = self._dump_state(full=False) if (self.cfg.record_state and self.recorder.cfg.hdf5) else None
             sim_time = None
@@ -1024,10 +898,28 @@ class Executor:
             self.recorder.record(self.n, action, obs, info, state=state, phase=phase, action_index=action_index, attempt=attempt,
                                  reward=rew, terminated=bool(terminated), truncated=bool(truncated), sim_time=sim_time)
         verdict = None
-        if monitor and self.monitors is not None:
-            verdict = self.monitors.check_timeout_only(self.n) if self._qa_off else self.monitors.check(self.n)
+        if self.qa is not None:
+            verdict = self.qa.observe(self.n, action, acting=acting, live=monitor, held=[n for n in ag_after.values() if n],
+                                      release_violations=new_violations, settling=settling)
+            if verdict is not None:
+                verdict.action_index, verdict.attempt = action_index, attempt
+                self.stats.record(verdict)
+        if verdict is None and monitor and self.monitors is not None:
+            if self._stream:
+                verdict = self.monitors.check_timeout_only(self.n, settle=not acting)
+                pop = getattr(self.monitors, "pop_logged", None)
+                for v in (pop() if pop is not None else ()):
+                    if self.qa is not None:
+                        self.qa.note_rule(v)
+            else:
+                verdict = self.monitors.check(self.n, settle=settling)
         if verdict is None and self.n >= self.cfg.max_steps:
             verdict = Verdict("timeout", f"episode exceeded max_steps {self.cfg.max_steps}", step=self.n)
+            self.stats.record(verdict)
+        if (verdict is None and phase != PHASE_SETTLE and self._wall_t0 is not None and self.cfg.max_wall_s
+                and time.time() - self._wall_t0 > self.cfg.max_wall_s):
+            self.wall_clock_exceeded = True
+            verdict = Verdict("timeout", f"the program exceeded the wall clock of {self.cfg.max_wall_s:.0f} s", step=self.n)
             self.stats.record(verdict)
         return verdict
 
@@ -1035,26 +927,10 @@ class Executor:
         """Step every action a generator yields; returns the first monitor verdict (the generator is then closed)."""
         for a in gen:
             v = self.step(a, phase, action_index, attempt, monitor=monitor)
-            if v is not None and self._log_stream_verdict(v):
-                continue
             if v is not None:
                 gen.close()
                 return v
         return None
-
-    def _log_stream_verdict(self, verdict: Verdict) -> bool:
-        """``stream_qa="log"`` during a replay / policy stream and its epilogue: record a QA monitor verdict (consecutive
-        repeats of one category / link / object merged) and return True to go on; a timeout still ends the episode."""
-        if not self._qa_log or verdict.category == "timeout":
-            return False
-        det = verdict.details or {}
-        key = [verdict.category, det.get("link"), det.get("object")]
-        last = self.stream_qa[-1] if self.stream_qa else None
-        if last is not None and last["key"] == key and last["last_step"] + 1 >= int(verdict.step or 0):
-            last["last_step"], last["n"] = int(verdict.step or 0), last["n"] + 1
-        else:
-            self.stream_qa.append({"key": key, "message": verdict.message, "first_step": int(verdict.step or 0), "last_step": int(verdict.step or 0), "n": 1})
-        return True
 
     # ------------------------------------------------------------------ checkpoints
 
@@ -1097,7 +973,7 @@ class Executor:
             env_step=getattr(self.env, "_current_step", None),
             task_tracking={k: getattr(self.task, k) for k in TASK_TRACKING_ATTRS if hasattr(self.task, k)},
             fov_spans=self.monitors.fov_spans() if self.monitors is not None and hasattr(self.monitors, "fov_spans") else {},
-            root_watch=self.root_watch.snapshot() if self.root_watch is not None else None,
+            qa=self.qa.snapshot() if self.qa is not None else None,
         )
         return cp
 
@@ -1115,8 +991,6 @@ class Executor:
         self._ag_last = None  # the restore re-establishes / drops grasps itself (not a release of the demo)
         for k in ("releases", "violations"):  # the rolled-back attempt's steps leave the recording, and its releases with them
             self.release_check[k] = [r for r in self.release_check[k] if r["step"] <= cp.step]
-        if self.torso_load is not None:
-            self.torso_load.trim(cp.step)
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
         if ag is not None:
@@ -1160,6 +1034,8 @@ class Executor:
             self.monitors.reset_ag_reference()
             if hasattr(self.monitors, "restore_fov_spans"):
                 self.monitors.restore_fov_spans(cp.fov_spans)
+        if self.qa is not None and cp.qa is not None:
+            self.qa.restore(cp.qa, cp.step)
         for obj in self.tracked.values():
             if hasattr(obj, "wake"):
                 obj.wake()
@@ -1172,8 +1048,6 @@ class Executor:
                 setattr(self.task, k, v)
             except Exception:  # noqa: BLE001
                 pass
-        if self.root_watch is not None:
-            self.root_watch.load(cp.root_watch)
         self.last_obs, self.last_info = cp.obs, cp.info
         if self.recorder is not None:
             self.recorder.set_observation(cp.obs)
@@ -1453,19 +1327,26 @@ class Executor:
         if isinstance(action, Grasp):
             ctx["next_place_kind"] = self.next_place_kind(index, action)
         ctx["sidecar"] = self.sidecar  # attachment: the hover alignment's regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
-        ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "alias", None) if self.sidecar is not None else None,
+        ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "variant", None) if self.sidecar is not None else None,
                           "index": index}
         if self.support_surface is not None:
             ctx["support_surface"] = self.support_surface
+        intended = self._scene_names(intended_contacts(action))
+        hooks: Dict[str, Any] = {}
+        if self.qa is not None or self.monitors is not None:
+            hooks["fov"] = self._set_fov
+        if self.qa is not None:
+            self.qa.begin_action(action, intended=intended, fov=fov_monitored(action))
         if self.monitors is not None:
-            ctx["hooks"] = {"fov": self.monitors.set_fov_enabled,
-                            "transit": (lambda on, objects=(), label=None: self.monitors.begin_transit(objects, label) if on else self.monitors.end_transit())}
+            hooks["transit"] = lambda on, objects=(), label=None: self.monitors.begin_transit(objects, label) if on else self.monitors.end_transit()
             ctx["monitors"] = self.monitors  # experiments read collision_events for their notes (owner 2026-09-20 23:58)
             allowed = self.brace_allowed_pairs(index)
             ctx["brace_allowed"] = [(sorted(links), obj) for links, obj in allowed]
-            self.monitors.begin_action(action, index, attempt, intended=self._scene_names(intended_contacts(action)), held=self.state.held_objects(),
+            self.monitors.begin_action(action, index, attempt, intended=intended, held=self.state.held_objects(),
                                        manipulation=is_manipulation(action), fov=fov_monitored(action), forbidden=self._scene_names(forbidden_contacts(action)),
                                        watch=[(links, next(iter(self._scene_names([obj])))) for links, obj in watch], allowed=allowed)
+        if hooks:
+            ctx["hooks"] = hooks
         try:
             gen = run_action(action, self.motions, self.state, targets, ctx)
             v = self.run_generator(gen, PHASE_ORACLE, index, attempt)
@@ -1492,6 +1373,15 @@ class Executor:
         finally:
             if self.monitors is not None:
                 self.monitors.end_action()
+            if self.qa is not None:
+                self.qa.end_action()
+
+    def _set_fov(self, enabled: bool = True) -> None:
+        """``ctx["hooks"]["fov"]``: open / close the acting arms' gripper-in-FOV span, for the retry rule and the QA log."""
+        if self.monitors is not None and hasattr(self.monitors, "set_fov_enabled"):
+            self.monitors.set_fov_enabled(enabled)
+        if self.qa is not None:
+            self.qa.set_fov_enabled(enabled)
 
     def _commit(self) -> None:
         """Commit the recorder's pending segment unless a group (braced push) defers commits to its end."""
@@ -1542,6 +1432,14 @@ class Executor:
                 log.info("action %d %s ok in %d steps (%.1fs)", index, action.summary() if hasattr(action, "summary") else action.name, self.n - rec.step_start, time.time() - t0)
                 break
             log.warning("action %d %s attempt %d failed: %s", index, action.name, k, verdict)
+            if self.qa is not None and verdict.category in RULE_METRICS:
+                self.qa.note_rule(verdict, retried=k < self.cfg.retries, arms=tuple(getattr(action, "arms", ()) or ()),
+                                  objects=tuple(getattr(action, "objects", ()) or ()))
+            if is_hard_qa(verdict):
+                # a QA hard metric fails the demo at once: no retry, the attempt's steps stay in the record for diagnosis
+                if self.recorder is not None:
+                    self.recorder.commit()
+                break
             if verdict.category in ("protected_contact", "protected_moved"):
                 self._protect_force.add(index)  # the retry re-plans the transit via the point above its goal (oracle.protection)
             if (ctx.get("grasp_support_lift") or {}).get("applied") and self.motions is not None:
@@ -1582,21 +1480,35 @@ class Executor:
             scene_idx = 0
         self.support_load = SupportLoad(self.robot, supports, scene_idx=scene_idx)
 
-    def _init_torso_load(self) -> None:
-        try:
-            self.torso_load = TorsoLoad(self.robot)
-        except Exception as e:  # noqa: BLE001  (a robot without a trunk controller: no fact, no gate)
-            log.warning("torso load monitor unavailable (%r)", e)
-            self.torso_load = None
+    def _init_qa(self, oracle: bool, actions: Optional[Sequence[Action]] = None) -> None:
+        """``cfg.qa``: the episode's QA metrics (``object_tilt`` watches the articulated roots ``actions`` work)."""
+        self.qa = None
+        if not self.cfg.qa:
+            return
+        watched, skipped = self.operated_roots(actions) if actions else ({}, {})
+        camera = getattr(self.monitors, "camera", None)
+        if camera is None and self.cam_key is not None:
+            try:
+                camera = CameraModel.from_sensor(self.robot.sensors[self.cam_key])
+            except Exception:  # noqa: BLE001
+                camera = None
+        cam_in_zed = getattr(self.monitors, "cam_in_zed", None)
+        if cam_in_zed is None:
+            cam_in_zed = getattr(self.state, "cam_in_zed", None)
+        pairs = (lambda: self.monitors._contact_pairs(self.n)) if self.monitors is not None else None
+        limits = self.monitors.rule_limits() if self.monitors is not None and hasattr(self.monitors, "rule_limits") else None
+        self.qa = QA(self.robot, oracle=oracle, scene=getattr(self.env, "scene", None), camera=camera, cam_in_zed=cam_in_zed,
+                     roots=watched, roots_skipped=skipped, task_objects=[getattr(o, "name", n) for n, o in self.tracked.items() if o is not self.robot],
+                     contact_pairs=pairs, rules=self.monitors is not None, rule_limits=limits)
 
-    def operated_roots(self) -> Tuple[Dict[str, Any], Dict[str, str]]:
-        """``(watched, skipped)``: the tracked articulated objects whose joint the program works without moving them as a whole -
-        the ``articulation.object`` of a handle grasp / base follow, the object of a push / brace / push-close carrying an
-        ``articulation`` record (a lid push, a flap press, a push-close segment) - minus any object a place, a body grasp or a
-        plain push moves on purpose. ``skipped`` names the operated objects not watched: fixed to the scene (an appliance, a
-        room door: the root cannot move) or not tracked."""
+    def operated_roots(self, actions: Optional[Sequence[Action]] = None) -> Tuple[Dict[str, Any], Dict[str, str]]:
+        """``(watched, skipped)``: the tracked articulated objects whose joint the program (``actions``, default the running
+        program) works without moving them as a whole - the ``articulation.object`` of a handle grasp / base follow, the object
+        of a push / brace / push-close carrying an ``articulation`` record (a lid push, a flap press, a push-close segment) -
+        minus any object a place, a body grasp or a plain push moves on purpose. ``skipped`` names the operated objects not
+        watched: fixed to the scene (an appliance, a room door: the root cannot move) or not tracked."""
         operated, moved = set(), set()
-        for a in self.program_actions:
+        for a in (self.program_actions if actions is None else actions):
             art = getattr(a, "articulation", None)
             if art is not None:
                 operated.add(art.object)
@@ -1634,12 +1546,12 @@ class Executor:
 
     def _run_program(self, actions: Sequence[Action]) -> Dict[str, Any]:
         t0 = time.time()
+        self._wall_t0 = t0
         actions = list(actions)
         self.program_actions = actions
+        self._stream = False
         self._init_support_load()
-        self._init_torso_load()
-        watched, skipped = self.operated_roots()
-        self.root_watch = RootWatch(watched, skipped) if (watched or skipped) else None
+        self._init_qa(oracle=True, actions=actions)
         # every tracked object's pose at the start (the loaded init): the reference for a partner displaced during the run
         # (attachment 0920-164504: the bottle knocked 4.7 cm during the grasp phase, the place aimed at its recorded pose)
         init_poses: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
@@ -1749,7 +1661,7 @@ class Executor:
                     watch = [(list(M.FINGER_LINKS[brace.contact.arm]) + [M.GRIPPER_LINK[brace.contact.arm]], push.contact.object)]
                     verdict = self.run_action(index + 1, push_k, watch=watch)
                 if verdict is not None:
-                    if best_in_tol is not None and not fell_back and (offset, shorten, extend) != best_in_tol:
+                    if best_in_tol is not None and not fell_back and (offset, shorten, extend) != best_in_tol and not is_hard_qa(verdict):
                         # owner 2026-09-25 (world vertical 0925-225052, wave 3): three rungs ended IN tolerance (0.025-0.035 rad of the
                         # 0.08) but above the aim, the fourth re-brace at -15 mm left the push arm no plan ('trajectory optimization to the
                         # joint goal failed' twice) and the demo failed although the painting had stood aligned three times. An improvement
@@ -1833,19 +1745,21 @@ class Executor:
         are not updated by a stream; holding them would drive the robot back to its initial configuration)."""
         t0 = time.time()
         verdict: Optional[Verdict] = None
-        self._qa_log = self.cfg.stream_qa == "log"
-        self._qa_off = self.cfg.stream_qa == "off"
-        self._init_torso_load()
+        self._stream = True
+        self._init_qa(oracle=False, actions=self.qa_program)
         if self.monitors is not None:
-            self.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=self.state.held_objects(), manipulation=False)
+            self.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=self.state.held_objects(), manipulation=False, fov=False)
+        phases = self.stream_phases
         try:
-            for a in actions:
+            for k, a in enumerate(actions):
+                if self.cfg.max_wall_s and time.time() - t0 > self.cfg.max_wall_s:
+                    self.wall_clock_exceeded = True
+                    log.info("stream: wall clock of %.0f s reached after %d steps; the epilogue judges the episode", self.cfg.max_wall_s, self.n)
+                    break
                 a = th.as_tensor(a, dtype=th.float32).reshape(-1)
                 self._last_stream_action = a.clone()
-                verdict = self.step(a, phase, 0, 0)
-                if verdict is not None and self._log_stream_verdict(verdict):
-                    verdict = None
-                    continue
+                settle_row = phases is not None and k < len(phases) and int(phases[k]) == PHASE_SETTLE
+                verdict = self.step(a, phase, 0, 0, acting=False if settle_row else None)
                 if verdict is not None:
                     break
         finally:
@@ -2007,67 +1921,6 @@ class Executor:
             best = ang if best is None or ang < best else best
         return None if best is None else float(best)
 
-    @staticmethod
-    def principal_axis(extent) -> Tuple[th.Tensor, str]:
-        """The object-frame axis whose tilt says whether a placed object tipped: the **long** axis of an elongated
-        object (one native extent >= 2x both others: a marker, a pencil, a bottle - lying or standing, it may roll
-        about that axis freely), the **thin** axis (the face normal) of a flat one (one extent <= half of both
-        others: a plate, a book, a board - it may spin on its face), else the object's **up** axis (+z: a cup, a
-        bowl, an apple - it may yaw). Returns ``(unit axis in the object frame, rule)``."""
-        e = [float(v) for v in C.as_tensor(extent).reshape(-1)[:3].tolist()]
-        order = sorted(range(3), key=lambda k: e[k])
-        lo, mid, hi = e[order[0]], e[order[1]], e[order[2]]
-        axis = th.zeros(3)
-        if hi >= 2.0 * mid and hi > 0:
-            axis[order[2]] = 1.0
-            return axis, "long"
-        if lo <= 0.5 * mid and mid > 0:
-            axis[order[0]] = 1.0
-            return axis, "thin"
-        axis[2] = 1.0
-        return axis, "up"
-
-    def placed_tilt_report(self) -> Dict[str, Dict[str, Any]]:
-        """Per placed object: the angle between its principal axis now and at the recorded goal orientation
-        (:meth:`principal_axis` from the native bounding box: the long axis of a marker, the face normal of a plate,
-        +z otherwise), minimised over the target's orientation equivalences; ``within`` against
-        ``demo_tilt_tolerance`` (None without an orientation target). A roll of a lying marker about its own axis,
-        the yaw of a cup, the spin of a plate on its face do not tilt that axis; a fallen cup or a marker standing on
-        its end do. The sampler's ``goal_tipped`` guard in oracle terms."""
-        out: Dict[str, Dict[str, Any]] = {}
-        for obj in self.placed_objects():
-            tgt = self.state.pose_target(obj) if hasattr(self.state, "pose_target") else None
-            goal_q = getattr(tgt, "orientation", None) if tgt is not None else None
-            if goal_q is None or str(getattr(tgt, "frame", "world")) != "world":
-                out[obj] = {"tilt_rad": None, "tolerance_rad": None, "within": None, "note": "no world orientation target"}
-                continue
-            try:
-                _, q_cur = self.state.object_pose(obj)
-            except Exception:  # noqa: BLE001
-                out[obj] = {"tilt_rad": None, "tolerance_rad": None, "within": None, "note": "no object pose"}
-                continue
-            extent = None
-            try:
-                o = self.state.object(obj)
-                extent = getattr(o, "native_bbox", None)
-                if extent is None:
-                    extent = getattr(o, "aabb_extent", None)
-            except Exception:  # noqa: BLE001
-                extent = None
-            axis, rule = self.principal_axis(extent) if extent is not None else (th.tensor([0.0, 0.0, 1.0]), "up")
-            goal_q = C.as_tensor(goal_q).float()
-            a_goal = C.quat_rotate(goal_q, axis)
-            best = None
-            for e in [None] + list(getattr(tgt, "orientation_equivalences", None) or []):
-                q = q_cur if e is None else C.qmul(q_cur, C.as_tensor(e).float())
-                a_now = C.quat_rotate(q, axis)
-                ang = math.acos(max(-1.0, min(1.0, float(th.dot(a_now, a_goal)))))
-                best = ang if best is None or ang < best else best
-            tol = float(self.cfg.demo_tilt_tolerance)
-            out[obj] = {"tilt_rad": float(best), "tilt_deg": math.degrees(best), "tolerance_rad": tol, "tolerance_deg": math.degrees(tol), "within": float(best) <= tol,
-                        "axis": "xyz"[int(th.argmax(axis))], "rule": rule, "extent": None if extent is None else [round(float(v), 4) for v in C.as_tensor(extent).reshape(-1)[:3].tolist()]}
-        return out
-
     def orientation_targets(self, isg: Optional[Dict[str, Any]] = None) -> set:
         """Instances whose goal has an orientation target: the evaluator's report says so (``pose_errors[inst]
         .orientation_error`` is a number, None for a position-only / relation-only target), else the TRO meta."""
@@ -2139,12 +1992,16 @@ class Executor:
         if self.monitors is not None:
             self.monitors.begin_epilogue(held=self.state.held_objects())
         window = max(int(self.cfg.settle_min_steps), int(math.ceil(self.cfg.settle_fraction * n_action_steps)))
+        # no window after a timeout, nor after a QA hard metric (the oracle demo stops where it failed)
+        runs_window = verdict is None or (verdict.category != "timeout" and not is_hard_qa(verdict))
+        if runs_window:  # a window that runs stays inside the episode's step budget
+            window = min(window, max(0, self.cfg.max_steps - self.n - 1))
         before = MotionSnapshot(self.robot, self.tracked)
         settle_verdict = None
         windows = [window]
         relax_info: Dict[str, Any] = {}
         self._reset_predicate_branches()  # D-007: the branch log of the final binary evaluation starts with the settle window
-        if verdict is None or verdict.category != "timeout":
+        if runs_window:
             settle_verdict = self.run_generator(self._epilogue_hold(window, relax_info), PHASE_SETTLE)
             if self.recorder is not None:
                 self.recorder.commit()
@@ -2153,11 +2010,12 @@ class Executor:
         isg = self.isg
         moved = self._moved(motion, isg)
         binary_final = bool(isg.get("binary_success", False))
-        if verdict is None and settle_verdict is None and (moved or not binary_final) and self.cfg.settle_second_window_factor > 0:
+        # the second window stays inside the episode's step budget
+        window2 = min(int(math.ceil(self.cfg.settle_second_window_factor * window)), self.cfg.max_steps - self.n - 1)
+        if self.cfg.settle_eval and verdict is None and settle_verdict is None and (moved or not binary_final) and window2 > 0:
             # second chance (owner rule 2026-09-16): a longer no-op window before the verdict; the motion over *this*
             # window and the binary goal at its end decide (a near-spherical object still rolling in a bowl, a
             # released object still relaxing)
-            window2 = int(math.ceil(self.cfg.settle_second_window_factor * window))
             log.info("epilogue: motion after the first no-op window (%s) - second window of %d steps", {k: round(v, 4) for k, v in motion.items() if (v > 1e-4)}, window2)
             before2 = MotionSnapshot(self.robot, self.tracked)
             self._reset_predicate_branches()  # the second window's last evaluation is the final one
@@ -2177,6 +2035,8 @@ class Executor:
         if binary_branch:
             log.info("epilogue: binary goal atoms decided by %s", binary_branch)
         out_of_tol = _out_of_tolerance(isg)
+        if self.qa is not None and settle_verdict is not None and settle_verdict.category in RULE_METRICS:
+            self.qa.note_rule(settle_verdict, retried=False)  # the settle window has no retry
         if verdict is None and settle_verdict is not None:
             verdict = settle_verdict
         if verdict is None and not (binary_ever or binary_final):
@@ -2193,7 +2053,11 @@ class Executor:
         if verdict is None and out_of_tol:
             verdict = Verdict("tolerance", "measured error above tolerance for " + ", ".join(out_of_tol), step=self.n, details={"targets": out_of_tol})
             self.stats.record(verdict)
-        if verdict is None and (moved or not binary_final or (self.cfg.require_task_settled and not settled_task)):
+        if verdict is None and not self.cfg.settle_eval and not binary_final:
+            verdict = Verdict("not_reached", "the binary goal does not hold at the end of the settle window; unsatisfied: " + ", ".join(_unsatisfied(isg)),
+                              step=self.n)
+            self.stats.record(verdict)
+        if verdict is None and self.cfg.settle_eval and (moved or not binary_final or (self.cfg.require_task_settled and not settled_task)):
             if moved:
                 msg = "robot / object motion after the final no-op window"
             elif not binary_final:
@@ -2202,49 +2066,8 @@ class Executor:
                 msg = "the evaluator's pose_settled atoms do not hold at the last step"
             verdict = Verdict("not_settled", msg, step=self.n, details={"motion": motion, "task_settled_success": settled_task})
             self.stats.record(verdict)
-        # -- demo-collection gates (owner decision 2026-09-16 10:15): the placed objects' orientation against their
-        #    recorded (non-gating) targets decides the *demo* verdict; the TRO / policy evaluation is untouched
-        demo_gating: Dict[str, Any] = {"enabled": list(self.cfg.demo_gating)}
-        if self.program_actions and ("placed_orientation" in self.cfg.demo_gating or "placed_tilt" in self.cfg.demo_gating):
-            # both reports are always written when a gate is on, so the strict and the tilt reading can be compared
-            demo_gating["placed_orientation"] = self.placed_orientation_report(isg)
-            demo_gating["placed_tilt"] = self.placed_tilt_report()
-        if "placed_tilt" in self.cfg.demo_gating:
-            rep = demo_gating["placed_tilt"]
-            failed = [o for o, r in rep.items() if r.get("within") is False]
-            if verdict is None and failed:
-                msg = ", ".join(f"{o} tilted {rep[o]['tilt_deg']:.1f} deg > {rep[o]['tolerance_deg']:.0f}" for o in failed)
-                verdict = Verdict("placed_tilt", "placed object tipped off its recorded up axis: " + msg, step=self.n, details={"targets": failed, "errors": {o: rep[o] for o in failed}})
-                self.stats.record(verdict)
-        if "placed_orientation" in self.cfg.demo_gating:
-            rep = demo_gating["placed_orientation"]
-            failed = [o for o, r in rep.items() if r.get("within") is False]
-            if verdict is None and failed:
-                msg = ", ".join(f"{o} {rep[o]['orientation_error']:.3f} rad > {rep[o]['tolerance']:.2f}" for o in failed)
-                verdict = Verdict("placed_orientation", "placed object orientation outside its recorded target tolerance: " + msg, step=self.n,
-                                  details={"targets": failed, "errors": {o: rep[o] for o in failed}})
-                self.stats.record(verdict)
-        band = (self.cfg.root_moved_pos, self.cfg.root_moved_rot, self.cfg.root_transient_factor)
-        root_report = self.root_watch.report(*band) if self.root_watch is not None else {}
-        if "root_moved" in self.cfg.demo_gating and self.root_watch is not None:
-            failed_roots = self.root_watch.exceeded(*band)
-            if verdict is None and failed_roots:
-                msg = "; ".join(f"{o} " + ", ".join(w) for o, w in failed_roots.items())
-                verdict = Verdict("root_moved", "articulated object's root moved while its joint was worked: " + msg, step=self.n,
-                                  details={"targets": sorted(failed_roots), "report": {o: root_report["objects"][o] for o in failed_roots}})
-                self.stats.record(verdict)
-        torso_report = self.torso_load.report() if self.torso_load is not None else {}
-        if "robot_wobble" in self.cfg.demo_gating and torso_report.get("max_deg", 0.0) > self.cfg.demo_torso_deflection_max_deg and verdict is None:
-            verdict = Verdict("robot_wobble", f"a load the hands bore bent the torso {torso_report['max_deg']:.2f} deg off its command at step {torso_report['at_step']} "
-                                              f"({torso_report['action']}; > {self.cfg.demo_torso_deflection_max_deg:.2f} deg): the robot visibly wobbles", step=self.n,
-                              details={"torso_load": torso_report})
-            self.stats.record(verdict)
-        bad = self.release_check["violations"]
-        if verdict is None and bad and "release_commanded" in self.cfg.demo_gating:
-            msg = "; ".join(f"step {v['step']} {v['arm']} {v['object']}: {v['kind']}" + (f" ({v['gripper_command']})" if "gripper_command" in v else "") for v in bad)
-            verdict = Verdict("release_not_commanded", "an assisted-grasp release did not come from a gripper command of +1: " + msg, step=self.n,
-                              details={"violations": bad})
-            self.stats.record(verdict)
+        # -- the placed objects' orientation against their recorded (non-gating) targets: a fact of an oracle demo, no verdict
+        placed_orientation = self.placed_orientation_report(isg) if (self.program_actions and not self._stream) else None
         self.timings["settle_s"] = time.time() - t0
         goal_obs = None
         if verdict is None and self.cfg.goal_image:
@@ -2255,19 +2078,19 @@ class Executor:
                 log.warning("goal image not captured: %r", e)
                 goal_obs = {"error": repr(e)}
             self.timings["goal_image_s"] = time.time() - t1
-        goal_occlusion = None
-        if verdict is None and "goal_occlusion" in self.cfg.demo_gating:
+        # -- QA: the episode measures (jerky motion, head camera upright, goal occlusion); a hard one fails an oracle demo
+        qa_report: Dict[str, Any] = {"enabled": False}
+        if self.qa is not None:
+            from ispatialgym.eval import goal_occlusion as GO
+
             t1 = time.time()
-            try:
-                goal_occlusion = self.goal_occlusion_report()
-            except Exception as e:  # noqa: BLE001
-                log.warning("goal occlusion not measured: %r", e)
-                goal_occlusion = {"error": repr(e)}
-            self.timings["goal_occlusion_s"] = time.time() - t1
-            if goal_occlusion.get("occluded"):
-                verdict = Verdict("goal_occluded", f"{goal_occlusion['worst']} is {goal_occlusion['max_occluded']:.0%} hidden in the goal image "
-                                                   f"(>= {goal_occlusion['threshold']:.0%})", step=self.n, details={"goal_occlusion": goal_occlusion})
+            measure = self.goal_occlusion_report if (GO.enabled() and (self._stream or verdict is None)) else None
+            qa_verdict = self.qa.finish(goal_occlusion=measure, step=self.n)
+            self.timings["qa_finish_s"] = time.time() - t1
+            if verdict is None and qa_verdict is not None:
+                verdict = qa_verdict
                 self.stats.record(verdict)
+            qa_report = self.qa.report()
         self.verdict = verdict
         success = verdict is None
         errors = isg.get("final_errors") or isg.get("errors") or {}
@@ -2285,11 +2108,9 @@ class Executor:
             "binary_branch_log": branch_log,
             # owner 2026-09-16 23:00 (fact, no verdict): the support's pose drift and the finger-support contact loading
             "support_disturbance": self.support_load.report() if self.support_load is not None else {},
-            # owner 2026-09-27: the root drift of every articulated object whose joint the program works (gate root_moved)
-            "articulated_root": root_report,
-            # owner 2026-10-09: how far a load the hands bore bent the torso off its command (gate robot_wobble)
-            "torso_load": torso_report,
             "settled_success": settled_task,
+            "settle_eval": bool(self.cfg.settle_eval),
+            "wall_clock_exceeded": bool(self.wall_clock_exceeded),
             "pose_settled_config": isg.get("pose_settled_config"),
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
             "first_success_step": isg.get("first_success_step"),
@@ -2312,15 +2133,15 @@ class Executor:
             "witness_via_posture": _jsonable(list(getattr(self.motions, "witness_via_posture_events", []) or [])),
             "protection": _jsonable({"protected": [getattr(o, "name", n) for n, o in self.protected_goal], "plan_checks": int(getattr(self.motions, "protect_checks", 0) or 0),
                                      "fired": list(getattr(self.motions, "protect_events", []) or []) + list(getattr(self.monitors, "protect_events", []) or [])}),
-            "demo_gating": demo_gating,
+            "placed_orientation": placed_orientation,
             "motion_delta": motion,
             "actions": [r.to_dict() for r in self.action_records],
-            "qa": self.monitors.report() if self.monitors is not None else {"stats": self.stats.to_dict()},
+            # the oracle's retry rules (verdict counts, the collision rule's contacts) and the --qa metrics
+            "monitors": self.monitors.report() if self.monitors is not None else {"stats": self.stats.to_dict()},
+            "qa": qa_report,
             "checkpoint_reports": list(self.checkpoint_reports),
             "brace_retry": _jsonable(self.brace_retries),
             "goal_observation": goal_obs,
-            "goal_occlusion": goal_occlusion,
-            "stream_qa": _jsonable(self.stream_qa) if self._qa_log else None,
             "timings": dict(self.timings),
             "release_check": _jsonable(self.release_check),
         }
@@ -2353,8 +2174,8 @@ class Executor:
         }
 
     def goal_occlusion_report(self) -> Dict[str, Any]:
-        """The demo gate ``goal_occlusion`` (``ispatialgym.eval.goal_occlusion``) on the settled last frame: the head camera's
-        depth, the box screen of every tracked target / partner (an inside goal's target measured, not judged: the sidecar's alias
+        """The QA hard metric ``goal_occlusion`` (``ispatialgym.eval.goal_occlusion``) on the settled last frame: the head camera's
+        depth, the box screen of every tracked target / partner (an inside goal's target measured, not judged: the sidecar's variant
         names the subtask) and the panel screen of a tracked fixture (a second depth render with the robot hidden; the panel = the
         links its revolute joints move, at the final joint state). Runs after the last recorded frame (``ispatialgym.oracle.head_depth``:
         the camera's observations stay as loaded) and leaves the robot visible."""
@@ -2381,7 +2202,7 @@ class Executor:
                     self.sim.render()
         cam = (cp.float().tolist(), cq.float().tolist())
         objects = GO.screen_scene(depth, cam, intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE,
-                                  subtask=getattr(self.sidecar, "alias", None))
+                                  subtask=getattr(self.sidecar, "variant", None))
         return GO.report(objects, method="live head-camera depth", step=self.n, camera_key=self.cam_key, resolution=[intr[0], intr[1]])
 
     # ------------------------------------------------------------------ TRO goal override (§3.8, spec §8)

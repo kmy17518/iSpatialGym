@@ -1,7 +1,0 @@
-configuration_matching-articulation_close_small_scale#03: no target / support row, skipped
-configuration_matching-articulation_close_small_scale#04: no target / support row, skipped
-configuration_matching-articulation_open_small_scale#03: no target / support row, skipped
-configuration_matching-articulation_open_small_scale#04: no target / support row, skipped
-configuration_matching-block_design#01: no target / support row, skipped
-disembedding#21: no target / support row, skipped
-disembedding#27: no target / support row, skipped

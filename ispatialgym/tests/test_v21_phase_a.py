@@ -384,7 +384,7 @@ def test_a2_executor_looks_ahead_past_travel_legs_and_applies_the_kept_witnesses
 
     sc, env = iors_world()
     ex, motions, backend, rec = make_executor(env, sc)
-    ex.program_actions = expand(sc.alias, sc)
+    ex.program_actions = expand(sc.variant, sc)
     names = [a.name for a in ex.program_actions]
     assert names[:5] == ["transition", "grasp", "lift", "place", "retreat"]
     q = [0.0] * 28

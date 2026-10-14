@@ -1,6 +1,6 @@
 (define (problem camera_relocalization-8)
     (:domain ispatialgym)
-    (:alias camera_relocalization-obstructed-straight_chair_1)
+    (:variant camera_relocalization-obstructed-straight_chair_1)
 
     ; ground_isg 2.0.0: camera_relocalization-obstructed-straight_chair_1 (camera_relocalization/obstructed.iddl; camera_relocalization-obstructed#08/representative)
     ; Camera relocalization - obstructed. As standard, plus an obstacle group placed on the eroded shortest path so that the

@@ -1,0 +1,42 @@
+(define (problem configuration_matching-3)
+    (:domain ispatialgym)
+
+    (:variant attachment)
+
+    (:objects
+        digital_camera.n.01_1 - digital_camera.n.01
+        camera_tripod.n.01_1 - camera_tripod.n.01
+        table.n.02_1 - table.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:groups
+        digital_camera.n.01_1 camera_tripod.n.01_1 - attachment_group.n.01_1
+    )
+
+    (:init
+        (ontop attachment_group.n.01_1 table.n.02_1)
+        (not (attached digital_camera.n.01_1 camera_tripod.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    ; Binary success: the camera is attached to the tripod, the tripod stands on the table, the camera pose in the
+    ; tripod frame matches the pictured one (TRO groups["attachment_group.n.01_1"], fixed assignment), and both
+    ; parts are released.
+    (:goal
+        (and
+            (attached ?digital_camera.n.01_1 ?camera_tripod.n.01_1)
+            (ontop ?camera_tripod.n.01_1 ?table.n.02_1)
+            (layout_reached ?attachment_group.n.01_1)
+            (not (grasped ?agent.n.01_1 ?attachment_group.n.01_1))
+            (pose_settled ?attachment_group.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    ; Non-gating: where the assembled pair stands (target_slots) is reported only.
+    (:measure
+        (pose_reached ?attachment_group.n.01_1)
+    )
+)

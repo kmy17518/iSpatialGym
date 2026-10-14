@@ -1,5 +1,5 @@
 """Attachment's carry from the lifted grasp to the pre-attach (``Attachment._carry_to_pre_attach``): by default the lift ladder and the
-straight SLERP line, as before; with ``generation.carry_over_partner_m`` (owner 2026-10-12 attachment#04 3b, the lid-stockpot aliases)
+straight SLERP line, as before; with ``generation.carry_over_partner_m`` (owner 2026-10-12 attachment#04 3b, the lid-stockpot variants)
 the 12 cm lift, a vertical rise until the male's lowest point clears the partner's top by the clearance, then the line - a ladder of
 clearances tried in order, a carry whose fingertips leave the image not tried."""
 

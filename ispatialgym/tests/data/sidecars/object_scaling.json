@@ -3,7 +3,7 @@
   "instance_id": "object_scaling-beaker__house_single_floor__target-beaker-rhohgs__0000",
   "tro_sha256": "2f4af07e089dd3e485d5492877a486820acba92ae5c6e0b31db3773634b985e5",
   "task_family": "object_scaling",
-  "alias": "object_scaling-beaker",
+  "variant": "object_scaling-beaker",
   "path_bucket_m": null,
   "grasps": [
     {

@@ -1,43 +1,38 @@
 (define (problem configuration_matching-8)
     (:domain ispatialgym)
-    (:alias configuration_matching-attachment-lid-teapot-bar)
+    (:variant configuration_matching-articulation_open_small_scale-carton-desk)
 
-    ; ground_isg 2.0.0: configuration_matching-attachment-lid-teapot-bar (configuration_matching/attachment.iddl; configuration_matching-attachment#01~T3/representative)
-    ; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced
-    ; by the other gripper while attaching). The assembly group carries the fixed member-to-slot layout target; the
-    ; partner's pose stays as at init. Male / female pairs with matching BEHAVIOR attachment meta-links come from
-    ; roles/constraints_compatible.csv (partner_of, attach_type); the partner brace is computed geometrically (no artefact).
+    ; ground_isg 2.0.0: configuration_matching-articulation_open_small_scale-carton-desk (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#02~T5/representative)
+    ; Configuration matching - articulation (small-scale, open). Spawned articulated object (toolbox, carton, hinged jar) on
+    ; the support (floor for objects taller than 0.6 m), facing the robot; closed -> open to q_goal in S. Handle arm + brace
+    ; arm on the base link (brace computed geometrically); the object's root pose is measured (pose_reached in :measure),
+    ; not gated. Joint from the customs list (roles.target.joint / handle_key).
 
     (:objects
-        lid.n.02_1 - lid.n.02
-        teapot.n.01_1 - teapot.n.01
-        countertop.n.01_1 - countertop.n.01
+        carton.n.02_1 - carton.n.02
+        desk.n.01_1 - desk.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
-    (:groups
-        lid.n.02_1 teapot.n.01_1 - assembly_group.n.01_1
-    )
-
     (:init
-        (ontop assembly_group.n.01_1 countertop.n.01_1)
-        (not (attached lid.n.02_1 teapot.n.01_1))
+        (not (open carton.n.02_1))
+        (ontop carton.n.02_1 desk.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (attached ?lid.n.02_1 ?teapot.n.01_1)
-            (ontop ?teapot.n.01_1 ?countertop.n.01_1)
-            (layout_reached ?assembly_group.n.01_1)
-            (not (grasped ?agent.n.01_1 ?assembly_group.n.01_1))
-            (pose_settled ?assembly_group.n.01_1)
+            (open ?carton.n.02_1)
+            (layout_reached ?carton.n.02_1)
+            (ontop ?carton.n.02_1 ?desk.n.01_1)
+            (not (grasped ?agent.n.01_1 ?carton.n.02_1))
+            (pose_settled ?carton.n.02_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?assembly_group.n.01_1)
+        (pose_reached ?carton.n.02_1)
     )
 )

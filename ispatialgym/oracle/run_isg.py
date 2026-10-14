@@ -3,7 +3,7 @@ the executor, record, evaluate (``oracle_primitives_design.md`` §3.8, §6.5; TO
 instance = one episode::
 
     OMNIGIBSON_HEADLESS=1 python -m ispatialgym.oracle.run_isg --instance <iid>-tro_state.json \\
-        [--sidecar <iid>.oracle.json] --mode oracle|replay|policy [--out <dir>] [--video] [--goal-image]
+        [--sidecar <iid>.oracle.json] --mode oracle|replay|policy [--out <dir>] [--record-view head,...] [--no-qa] [--goal-image]
 
 What it does
 
@@ -21,23 +21,25 @@ What it does
    ``blocked_footprints`` of the instance) on the planner map. ``pose_targets`` / ``groups`` /
    ``orientation_equivalences`` / ``evaluation_profile`` are the task's (``configure_targets``).
 2. **Sidecar** (``--sidecar``, default ``<iid>.oracle.json`` next to the TRO): loaded, validated, ``tro_sha256``
-   verified (``--allow-sha-mismatch`` for hand-built sidecars), ``expand(alias, sidecar)`` → the action list.
-3. **Executor** (:class:`~ispatialgym.oracle.executor.Executor`): per action checkpoint → execute under the QA
-   monitors → postcondition → one retry → annotate; epilogue: binary success → ``max(50, 20 %)`` no-op → settled →
+   verified (``--allow-sha-mismatch`` for hand-built sidecars), ``expand(variant, sidecar)`` → the action list.
+3. **Executor** (:class:`~ispatialgym.oracle.executor.Executor`): per action checkpoint → execute under the retry
+   rules (:class:`~ispatialgym.oracle.qa.Monitors`) and the ``--qa`` metrics (:class:`~ispatialgym.oracle.qa.QA`: a HARD
+   metric ends the oracle's demo as failed) → postcondition → one retry → annotate; epilogue: binary success → ``max(50, 20 %)`` no-op → settled →
    goal image (``--goal-image``: ≥ 3 renders, ``goal_observation.camera_pose_world``, profile ``isg-v1``) → TRO goal
    override with the settled values when within tolerance (written back into the TRO, the sidecar's ``tro_sha256``
    updated; ``--no-goal-override`` to disable).
 4. **Recording** (``--record full|hdf5|video``): ``demo.hdf5`` (BEHAVIOR-replayable) + the LeRobot v3 dataset under
-   ``lerobot/`` (``full``), ``head_rgb.mp4`` with ``--video``, ``init_rgb.png`` / ``final_rgb.png`` / ``goal_rgb.png``,
-   ``annotations.json`` (the three §6.3 levels, QA verdicts) and ``meta.json``.
+   ``lerobot/`` (``full``), ``<view>_rgb.mp4`` per ``--record-view`` view (``tiled``, ``head``, ``external``,
+   ``left_wrist``, ``right_wrist``), ``init_rgb.png`` / ``final_rgb.png`` / ``goal_rgb.png``, ``annotations.json`` (the
+   three §6.3 levels, QA verdicts) and ``meta.json`` (``meta.qa``: every ``--qa`` metric with the steps it fired at).
 5. Prints one line ``RUN_ISG_RESULT {...}`` and exits with ``0`` success, ``2`` oracle / QA failure (``reason`` one
-   of ``qa.CATEGORIES``), ``3`` ``no_oracle`` (no sidecar / no program for the alias; the instance is still loaded
+   of ``qa.CATEGORIES``), ``3`` ``no_oracle`` (no sidecar / no program for the variant; the instance is still loaded
    and its init view rendered), ``4`` ``error`` (traceback in ``meta.json``).
 
 ``--mode replay`` feeds the actions of a LeRobot episode (``--replay <dataset root> [--episode N]``) or of a
 ``demo.hdf5`` through the same executor; ``--mode policy`` calls ``--policy module:callable`` as
-``policy(obs, info) -> 23-D action`` every step (``--policy-steps``). Both are thin: no program, no checkpoints, the
-same monitors, recorder and epilogue.
+``policy(obs, info) -> 23-D action`` every step (at most ``--max-steps`` steps). Both are thin: no program, no checkpoints,
+the same recorder and epilogue; their ``--qa`` metrics are only logged.
 """
 
 from __future__ import annotations
@@ -78,10 +80,10 @@ from ispatialgym.oracle.executor import Executor, ExecutorConfig, SimState, appl
 from ispatialgym.oracle.motions import Motions  # noqa: E402
 from ispatialgym.oracle.programs import expand  # noqa: E402
 from ispatialgym.oracle.qa import Monitors, QAConfig  # noqa: E402
-from ispatialgym.oracle.recorder import EpisodeAnnotations, Recorder, RecorderConfig, dump_json, json_default, save_png  # noqa: E402
-from ispatialgym.eval import goal_occlusion
+from ispatialgym.oracle.recorder import VIEWS, EpisodeAnnotations, Recorder, RecorderConfig, dump_json, json_default, save_png  # noqa: E402
+from ispatialgym.eval import instances as INST
 from ispatialgym.oracle import start_state
-from ispatialgym.oracle.sidecar import IDDL_ROOT, Sidecar, SidecarError, family_of_subtask, sha256_of_file  # noqa: E402
+from ispatialgym.oracle.sidecar import IDDL_ROOT, Sidecar, SidecarError, family_of_subtask, from_legacy_keys, sha256_of_file  # noqa: E402
 from ispatialgym.robot import conventions as C  # noqa: E402
 from ispatialgym.tasks import ISpatialGymTask  # noqa: E402, F401  (registers the task type)
 
@@ -133,17 +135,28 @@ class LoadError(RuntimeError):
 
 
 def resolve_instance(path: str) -> Tuple[str, str, dict, str, int]:
-    """``(instance id, template dir, template_meta, activity, definition id)`` from a ``*-tro_state.json`` path."""
+    """``(instance id, template dir, template_meta, activity, definition id)`` from a ``*-tro_state.json`` path: a sampler
+    output (``<template>/instances/<iid>-tro_state.json``) or an instance of the eval dataset (ispatialgym.eval.instances),
+    whose template-level files sit next to its instances folder; for the latter ``template_meta["_paths"]`` names them."""
     path = os.path.abspath(path)
     if not path.endswith(TRO_SUFFIX):
         raise ValueError(f"--instance must point at a *{TRO_SUFFIX} file, got {path}")
     iid = os.path.basename(path)[: -len(TRO_SUFFIX)]
+    from ispatialgym.eval.instances import template_files
+
+    dataset = template_files(path)
+    if dataset is not None:
+        with open(dataset["template_meta"]) as f:
+            meta = from_legacy_keys(json.load(f))
+        meta["_paths"] = {"scene_file": dataset["template"], "activity_definitions_root": dataset["activity_definitions"], "dataset_root": dataset["root"]}
+        activity, did = meta["problem"].rsplit("-", 1)
+        return iid, os.path.dirname(dataset["template"]), meta, activity, int(did)
     template_dir = os.path.dirname(os.path.dirname(path))
     meta_path = os.path.join(template_dir, "template_meta.json")
     if not os.path.exists(meta_path):
         raise FileNotFoundError(f"no template_meta.json next to the instance (expected {meta_path})")
     with open(meta_path) as f:
-        meta = json.load(f)
+        meta = from_legacy_keys(json.load(f))
     activity, did = meta["problem"].rsplit("-", 1)
     return iid, template_dir, meta, activity, int(did)
 
@@ -166,7 +179,9 @@ def robot_name_from_tro(tro: TROFile, default: str = DEFAULT_ROBOT_NAME) -> str:
     return key.split(":", 1)[0] if key and ":" in key else default
 
 
-EXTERNAL_CAMERA_NAME = "external_sensor0"  # --dev: the JoyLo replay over-the-shoulder viewpoint
+#: the JoyLo replay over-the-shoulder camera (``--record-view external`` / ``tiled``), BEHAVIOR's size
+EXTERNAL_CAMERA_NAME = "external_sensor0"
+EXTERNAL_CAMERA_HW = (960, 1440)
 
 
 def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str, activity: str, did: int, robot_name: str, image_size: int, proprio: bool = True,
@@ -191,7 +206,7 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": meta["scene"],
-            "scene_file": os.path.join(template_dir, "template.json"),
+            "scene_file": (meta.get("_paths") or {}).get("scene_file") or os.path.join(template_dir, "template.json"),
             "load_room_instances": meta.get("load_room_instances") or None,
         },
         "robots": [M.joylo_robot_config(robot_name, **sensors, **robot_kw)],
@@ -199,7 +214,7 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
             "type": "ISpatialGymTask",
             "activity_name": activity,
             "activity_definition_id": did,
-            "activity_definitions_root": os.path.join(template_dir, "activity_definitions"),
+            "activity_definitions_root": (meta.get("_paths") or {}).get("activity_definitions_root") or os.path.join(template_dir, "activity_definitions"),
             "tro_path": tro_path,
             "termination_config": {"max_steps": 10**6},  # the executor owns the step budget
         },
@@ -347,15 +362,14 @@ class InstanceLoader:
         self.cfg = build_env_config(self.template_dir, self.tmeta, self.tro, self.tro_path, self.activity, self.did, self.robot_name, self.image_size,
                                     behavior_output=getattr(self, "behavior_output", False))
         if getattr(self, "external_camera", False):
-            # --dev (owner 2026-09-17 23:39): the BEHAVIOR / JoyLo replay external viewpoint - a camera on the robot's
-            # base link over its shoulder, looking down-forward (render_instances.render_template) - recorded next to
-            # the head video as external_rgb.mp4
+            # the BEHAVIOR / JoyLo replay external viewpoint (joylo/scripts/replay_data.py): a camera on the robot's base
+            # link over its shoulder, looking down-forward
             self.cfg["env"]["external_sensors"] = [{
                 "sensor_type": "VisionSensor",
                 "name": EXTERNAL_CAMERA_NAME,
                 "relative_prim_path": f"/controllable__r1pro__{self.robot_name}/base_link/{EXTERNAL_CAMERA_NAME}",
                 "modalities": ["rgb"],
-                "sensor_kwargs": {"image_height": self.image_size, "image_width": self.image_size, "horizontal_aperture": 40.0},
+                "sensor_kwargs": {"image_height": EXTERNAL_CAMERA_HW[0], "image_width": EXTERNAL_CAMERA_HW[1], "horizontal_aperture": 40.0},
                 "position": th.tensor([-0.4, 0.0, 2.0], dtype=th.float32),
                 "orientation": th.tensor([0.2706, -0.2706, -0.6533, 0.6533], dtype=th.float32),
                 "pose_frame": "parent",
@@ -811,7 +825,7 @@ def episode_annotations(sidecar: Sidecar) -> EpisodeAnnotations:
         family_description=FAMILY_DESCRIPTIONS.get(family, ""),
         template_description=template,
         instance_description=instance,
-        alias=sidecar.alias,
+        variant=sidecar.variant,
         instance_id=sidecar.instance_id,
     )
 
@@ -839,6 +853,24 @@ def replay_actions(path: str, episode: int = 0) -> Iterator[th.Tensor]:
         yield th.as_tensor(a, dtype=th.float32)
 
 
+def replay_phases(path: str, episode: int = 0) -> Optional[List[int]]:
+    """The recorded phase (oracle / settle) of every action of a ``demo.hdf5`` episode (``isg/phase``); None for a LeRobot
+    dataset or a demo without it."""
+    if os.path.isdir(path):
+        return None
+    import h5py
+
+    with h5py.File(path, "r") as f:
+        g = f["data"][f"demo_{episode}"]
+        return [int(p) for p in g["isg/phase"][()]] if "isg/phase" in g else None
+
+
+def _dataset_record(loader) -> Optional["INST.InstanceRecord"]:
+    """The eval dataset's record of the instance ``loader`` loaded (its ``template_meta["_paths"]`` names the dataset)."""
+    tro = os.path.abspath(loader.tro_path)
+    return next((r for r in INST.load_index(loader.tmeta["_paths"]["dataset_root"]) if os.path.abspath(r.path("tro_state")) == tro), None)
+
+
 def load_policy(spec: str):
     """``module:callable`` → ``policy(obs, info) -> action``."""
     mod, _, name = spec.partition(":")
@@ -861,27 +893,25 @@ def policy_actions(policy, executor: Executor, obs0, info0, max_steps: int) -> I
 # ==========================================================================================
 
 
-def demo_gating_for(mode: str, demo_gating: str) -> Tuple[str, ...]:
-    """The executor's ``demo_gating`` for ``--mode`` / ``--demo-gating``. ``auto``: the full placed_orientation gate (owner
-    2026-09-16 17:10 item 4: placed_tilt retracted; cylinders are compared modulo rotation about their long axis inside the
-    gate, ExecutorConfig.demo_revolution_axes), the operated articulated roots (owner 2026-09-27: the body of an object whose
-    lid / flap / door the robot works stays put), the torso a load bent visibly off its command (owner 2026-10-09: "if
-    unpreventable discard"), a target / partner at least half hidden in the goal image (ispatialgym.eval.goal_occlusion,
-    ISPATIALGYM_GOAL_OCCLUSION=off drops it) for the oracle; the release by the gripper command for the oracle and for replays
-    of its demos; nothing for an evaluated policy."""
-    if demo_gating != "auto":
-        return () if demo_gating == "none" else (demo_gating,)
-    gating: Tuple[str, ...] = ("placed_orientation", "root_moved", "robot_wobble") if mode == "oracle" else ()
-    if mode == "oracle" and goal_occlusion.enabled():
-        gating += ("goal_occlusion",)
-    if mode in ("oracle", "replay"):
-        gating += ("release_commanded",)
-    return gating
+def record_views(text: str) -> Tuple[str, ...]:
+    """``--record-view``: a comma-separated list of :data:`~ispatialgym.oracle.recorder.VIEWS`."""
+    views = tuple(dict.fromkeys(v.strip() for v in text.split(",") if v.strip()))
+    unknown = [v for v in views if v not in VIEWS]
+    if unknown:
+        raise argparse.ArgumentTypeError(f"unknown view(s) {', '.join(unknown)}; choose from {', '.join(VIEWS)}")
+    return views
 
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--instance", default=None, help="path to <iid>-tro_state.json of a sampled instance")
+    p.add_argument("--task", default=None,
+                   help="instead of --instance: a task family, task or subtask of the eval dataset (ispatialgym.eval.instances); runs "
+                        "its instances --instance-indices (one in this process, several each in a process of its own)")
+    p.add_argument("--instance-indices", type=int, nargs="+", default=[0],
+                   help="--task: instance indices (a task's instances are its subtasks' instances in the dataset's order)")
+    p.add_argument("--instances-root", default=None,
+                   help="--task: dataset root (default $ISPATIALGYM_INSTANCES_PATH or $OMNIGIBSON_DATA_PATH/ispatialgym-eval-instances)")
     p.add_argument("--queue", default=None, metavar="INST_ROOT",
                    help="instead of --instance: replay every instance a sampler writes under INST_ROOT (sample_isg --out), one after "
                         "the other in this process's world (run_queue)")
@@ -893,36 +923,39 @@ def parse_args(argv=None):
     p.add_argument("--poll-s", type=float, default=10.0, help="--queue: wait between scans for new instances")
     p.add_argument("--sidecar", default=None, help="oracle sidecar (default: <iid>.oracle.json next to the TRO)")
     p.add_argument("--mode", default="oracle", choices=["oracle", "replay", "policy"])
-    p.add_argument("--replay", default=None, help="replay mode: LeRobot dataset root or demo.hdf5")
+    p.add_argument("--replay", default=None, help="replay mode: LeRobot dataset root or demo.hdf5 (default for an eval dataset instance: its demo)")
     p.add_argument("--episode", type=int, default=0, help="replay mode: episode index")
     p.add_argument("--policy", default=None, help="policy mode: module:callable -> policy(obs, info) -> action")
-    p.add_argument("--policy-steps", type=int, default=3000, help="policy mode: step budget")
     p.add_argument("--out", default=None, help="output root; the run goes to <out>/<iid>/ (default: <template_dir>/runs)")
-    p.add_argument("--record", default="full", choices=["full", "hdf5", "video"], help="full = hdf5 + LeRobot; hdf5 = hdf5 only; video = mp4 / meta only")
-    p.add_argument("--video", action="store_true", help="record the head camera RGB to <out>/<iid>/head_rgb.mp4")
-    p.add_argument("--dev", action="store_true", help="development recording: also the JoyLo over-the-shoulder external viewpoint (external_rgb.mp4, with --video)")
-    p.add_argument("--video-size", type=int, default=None, help="downscale video frames to this square size")
+    p.add_argument("--record", default="full", choices=["full", "hdf5", "video"],
+                   help="full = hdf5 + LeRobot; hdf5 = hdf5 only; video = the --record-view videos and meta only")
+    p.add_argument("--record-view", type=record_views, default=(), metavar="VIEW[,VIEW...]",
+                   help="videos to record, each to <out>/<iid>/<view>_rgb.mp4: head (head camera), external (BEHAVIOR's JoyLo replay "
+                        "camera over the robot's shoulder, 1440 x 960), left_wrist / right_wrist (wrist cameras), tiled (BEHAVIOR's "
+                        "JoyLo replay video: left wrist | head | right wrist in 480 px tiles over the external camera, 1440 x 1440)")
+    p.add_argument("--video-size", type=int, default=None, help="scale every video to this width (aspect kept)")
     p.add_argument("--goal-image", action="store_true", help="capture the goal image after the settled check (>= 3 renders) and write goal_observation into the TRO")
     p.add_argument("--no-goal-override", action="store_true", help="do not write the settled values back into the TRO goal poses")
-    p.add_argument("--stream-qa", default="stop", choices=["stop", "log", "off"],
-                   help="replay / policy: stop = a QA monitor verdict (collision, ghost hand, ...) ends the episode; log = it is recorded in "
-                        "meta.stream_qa and the stream goes on, the episode judged by its goal (a stream has no program: its grasps and "
-                        "pushes have no intended contacts); off = only the timeout ends the episode (the collision monitor keeps its "
-                        "contact statistics)")
-    p.add_argument("--demo-gating", default="auto",
-                   choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "robot_wobble", "release_commanded", "none"],
-                   help="demo-collection gate after the epilogue: placed_orientation = every placed object within its recorded orientation tolerance (full error; "
-                        "an object with a continuous symmetry about its long axis per the ICL survey - marker, pencil, bottles - modulo rotation about that axis); "
-                        "root_moved = the root of a free-standing articulated object whose joint the program works stays within 5 mm / 0.02 rad at the end and "
-                        "10 mm / 0.04 rad of tilt throughout; goal_occlusion = no target / partner >= 50%% hidden in the settled goal image; robot_wobble = no "
-                        "load the hands bear bends the torso more than 1 deg off its command; release_commanded = every assisted-grasp release comes from a "
-                        "gripper command of +1 (meta.release_check records the releases in every case) (auto = the five on for --mode oracle, "
-                        "release_commanded alone for --mode replay, none for --mode policy); placed_tilt = the retracted principal-axis tilt variant "
-                        "(unused by default); none")
+    p.add_argument("--qa", action=argparse.BooleanOptionalAction, default=True,
+                   help="the QA metrics of BEHAVIOR's demo QA plus the demo gates (ispatialgym.oracle.qa.QA_METRICS), logged in meta.qa "
+                        "with the steps each fired at. HARD: robot touching objects / itself, pause, jerky motion, ghost hand, object "
+                        "tilt, goal occlusion, robot wobble, bad release; SOFT: held object drift and stalled, gripper in view and failed "
+                        "grasp (oracle only) - the oracle's retry rules, retried as before and every verdict logged -, head camera "
+                        "upright, arm / hand contacts. --mode oracle: a HARD metric ends the demo as failed; replay / policy: every "
+                        "metric is only logged. --no-qa: none of them (the oracle's retry rules still apply)")
     p.add_argument("--carry-leg", default="straight", choices=["straight", "trajopt"],
                    help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
-    p.add_argument("--max-steps", type=int, default=6000, help="episode step budget (30 Hz control steps)")
-    p.add_argument("--settle-steps", type=int, default=50, help="no-op window after the program: max(this, 20%% of the action steps)")
+    p.add_argument("--max-steps", type=int, default=None,
+                   help="steps of the actions (policy steps, a replay, the oracle program; 30 Hz control steps); default: an eval dataset "
+                        "instance max(300, 2 x its demo's length), else 3000. The episode is cut at --max-steps + --settle-steps")
+    p.add_argument("--settle-steps", type=int, default=None, help="no-op window after the actions; default 0.2 x --max-steps")
+    p.add_argument("--wallclock", type=float, default=None,
+                   help="seconds the actions may take (default 1 s x --max-steps): a replay / policy stream ends there and the settle "
+                        "window still judges the episode; the oracle program gets a timeout verdict")
+    p.add_argument("--settle-eval", default="auto", choices=["auto", "on", "off"],
+                   help="the settling evaluation after the settle window: on = no robot / object motion over it (else a second, longer "
+                        "window decides) and the binary goal at its end; off = the binary goal (every goal atom but pose_settled) at the "
+                        "end of the settle window alone decides; auto = off for --mode policy, on for oracle / replay")
     p.add_argument("--retries", type=int, default=1, help="retries per action from its checkpoint")
     p.add_argument("--image-size", type=int, default=DEFAULT_IMAGE_SIZE)
     p.add_argument("--head-aperture", type=float, default=DEFAULT_HEAD_APERTURE_MM)
@@ -937,10 +970,15 @@ def parse_args(argv=None):
     p.add_argument("--load-only", action="store_true", help="load the instance, record its start state (meta.start_state) and exit: no program, no demo, no "
                                                             "TRO writes - the fresh-reload reference a warm demo's start state is compared with")
     args = p.parse_args(argv)
-    if (args.instance is None) == (args.queue is None):
-        p.error("exactly one of --instance and --queue")
+    if sum(x is not None for x in (args.instance, args.queue, args.task)) != 1:
+        p.error("exactly one of --instance, --queue and --task")
+    if args.task and args.replay and len(args.instance_indices) > 1:
+        p.error("--replay names one demo: give one --instance-indices value (without --replay each instance replays its own demo)")
     if args.all_cameras and M.head_camera_only():
         p.error("--all-cameras records the wrist cameras, which ISPATIALGYM_HEAD_CAMERA_ONLY removes")
+    wrist_views = [v for v in args.record_view if v in ("tiled", "left_wrist", "right_wrist")]
+    if wrist_views and M.head_camera_only():
+        p.error(f"--record-view {','.join(wrist_views)} records the wrist cameras, which ISPATIALGYM_HEAD_CAMERA_ONLY removes")
     if args.behavior_shard and M.head_camera_only():
         p.error("--behavior-shard records the wrist cameras, which ISPATIALGYM_HEAD_CAMERA_ONLY removes")
     if args.behavior_shard and args.record not in ("full", "hdf5"):
@@ -1012,7 +1050,37 @@ def main(argv=None) -> int:
     logging.getLogger("ispatialgym").setLevel(args.log_level)
     if args.queue:
         return run_queue(args)
+    if args.task:
+        return run_task(args, argv)
     return run_instance(args, args.instance)[0]
+
+
+def run_task(args, argv=None) -> int:
+    """``--task``: the eval dataset instances the name and indices resolve to; one runs in this process, several each in a
+    process of its own (an Isaac Sim process builds one environment)."""
+    import subprocess
+
+    from ispatialgym.eval import instances as INST
+
+    recs = INST.resolve(args.task, args.instance_indices, args.instances_root)
+    for i, rec in zip(args.instance_indices, recs):
+        log.info("--task %s index %d -> subtask %s instance %d (%s)", args.task, i, rec.subtask, rec.instance, rec.files["tro_state"])
+    if len(recs) == 1:
+        return run_instance(args, recs[0].path("tro_state"))[0]
+    rest, src, i = [], list(sys.argv[1:] if argv is None else argv), 0
+    while i < len(src):
+        if src[i] in ("--task", "--instances-root"):
+            i += 2
+            continue
+        if src[i] == "--instance-indices":
+            i += 1
+            while i < len(src) and src[i].lstrip("-").isdigit():
+                i += 1
+            continue
+        rest.append(src[i])
+        i += 1
+    codes = [subprocess.run([sys.executable, "-m", "ispatialgym.oracle.run_isg", *rest, "--instance", rec.path("tro_state")]).returncode for rec in recs]
+    return max(codes)
 
 
 def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
@@ -1034,20 +1102,36 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
 
     try:
         loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=args.image_size, head_aperture=args.head_aperture)
-        loader.external_camera = bool(args.dev)
+        loader.external_camera = bool({"external", "tiled"} & set(args.record_view))
         loader.behavior_output = bool(args.behavior_shard)
-        meta["dev"] = bool(args.dev)
+        meta["record_view"] = list(args.record_view)
         iid, tro_path = loader.iid, loader.tro_path
-        out_root = args.out or os.path.join(loader.template_dir, "runs")
+        # an eval dataset instance (template_meta "_paths") never gets runs written into the dataset
+        out_root = args.out or (os.path.join(os.getcwd(), "runs") if loader.tmeta.get("_paths") else os.path.join(loader.template_dir, "runs"))
         out_dir = os.path.join(out_root, iid)
         os.makedirs(out_dir, exist_ok=True)
         meta.update({
             "instance_id": iid, "template_dir": loader.template_dir, "template_id": loader.tmeta.get("template_id"), "problem": loader.tmeta["problem"],
-            "activity": loader.activity, "activity_definition_id": loader.did, "alias": loader.tmeta.get("alias") or loader.tro.meta.task_variant,
+            "activity": loader.activity, "activity_definition_id": loader.did, "variant": loader.tmeta.get("variant") or loader.tro.meta.task_variant,
             "scene": loader.tmeta.get("scene"), "load_room_instances": loader.tmeta.get("load_room_instances"), "tro_path": tro_path,
             "robot_name": loader.robot_name, "out_dir": out_dir,
         })
-        result.update({"instance": iid, "activity": loader.activity, "alias": meta["alias"], "out": out_dir})
+        # task family / task / subtask (isg_customs.json is keyed by subtask): the eval dataset's names, else from the sampling key
+        names = {k: v for k, v in (loader.tmeta.get("eval") or {}).items() if k in ("task_family", "task", "subtask")}
+        if not names and meta.get("variant"):
+            from ispatialgym.eval import names as NAMES
+
+            try:
+                names = {"task_family": NAMES.task_family(meta["variant"]), "task": NAMES.task_name(meta["variant"]), "subtask": NAMES.subtask_name(meta["variant"])}
+            except Exception as e:  # noqa: BLE001  (a key outside the iddl name templates: no customs entry)
+                log.warning("no subtask name for %s (%r)", meta["variant"], e)
+        meta.update(names)
+        # an eval dataset instance's demo: the default --replay, and its length the step budget
+        dataset_rec = _dataset_record(loader) if loader.tmeta.get("_paths") else None
+        budget = INST.step_budget(dataset_rec.episode.get("length") if dataset_rec else None, args.max_steps, args.settle_steps, args.wallclock)
+        settle_eval = args.settle_eval == "on" or (args.settle_eval == "auto" and args.mode != "policy")
+        meta.update({"budget": budget, "settle_eval": settle_eval})
+        result.update({"instance": iid, **names, "activity": loader.activity, "variant": meta["variant"], "out": out_dir})
 
         # ---------------------------------------------------------------- sidecar + program (before the sim: cheap failures first)
         actions = None
@@ -1067,18 +1151,28 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                         raise
                     meta["tro_sha256_verified"] = False
                     log.warning("%s (--allow-sha-mismatch)", e)
-                alias = sidecar.alias
+                variant = sidecar.variant
                 try:
-                    actions = expand(alias, sidecar)
+                    actions = expand(variant, sidecar)
                 except SidecarError as e:
-                    program_error = f"no program for {alias!r}: {e}"
+                    program_error = f"no program for {variant!r}: {e}"
                 if actions is not None and os.environ.get("ISG_PROGRAM_HOOK"):
                     # experiments (owner 2026-09-19 night: the door pull-back / push-open study): ``path.py:callable`` or
                     # ``module:callable`` rewriting the expanded program; recorded in meta, never used by the pilot runs
                     actions = _apply_program_hook(os.environ["ISG_PROGRAM_HOOK"], actions, sidecar, loader)
                     meta["program_hook"] = os.environ["ISG_PROGRAM_HOOK"]
-                meta["subtask"] = sidecar.subtask
+                meta["iddl"] = sidecar.subtask  # the task's iddl id (meta["subtask"] is the subtask name, the isg_customs key)
                 meta["program"] = [a.summary() for a in actions] if actions else None
+        qa_program = actions
+        if args.mode != "oracle" and args.qa:
+            # a stream has no program: object_tilt watches the free-standing objects the instance's oracle program opens or closes
+            qa_sidecar = os.path.abspath(args.sidecar) if args.sidecar else default_sidecar_path(tro_path)
+            try:
+                _sc = Sidecar.load(qa_sidecar).validate(check_program=True)
+                qa_program = expand(_sc.variant, _sc)
+            except Exception as e:  # noqa: BLE001
+                log.info("--qa object_tilt: no program for this instance (%r); no object is watched", e)
+            meta["qa_program_sidecar"] = qa_sidecar if qa_program else None
         log.info("run_isg v2: %s (%s, mode %s, %s actions) -> %s", iid, loader.activity, args.mode, None if actions is None else len(actions), out_dir)
 
         # ---------------------------------------------------------------- environment + loader contract
@@ -1117,7 +1211,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         from ispatialgym.oracle import texture_wait as _TW
 
         t_tex = time.time()
-        meta["texture_wait"], obs_tex = _TW.wait_for_textures(lambda: SE.get_obs(env)[0], og.sim.render, robot.name, EXTERNAL_CAMERA_NAME if args.dev else None)
+        meta["texture_wait"], obs_tex = _TW.wait_for_textures(lambda: SE.get_obs(env)[0], og.sim.render, robot.name,
+                                                              EXTERNAL_CAMERA_NAME if loader.external_camera else None)
         timings["texture_wait_s"] = time.time() - t_tex
         if obs_tex is not None:
             obs = obs_tex
@@ -1169,23 +1264,21 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         meta["camera_in_zed"] = {"position": cam_in_zed[0].tolist(), "orientation": cam_in_zed[1].tolist(),
                                  "constant_dev_mm": 1000.0 * float(th.linalg.norm(cam_in_zed[0] - C.CAMERA_IN_ZED[0]))}
         state = SimState(env, task, robot, cam_key, cam_in_zed=cam_in_zed)
-        qa_cfg = QAConfig(max_episode_steps=args.max_steps)
+        qa_cfg = QAConfig(max_episode_steps=budget["episode_cap"])
         if args.mode != "oracle":
             # a replay / policy run is a single stream action: the per-action cap would otherwise cut every episode at 3000 steps
-            qa_cfg.max_action_steps = args.max_steps
+            qa_cfg.max_action_steps = budget["episode_cap"]
         monitors = Monitors(env, robot, qa_cfg, cam_key=cam_key, cam_in_zed=cam_in_zed)
-        rec_cfg = RecorderConfig(hdf5=args.record in ("full", "hdf5"), lerobot=args.record == "full", video=args.video, video_size=args.video_size,
-                                 all_cameras=args.all_cameras, frame_buffer=args.frame_buffer,
-                                 external_camera=EXTERNAL_CAMERA_NAME if args.dev else None,
-                                 behavior_shard=args.behavior_shard, behavior_task=meta.get("alias") or loader.activity)
+        rec_cfg = RecorderConfig(hdf5=args.record in ("full", "hdf5"), lerobot=args.record == "full", views=tuple(args.record_view),
+                                 video_size=args.video_size, all_cameras=args.all_cameras, frame_buffer=args.frame_buffer,
+                                 external_camera=EXTERNAL_CAMERA_NAME if loader.external_camera else None,
+                                 behavior_shard=args.behavior_shard, behavior_task=meta.get("variant") or loader.activity)
         recorder = Recorder(out_dir, env, robot, cam_key, tracked, fps=int(loader.cfg["env"]["action_frequency"]), cfg=rec_cfg,
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
         if sidecar is not None:
             recorder.episode = episode_annotations(sidecar)
-        gating = demo_gating_for(args.mode, args.demo_gating)
-        ex_cfg = ExecutorConfig(max_steps=args.max_steps, retries=args.retries, settle_min_steps=args.settle_steps, goal_image=args.goal_image,
-                                record_state=rec_cfg.hdf5, demo_gating=gating, stream_qa=args.stream_qa)
-        meta["demo_gating_enabled"] = list(gating)
+        ex_cfg = ExecutorConfig(max_steps=budget["episode_cap"], max_wall_s=budget["wallclock_s"], settle_eval=settle_eval, retries=args.retries,
+                                settle_min_steps=budget["settle_steps"], goal_image=args.goal_image, record_state=rec_cfg.hdf5, qa=args.qa)
         from ispatialgym.oracle import execute as _execute
 
         _execute.CONFIG.carry_leg = args.carry_leg
@@ -1200,6 +1293,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         meta["rush_env"] = {k: v for k, v in os.environ.items() if k.startswith("ISG_")}
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
                             tracked_objects=tracked, cam_key=cam_key)
+        executor.qa_program = qa_program
         executor.last_obs, executor.last_info = obs, info
         # owner 2026-10-11: the template's objects start on an interior support surface (a shelf inside a bookcase / wardrobe / hall
         # tree, template_meta template_facts.support_surface): the support stays an obstacle but for the board under the object
@@ -1215,7 +1309,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
 
             try:
                 _goal = list(getattr(getattr(task, "problem", None), "goal", None) or [])
-                executor.protected_goal = _PROT.goal_protected(_goal, loader.physical, _PROT.alias_override(meta.get("alias")))
+                executor.protected_goal = _PROT.goal_protected(_goal, loader.physical, _PROT.subtask_override(meta.get("subtask")))
             except Exception as e:  # noqa: BLE001
                 log.warning("protected objects unavailable (%r): transits unchecked", e)
                 executor.protected_goal = []
@@ -1233,16 +1327,24 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         if args.mode == "oracle":
             episode = executor.run_program(actions)
         elif args.mode == "replay":
-            if not args.replay:
-                raise ValueError("--mode replay needs --replay <dataset root | demo.hdf5>")
-            episode = executor.run_stream(replay_actions(args.replay, args.episode))
+            replay = args.replay or (dataset_rec.demo_path() if dataset_rec else None)
+            if not replay:
+                raise ValueError("--mode replay needs --replay <dataset root | demo.hdf5> (an eval dataset instance replays its own demo)")
+            meta["replay"] = replay
+            executor.stream_phases = replay_phases(replay, args.episode)
+            episode = executor.run_stream(replay_actions(replay, args.episode))
         else:
             if not args.policy:
                 raise ValueError("--mode policy needs --policy module:callable")
             policy = load_policy(args.policy)
-            episode = executor.run_stream(policy_actions(policy, executor, obs, info, args.policy_steps))
+            bind = getattr(policy, "bind", None)
+            if callable(bind):  # a policy driving the robot-level motion layer (ispatialgym.harness) gets the executor
+                bind(executor=executor, loader=loader, meta=meta, out_dir=out_dir, tro_path=tro_path)
+            episode = executor.run_stream(policy_actions(policy, executor, obs, info, budget["max_steps"]))
         timings["episode_s"] = time.time() - t0
         timings.update({f"executor_{k}": v for k, v in episode.get("timings", {}).items()})
+        if args.mode == "policy" and callable(getattr(policy, "finalize", None)):
+            policy.finalize(episode)
         joints_end = loader.joint_positions_report()  # the TRO's joint_positions constraints (a door opened at init) as the episode leaves them
         if joints_end:
             meta["joint_positions"] = joints_end
@@ -1258,7 +1360,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                 log.warning("goal override not computed: %r", e)
                 meta["goal_override_error"] = repr(e)
         if episode["success"] and (override is not None or (goal_obs and goal_obs.get("rgb") is not None)):
-            meta["tro_updates"] = write_tro_updates(tro_path, sidecar_path, sidecar, override, goal_obs if args.goal_image else None, out_dir)
+            if loader.tmeta.get("_paths"):  # the eval dataset's instance files stay as released
+                meta["tro_updates"] = {"changed": [], "skipped": "eval dataset instance"}
+            else:
+                meta["tro_updates"] = write_tro_updates(tro_path, sidecar_path, sidecar, override, goal_obs if args.goal_image else None, out_dir)
         if goal_obs is not None:
             goal_obs = {k: v for k, v in goal_obs.items() if k != "rgb"}
         meta["goal_observation"] = goal_obs
@@ -1284,8 +1389,13 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             "status": meta["status"], "success": success, "reason": reason, "n_steps": episode["n_steps"], "n_action_steps": episode["n_action_steps"],
             "max_position_error": errors.get("max_position_error"), "max_orientation_error": errors.get("max_orientation_error"),
             "final_step_max_position_error": last_errors.get("max_position_error"), "final_step_max_orientation_error": last_errors.get("max_orientation_error"),
-            "settled_success": episode.get("settled_success"), "binary_branch": episode.get("binary_branch"), "collisions": (episode.get("qa") or {}).get("collisions", {}).get("n_events"),
-            "qa_by_category": (episode.get("qa") or {}).get("stats", {}).get("by_category"), "goal_override": None if override is None else override.get("applied"),
+            "settled_success": episode.get("settled_success"), "binary_branch": episode.get("binary_branch"),
+            "collisions": (episode.get("monitors") or {}).get("collisions", {}).get("n_events"),
+            "qa_by_category": (episode.get("monitors") or {}).get("stats", {}).get("by_category"),
+            "qa_hard": (episode.get("qa") or {}).get("hard_triggered"), "qa_soft": (episode.get("qa") or {}).get("soft_triggered"),
+            "goal_override": None if override is None else override.get("applied"),
+            "max_steps": budget["max_steps"], "settle_steps": budget["settle_steps"], "wallclock_s": budget["wallclock_s"], "settle_eval": settle_eval,
+            "wall_clock_exceeded": episode.get("wall_clock_exceeded"),
             **({"joint_positions": {k: {"init": v["init"], "end": v["end"]} for k, v in joints_end.items()}} if joints_end else {}),
         })
         return exit_code, result
@@ -1310,12 +1420,13 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         result["exit_code"] = exit_code
         if recorder is not None:
             try:
-                qa = (executor.result.get("qa") or {}).get("stats") if executor is not None and executor.result else None
+                qa = None
+                if executor is not None and executor.result:
+                    qa = {"stats": (executor.result.get("monitors") or {}).get("stats"), "metrics": executor.result.get("qa")}
                 paths = recorder.close(meta, qa=qa, success=bool(result.get("success")))
-                meta.update({"hdf5": paths.get("hdf5"), "video": paths.get("video"), "lerobot": paths.get("lerobot"), "annotations": paths.get("annotations"),
-                             "video_error": paths.get("video_error"), "lerobot_error": paths.get("lerobot_error"),
-                             "behavior_lerobot": paths.get("behavior_lerobot"),
-                             **{k: paths[k] for k in ("external_video", "external_video_error") if k in paths}})  # --dev: the overhead view
+                meta.update({"hdf5": paths.get("hdf5"), "videos": paths.get("views"), "lerobot": paths.get("lerobot"), "annotations": paths.get("annotations"),
+                             "video_errors": paths.get("view_errors"), "lerobot_error": paths.get("lerobot_error"),
+                             "behavior_lerobot": paths.get("behavior_lerobot")})
                 result["behavior_lerobot"] = paths.get("behavior_lerobot")
                 result["hdf5_ok"] = bool(paths.get("hdf5")) if rec_cfg.hdf5 else None
             except Exception as e:  # noqa: BLE001

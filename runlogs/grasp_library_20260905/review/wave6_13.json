@@ -1,351 +1,41 @@
 {
-  "batch": "wave6_13",
-  "models": [
+ "models": [
+  {
+   "key": "pack_of_kielbasa__dgodnn__t",
+   "n_rows": 5,
+   "grasps": [
     {
-      "key": "pencil_holder__mrrpay__t",
-      "n_rows": 3,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "pads on opposite walls near top; box pushed to one finger"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "30 deg tilt, pads at box corner/top rim, coverage 0"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "wall pinch near top, slight yaw, coverage 1"}
-      ],
-      "object_note": "open box; grasps pinch outer walls; 50/25 fingers = box pushed against fully-open finger, both pads touch"
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch at middle of lying sausage"
     },
     {
-      "key": "bottle_of_shampoo__dvrzmy__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of standing tube"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of tube"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of tube"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "31 deg tilt, still flat-face pinch at top"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of tube"}
-      ],
-      "object_note": "squeeze tube; all grasps pinch the flattened top end, natural for disembedding"
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch at middle of lying sausage"
     },
     {
-      "key": "bottle_of_shampoo__hlkpwd__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of standing tube"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of tube"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of tube"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of tube"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch on top of tube"}
-      ],
-      "object_note": "squeeze tube; all grasps pinch the flattened top end, natural for disembedding"
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch at middle of lying sausage"
     },
     {
-      "key": "bottle_of_shampoo__stjjjm__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder, 59 mm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"}
-      ],
-      "object_note": "bottle pushed against fully-open finger (50/10) but both pads on 59 mm body"
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch at middle of lying sausage"
     },
     {
-      "key": "bottle_of_shampoo__lvvkhx__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder, 59 mm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch just below shoulder"}
-      ],
-      "object_note": "bottle pushed against fully-open finger (50/10) but both pads on 59 mm body"
-    },
-    {
-      "key": "conditioner_dispenser__udeflt__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on 29 mm pump-head ball, body hangs below"},
-        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "pads stop 46 mm apart (46/0); 29 mm ball floats"},
-        {"rank": 3, "verdict": "flag", "flags": ["gap"], "note": "pads stop 46 mm apart (46/0); 29 mm ball floats"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on pump-head ball, pads 31 mm apart"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on pump-head ball, pads 31 mm apart"}
-      ],
-      "object_note": "all grasps on pump-head ball; rows 2-3 stop on wider invisible hull below ball (neck/shoulder)"
-    },
-    {
-      "key": "conditioner_dispenser__uncljo__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on 42 mm pump-head ball, body hangs below"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on pump-head ball"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on pump-head ball"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on pump-head ball"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on pump-head ball, near-symmetric 35/11"}
-      ],
-      "object_note": "all grasps on pump-head ball; plausible top grasp for disembedding, body hangs below"
-    },
-    {
-      "key": "conditioner_dispenser__njqnuo__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch of lying body at CoM, 22 deg tilt"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch of lying body at CoM"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "28 deg tilt along axis, pads still on flanks"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "27 deg tilt along axis, pads still on flanks"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "28 deg tilt, pinch near CoM"}
-      ],
-      "object_note": "bottle lies on side; all grasps pinch 77 mm body across diameter at centre"
-    },
-    {
-      "key": "jar_of_bath_salt__dtrjxi__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["gap"], "note": "pads stop 67 mm apart (50/17); 54 mm lid not touched"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across flats near top"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch across flats near top"},
-        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "pads stop 68 mm apart (50/18); 53 mm lid floats"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch across flats near top"}
-      ],
-      "object_note": "lid grasps stop on wider body shoulder/hull, lid floats between pads; body grasps fine"
-    },
-    {
-      "key": "box_of_butter__mfjuil__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch across 39 mm thickness near top edge"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch across thickness near top edge"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "30 deg tilt, pads still flat on faces"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "30 deg tilt, pads still flat on faces"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "30 deg tilt, pads still flat on faces"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "box_of_butter__oixapu__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch across 45 mm thickness near top edge"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch across thickness near top edge"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch across thickness near top edge"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch across thickness near top edge"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "30 deg tilt near top corner, pads flat on faces"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "blackberry__tvpfvb__a",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "27 mm berry between fingertips, both pads touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "berry between fingertips, both pads touch"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "berry between fingertips, both pads touch"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "berry between fingertips, both pads touch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "berry between fingertips, near-vertical approach"}
-      ],
-      "object_note": "small object sits at fingertips; finger readings (29-30/0) consistent with 27 mm width"
-    },
-    {
-      "key": "holly_decoration__shmkir__a",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "5 mm pinch near berry cluster, presumably twig"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "3 mm pinch beside berries, presumably stem"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "5 mm pinch near berries, presumably twig"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "pads 47 mm apart (47/0) squeeze berry cluster/leaves"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "4 mm twig pinch near cut end"}
-      ],
-      "object_note": "sprig tiny in renders; twig vs leaf not fully resolvable for the 3-5 mm pinches"
-    },
-    {
-      "key": "trout__kqpeke__a",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "flank pinch across body behind head"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "flank pinch behind head, 24 deg tilt"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "flank pinch across body behind head"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "rear-body pinch 50 mm behind CoM, still thick body"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "rear-body pinch 44 mm behind CoM, 26 deg tilt"}
-      ],
-      "object_note": "fish lies flat; rows 4-5 are slightly aft of middle third but on 61 mm body, not tail"
-    },
-    {
-      "key": "skateboard_wheel_assembly__jljqtt__a",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on central hanger between wheels"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on central hanger between wheels"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on central hanger between wheels"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "30 deg tilt, still central hanger pinch"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "central hanger pinch, 22 mm lateral offset"}
-      ],
-      "object_note": "all grasps at truck centre; baseplate mating side not covered by pads"
-    },
-    {
-      "key": "skateboard_wheel_assembly__acmbvb__a",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "axial pinch on end wheel; truck cantilevers ~80 mm"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "axial pinch on end wheel; truck cantilevers ~80 mm"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "axial pinch on end wheel; truck cantilevers ~80 mm"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "vertical axial pinch on end wheel, 34 mm CoM offset"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "central hanger pinch between wheels"}
-      ],
-      "object_note": "rows 1-4 hold one wheel at axle end (60 mm); wheel would spin in reality, truck hangs off-axis"
-    },
-    {
-      "key": "cabinet_door__ertkre__a",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-edge face pinch across 8 mm panel, panel hangs"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-edge face pinch, panel hangs"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "30 deg tilt at top edge, faces still pinched"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-edge face pinch, panel hangs"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "30 deg tilt at top edge, faces still pinched"}
-      ],
-      "object_note": "thin panel held by top edge near horizontal centre; hinge side far from fingers"
-    },
-    {
-      "key": "bookcase_baseboard__hlhneo__a",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across 67 mm width near board centre"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across width near board centre"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across width, 21 mm from CoM"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "30 deg tilt along board, pads on narrow edges"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "30 deg tilt along board, pads on narrow edges"}
-      ],
-      "object_note": "long board pinched on narrow edges within ~2 cm of CoM; V1 partly occluded by robot arm"
-    },
-    {
-      "key": "pack_of_kielbasa__rvhpal__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch 16 mm from CoM, middle third"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__fwqdoy__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle; V1 occluded by arm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch 14 mm from CoM, middle third"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__biokqz__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "35 deg tilt along axis, pinch at CoM"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "38 deg tilt along axis, pinch at CoM"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__gmwwsh__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__dgodnn__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch 10 mm from CoM"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__nhkuzn__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch 14 mm from CoM, middle third"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__bzlsuh__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch 15 mm from CoM, middle third"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__femhoz__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of lying sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch 11 mm from CoM"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__bhkkiq__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "34 deg tilt along axis, pinch at CoM"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__herxxh__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "34 deg tilt along axis, pinch at CoM"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "37 deg tilt along axis, pinch at CoM"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "pack_of_kielbasa__lwrdjd__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "37 deg tilt along axis, pinch at CoM"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at middle of short sausage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch 7 mm from CoM"}
-      ],
-      "object_note": ""
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch 10 mm from CoM"
     }
-  ]
+   ],
+   "object_note": ""
+  }
+ ]
 }

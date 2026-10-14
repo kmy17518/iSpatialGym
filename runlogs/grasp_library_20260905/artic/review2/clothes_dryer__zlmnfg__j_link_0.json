@@ -1,5 +1,0 @@
-{"key": "clothes_dryer__zlmnfg", "joint": "j_link_0", "feasible": true,
- "proposal": {"face": "outer", "a": 0.92, "b": 0.5, "pinch": "horizontal", "approach": "front", "depth_mm": 8,
-              "expected_motion": "pull"},
- "alternative": {"face": "outer", "a": 0.5, "b": 0.92, "pinch": "vertical", "approach": "front", "depth_mm": 8, "expected_motion": "pull"},
- "note": "Radial pinch across ~75 mm bezel ring at free edge: outer pad on 20 mm proud bezel wall, inner pad on steep bowl wall.", "confidence": "low"}

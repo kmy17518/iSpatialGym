@@ -1,6 +1,0 @@
-{"key": "openable_window__qdkcdn", "joint": "j_dof_rootd_aa002_t", "feasible": false,
- "proposal": {"face": "outer", "a": 0.5, "b": 0.5, "pinch": "horizontal", "approach": "front", "depth_mm": 30,
-              "expected_motion": "slide"},
- "alternative": null,
- "note": "Flush 50 mm wooden sash recessed behind the frame; every edge in a track or against the fixed sash, muntins too thin. Nothing pinchable.",
- "confidence": "medium"}

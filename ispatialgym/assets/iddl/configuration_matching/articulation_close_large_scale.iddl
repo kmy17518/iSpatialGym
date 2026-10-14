@@ -3,7 +3,7 @@
 ; -> closed limit. Handle grasp in this direction too; base / trunk primary, arm secondary.
 (define (iddl configuration_matching-articulation_close_large_scale)
     (:family configuration_matching)
-    (:alias configuration_matching-articulation_close_large_scale-{target})
+    (:variant configuration_matching-articulation_close_large_scale-{target})
     (:require
         (handle target)
     )

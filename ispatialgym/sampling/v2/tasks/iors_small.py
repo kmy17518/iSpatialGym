@@ -79,7 +79,7 @@ RELATION_OF_SUBTASK = {
     "inter_object_relation_satisfaction-nextto": "nextto",
     "inter_object_relation_satisfaction-touching": "touching",
 }
-#: v1 ``bddl_writer`` definition ids of the relations (facade rendering when the alias has no grounded BDDL)
+#: v1 ``bddl_writer`` definition ids of the relations (facade rendering when the variant has no grounded BDDL)
 V1_DEFINITION_ID = {"ontop": 0, "under": 1, "inside": 2, "nextto": 3, "touching": 4}
 
 
@@ -355,7 +355,7 @@ class IORSSmall(SamplerV2):
         lift) -, "partner" for the other relations."""
         rule = str(self.gen("carry_clears", "auto" if self.relation == "touching" else "partner"))
         if rule not in CARRY_CLEARS:
-            raise Reject("spec", f"{self.gp.alias}: generation.carry_clears must be one of {list(CARRY_CLEARS)}, got {rule!r}")
+            raise Reject("spec", f"{self.gp.variant}: generation.carry_clears must be one of {list(CARRY_CLEARS)}, got {rule!r}")
         return rule
 
     def carry_height_over(self, partner: bool) -> float:
@@ -366,7 +366,7 @@ class IORSSmall(SamplerV2):
 
     # ------------------------------------------------------------------ roles
 
-    def v1_role_aliases(self) -> Dict[str, str]:
+    def v1_role_variants(self) -> Dict[str, str]:
         return {"partner_support": "support"}
 
     def bind_scene_roles(self):
@@ -374,7 +374,7 @@ class IORSSmall(SamplerV2):
         req = self.choice.bindings.get("support")
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+            raise Reject("spec", f"{self.gp.variant}: scenes.{self.scene}.bindings.support must list scene object names")
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     @property
@@ -585,7 +585,7 @@ class IORSSmall(SamplerV2):
                                                  top=self.top if nb_top is None else nb_top, scale_key=self.choice.models["target"].scale, arms=arms,
                                                  arm_bands=getattr(self, "arm_bands", None) or None)
                 if i > 0:
-                    log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.alias, grasp.grasp_name)
+                    log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.variant, grasp.grasp_name)
                 return t_pose, grasp
             except Reject as e:
                 last = e
@@ -759,7 +759,7 @@ class IORSSmall(SamplerV2):
         """§6.11 per (target, partner): ontop / under -> the partner's top admits the target footprint with >= 1 cm
         (tier any_yaw / aligned / centred, else ``partner_too_small``); nextto -> the centre heights overlap
         (``nextto_height_mismatch``); touching -> partner stability / target pushability; inside -> opening >= footprint
-        + 1 cm at the rest orientation - standing on :meth:`up_axis` when the alias names one (the drop test runs in the goal check)."""
+        + 1 cm at the rest orientation - standing on :meth:`up_axis` when the variant names one (the drop test runs in the goal check)."""
         up = self.up_axis() if self.gen("target_up_axis") is not None else None
         t_ext = TT.hull_extents(self.hull["target"], self.standing_quats()[0] if up is not None else self.rest["target"])
         p_ext = TT.hull_extents(self.hull["partner"], self.rest["partner"])
@@ -875,12 +875,12 @@ class IORSSmall(SamplerV2):
         if name is None:
             return None
         if name not in ("left", "right"):
-            raise Reject("spec", f"{self.gp.alias}: generation.partner_side must be 'left' or 'right', got {name!r}")
+            raise Reject("spec", f"{self.gp.variant}: generation.partner_side must be 'left' or 'right', got {name!r}")
         side = 1.0 if name == "left" else -1.0
         allowed = self.admitted_sides()
         if side not in allowed:
             who = "the shelf layout (the partner leans against the board opposite the target's lean)" if self.shelf_lean() is not None else "the pair"
-            raise Reject("partner_side", f"{self.gp.alias}: generation.partner_side {name} - {who} admits the partner on the "
+            raise Reject("partner_side", f"{self.gp.variant}: generation.partner_side {name} - {who} admits the partner on the "
                                          f"{' / '.join(TT.side_name(sd) for sd in allowed)} only")
         return side
 
@@ -954,7 +954,7 @@ class IORSSmall(SamplerV2):
         None without it; ``Reject("spec")`` for touching (its partner is braced beside the push)."""
         link = self.gen("partner_on_meta_link")
         if link and self.relation == "touching":
-            raise Reject("spec", f"{self.gp.alias}: generation.partner_on_meta_link is for ontop / under / inside / nextto (touching braces its partner)")
+            raise Reject("spec", f"{self.gp.variant}: generation.partner_on_meta_link is for ontop / under / inside / nextto (touching braces its partner)")
         return str(link) if link else None
 
     def neighbor_start_top(self) -> Optional["NB.UnionTop"]:
@@ -966,7 +966,7 @@ class IORSSmall(SamplerV2):
         if not self.gen("start_region_on_neighbors", False):
             return None
         if self.meta_link() is None:
-            raise Reject("spec", f"{self.gp.alias}: generation.start_region_on_neighbors needs generation.partner_on_meta_link (the partner on the support)")
+            raise Reject("spec", f"{self.gp.variant}: generation.start_region_on_neighbors needs generation.partner_on_meta_link (the partner on the support)")
         if not isinstance(self.top, NB.UnionTop):
             raise Reject("no_start_region", f"{self.top.name}: generation.start_region_on_neighbors, but no neighbour top is united with the support")
         return self.top.neighbors_only()
@@ -1098,12 +1098,12 @@ class IORSSmall(SamplerV2):
             "cells": {TT.side_name(sd): len(cells[sd]) for sd in sides}, "candidates": {TT.side_name(sd): n_cands[sd] for sd in sides},
             "gap_m": {TT.side_name(sd): ([round(min(gaps[sd]), 4), round(max(gaps[sd]), 4)] if gaps[sd] else None) for sd in sides},
             "meta_link": None if self.meta_spots is None else [mid for mid, _ in self.meta_spots]}
-        log.info("%s: start region on edge %s (L %.2f, lateral %+.2f): %s of %d Phase-2 candidates", self.gp.alias, self.edge.name, self.edge.length,
+        log.info("%s: start region on edge %s (L %.2f, lateral %+.2f): %s of %d Phase-2 candidates", self.gp.variant, self.edge.name, self.edge.length,
                  self.init_stance.lateral, ", ".join(f"{TT.side_name(sd)} {len(cells[sd])} cells ({n_cands[sd]} candidates)" for sd in sides), len(cands))
         if on_nb is not None:
             names = [m.name for m in on_nb.members[1:]]
             self.template_facts["start_region"].update({"on_neighbors": names, "off_neighbors": n_off})
-            log.info("%s: start_region_on_neighbors: %d of %d Phase-2 candidates have their focus off the neighbour tops %s", self.gp.alias, n_off, len(cands), names)
+            log.info("%s: start_region_on_neighbors: %d of %d Phase-2 candidates have their focus off the neighbour tops %s", self.gp.variant, n_off, len(cands), names)
         return out
 
     def draw_partner_side(self, rng: np.random.Generator) -> float:
@@ -1147,7 +1147,7 @@ class IORSSmall(SamplerV2):
         self.counters["travel_dropped"] = self.counters.get("travel_dropped", 0) + 1
         self.template_meta.setdefault("travel_dropped", []).append({"base_pose2d": [round(float(v), 4) for v in cand.base_pose2d], "trunk": [cand.translate, round(float(cand.tilt), 4)],
                                                                    "focus": None if cand.focus is None else [round(float(v), 4) for v in cand.focus.tolist()], "why": why[:300]})
-        log.info("%s: candidate at %s (trunk %.2f / %+.2f) dropped for the template: its init -> manipulation travel fails on every redraw (%s)", self.gp.alias,
+        log.info("%s: candidate at %s (trunk %.2f / %+.2f) dropped for the template: its init -> manipulation travel fails on every redraw (%s)", self.gp.variant,
                  [round(float(v), 2) for v in cand.base_pose2d], cand.translate, cand.tilt, why[:200])
 
     def start_region_exhausted(self) -> bool:
@@ -1604,7 +1604,7 @@ class IORSSmall(SamplerV2):
         try:
             return PR.target_up_axis(self.gen("target_up_axis"), t.category, t.model)
         except ValueError as e:
-            raise Reject("spec", f"{self.gp.alias}: generation.target_up_axis of {t.category}/{t.model}: {e}")
+            raise Reject("spec", f"{self.gp.variant}: generation.target_up_axis of {t.category}/{t.model}: {e}")
 
     def up_vector(self) -> th.Tensor:
         """:meth:`up_axis` as a unit vector in the target's frame."""
@@ -1933,7 +1933,7 @@ class IORSSmall(SamplerV2):
                 # library grasps at the settled pose from the same stance (what the oracle would have to grasp anyway)
                 chosen = self.reselect_grasp(draft, grasp, manip, tname)
                 if chosen is not None:
-                    log.info("%s: target rolled %.0f deg while settling; grasp re-selected at the settled pose: %s", self.gp.alias, settled["rotation_deg"], chosen)
+                    log.info("%s: target rolled %.0f deg while settling; grasp re-selected at the settled pose: %s", self.gp.variant, settled["rotation_deg"], chosen)
                     draft.summary["grasp"] = {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "reselected_after_roll": True}
                     ok = True
             if not ok:
@@ -1964,11 +1964,11 @@ class IORSSmall(SamplerV2):
                 # fact is recorded (low cylinders: the pads necessarily reach the table)
                 chosen = self.reselect_grasp(draft, grasp, manip, tname, require_pad_clearance=True)
                 if chosen is not None:
-                    log.info("%s: open pad on the support for %s; grasp re-selected at the settled pose: %s", self.gp.alias, draft.summary.get("grasp", {}).get("name"), chosen)
+                    log.info("%s: open pad on the support for %s; grasp re-selected at the settled pose: %s", self.gp.variant, draft.summary.get("grasp", {}).get("name"), chosen)
                     draft.summary["grasp"] = {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "reselected_pad_clearance": True}
                     clear = True
                 else:
-                    log.info("%s: open pad on the support for %s and no library grasp clears it at the settled pose; kept", self.gp.alias, grasp.grasp_name)
+                    log.info("%s: open pad on the support for %s and no library grasp clears it at the settled pose; kept", self.gp.variant, grasp.grasp_name)
             grasp.extras["open_pads_clear_of_support"] = clear
             draft.summary["open_pads_clear_of_support"] = clear
         if self.up_axis() is not None:
@@ -2254,7 +2254,7 @@ class IORSSmall(SamplerV2):
                 pre_place = self.pre_place_of(place)
                 res = descent(pre_place, place)
                 if res.ok:
-                    log.info("%s: the carried object hit the robot on the descent with the drawn grasp; grasp %s carries clear", self.gp.alias, chosen)
+                    log.info("%s: the carried object hit the robot on the descent with the drawn grasp; grasp %s carries clear", self.gp.variant, chosen)
                     draft.summary["grasp"] = {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "reselected_descent_self_collision": True,
                                               "tried": tried}
                     grasp.extras.update(self.grasp_facts(grasp))
@@ -2509,7 +2509,7 @@ class IORSSmall(SamplerV2):
             if manip_ok:
                 return None  # the manipulation stance itself passes: no second base pose
             raise Reject("contact_unreachable", f"touching push: no push class passes from any push stance lateral ({'; '.join(tried)})")
-        log.info("%s: push stance search: %s", self.gp.alias, " | ".join(tried))
+        log.info("%s: push stance search: %s", self.gp.variant, " | ".join(tried))
         try:
             TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
         finally:
@@ -2540,7 +2540,7 @@ class IORSSmall(SamplerV2):
         self.sidecar.set_goal(st.base_pose2d, st.translate, st.tilt, arms="same")  # the goal observation is taken from the push stance
         draft.summary["push_stance"] = {"lateral_shift_m": st.extras["lateral_shift_m"], "base_pose2d": [float(v) for v in st.base_pose2d],
                                         "path_length_m": st.extras["path_length_m"], "brace_gate": self._brace_gate}
-        log.info("%s: push stance recorded %+.3f m along the edge (path %.2f m, box in hand)", self.gp.alias, st.extras["lateral_shift_m"],
+        log.info("%s: push stance recorded %+.3f m along the edge (path %.2f m, box in hand)", self.gp.variant, st.extras["lateral_shift_m"],
                  float(st.extras["path_length_m"] or 0.0))
         return st
 
@@ -2563,7 +2563,7 @@ class IORSSmall(SamplerV2):
         grasp.carry_height = self.carry_height_over(over)
         draft.summary["carry_lift"] = {"rule": "auto", "clears": "partner" if over else "table", "drive_gap_m": round(gap, 4), "height_m": round(float(grasp.carry_height), 4)}
         if over:
-            log.info("%s: the carried drive to the push stance passes %.3f m from the partner: the lift clears its top (%.2f m)", self.gp.alias, gap, grasp.carry_height)
+            log.info("%s: the carried drive to the push stance passes %.3f m from the partner: the lift clears its top (%.2f m)", self.gp.variant, gap, grasp.carry_height)
 
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
@@ -2643,7 +2643,7 @@ class IORSSmall(SamplerV2):
                                                 f"{manip.tilt:.2f}; {'; '.join(why[-3:])})")
         push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, "classes_failed": why[:6], **{k: v for k, v in push_extras.items() if v is not None}})
-        log.info("%s: touching push class %s from the %s stance%s", self.gp.alias, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
+        log.info("%s: touching push class %s from the %s stance%s", self.gp.variant, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
         if self.shelf_start is not None:
             push_rec.arm = self.shelf_push_arm()

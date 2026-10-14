@@ -1,1 +1,0 @@
-{"key": "cherry_tomato__iydznu", "category": "cherry_tomato", "model": "iydznu", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"y2": {"mad": 0.01757231360410907, "p95": 0.040522875816993466, "p99": 0.0718954248366013, "mad_union": 0.07037834852250759, "iou": 0.9330985915492958, "worst": "y180"}}, "render_s": 0.105}

@@ -1,1 +1,0 @@
-{"key": "umbrella__cqfbku", "category": "umbrella", "model": "cqfbku", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x6": {"mad": 0.008547620106754548, "p95": 0.013071895424836602, "p99": 0.24313725490196078, "mad_union": 0.22448596801537982, "iou": 0.7633555633555633, "worst": "x60"}}, "render_s": 0.105}

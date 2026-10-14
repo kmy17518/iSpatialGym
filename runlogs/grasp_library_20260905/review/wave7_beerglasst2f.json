@@ -1,5 +1,4 @@
 {
- "batch": "wave7_beerglasst2f (2026-10-12, beer_glass B6 worker on strips/beer_glass__mxsliu__t2f.png (rows 1-5) and the six grasps' frames with 3x crops of both pads in V1 / V2 (review_crops/), review_prompt.md, not the reviewer pool; frames = the oracle's closure held under gravity)",
  "models": [
   {
    "key": "beer_glass__mxsliu__t2f",

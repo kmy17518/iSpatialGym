@@ -1,1 +1,0 @@
-{"key": "light_bulb__sxkjea", "category": "light_bulb", "model": "sxkjea", "scale": null, "n_glass": 1, "glass_only": false, "n_textured": 1, "base": {"x6": {"mad": 0.01133759322014848, "p95": 0.030065359477124184, "p99": 0.24313725490196078, "mad_union": 0.5879904704796302, "iou": 0.35540038889870956, "worst": "x60"}}, "render_s": 0.125}

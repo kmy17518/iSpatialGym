@@ -1,7 +1,0 @@
-{
-  "category": "mug",
-  "pages_opened": ["grids/pool_other/mug__p1.png", "grids/pool_other/mug__p2.png"],
-  "n_models": 20,
-  "exclude": [],
-  "notes": "All 20 drinkware items are textured, intact and upright; glass items are transparent with dark contents, not missing material. coffee_cup/ckkwmj, coffee_cup/fgizgn and teacup/oxfzfe are straight-sided cups with handles and read as mugs (target lookalikes, kept since the category was chosen upstream). teacup/tfzfam is a shallow bowl-like cup."
-}

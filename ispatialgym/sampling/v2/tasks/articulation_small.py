@@ -195,7 +195,7 @@ class ArticulationSmall(SamplerV2):
 
     # ------------------------------------------------------------------ roles
 
-    def v1_role_aliases(self) -> Dict[str, str]:
+    def v1_role_variants(self) -> Dict[str, str]:
         return {"artic": self.role} if self.role != "artic" else {}
 
     def bind_scene_roles(self):
@@ -209,12 +209,12 @@ class ArticulationSmall(SamplerV2):
             self.floor_room = str(req["room"])
             floor_req = self.choice.bindings.get("floor")
             if isinstance(floor_req, dict) and floor_req.get("room") and floor_req["room"] != self.floor_room:
-                raise Reject("spec", f"{self.gp.alias}: support room {self.floor_room} differs from the floor room {floor_req['room']}")
+                raise Reject("spec", f"{self.gp.variant}: support room {self.floor_room} differs from the floor room {floor_req['room']}")
             self.floor_obj = self.objects[floor.name]
             return
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names or a room ({{'room': ...}}, floor support)")
+            raise Reject("spec", f"{self.gp.variant}: scenes.{self.scene}.bindings.support must list scene object names or a room ({{'room': ...}}, floor support)")
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     def _support(self):
@@ -344,7 +344,7 @@ class ArticulationSmall(SamplerV2):
             aa = float(th.dot(a, axis))
             a = C.unit(a + axis * (-side * abs(aa) - aa))  # pointing away from the robot along the hinge
             self.handle = dict(self.handle, contact=[float(v) for v in c.tolist()], approach_dir=[float(v) for v in a.tolist()])
-            log.info("%s: handle front end on the robot's side: contact %s, approach %s", self.gp.alias,
+            log.info("%s: handle front end on the robot's side: contact %s, approach %s", self.gp.variant,
                      [round(v, 4) for v in self.handle["contact"]], [round(v, 4) for v in self.handle["approach_dir"]])
         self.v4 = self.gen("prep_push", None) == "two_flap_v4"  # owner 2026-09-20 15:21: the left fist levers the seam open, the right hand pinches the raised edge
         self.v2 = self.gen("prep_push", None) == "two_flap_v2" or self.v4
@@ -405,7 +405,7 @@ class ArticulationSmall(SamplerV2):
                 applied = CN.apply_joint_brake(self.joint, cand)
                 self.joint_friction = cand
             self.stable = self._stable_angles(target)
-            log.info("%s: stable set of %s (moving link %s kg) at joint resistance %s: %s", self.gp.alias, self.joint_name,
+            log.info("%s: stable set of %s (moving link %s kg) at joint resistance %s: %s", self.gp.variant, self.joint_name,
                      None if lid_mass is None else round(lid_mass, 3), "stock" if cand is None else applied, self.stable)
             if self.stable and (cand is None or any(q < self.upper - 1e-6 for q in self.stable)):
                 break  # a resistance candidate must buy an open value below the upper limit, else the next one is tried
@@ -420,7 +420,7 @@ class ArticulationSmall(SamplerV2):
             if jn not in target.joints:
                 raise Reject("spec", f"generation.joint_drives names {jn!r}, not a joint of {target.name} ({list(target.joints)})")
             self.other_joint_drives[jn] = CN.apply_joint_brake(target.joints[jn], spec)
-            log.info("%s: drive of %s applied: %s", self.gp.alias, jn, self.other_joint_drives[jn])
+            log.info("%s: drive of %s applied: %s", self.gp.variant, jn, self.other_joint_drives[jn])
         if any((spec or {}).get("lower_limit_rad") is not None for spec in dict(self.gen("joint_drives", None) or {}).values()):
             CN.restrict_openable_joints(target, [self.joint_name])  # OG's Open state must not read the extended-limit flap as open
         self.template_facts["joint_drives"] = self.other_joint_drives or None
@@ -460,14 +460,14 @@ class ArticulationSmall(SamplerV2):
                 if self.brace_arm == "left":
                     self.left_bands = TT.load_left_contact_band(self, H_max, top=self.top, edge=edge, compute=TT.left_band_compute())
                     if self.left_bands is None:
-                        log.info("%s: no left contact band for height %.2f: brace by the exact IK alone", self.gp.alias, H_max)
+                        log.info("%s: no left contact band for height %.2f: brace by the exact IK alone", self.gp.variant, H_max)
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=self.bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=self.bands)
                 init.name = "init"
                 # §6.7 (owner 2026-09-16 17:10): the Phase-2 loose class is relaxed / focus-in-frame for small articulation (the same
                 # shape as the ontop-large C rule; the hinged jar's best focus lies 24° off the optical axis from the tall trunks
                 # where the handle is reachable, 25° admits 42 foci over 3 stand-offs); since owner 2026-10-11 the classes are the
-                # tabletop 20° / 30° (were 8° / 25°), the hand-tuned aliases pin the tight class at 8° in their customs
+                # tabletop 20° / 30° (were 8° / 25°), the hand-tuned variants pin the tight class at 8° in their customs
                 # generation.focus_at_handle (2026-09-18, default off): the Phase-2 focus at the handle's height instead of the
                 # target's mid height - the optical axis then passes the hand at the grasp (blender eyedvd 0918-225951: every
                 # stance that reached the ring failed gripper_not_in_frame; the ring sits 0.35 m above the table top)
@@ -483,7 +483,7 @@ class ArticulationSmall(SamplerV2):
                 break
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         if self.init_stance is None:
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
@@ -700,7 +700,7 @@ class ArticulationSmall(SamplerV2):
                         self.handle_variants.append(dict(self.handle, contact=c_o, approach_dir=[float(v) for v in app.tolist()], pitch_deg=pdeg, yaw_deg=90.0 - ydeg, site=cname,
                                                          note=f"v2 main opening: {cname} near the robot (yaw 0 = along the hinge away from the robot, positive = turned toward the hinge)"))
         self.q_ajar = float(self.gen("v2_ajar_rad", 0.45))
-        log.info("%s: v2 handles: A (first, centre line) contact %s approach %s; B (main, near end) contact %s approach %s; q_ajar %.3f", self.gp.alias,
+        log.info("%s: v2 handles: A (first, centre line) contact %s approach %s; B (main, near end) contact %s approach %s; q_ajar %.3f", self.gp.variant,
                  [round(v, 4) for v in self.handle_first["contact"]], [round(v, 3) for v in self.handle_first["approach_dir"]],
                  [round(v, 4) for v in self.handle["contact"]], [round(v, 3) for v in self.handle["approach_dir"]], self.q_ajar)
 
@@ -730,7 +730,7 @@ class ArticulationSmall(SamplerV2):
                            width=None, note="push-close: the closed fist on the tip's top face, riding the closing arc (owner 2026-09-19 22:59)")
         self._close_push_handle0 = self.handle  # the fist's own turn: every attempt ranks its two turns from here
         self.grasp_fingers = C.FINGER_CLOSED
-        log.info("%s: push-close handle: tip contact %s (r %.3f m from the hinge), q_init %.3f -> q_goal %.3f", self.gp.alias,
+        log.info("%s: push-close handle: tip contact %s (r %.3f m from the hinge), q_init %.3f -> q_goal %.3f", self.gp.variant,
                  [round(v, 4) for v in self.handle["contact"]], r_c, self.q_init, self.q_goal)
 
     def _pinch_variants(self, handle: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -785,7 +785,7 @@ class ArticulationSmall(SamplerV2):
             passing_all.extend(v for k, v in ok_here.items() if v[2] is not chosen.result)
         self._pinch_passing = passing_all
         if not chosen_all:
-            log.info("%s: %s pinch at q %.3f fails both finger assignments (%s; contact base %s)", self.gp.alias, arm, q, "; ".join(whys),
+            log.info("%s: %s pinch at q %.3f fails both finger assignments (%s; contact base %s)", self.gp.variant, arm, q, "; ".join(whys),
                      [round(float(v), 3) for v in stance.world_to_base(C.handle_waypoints(handle, self.jinfo, [q], pose)[0].contact[:2]).tolist()])
             return None, None, None
         best = max(chosen_all, key=lambda c: c[3])
@@ -795,7 +795,7 @@ class ArticulationSmall(SamplerV2):
         ok = sorted([c for c in chosen_all if c[3] >= floor_m], key=lambda c: (abs(float(c[0].get("yaw_deg", 0.0))), float(c[0].get("pitch_deg", 0.0)), -c[3]))
         if ok:
             best = ok[0]
-        log.info("%s: %s pinch at q %.3f: closing along %s, pitch %s / yaw %s deg (joint margin %.0f mrad)", self.gp.alias, arm, q, [round(v, 2) for v in best[0]["pinch_axis"]],
+        log.info("%s: %s pinch at q %.3f: closing along %s, pitch %s / yaw %s deg (joint margin %.0f mrad)", self.gp.variant, arm, q, [round(v, 2) for v in best[0]["pinch_axis"]],
                  best[0].get("pitch_deg", "-"), best[0].get("yaw_deg", "-"), 1000 * best[3])
         return best[0], best[1], best[2]
 
@@ -835,13 +835,13 @@ class ArticulationSmall(SamplerV2):
             except FileNotFoundError:
                 continue
             if mode == "handle" and b.meta.get("handle_sig") != handle_sig:
-                log.info("%s: handle band %s was computed for another handle pose class (%s); computing this one's", self.gp.alias, b.path, b.meta.get("handle_sig"))
+                log.info("%s: handle band %s was computed for another handle pose class (%s); computing this one's", self.gp.variant, b.path, b.meta.get("handle_sig"))
                 continue
             if any(len(c) for c in b.cells.values()):
-                log.info("%s: %s band cache hit (%d cells): %s", self.gp.alias, mode, sum(len(c) for c in b.cells.values()), b.path)
+                log.info("%s: %s band cache hit (%d cells): %s", self.gp.variant, mode, sum(len(c) for c in b.cells.values()), b.path)
                 self.handle_only_band = mode == "handle"
                 return b
-            log.info("%s: B3 %s band %s has no cell (no §5.4 brace is IK-feasible): computing the handle band", self.gp.alias, mode, b.path)
+            log.info("%s: B3 %s band %s has no cell (no §5.4 brace is IK-feasible): computing the handle band", self.gp.variant, mode, b.path)
         self.handle_only_band = True
         # the band itself on reach_bands.band_kit (self.kit is not touched); the stance above keys the cache lookup and stays the sampler kit's
         kit = RB.band_kit(world, self.kit)
@@ -851,7 +851,7 @@ class ArticulationSmall(SamplerV2):
         # the §5.3 required set exactly as the instance checks it (q_init + every q_k up to the passive fraction); B3's brace
         # bands record n_all_q = 0 for every target at all five fractions, so requiring q_goal itself would empty the band
         q_values = self._band_q_values()
-        log.info("%s: handle band over q = %s (q_init + the %s required fraction of %s, passive from %s; one yaw = the face yaw)", self.gp.alias,
+        log.info("%s: handle band over q = %s (q_init + the %s required fraction of %s, passive from %s; one yaw = the face yaw)", self.gp.variant,
                  [round(v, 3) for v in q_values], "first (stage 2)" if self._stage2_enabled() else "last", self.required, self.passive_from)
         trunks = RB.trunk_grid(self.top.z - kit.floor_z)
         gen_trunks = self.gen("band_trunks", None)
@@ -905,7 +905,7 @@ class ArticulationSmall(SamplerV2):
                 cells_out[(tr, ti)] = np.array([f["cell"] for f in feasible], dtype=np.float32).reshape(-1, 2)
                 log.info("handle trunk (%.2f, %+.1f): %d/%d cells feasible", tr, ti, len(feasible), len(base_cells))
         except RB.BandDeadline as e:
-            raise Reject("band_budget", f"{self.gp.alias}: in-process handle band of {self.top.name} not finished: {e}; nothing written") from e
+            raise Reject("band_budget", f"{self.gp.variant}: in-process handle band of {self.top.name} not finished: {e}; nothing written") from e
         finally:
             scope.__exit__(None, None, None)
             kit.sync_world()
@@ -1100,7 +1100,7 @@ class ArticulationSmall(SamplerV2):
             chosen, _, _, extras = self._brace_from(st, pose, q_values, grasp_pair, target, support)
             if chosen is not None:
                 st.extras.update({"second_stance": True, "lateral_shift": float(dlat), "stand_off_shift": float(dso), "trunk_from": [float(manip.translate), float(manip.tilt)]})
-                log.info("%s: second stance: lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f) reaches the handle grasp + brace %s", self.gp.alias, dlat, dso,
+                log.info("%s: second stance: lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f) reaches the handle grasp + brace %s", self.gp.variant, dlat, dso,
                          trunk[0], trunk[1], chosen[0])
                 return chosen, st, tried
         return None, manip, tried
@@ -1144,12 +1144,12 @@ class ArticulationSmall(SamplerV2):
             if not TT.in_frame(self, cam, pts, float(self.g("view_margin_m"))) or not TT.in_frame(self, cam, wp0.contact.unsqueeze(0), TT.IN_FRAME_MARGIN):
                 continue
             if not self.ikc.eef_in_frame(wp0.eef, cam):
-                log.info("%s: handle-only second stance lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f): grasp eef outside the image", self.gp.alias, dlat, dso, trunk[0], trunk[1])
+                log.info("%s: handle-only second stance lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f): grasp eef outside the image", self.gp.variant, dlat, dso, trunk[0], trunk[1])
                 continue
             tried.append(st)
             r_h = self.ikc.exact(list(grasp_pair), st, self.handle_arm, [support, target], cache=False, fingers=self.grasp_fingers)
             if not r_h.ok:
-                log.info("%s: handle-only second stance lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f): %s", self.gp.alias, dlat, dso, trunk[0], trunk[1], str(r_h.reason)[:160])
+                log.info("%s: handle-only second stance lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f): %s", self.gp.variant, dlat, dso, trunk[0], trunk[1], str(r_h.reason)[:160])
                 continue
             bad = None
             for qk in list(q_values)[1:]:
@@ -1163,11 +1163,11 @@ class ArticulationSmall(SamplerV2):
             self._set_joint(target, self._q_main())
             self.kit.sync_world()
             if bad is not None:
-                log.info("%s: handle-only second stance lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f): grasp ok, handle pose at q = %.3f fails (%s)", self.gp.alias, dlat, dso,
+                log.info("%s: handle-only second stance lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f): grasp ok, handle pose at q = %.3f fails (%s)", self.gp.variant, dlat, dso,
                          trunk[0], trunk[1], bad[0], bad[1])
                 continue
             st.extras.update({"second_stance": True, "lateral_shift": float(dlat), "stand_off_shift": float(dso), "trunk_from": [float(manip.translate), float(manip.tilt)], "handle_only": True})
-            log.info("%s: handle-only second stance: lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f) reaches the handle grasp and the %d required handle poses", self.gp.alias, dlat, dso,
+            log.info("%s: handle-only second stance: lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f) reaches the handle grasp and the %d required handle poses", self.gp.variant, dlat, dso,
                      trunk[0], trunk[1], max(0, len(q_values) - 1))
             return r_h, st, tried
         return None, manip, tried
@@ -1190,9 +1190,9 @@ class ArticulationSmall(SamplerV2):
                 out["stances"].append({"trunk": [round(float(st.translate), 2), round(float(st.tilt), 2)], "stand_off": st.stand_off, "target_base": [round(float(v), 2) for v in st.world_to_base(pose[0][:2]).tolist()],
                                        "shift": [st.extras.get("lateral_shift"), st.extras.get("stand_off_shift")], "handle_alone": bool(r_h.ok),
                                        "left_band": self.left_bands is not None, "braces": rows})
-            log.info("%s: BRACE_FAILURE %s", self.gp.alias, json.dumps(out))
+            log.info("%s: BRACE_FAILURE %s", self.gp.variant, json.dumps(out))
         except Exception as e:  # diagnostics only
-            log.info("%s: BRACE_FAILURE diagnostic failed: %r", self.gp.alias, e)
+            log.info("%s: BRACE_FAILURE diagnostic failed: %r", self.gp.variant, e)
 
     @property
     def _hull_q_init(self) -> th.Tensor:
@@ -1234,7 +1234,7 @@ class ArticulationSmall(SamplerV2):
                 return self._sample_with(rng, init, manip, int(k))
             except Reject as e:
                 errors.append(f"candidate {int(k)}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
     def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
@@ -1320,7 +1320,7 @@ class ArticulationSmall(SamplerV2):
                     raise Reject("handle_unreachable", f"handle grasp at q_init fails the exact IK from the manipulation stance and {len(tried)} second stances")
                 manip = manip2
             chosen, brace_state = (None, None, None, r_h.q), "none"
-            log.info("%s: BRACE_OPTIONAL handle-only instance (%s; %d stances tried)", self.gp.alias, "brace search off" if not brace_search else "no brace passed", len(tried_stances))
+            log.info("%s: BRACE_OPTIONAL handle-only instance (%s; %d stances tried)", self.gp.variant, "brace search off" if not brace_search else "no brace passed", len(tried_stances))
         self.record_stance_travel(init, manip)
         kind, b_pre, b_contact, q_both = chosen
         if self.handle_only_band and kind is not None:
@@ -1359,7 +1359,7 @@ class ArticulationSmall(SamplerV2):
         k_mid: Optional[float] = None
         for kk in self.required:
             if max_k is not None and kk > float(max_k) + 1e-9 and k_mid is not None:
-                log.info("%s: follow capped at k = %g (stage2_max_follow_k %s): the fist push takes the lid on from q %.3f", self.gp.alias, k_mid, max_k, self.q_init + k_mid * (self.q_goal - self.q_init))
+                log.info("%s: follow capped at k = %g (stage2_max_follow_k %s): the fist push takes the lid on from q %.3f", self.gp.variant, k_mid, max_k, self.q_init + k_mid * (self.q_goal - self.q_init))
                 break
             qk = self.q_init + kk * (self.q_goal - self.q_init)
             self._set_joint(target, qk)
@@ -1371,7 +1371,7 @@ class ArticulationSmall(SamplerV2):
             reach[key] = bool(r.ok)
             if not r.ok:
                 if stage2 and k_mid is not None:
-                    log.info("%s: handle pose at k = %g out of reach -> stage 2: follow to k = %g (q %.3f), then push the lid from inside to q_goal %.3f", self.gp.alias, kk, k_mid,
+                    log.info("%s: handle pose at k = %g out of reach -> stage 2: follow to k = %g (q %.3f), then push the lid from inside to q_goal %.3f", self.gp.variant, kk, k_mid,
                              self.q_init + k_mid * (self.q_goal - self.q_init), self.q_goal)
                     break
                 self._set_joint(target, self.q_init)
@@ -1770,7 +1770,7 @@ class ArticulationSmall(SamplerV2):
                 if rec is not None:
                     return rec
                 whys.append(why)
-            log.info("%s: push-close brace (%s hand, open) with the fist at q %.2f fails: %s", self.gp.alias, brace_arm, q_from, " | ".join(whys)[:700])
+            log.info("%s: push-close brace (%s hand, open) with the fist at q %.2f fails: %s", self.gp.variant, brace_arm, q_from, " | ".join(whys)[:700])
             return None
 
         # ---- stance 1: among the Phase-2 candidate and its second stances, the one covering the most of the arc from q_init (owner
@@ -1796,7 +1796,7 @@ class ArticulationSmall(SamplerV2):
             out = fingertip_out(st, q0, q_to)
             if out is not None:
                 log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but the fingertip leaves the frame at "
-                         "push.%s[%d] (u %.0f, v %.0f): skipped", self.gp.alias, dlat, dso, trunk[0], trunk[1], q0, q_to, out["key"], out["index"], out["u"], out["v"])
+                         "push.%s[%d] (u %.0f, v %.0f): skipped", self.gp.variant, dlat, dso, trunk[0], trunk[1], q0, q_to, out["key"], out["index"], out["u"], out["v"])
                 continue
             n_eval += 1
             if fc[1] is not None:
@@ -1804,18 +1804,18 @@ class ArticulationSmall(SamplerV2):
             if not self._v2_transition_ok(init, st):
                 st.q = None
                 if not self._v2_transition_ok(init, st):
-                    log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but no transition from init", self.gp.alias, dlat, dso, trunk[0], trunk[1], q0, q_to)
+                    log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but no transition from init", self.gp.variant, dlat, dso, trunk[0], trunk[1], q0, q_to)
                     continue
             cov = abs(q_to - q0)
             b_ok = 1.0 if (brace_on and find_brace(st, [wp_at(q0).pre_grasp, wp_at(q0).eef], q0) is not None) else 0.0
             if brace_on and not b_ok:
                 # owner 2026-09-20 23:20: the brace is REQUIRED for segment 1 (the flap standing, the tip push lateral - the box slid 5 cm)
-                log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but has no brace: skipped", self.gp.alias, dlat, dso, trunk[0], trunk[1], q0, q_to)
+                log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but has no brace: skipped", self.gp.variant, dlat, dso, trunk[0], trunk[1], q0, q_to)
                 continue
             score = (b_ok, cov)
             if best1 is None or score > best1[0]:
                 best1 = (score, st, fc, q_to, (dlat, dso, trunk))
-                log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f%s", self.gp.alias, dlat, dso, trunk[0], trunk[1], q0, q_to,
+                log.info("%s: push-close stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f%s", self.gp.variant, dlat, dso, trunk[0], trunk[1], q0, q_to,
                          "" if not brace_on else (" with the brace" if b_ok else " (no brace)"))
             if abs(q_to - qg) < 1e-3:
                 break  # the whole arc from one stance
@@ -1871,7 +1871,7 @@ class ArticulationSmall(SamplerV2):
             for p_, q_ in ((pre, seed_pre), (contact, seed)):
                 if q_ is not None:
                     self.ikc.solutions[(arm, self.ikc._pose_key(p_))] = q_.clone()
-            log.info("%s: push-close segment %d from %s: q %.3f -> %.3f (of %.3f) at r %.3f m%s", self.gp.alias, seg_i + 1, stance.name, q_from, q_to, qg, r_w,
+            log.info("%s: push-close segment %d from %s: q %.3f -> %.3f (of %.3f) at r %.3f m%s", self.gp.variant, seg_i + 1, stance.name, q_from, q_to, qg, r_w,
                      f", braced by the {brace_arm} hand" if seg.get("brace") else "")
             q_from = q_to
             if abs(q_from - qg) < 1e-3:
@@ -1899,12 +1899,12 @@ class ArticulationSmall(SamplerV2):
                 q_to_c, _ = coverage(st, q_from, fc[0].q)
                 if q_to_c is None:
                     log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f): the tip at q %.2f is reachable but no arc pose beyond it (with its retreat)",
-                             self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from)
+                             self.gp.variant, dlat, dso, trunk[0], trunk[1], q_from)
                     continue
                 out = fingertip_out(st, q_from, q_to_c)
                 if out is not None:
                     log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but the fingertip leaves the frame at "
-                             "push.%s[%d] (u %.0f, v %.0f): skipped", self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, out["key"], out["index"], out["u"], out["v"])
+                             "push.%s[%d] (u %.0f, v %.0f): skipped", self.gp.variant, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, out["key"], out["index"], out["u"], out["v"])
                     continue
                 n_eval += 1
                 if fc[1] is not None:
@@ -1913,13 +1913,13 @@ class ArticulationSmall(SamplerV2):
                     st.q = None
                     if not self._v2_transition_ok(stance, st):
                         log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f but no transition from %s",
-                                 self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, stance.name)
+                                 self.gp.variant, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, stance.name)
                         continue
                 # the pre-contact's joint distance from the carried arm: an elbow flip in between is an out-and-back swing of the hand
                 jump = float(th.max(th.abs(fc[1][idx_arm] - q_carry[idx_arm]))) if (fc[1] is not None and q_carry is not None) else 0.0
                 direct = 1.0 if jump <= branch_jump else 0.0
                 log.info("%s: push-close re-stance candidate lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f) covers q %.2f -> %.2f, pre-contact %.2f rad from the carried arm",
-                         self.gp.alias, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, jump)
+                         self.gp.variant, dlat, dso, trunk[0], trunk[1], q_from, q_to_c, jump)
                 cov = abs(q_to_c - q_from)
                 # at equal coverage the stance keeping the departing trunk: the transition then moves the base only
                 same_trunk = 1.0 if (abs(float(st.translate) - float(stance.translate)) < 1e-6 and abs(float(st.tilt) - float(stance.tilt)) < 1e-6) else 0.0
@@ -1971,7 +1971,7 @@ class ArticulationSmall(SamplerV2):
                                      "object_pose": {"position": [round(float(v), 5) for v in pose[0].tolist()], "orientation": [round(float(v), 6) for v in pose[1].tolist()]},
                                      "hinge_world": [round(float(v), 5) for v in hinge_w.tolist()], "axis_world": [round(float(v), 5) for v in axis_w.tolist()],
                                      "close_push": {"segments": segments, "n_stances": len(stances)}}
-        log.info("%s: push-close instance: %d segment(s) over %d stance(s): %s", self.gp.alias, len(segments), len(stances),
+        log.info("%s: push-close instance: %d segment(s) over %d stance(s): %s", self.gp.variant, len(segments), len(stances),
                  [(sg["stance"], round(sg["q_from"], 2), round(sg["q_to"], 2)) for sg in segments])
         return self._finish_draft(d, target, pose, init, stances[-1], k, reach, kind=None, brace_state="none", summary_extra={"close_push": {"segments": segments}})
 
@@ -2245,7 +2245,7 @@ class ArticulationSmall(SamplerV2):
                 if q_end is None:
                     continue
                 log.info("%s: B pinch beside the lever taken from the resting-arm solution (site %s yaw %s pitch %s): pre / grasp free with the lever arm in at %.0f mm, approach tracks",
-                         self.gp.alias, h_c.get("site"), h_c.get("yaw_deg"), h_c.get("pitch_deg"), 1000 * margin)
+                         self.gp.variant, h_c.get("site"), h_c.get("yaw_deg"), h_c.get("pitch_deg"), 1000 * margin)
                 from ispatialgym.sampling.v2.ik import IKResult
 
                 # the witnesses of the pre-grasp / grasp in the two-arm context (the program check / oracle hints)
@@ -2364,7 +2364,7 @@ class ArticulationSmall(SamplerV2):
             its limit, the pinch in the other shoulder solution [-2.0, 0.01, 1.73, ...] - the oracle's up-across-down detour runs only
             when it tracks from the brace's solution, so it planned to the pinch's witness and swung the hand 56 cm out to the right):
             the brace is kept when ``lever_detour_reaches`` from it to this pinch and its witnesses keep ``IKChecker.JOINT_LIMIT_MARGIN``
-            (0.05 rad; the alias runs margin 0) from every joint limit - a witness pinned at a limit tracks the detour in the sampler's
+            (0.05 rad; the variant runs margin 0) from every joint limit - a witness pinned at a limit tracks the detour in the sampler's
             kinematics yet not from where the oracle's brace really stands (it stops on touch, holds against the lever, retreats from
             there: the v2.2 instance's brace passes the kinematic check, the oracle refused the detour). Otherwise it is re-solved nearest
             the pinch's pre-grasp witness with that margin (``find_lever_brace(q_seed=...)``), the lever re-checked with the brace arm
@@ -2430,7 +2430,7 @@ class ArticulationSmall(SamplerV2):
             b2.extras["grasp_solution"] = {"fired": True, "why": f"the first brace's solution does not reach the pinch ({why}); re-solved nearest the pinch's solution: {why3}",
                                            "first_brace_q": [round(float(x), 4) for x in q_lock[idx].tolist()], "first_margin_rad": round(m0, 4),
                                            "margin_rad": round(m2, 4), "joint_gap_rad": round(gap, 3)}
-            log.info("%s: lever brace re-solved in the pinch's IK solution (%.2f rad from the first brace's; the first one does not reach the pinch: %s)", self.gp.alias, gap, why)
+            log.info("%s: lever brace re-solved in the pinch's IK solution (%.2f rad from the first brace's; the first one does not reach the pinch: %s)", self.gp.variant, gap, why)
             return b2, q2_lock, o2, pinch2
 
         def try_stance(st: Stance):
@@ -2480,9 +2480,9 @@ class ArticulationSmall(SamplerV2):
                                     w = link.transform_local_points_to_world(pts) - hinge_w
                                     c = w.mean(dim=0)
                                     rows.append(f"{mn.rsplit('__', 1)[-1]}: n {float(c @ right_h):+.3f} a {float(c @ axis_w):+.3f} z {float(c[2]):+.3f} (z {float(w[:, 2].min()):+.3f}..{float(w[:, 2].max()):+.3f})")
-                                log.info("%s: box body pieces in the lever frame: %s", self.gp.alias, "; ".join(rows))
+                                log.info("%s: box body pieces in the lever frame: %s", self.gp.variant, "; ".join(rows))
                     except Exception as e:  # noqa: BLE001
-                        log.info("%s: the braced wall could not be named by geometry (%r): falling back to the collision probe", self.gp.alias, e)
+                        log.info("%s: the braced wall could not be named by geometry (%r): falling back to the collision probe", self.gp.variant, e)
                     offenders = []
                     if not names:
                         with self.ikc.ignoring([support, flaps]):
@@ -2495,20 +2495,20 @@ class ArticulationSmall(SamplerV2):
                         wall = _MeshSubset(target, root, lambda n, cm, ns=names: n in ns)
                         if wall.links:
                             flaps_locked.append(wall)
-                            log.info("%s: lever brace sits in %s - those pieces leave the world for the lever legs", self.gp.alias, sorted(names))
+                            log.info("%s: lever brace sits in %s - those pieces leave the world for the lever legs", self.gp.variant, sorted(names))
                         else:
-                            log.info("%s: the braced wall %s matches no collision mesh of %s (%s): the lever legs are checked with the whole box body", self.gp.alias, sorted(names), root,
+                            log.info("%s: the braced wall %s matches no collision mesh of %s (%s): the lever legs are checked with the whole box body", self.gp.variant, sorted(names), root,
                                      sorted(getattr(getattr(target, "links", {}).get(root), "collision_meshes", {}).keys()))
                     elif offenders:
-                        log.info("%s: the braced blade's offenders are not the box body (%s): the lever legs are checked with the whole box body", self.gp.alias, offenders)
+                        log.info("%s: the braced blade's offenders are not the box body (%s): the lever legs are checked with the whole box body", self.gp.variant, offenders)
                     else:
                         with self.ikc.ignoring([support, flaps]):
                             hit_lock = self.kit.collision_free(q_lock, margin=0.0)[0] if hasattr(self.kit, "collision_free") else None
                             hit_probe = self.kit.collision_free(q_probe, margin=0.0)[0] if (q_probe is not None and hasattr(self.kit, "collision_free")) else None
                         log.info("%s: the braced blade has no world offender (backend has offenders: %s; probe solved: %s; free at the brace: %s, free at the probe: %s): the lever legs are checked with the whole box body",
-                                 self.gp.alias, hasattr(self.kit.backend, "world_collision_offenders"), q_probe is not None, hit_lock, hit_probe)
+                                 self.gp.variant, hasattr(self.kit.backend, "world_collision_offenders"), q_probe is not None, hit_lock, hit_probe)
                 except Exception as e:  # noqa: BLE001
-                    log.info("%s: the braced wall could not be resolved (%r): the lever legs are checked with the whole box body", self.gp.alias, e)
+                    log.info("%s: the braced wall could not be resolved (%r): the lever legs are checked with the whole box body", self.gp.variant, e)
             for v in variants:
                 for seed_posture in [None] + [str(x) for x in (self.gen("v4_lever_seed_postures", ["ready", "tucked"]) or [])]:
                     o = try_lever(st, v, seed_posture, q_lock=q_lock)
@@ -2536,7 +2536,7 @@ class ArticulationSmall(SamplerV2):
                     if pinch is not None:
                         lever_out, lever_v = o, v
                         if whys:
-                            log.info("%s: lever variants before %s: %s", self.gp.alias, v["name"], " | ".join(w.replace("press pre / contact: exact IK failed at pose 1 of 2", "pre") for w in whys)[:1500])
+                            log.info("%s: lever variants before %s: %s", self.gp.variant, v["name"], " | ".join(w.replace("press pre / contact: exact IK failed at pose 1 of 2", "pre") for w in whys)[:1500])
                         break
                     whys.append(f"{v['name']}{'' if seed_posture is None else ' (seed ' + seed_posture + ')'}: lever ok, the pinch beside it fails")
                 if lever_out is not None:
@@ -2645,9 +2645,9 @@ class ArticulationSmall(SamplerV2):
                 manip = st
                 break
             reasons.append(f"lateral {dlat:+.2f} stand-off {dso:+.2f} trunk ({trunk[0]:.2f}, {trunk[1]:+.2f}): {out}")
-            log.info("%s: v4 stance %s", self.gp.alias, reasons[-1][:1500])
+            log.info("%s: v4 stance %s", self.gp.variant, reasons[-1][:1500])
         set_flaps(self.q_init, q0o)
-        log.info("%s: v4 stance search: %d tried, skipped before the checks: %s (of %d candidates)", self.gp.alias, tried, dict(skipped), len(cands))
+        log.info("%s: v4 stance search: %d tried, skipped before the checks: %s (of %d candidates)", self.gp.variant, tried, dict(skipped), len(cands))
         if found is None:
             raise Reject("handle_unreachable", f"two-flap v4: no stance of {tried} passes the lever + pinch sequence (skipped {dict(skipped)}); " + " | ".join(reasons[-3:])[:900])
         h_b, wp_b, reach, waypoints, k_last = found["h_b"], found["wp_b"], found["reach"], found["waypoints"], found["k_last"]
@@ -2717,7 +2717,7 @@ class ArticulationSmall(SamplerV2):
             stage2_rec["facts"]["k_mid"] = float(k_mid)
             self.sidecar.articulation.update({"follow_to": float(k_mid), "stage2": stage2_rec["facts"]})
         log.info("%s: two-flap v4 instance: %s fist presses the %s flap %.0f cm left of the seam, slides under the %s flap and lifts it to %.2f rad; %s pinch from there to %.2f (k %.2g%s)",
-                 self.gp.alias, lever_arm, other, 100 * d_press, self.joint_name, qa, main_arm, q_goal, k_last, ", then stage 2" if stage2_rec else "")
+                 self.gp.variant, lever_arm, other, 100 * d_press, self.joint_name, qa, main_arm, q_goal, k_last, ", then stage 2" if stage2_rec else "")
         return self._finish_draft(d, target, pose, init, manip, k, reach, kind=None, brace_state="none", stage2_rec=stage2_rec,
                                   summary_extra={"v4": {"ajar_rad": qa, "lever_arm": lever_arm, "k_last": k_last}})
 
@@ -2759,7 +2759,7 @@ class ArticulationSmall(SamplerV2):
                 if not TT.in_frame(self, cam, pts, float(self.g("view_margin_m"))):
                     continue
             if not self._v2_transition_ok(init, st):
-                log.info("%s: v2 phase-2 stance lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f): the init transition would fail the validator", self.gp.alias, dlat, dso, trunk[0], trunk[1])
+                log.info("%s: v2 phase-2 stance lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f): the init transition would fail the validator", self.gp.variant, dlat, dso, trunk[0], trunk[1])
                 continue
             tried += 1
             out = self._v2_try_phase2(st, pose, target, support, qa, q_goal)
@@ -2770,7 +2770,7 @@ class ArticulationSmall(SamplerV2):
                 manip = st
                 break
             reasons.append(f"lateral {dlat:+.2f} stand-off {dso:+.2f} trunk ({trunk[0]:.2f}, {trunk[1]:+.2f}): {out}")
-            log.info("%s: v2 phase-2 stance %s", self.gp.alias, reasons[-1][:300])
+            log.info("%s: v2 phase-2 stance %s", self.gp.variant, reasons[-1][:300])
         if found2 is None:
             self._set_joint(target, self.q_init)
             self.kit.sync_world()
@@ -2807,7 +2807,7 @@ class ArticulationSmall(SamplerV2):
                     ok_t = self._v2_transition_ok(st, m2)
                 self._set_named_joint(target, other, q0o - angle)
                 if not ok_t:
-                    log.info("%s: v2 phase-1 stance lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f): a transition (init -> M1 or M1 -> M2) would fail the validator", self.gp.alias, dlat, dso, trunk[0], trunk[1])
+                    log.info("%s: v2 phase-1 stance lateral %+.2f stand-off %+.2f trunk (%.2f, %+.2f): a transition (init -> M1 or M1 -> M2) would fail the validator", self.gp.variant, dlat, dso, trunk[0], trunk[1])
                     continue
             tried1 += 1
             # at the phase-2 stance the phase-2 press may serve phase 1 too (the same fist, the same pose: one continuous press)
@@ -2821,7 +2821,7 @@ class ArticulationSmall(SamplerV2):
                 m1 = st
                 break
             reasons1.append(f"lateral {dlat:+.2f} stand-off {dso:+.2f} trunk ({trunk[0]:.2f}, {trunk[1]:+.2f}): {out}")
-            log.info("%s: v2 phase-1 stance %s", self.gp.alias, reasons1[-1][:300])
+            log.info("%s: v2 phase-1 stance %s", self.gp.variant, reasons1[-1][:300])
         self._set_joint(target, self.q_init)
         self.kit.sync_world()
         if found1 is None:
@@ -2849,7 +2849,7 @@ class ArticulationSmall(SamplerV2):
         from ispatialgym.sampling.v2 import navigation as NAVD
         chk = NAVD.transition(self.kit, init, m1, min_standoff=tr1.stand_off, path_end_standoff=self.path_end_standoff(init, m1))
         log.info("%s: v2 transition init -> %s recorded at s_T %.2f (M1 stand-off %.2f lateral %+.2f trunk (%.2f, %+.2f), init trunk (%.2f, %+.2f)); validator-style re-check: %s; joints %s",
-                 self.gp.alias, m1.name, tr1.stand_off, float(m1.stand_off or 0), float(m1.lateral or 0), m1.translate, m1.tilt, init.translate, init.tilt,
+                 self.gp.variant, m1.name, tr1.stand_off, float(m1.stand_off or 0), float(m1.lateral or 0), m1.translate, m1.tilt, init.translate, init.tilt,
                  "ok" if chk is not None else "NONE", [round(float(v), 3) for v in target.get_joint_positions().tolist()])
         if two_stances:
             m2.name = "manipulation2"
@@ -2895,7 +2895,7 @@ class ArticulationSmall(SamplerV2):
                                          first=first, prep_push=prep1["facts"], prep_push2=None if single_press else prep2["facts"], single_press=single_press, ajar_rad=qa, v2=True,
                                          stance="manipulation2" if two_stances else "manipulation",
                                          pinch_axis=[float(v) for v in h_b["pinch_axis"]], contact_obj=[round(float(v), 4) for v in h_b["contact"]])
-        log.info("%s: two-flap v2 instance (%s%s): %s fist press (%s) -> %s pinch on the seam (yaw %s, pitch %s) to %.2f rad -> %s fist press (%s) -> %s near-end pinch to %.2f rad", self.gp.alias,
+        log.info("%s: two-flap v2 instance (%s%s): %s fist press (%s) -> %s pinch on the seam (yaw %s, pitch %s) to %.2f rad -> %s fist press (%s) -> %s near-end pinch to %.2f rad", self.gp.variant,
                  "two stances" if two_stances else "one stance", ", single press" if single_press else "", prep1["record"].arm, prep1["facts"].get("axial"), first_arm, h_a.get("yaw_deg"),
                  h_a.get("pitch_deg"), qa, prep2["record"].arm, prep2["facts"].get("axial"), self.handle_arm, q_goal)
         return self._finish_draft(d, target, pose, init, manip, k, reach, kind=None, brace_state="none",
@@ -2913,7 +2913,7 @@ class ArticulationSmall(SamplerV2):
                 return False
             return NAVX.transition(self.kit, frm, to, min_standoff=tr.stand_off, path_end_standoff=self.path_end_standoff(frm, to)) is not None
         except Exception as e:  # noqa: BLE001
-            log.info("%s: transition pre-check %s -> %s raised %r", self.gp.alias, frm.name, to.name, e)
+            log.info("%s: transition pre-check %s -> %s raised %r", self.gp.variant, frm.name, to.name, e)
             return False
 
     def _v2_stance_combos(self, manip: Stance, pose: TT.Pose):
@@ -3190,7 +3190,7 @@ class ArticulationSmall(SamplerV2):
                                             "articulation": {"joint": other, "link": ji.get("child_link"), "q_from": q0, "q_to": q0 - angle, "tolerance": min(tol, 0.5 * angle),
                                                              "hinge_world": [round(float(v), 4) for v in hinge_w.tolist()], "axis_world": [round(float(v), 4) for v in axis_w.tolist()]}})
                 log.info("%s: %s recorded (%s arm, fist tilt %.0f deg, pads closing %s the hinge, axial %s): the %s flap pressed down %.0f deg at r %.3f m",
-                         self.gp.alias, slot, arm, tilt_deg, "along" if cw is axis_w else "across", axial, other, math.degrees(angle), r_w)
+                         self.gp.variant, slot, arm, tilt_deg, "along" if cw is axis_w else "across", axial, other, math.degrees(angle), r_w)
                 return {"record": rec, "facts": {"joint": other, "arm": arm, "angle_rad": angle, "radius_m": r_w, "fist_tilt_deg": tilt_deg, "axial": axial,
                                                  "contact_obj": [round(float(v), 4) for v in p0.tolist()]}}
             errors.append(f"{arm}/tilt{tilt_deg:.0f}/{'along' if cw is axis_w else 'across'}: {why}")
@@ -3224,11 +3224,11 @@ class ArticulationSmall(SamplerV2):
                 pre = C.pre_pose(contact, 0.06)
                 res = TT.brace_second_arm(self, manip, self.handle_arm, grasp_pair, arm, [pre, contact], ignore_work_last=[support, target], ignore_brace_last=[target], fingers=self.grasp_fingers)
                 if res.ok:
-                    log.info("%s: top-rim brace recorded (%s arm, fist tilt %.0f deg) at the %s hinge line", self.gp.alias, arm, tilt_deg, other)
+                    log.info("%s: top-rim brace recorded (%s arm, fist tilt %.0f deg) at the %s hinge line", self.gp.variant, arm, tilt_deg, other)
                     return TT.BraceRecord("brace", arm, pre, contact, direction=aw, brace_kind="top_rim_press", object=self.tname,
                                           extras={"stop_clearance_m": 0.0, "pose_class": "top_rim_press", "hinge_joint": other, "fist_tilt_deg": tilt_deg})
                 last = str(res.reason)[:160]
-        log.info("%s: top-rim brace (%s arm) with the handle grasp fails the exact IK (%s): handle-only after the prep press", self.gp.alias, arm, last)
+        log.info("%s: top-rim brace (%s arm) with the handle grasp fails the exact IK (%s): handle-only after the prep press", self.gp.variant, arm, last)
         return None
 
     # ------------------------------------------------------------------ stage 2: fist push of the lid from inside (owner 2026-09-18 22:38)
@@ -3317,7 +3317,7 @@ class ArticulationSmall(SamplerV2):
                             extras={"pose_class": "lid_underside_fist", "closed_gripper": True, "push_arm": arm,
                                     "articulation": {"joint": self.joint_name, "link": self.jinfo.get("child_link"), "q_from": float(q_mid), "q_to": float(self.q_goal),
                                                      "tolerance": tol, "hinge_world": facts["hinge_world"], "axis_world": facts["axis_world"]}})
-        log.info("%s: stage 2 push recorded (%s arm): fist on the lid underside r %.3f m, %.0f deg about the hinge from q %.3f to %.3f", self.gp.alias, arm, r_w, math.degrees(delta), q_mid, self.q_goal)
+        log.info("%s: stage 2 push recorded (%s arm): fist on the lid underside r %.3f m, %.0f deg about the hinge from q %.3f to %.3f", self.gp.variant, arm, r_w, math.degrees(delta), q_mid, self.q_goal)
         return {"record": rec, "facts": facts}
 
     # ------------------------------------------------------------------ program check (brace-less small articulation, D-008)
@@ -3333,7 +3333,7 @@ class ArticulationSmall(SamplerV2):
             msg = str(e)
             if not (getattr(self, "brace_missing", False) and "brace" in msg and TT.program_check_stub()):
                 raise
-            log.warning("%s: program check asks for contacts.brace on a handle-only instance (%s); recorded as stub-brace-optional", self.gp.alias, msg[:200])
+            log.warning("%s: program check asks for contacts.brace on a handle-only instance (%s); recorded as stub-brace-optional", self.gp.variant, msg[:200])
             report = {"mode": "stub-brace-optional", "problems": [], "note": "brace-less small articulation not yet accepted by the oracle program", "error": msg[:300]}
             self.last_program_check = report
             draft.summary["program_check"] = report

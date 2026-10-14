@@ -1,1 +1,0 @@
-{"key": "statue__ponfvo", "category": "statue", "model": "ponfvo", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.009936765719034719, "p95": 0.05359477124183006, "p99": 0.09934640522875816, "mad_union": 0.17166583673876876, "iou": 0.8161938808672641, "worst": "z180"}}, "render_s": 0.114}

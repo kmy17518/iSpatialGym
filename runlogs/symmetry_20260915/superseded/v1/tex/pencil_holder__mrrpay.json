@@ -1,1 +1,0 @@
-{"key": "pencil_holder__mrrpay", "category": "pencil_holder", "model": "mrrpay", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0009365419687154782, "p95": 0.00392156862745098, "p99": 0.027450980392156862, "mad_union": 0.001617399040569386, "iou": 0.9983950818780262, "worst": "z180"}}, "render_s": 0.111}

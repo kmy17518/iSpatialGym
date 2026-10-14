@@ -8,7 +8,7 @@ from ispatialgym.sampling import iddl as I
 
 IDDLS = I.load_all()
 
-#: subtask -> (explicit roles, :require forms, alias slots, composite groups)
+#: subtask -> (explicit roles, :require forms, variant slots, composite groups)
 EXPECTED = {
     "camera_relocalization-standard": ([], [], [], {}),
     "camera_relocalization-obstructed": (["obstacles"], [], ["obstacles"], {}),
@@ -53,14 +53,14 @@ def test_roles_requires_slots(subtask):
     iddl = IDDLS[subtask]
     assert iddl.roles == roles
     assert [r.form for r in iddl.require] == requires
-    assert iddl.alias_slots == slots
+    assert iddl.variant_slots == slots
     assert iddl.groups == groups
-    assert iddl.alias_template.startswith(subtask)
+    assert iddl.variant_template.startswith(subtask)
     assert "agent" in iddl.literal_roles() and "floor" in iddl.literal_roles()
     for r in iddl.require:
         assert r.role in roles
         assert r.missing_reason.startswith("missing_")
-    # every alias slot is an explicit role and every literal role is explicit, implicit or a composite
+    # every variant slot is an explicit role and every literal role is explicit, implicit or a composite
     for s in slots:
         assert s in roles
     for r in iddl.literal_roles():
@@ -102,20 +102,20 @@ def test_pose_evaluated_roles_and_measure():
     assert IDDLS["inter_object_relation_satisfaction-nextto"].pose_evaluated_roles() == ["target", "partner"]
 
 
-def test_fill_alias():
+def test_fill_variant():
     iddl = IDDLS["inter_object_relation_satisfaction-nextto"]
-    assert iddl.fill_alias({"target": "spatula", "partner": "soup_ladle", "support": "breakfast_table"}) == \
+    assert iddl.fill_variant({"target": "spatula", "partner": "soup_ladle", "support": "breakfast_table"}) == \
         "inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table"
     with pytest.raises(I.IDDLError, match="slots without a value"):
-        iddl.fill_alias({"target": "spatula"})
-    assert IDDLS["camera_relocalization-standard"].fill_alias({}) == "camera_relocalization-standard"
+        iddl.fill_variant({"target": "spatula"})
+    assert IDDLS["camera_relocalization-standard"].fill_variant({}) == "camera_relocalization-standard"
 
 
 @pytest.mark.parametrize("subtask", sorted(EXPECTED))
 def test_round_trip(subtask):
     iddl = IDDLS[subtask]
     again = I.parse(iddl.to_text())
-    assert again.subtask == iddl.subtask and again.family == iddl.family and again.alias_template == iddl.alias_template
+    assert again.subtask == iddl.subtask and again.family == iddl.family and again.variant_template == iddl.variant_template
     assert again.init == iddl.init and again.goal == iddl.goal and again.measure == iddl.measure
     assert again.require == iddl.require and again.groups == iddl.groups
 
@@ -124,7 +124,7 @@ GOOD = """
 ; a comment
 (define (iddl alignment-axial)
     (:family alignment)
-    (:alias alignment-axial-{target}-{support})
+    (:variant alignment-axial-{target}-{support})
     (:require (contacts target))
     (:init (ontop target support) (ontop agent floor))
     (:goal (and (ontop ?target ?support) (pose_reached ?target) (not (grasped ?agent ?target)) (pose_settled ?target) (pose_settled ?agent)))
@@ -143,9 +143,9 @@ def test_parse_minimal_file():
     [
         (GOOD.replace("(:family alignment)", ""), "missing section :family"),
         (GOOD.replace("(:family alignment)", "(:family alignments)"), "unknown family"),
-        (GOOD.replace("(:alias alignment-axial-{target}-{support})", "(:alias axial-{target})"), "must start with the subtask id"),
-        (GOOD.replace("(:alias alignment-axial-{target}-{support})", "(:alias alignment-axial-{target}-{target})"), "repeats a slot"),
-        (GOOD.replace("(:alias alignment-axial-{target}-{support})", "(:alias alignment-axial-{floor})"), "explicit non-composite role"),
+        (GOOD.replace("(:variant alignment-axial-{target}-{support})", "(:variant axial-{target})"), "must start with the subtask id"),
+        (GOOD.replace("(:variant alignment-axial-{target}-{support})", "(:variant alignment-axial-{target}-{target})"), "repeats a slot"),
+        (GOOD.replace("(:variant alignment-axial-{target}-{support})", "(:variant alignment-axial-{floor})"), "explicit non-composite role"),
         (GOOD.replace("(contacts target)", "(contacts target tabletop)"), "takes exactly one role"),
         (GOOD.replace("(contacts target)", "(grasps target sideways)"), "unknown grasps pipeline"),
         (GOOD.replace("(contacts target)", "(pushes target)"), "unknown :require form"),
@@ -173,7 +173,7 @@ def test_malformed_files_are_rejected(text, match):
 WITH_MEASURE = """
 (define (iddl alignment-axial)
     (:family alignment)
-    (:alias alignment-axial-{target}-{support})
+    (:variant alignment-axial-{target}-{support})
     (:init (ontop target support) (ontop agent floor))
     (:goal (and (ontop ?target ?support) (layout_reached ?target) (pose_settled ?agent)))
     (:measure (pose_reached ?target))

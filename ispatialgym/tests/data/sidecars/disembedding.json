@@ -3,7 +3,7 @@
   "instance_id": "disembedding-bottle_of_beer-box_of_cereal_2_bar_soap_1-breakfast_table__house_single_floor__target-bottle_of_beer-meqliv__0000",
   "tro_sha256": "c6ccc86c2144f2ce1a64c9c0c36090a8397592991999ef133a36a696b8ae1921",
   "task_family": "disembedding",
-  "alias": "disembedding-bottle_of_beer-box_of_cereal_2_bar_soap_1-breakfast_table",
+  "variant": "disembedding-bottle_of_beer-box_of_cereal_2_bar_soap_1-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

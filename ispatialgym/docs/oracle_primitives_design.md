@@ -53,7 +53,7 @@ Layer 1   motions        decision-free executors of one recorded target each (3.
 Layer 2   actions        the unit of checkpoint / annotation / QA (3.6): Navigate, Transition, SetTorso, Grasp,
                          Lift, Reorient, Place, Push, Brace, BaseFollow, Retreat — targets() from a sidecar block
                          via the conventions; execute() yields 23-D actions via Layer 1; postcondition(); annotate()
-Layer 3   programs       one pure function per row of 6.2: expand(alias, sidecar) -> list[Action] (3.7); no simulator
+Layer 3   programs       one pure function per row of 6.2: expand(variant, sidecar) -> list[Action] (3.7); no simulator
 Executor  run_isg        one loop for the oracle / replay / policy modes (3.8): load -> expand -> per action:
                          checkpoint -> execute under the QA monitors -> postcondition -> one retry -> annotate;
                          then the epilogue (success, no-op window, settled, goal image, TRO goal override) -> record
@@ -227,7 +227,7 @@ postcondition and to close the loop on tracking error; they never choose between
 
 ### 3.7 Layer 3: programs and `expand`
 
-`expand(alias, sidecar) -> list[Action]` (`ispatialgym/oracle/programs.py`, TODO F6) dispatches on the alias's
+`expand(variant, sidecar) -> list[Action]` (`ispatialgym/oracle/programs.py`, TODO F6) dispatches on the variant's
 subtask to one function per row of 6.2 (`program_block_design(sidecar)`, `program_iors_touching(sidecar)`, …).
 Each returns the action list with the loops and conditionals of its row resolved from the sidecar (block order,
 `brace_col` present or not, `passive_from`, `follow_mode`, the placement stance of disembedding / IORS large-scale).
@@ -252,7 +252,7 @@ One loop serves the three modes of 6.5; only the action source differs (a progra
 
 ```
 load TRO + sidecar + scene variant (loader contract, spec §3.14); verify sidecar.tro_sha256
-actions = expand(alias, sidecar)
+actions = expand(variant, sidecar)
 for action in actions:
     checkpoint = snapshot(simulator state, executor state)
     for attempt in (0, 1):
@@ -450,8 +450,13 @@ object); an asymmetric closure — one finger at 0 mm, the other at 30–50 mm �
 position-controlled fingers under assisted grasping and is not a failure.
 
 Categories, as the executor's verdict / `SkillError.reason` (F3 fixes the final list): `not_reached` (binary goal),
-`tolerance`, `not_settled`, `collision`, `ghost_hand`, `paused`, `gripper_out_of_fov`, `failed_grasp`, `no_motion`
-(push / articulation moved nothing), `plan_failed`, `execution` (a motion did not converge), `timeout`. QA
+`tolerance`, `not_settled`, `collision`, `held_object_drift`, `stalled`, `gripper_out_of_fov`, `failed_grasp`, `no_motion`
+(push / articulation moved nothing), `plan_failed`, `execution` (a motion did not converge), `timeout`, and since
+2026‑10‑14 the HARD `run_isg --qa` metrics, which end an oracle demo without a retry: `robot_touching_objects`,
+`robot_touching_itself`, `pause`, `jerky_motion`, `ghost_hand`, `object_tilt`, `goal_occlusion`, `robot_wobble`,
+`bad_release`. `held_object_drift` and `stalled` are the former `ghost_hand` (assisted-grasp drift) and `paused` monitor
+verdicts, renamed on 2026‑10‑14 when BEHAVIOR's `ghost_hand` and `pause` became QA metrics; like `gripper_out_of_fov` and
+`failed_grasp` they are retried and logged as SOFT `--qa` metrics. QA
 statistics are reported per category and per action name, so a sampler-side cause and a planner-side cause of the
 same symptom stay distinguishable.
 
@@ -478,14 +483,15 @@ brace approach). The monitor runs during every action (`fov_monitored` is true f
 hand's actual pose at the start of the place (the lift end) to the recorded pre‑place — orientation SLERPed, a pose every
 5 cm — through the sampler's `grasps[k].carry` waypoint when one is recorded (core `dc6a1a5`); `execute_place` tracks it
 with differential IK and the free‑leg `arm_to` finish (as lift / retreat), `notes.carry_leg`; `run_isg --carry-leg
-trajopt` keeps the former free transit as the regression reference. **Placed‑object gate:** `placed_orientation` (full orientation error vs the
-recorded tolerance) is the demo gate and the `run_isg --mode oracle` default; the `placed_tilt` variant is withdrawn (the
-nextto roll happened during finger closure, not at release; the code path stays selectable, unused). **Cylinder
+trajopt` keeps the former free transit as the regression reference. **Placed‑object orientation:** `placed_orientation` (full
+orientation error vs the recorded tolerance) is reported for every oracle demo (`result.placed_orientation` /
+`meta.json`); it was the oracle's demo gate until 2026‑10‑14 and no longer fails a demo (owner: dealt with elsewhere); the
+`placed_tilt` variant is withdrawn (the nextto roll happened during finger closure, not at release) and removed. **Cylinder
 equivalence (owner fallback, applied 2026‑09‑16 20:00 after the closure investigation ended without its criterion —
 `runlogs/closure_probe_20260916/report.md`):** inside this gate an object whose model has a *continuous symmetry about
-its long axis* in the ICL symmetry survey is compared **modulo rotation about that axis** — the gate error is the angle
+its long axis* in the ICL symmetry survey is compared **modulo rotation about that axis** — the reported error is the angle
 between its long axis now and at the recorded goal (nearest recorded equivalence), against the same tolerance; the
-evaluator's full error is reported alongside (`demo_gating.placed_orientation.<obj>.full_error`). The tag table is
+evaluator's full error is reported alongside (`placed_orientation.<obj>.full_error`). The tag table is
 `ispatialgym/assets/icl/revolution_axes.json` (`scripts/symmetry/revolution_axes.py` over `runlogs/symmetry_20260915/
 symmetry.json`: a body‑of‑revolution tag `xinf` / `yinf` / `zinf` in `symmetry`, `symmetry_near`, `geom_exact` or
 `geom_near` about the model's long axis — largest native extent ≥ 1.5 × the middle one; geometry alone counts, a printed
@@ -493,7 +499,8 @@ label breaks the visual symmetry but not the rolling): markers, pencils, bottles
 plates, bowls, boxes and every other object keep the full error (`ExecutorConfig.demo_revolution_axes` switches the
 equivalence off). The TRO targets and the policy evaluation are untouched.
 
-Owner decisions 2026‑09‑16: **`gripper_out_of_fov` is armed unconditionally** from the pre‑pose of every manipulation
+Owner decisions 2026‑09‑16 (since 2026‑10‑14 its verdicts and out‑of‑view steps are also logged as `run_isg --qa`'s SOFT,
+oracle‑only `gripper_in_view`): **`gripper_out_of_fov` is armed unconditionally** from the pre‑pose of every manipulation
 action (grasp, lift, place, push, brace) to the end of the action — a leg whose fingertips never enter the frame is
 itself a verdict (`fov_first_entry_step: null`); the transit to the pre‑pose and the retreat legs stay unmonitored, and
 a recorded pre‑pose on the 5 % margin is a sampler defect (the sampler's frame check includes the pre‑poses).
@@ -501,10 +508,9 @@ Since 2026‑09‑25 the sampler's program check applies QA's own criterion to e
 (`program_check.fingertips_in_frame`: the fingertip point `C.fingertip(eef)` projected into the stance camera, the 5 %
 margin plus 2 cm of execution slack at the point's depth; reject `gripper_not_in_frame`), while the contact poses keep
 the `eef_in_frame` box; cap 0925‑191101 (`reorient.waypoints[3]`, v = 65 px against QA's 54 px) is the reference.
-**Placed‑object orientation gates demo collection only**: `run_isg --mode oracle` (`--demo-gating placed_orientation`,
-default on for oracle runs, off for replay / policy) fails a demo whose placed object ends outside its recorded
-orientation tolerance (`placed_orientation`); the TRO targets keep `gating: false`, so policy evaluation is unchanged;
-position stays non‑gating. **Brush warning (conditional, wall alignment)**: if, with the recorded drive‑in posture
+**Placed‑object orientation is reported, not gated** (until 2026‑10‑14 `run_isg --mode oracle` failed a demo whose placed
+object ended outside its recorded orientation tolerance): the TRO targets keep `gating: false`, so policy evaluation is
+unchanged; position stays non‑gating. **Brush warning (conditional, wall alignment)**: if, with the recorded drive‑in posture
 applied to every free arm, an idle hand (no acting arm, nothing held) still touches the task support (wall / table)
 during `transition` / `set_torso` briefly (< 3 × the monitor's consecutive‑step threshold) with no penetration and no
 displacement of the support, that contact is a *brush warning* in `meta.json` / `annotations.json`, not a failure;
@@ -561,7 +567,7 @@ the sampler's `seg_instance` renders, no prim is hidden anywhere).
 ## 7. Running it
 
 The snippet below is the **v1** API and still runs. The v2 entry point is `run_isg --mode oracle <instance>` (TODO
-F1), which loads the TRO + sidecar, expands the alias's program and runs it through the executor (3.8); none of the
+F1), which loads the TRO + sidecar, expands the variant's program and runs it through the executor (3.8); none of the
 v2 modules (`robot/conventions.py`, `oracle/actions.py`, `oracle/programs.py`, `run_isg`) exists yet.
 
 ```bash

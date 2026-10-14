@@ -28,8 +28,8 @@ FIXTURE = os.path.join(os.path.dirname(__file__), "data", "sidecars", f"{SUBTASK
 
 
 class _GP:
-    def __init__(self, alias: str = f"{SUBTASK}-plate-drop_in_sink-countertop", **gen):
-        self.alias, self.generation = alias, dict(gen)
+    def __init__(self, variant: str = f"{SUBTASK}-plate-drop_in_sink-countertop", **gen):
+        self.variant, self.generation = variant, dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)
@@ -560,7 +560,7 @@ def _goal_check_release(s, drawn, quat, monkeypatch, gc=(0.05, -0.02)):
     s.ikc = SimpleNamespace(exact=lambda *a, **kw: SimpleNamespace(ok=True), eef_in_frame=lambda eef, cam: True)
     release = s.goal_pose_at(gc, quat, drawn.pose)
     place_eef = IN.IK.grasp_pose(release, drawn.pose)
-    s.sidecar = SidecarDraft(s.gp.alias, "iors")
+    s.sidecar = SidecarDraft(s.gp.variant, "iors")
     for name in ("manipulation", "placement"):
         s.sidecar.add_stance(Stance(name, (5.4, -0.9, 1.57), 0.5, -0.3, 0.55, None, None, 0.0, None, ["right"]))
     rec = s.sidecar.add_grasp(GraspRecord("jar", "right", "jar__k", drawn.name, 0.0, None, None, IN.IK.pre_pose(place_eef), place_eef, eef_in_object=drawn.pose))
@@ -782,7 +782,7 @@ class _StanceCStub:
 
 
 def test_no_band_stance_c_keeps_the_free_trunks_with_the_most_reach_margin(monkeypatch):
-    """inside_large#03 (bar alias): without a band the reach-margin cut ran before the collision check and kept the three deepest leans
+    """inside_large#03 (bar variant): without a band the reach-margin cut ran before the collision check and kept the three deepest leans
     per base - the very trunks the counter blocks -, so every stance C candidate collided while 15 of 20 trunks were free there."""
     edge = EdgeFrame.from_edge("+u", th.tensor([5.683, -1.752]), th.tensor([0.0025, 1.0]), 0.18, 0.09)
     monkeypatch.setattr(IN.P0, "base_ok", lambda s, xy: True)
@@ -1035,7 +1035,7 @@ def test_inside_atom_uses_the_rays_for_a_container_without_a_fillable_link(monke
 def test_inside_program_drops_into_the_partner():
     sc = Sidecar.load(FIXTURE)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == ["transition", "grasp", "lift", "navigate", "transition", "place", "retreat"]
     place, retreat = actions[-2:]
     assert (place.kind, place.relation, place.on) == ("drop", "into", "sink.n.01_1") and retreat.after is place
@@ -1043,7 +1043,7 @@ def test_inside_program_drops_into_the_partner():
     d = Sidecar.load(FIXTURE).to_dict()
     d["paths"] = []
     with pytest.raises(Exception, match="paths"):
-        expand(sc.alias, Sidecar.from_dict(d))
+        expand(sc.variant, Sidecar.from_dict(d))
 
 
 # ----------------------------------------------------------------------------------------------------------------

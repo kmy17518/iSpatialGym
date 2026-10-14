@@ -81,11 +81,12 @@ patch(EX.Executor, "restore")
 patch(EX.Executor, "render_restored")
 patch(EX.Executor, "epilogue")
 patch(EX.SupportLoad, "observe")
-patch(EX.RootWatch, "observe")
+patch(QA.RootWatch, "observe")
 patch(REC.Recorder, "record")
 patch(REC.Recorder, "commit")
 patch(REC.Recorder, "close")
 patch(QA.Monitors, "check")
+patch(QA.QA, "observe")
 for _m in ("plan_pose", "plan_joint", "solve_ik", "solve_ik_batch", "solve_ik_path", "update_world", "check_collision", "attach_object"):
     patch(CP.R1ProCuRobo, _m)
 # inside cuRobo's planner: the trajectory optimizer, the PRM graph planner that seeds retries, and the IK solver

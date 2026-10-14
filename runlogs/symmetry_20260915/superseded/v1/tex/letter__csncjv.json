@@ -1,1 +1,0 @@
-{"key": "letter__csncjv", "category": "letter", "model": "csncjv", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.030707295129559595, "p95": 0.07450980392156863, "p99": 0.11633986928104575, "mad_union": 0.07290511442672307, "iou": 0.9301708778749596, "worst": "z180"}}, "render_s": 0.116}

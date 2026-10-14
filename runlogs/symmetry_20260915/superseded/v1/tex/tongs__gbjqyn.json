@@ -1,1 +1,0 @@
-{"key": "tongs__gbjqyn", "category": "tongs", "model": "gbjqyn", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.021167741912776598, "p95": 0.04183006535947712, "p99": 0.1660392156862751, "mad_union": 0.07143507856650275, "iou": 0.9098221579840382, "worst": "x180"}}, "render_s": 0.115}

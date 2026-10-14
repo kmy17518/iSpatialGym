@@ -1,0 +1,42 @@
+(define (problem disembedding-0)
+    (:domain ispatialgym)
+
+    (:objects
+        mug.n.04_1 mug.n.04_2 mug.n.04_3 mug.n.04_4 - mug.n.04
+        tray.n.01_1 tray.n.01_2 - tray.n.01
+        table.n.02_1 - table.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:groups
+        mug.n.04_2 mug.n.04_3 mug.n.04_4 - distractors_group.n.01_1
+    )
+
+    (:init
+        (ontop tray.n.01_1 table.n.02_1)
+        (ontop tray.n.01_2 table.n.02_1)
+        (ontop mug.n.04_1 tray.n.01_1)
+        (ontop distractors_group.n.01_1 tray.n.01_1)
+        (not (ontop mug.n.04_1 tray.n.01_2))
+        (not (ontop distractors_group.n.01_1 tray.n.01_2))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    ; Binary success: the target is on the destination tray, no distractor is, and the target is released.
+    (:goal
+        (and
+            (ontop ?mug.n.04_1 ?tray.n.01_2)
+            (not (ontop ?distractors_group.n.01_1 ?tray.n.01_2))
+            (not (grasped ?agent.n.01_1 ?mug.n.04_1))
+            (pose_settled ?mug.n.04_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    ; Non-gating: the target's exact pictured pose (TRO pose_targets["mug.n.04_1"]) is reported as position /
+    ; orientation error but does not decide success.
+    (:measure
+        (pose_reached ?mug.n.04_1)
+    )
+)

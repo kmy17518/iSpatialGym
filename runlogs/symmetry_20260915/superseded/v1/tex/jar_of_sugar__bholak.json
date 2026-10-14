@@ -1,1 +1,0 @@
-{"key": "jar_of_sugar__bholak", "category": "jar_of_sugar", "model": "bholak", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0016190544556185192, "p95": 0.00392156862745098, "p99": 0.043137254901960784, "mad_union": 0.0019046731514969918, "iou": 0.9993532667549031, "worst": "z180"}}, "render_s": 0.111}

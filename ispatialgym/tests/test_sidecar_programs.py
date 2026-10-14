@@ -26,10 +26,10 @@ from ispatialgym.oracle.sidecar import (
     Pose,
     Sidecar,
     SidecarError,
-    alias_templates,
+    variant_templates,
     family_of_subtask,
     sha256_of_file,
-    subtask_of_alias,
+    subtask_of_variant,
 )
 
 DATA = os.path.join(os.path.dirname(__file__), "data", "sidecars")
@@ -185,7 +185,7 @@ def test_fixture_set_covers_every_subtask():
 
 
 def test_subtask_registry_is_consistent():
-    assert set(alias_templates()) == set(SUBTASKS) == set(PROGRAMS) == set(REQUIRED_BLOCKS)
+    assert set(variant_templates()) == set(SUBTASKS) == set(PROGRAMS) == set(REQUIRED_BLOCKS)
     assert set(EXPECTED_SEQUENCE) == set(FIXTURE_SUBTASKS)
     # 14 rows of §6.2 -> 13 program functions (camera relocalization standard / obstructed share one with a flag)
     assert len({fn for fn, _ in PROGRAMS.values()}) == 13
@@ -223,17 +223,24 @@ def test_sidecar_round_trips(subtask, tmp_path):
     assert all(v["pixels"] == 123 for v in sc2.to_dict()["language"]["objects"].values())
 
 
-def test_subtask_of_alias():
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
+def test_sidecar_written_before_the_rename_loads(subtask):
+    old = {("alias" if k == "variant" else k): v for k, v in raw(subtask).items()}  # legacy spelling
+    sc = Sidecar.from_dict(old)
+    assert sc == load(subtask) and sc.to_dict()["variant"] == raw(subtask)["variant"]
+
+
+def test_subtask_of_variant():
     for subtask in SUBTASKS:
         if subtask in FIXTURE_SUBTASKS:
-            assert subtask_of_alias(load(subtask).alias) == subtask
-        _family, template = alias_templates()[subtask]
-        assert subtask_of_alias(template) == subtask
-    assert subtask_of_alias("configuration_matching-block_design-block_4-breakfast_table") == "configuration_matching-block_design"
-    assert subtask_of_alias("disembedding-mug-bottle_of_beer_3_bottle_of_sake_1-breakfast_table") == "disembedding"
+            assert subtask_of_variant(load(subtask).variant) == subtask
+        _family, template = variant_templates()[subtask]
+        assert subtask_of_variant(template) == subtask
+    assert subtask_of_variant("configuration_matching-block_design-block_4-breakfast_table") == "configuration_matching-block_design"
+    assert subtask_of_variant("disembedding-mug-bottle_of_beer_3_bottle_of_sake_1-breakfast_table") == "disembedding"
     for bad in ("", "camera_relocalization", "camera_relocalization-standard-extra", "alignment-diagonal-x-y", "disembedding-Mug-x-y", "nope"):
         with pytest.raises(SidecarError):
-            subtask_of_alias(bad)
+            subtask_of_variant(bad)
 
 
 def test_verify_tro(tmp_path):
@@ -256,16 +263,16 @@ def test_verify_tro(tmp_path):
 @pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_expand_returns_the_expected_sequence(subtask):
     sc = load(subtask)
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == EXPECTED_SEQUENCE[subtask]
-    # the template alias resolves to the same program
-    assert [a.name for a in expand(alias_templates()[subtask][1], sc)] == EXPECTED_SEQUENCE[subtask]
+    # the template variant resolves to the same program
+    assert [a.name for a in expand(variant_templates()[subtask][1], sc)] == EXPECTED_SEQUENCE[subtask]
 
 
 @pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_actions_follow_the_contract(subtask):
     sc = load(subtask)
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert actions
     for action in actions:
         assert isinstance(action, A.Action)
@@ -292,13 +299,13 @@ def test_actions_follow_the_contract(subtask):
 @pytest.mark.parametrize("subtask", sorted(EXPECTED_ARMS_OBJECTS))
 def test_arms_and_objects_per_action(subtask):
     sc = load(subtask)
-    got = [(a.name, a.arms, a.objects) for a in expand(sc.alias, sc)]
+    got = [(a.name, a.arms, a.objects) for a in expand(sc.variant, sc)]
     assert got == EXPECTED_ARMS_OBJECTS[subtask]
 
 
 def test_block_design_program_details():
     sc = load("configuration_matching-block_design")
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     order = [b.instance for b in sorted(sc.blocks, key=lambda b: b.order)]
     grasps = [a for a in actions if a.name == "grasp"]
     assert [a.object for a in grasps] == order
@@ -315,7 +322,7 @@ def test_block_design_program_details():
     d["blocks"][0]["yaw_align_deg"] = 12.0
     sc_psi = Sidecar.from_dict(d)
     assert A.yaw_align_deg(sc_psi.blocks[0]) == 12.0 and A.block_reorients(sc_psi.blocks[0])
-    assert [a.name for a in expand(sc_psi.alias, sc_psi)][:7] == _TABLE_IN + ["grasp", "lift", "reorient", "place", "retreat", "grasp"]
+    assert [a.name for a in expand(sc_psi.variant, sc_psi)][:7] == _TABLE_IN + ["grasp", "lift", "reorient", "place", "retreat", "grasp"]
     # brace/push pairing: the brace holds an already placed block, the push moves the block just placed
     for brace, push in zip((a for a in actions if a.name == "brace"), (a for a in actions if a.name == "push")):
         assert brace.contact.object in order[: order.index(push.contact.object)]
@@ -325,7 +332,7 @@ def test_block_design_program_details():
         for k in ("brace_row", "push_row", "brace_col", "push_col"):
             b.pop(k, None)
     sc2 = Sidecar.from_dict(d)
-    assert [a.name for a in expand(sc2.alias, sc2) if a.name in ("brace", "push")] == []
+    assert [a.name for a in expand(sc2.variant, sc2) if a.name in ("brace", "push")] == []
     # an unpaired brace is rejected
     d = raw("configuration_matching-block_design")
     d["blocks"][1].pop("push_row")
@@ -349,7 +356,7 @@ def test_block_design_flip_on_the_table_sub_chain():
                     "pick": {"position": [0.55, -0.25, 0.85], "orientation": [0.0, 0.7071, 0.0, 0.7071]}},
     }
     sc = Sidecar.from_dict(d)
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     first = next(i for i, a in enumerate(actions) if a.name == "grasp" and a.objects[0] == b["instance"])
     names = []
     for a in actions[first:]:
@@ -372,7 +379,7 @@ def test_block_design_flip_on_the_table_sub_chain():
     d2 = raw("configuration_matching-block_design")
     [x for x in d2["blocks"] if x["flip_sign"] != 0][0]["table_flip"] = {"place": b["table_flip"]["place"]}
     with pytest.raises(SidecarError):
-        expand(sc.alias, Sidecar.from_dict(d2))
+        expand(sc.variant, Sidecar.from_dict(d2))
 
 
 def test_block_design_flip_in_place_then_move_and_per_block_stances():
@@ -405,7 +412,7 @@ def test_block_design_flip_in_place_then_move_and_per_block_stances():
                                       "length_m": 0.3, "posture": "untucked", "carried": None})
     d.setdefault("transitions", []).append({"from": "manipulation", "to": "manipulation_2", "stand_off": float(manip.get("stand_off", 0.35)), "order": ["drive-back", "trunk", "drive-in"]})
     sc = Sidecar.from_dict(d)
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     first = next(i for i, a in enumerate(actions) if a.name == "grasp" and a.objects[0] == b["instance"])
     names = []
     for a in actions[first:]:
@@ -430,35 +437,35 @@ def test_block_design_flip_in_place_then_move_and_per_block_stances():
 
 def test_articulation_program_details():
     sc = load("configuration_matching-articulation_open_large_scale")
-    follow = [a for a in expand(sc.alias, sc) if a.name == "base_follow"][0]
+    follow = [a for a in expand(sc.variant, sc) if a.name == "base_follow"][0]
     assert follow.articulation.follow_mode == "base"
     assert [f for f, _ in follow.articulation.followed_fractions()] == [0.25, 0.5, 0.75]  # up to passive_from
     assert follow.direction == "open"
-    grasp = [a for a in expand(sc.alias, sc) if a.name == "grasp"][0]
+    grasp = [a for a in expand(sc.variant, sc) if a.name == "grasp"][0]
     assert grasp.kind == "handle" and grasp.articulation is sc.articulation
     d = raw("configuration_matching-articulation_open_large_scale")
     d["articulation"]["passive_from"] = None
     sc2 = Sidecar.from_dict(d)
     assert [f for f, _ in sc2.articulation.followed_fractions()] == [0.25, 0.5, 0.75, 1.0]
     sc_close = load("configuration_matching-articulation_close_large_scale")
-    follow = [a for a in expand(sc_close.alias, sc_close) if a.name == "base_follow"][0]
+    follow = [a for a in expand(sc_close.variant, sc_close) if a.name == "base_follow"][0]
     assert follow.articulation.follow_mode == "arm" and follow.direction == "close"
     # small-scale must move the arm; the brace arm is the other arm on the same object
     d = raw("configuration_matching-articulation_open_small_scale")
     d["articulation"]["follow_mode"] = "base"
     d["articulation"]["base_follow"] = {k: [7.1, 2.45, 1.5708] for k in d["articulation"]["waypoints"] if k != "0.0"}
     with pytest.raises(SidecarError, match="follow_mode"):
-        expand(d["alias"], Sidecar.from_dict(d))
+        expand(d["variant"], Sidecar.from_dict(d))
     d = raw("configuration_matching-articulation_open_small_scale")
     d["contacts"]["brace"]["arm"] = "right"
     with pytest.raises(SidecarError, match="brace"):
-        expand(d["alias"], Sidecar.from_dict(d))
+        expand(d["variant"], Sidecar.from_dict(d))
 
 
 def test_camera_relocalization_program_details():
     std, obs = load("camera_relocalization-standard"), load("camera_relocalization-obstructed")
-    nav_s, torso_s = expand(std.alias, std)
-    nav_o, torso_o = expand(obs.alias, obs)
+    nav_s, torso_s = expand(std.variant, std)
+    nav_o, torso_o = expand(obs.variant, obs)
     assert nav_s.obstacles == () and nav_o.obstacles == ("hamper.n.02_1",)
     assert nav_o.objects == ()  # the obstacle is never an intended contact
     # the long drives of this family are the shared face_travel schedule, also for records without a ``style``
@@ -468,7 +475,7 @@ def test_camera_relocalization_program_details():
     # generation.base_path_style record their uncarried drives as ``face_travel`` - IORS large init -> B, the large-articulation
     # and wall-alignment approaches - and every carried leg as recorded); a record without a style is driven as recorded
     iors = load("inter_object_relation_satisfaction-ontop_large_scale")
-    navs = [a for a in expand(iors.alias, iors) if a.name == "navigate"]
+    navs = [a for a in expand(iors.variant, iors) if a.name == "navigate"]
     assert navs and all(a.style is None for a in navs)
     assert all(a.targets(iors, None)["style"] == (BP.FACE_TRAVEL if (a.path.extra or {}).get("style") == BP.FACE_TRAVEL else BP.RECORDED) for a in navs)
     navs[0].path.extra["style"] = BP.FACE_TRAVEL  # an init -> B record written by a face_travel family
@@ -484,7 +491,7 @@ def test_camera_relocalization_program_details():
     d = raw("camera_relocalization-standard")
     d["paths"] = []
     with pytest.raises(SidecarError, match="paths"):
-        expand(d["alias"], Sidecar.from_dict(d))
+        expand(d["variant"], Sidecar.from_dict(d))
 
 
 def test_travel_rule_between_stances():
@@ -492,21 +499,21 @@ def test_travel_rule_between_stances():
     d = raw("inter_object_relation_satisfaction-ontop_small_scale")
     d["transitions"] = []
     with pytest.raises(SidecarError, match="transition"):
-        expand(d["alias"], Sidecar.from_dict(d))
+        expand(d["variant"], Sidecar.from_dict(d))
     # ... equal trunks and base poses need nothing ...
     d = raw("inter_object_relation_satisfaction-ontop_small_scale")
     d["transitions"] = []
     d["stances"]["manipulation"].update({k: d["stances"]["init"][k] for k in ("base_pose2d", "translate", "tilt")})
-    names = [a.name for a in expand(d["alias"], Sidecar.from_dict(d))]
+    names = [a.name for a in expand(d["variant"], Sidecar.from_dict(d))]
     assert names == ["grasp", "lift", "place", "retreat"]
     # ... a path alone is fine when only the base moves; the carried object must match
     d = raw("disembedding")
     d["paths"][0]["carried"] = None
     with pytest.raises(SidecarError, match="carried"):
-        expand(d["alias"], Sidecar.from_dict(d))
-    # alias must belong to the sidecar
+        expand(d["variant"], Sidecar.from_dict(d))
+    # variant must belong to the sidecar
     sc = load("disembedding")
-    with pytest.raises(SidecarError, match="alias"):
+    with pytest.raises(SidecarError, match="variant"):
         expand("object_scaling-mug", sc)
 
 
@@ -519,11 +526,11 @@ def test_disembedding_grasp_may_touch_the_tray_objects():
     assert sc.problems() == []
     assert sc.grasps[0].may_touch == (("box_of_cereal.n.01_1", "box_of_cereal.n.01_2"), "tray.n.01_1")
     assert sc.grasps[0].to_dict()["may_touch"] == d["grasps"][0]["may_touch"]
-    grasp = [a for a in expand(sc.alias, sc) if a.name == "grasp"][0]
+    grasp = [a for a in expand(sc.variant, sc) if a.name == "grasp"][0]
     assert grasp.touches == ("box_of_cereal.n.01_1", "box_of_cereal.n.01_2") and grasp.objects == ("bottle_of_beer.n.01_1",)
     assert sc.grasps[0].may_touch_pre_grasp == ()
     plain = load("disembedding")
-    assert plain.grasps[0].may_touch == ((), None) and [a for a in expand(plain.alias, plain) if a.name == "grasp"][0].touches == ()
+    assert plain.grasps[0].may_touch == ((), None) and [a for a in expand(plain.variant, plain) if a.name == "grasp"][0].touches == ()
     # the puzzle's fixed-layout parts: the pre-grasp may overlap them too
     d["grasps"][0]["may_touch"]["pre_grasp"] = ["box_of_cereal.n.01_2"]
     sc = Sidecar.from_dict(d)
@@ -535,14 +542,14 @@ def test_iors_place_kinds_and_relations():
     kinds = {}
     for rel in ("ontop_small_scale", "under_small_scale", "inside", "nextto", "touching", "ontop_large_scale", "under_large_scale"):
         sc = load(f"inter_object_relation_satisfaction-{rel}")
-        place = [a for a in expand(sc.alias, sc) if a.name == "place"][0]
+        place = [a for a in expand(sc.variant, sc) if a.name == "place"][0]
         kinds[rel] = (place.kind, place.relation)
     assert kinds["inside"] == ("drop", "into")
     assert kinds["nextto"] == ("support", "next to") and kinds["touching"] == ("support", "next to")
     assert kinds["under_large_scale"] == ("support", "under")
     assert kinds["ontop_small_scale"] == kinds["under_small_scale"] == kinds["ontop_large_scale"] == ("support", "on")
     att = load("configuration_matching-attachment")
-    assert [a.kind for a in expand(att.alias, att) if a.name == "place"] == ["attach"]
+    assert [a.kind for a in expand(att.variant, att) if a.name == "place"] == ["attach"]
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -553,7 +560,7 @@ def test_iors_place_kinds_and_relations():
 @pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
 def test_annotate_returns_two_texts_with_display_names(subtask):
     sc = load(subtask)
-    for action in expand(sc.alias, sc):
+    for action in expand(sc.variant, sc):
         fine, numbers = action.annotate(sc)
         assert isinstance(fine, str) and fine.strip()
         assert isinstance(numbers, str) and numbers.strip()
@@ -569,16 +576,16 @@ def test_annotate_returns_two_texts_with_display_names(subtask):
 
 def test_annotation_numbers():
     sc = load("mental_rotation")
-    _, numbers = expand(sc.alias, sc)[0].annotate(sc)
+    _, numbers = expand(sc.variant, sc)[0].annotate(sc)
     assert "77°" in numbers
     sc = load("object_scaling")
-    _, numbers = expand(sc.alias, sc)[0].annotate(sc)
+    _, numbers = expand(sc.variant, sc)[0].annotate(sc)
     assert "15 cm" in numbers
     sc = load("configuration_matching-articulation_open_large_scale")
-    _, numbers = [a for a in expand(sc.alias, sc) if a.name == "base_follow"][0].annotate(sc)
+    _, numbers = [a for a in expand(sc.variant, sc) if a.name == "base_follow"][0].annotate(sc)
     assert "77°" in numbers and "75 %" in numbers and "driving the base" in numbers
     sc = load("inter_object_relation_satisfaction-touching")
-    push = [a for a in expand(sc.alias, sc) if a.name == "push"][0]
+    push = [a for a in expand(sc.variant, sc) if a.name == "push"][0]
     fine, numbers = push.annotate(sc)
     assert "to the left" in fine and "1.8 cm" in numbers  # partner on the robot's left
 
@@ -644,7 +651,7 @@ def _check_value(key, value, where):
 def test_targets_keys_and_shapes(subtask):
     sc = load(subtask)
     state = StubState()
-    for i, action in enumerate(expand(sc.alias, sc)):
+    for i, action in enumerate(expand(sc.variant, sc)):
         targets = action.targets(sc, state)
         where = f"{subtask}[{i}] {action.name}"
         assert set(targets) == set(action.TARGET_KEYS), where
@@ -658,7 +665,7 @@ def test_targets_keys_and_shapes(subtask):
 def test_targets_chain_through_end_poses():
     sc = load("inter_object_relation_satisfaction-ontop_small_scale")
     state = StubState()
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     grasp, lift = actions[1], actions[2]
     g = grasp.targets(sc, state)
     assert g["approach"][-1].position == pytest.approx(g["grasp"].position, abs=1e-5)
@@ -704,7 +711,7 @@ def _pose_dict(p, q):
 @needs_conventions
 def test_transition_targets_are_the_transition_poses_fields():
     sc = load("disembedding")
-    tr = [a for a in expand(sc.alias, sc) if a.name == "transition"][0]
+    tr = [a for a in expand(sc.variant, sc) if a.name == "transition"][0]
     tp = C.transition_poses(tr.stance_from.to_dict(), tr.stance_to.to_dict(), tr.transition.stand_off)
     assert isinstance(tp, C.TransitionPoses)
     t = tr.targets(sc, StubState())
@@ -725,7 +732,7 @@ def test_transition_targets_are_the_transition_poses_fields():
 @needs_conventions
 def test_library_grasp_is_derived_from_the_settled_pose_without_the_recorded_yaw():
     sc = load("inter_object_relation_satisfaction-ontop_small_scale")
-    grasp = [a for a in expand(sc.alias, sc) if a.name == "grasp"][0]
+    grasp = [a for a in expand(sc.variant, sc) if a.name == "grasp"][0]
     g = grasp.grasp
     assert grasp.kind == "library" and abs(g.yaw) > 0.1
     # the settled object stands at the yaw the sampler drew (spec §4.6: R_z(yaw) on the library's rest orientation)
@@ -759,7 +766,7 @@ def test_library_grasp_is_derived_from_the_settled_pose_without_the_recorded_yaw
 def test_cube_grasp_uses_the_wrist_yaw_in_radians_and_the_pick_tilt_in_degrees():
     sc = load("configuration_matching-block_design")
     state = StubState()
-    grasps = [a for a in expand(sc.alias, sc) if a.name == "grasp"]
+    grasps = [a for a in expand(sc.variant, sc) if a.name == "grasp"]
     assert grasps and all(a.kind == "cube" for a in grasps)
     for grasp in grasps:
         b = grasp.block
@@ -781,7 +788,7 @@ def test_block_centre_offset_moves_the_cube_grasp_and_the_flip_pivot():
     grasp is built about ``root ∘ (centre_offset, I)`` and the in-hand flip pivots there, not at the root link."""
     sc = load("configuration_matching-block_design")
     state = StubState()
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     grasp = [a for a in actions if a.name == "grasp"][0]
     reorient = [a for a in actions if a.name == "reorient" and a.block is not None][0]
     b = grasp.block
@@ -815,7 +822,7 @@ def test_flip_reorient_calls_flip_waypoints_with_the_f5_signature():
     flipper = next(b for b in d["blocks"] if b["flip_sign"] != 0)
     flipper["yaw_align_deg"] = -31.0  # the table-alignment yaw ψ, written next to the wrist yaw
     sc = Sidecar.from_dict(d)
-    reor = next(a for a in expand(sc.alias, sc) if a.name == "reorient" and a.object == flipper["instance"])
+    reor = next(a for a in expand(sc.variant, sc) if a.name == "reorient" and a.object == flipper["instance"])
     assert reor.mode == "flip" and reor.after.name == "lift" and reor.waypoints is None
     t = reor.targets(sc, state)
     start = reor.after.end_pose(sc, state).tensors()
@@ -838,7 +845,7 @@ def test_flip_reorient_calls_flip_waypoints_with_the_f5_signature():
     # ψ = 0: the yaw stage is skipped -> the 3 flip poses only
     flipper["yaw_align_deg"] = 0.0
     sc0 = Sidecar.from_dict(d)
-    reor0 = next(a for a in expand(sc0.alias, sc0) if a.name == "reorient" and a.object == flipper["instance"])
+    reor0 = next(a for a in expand(sc0.variant, sc0) if a.name == "reorient" and a.object == flipper["instance"])
     t0 = reor0.targets(sc0, state)
     assert len(t0["derived"]) == A.N_FLIP == 3 and "yaw it" not in reor0.annotate(sc0)[1]
     want0 = C.flip_waypoints(start, pivot, yaw=0.0, flip_axis=th.tensor(flipper["flip_axis"]), flip_sign=flipper["flip_sign"],
@@ -852,7 +859,7 @@ def test_flip_reorient_calls_flip_waypoints_with_the_f5_signature():
     assert anchor["flip_sign"] == 0 and anchor.get("flip_axis") is None
     anchor["yaw_align_deg"] = 12.0
     sc1 = Sidecar.from_dict(d)
-    reor1 = next(a for a in expand(sc1.alias, sc1) if a.name == "reorient" and a.object == anchor["instance"])
+    reor1 = next(a for a in expand(sc1.variant, sc1) if a.name == "reorient" and a.object == anchor["instance"])
     t1 = reor1.targets(sc1, state)
     s1 = reor1.after.end_pose(sc1, state).tensors()
     assert len(t1["derived"]) == A.N_YAW_ALIGN == 2
@@ -864,7 +871,7 @@ def test_flip_reorient_calls_flip_waypoints_with_the_f5_signature():
     flipper["yaw_align_deg"] = -31.0
     flipper["waypoints"] = recorded
     sc2 = Sidecar.from_dict(d)
-    reor2 = next(a for a in expand(sc2.alias, sc2) if a.name == "reorient" and a.object == flipper["instance"])
+    reor2 = next(a for a in expand(sc2.variant, sc2) if a.name == "reorient" and a.object == flipper["instance"])
     t2 = reor2.targets(sc2, state)
     assert [w.to_dict() for w in t2["waypoints"]] == recorded and t2["end"].to_dict() == recorded[-1]
     assert reor2.end_pose(sc2, state).to_dict() == recorded[-1]
@@ -876,7 +883,7 @@ def test_flip_reorient_calls_flip_waypoints_with_the_f5_signature():
 def test_held_object_reorient_tracks_the_recorded_three_intermediate_waypoints(subtask, mode):
     sc = load(subtask)
     state = StubState()
-    (reor,) = expand(sc.alias, sc)
+    (reor,) = expand(sc.variant, sc)
     g = sc.grasps[0]
     assert reor.mode == mode and reor.n == A.N_INHAND == 4 and reor.start_pose == g.grasp
     t = reor.targets(sc, state)
@@ -896,7 +903,7 @@ def test_held_object_reorient_tracks_the_recorded_three_intermediate_waypoints(s
     d = raw(subtask)
     d["grasps"][0]["waypoints"] = [_pose_dict(p, q) for p, q in sampler]
     sc2 = Sidecar.from_dict(d)
-    (reor2,) = expand(sc2.alias, sc2)
+    (reor2,) = expand(sc2.variant, sc2)
     t2 = reor2.targets(sc2, state)
     assert len(t2["waypoints"]) == len(t2["derived"]) == 4
     for got, exp in zip(t2["derived"], t2["waypoints"]):
@@ -924,7 +931,7 @@ def test_held_object_reorient_tracks_the_recorded_three_intermediate_waypoints(s
 def test_attachment_reorient_is_the_eef_line_with_slerped_orientation():
     sc = load("configuration_matching-attachment")
     state = StubState()
-    reor = next(a for a in expand(sc.alias, sc) if a.name == "reorient")
+    reor = next(a for a in expand(sc.variant, sc) if a.name == "reorient")
     assert reor.mode == "slerp" and reor.after.name == "lift"
     t = reor.targets(sc, state)
     g = sc.grasps[0]
@@ -959,7 +966,7 @@ def test_handle_records_reproduce_handle_waypoints_of_the_sampler():
     art["base_follow"] = {str(k): [float(v) for v in b] for k, b in zip(fractions[1:], C.base_follow_poses([w.eef for w in wps[1:]], T))}
     sc = Sidecar.from_dict(d)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     grasp = next(a for a in actions if a.name == "grasp")
     follow = next(a for a in actions if a.name == "base_follow")
     state = StubState()
@@ -1027,7 +1034,7 @@ def test_under_large_push_under_chain():
         d = json.load(f)
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.contacts.push.kind == "push_under"
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == ["transition", "grasp", "lift", "navigate", "place", "retreat", "push", "retreat"]
     place, ret1, push, ret2 = actions[4:]
     assert place.kind == "drop" and place.on == "floor.n.01_1" and place.relation == "under" and place.avoid == ("breakfast_table.n.01_1",)
@@ -1039,7 +1046,7 @@ def test_under_large_push_under_chain():
         assert len(t["waypoints"]) == 3 and t["distance_m"] == 0.25
     # the plain under-large fixture (no drop) keeps the support place
     plain = load("inter_object_relation_satisfaction-under_large_scale")
-    assert [a.name for a in expand(plain.alias, plain)] == EXPECTED_SEQUENCE["inter_object_relation_satisfaction-under_large_scale"]
+    assert [a.name for a in expand(plain.variant, plain)] == EXPECTED_SEQUENCE["inter_object_relation_satisfaction-under_large_scale"]
     # a drop without the push record, or with a plain push, is rejected
     d2 = copy.deepcopy(d)
     d2.pop("contacts")
@@ -1050,7 +1057,7 @@ def test_under_large_push_under_chain():
     d4 = copy.deepcopy(d)
     d4["grasps"][0].pop("place_kind")
     sc4 = Sidecar.from_dict(d4)
-    assert sc4.problems() == [] and [a.name for a in expand(sc4.alias, sc4)] == ["transition", "grasp", "lift", "navigate", "place", "retreat"]
+    assert sc4.problems() == [] and [a.name for a in expand(sc4.variant, sc4)] == ["transition", "grasp", "lift", "navigate", "place", "retreat"]
 
 
 def test_block_design_braces_are_optional():
@@ -1063,12 +1070,12 @@ def test_block_design_braces_are_optional():
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.validate() is sc
     assert "contacts.brace" not in REQUIRED_BLOCKS["configuration_matching-block_design"]
-    names = [a.name for a in expand(sc.alias, sc)]
+    names = [a.name for a in expand(sc.variant, sc)]
     assert "brace" not in names and "push" not in names
     per_block = ["grasp", "lift", "place", "retreat"]
     assert names == _TABLE_IN + per_block + ["grasp", "lift", "reorient", "place", "retreat"] + per_block + ["grasp", "lift", "reorient", "place", "retreat"]
     # the fully recorded fixture keeps its tails; a brace without its push (or the reverse) on one axis is rejected
-    assert [a.name for a in expand(load("configuration_matching-block_design").alias, load("configuration_matching-block_design"))] == EXPECTED_SEQUENCE["configuration_matching-block_design"]
+    assert [a.name for a in expand(load("configuration_matching-block_design").variant, load("configuration_matching-block_design"))] == EXPECTED_SEQUENCE["configuration_matching-block_design"]
     d2 = raw("configuration_matching-block_design")
     d2["blocks"][1].pop("brace_row")
     assert any("must be recorded together" in p for p in Sidecar.from_dict(d2).problems())
@@ -1083,7 +1090,7 @@ def test_axial_is_push_only_without_a_brace_record():
     assert "brace" not in d["contacts"]
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == ["transition", "push", "retreat"]
     assert [(a.name, a.arms, a.objects) for a in actions[1:]] == [
         ("push", ("right",), ("paperback_book.n.01_1",)),
@@ -1092,7 +1099,7 @@ def test_axial_is_push_only_without_a_brace_record():
     assert actions[2].after is actions[1] and actions[2].release is False
     # the same sidecar with the brace record keeps the braced chain
     braced = load("alignment-axial")
-    assert [a.name for a in expand(braced.alias, braced)] == _TABLE_IN + _BRACE_PUSH
+    assert [a.name for a in expand(braced.variant, braced)] == _TABLE_IN + _BRACE_PUSH
     # a left-arm push-only record is still rejected (spec §6.10: the right gripper pushes)
     d2 = copy.deepcopy(d)
     d2["contacts"]["push"]["arm"] = "left"
@@ -1112,7 +1119,7 @@ def test_touching_is_push_only_without_a_brace_record():
     assert "brace" not in d["contacts"] and d["summary"]["brace"]["present"] is False
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == _TABLE_IN + _PICK + _PLACE + ["push", "retreat"]
     assert [(a.name, a.arms, a.objects) for a in actions[-2:]] == [
         ("push", ("right",), ("can_of_soda.n.01_1",)),
@@ -1126,7 +1133,7 @@ def test_touching_is_push_only_without_a_brace_record():
         assert fine and numbers
     # the braced fixture keeps the braced chain
     braced = load(st)
-    assert [a.name for a in expand(braced.alias, braced)] == EXPECTED_SEQUENCE[st]
+    assert [a.name for a in expand(braced.variant, braced)] == EXPECTED_SEQUENCE[st]
     # a left-arm push-only record is still rejected (spec §6.11: the right gripper pushes the target)
     d2 = copy.deepcopy(d)
     d2["contacts"]["push"]["arm"] = "left"
@@ -1152,7 +1159,7 @@ def test_small_articulation_is_handle_only_without_a_brace_record(st):
     assert "contacts" not in d and d["summary"]["brace"] == "none" and d["stances"]["manipulation"]["arms"] == ["right"] and d["articulation"]["brace_kind"] is None
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == _TABLE_IN + ["grasp", "base_follow", "retreat"]
     assert [(a.name, a.arms, a.objects) for a in actions[1:]] == [
         ("grasp", ("right",), ("toolbox.n.01_1",)),
@@ -1167,13 +1174,13 @@ def test_small_articulation_is_handle_only_without_a_brace_record(st):
     d2 = copy.deepcopy(d)
     d2["articulation"]["handle_arm"] = "left"
     d2["stances"]["manipulation"]["arms"] = ["left"]
-    assert [a.arms for a in expand(sc.alias, Sidecar.from_dict(d2))[1:]] == [("left",)] * 3
+    assert [a.arms for a in expand(sc.variant, Sidecar.from_dict(d2))[1:]] == [("left",)] * 3
     d3 = copy.deepcopy(d)
     d3["articulation"]["handle_arm"] = "middle"
     assert any("unknown arm 'middle'" in p for p in Sidecar.from_dict(d3).problems())
     # the braced fixture keeps brace -> grasp -> articulate -> retreat both
     braced = load(st)
-    assert [a.name for a in expand(braced.alias, braced)] == EXPECTED_SEQUENCE[st]
+    assert [a.name for a in expand(braced.variant, braced)] == EXPECTED_SEQUENCE[st]
     # a brace record on the handle arm, or on another object, is still rejected
     d4 = raw(st)
     d4["contacts"]["brace"]["arm"] = "right"
@@ -1192,11 +1199,11 @@ def test_small_articulation_braced_stance_lists_both_working_arms():
         d = json.load(f)
     assert d["stances"]["manipulation"]["arms"] == ["right", "left"] and d["articulation"]["handle_arm"] == "right"
     sc = Sidecar.from_dict(d)
-    assert sc.problems() == [] and [a.name for a in expand(sc.alias, sc)] == EXPECTED_SEQUENCE[st]
-    assert [a.arms for a in expand(sc.alias, sc)[1:]] == [("left",), ("right",), ("right",), ("right",), ("left",)]
+    assert sc.problems() == [] and [a.name for a in expand(sc.variant, sc)] == EXPECTED_SEQUENCE[st]
+    assert [a.arms for a in expand(sc.variant, sc)[1:]] == [("left",), ("right",), ("right",), ("right",), ("left",)]
     d2 = copy.deepcopy(d)
     d2["articulation"].pop("handle_arm")
-    assert [a.arms for a in expand(sc.alias, Sidecar.from_dict(d2))[1:]] == [("left",), ("right",), ("right",), ("right",), ("left",)]
+    assert [a.arms for a in expand(sc.variant, Sidecar.from_dict(d2))[1:]] == [("left",), ("right",), ("right",), ("right",), ("left",)]
     d3 = copy.deepcopy(d2)
     d3.pop("contacts")
     assert any("cannot tell the handle arm" in p for p in Sidecar.from_dict(d3).problems())
@@ -1214,7 +1221,7 @@ def test_room_door_close_pushes_the_outer_face():
         d = json.load(f)
     sc = Sidecar.from_dict(d)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == _WALL_IN + ["push_close"]
     push = actions[-1]
     assert isinstance(push, A.PushClose) and type(push) in A.VOCABULARY
@@ -1232,13 +1239,13 @@ def test_room_door_close_pushes_the_outer_face():
     for cls in (None, "cabinet"):
         d2 = copy.deepcopy(d)
         d2["articulation"]["door_class"] = cls
-        assert [a.name for a in expand(sc.alias, Sidecar.from_dict(d2))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+        assert [a.name for a in expand(sc.variant, Sidecar.from_dict(d2))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
     assert [a.name for a in program_articulation_large(sc, direction="open")] == _WALL_IN + ["grasp", "base_follow", "retreat"]
     d3 = copy.deepcopy(d)
     d3["articulation"]["waypoints"] = {k: d3["articulation"]["waypoints"][k] for k in ("0.0", "1.0")}
     d3["articulation"]["handle_reach"] = {"1.0": True}
     with pytest.raises(SidecarError, match=">= 3 recorded handle waypoints"):
-        expand(sc.alias, Sidecar.from_dict(d3))
+        expand(sc.variant, Sidecar.from_dict(d3))
 
 
 def _cabinet_push_finish(k=0.75):
@@ -1272,7 +1279,7 @@ def test_cabinet_push_finish_program():
     d = _cabinet_push_finish()
     sc = Sidecar.from_dict(d)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == _WALL_IN + ["grasp", "base_follow", "retreat", "push_close"]
     grasp, follow, retreat, push = actions[2:]
     art = d["articulation"]
@@ -1288,18 +1295,18 @@ def test_cabinet_push_finish_program():
     # the room door, a plain cabinet close and the open: as before
     with open(os.path.join(VARIANTS, f"{st}__room_door.json")) as f:
         room = Sidecar.from_dict(json.load(f))
-    assert [a.name for a in expand(room.alias, room)] == _WALL_IN + ["push_close"] and expand(room.alias, room)[-1].plan is None
+    assert [a.name for a in expand(room.variant, room)] == _WALL_IN + ["push_close"] and expand(room.variant, room)[-1].plan is None
     plain = copy.deepcopy(d)
     for key in ("push_finish", "follow_to"):
         plain["articulation"].pop(key)
-    assert [a.name for a in expand(sc.alias, Sidecar.from_dict(plain))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+    assert [a.name for a in expand(sc.variant, Sidecar.from_dict(plain))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
     assert [a.name for a in program_articulation_large(sc, direction="open")] == _WALL_IN + ["grasp", "base_follow", "retreat"]
     # the release as its own waypoint (the sampler records the exact reach fraction)
     d2 = _cabinet_push_finish(0.8547)
     d2["articulation"]["waypoints"]["0.8547"] = dict(d2["articulation"]["waypoints"]["0.75"])
     d2["articulation"]["handle_reach"].update({"0.8547": True, "1.0": False})
     sc2 = Sidecar.from_dict(d2)
-    assert sc2.problems() == [] and [k for _, k in expand(sc2.alias, sc2)[3].articulation.followed_fractions()] == ["0.25", "0.5", "0.75", "0.8547"]
+    assert sc2.problems() == [] and [k for _, k in expand(sc2.variant, sc2)[3].articulation.followed_fractions()] == ["0.25", "0.5", "0.75", "0.8547"]
     # malformed records
     for mutate, match in ((lambda a: a.pop("follow_to"), "follow_to must be recorded"),
                           (lambda a: a["push_finish"].update(k_release=0.5), "the push starts where the hand lets go"),
@@ -1323,7 +1330,7 @@ def test_room_door_push_close_program_is_unchanged():
         sc = Sidecar.from_dict(json.load(f))
     assert door_leaf_geometry(sc.articulation) == {"hinge_xy": (-6.861306703398571, 5.211934738096777), "handle_radius_m": 0.7964860434373733,
                                                    "handle_xy_closed": (-6.827795, 4.416154), "approach_closed": (-0.999872, -0.015978, -1e-05), "handle_z": 1.036606}
-    push = expand(sc.alias, sc)[-1]
+    push = expand(sc.variant, sc)[-1]
     assert {k: getattr(push, k) for k in ("arm", "object", "joint", "hinge_xy", "handle_xy_closed", "approach_closed", "handle_radius_m", "handle_z", "q_from", "q_lower",
                                           "leaf_link", "push_inset_m", "push_height_drop_m", "hook_gap_m", "push_pre_m", "chunk_deg", "push_n", "closed_tol_rad",
                                           "max_chunks", "drag_m", "push_arms", "plan", "plan_repeats", "tol_span_rad")} == {
@@ -1360,7 +1367,7 @@ def test_cabinet_close_by_push_takes_the_room_door_branch():
     d = _cabinet_close_by_push()
     sc = Sidecar.from_dict(d)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == _WALL_IN + ["push_close"]
     push, art = actions[-1], d["articulation"]
     assert isinstance(push, A.PushClose) and push.plan is None and (push.arm, push.arms) == ("right", ("left", "right"))
@@ -1368,13 +1375,13 @@ def test_cabinet_close_by_push_takes_the_room_door_branch():
     assert (push.q_from, push.q_lower, push.q_closed) == (pytest.approx(art["q_init"]), pytest.approx(art["q_goal"]), pytest.approx(min(art["q_init"], art["q_goal"])))
     with open(os.path.join(VARIANTS, f"{st}__room_door.json")) as f:
         room = Sidecar.from_dict(json.load(f))
-    door = expand(room.alias, room)[-1]
+    door = expand(room.variant, room)[-1]
     assert [getattr(push, k) for k in ("hinge_xy", "handle_radius_m", "handle_xy_closed", "approach_closed", "handle_z")] == \
         [getattr(door, k) for k in ("hinge_xy", "handle_radius_m", "handle_xy_closed", "approach_closed", "handle_z")]
     assert list(iter_pose_targets(push.targets(sc, None))) == [] and push.annotate(sc)[1].endswith("pushed in arcs of 45° about the hinge")
     plain = copy.deepcopy(d)
     plain["articulation"]["close_by_push"] = False
-    assert [a.name for a in expand(sc.alias, Sidecar.from_dict(plain))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
+    assert [a.name for a in expand(sc.variant, Sidecar.from_dict(plain))] == _WALL_IN + ["grasp", "base_follow", "retreat"]
     with pytest.raises(SidecarError, match="a close pushes the leaf shut"):
         program_articulation_large(sc, direction="open")
     for mutate, match in ((lambda a: a.update(close_by_push="yes"), "true or false"),
@@ -1408,7 +1415,7 @@ def test_attachment_second_base_pose_is_travelled_while_holding():
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.validate() is sc
     assert sc.transition("manipulation", "attach").holding == "cap.n.02_1" and sc.path("manipulation", "attach").carried == "cap.n.02_1"
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == _TABLE_IN + _PICK + ["navigate", "transition", "reorient", "brace", "place", "retreat", "retreat"]
     nav, tr, reo, br = actions[3], actions[4], actions[5], actions[6]
     assert nav.path.to == "attach" and nav.objects == ("cap.n.02_1",)
@@ -1435,7 +1442,7 @@ def test_attachment_second_base_pose_is_travelled_while_holding():
     # without the sampler's lift record the carried lift is the recorded grasp + carry_height moved with the base
     d2 = copy.deepcopy(d)
     d2["grasps"][0].pop("lift")
-    reo2 = [a for a in expand(sc.alias, Sidecar.from_dict(d2)) if a.name == "reorient"][0]
+    reo2 = [a for a in expand(sc.variant, Sidecar.from_dict(d2)) if a.name == "reorient"][0]
     assert _close(reo2.start_pose.position, d["grasps"][0]["lift"], tol=1e-6)
     # a transition swept with another object in hand, or with the object the program does not carry, is rejected
     d3 = copy.deepcopy(d)
@@ -1458,7 +1465,7 @@ def test_attachment_second_base_pose_is_travelled_while_holding():
     assert any("neither a path nor a transition" in p for p in Sidecar.from_dict(d7).problems())
     # the base fixture (attach from the grasp stance) keeps its sequence
     base = load(st)
-    assert [a.name for a in expand(base.alias, base)] == EXPECTED_SEQUENCE[st]
+    assert [a.name for a in expand(base.variant, base)] == EXPECTED_SEQUENCE[st]
 
 
 def test_attachment_without_a_brace_record_is_a_one_arm_attach():
@@ -1472,7 +1479,7 @@ def test_attachment_without_a_brace_record_is_a_one_arm_attach():
     assert "contacts" not in d and d["summary"]["brace"] == "none"
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == _TABLE_IN + _PICK + ["reorient", "place", "retreat"]
     assert actions[-2].kind == "attach" and actions[-2].on == "lemonade_bottle.n.01_1" and actions[-1].arm == "right"
     assert all(a.arms == ("right",) for a in actions[1:])
@@ -1489,7 +1496,7 @@ def test_attachment_without_a_brace_record_is_a_one_arm_attach():
 @pytest.mark.parametrize(
     "subtask,mutate,match",
     [
-        ("disembedding", lambda d: d.update(alias="alignment-diagonal-x-y"), "matches no iddl"),
+        ("disembedding", lambda d: d.update(variant="alignment-diagonal-x-y"), "matches no iddl"),
         ("disembedding", lambda d: d.update(task_family="alignment"), "task_family"),
         ("disembedding", lambda d: d.update(tro_sha256="abc"), "tro_sha256"),
         ("disembedding", lambda d: d["stances"].pop("placement"), "required block 'stances.placement'"),

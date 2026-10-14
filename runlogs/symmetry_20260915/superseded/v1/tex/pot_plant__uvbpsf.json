@@ -1,1 +1,0 @@
-{"key": "pot_plant__uvbpsf", "category": "pot_plant", "model": "uvbpsf", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0237973905512251, "p95": 0.12026143790849673, "p99": 0.1437908496732026, "mad_union": 0.15022347990928553, "iou": 0.8344063662174591, "worst": "z180"}}, "render_s": 0.145}

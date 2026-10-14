@@ -1,1 +1,0 @@
-{"key": "recreational_vehicle__doiucd", "category": "recreational_vehicle", "model": "doiucd", "scale": null, "n_glass": 10, "glass_only": false, "n_textured": 7, "base": {"z2": {"mad": 0.028684150968135473, "p95": 0.17098039215685704, "p99": 0.23137254901960785, "mad_union": 0.10329369633739018, "iou": 0.9052195928020254, "worst": "z180"}}, "render_s": 0.431}

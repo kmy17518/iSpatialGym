@@ -1,1 +1,0 @@
-{"key": "painting__jayvqq", "category": "painting", "model": "jayvqq", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.041706368034314004, "p95": 0.13464052287581701, "p99": 0.18169934640522878, "mad_union": 0.040551582961597395, "iou": 1.0, "worst": "x180"}}, "render_s": 0.116}

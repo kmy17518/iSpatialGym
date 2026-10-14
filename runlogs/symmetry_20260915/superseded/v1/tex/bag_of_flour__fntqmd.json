@@ -1,1 +1,0 @@
-{"key": "bag_of_flour__fntqmd", "category": "bag_of_flour", "model": "fntqmd", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.005144400859058767, "p95": 0.018300653594771243, "p99": 0.06666666666666667, "mad_union": 0.0053103963161953574, "iou": 0.999721268923227, "worst": "z180"}}, "render_s": 0.116}

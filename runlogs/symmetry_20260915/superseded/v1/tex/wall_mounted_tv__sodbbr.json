@@ -1,1 +1,0 @@
-{"key": "wall_mounted_tv__sodbbr", "category": "wall_mounted_tv", "model": "sodbbr", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.004826491467252555, "p95": 0.01568627450980392, "p99": 0.11764705882352941, "mad_union": 0.22441361138214078, "iou": 0.7533161244153653, "worst": "x180"}}, "render_s": 0.122}

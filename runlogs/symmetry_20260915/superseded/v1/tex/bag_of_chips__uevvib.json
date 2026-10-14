@@ -1,1 +1,0 @@
-{"key": "bag_of_chips__uevvib", "category": "bag_of_chips", "model": "uevvib", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.03719752670365257, "p95": 0.1568627450980392, "p99": 0.19607843137254902, "mad_union": 0.13549518322397705, "iou": 0.8711902375759005, "worst": "x180"}}, "render_s": 0.11}

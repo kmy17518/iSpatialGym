@@ -1,6 +1,0 @@
-{"key": "fridge__lleghp", "joint": "j_shelf3", "feasible": true,
- "proposal": {"face": "outer", "a": 0.5, "b": 0.5, "pinch": "vertical", "approach": "front", "depth_mm": 6,
-              "expected_motion": "pull"},
- "alternative": {"face": "top_edge", "a": 0.5, "b": 1.0, "pinch": "thickness", "approach": "front_down45", "depth_mm": 10, "expected_motion": "pull"},
- "note": "Clamp the 13 mm front wire of the ~30 mm wire lip up-down and pull the shelf out; glass door must be opened first.",
- "confidence": "medium"}

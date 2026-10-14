@@ -28,7 +28,7 @@ from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
-ALIAS = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor"
+VARIANT = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor"
 L = C.FINGERTIP_LENGTH
 #: the hand's lowest sphere below the fingertips per turn (``tabletop.hand_spheres_eef``): a fingertip with the camera up, a knuckle with the
 #: closing axis in the push plane and the camera's spheres reaching up (plane-), the camera hanging below (lateral- / plane)
@@ -43,7 +43,7 @@ def _box(dx: float, dy: float, h: float) -> th.Tensor:
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = ALIAS, dict(gen)
+        self.variant, self.generation = VARIANT, dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)

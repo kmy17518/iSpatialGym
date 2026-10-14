@@ -1,1 +1,0 @@
-{"key": "date__kdfasq", "category": "date", "model": "kdfasq", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.033438243892178886, "p95": 0.07973856209150326, "p99": 0.1084967320261438, "mad_union": 0.11360047851361707, "iou": 0.9030314585319352, "worst": "x180"}}, "render_s": 0.108}

@@ -1,6 +1,6 @@
-"""The release check as a demo gate (``release_commanded``): the gate per ``--mode`` under ``--demo-gating auto``, the
-verdict only with the gate on, ``release_check`` recorded as a fact in every mode - by the single-env executor and, with
-the same rule, per slot by ``VecStreamExecutor``."""
+"""The release check: ``release_check`` recorded as a fact in every mode - by the single-env executor and, with the same
+rule, per slot by ``VecStreamExecutor`` - and the ``--qa`` hard metric ``bad_release`` (an assisted-grasp release without a
+gripper command of +1): it fails an oracle demo at once and is only logged in a stream."""
 
 from __future__ import annotations
 
@@ -10,33 +10,15 @@ import pytest
 
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.executor import Executor, ExecutorConfig
+from ispatialgym.oracle.programs import expand
 from ispatialgym.oracle.vec_stream import Slot, VecStreamExecutor
-from ispatialgym.tests.test_v2_oracle import CAM_KEY, FakeEnv, FakeRobot
-from ispatialgym.tests.test_vec_stream import Drive, FakeVecEnv, GoalTracker, _State, make_world
-
-ORACLE_GATES = ("placed_orientation", "root_moved", "robot_wobble")
+from ispatialgym.tests.test_v2_oracle import CAM_KEY, FakeEnv, FakeRobot, _place_goal, iors_world, make_executor, quiet_qa, success_eval
+from ispatialgym.tests.test_vec_stream import Drive, FakeVecEnv, GoalTracker, _State
 
 
-@pytest.mark.parametrize("occlusion", [True, False])
-def test_demo_gating_per_mode(monkeypatch, occlusion):
-    from ispatialgym.oracle import run_isg as R
-
-    monkeypatch.setattr(R.goal_occlusion, "enabled", lambda: occlusion)
-    assert R.demo_gating_for("oracle", "auto") == ORACLE_GATES + (("goal_occlusion",) if occlusion else ()) + ("release_commanded",)
-    assert R.demo_gating_for("replay", "auto") == ("release_commanded",)
-    assert R.demo_gating_for("policy", "auto") == ()
-    for mode in ("oracle", "replay", "policy"):
-        assert R.demo_gating_for(mode, "none") == ()
-        assert R.demo_gating_for(mode, "release_commanded") == ("release_commanded",)
-        assert R.demo_gating_for(mode, "root_moved") == ("root_moved",)  # an explicit gate replaces auto: no release check
-    assert R.parse_args(["--instance", "x", "--demo-gating", "release_commanded"]).demo_gating == "release_commanded"
-
-
-def _single(env, source, cfg, violation=None):
+def _single(env, source, cfg):
     ex = Executor(env, env.task, None, recorder=None, motions=None, monitors=None, cfg=cfg, sim=env.sim, state=_State(), tracked_objects={}, cam_key=CAM_KEY)
     ex.last_obs, ex.last_info = env._obs(), env._info()
-    if violation is not None:
-        ex.release_check["violations"].append(dict(violation))
 
     def stream():
         while True:
@@ -46,23 +28,6 @@ def _single(env, source, cfg, violation=None):
             yield a
 
     return ex.run_stream(stream())
-
-
-@pytest.mark.parametrize("mode", ["oracle", "replay", "policy"])
-def test_release_check_is_a_fact_and_the_gate_decides(monkeypatch, mode):
-    from ispatialgym.oracle import run_isg as R
-
-    monkeypatch.setattr(R.goal_occlusion, "enabled", lambda: False)
-    env, source, cfg = make_world("reach_then_stop")
-    # the mode's gates; the oracle's placement / root / torso gates judge a program, which a stream does not have
-    cfg.demo_gating = tuple(g for g in R.demo_gating_for(mode, "auto") if g not in ORACLE_GATES)
-    bad = {"step": 7, "arm": "right", "object": "cup_0", "kind": "released_between_steps"}
-    r = _single(env, source, cfg, violation=bad)
-    assert r["release_check"]["violations"] == [bad]
-    if mode == "policy":
-        assert r["success"] is True and r["reason"] is None
-    else:
-        assert r["success"] is False and r["reason"] == "release_not_commanded"
 
 
 class GraspEnv(FakeEnv):
@@ -107,17 +72,50 @@ def _grasp_world(kind):
 
 
 @pytest.mark.parametrize("kind", ["open", "drop"])
-def test_vec_records_releases_with_the_single_env_rule(kind):
+def test_vec_records_releases_with_the_single_env_rule_and_logs_a_bad_one(kind):
     env, source, cfg = _grasp_world(kind)
     single = _single(env, source, cfg)
     venv_env, vsource, vcfg = _grasp_world(kind)
     slot = Slot(idx=0, robot=venv_env.robot, source=vsource, cfg=vcfg, task=venv_env.task, tracked={}, held=lambda: [], never_held_window=10)
-    (r,) = VecStreamExecutor(FakeVecEnv([venv_env]), [slot], sim=None).run([venv_env._obs()], [venv_env._info()])
+    (r,) = VecStreamExecutor(FakeVecEnv([venv_env]), [slot], sim=None, qa=True).run([venv_env._obs()], [venv_env._info()])
     assert r["release_check"] == single["release_check"]
     (rel,) = r["release_check"]["releases"]
     assert rel["step"] == 12 and rel["arm"] == "right" and rel["object"] == "cup_0"
+    bad = r["qa"]["metrics"]["bad_release"]
+    assert bad == single["qa"]["metrics"]["bad_release"]
     if kind == "open":
-        assert rel["gripper_command"] == 1.0 and r["release_check"]["violations"] == []
+        assert rel["gripper_command"] == 1.0 and r["release_check"]["violations"] == [] and not bad["triggered"]
     else:
         assert rel["gripper_command"] == -1.0 and r["release_check"]["violations"][0]["kind"] == "gripper_command_below_open"
-    assert r["success"] is True and r["reason"] is None  # facts only: no release verdict in the vectorized evaluator
+        assert bad["triggered"] and [v["step"] for v in bad["violations"]] == [12] and "bad_release" in r["qa"]["hard_triggered"]
+    assert r["success"] is True and r["reason"] is None  # a stream only logs
+
+
+def test_bad_release_fails_an_oracle_demo_without_a_retry(tmp_path, monkeypatch):
+    """The apple slips out of the assisted grasp while held (no open command): ``bad_release`` ends the demo at that step."""
+    quiet_qa(monkeypatch)
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    robot = env.robot
+    dropped = {"step": None, "held": 0}
+
+    def sync():
+        robot._ag_obj_constraints = {a: (True if robot._ag_obj_in_hand[a] is not None else None) for a in M.ARMS}
+
+    def slip(action):
+        if dropped["step"] is None and robot._ag_obj_in_hand["right"] is not None:
+            dropped["held"] += 1
+            if dropped["held"] == 10:
+                robot._ag_obj_in_hand["right"] = None
+                dropped["step"] = env.steps
+        sync()
+
+    sync()
+    env.after_step = slip
+    ex, *_ = make_executor(env, sc, tmp_path, qa=True)
+    result = ex.run_program(expand(sc.variant, sc))
+    assert dropped["step"] is not None
+    assert not result["success"] and result["reason"] == "bad_release" and result["qa"]["stopped_by"] == "bad_release"
+    v = result["verdict"]
+    assert v["details"]["object"] == "apple_omzprq_0" and len(result["actions"][v["action_index"]]["attempts"]) == 1
+    assert result["release_check"]["violations"] and result["release_check"]["violations"][0]["object"] == "apple_omzprq_0"

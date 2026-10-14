@@ -1,9 +1,0 @@
-{
-  "category": "teaspoon",
-  "pages_opened": ["grids/pool_other/teaspoon__p1.png", "grids/pool_other/teaspoon__p2.png"],
-  "n_models": 23,
-  "exclude": [
-    {"model": "comb/lqnwhb", "reason": "Nearly invisible white/translucent shape on the tray; does not read as a comb or any object."}
-  ],
-  "notes": "Other 22 tiles (spoons, forks, knives, toothbrushes, markers, pens, pencil, chopstick, lipstick, razor, clipper) are intact and lie flat as expected; larger tilt values on spoons/pens are resting-pose rolls, not toppling. toothbrush/nbgpwg and table_knife/lrdmpf are low-contrast white but readable. toothbrush/ifxlss and clipper/befwbq report missing segmentation labels."
-}

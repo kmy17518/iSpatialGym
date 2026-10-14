@@ -1,1 +1,0 @@
-{"key": "platter__ieoasd", "category": "platter", "model": "ieoasd", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.004735233418312401, "p95": 0.023529411764705882, "p99": 0.06274509803921569, "mad_union": 0.019678821337302206, "iou": 0.9700970873786408, "worst": "z180"}}, "render_s": 0.122}

@@ -1,9 +1,0 @@
-{
-  "category": "can_of_soda",
-  "pages_opened": ["grids/pool_other/can_of_soda__p1.png", "grids/pool_other/can_of_soda__p2.png"],
-  "n_models": 19,
-  "exclude": [
-    {"model": "can_of_coffee/poteji", "reason": "Visibly leaning, settled tilt 13.4 deg; can does not sit flat on the tray."}
-  ],
-  "notes": "Remaining 18 tiles are upright, textured food/drink cans, jars and spray cans that read clearly. spray_can/bgalkx shows a small red part at its base (detached cap or nozzle) but the can itself is intact and upright; kept. Jars acgdtc/cbmndg are lidded containers, acceptable related distractors."
-}

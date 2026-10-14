@@ -1278,7 +1278,7 @@ class SimWorld:
             # the position drives kept the targets of the last ``apply_action`` (a program-check grasp over the tray, the
             # previous attempt's stance), and during the physics-only settle (``keep_still`` zeroes the velocities every
             # step, the drive torque still integrates ½·a·dt² per step) the arm crept toward them - hundreds of steps
-            # later the hand had swept into the tray and shoved the bottles (the disembedding milk alias never settled
+            # later the hand had swept into the tray and shoved the bottles (the disembedding milk variant never settled
             # once its distractors filled the tray; the objects nearest the hand moved first)
             self.robot.set_joint_positions(G.t(q), drive=True)
             self.robot.set_joint_velocities(th.zeros_like(G.t(q)), drive=True)

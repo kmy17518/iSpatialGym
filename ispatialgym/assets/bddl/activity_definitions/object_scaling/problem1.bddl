@@ -1,27 +1,27 @@
 (define (problem object_scaling-1)
     (:domain ispatialgym)
-    (:alias object_scaling-bottle_of_pop)
+    (:variant object_scaling-apple)
 
-    ; ground_isg 2.0.0: object_scaling-bottle_of_pop (object_scaling/object_scaling.iddl; object_scaling#02/representative)
+    ; ground_isg 2.0.0: object_scaling-apple (object_scaling/object_scaling.iddl; object_scaling#04/representative)
     ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of
     ; the target along the head-camera optical axis (TRO pose target: frame = head camera, position_metric = depth).
 
     (:objects
-        bottle__of__pop.n.01_1 - bottle__of__pop.n.01
+        apple.n.01_1 - apple.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
         (ontop agent.n.01_1 floor.n.01_1)
-        (grasped agent.n.01_1 bottle__of__pop.n.01_1)
+        (grasped agent.n.01_1 apple.n.01_1)
     )
 
     (:goal
         (and
-            (grasped ?agent.n.01_1 ?bottle__of__pop.n.01_1)
-            (pose_reached ?bottle__of__pop.n.01_1)
-            (pose_settled ?bottle__of__pop.n.01_1)
+            (grasped ?agent.n.01_1 ?apple.n.01_1)
+            (pose_reached ?apple.n.01_1)
+            (pose_settled ?apple.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

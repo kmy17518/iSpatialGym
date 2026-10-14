@@ -1,1 +1,0 @@
-{"key": "lock__pngvzn", "category": "lock", "model": "pngvzn", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.005033018614222394, "p95": 0.01045751633986928, "p99": 0.1111111111111111, "mad_union": 0.21554577499938019, "iou": 0.7402571246349569, "worst": "x180"}}, "render_s": 0.115}

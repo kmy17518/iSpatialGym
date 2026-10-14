@@ -1,1 +1,0 @@
-{"key": "statue__cxsvwj", "category": "statue", "model": "cxsvwj", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0033085927402976257, "p95": 0.00392156862745098, "p99": 0.11372549019607843, "mad_union": 0.23870822752782792, "iou": 0.7292668347324376, "worst": "z180"}}, "render_s": 0.109}

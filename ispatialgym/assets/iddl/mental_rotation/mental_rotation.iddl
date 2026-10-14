@@ -2,7 +2,7 @@
 ; orientation of the target, its position unchanged (TRO pose target: orientation_metric = full, equivalences per model).
 (define (iddl mental_rotation)
     (:family mental_rotation)
-    (:alias mental_rotation-{target})
+    (:variant mental_rotation-{target})
     (:require
         (grasps target floating)
     )

@@ -1,27 +1,27 @@
 (define (problem mental_rotation-7)
     (:domain ispatialgym)
-    (:alias mental_rotation-soup_ladle)
+    (:variant mental_rotation-statue)
 
-    ; ground_isg 2.0.0: mental_rotation-soup_ladle (mental_rotation/mental_rotation.iddl; mental_rotation#08/representative)
+    ; ground_isg 2.0.0: mental_rotation-statue (mental_rotation/mental_rotation.iddl; mental_rotation#10/representative)
     ; Mental rotation. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a world-frame
     ; orientation of the target, its position unchanged (TRO pose target: orientation_metric = full, equivalences per model).
 
     (:objects
-        soup_ladle.n.01_1 - soup_ladle.n.01
+        statue.n.01_1 - statue.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
         (ontop agent.n.01_1 floor.n.01_1)
-        (grasped agent.n.01_1 soup_ladle.n.01_1)
+        (grasped agent.n.01_1 statue.n.01_1)
     )
 
     (:goal
         (and
-            (grasped ?agent.n.01_1 ?soup_ladle.n.01_1)
-            (pose_reached ?soup_ladle.n.01_1)
-            (pose_settled ?soup_ladle.n.01_1)
+            (grasped ?agent.n.01_1 ?statue.n.01_1)
+            (pose_reached ?statue.n.01_1)
+            (pose_settled ?statue.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

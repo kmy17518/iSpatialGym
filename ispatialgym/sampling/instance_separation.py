@@ -1,7 +1,7 @@
 """Distinct eval instances and the train-repeat rule (owner 2026-10-11). Pure: reads the TRO / sidecar / summary /
 template_meta files of sampled instances, no simulator.
 
-Instance record (:func:`read_instance`, :func:`record_from_dicts`): task (TRO ``activity``), alias (``task_variant``),
+Instance record (:func:`read_instance`, :func:`record_from_dicts`): task (TRO ``activity``), variant (``task_variant``),
 scene (``scene.model``), room (``scene.task_rooms``), the robot's start base (TRO ``robot_poses.robot[0]``: x, y and the yaw
 of its quaternion; sidecar ``stances.init.base_pose2d`` when the TRO has none), the goal base (camera relocalization:
 sidecar ``goal.base_pose2d`` / ``stances.goal.base_pose2d``, else summary ``goal_base_pose2d``; the held-object tasks never
@@ -15,9 +15,9 @@ move the base: the start base), and the poses the train-repeat rule compares:
 
 Eval separation (:func:`separation_offenders`): within one task and one (scene, room) every pair of instances whose start
 bases are less than ``min_m`` (0.5 m) apart - for camera relocalization also every pair whose goal bases are - is an offender;
-:func:`resample_choice` walks the aliases in order (an alias list, else sorted) and re-samples an alias that conflicts with
-one kept before it (the later alias of a pair), keeping the rest. The checker CLI (:func:`main`, ``$E/separation_check.py``)
-prints the pairs and the aliases to re-sample with their next seed index (``sample_isg --seed-split eval --seed-index``), and
+:func:`resample_choice` walks the variants in order (a variant list, else sorted) and re-samples a variant that conflicts with
+one kept before it (the later variant of a pair), keeping the rest. The checker CLI (:func:`main`, ``$E/separation_check.py``)
+prints the pairs and the variants to re-sample with their next seed index (``sample_isg --seed-split eval --seed-index``), and
 exits 1 when there is any.
 
 Train repeat (:func:`find_repeat`, :func:`repeat_filter`; ``multiply_isg --split train --eval-run``): a train instance repeats an
@@ -36,6 +36,8 @@ import os
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+
+from ispatialgym.oracle.sidecar import from_legacy_keys
 
 CAMERA = "camera_relocalization"
 HELD_TASKS = ("object_scaling", "mental_rotation")
@@ -123,7 +125,7 @@ class Pose:
 class InstanceRecord:
     path: str
     task: str
-    alias: str
+    variant: str
     instance_id: str
     scene: str
     room: str
@@ -134,13 +136,14 @@ class InstanceRecord:
     split: Dict[str, Any] = field(default_factory=dict)
 
     def to_json(self) -> Dict[str, Any]:
-        return {"path": self.path, "task": self.task, "alias": self.alias, "instance_id": self.instance_id, "scene": self.scene, "room": self.room,
+        return {"path": self.path, "task": self.task, "variant": self.variant, "instance_id": self.instance_id, "scene": self.scene, "room": self.room,
                 "start_base": self.start_base, "goal_base": self.goal_base, "start": [p.to_json() for p in self.start],
                 "goal": [p.to_json() for p in self.goal], "split": self.split}
 
     @staticmethod
     def from_json(d: Dict[str, Any]) -> "InstanceRecord":
-        return InstanceRecord(d.get("path", ""), d["task"], d["alias"], d.get("instance_id", ""), d["scene"], d.get("room", ""),
+        d = from_legacy_keys(d)
+        return InstanceRecord(d.get("path", ""), d["task"], d["variant"], d.get("instance_id", ""), d["scene"], d.get("room", ""),
                               list(d["start_base"]), None if d.get("goal_base") is None else list(d["goal_base"]),
                               [Pose(**p) for p in d.get("start") or []], [Pose(**p) for p in d.get("goal") or []], dict(d.get("split") or {}))
 
@@ -213,7 +216,7 @@ def record_from_dicts(tro: Dict[str, Any], sidecar: Optional[Dict[str, Any]] = N
     isg = tro.get("ispatialgym") or {}
     meta = meta or {}
     task = str(isg.get("activity") or meta.get("problem", "").split("-")[0])
-    alias = str(isg.get("task_variant") or (sidecar or {}).get("alias") or meta.get("alias") or "")
+    variant = str(isg.get("task_variant") or (sidecar or {}).get("variant") or meta.get("variant") or "")
     sb = isg.get("scene") or {}
     scene = str(sb.get("model") or meta.get("scene") or "")
     room = "+".join(sorted(sb.get("task_rooms") or meta.get("task_rooms") or meta.get("rooms") or []))
@@ -234,16 +237,17 @@ def record_from_dicts(tro: Dict[str, Any], sidecar: Optional[Dict[str, Any]] = N
             goal.append(Pose("goal_camera", [float(v) for v in cam["position"]], q=[float(v) for v in cam["orientation"]]))
         elif goal_base is not None:
             goal.append(Pose("goal_base", goal_base[:2], yaw=goal_base[2]))
-    return InstanceRecord(path, task, alias, str(isg.get("instance_id") or (sidecar or {}).get("instance_id") or ""), scene, room, start_base,
+    return InstanceRecord(path, task, variant, str(isg.get("instance_id") or (sidecar or {}).get("instance_id") or ""), scene, room, start_base,
                           goal_base, start, goal, dict(meta.get("split") or {}))
 
 
 def _read_json(path: str) -> Optional[Dict[str, Any]]:
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
     except (OSError, ValueError):
         return None
+    return from_legacy_keys(data) if isinstance(data, dict) else data
 
 
 def read_instance(tro_path: str) -> InstanceRecord:
@@ -261,17 +265,17 @@ def read_instance(tro_path: str) -> InstanceRecord:
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def renamed_run_dir(tro_path: str, alias: str) -> bool:
-    """True for an instance under ``<run>/<dir>/inst/<alias>/<template>/instances/`` whose ``<dir>`` is not the alias (a run
-    directory set aside, e.g. ``<alias>.hung_<job>``)."""
+def renamed_run_dir(tro_path: str, variant: str) -> bool:
+    """True for an instance under ``<run>/<dir>/inst/<variant>/<template>/instances/`` whose ``<dir>`` is not the variant (a run
+    directory set aside, e.g. ``<variant>.hung_<job>``)."""
     d = os.path.abspath(tro_path)
     for _ in range(4):
         d = os.path.dirname(d)
-    return os.path.basename(d) == "inst" and os.path.basename(os.path.dirname(d)) != alias
+    return os.path.basename(d) == "inst" and os.path.basename(os.path.dirname(d)) != variant
 
 
-#: directory layouts, first match wins: a run tag (``<tag>/<alias>/inst/<alias>/<template>/instances``; the job's other copies -
-#: ``replay_inst/`` - are not instances of the run), one run of an alias, a sampler out root, a template directory
+#: directory layouts, first match wins: a run tag (``<tag>/<variant>/inst/<variant>/<template>/instances``; the job's other copies -
+#: ``replay_inst/`` - are not instances of the run), one run of a variant, a sampler out root, a template directory
 _LAYOUTS = (("*", "inst", "*", "*", "instances"), ("inst", "*", "*", "instances"), ("*", "*", "instances"), ("instances",))
 
 
@@ -320,7 +324,7 @@ def load_instances(sources: Iterable[str], tasks: Optional[Sequence[str]] = None
                 except (OSError, ValueError, KeyError, TypeError) as e:
                     notes.append(f"unreadable {p}: {e!r}")
                     continue
-                if renamed_run_dir(p, rec.alias):
+                if renamed_run_dir(p, rec.variant):
                     notes.append(f"skipped (run directory set aside): {p}")
                     continue
                 recs.append(rec)
@@ -328,15 +332,15 @@ def load_instances(sources: Iterable[str], tasks: Optional[Sequence[str]] = None
     return out
 
 
-def latest_by_alias(record_lists: Sequence[List[InstanceRecord]]) -> List[InstanceRecord]:
-    """One list from several runs: a later run's instances replace every instance of the same alias from an earlier run."""
-    by_alias: Dict[str, List[InstanceRecord]] = {}
+def latest_by_variant(record_lists: Sequence[List[InstanceRecord]]) -> List[InstanceRecord]:
+    """One list from several runs: a later run's instances replace every instance of the same variant from an earlier run."""
+    by_variant: Dict[str, List[InstanceRecord]] = {}
     for recs in record_lists:
         fresh: Dict[str, List[InstanceRecord]] = {}
         for r in recs:
-            fresh.setdefault(r.alias, []).append(r)
-        by_alias.update(fresh)
-    return [r for a in sorted(by_alias) for r in by_alias[a]]
+            fresh.setdefault(r.variant, []).append(r)
+        by_variant.update(fresh)
+    return [r for a in sorted(by_variant) for r in by_variant[a]]
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -360,7 +364,7 @@ def separation_offenders(records: Sequence[InstanceRecord], min_m: float = MIN_S
         groups.setdefault((r.task, r.scene, r.room), []).append(r)
     out: List[Offense] = []
     for key in sorted(groups):
-        rs = sorted(groups[key], key=lambda r: (r.alias, r.instance_id))
+        rs = sorted(groups[key], key=lambda r: (r.variant, r.instance_id))
         for i in range(len(rs)):
             for j in range(i + 1, len(rs)):
                 a, b = rs[i], rs[j]
@@ -375,14 +379,14 @@ def separation_offenders(records: Sequence[InstanceRecord], min_m: float = MIN_S
 
 
 def resample_choice(offenses: Sequence[Offense], order: Optional[Sequence[str]] = None) -> Dict[str, List[Offense]]:
-    """Alias -> its offenses with the aliases kept, for every alias to re-sample: in ``order`` (unlisted aliases after it, sorted),
-    an alias that conflicts with an alias kept before it or with itself is re-sampled, every other alias is kept."""
+    """Variant -> its offenses with the variants kept, for every variant to re-sample: in ``order`` (unlisted variants after it, sorted),
+    a variant that conflicts with a variant kept before it or with itself is re-sampled, every other variant is kept."""
     rank = {a: i for i, a in enumerate(order or [])}
-    aliases = sorted({o.a.alias for o in offenses} | {o.b.alias for o in offenses}, key=lambda a: (rank.get(a, len(rank)), a))
+    variants = sorted({o.a.variant for o in offenses} | {o.b.variant for o in offenses}, key=lambda a: (rank.get(a, len(rank)), a))
     kept: set = set()
     out: Dict[str, List[Offense]] = {}
-    for al in aliases:
-        conf = [o for o in offenses if (o.a.alias == al and (o.b.alias == al or o.b.alias in kept)) or (o.b.alias == al and o.a.alias in kept)]
+    for al in variants:
+        conf = [o for o in offenses if (o.a.variant == al and (o.b.variant == al or o.b.variant in kept)) or (o.b.variant == al and o.a.variant in kept)]
         if conf:
             out[al] = conf
         else:
@@ -390,13 +394,13 @@ def resample_choice(offenses: Sequence[Offense], order: Optional[Sequence[str]] 
     return out
 
 
-def next_seed_index(records: Sequence[InstanceRecord], alias: str) -> Tuple[int, str]:
-    """The seed index to re-sample ``alias`` with and why: one past the split seed index its instances were sampled with, 0 for an
+def next_seed_index(records: Sequence[InstanceRecord], variant: str) -> Tuple[int, str]:
+    """The seed index to re-sample ``variant`` with and why: one past the split seed index its instances were sampled with, 0 for an
     instance sampled without a split seed (``--seed``)."""
-    ks = [r.split.get("index") for r in records if r.alias == alias and r.split.get("seed_source") == "split" and r.split.get("index") is not None]
+    ks = [r.split.get("index") for r in records if r.variant == variant and r.split.get("seed_source") == "split" and r.split.get("index") is not None]
     if ks:
         return max(int(k) for k in ks) + 1, f"sampled with split seed index {max(int(k) for k in ks)}"
-    seeds = sorted({str(r.split.get("seed")) for r in records if r.alias == alias and r.split.get("seed") is not None})
+    seeds = sorted({str(r.split.get("seed")) for r in records if r.variant == variant and r.split.get("seed") is not None})
     return 0, ("sampled with --seed " + ",".join(seeds) if seeds else "sampled without a recorded split seed")
 
 
@@ -447,7 +451,7 @@ def repeat_filter(eval_records: Sequence[InstanceRecord], task: Optional[str] = 
         if hit is None:
             return None
         e, gaps = hit
-        return f"repeats eval instance {e.instance_id or e.path} ({e.alias}): " + ", ".join(f"{k} {d:.2f} m / {a:.0f} deg" for k, (d, a) in gaps.items())
+        return f"repeats eval instance {e.instance_id or e.path} ({e.variant}): " + ", ".join(f"{k} {d:.2f} m / {a:.0f} deg" for k, (d, a) in gaps.items())
 
     return check
 
@@ -459,7 +463,7 @@ def repeat_filter(eval_records: Sequence[InstanceRecord], task: Optional[str] = 
 
 def run_tag_records(source: str, runs_root: Optional[str], tasks: Sequence[str], notes: List[str]) -> List[InstanceRecord]:
     """The instances of one run: ``source`` is a directory / index file, or a tag under ``runs_root``
-    (``<runs_root>/<tag>/<alias>/inst/...``)."""
+    (``<runs_root>/<tag>/<variant>/inst/...``)."""
     path = source if (os.path.exists(source) or runs_root is None) else os.path.join(runs_root, source)
     return load_instances([path], tasks=tasks, notes=notes)
 
@@ -467,21 +471,21 @@ def run_tag_records(source: str, runs_root: Optional[str], tasks: Sequence[str],
 def main(argv: Optional[Sequence[str]] = None, runs_root: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(description="Eval separation check: instances of one task in one (scene, room) whose start bases (camera "
                                                  "relocalization: or goal bases) are closer than --min. Several runs: a later run's instances replace "
-                                                 "the alias's instances of the earlier ones. Exit 1 when there is an offender.")
+                                                 "the variant's instances of the earlier ones. Exit 1 when there is an offender.")
     parser.add_argument("runs", nargs="+", help="run tags (under --runs-root) or directories / TRO files / index files")
     parser.add_argument("--runs-root", default=runs_root, help="where the run tags live (default: %(default)s)")
     parser.add_argument("--min", type=float, default=MIN_SEPARATION_M, help="minimum base distance in m (default: %(default)s)")
     parser.add_argument("--tasks", default=",".join(RULE_TASKS), help="comma-separated tasks (TRO activity; default: %(default)s)")
-    parser.add_argument("--aliases", default=None, help="alias list file: its order decides which alias of a pair is re-sampled (the later); default sorted")
+    parser.add_argument("--variants", default=None, help="variant list file: its order decides which variant of a pair is re-sampled (the later); default sorted")
     parser.add_argument("--write-index", default=None, help="write the instances checked as an index file (multiply_isg --eval-run)")
     parser.add_argument("--json", default=None, help="write the report as JSON")
     args = parser.parse_args(argv)
     tasks = [t for t in args.tasks.split(",") if t]
     notes: List[str] = []
-    records = latest_by_alias([run_tag_records(s, args.runs_root, tasks, notes) for s in args.runs])
+    records = latest_by_variant([run_tag_records(s, args.runs_root, tasks, notes) for s in args.runs])
     order = None
-    if args.aliases:
-        with open(args.aliases) as f:
+    if args.variants:
+        with open(args.variants) as f:
             order = [line.strip() for line in f if line.strip() and not line.startswith("#")]
     offenses = separation_offenders(records, args.min)
     resample = resample_choice(offenses, order)
@@ -490,7 +494,7 @@ def main(argv: Optional[Sequence[str]] = None, runs_root: Optional[str] = None) 
     groups: Dict[Tuple[str, str, str], int] = {}
     for r in records:
         groups[(r.task, r.scene, r.room)] = groups.get((r.task, r.scene, r.room), 0) + 1
-    print(f"{len(records)} instances of {len({r.alias for r in records})} aliases in {len(groups)} (task, scene, room) groups; minimum {args.min:.2f} m")
+    print(f"{len(records)} instances of {len({r.variant for r in records})} variants in {len(groups)} (task, scene, room) groups; minimum {args.min:.2f} m")
     for (task, scene, room), n in sorted(groups.items()):
         print(f"  {task:24s} {scene:26s} {room:22s} {n}")
     report: Dict[str, Any] = {"min_m": args.min, "n_instances": len(records), "offenses": [], "resample": {}}
@@ -499,17 +503,17 @@ def main(argv: Optional[Sequence[str]] = None, runs_root: Optional[str] = None) 
         pairs.setdefault((o.a.path, o.b.path), []).append(o)
     for os_ in pairs.values():
         a, b = os_[0].a, os_[0].b
-        who = b.alias if b.alias in resample else (a.alias if a.alias in resample else None)
+        who = b.variant if b.variant in resample else (a.variant if a.variant in resample else None)
         gaps = ", ".join(f"{o.kind} {o.distance_m:.2f} m" for o in os_)
-        print(f"OFFENDER {a.task} {a.scene}/{a.room}: {a.alias} ({a.instance_id}) <-> {b.alias} ({b.instance_id}): {gaps}; start bases "
+        print(f"OFFENDER {a.task} {a.scene}/{a.room}: {a.variant} ({a.instance_id}) <-> {b.variant} ({b.instance_id}): {gaps}; start bases "
               f"{[round(v, 2) for v in a.start_base[:2]]} / {[round(v, 2) for v in b.start_base[:2]]} -> re-sample {who}")
         for o in os_:
-            report["offenses"].append({"task": a.task, "scene": a.scene, "room": a.room, "a": a.alias, "b": b.alias, "kind": o.kind,
+            report["offenses"].append({"task": a.task, "scene": a.scene, "room": a.room, "a": a.variant, "b": b.variant, "kind": o.kind,
                                        "distance_m": round(o.distance_m, 3), "a_instance": a.path, "b_instance": b.path, "resample": who})
-    for alias in resample:
-        k, why = next_seed_index(records, alias)
-        print(f"RESAMPLE {alias} --seed-split eval --seed-index {k}  ({why})")
-        report["resample"][alias] = {"seed_index": k, "why": why}
+    for variant in resample:
+        k, why = next_seed_index(records, variant)
+        print(f"RESAMPLE {variant} --seed-split eval --seed-index {k}  ({why})")
+        report["resample"][variant] = {"seed_index": k, "why": why}
     if args.write_index:
         write_index(args.write_index, records)
         print(f"index of {len(records)} instances -> {args.write_index}")

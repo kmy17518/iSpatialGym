@@ -3,7 +3,7 @@ is re-loaded in a fresh process from its TRO and re-checked the way the evaluato
 
 Two artefact layouts are handled; the mode is detected per template directory (:func:`detect_layout`):
 
-**v2** (``sample_isg`` / ``multiply_isg``, spec §1: ``<root>/<alias>/<template_id>/{template.json, template_meta.json,
+**v2** (``sample_isg`` / ``multiply_isg``, spec §1: ``<root>/<variant>/<template_id>/{template.json, template_meta.json,
 instances/<iid>-tro_state.json, <iid>.oracle.json, <iid>.summary.json}``; detected by the ``<iid>.oracle.json``
 sidecars / the v2 ``template_meta.json``). Per instance, in a worker process (one per template directory, or one per
 instance with ``--fresh-process-per-instance``):
@@ -18,7 +18,7 @@ instance with ``--fresh-process-per-instance``):
 4. the loader contract items the TRO carries were restored (every hinge exists, every grasp is attached, every
    attachment pair filtered, articulation joints at their initial values),
 5. the sidecar loads (``Sidecar.load``), validates (``problems(check_program=True)``) and ``verify_tro`` matches the TRO,
-6. the program check is re-run through ``ispatialgym.sampling.v2.program_check.run`` -- ``expand(alias, sidecar)``,
+6. the program check is re-run through ``ispatialgym.sampling.v2.program_check.run`` -- ``expand(variant, sidecar)``,
    then the IK / collision check of every action's targets from the recorded stances (reported per action name),
 7. a contact sheet (init view; goal view when the goal can be materialised by teleport as the sampler did) is written
    to ``<template>/validation/<iid>.png``.
@@ -33,7 +33,7 @@ patched. One summary line per template (``VALIDATION_TEMPLATE {...}``) and one f
 Examples::
 
     OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.validate_instances --root /tmp/isg_v2 \\
-        [--alias <alias> ...] [--template <template_id | dir> ...] [--delete-failed] [--no-render] \\
+        [--variant <variant> ...] [--template <template_id | dir> ...] [--delete-failed] [--no-render] \\
         [--fresh-process-per-instance] [--settle-steps 60] [--no-program-check] [--no-goal]
     OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.validate_instances --out /tmp/isg_out      # v1 layout
 """
@@ -78,7 +78,7 @@ SIDECAR_SUFFIX = ".oracle.json"
 SUMMARY_SUFFIX = ".summary.json"
 VALIDATION_DIR = "validation"
 REPORT_SCHEMA = "isg-validation-v1"
-#: directories under ``<root>`` / ``<root>/<alias>`` that are not aliases / templates
+#: directories under ``<root>`` / ``<root>/<variant>`` that are not variants / templates
 NON_TEMPLATE_DIRS = {"renders", "scene_variants", "validation", "activity_definitions", "runs", "instances"}
 
 #: §3.5 reload tolerances: the fresh process must reproduce the stored state within these
@@ -120,8 +120,11 @@ def pose_deviation(p0, q0, p1, q1) -> Tuple[float, float]:
 
 
 def _read_json(path: str) -> Dict[str, Any]:
+    from ispatialgym.oracle.sidecar import from_legacy_keys
+
     with open(path) as f:
-        return json.load(f)
+        data = json.load(f)
+    return from_legacy_keys(data) if isinstance(data, dict) else data
 
 
 def _write_json(path: str, data: Any) -> None:
@@ -180,9 +183,9 @@ def detect_layout(template_dir: str) -> str:
     return "v1"
 
 
-def discover_templates(root: str, aliases: Optional[Sequence[str]] = None, templates: Optional[Sequence[str]] = None) -> List[str]:
-    """Template directories under ``root`` (``<root>/<alias | problem>/<template_id>/template_meta.json``), filtered by
-    alias / problem directory name and by template id; a ``--template`` entry that is itself a template directory
+def discover_templates(root: str, variants: Optional[Sequence[str]] = None, templates: Optional[Sequence[str]] = None) -> List[str]:
+    """Template directories under ``root`` (``<root>/<variant | problem>/<template_id>/template_meta.json``), filtered by
+    variant / problem directory name and by template id; a ``--template`` entry that is itself a template directory
     (contains ``template_meta.json``) is taken as is."""
     out: List[str] = []
     for t in templates or []:
@@ -191,11 +194,11 @@ def discover_templates(root: str, aliases: Optional[Sequence[str]] = None, templ
     wanted_ids = {os.path.basename(os.path.normpath(t)) for t in (templates or []) if os.path.abspath(t) not in out}
     if not os.path.isdir(root):
         return out
-    for alias_dir in sorted(glob.glob(os.path.join(root, "*"))):
-        alias = os.path.basename(alias_dir)
-        if not os.path.isdir(alias_dir) or alias in NON_TEMPLATE_DIRS or (aliases and alias not in aliases):
+    for variant_dir in sorted(glob.glob(os.path.join(root, "*"))):
+        variant = os.path.basename(variant_dir)
+        if not os.path.isdir(variant_dir) or variant in NON_TEMPLATE_DIRS or (variants and variant not in variants):
             continue
-        for tdir in sorted(glob.glob(os.path.join(alias_dir, "*"))):
+        for tdir in sorted(glob.glob(os.path.join(variant_dir, "*"))):
             tid = os.path.basename(tdir)
             if not os.path.isdir(tdir) or tid in NON_TEMPLATE_DIRS or not os.path.exists(os.path.join(tdir, "template_meta.json")):
                 continue
@@ -207,13 +210,13 @@ def discover_templates(root: str, aliases: Optional[Sequence[str]] = None, templ
 
 
 def template_identity(template_dir: str, meta: Mapping[str, Any]) -> Dict[str, Any]:
-    """Alias / template id / problem / subtask / scene of a template (v2 ``template_meta.json`` keys, v1 fallbacks)."""
+    """Variant / template id / problem / subtask / scene of a template (v2 ``template_meta.json`` keys, v1 fallbacks)."""
     tdir = os.path.normpath(os.path.abspath(template_dir))
-    alias = meta.get("alias") or os.path.basename(os.path.dirname(tdir))
+    variant = meta.get("variant") or os.path.basename(os.path.dirname(tdir))
     return {
         "template": tdir,
         "template_id": meta.get("template_id") or os.path.basename(tdir),
-        "alias": alias,
+        "variant": variant,
         "problem": meta.get("problem"),
         "subtask": meta.get("subtask"),
         "scene": meta.get("scene"),
@@ -584,7 +587,7 @@ def delete_failed_instances(template_dir: str, iids: Iterable[str]) -> List[str]
 
 def summary_line(report: Mapping[str, Any]) -> str:
     fails = {iid: (r.get("failures") or [r.get("error", "error")])[:3] for iid, r in report.get("instances", {}).items() if r.get("status") != "ok"}
-    body = {"alias": report.get("alias"), "template_id": report.get("template_id"), "n_instances": report.get("n_instances", 0), "n_ok": report.get("n_ok", 0),
+    body = {"variant": report.get("variant"), "template_id": report.get("template_id"), "n_instances": report.get("n_instances", 0), "n_ok": report.get("n_ok", 0),
             "reload_failed": report.get("reload_failed", 0), "n_error": report.get("n_error", 0), "deleted": len(report.get("deleted") or []),
             "time_s": report.get("time_s"), "fails": fails}
     if report.get("error"):
@@ -603,14 +606,14 @@ def check_sidecar(sidecar_path: str, tro_path: str) -> Tuple[Dict[str, Any], Opt
     from ispatialgym.oracle.sidecar import Sidecar, SidecarError
 
     rec: Dict[str, Any] = {"path": os.path.basename(sidecar_path), "loaded": False, "valid": False, "tro_sha256_ok": False, "problems": [],
-                           "subtask": None, "alias": None, "ok": False}
+                           "subtask": None, "variant": None, "ok": False}
     try:
         sc = Sidecar.load(sidecar_path)
     except SidecarError as e:
         rec["problems"].append(str(e))
         return rec, None
     rec["loaded"] = True
-    rec["alias"] = sc.alias
+    rec["variant"] = sc.variant
     try:
         rec["subtask"] = sc.subtask
     except SidecarError as e:
@@ -635,8 +638,8 @@ class LoadedSidecar(SidecarDraft):
     (``stance()``, ``grasp_of()``, ``stances``, ``transitions``) rebuilt from the file, ``to_dict()`` = the written dict
     itself (no lossy re-serialisation: the program is expanded from exactly what the sampler wrote)."""
 
-    def __init__(self, alias: str, task_family: str, instance_id: str, raw: Mapping[str, Any]):
-        super().__init__(alias, task_family, instance_id)
+    def __init__(self, variant: str, task_family: str, instance_id: str, raw: Mapping[str, Any]):
+        super().__init__(variant, task_family, instance_id)
         self.raw: Dict[str, Any] = dict(raw)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -646,7 +649,7 @@ class LoadedSidecar(SidecarDraft):
 def draft_from_sidecar(d: Mapping[str, Any]) -> LoadedSidecar:
     """:class:`LoadedSidecar` from a written sidecar dict, so that the §3.5 program check runs on a written instance
     exactly as it ran in the sampler."""
-    sd = LoadedSidecar(d["alias"], d.get("task_family", ""), d.get("instance_id", "draft"), d)
+    sd = LoadedSidecar(d["variant"], d.get("task_family", ""), d.get("instance_id", "draft"), d)
     sd.path_bucket_m = d.get("path_bucket_m")
     sd.tro_sha256 = d.get("tro_sha256")
     for name, st in (d.get("stances") or {}).items():
@@ -682,7 +685,7 @@ def draft_from_sidecar(d: Mapping[str, Any]) -> LoadedSidecar:
 
 
 class _GenerationView:
-    """``sampler.gp`` for the program check: ``gen(key, default)`` over the alias's customs ``generation`` (its per-problem
+    """``sampler.gp`` for the program check: ``gen(key, default)`` over the variant's customs ``generation`` (its per-problem
     witness-residual overrides), as ``GroundedProblem.gen``."""
 
     def __init__(self, generation: Optional[Mapping[str, Any]] = None):
@@ -692,12 +695,12 @@ class _GenerationView:
         return self.generation.get(key, default)
 
 
-def customs_generation(alias: Optional[str]) -> Dict[str, Any]:
-    """The ``generation`` of ``alias`` in the tree's customs list (empty when the alias or the file is missing)."""
+def customs_generation(subtask: Optional[str]) -> Dict[str, Any]:
+    """The ``generation`` of ``subtask`` in the tree's customs list (empty when the subtask or the file is missing)."""
     from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH
 
     try:
-        return dict((_read_json(DEFAULT_CUSTOMS_PATH).get(alias or "") or {}).get("generation") or {})
+        return dict((_read_json(DEFAULT_CUSTOMS_PATH).get(subtask or "") or {}).get("generation") or {})
     except (OSError, json.JSONDecodeError):
         return {}
 
@@ -705,7 +708,7 @@ def customs_generation(alias: Optional[str]) -> Dict[str, Any]:
 class ValidationSampler:
     """What ``program_check.run`` needs from "the sampler" (its docstring): ``ikc`` (``IKChecker``), ``kit``
     (``RobotKit``), ``objects`` (bddl instance -> sim object), ``support_objects()`` / ``grasp_ignore_objects()``,
-    ``subtask`` and ``gp.gen`` (the alias's generation), over the evaluator's loaded instance."""
+    ``subtask`` and ``gp.gen`` (the variant's generation), over the evaluator's loaded instance."""
 
     def __init__(self, kit, ikc, objects: Mapping[str, Any], supports: Sequence[Any], subtask: str, generation: Optional[Mapping[str, Any]] = None):
         self.kit = kit
@@ -722,7 +725,7 @@ class ValidationSampler:
         return []
 
 
-def run_program_check(alias: str, draft, sampler, subtask: str) -> Dict[str, Any]:
+def run_program_check(variant: str, draft, sampler, subtask: str) -> Dict[str, Any]:
     """The §3.5 program check on a written instance through ``ispatialgym.sampling.v2.program_check.run`` (the same
     call the sampler makes): ``{"ok", "mode", "actions": [{"name", "stance", "carried", "n_poses"}], "failed_action",
     "reason", "time_s"}``. A ``Reject("program_check_failed", action=<name>)`` becomes ``ok = False`` with the action
@@ -732,7 +735,7 @@ def run_program_check(alias: str, draft, sampler, subtask: str) -> Dict[str, Any
     t0 = time.time()
     out: Dict[str, Any] = {"ok": False, "mode": None, "actions": [], "failed_action": None, "reason": None, "time_s": None}
     try:
-        rep = PC.run(alias, draft, sampler, subtask=subtask)
+        rep = PC.run(variant, draft, sampler, subtask=subtask)
         out.update({"ok": True, "mode": rep.get("mode"), "actions": list(rep.get("actions") or []), "blocks": rep.get("blocks")})
     except Exception as e:  # noqa: BLE001  (``sim_utils.Reject`` needs the simulator stack: duck-typed on ``reason``)
         details = getattr(e, "details", None) or {}
@@ -1102,7 +1105,7 @@ def _program_arms(sidecar_dicts: Iterable[Mapping[str, Any]]) -> List[str]:
     arms = set()
     for d in sidecar_dicts:
         try:
-            for a in expand(d["alias"], Sidecar.from_dict(d)):
+            for a in expand(d["variant"], Sidecar.from_dict(d)):
                 arms.update(a.arms)
         except Exception:  # noqa: BLE001
             continue
@@ -1145,9 +1148,9 @@ def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] =
                 pass
     if not report.get("subtask") and sidecar_dicts:  # a v1 template_meta with v2 sidecars: the subtask comes from the sidecar
         try:
-            from ispatialgym.oracle.sidecar import subtask_of_alias
+            from ispatialgym.oracle.sidecar import subtask_of_variant
 
-            report["subtask"] = subtask_of_alias(sidecar_dicts[0]["alias"])
+            report["subtask"] = subtask_of_variant(sidecar_dicts[0]["variant"])
         except Exception:  # noqa: BLE001
             pass
     env = cfg = None
@@ -1221,8 +1224,8 @@ def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] =
                 rec["failures"].append(f"no sidecar {inst.iid}{SIDECAR_SUFFIX}")
             # -- program check (§3.5) ------------------------------------------------------------------------------
             if program_check and sc_dict is not None and rec["checks"]["sidecar"].get("loaded"):
-                alias = sc_dict.get("alias") or meta.get("alias")
-                subtask = rec["checks"]["sidecar"].get("subtask") or meta.get("subtask") or alias
+                variant = sc_dict.get("variant") or meta.get("variant")
+                subtask = rec["checks"]["sidecar"].get("subtask") or meta.get("subtask") or variant
                 rooms = list((tro.meta.scene or {}).get("task_rooms") or meta.get("task_rooms") or meta.get("rooms") or [])
                 objects = {k: v for k, v in physical.items() if k != AGENT_INSTANCE and v is not robot}
                 if kit is None:
@@ -1231,8 +1234,10 @@ def validate_template_v2(template_dir: str, instances: Optional[Sequence[str]] =
                     report["loader"]["planner_build_s"] = round(time.time() - t0, 1)
                 else:
                     kit.sync_world()
-                sampler = ValidationSampler(kit, ikc, objects, [objects[s] for s in supports if s in objects], subtask, customs_generation(alias))
-                pc = run_program_check(alias, draft_from_sidecar(sc_dict), sampler, subtask)
+                from ispatialgym.eval.names import subtask_name
+
+                sampler = ValidationSampler(kit, ikc, objects, [objects[s] for s in supports if s in objects], subtask, customs_generation(subtask_name(variant)))
+                pc = run_program_check(variant, draft_from_sidecar(sc_dict), sampler, subtask)
                 rec["checks"]["program_check"] = pc
                 if not pc["ok"]:
                     rec["failures"].append(f"program check failed at {pc['failed_action']}: {pc['reason']}")
@@ -1643,11 +1648,11 @@ def _worker_main(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=None, help="v2 output root (<root>/<alias>/<template_id>/...)")
+    parser.add_argument("--root", default=None, help="v2 output root (<root>/<variant>/<template_id>/...)")
     parser.add_argument("--out", default=None, help="v1 sampler output directory (<out>/<problem>/<template>/...); same as --root for the v1 layout")
-    parser.add_argument("--alias", action="append", default=None, help="restrict to these aliases (v2) / problem directories (v1); repeatable")
+    parser.add_argument("--variant", action="append", default=None, help="restrict to these variants (v2) / problem directories (v1); repeatable")
     parser.add_argument("--template", action="append", default=None, help="restrict to these template ids or template directories; repeatable")
-    parser.add_argument("--problem", action="append", default=None, help="(v1) problem directories; alias of --alias")
+    parser.add_argument("--problem", action="append", default=None, help="(v1) problem directories; same as --variant")
     parser.add_argument("--delete-failed", action="store_true", help="delete the instances that failed the reload (counted as reload_failed)")
     parser.add_argument("--no-render", action="store_true", help="no contact sheets")
     parser.add_argument("--no-goal", action="store_true", help="skip the goal materialisation (teleport) and the goal view")
@@ -1677,8 +1682,8 @@ def main(argv=None):
     root = args.root or args.out
     if not root:
         raise SystemExit("--root (v2) or --out (v1) is required")
-    aliases = list(args.alias or []) + list(args.problem or []) or None
-    templates = discover_templates(root, aliases, args.template)
+    variants = list(args.variant or []) + list(args.problem or []) or None
+    templates = discover_templates(root, variants, args.template)
     v2 = [t for t in templates if detect_layout(t) == "v2"]
     v1 = [t for t in templates if t not in v2]
     log.info("%d templates under %s (%d v2, %d v1)", len(templates), root, len(v2), len(v1))

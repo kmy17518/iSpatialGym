@@ -1,1 +1,0 @@
-{"key": "bag_of_cookies__ikivgk", "category": "bag_of_cookies", "model": "ikivgk", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.06304735146252971, "p95": 0.16732026143790849, "p99": 0.2261437908496732, "mad_union": 0.06607244922461092, "iou": 0.9924824803567637, "worst": "x180"}}, "render_s": 0.113}

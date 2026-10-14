@@ -1,5 +1,4 @@
 {
- "batch": "wave7_lidpbmsjis065 (2026-10-12, lid065 grasp worker on strips/lid__pbmsji__s065.png (rows 1-5) and the six grasps' V1 / V2 / V3 / wrist frames with 3x pad crops and 4x knob crops (scratch_lid065/review_crops, review_crops_x5), review_prompt.md, not the reviewer pool; frames = the oracle's closure held under gravity)",
  "models": [
   {
    "key": "lid__pbmsji__s065",

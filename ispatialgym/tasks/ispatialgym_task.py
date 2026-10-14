@@ -262,7 +262,7 @@ class ISpatialGymTask(BehaviorTask):
         self.activity_definition_id = int(activity_definition_id)
         self.problem = load_problem(activity_name, activity_definition_id, root=self.activity_definitions_root)
         self.compiled_task = self.problem.compile()
-        self.task_variant = self.problem.alias
+        self.task_variant = self.problem.variant
         self.groups = {g: list(members) for g, members in self.problem.groups.items()}
 
         # Scope: agent first, then declared instances, then the nonphysical group entities.

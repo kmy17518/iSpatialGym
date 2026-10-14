@@ -98,7 +98,7 @@ class _Target:
 
 def _sampler(relation="touching", tremble=(None,), gen=None, **extra):
     s = IS.IORSSmall.__new__(IS.IORSSmall)
-    s.relation, s.gp, s.spec = relation, SimpleNamespace(alias="a"), SimpleNamespace(generation=dict(gen or {}))
+    s.relation, s.gp, s.spec = relation, SimpleNamespace(variant="a"), SimpleNamespace(generation=dict(gen or {}))
     s.hull, s.rest = {"target": _box(0.06, 0.10, 0.25)}, {"target": C.IDENTITY_QUAT.clone()}
     s.top, s.world, s.shelf_start = _top(), _World(tremble), None
     s.template_meta, s.template_facts = {}, {}

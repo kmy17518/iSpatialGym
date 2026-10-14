@@ -1,6 +1,0 @@
-configuration_matching-attachment#01: attachment partner candle_holder/wiufnv needs the attach-reach band (every attachment pose reachable, spec 4.6 step 2) - not a reach_bands mode; the target's band is computed
-configuration_matching-attachment#02: attachment partner vinegar_bottle/hbsbwt needs the attach-reach band (every attachment pose reachable, spec 4.6 step 2) - not a reach_bands mode; the target's band is computed
-configuration_matching-attachment#03: attachment partner table_lamp/ehjsdz needs the attach-reach band (every attachment pose reachable, spec 4.6 step 2) - not a reach_bands mode; the target's band is computed
-configuration_matching-attachment#04: attachment partner skateboard_deck/tgfidu needs the attach-reach band (every attachment pose reachable, spec 4.6 step 2) - not a reach_bands mode; the target's band is computed
-configuration_matching-attachment#05: attachment partner teapot/mvrhya needs the attach-reach band (every attachment pose reachable, spec 4.6 step 2) - not a reach_bands mode; the target's band is computed
-configuration_matching-attachment#06: attachment partner lemonade_bottle/yprkek needs the attach-reach band (every attachment pose reachable, spec 4.6 step 2) - not a reach_bands mode; the target's band is computed

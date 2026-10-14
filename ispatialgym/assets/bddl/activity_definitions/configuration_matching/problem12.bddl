@@ -1,8 +1,8 @@
 (define (problem configuration_matching-12)
     (:domain ispatialgym)
-    (:alias configuration_matching-attachment-lid-teapot-coffee_table)
+    (:variant configuration_matching-attachment-lid-stockpot-desk)
 
-    ; ground_isg 2.0.0: configuration_matching-attachment-lid-teapot-coffee_table (configuration_matching/attachment.iddl; configuration_matching-attachment#01~T5/representative)
+    ; ground_isg 2.0.0: configuration_matching-attachment-lid-stockpot-desk (configuration_matching/attachment.iddl; configuration_matching-attachment#04~T5/representative)
     ; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced
     ; by the other gripper while attaching). The assembly group carries the fixed member-to-slot layout target; the
     ; partner's pose stays as at init. Male / female pairs with matching BEHAVIOR attachment meta-links come from
@@ -10,26 +10,26 @@
 
     (:objects
         lid.n.02_1 - lid.n.02
-        teapot.n.01_1 - teapot.n.01
-        coffee_table.n.01_1 - coffee_table.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        desk.n.01_1 - desk.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:groups
-        lid.n.02_1 teapot.n.01_1 - assembly_group.n.01_1
+        lid.n.02_1 stockpot.n.01_1 - assembly_group.n.01_1
     )
 
     (:init
-        (ontop assembly_group.n.01_1 coffee_table.n.01_1)
-        (not (attached lid.n.02_1 teapot.n.01_1))
+        (ontop assembly_group.n.01_1 desk.n.01_1)
+        (not (attached lid.n.02_1 stockpot.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (attached ?lid.n.02_1 ?teapot.n.01_1)
-            (ontop ?teapot.n.01_1 ?coffee_table.n.01_1)
+            (attached ?lid.n.02_1 ?stockpot.n.01_1)
+            (ontop ?stockpot.n.01_1 ?desk.n.01_1)
             (layout_reached ?assembly_group.n.01_1)
             (not (grasped ?agent.n.01_1 ?assembly_group.n.01_1))
             (pose_settled ?assembly_group.n.01_1)

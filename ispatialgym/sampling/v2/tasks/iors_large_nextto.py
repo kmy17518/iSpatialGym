@@ -118,7 +118,7 @@ DEFAULTS: Dict[str, Any] = {
 
 
 def knob(s, key: str) -> Any:
-    """``generation.<key>`` of the alias, else :data:`DEFAULTS`."""
+    """``generation.<key>`` of the variant, else :data:`DEFAULTS`."""
     v = s.gp.gen(key) if s is not None else None
     return DEFAULTS[key] if v is None else v
 
@@ -395,7 +395,7 @@ def translated_pose(pose: G.Pose, delta) -> G.Pose:
 
 def prepare(s) -> None:
     """The target's geometry (root-frame hull, local box, collision pieces), the partner's sides and the obstacle boxes of the floor
-    the target slides on; no grasp library, no init surface: the target stands on the floor (the support role, when the alias has
+    the target slides on; no grasp library, no init surface: the target stands on the floor (the support role, when the variant has
     one, is the floor binding)."""
     tgt, partner = s.target, s.partner
     s.hull = s.world.local_hull(tgt)
@@ -403,7 +403,7 @@ def prepare(s) -> None:
     s.grasps, s.grasp_key = [], None
     s.floor_z = float(s.obj("floor").aabb[1][2])
     if s.hull is None or len(s.hull) == 0:
-        raise Reject("spec", f"{s.gp.alias}: the target has no collision points")
+        raise Reject("spec", f"{s.gp.variant}: the target has no collision points")
     lo, hi = s.hull.min(dim=0).values, s.hull.max(dim=0).values
     height = float(hi[2] - lo[2])
     plo, phi = (v.float() for v in partner.aabb)
@@ -415,7 +415,7 @@ def prepare(s) -> None:
                "local_lo": lo, "local_hi": hi, "pieces": s.world.local_collision_pieces(tgt), "partner_aabb": (plo, phi)}
     s.place["boxes"] = obstacle_boxes(s, height)
     if "support" in s.gp.scene_roles() and not s.bindings.has("support"):
-        s.alias_role("support", s.bindings.one("floor"))
+        s.variant_role("support", s.bindings.one("floor"))
     s.template_facts["nextto"] = {"target_box_local": [lo.tolist(), hi.tolist()], "target_height_m": round(height, 4), "partner": partner.name,
                                   "partner_aabb": [plo.tolist(), phi.tolist()], "sides": [e.to_json() for e in sides],
                                   "nextto_bound_at_yaw0_m": round(nextto_bound(*world_aabb(lo, hi, (0.0, 0.0), 0.0, s.floor_z), plo, phi), 4),
@@ -464,7 +464,7 @@ def nextto_now(s) -> Optional[bool]:
 
         return bool(PRED.evaluate_predicate(BP.NextTo, s.target, s.partner))
     except Exception as e:  # noqa: BLE001 - no verdict: the goal check decides
-        log.debug("%s: NextTo unreadable (%r)", s.gp.alias, e)
+        log.debug("%s: NextTo unreadable (%r)", s.gp.variant, e)
         return None
 
 
@@ -987,7 +987,7 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
     s.sidecar.describe(pname, s.partner.category.replace("_", " "), push_distance_cm=100.0 * float(dist))
     hands = f"{arm} arm" if second is None else f"{arm} + {second['arm']} arms {extras['hand_spacing_m']:.2f} m apart"
     log.info("%s: nextto push drawn: side %s angle %+.0f deg face %s, %.2f m from the goal (gap %.3f, bound %.3f, NextTo at the goal %s), push at %.2f m from "
-             "d %.2f lat %+.2f trunk %s pitch %.0f, %s", s.gp.alias, side.name, d.summary["nextto"]["push_angle_deg"], face, dist, gap, bound, nt, f["height"],
+             "d %.2f lat %+.2f trunk %s pitch %.0f, %s", s.gp.variant, side.name, d.summary["nextto"]["push_angle_deg"], face, dist, gap, bound, nt, f["height"],
              st.stand_off, st.lateral, (st.translate, st.tilt), chain["pitch_deg"], hands)
     return d
 

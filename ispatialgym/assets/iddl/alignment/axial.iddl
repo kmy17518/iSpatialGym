@@ -5,7 +5,7 @@
 ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 (define (iddl alignment-axial)
     (:family alignment)
-    (:alias alignment-axial-{target}-{support})
+    (:variant alignment-axial-{target}-{support})
     (:require
         (contacts target)
     )

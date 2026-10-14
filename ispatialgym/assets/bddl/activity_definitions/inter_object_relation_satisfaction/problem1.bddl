@@ -1,37 +1,38 @@
 (define (problem inter_object_relation_satisfaction-1)
     (:domain ispatialgym)
+    (:variant inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table)
 
-    (:alias under)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#01~T5/representative)
+    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
+    ; its init orientation; the partner stays where it was. Both poses measured.
 
     (:objects
-        apple.n.01_1 - apple.n.01
-        bowl.n.01_1 - bowl.n.01
-        table.n.02_1 - table.n.02
+        pack__of__kielbasa.n.01_1 - pack__of__kielbasa.n.01
+        platter.n.01_1 - platter.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop apple.n.01_1 table.n.02_1)
-        (ontop bowl.n.01_1 table.n.02_1)
+        (ontop pack__of__kielbasa.n.01_1 breakfast_table.n.01_1)
+        (ontop platter.n.01_1 breakfast_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
-    ; Binary success: the pictured relation holds and both objects are released.
     (:goal
         (and
-            (under ?apple.n.01_1 ?bowl.n.01_1)
-            (not (grasped ?agent.n.01_1 ?apple.n.01_1))
-            (not (grasped ?agent.n.01_1 ?bowl.n.01_1))
-            (pose_settled ?apple.n.01_1)
-            (pose_settled ?bowl.n.01_1)
+            (ontop ?pack__of__kielbasa.n.01_1 ?platter.n.01_1)
+            (not (grasped ?agent.n.01_1 ?pack__of__kielbasa.n.01_1))
+            (not (grasped ?agent.n.01_1 ?platter.n.01_1))
+            (pose_settled ?pack__of__kielbasa.n.01_1)
+            (pose_settled ?platter.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
-    ; Non-gating: the exact pictured poses (TRO pose_targets) are reported only.
     (:measure
-        (pose_reached ?apple.n.01_1)
-        (pose_reached ?bowl.n.01_1)
+        (pose_reached ?pack__of__kielbasa.n.01_1)
+        (pose_reached ?platter.n.01_1)
     )
 )

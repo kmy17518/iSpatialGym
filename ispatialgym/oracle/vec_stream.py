@@ -7,9 +7,9 @@ action holds, per environment, the action its stream produced this step, or - on
 stream no-op (its **last streamed action with the base stopped**) during the settle windows and after its verdict until the
 batch ends. Everything that decides an episode is per environment and reuses the single-env executor's rules unchanged:
 
-* the stream ends at the source's ``None`` (horizon / stop-on-success) or at that env's first QA verdict - ``stream_qa`` as
-  in ``ExecutorConfig``: ``off`` (default) = the timeout only, ``stop`` = every monitor, ``log`` = the verdicts are recorded
-  per env (``result.stream_qa``) and the stream goes on, a timeout still ends it;
+* the stream ends at the source's ``None`` (horizon / stop-on-success) or at that env's timeout; with ``qa=True`` every
+  environment logs the ``--qa`` metrics of a stream (``ispatialgym.oracle.qa.QA``, ``result.qa``; goal occlusion is not
+  measured here), as ``Executor.run_stream`` does;
 * the epilogue windows: ``max(settle_min_steps, ceil(settle_fraction * n_action_steps))``, then a second window of
   ``settle_second_window_factor`` x when the robot / a tracked object moved or the binary goal is lost at its end
   (``Executor._moved``), the lab's never-held rule (``never_held_window`` steps, no second window) when the goal never held
@@ -30,7 +30,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 import torch as th
 
 from ispatialgym.oracle.executor import Executor, ExecutorConfig, MotionSnapshot, _StreamAction, _hold_actions, _jsonable, _out_of_tolerance, _pose_reached_of, _unsatisfied
-from ispatialgym.oracle.qa import QAStats, Verdict
+from ispatialgym.oracle.qa import QA, QAStats, Verdict
 from ispatialgym.oracle.recorder import PHASE_ORACLE, PHASE_SETTLE
 
 ActionSource = Callable[[Any, Any], Optional[Any]]  # (obs, info) -> action | None
@@ -96,8 +96,9 @@ class Slot:
     #: ``Executor.release_check`` of this environment (facts only: the vectorized evaluator has no release verdict)
     release_check: Dict[str, Any] = field(default_factory=lambda: {"releases": [], "violations": []})
     _ag_last: Optional[Dict[str, Optional[str]]] = None
-    stream_qa: List[Dict[str, Any]] = field(default_factory=list)
-    _qa_log: bool = False
+    #: the environment's ``--qa`` metrics (``VecStreamExecutor(qa=True)``)
+    qa: Any = None
+    wall_clock_exceeded: bool = False
 
     @property
     def isg(self) -> Dict[str, Any]:
@@ -115,13 +116,11 @@ class VecStreamExecutor:
     infos``); ``sim`` provides ``current_time`` for the recorders (None: not recorded)."""
 
     def __init__(self, env, slots: List[Slot], sim=None, n_render_iterations: int = 1, num_envs: Optional[int] = None, idle_actions: Optional[Dict[int, th.Tensor]] = None,
-                 stream_qa: str = "off"):
+                 qa: bool = False):
         """``num_envs`` / ``idle_actions``: the batch may have environments without an episode (a partial last batch); their
-        rows of every step's action are ``idle_actions[env_idx]`` (a hold of that robot's joints). ``stream_qa``: off | stop | log
-        (module docstring)."""
-        if stream_qa not in ("off", "stop", "log"):
-            raise ValueError(f"stream_qa must be off, stop or log, got {stream_qa!r}")
-        self.stream_qa = stream_qa
+        rows of every step's action are ``idle_actions[env_idx]`` (a hold of that robot's joints). ``qa``: log the ``--qa``
+        metrics per environment (module docstring)."""
+        self.qa = bool(qa)
         self.env = env
         self.slots = list(slots)
         self.sim = sim
@@ -132,7 +131,12 @@ class VecStreamExecutor:
             if s.monitors is not None:
                 s.stats = s.monitors.stats
             s.rules = _Rules(s.cfg, s.task)
-            s._qa_log = stream_qa == "log"
+            if self.qa and s.qa is None:
+                s.qa = QA(s.robot, oracle=False, scene=getattr(s.robot, "scene", None),
+                          task_objects=[getattr(o, "name", n) for n, o in s.tracked.items() if o is not s.robot],
+                          contact_pairs=(lambda s=s: s.monitors._contact_pairs(s.n)) if s.monitors is not None else None,
+                          rules=s.monitors is not None,
+                          rule_limits=s.monitors.rule_limits() if s.monitors is not None and hasattr(s.monitors, "rule_limits") else None)
         self.steps = 0  # batch steps
         self.action_dim = int(getattr(self.slots[0].robot, "action_dim", 23)) if self.slots else 23
 
@@ -160,7 +164,7 @@ class VecStreamExecutor:
             s.last_obs, s.last_info = obs_list[s.idx], info_list[s.idx]
             s.t_stream0 = time.time()
             if s.monitors is not None:
-                s.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=s.held(), manipulation=False)
+                s.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=s.held(), manipulation=False, fov=False)
         while any(not s.done for s in self.slots):
             actions = th.zeros((self.num_envs, self.action_dim), dtype=th.float32)
             for i, a in self.idle_actions.items():
@@ -168,7 +172,8 @@ class VecStreamExecutor:
             phases: Dict[int, int] = {}
             for s in self.slots:
                 if s.stage == "stream":
-                    a = s.source(s.last_obs, s.last_info)
+                    s.wall_clock_exceeded = bool(s.cfg.max_wall_s) and time.time() - s.t_stream0 > s.cfg.max_wall_s
+                    a = None if s.wall_clock_exceeded else s.source(s.last_obs, s.last_info)
                     if a is None:
                         self._end_stream(s, None)
                     else:
@@ -199,6 +204,7 @@ class VecStreamExecutor:
                 phase = phases[s.idx]
                 s.n += 1
                 ag_after = Executor._ag_held(s)
+                n_violations = len(s.release_check["violations"])
                 Executor._check_releases(s, ag_before[s.idx], ag_after, actions[s.idx])
                 s._ag_last = ag_after
                 s.phase_steps[phase] = s.phase_steps.get(phase, 0) + 1
@@ -210,14 +216,19 @@ class VecStreamExecutor:
                         rew = 0.0
                     s.recorder.record(s.n, actions[s.idx], s.last_obs, s.last_info, state=None, phase=phase, action_index=0, attempt=0, reward=rew,
                                       terminated=bool(terminateds[s.idx]), truncated=bool(truncateds[s.idx]), sim_time=sim_time)
+                if s.qa is not None:
+                    s.qa.observe(s.n, actions[s.idx], acting=phase == PHASE_ORACLE, held=[n for n in ag_after.values() if n],
+                                 release_violations=s.release_check["violations"][n_violations:])
                 verdict = None
                 if s.monitors is not None:
-                    verdict = s.monitors.check_timeout_only(s.n) if self.stream_qa == "off" else s.monitors.check(s.n)
+                    verdict = s.monitors.check_timeout_only(s.n, settle=phase != PHASE_ORACLE)
+                    pop = getattr(s.monitors, "pop_logged", None)
+                    for v in (pop() if pop is not None else ()):
+                        if s.qa is not None:
+                            s.qa.note_rule(v)
                 if verdict is None and s.n >= s.cfg.max_steps:
                     verdict = Verdict("timeout", f"episode exceeded max_steps {s.cfg.max_steps}", step=s.n)
                     s.stats.record(verdict)
-                if verdict is not None and Executor._log_stream_verdict(s, verdict):
-                    verdict = None
                 if phase == PHASE_ORACLE:
                     if verdict is not None:
                         self._end_stream(s, verdict)
@@ -255,6 +266,8 @@ class VecStreamExecutor:
         else:
             s.window = max(int(s.cfg.settle_min_steps), int(math.ceil(s.cfg.settle_fraction * s.n_action_steps)))
             s._second_factor = float(s.cfg.settle_second_window_factor)
+        if s.verdict is None or s.verdict.category != "timeout":  # a window that runs stays inside the episode's step budget
+            s.window = min(s.window, max(0, s.cfg.max_steps - s.n - 1))
         s.before = MotionSnapshot(s.robot, s.tracked)
         s.windows = [s.window]
         s.rules._reset_predicate_branches()
@@ -276,8 +289,8 @@ class VecStreamExecutor:
         binary_final = bool(isg.get("binary_success", False))
         if s.stage == "settle1":
             s.motion = motion
-            if s.verdict is None and s.settle_verdict is None and (moved or not binary_final) and s._second_factor > 0:
-                window2 = int(math.ceil(s._second_factor * s.window))
+            window2 = min(int(math.ceil(s._second_factor * s.window)), s.cfg.max_steps - s.n - 1)
+            if s.cfg.settle_eval and s.verdict is None and s.settle_verdict is None and (moved or not binary_final) and window2 > 0:
                 s.motion_first = motion
                 s.before = MotionSnapshot(s.robot, s.tracked)
                 s.rules._reset_predicate_branches()
@@ -317,7 +330,11 @@ class VecStreamExecutor:
         if verdict is None and out_of_tol:
             verdict = Verdict("tolerance", "measured error above tolerance for " + ", ".join(out_of_tol), step=s.n, details={"targets": out_of_tol})
             s.stats.record(verdict)
-        if verdict is None and (moved or not binary_final or (s.cfg.require_task_settled and not settled_task)):
+        if verdict is None and not s.cfg.settle_eval and not binary_final:
+            verdict = Verdict("not_reached", "the binary goal does not hold at the end of the settle window; unsatisfied: " + ", ".join(_unsatisfied(isg)),
+                              step=s.n)
+            s.stats.record(verdict)
+        if verdict is None and s.cfg.settle_eval and (moved or not binary_final or (s.cfg.require_task_settled and not settled_task)):
             if moved:
                 msg = "robot / object motion after the final no-op window"
             elif not binary_final:
@@ -327,6 +344,8 @@ class VecStreamExecutor:
             verdict = Verdict("not_settled", msg, step=s.n, details={"motion": motion, "task_settled_success": settled_task})
             s.stats.record(verdict)
         s.timings["settle_s"] = time.time() - s.t_settle0
+        if s.qa is not None:
+            s.qa.finish(step=s.n)
         s.verdict = verdict
         errors = isg.get("final_errors") or isg.get("errors") or {}
         last_errors = isg.get("errors") or {}
@@ -340,8 +359,9 @@ class VecStreamExecutor:
             "binary_branch_fallback": sorted(k for k, v in binary_branch.items() if v not in ("omnigibson",)),
             "binary_branch_log": branch_log,
             "support_disturbance": {},
-            "articulated_root": {},
             "settled_success": settled_task,
+            "settle_eval": bool(s.cfg.settle_eval),
+            "wall_clock_exceeded": bool(s.wall_clock_exceeded),
             "pose_settled_config": isg.get("pose_settled_config"),
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
             "first_success_step": isg.get("first_success_step"),
@@ -362,17 +382,15 @@ class VecStreamExecutor:
             "jams": [],
             "witness_branch_accepted": [],
             "protection": {"protected": [], "plan_checks": 0, "fired": list(getattr(s.monitors, "protect_events", []) or [])},
-            "demo_gating": {"enabled": []},
+            "placed_orientation": None,
             "motion_delta": motion,
             "actions": [],
-            "qa": s.monitors.report() if s.monitors is not None else {"stats": s.stats.to_dict()},
+            "monitors": s.monitors.report() if s.monitors is not None else {"stats": s.stats.to_dict()},
+            "qa": s.qa.report() if s.qa is not None else {"enabled": False},
             "checkpoint_reports": [],
             "brace_retry": _jsonable([]),
             "goal_observation": None,
-            "goal_occlusion": None,
-            "torso_load": None,
             "witness_via_posture": [],
-            "stream_qa": _jsonable(s.stream_qa) if s._qa_log else None,
             "release_check": _jsonable(s.release_check),
             "timings": dict(s.timings),
             "env_idx": s.idx,

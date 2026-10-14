@@ -1,6 +1,0 @@
-{"key": "recycling_bin__mdojox", "joint": "j_link_2", "feasible": false,
- "proposal": {"face": "bottom_edge", "a": 0.5, "b": 0.0, "pinch": "thickness", "approach": "front", "depth_mm": 30,
-              "expected_motion": "lift"},
- "alternative": null,
- "note": "Lid skirt sits flush on the body's flared rim; front edge has no lip or undercut, top is flat, hinge bar belongs to the body.",
- "confidence": "medium"}

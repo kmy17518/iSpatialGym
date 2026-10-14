@@ -1,1 +1,0 @@
-{"key": "carving_knife__zaihmr", "category": "carving_knife", "model": "zaihmr", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x6": {"mad": 0.004469041640783993, "p95": 0.011764705882352941, "p99": 0.11372549019607843, "mad_union": 0.3175921776329191, "iou": 0.6310042778569973, "worst": "x60"}}, "render_s": 0.288}

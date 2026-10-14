@@ -151,7 +151,7 @@ def _sampler():
     s.choice = SimpleNamespace(models={"target": SimpleNamespace(category="apple", model="x", scale=None)})
     s.world = SimpleNamespace(scene_model="s_large")
     s.grasp_key = "apple__x__t"
-    s.gp = SimpleNamespace(alias="ispatialgym-test-large")
+    s.gp = SimpleNamespace(variant="ispatialgym-test-large")
     s.template_facts = {}
     return s
 

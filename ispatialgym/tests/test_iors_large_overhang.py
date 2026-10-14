@@ -173,7 +173,7 @@ def test_settle_facts_and_verdict():
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = f"{SUBTASK}-plate-drop_in_sink-countertop", dict(gen)
+        self.variant, self.generation = f"{SUBTASK}-plate-drop_in_sink-countertop", dict(gen)
         self.roles = {"target": SimpleNamespace(equivalence_tags=lambda cat, model: ["zinf"])}
 
     def gen(self, key, default=None):
@@ -555,7 +555,7 @@ def _sidecar_with_pick_push(**over):
 def test_program_pushes_retreats_then_grasps():
     sc = Sidecar.from_dict(_sidecar_with_pick_push())
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == ["transition", "push", "retreat", "grasp", "lift", "navigate", "transition", "place", "retreat"]
     push, retreat = actions[1], actions[2]
     assert push.kind == "pick_overhang" and push.touches == ("countertop.n.01_1",) and push.contact.distance_m == pytest.approx(0.06)
@@ -564,11 +564,11 @@ def test_program_pushes_retreats_then_grasps():
     assert fine == "push the plate on the counter along the countertop until it overhangs the edge, with the open right hand" and "6.0 cm backward" in numbers and "overhangs the edge by 2.5 cm" in numbers
     for bad, match in (({"arm": "left"}, "arm"), ({"object": "bowl.n.01_1"}, "object"), ({"kind": "push"}, "kind")):
         with pytest.raises(SidecarError, match=match):
-            expand(sc.alias, Sidecar.from_dict(_sidecar_with_pick_push(**bad)))
+            expand(sc.variant, Sidecar.from_dict(_sidecar_with_pick_push(**bad)))
     # without the record: today's program
     d = _sidecar_with_pick_push()
     d.pop("contacts")
-    assert [a.name for a in expand(sc.alias, Sidecar.from_dict(d))][:3] == ["transition", "grasp", "lift"]
+    assert [a.name for a in expand(sc.variant, Sidecar.from_dict(d))][:3] == ["transition", "grasp", "lift"]
 
 
 def test_program_of_the_two_stance_overhang_pick():
@@ -584,17 +584,17 @@ def test_program_of_the_two_stance_overhang_pick():
             rec["from"] = "pick"
     sc = Sidecar.from_dict(d)
     assert sc.problems() == []
-    actions = expand(sc.alias, sc)
+    actions = expand(sc.variant, sc)
     assert [a.name for a in actions] == ["transition", "push", "retreat", "transition", "grasp", "lift", "navigate", "transition", "place", "retreat"]
     assert (actions[3].transition.frm, actions[3].transition.to) == ("manipulation", "pick") and actions[6].path.frm == "pick"
     d["paths"][0]["from"] = "manipulation"  # the carry must leave from the grasp stance
     with pytest.raises(SidecarError, match="'pick'"):
-        expand(sc.alias, Sidecar.from_dict(d))
+        expand(sc.variant, Sidecar.from_dict(d))
 
 
 def test_grasp_after_the_push_is_taken_at_the_recorded_yaw():
     sc = Sidecar.from_dict(_sidecar_with_pick_push())
-    grasp = next(a for a in expand(sc.alias, sc) if a.name == "grasp")
+    grasp = next(a for a in expand(sc.variant, sc) if a.name == "grasp")
 
     class _State:
         def __init__(self, yaw):
@@ -610,7 +610,7 @@ def test_grasp_after_the_push_is_taken_at_the_recorded_yaw():
     d = _sidecar_with_pick_push()
     d["grasps"][0]["pick_overhang"]["yaw_free"] = False
     sc2 = Sidecar.from_dict(d)
-    grasp2 = next(a for a in expand(sc2.alias, sc2) if a.name == "grasp")
+    grasp2 = next(a for a in expand(sc2.variant, sc2) if a.name == "grasp")
     plain = C.grasp_pose_from_transform((th.tensor([13.9, 0.37, 0.913]), C.quat_from_yaw(rec_yaw + 0.3)), (G5_POS, G5_QUAT))
     assert float(th.linalg.norm(th.tensor(grasp2.targets(sc2, _State(rec_yaw + 0.3))["grasp"].position) - plain[0])) < 1e-5
     # no support lift for the overhang grasp
@@ -624,7 +624,7 @@ def test_program_check_advances_the_plate_to_the_pushed_pose():
     from ispatialgym.sampling.v2 import program_check as PC
 
     sc = Sidecar.from_dict(_sidecar_with_pick_push())
-    push = next(a for a in expand(sc.alias, sc) if a.name == "push")
+    push = next(a for a in expand(sc.variant, sc) if a.name == "push")
 
     class _Obj:
         def __init__(self):

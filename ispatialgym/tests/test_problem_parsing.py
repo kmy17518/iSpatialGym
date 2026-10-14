@@ -1,5 +1,5 @@
 """Parsing, validation, group expansion and compilation of the shipped iSpatialGym problem files (no simulator);
-the ``alignment`` activity with its retired name ``world_alignment``; the ``problems.json`` alias registry; and the
+the ``alignment`` activity with its retired name ``world_alignment``; the ``problems.json`` variant registry; and the
 v2 problem shapes of ``docs/task_bddl_formats.md``."""
 
 import json
@@ -9,27 +9,32 @@ import tempfile
 import pytest
 
 from ispatialgym.activity import (
-    ALIAS_RE,
+    VARIANT_RE,
     LEGACY_ACTIVITIES,
     ISGProblemError,
     activity_dir,
-    alias_of,
+    variant_of,
     canonical_activity,
     collect_predicate_args,
-    id_of_alias,
+    id_of_variant,
     list_activities,
     list_problem_ids,
     load_problem,
     load_problem_registry,
-    problem_aliases,
+    problem_variants,
     problem_path,
     problem_registry_path,
     same_activity,
     validate_problem_registry,
 )
+from ispatialgym import ASSETS_ROOT
 from ispatialgym.activity.problem import parse_problem_file, parse_problem_string
 
-# Expected structure per problem: (alias, binary-success predicates, pose_settled args, gating pose_reached args,
+#: the problems EXPECTED describes (the v1 templates and the first grounded picks); the shipped tree holds the eval
+#: release's problems only
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bddl")
+
+# Expected structure per problem: (variant, binary-success predicates, pose_settled args, gating pose_reached args,
 # gating layout_reached args, non-gating (:measure) pose_reached args). Binary predicates are the multiset of
 # predicate tokens of the expanded binary goal.
 EXPECTED = {
@@ -120,10 +125,12 @@ def _shipped_problems():
 
 
 def test_all_shipped_problems_are_listed():
-    """Every structural template has an entry in EXPECTED; the retired directory name is gone. Problems that the
-    v2 grounding (``ground_isg``) adds next to the templates are covered by ``test_every_shipped_problem_compiles``."""
-    found = set(_shipped_problems())
-    assert set(EXPECTED) <= found
+    """The shipped problems are those of the eval release's subtasks (``isg_customs.json``: iddl family + definition id);
+    the retired directory name is gone."""
+    with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
+        customs = json.load(f)
+    expected = {(e["iddl"].split("/")[0], int(e["definition_id"])) for k, e in customs.items() if not k.startswith("_")}
+    assert set(_shipped_problems()) == expected
     assert "world_alignment" not in list_activities()
     assert "alignment" in list_activities()
 
@@ -132,22 +139,22 @@ def test_all_shipped_problems_are_listed():
 def test_every_shipped_problem_compiles(activity, definition_id):
     problem = load_problem(activity, definition_id)
     assert problem.name == f"{activity}-{definition_id}"
-    assert problem.alias is None or ALIAS_RE.match(problem.alias)
+    assert problem.variant is None or VARIANT_RE.match(problem.variant)
     compiled = problem.compile()
     assert compiled.binary_goal_head_idxs
-    assert alias_of(activity, definition_id) == problem.alias
-    # one alias = one BDDL in v2; the v1 articulation templates (open / close) still share ``articulation``
-    if problem.alias is not None and list(problem_aliases(activity).values()).count(problem.alias) == 1:
-        assert id_of_alias(activity, problem.alias) == definition_id
+    assert variant_of(activity, definition_id) == problem.variant
+    # one variant = one BDDL in v2; the v1 articulation templates (open / close) still share ``articulation``
+    if problem.variant is not None and list(problem_variants(activity).values()).count(problem.variant) == 1:
+        assert id_of_variant(activity, problem.variant) == definition_id
 
 
 @pytest.mark.parametrize("activity,definition_id", sorted(EXPECTED))
 def test_shipped_problem_structure(activity, definition_id):
-    alias, binary, settled, pose_reached, layout_reached, measured = EXPECTED[(activity, definition_id)]
-    problem = load_problem(activity, definition_id)
+    variant, binary, settled, pose_reached, layout_reached, measured = EXPECTED[(activity, definition_id)]
+    problem = load_problem(activity, definition_id, root=FIXTURES)
     compiled = problem.compile()
     assert problem.name == f"{activity}-{definition_id}"
-    assert problem.alias == alias
+    assert problem.variant == variant
     assert sorted(_binary_tokens(problem)) == sorted(binary)
     assert compiled.pose_settled_insts == settled
     assert compiled.pose_reached_args == pose_reached
@@ -175,12 +182,12 @@ def test_shipped_problem_structure(activity, definition_id):
 
 @pytest.mark.parametrize("activity,definition_id", sorted(EXPECTED))
 def test_expanded_bddl_round_trips(activity, definition_id):
-    problem = load_problem(activity, definition_id)
+    problem = load_problem(activity, definition_id, root=FIXTURES)
     again = parse_problem_string(problem.expanded_bddl(), activity, definition_id)
     assert again.goal == problem.goal
     assert again.init == problem.init
     assert again.groups == problem.groups
-    assert again.alias == problem.alias
+    assert again.variant == problem.variant
     assert again.measure == problem.measure
 
 
@@ -188,7 +195,7 @@ def test_expanded_bddl_is_stock_compatible():
     """The expanded text compiles with the stock bddl pipeline (unknown sections are ignored by parse_problem)."""
     from bddl.activity import Conditions, get_goal_conditions, get_object_scope
 
-    problem = load_problem("configuration_matching", 0)
+    problem = load_problem("configuration_matching", 0, root=FIXTURES)
     conds = Conditions("configuration_matching", 0, "ispatialgym", predefined_problem=problem.expanded_bddl())
     scope = get_object_scope(conds) | set(problem.groups)
     goals = get_goal_conditions(conds, scope)
@@ -196,7 +203,7 @@ def test_expanded_bddl_is_stock_compatible():
 
 
 def test_compiled_goal_evaluates_with_callback():
-    problem = load_problem("disembedding", 0)
+    problem = load_problem("disembedding", 0, root=FIXTURES)
     compiled = problem.compile()
     seen = []
 
@@ -313,7 +320,7 @@ def test_malformed_measure_sections_are_rejected(body, match):
         (f"{HEADER} {OBJECTS} {INIT} (:goal (cooked ?mug.n.04_1)))", "unknown predicate"),
         (f"{HEADER} {OBJECTS} {INIT} (:goal (ontop ?mug.n.04_1)))", "argument"),
         (f"{HEADER} {OBJECTS} {INIT} (:goal (pose_settled ?mug.n.04_1)))", "at least one"),
-        (f"{HEADER} {OBJECTS} (:alias x) {INIT} (:goal (ontop ?mug.n.04_1 ?tray.n.01_1)))", "directly follow"),
+        (f"{HEADER} {OBJECTS} (:variant x) {INIT} (:goal (ontop ?mug.n.04_1 ?tray.n.01_1)))", "directly follow"),
         (f"(define (problem t-1) (:domain ispatialgym) {OBJECTS} {INIT} (:goal (ontop ?mug.n.04_1 ?tray.n.01_1)))", "does not match"),
     ],
 )
@@ -353,13 +360,12 @@ def test_legacy_activity_name_loads_renamed_templates():
     assert problem_path("world_alignment", 0) == problem_path("alignment", 0)
     assert problem_path("alignment", 0).endswith(os.path.join("alignment", "problem0.bddl"))
     assert activity_dir("world_alignment").endswith(os.sep + "alignment")
-    ids = list_problem_ids("alignment")
-    assert list_problem_ids("world_alignment") == ids
-    assert ids[:2] == [0, 1] and ids == list(range(len(ids)))  # the v1 templates stay 0-1; ground_isg appends contiguous ids
-    problem = load_problem("world_alignment", 0)
+    ids = list_problem_ids("alignment", FIXTURES)
+    assert list_problem_ids("world_alignment", FIXTURES) == ids == [0, 1]  # the v1 templates
+    problem = load_problem("world_alignment", 0, root=FIXTURES)
     assert problem.activity == "alignment" and problem.name == "alignment-0" and problem.canonical_name == "alignment-0"
-    assert problem.alias == "table_surface"
-    assert problem.path == problem_path("alignment", 0)
+    assert problem.variant == "table_surface"
+    assert problem.path == problem_path("alignment", 0, FIXTURES)
 
 
 def test_problem_name_accepts_canonical_and_retired_activity():
@@ -387,7 +393,7 @@ def test_legacy_root_directory_is_found_under_either_name():
     problem keeps the directory's activity."""
     with tempfile.TemporaryDirectory() as root:
         os.makedirs(os.path.join(root, "world_alignment"))
-        with open(problem_path("alignment", 0), "r") as f:
+        with open(problem_path("alignment", 0, FIXTURES), "r") as f:
             text = f.read().replace("(define (problem alignment-0)", "(define (problem world_alignment-0)")
         with open(os.path.join(root, "world_alignment", "problem0.bddl"), "w") as f:
             f.write(text)
@@ -397,7 +403,7 @@ def test_legacy_root_directory_is_found_under_either_name():
         for name in ("alignment", "world_alignment"):
             problem = load_problem(name, 0, root=root)
             assert problem.activity == "world_alignment" and problem.canonical_activity == "alignment"
-            assert problem.alias == "table_surface"
+            assert problem.variant == "table_surface"
         assert parse_problem_file(os.path.join(root, "world_alignment", "problem0.bddl")).name == "world_alignment-0"
         # the canonical directory wins once it exists
         os.makedirs(os.path.join(root, "alignment"))
@@ -410,7 +416,7 @@ def test_tro_activity_check_accepts_retired_name():
     from ispatialgym.eval.targets import SCHEMA_VERSION, ISGTroMeta, TROValidationError
     from ispatialgym.eval.tro import validate_tro_against_problem
 
-    compiled = load_problem("alignment", 0).compile()
+    compiled = load_problem("alignment", 0, root=FIXTURES).compile()
 
     def meta(activity, variant="table_surface"):
         return ISGTroMeta.from_dict(
@@ -453,7 +459,7 @@ def test_v1_bddl_writer_and_sampler_dispatch_accept_both_names(monkeypatch):
         # rendered under the name it was asked for: v1 output stays ``world_alignment-0``
         assert problem.name == f"{activity}-0" and problem.canonical_name == "alignment-0"
         assert problem.text.startswith(f"(define (problem {activity}-0)")
-        assert problem.alias == "table_surface"
+        assert problem.variant == "table_surface"
         assert get_sampler_class(f"{activity}-0").__name__ == "TableSurfaceSampler"
         assert get_sampler_class(f"{activity}-1").__name__ == "WorldVerticalSampler"
     with pytest.raises(ValueError, match="world_alignment has no definition 2"):  # world horizontal was retired
@@ -466,30 +472,30 @@ def test_v1_bddl_writer_and_sampler_dispatch_accept_both_names(monkeypatch):
 # problems.json registry
 # ----------------------------------------------------------------------------------------------------------------
 
-V2_ALIAS = "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table"
+V2_VARIANT = "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table"
 IORS_OBJECTS = (
     "(:objects apple.n.01_1 - apple.n.01 plate.n.04_1 - plate.n.04 breakfast_table.n.01_1 - breakfast_table.n.01"
     " floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
 )
 
 
-def _iors_problem(activity, pid, alias, relation="ontop"):
-    alias_section = f"(:alias {alias})" if alias else ""
+def _iors_problem(activity, pid, variant, relation="ontop"):
+    variant_section = f"(:variant {variant})" if variant else ""
     return (
-        f"(define (problem {activity}-{pid}) (:domain ispatialgym) {alias_section} {IORS_OBJECTS}"
+        f"(define (problem {activity}-{pid}) (:domain ispatialgym) {variant_section} {IORS_OBJECTS}"
         " (:init (ontop apple.n.01_1 breakfast_table.n.01_1) (ontop plate.n.04_1 breakfast_table.n.01_1) (ontop agent.n.01_1 floor.n.01_1))"
         f" (:goal (and ({relation} ?apple.n.01_1 ?plate.n.04_1) (not (grasped ?agent.n.01_1 ?apple.n.01_1))"
         " (pose_settled ?apple.n.01_1) (pose_settled ?agent.n.01_1))) (:measure (pose_reached ?apple.n.01_1)))"
     )
 
 
-def _write_activity(root, activity, aliases, registry=None):
-    """``aliases``: alias per definition id (None = no alias); ``registry``: JSON value for problems.json."""
+def _write_activity(root, activity, variants, registry=None):
+    """``variants``: variant per definition id (None = no variant); ``registry``: JSON value for problems.json."""
     directory = os.path.join(root, activity)
     os.makedirs(directory, exist_ok=True)
-    for pid, alias in enumerate(aliases):
+    for pid, variant in enumerate(variants):
         with open(os.path.join(directory, f"problem{pid}.bddl"), "w") as f:
-            f.write(_iors_problem(activity, pid, alias))
+            f.write(_iors_problem(activity, pid, variant))
     if registry is not None:
         with open(os.path.join(directory, "problems.json"), "w") as f:
             json.dump(registry, f)
@@ -500,28 +506,28 @@ def test_problem_registry_lookup_and_fallback():
     with tempfile.TemporaryDirectory() as root:
         act = "inter_object_relation_satisfaction"
         second = act + "-nextto-spatula-soup_ladle-breakfast_table"
-        directory = _write_activity(root, act, [V2_ALIAS, second, None], registry={V2_ALIAS: 0, second: 1})
+        directory = _write_activity(root, act, [V2_VARIANT, second, None], registry={V2_VARIANT: 0, second: 1})
         assert problem_registry_path(act, root) == os.path.join(directory, "problems.json")
-        assert load_problem_registry(directory) == {V2_ALIAS: 0, second: 1}
-        assert load_problem_registry(os.path.join(directory, "problems.json")) == {V2_ALIAS: 0, second: 1}
+        assert load_problem_registry(directory) == {V2_VARIANT: 0, second: 1}
+        assert load_problem_registry(os.path.join(directory, "problems.json")) == {V2_VARIANT: 0, second: 1}
         assert list_problem_ids(act, root) == [0, 1, 2]  # problems.json is not a problem file
-        assert problem_aliases(act, root) == {0: V2_ALIAS, 1: second, 2: None}
-        assert id_of_alias(act, V2_ALIAS, root) == 0 and id_of_alias(act, second, root) == 1
-        assert alias_of(act, 0, root) == V2_ALIAS and alias_of(act, 1, root) == second and alias_of(act, 2, root) is None
-        assert validate_problem_registry(act, root) == {V2_ALIAS: 0, second: 1}
-        problem = load_problem(act, id_of_alias(act, V2_ALIAS, root), root=root)
-        assert problem.task_variant == V2_ALIAS
-        with pytest.raises(ISGProblemError, match="known aliases"):
-            id_of_alias(act, act + "-inside-apple-bowl-breakfast_table", root)
+        assert problem_variants(act, root) == {0: V2_VARIANT, 1: second, 2: None}
+        assert id_of_variant(act, V2_VARIANT, root) == 0 and id_of_variant(act, second, root) == 1
+        assert variant_of(act, 0, root) == V2_VARIANT and variant_of(act, 1, root) == second and variant_of(act, 2, root) is None
+        assert validate_problem_registry(act, root) == {V2_VARIANT: 0, second: 1}
+        problem = load_problem(act, id_of_variant(act, V2_VARIANT, root), root=root)
+        assert problem.task_variant == V2_VARIANT
+        with pytest.raises(ISGProblemError, match="known variants"):
+            id_of_variant(act, act + "-inside-apple-bowl-breakfast_table", root)
         with pytest.raises(FileNotFoundError, match="no problem 5"):
-            alias_of(act, 5, root)
+            variant_of(act, 5, root)
 
-        # without a registry the aliases come from the files (the shipped templates have none yet)
+        # without a registry the variants come from the files (the shipped templates have none yet)
         os.remove(os.path.join(directory, "problems.json"))
         assert load_problem_registry(directory, missing_ok=True) == {}
         with pytest.raises(FileNotFoundError):
             load_problem_registry(directory)
-        assert id_of_alias(act, second, root) == 1 and alias_of(act, 1, root) == second
+        assert id_of_variant(act, second, root) == 1 and variant_of(act, 1, root) == second
         with pytest.raises(FileNotFoundError):
             validate_problem_registry(act, root)
 
@@ -529,39 +535,39 @@ def test_problem_registry_lookup_and_fallback():
 def test_problem_registry_accepted_shapes():
     with tempfile.TemporaryDirectory() as root:
         act = "inter_object_relation_satisfaction"
-        directory = _write_activity(root, act, [V2_ALIAS])
+        directory = _write_activity(root, act, [V2_VARIANT])
         path = os.path.join(directory, "problems.json")
         for shape in (
-            {V2_ALIAS: 0},
-            {"0": V2_ALIAS},
-            [{"alias": V2_ALIAS, "id": 0}],
-            [{"alias": V2_ALIAS, "definition_id": "0"}],
-            {"activity": act, "problems": {V2_ALIAS: 0}},
-            {"activity": "inter_object_relation_satisfaction", "problems": [{"alias": V2_ALIAS, "id": 0}]},
+            {V2_VARIANT: 0},
+            {"0": V2_VARIANT},
+            [{"variant": V2_VARIANT, "id": 0}],
+            [{"variant": V2_VARIANT, "definition_id": "0"}],
+            {"activity": act, "problems": {V2_VARIANT: 0}},
+            {"activity": "inter_object_relation_satisfaction", "problems": [{"variant": V2_VARIANT, "id": 0}]},
         ):
             with open(path, "w") as f:
                 json.dump(shape, f)
-            assert load_problem_registry(directory) == {V2_ALIAS: 0}, shape
-            assert validate_problem_registry(act, root) == {V2_ALIAS: 0}
+            assert load_problem_registry(directory) == {V2_VARIANT: 0}, shape
+            assert validate_problem_registry(act, root) == {V2_VARIANT: 0}
 
 
 @pytest.mark.parametrize(
     "registry,match",
     [
-        ({V2_ALIAS: 0, "b": 0}, "registered for both"),
-        ({V2_ALIAS: -1}, "non-negative"),
-        ({V2_ALIAS: 1.5}, "non-negative"),
-        ({V2_ALIAS: True}, "non-negative"),
-        ({"Bad-Alias": 0}, "invalid alias"),
-        ([{"alias": V2_ALIAS}], "no 'id'"),
+        ({V2_VARIANT: 0, "b": 0}, "registered for both"),
+        ({V2_VARIANT: -1}, "non-negative"),
+        ({V2_VARIANT: 1.5}, "non-negative"),
+        ({V2_VARIANT: True}, "non-negative"),
+        ({"Bad-Variant": 0}, "invalid variant"),
+        ([{"variant": V2_VARIANT}], "no 'id'"),
         (["x"], "must be an object"),
         (3, "must be a JSON object"),
-        ({"activity": "disembedding", "problems": {V2_ALIAS: 0}}, "directory is"),
+        ({"activity": "disembedding", "problems": {V2_VARIANT: 0}}, "directory is"),
     ],
 )
 def test_malformed_problem_registries_are_rejected(registry, match):
     with tempfile.TemporaryDirectory() as root:
-        directory = _write_activity(root, "inter_object_relation_satisfaction", [V2_ALIAS], registry=registry)
+        directory = _write_activity(root, "inter_object_relation_satisfaction", [V2_VARIANT], registry=registry)
         with pytest.raises(ISGProblemError, match=match):
             load_problem_registry(directory)
 
@@ -570,43 +576,43 @@ def test_problem_registry_must_agree_with_the_files():
     with tempfile.TemporaryDirectory() as root:
         act = "inter_object_relation_satisfaction"
         other = act + "-nextto-spatula-soup_ladle-breakfast_table"
-        # stale registry: alias registered under an id whose file declares another alias
-        _write_activity(root, act, [V2_ALIAS, other], registry={V2_ALIAS: 1, other: 0})
-        with pytest.raises(ISGProblemError, match=r"registers .* -> 0 but .*problem0.bddl declares \(:alias"):
-            alias_of(act, 0, root)
+        # stale registry: variant registered under an id whose file declares another variant
+        _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 1, other: 0})
+        with pytest.raises(ISGProblemError, match=r"registers .* -> 0 but .*problem0.bddl declares \(:variant"):
+            variant_of(act, 0, root)
         with pytest.raises(ISGProblemError, match=r"registers .* -> 1 but .*problem1.bddl declares"):
-            id_of_alias(act, V2_ALIAS, root)
+            id_of_variant(act, V2_VARIANT, root)
         with pytest.raises(ISGProblemError, match="declares"):
             validate_problem_registry(act, root)
         # registered id without a file
-        _write_activity(root, act, [V2_ALIAS, other], registry={V2_ALIAS: 0, other: 1, act + "-touching-a-b-c": 2})
+        _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 0, other: 1, act + "-touching-a-b-c": 2})
         with pytest.raises(ISGProblemError, match="problem2.bddl does not exist"):
             validate_problem_registry(act, root)
         with pytest.raises(ISGProblemError, match="does not exist"):
-            alias_of(act, 2, root)
+            variant_of(act, 2, root)
         # aliased file that the registry does not know
-        _write_activity(root, act, [V2_ALIAS, other], registry={V2_ALIAS: 0})
+        _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 0})
         with pytest.raises(ISGProblemError, match="does not register it"):
             validate_problem_registry(act, root)
-        assert id_of_alias(act, other, root) == 1  # ... but the file scan still finds it
-        # a registry-less directory with two files sharing an alias cannot resolve it (one alias = one BDDL)
-        _write_activity(root, act, [V2_ALIAS, V2_ALIAS])
+        assert id_of_variant(act, other, root) == 1  # ... but the file scan still finds it
+        # a registry-less directory with two files sharing a variant cannot resolve it (one variant = one BDDL)
+        _write_activity(root, act, [V2_VARIANT, V2_VARIANT])
         os.remove(os.path.join(root, act, "problems.json"))
         with pytest.raises(ISGProblemError, match="all declare"):
-            id_of_alias(act, V2_ALIAS, root)
+            id_of_variant(act, V2_VARIANT, root)
 
 
 # ----------------------------------------------------------------------------------------------------------------
-# Alias grammar (v2: <family>-<subtask>-<category slots>)
+# Variant grammar (v2: <family>-<subtask>-<category slots>)
 # ----------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "alias",
+    "variant",
     [
         "table_surface",  # v1
         "block_design",
-        V2_ALIAS,
+        V2_VARIANT,
         "camera_relocalization-standard",
         "camera_relocalization-obstructed-trash_can_1",
         "configuration_matching-block_design-block_4-table",
@@ -615,24 +621,38 @@ def test_problem_registry_must_agree_with_the_files():
         "disembedding-mug-bottle_of_beer_3_bottle_of_sake_1-table",
     ],
 )
-def test_alias_grammar_accepts_v1_and_v2_aliases(alias):
-    assert ALIAS_RE.match(alias)
-    p = _parse(f"{HEADER} (:alias {alias}) {OBJECTS} {INIT} {GOAL})")
-    assert p.alias == alias and p.task_variant == alias
-    assert f"(:alias {alias})" in p.expanded_bddl()
+def test_variant_grammar_accepts_v1_and_v2_variants(variant):
+    assert VARIANT_RE.match(variant)
+    p = _parse(f"{HEADER} (:variant {variant}) {OBJECTS} {INIT} {GOAL})")
+    assert p.variant == variant and p.task_variant == variant
+    assert f"(:variant {variant})" in p.expanded_bddl()
 
 
-@pytest.mark.parametrize("alias", ["-a", "a-", "a--b", "a.b", "a b", "1a", "a_-b-", "ä", "a/b", "a:b"])
-def test_alias_grammar_rejects_malformed_aliases(alias):
-    assert not ALIAS_RE.match(alias)
-    with pytest.raises(ISGProblemError, match="alias"):
-        _parse(f"{HEADER} (:alias {alias}) {OBJECTS} {INIT} {GOAL})")
+@pytest.mark.parametrize("variant", ["-a", "a-", "a--b", "a.b", "a b", "1a", "a_-b-", "ä", "a/b", "a:b"])
+def test_variant_grammar_rejects_malformed_variants(variant):
+    assert not VARIANT_RE.match(variant)
+    with pytest.raises(ISGProblemError, match="variant"):
+        _parse(f"{HEADER} (:variant {variant}) {OBJECTS} {INIT} {GOAL})")
 
 
-def test_alias_grammar_is_lowercase():
+def test_variant_grammar_is_lowercase():
     # the regex is lowercase-only; BDDL's tokenizer lowercases the file anyway, so ``A-b`` parses as ``a-b``
-    assert not ALIAS_RE.match("A-b") and not ALIAS_RE.match("a-B")
-    assert _parse(f"{HEADER} (:alias Alignment-Axial-Fishing_Rod-Table) {OBJECTS} {INIT} {GOAL})").alias == "alignment-axial-fishing_rod-table"
+    assert not VARIANT_RE.match("A-b") and not VARIANT_RE.match("a-B")
+    assert _parse(f"{HEADER} (:variant Alignment-Axial-Fishing_Rod-Table) {OBJECTS} {INIT} {GOAL})").variant == "alignment-axial-fishing_rod-table"
+
+
+def test_problem_files_written_before_the_rename():
+    p = _parse(f"{HEADER} (:alias {V2_VARIANT}) {OBJECTS} {INIT} {GOAL})")  # legacy spelling
+    assert p.variant == V2_VARIANT and f"(:variant {V2_VARIANT})" in p.expanded_bddl()
+    with pytest.raises(ISGProblemError, match="Duplicate section"):
+        _parse(f"{HEADER} (:alias a) (:variant a) {OBJECTS} {INIT} {GOAL})")  # legacy spelling
+    with tempfile.TemporaryDirectory() as root:
+        act = "inter_object_relation_satisfaction"
+        directory = _write_activity(root, act, [V2_VARIANT], registry=[{"alias": V2_VARIANT, "id": 0}])  # legacy spelling
+        with open(os.path.join(directory, "problem0.bddl"), "w") as f:
+            f.write(_iors_problem(act, 0, V2_VARIANT).replace("(:variant ", "(:alias "))  # legacy spelling
+        assert load_problem_registry(directory) == {V2_VARIANT: 0}
+        assert problem_variants(act, root) == {0: V2_VARIANT} and validate_problem_registry(act, root) == {V2_VARIANT: 0}
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -645,7 +665,7 @@ AGENT_ON_FLOOR = "(ontop agent.n.01_1 floor.n.01_1)"
 def test_v2_obstructed_camera_relocalization_with_obstacles_group():
     p = parse_problem_string(
         "(define (problem camera_relocalization-1) (:domain ispatialgym)"
-        " (:alias camera_relocalization-obstructed-trash_can_1)"
+        " (:variant camera_relocalization-obstructed-trash_can_1)"
         " (:objects trash_can.n.01_1 - trash_can.n.01 floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
         " (:groups trash_can.n.01_1 - obstacles_group.n.01_1)"
         f" (:init (ontop obstacles_group.n.01_1 floor.n.01_1) {AGENT_ON_FLOOR})"
@@ -666,7 +686,7 @@ def test_v2_under_small_scale_has_partner_first():
     """``(under ?partner ?target)``: the manipulated glass is set down on the coaster, so the *partner* ends under it."""
     p = parse_problem_string(
         "(define (problem inter_object_relation_satisfaction-4) (:domain ispatialgym)"
-        " (:alias inter_object_relation_satisfaction-under_small_scale-water_glass-coaster-breakfast_table)"
+        " (:variant inter_object_relation_satisfaction-under_small_scale-water_glass-coaster-breakfast_table)"
         " (:objects water_glass.n.02_1 - water_glass.n.02 coaster.n.03_1 - coaster.n.03"
         " breakfast_table.n.01_1 - breakfast_table.n.01 floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
         " (:init (ontop water_glass.n.02_1 breakfast_table.n.01_1) (ontop coaster.n.03_1 breakfast_table.n.01_1)"
@@ -692,7 +712,7 @@ def test_v2_under_large_scale_partner_is_the_support():
     ``pose_reached`` for it, ``(under ?target ?partner)``."""
     p = parse_problem_string(
         "(define (problem inter_object_relation_satisfaction-5) (:domain ispatialgym)"
-        " (:alias inter_object_relation_satisfaction-under_large_scale-basketball-bed-bed)"
+        " (:variant inter_object_relation_satisfaction-under_large_scale-basketball-bed-bed)"
         " (:objects basketball.n.02_1 - basketball.n.02 bed.n.01_1 - bed.n.01 floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
         f" (:init (ontop basketball.n.02_1 bed.n.01_1) (not (under basketball.n.02_1 bed.n.01_1)) {AGENT_ON_FLOOR})"
         " (:goal (and (under ?basketball.n.02_1 ?bed.n.01_1) (not (grasped ?agent.n.01_1 ?basketball.n.02_1))"
@@ -708,7 +728,7 @@ def test_v2_under_large_scale_partner_is_the_support():
     # ontop large-scale: partner fixed, init support is another scene object
     q = parse_problem_string(
         "(define (problem inter_object_relation_satisfaction-6) (:domain ispatialgym)"
-        " (:alias inter_object_relation_satisfaction-ontop_large_scale-pillow-bed-breakfast_table)"
+        " (:variant inter_object_relation_satisfaction-ontop_large_scale-pillow-bed-breakfast_table)"
         " (:objects pillow.n.01_1 - pillow.n.01 bed.n.01_1 - bed.n.01 breakfast_table.n.01_1 - breakfast_table.n.01"
         " floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
         f" (:init (ontop pillow.n.01_1 breakfast_table.n.01_1) (not (ontop pillow.n.01_1 bed.n.01_1)) {AGENT_ON_FLOOR})"
@@ -723,7 +743,7 @@ def test_v2_under_large_scale_partner_is_the_support():
 
 def test_v2_alignment_wall_support_without_literal():
     p = parse_problem_string(
-        "(define (problem alignment-3) (:domain ispatialgym) (:alias alignment-world_vertical-painting-wall)"
+        "(define (problem alignment-3) (:domain ispatialgym) (:variant alignment-world_vertical-painting-wall)"
         " (:objects painting.n.01_1 - painting.n.01 wall.n.01_1 - wall.n.01 floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
         f" (:init {AGENT_ON_FLOOR})"
         " (:goal (and (pose_reached ?painting.n.01_1) (not (grasped ?agent.n.01_1 ?painting.n.01_1))"
@@ -743,7 +763,7 @@ def test_v2_block_design_group_names(group):
     dice = " ".join(f"toy_dice.n.01_{i}" for i in range(1, 5))
     p = parse_problem_string(
         "(define (problem configuration_matching-0) (:domain ispatialgym)"
-        " (:alias configuration_matching-block_design-block_4-table)"
+        " (:variant configuration_matching-block_design-block_4-table)"
         f" (:objects {dice} - toy_dice.n.01 table.n.02_1 - table.n.02 floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
         f" (:groups {dice} - {group})"
         f" (:init (ontop {group} table.n.02_1) {AGENT_ON_FLOOR})"
@@ -763,7 +783,7 @@ def test_v2_block_design_group_names(group):
 def test_v2_attachment_group_names(group):
     p = parse_problem_string(
         "(define (problem configuration_matching-3) (:domain ispatialgym)"
-        " (:alias configuration_matching-attachment-digital_camera-camera_tripod-table)"
+        " (:variant configuration_matching-attachment-digital_camera-camera_tripod-table)"
         " (:objects digital_camera.n.01_1 - digital_camera.n.01 camera_tripod.n.01_1 - camera_tripod.n.01"
         " table.n.02_1 - table.n.02 floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)"
         f" (:groups digital_camera.n.01_1 camera_tripod.n.01_1 - {group})"

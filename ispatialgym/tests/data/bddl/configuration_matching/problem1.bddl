@@ -1,0 +1,28 @@
+(define (problem configuration_matching-1)
+    (:domain ispatialgym)
+
+    (:variant articulation)
+
+    (:objects
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (not (open cabinet.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    ; Closed -> open. Binary success: the cabinet counts as open, every non-fixed joint is within tolerance of its
+    ; target (TRO articulation_targets["cabinet.n.01_1"]), and the cabinet is released.
+    (:goal
+        (and
+            (open ?cabinet.n.01_1)
+            (layout_reached ?cabinet.n.01_1)
+            (not (grasped ?agent.n.01_1 ?cabinet.n.01_1))
+            (pose_settled ?cabinet.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

@@ -355,7 +355,7 @@ class CameraRelocalizationV2(SamplerV2):
             return d[key]
         if default is not None:
             return default
-        raise Reject("spec", f"{self.gp.alias}: generation.{key} missing and no default in generation_defaults")
+        raise Reject("spec", f"{self.gp.variant}: generation.{key} missing and no default in generation_defaults")
 
     @property
     def obstructed(self) -> bool:
@@ -399,7 +399,7 @@ class CameraRelocalizationV2(SamplerV2):
         and the goal's arms when they stay as at init."""
         name = str(self.g("init_pose").get("arms", "untucked"))
         if name not in INIT_ARM_MODES:
-            raise Reject("spec", f"{self.gp.alias}: generation.init_pose.arms {name!r} is not one of {sorted(INIT_ARM_MODES)}")
+            raise Reject("spec", f"{self.gp.variant}: generation.init_pose.arms {name!r} is not one of {sorted(INIT_ARM_MODES)}")
         return INIT_ARM_MODES[name]
 
     def config(self, base2d, translate: float, tilt: float, arms: Optional[str] = None) -> th.Tensor:
@@ -430,7 +430,7 @@ class CameraRelocalizationV2(SamplerV2):
         self.template_facts["bucket_counts_existing"] = {str(k): v for k, v in self.bucket_counts().items()}
         if self.obstructed:
             if not self.obstacle_names:
-                raise Reject("spec", f"{self.gp.alias}: the obstructed variant needs the obstacles role bound")
+                raise Reject("spec", f"{self.gp.variant}: the obstructed variant needs the obstacles role bound")
             self.prepare_obstacles()
 
     # ------------------------------------------------------------------ buckets (§2.3 / §9)
@@ -633,7 +633,7 @@ class CameraRelocalizationV2(SamplerV2):
         poses = sched.stride_poses(NAV.STRIDE_M, dwell_step_rad=BP.DWELL_CHECK_STEP_RAD, max_yaw_step=NAV.YAW_STEP_MAX_RAD)
         ok, bad = NAV.path_collision_free(self.kit, poses, trunk, posture=self.init_arms)
         if not ok:
-            log.info("%s: path %s -> %s collides at stride %d/%d (%s)", self.gp.alias, frm, to, bad, len(poses), [round(v, 2) for v in poses[bad]])
+            log.info("%s: path %s -> %s collides at stride %d/%d (%s)", self.gp.variant, frm, to, bad, len(poses), [round(v, 2) for v in poses[bad]])
             return None
         return PathRecord(frm, to, "global", waypoints, path_length(waypoints), posture=self.init_arms, carried=None, trunk=trunk, stride_m=NAV.STRIDE_M,
                           n_checked=len(poses), style=BP.FACE_TRAVEL)
@@ -740,7 +740,7 @@ class CameraRelocalizationV2(SamplerV2):
             lo, hi = o.aabb
             self._scene_aabbs.append((o.name, lo.clone(), hi.clone()))
         self.template_meta["obstacles"] = {"instances": dict(self.obst_geom), "generation": P, "per_instance": {}}
-        log.info("%s: obstacles %s (%d scene AABBs to avoid, floor z %.3f)", self.gp.alias,
+        log.info("%s: obstacles %s (%d scene AABBs to avoid, floor z %.3f)", self.gp.variant,
                  {n: f"{g['category']}/{g['model']} {g['footprint_m'][0]:.2f}x{g['footprint_m'][1]:.2f}x{g['height_m']:.2f} m" for n, g in self.obst_geom.items()},
                  len(self._scene_aabbs), self.floor_z)
 
@@ -1054,7 +1054,7 @@ class CameraRelocalizationV2(SamplerV2):
             o = self.objects[name]
             self.sidecar.describe(name, o.category.replace("_", " "), descriptor=f"the {o.category.replace('_', ' ')} on the way")
         log.info("%s: %d obstacle(s) placed after %d cells (%s): free path %.2f m -> blocked %.2f m (recorded %.2f m), seen at waypoint %s (divergence %s) of %d",
-                 self.gp.alias, len(names), n_tried, fails, geo_free, cur_geo, rec_path.length_m, view["view_waypoint_index"], view["divergence_waypoint_index"], len(cur_path))
+                 self.gp.variant, len(names), n_tried, fails, geo_free, cur_geo, rec_path.length_m, view["view_waypoint_index"], view["divergence_waypoint_index"], len(cur_path))
 
     def after_settle(self, draft: Draft):
         """Obstructed: the settled obstacle must not have moved (≤ drift / tilt); the footprints, path and view indices

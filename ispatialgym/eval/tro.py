@@ -53,7 +53,7 @@ def physical_instances(compiled: ISGCompiledTask):
 def validate_tro_against_problem(meta: ISGTroMeta, compiled: ISGCompiledTask, require_bindings: bool = True) -> None:
     """Raise :class:`TROValidationError` if ``meta`` does not fit the compiled problem.
 
-    Checks: activity / definition id / alias agreement (a retired activity name such as ``world_alignment`` equals its
+    Checks: activity / definition id / variant agreement (a retired activity name such as ``world_alignment`` equals its
     canonical name ``alignment``, so the v1 TROs still validate against the renamed problems); every ``pose_reached``
     / ``layout_reached`` atom of the goal (gating) and of ``(:measure ...)`` (non-gating) has a matching target of
     the right kind; conversely every TRO target corresponds to one of those atoms (the BDDL is the single statement
@@ -66,8 +66,8 @@ def validate_tro_against_problem(meta: ISGTroMeta, compiled: ISGCompiledTask, re
         raise TROValidationError(
             f"TRO is for {meta.name!r} but the problem is {problem.name!r}"
         )
-    if meta.task_variant != problem.alias:
-        raise TROValidationError(f"TRO task_variant {meta.task_variant!r} != problem alias {problem.alias!r}")
+    if meta.task_variant != problem.variant:
+        raise TROValidationError(f"TRO task_variant {meta.task_variant!r} != problem variant {problem.variant!r}")
 
     declared = set(problem.instances)
     groups = problem.groups

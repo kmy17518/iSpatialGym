@@ -1,5 +1,0 @@
-{"key": "clothes_dryer__fhtvuq", "joint": "j_link_0", "feasible": true,
- "proposal": {"face": "outer", "a": 0.96, "b": 0.5, "pinch": "vertical", "approach": "front", "depth_mm": 12,
-              "expected_motion": "pull"},
- "alternative": null,
- "note": "Pinch the ~22 mm latch nub protruding from the disc rim at 3 o'clock (free edge, left hinge) top/bottom, then pull.", "confidence": "medium"}

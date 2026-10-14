@@ -3,7 +3,7 @@
   "instance_id": "alignment-world_vertical-painting-walls__house_single_floor__target-painting-dacihj__0000",
   "tro_sha256": "889da90f52ceca59585861b10161a57c65ebd35d09c44529c4b43ef2c1e3e95c",
   "task_family": "alignment",
-  "alias": "alignment-world_vertical-painting-walls",
+  "variant": "alignment-world_vertical-painting-walls",
   "path_bucket_m": null,
   "contacts": {
     "push": {

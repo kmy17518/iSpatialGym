@@ -1,1 +1,0 @@
-{"key": "canister__xcppkc", "category": "canister", "model": "xcppkc", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0006540902578384381, "p95": 0.00392156862745098, "p99": 0.011764705882352941, "mad_union": 0.0007368221823548764, "iou": 0.9998435356137014, "worst": "z180"}}, "render_s": 0.146}

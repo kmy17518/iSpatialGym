@@ -1,28 +1,32 @@
 (define (problem alignment-0)
     (:domain ispatialgym)
+    (:variant alignment-axial-board_game-breakfast_table)
 
-    (:alias table_surface)
+    ; ground_isg 2.0.0: alignment-axial-board_game-breakfast_table (alignment/axial.iddl; alignment-axial#01~T1/representative)
+    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
+    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
+    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
+    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
+    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
 
     (:objects
-        fishing_rod.n.01_1 - fishing_rod.n.01
-        table.n.02_1 - table.n.02
+        board_game.n.01_1 - board_game.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop fishing_rod.n.01_1 table.n.02_1)
+        (ontop board_game.n.01_1 breakfast_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
-    ; Binary success: the rod is on the table, released, and its orientation is within tolerance of the goal
-    ; (TRO pose_targets["fishing_rod.n.01_1"]: orientation_metric = "full", position_metric = null).
     (:goal
         (and
-            (ontop ?fishing_rod.n.01_1 ?table.n.02_1)
-            (pose_reached ?fishing_rod.n.01_1)
-            (not (grasped ?agent.n.01_1 ?fishing_rod.n.01_1))
-            (pose_settled ?fishing_rod.n.01_1)
+            (ontop ?board_game.n.01_1 ?breakfast_table.n.01_1)
+            (pose_reached ?board_game.n.01_1)
+            (not (grasped ?agent.n.01_1 ?board_game.n.01_1))
+            (pose_settled ?board_game.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

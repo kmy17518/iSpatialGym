@@ -3,7 +3,7 @@
   "instance_id": "configuration_matching-articulation_close_large_scale-door__house_single_floor__0000",
   "tro_sha256": "36bba1c35c5d2990d041a63a06b74836e06593c293cc9c6865a97ad517044d1a",
   "task_family": "configuration_matching",
-  "alias": "configuration_matching-articulation_close_large_scale-door",
+  "variant": "configuration_matching-articulation_close_large_scale-door",
   "path_bucket_m": null,
   "stances": {
     "init": {

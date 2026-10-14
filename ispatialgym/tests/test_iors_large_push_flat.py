@@ -24,7 +24,7 @@ from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
-ALIAS = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor"
+VARIANT = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor"
 #: the hand's lowest collision sphere below the eef origin per flat-hand turn (``PALM_SPHERES_EEF`` + the wrist camera's): the gripper
 #: body with the camera up (lateral), the knuckles (vertical-), the camera hanging below (lateral- / vertical)
 DROPS = {"lateral": 0.040, "vertical-": 0.057, "lateral-": 0.074, "vertical": 0.075}
@@ -37,7 +37,7 @@ def _box(dx: float, dy: float, h: float) -> th.Tensor:
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = ALIAS, dict(gen)
+        self.variant, self.generation = VARIANT, dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)

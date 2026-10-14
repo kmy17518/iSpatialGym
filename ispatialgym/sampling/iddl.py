@@ -4,7 +4,7 @@ An iddl file is a BDDL problem skeleton written over bare **roles** instead of s
 
     (define (iddl <subtask-id>)
         (:family <family>)
-        (:alias <template>)                      ; {role} slots, filled with category names by ground_isg
+        (:variant <template>)                    ; {role} slots, filled with category names by ground_isg
         (:groups <role> <role> - <group-role>)   ; optional composite groups (attachment assembly)
         (:require (grasps <role> <pipeline>) (contacts <role>) (handle <role>))   ; optional
         (:init <literals>)                       ; no ? prefix
@@ -13,7 +13,7 @@ An iddl file is a BDDL problem skeleton written over bare **roles** instead of s
     )
 
 The parser knows nothing about categories, models or role kinds — those are the icl's (``roles/candidates.csv``);
-it collects the roles from the alias slots, the ``:groups`` members and the literal arguments (``agent`` and ``floor``
+it collects the roles from the variant slots, the ``:groups`` members and the literal arguments (``agent`` and ``floor``
 are implicit, see :data:`IMPLICIT_ROLES`) and validates the grammar: known predicates with the right arity (the
 ``ispatialgym`` BDDL domain), ``?`` prefixes per section, ``pose_settled`` only at the top level of the goal,
 ``:measure`` restricted to ``pose_reached`` / ``layout_reached``, ``:require`` forms, unique sections.
@@ -117,7 +117,7 @@ class IDDL:
 
     subtask: str
     family: str
-    alias_template: str
+    variant_template: str
     groups: Dict[str, List[str]] = field(default_factory=dict)  # composite group role -> member roles
     require: List[Require] = field(default_factory=list)
     init: List[list] = field(default_factory=list)
@@ -129,9 +129,9 @@ class IDDL:
     # ------------------------------------------------------------------ roles
 
     @property
-    def alias_slots(self) -> List[str]:
-        """Roles named by ``{role}`` slots of the alias template, in template order."""
-        return SLOT_RE.findall(self.alias_template)
+    def variant_slots(self) -> List[str]:
+        """Roles named by ``{role}`` slots of the variant template, in template order."""
+        return SLOT_RE.findall(self.variant_template)
 
     @property
     def composite_groups(self) -> List[str]:
@@ -149,10 +149,10 @@ class IDDL:
 
     @property
     def roles(self) -> List[str]:
-        """Explicit roles to ground: alias slots, ``:groups`` members, literal arguments — without the implicit
+        """Explicit roles to ground: variant slots, ``:groups`` members, literal arguments — without the implicit
         ``agent`` / ``floor`` and without the composite group names. Order of first appearance."""
         out: List[str] = []
-        seq: List[str] = list(self.alias_slots)
+        seq: List[str] = list(self.variant_slots)
         for members in self.groups.values():
             seq.extend(members)
         seq.extend(self.literal_roles())
@@ -165,7 +165,7 @@ class IDDL:
     @property
     def all_roles(self) -> List[str]:
         """Explicit roles, then the composite groups, then the implicit roles that appear in the literals."""
-        used = set(self.literal_roles()) | set(self.alias_slots)
+        used = set(self.literal_roles()) | set(self.variant_slots)
         return self.roles + self.composite_groups + [r for r in IMPLICIT_ROLES if r in used]
 
     def require_of(self, role: str) -> List[Require]:
@@ -199,20 +199,20 @@ class IDDL:
                         out.append(r)
         return out
 
-    # ------------------------------------------------------------------ alias
+    # ------------------------------------------------------------------ variant
 
-    def fill_alias(self, values: Mapping[str, str]) -> str:
+    def fill_variant(self, values: Mapping[str, str]) -> str:
         """Fill every ``{role}`` slot from ``values``; a missing slot is an error (no silent placeholder)."""
-        missing = [s for s in self.alias_slots if s not in values]
+        missing = [s for s in self.variant_slots if s not in values]
         if missing:
-            raise IDDLError(f"{self.subtask}: alias slots without a value: {missing}")
-        return SLOT_RE.sub(lambda m: values[m.group(1)], self.alias_template)
+            raise IDDLError(f"{self.subtask}: variant slots without a value: {missing}")
+        return SLOT_RE.sub(lambda m: values[m.group(1)], self.variant_template)
 
     # ------------------------------------------------------------------ serialization
 
     def to_text(self) -> str:
         """Re-serialize the parsed file (comments dropped) — round-trips through :func:`parse`."""
-        lines = [f"(define (iddl {self.subtask})", f"    (:family {self.family})", f"    (:alias {self.alias_template})"]
+        lines = [f"(define (iddl {self.subtask})", f"    (:family {self.family})", f"    (:variant {self.variant_template})"]
         if self.groups:
             lines.append("    (:groups")
             for g, members in self.groups.items():
@@ -356,14 +356,14 @@ def parse(text: str, path: Optional[str] = None) -> IDDL:
             raise IDDLError(f"{where}: duplicate section {tag}")
         sections[tag] = sec[1:]
         order.append(tag)
-    unknown = [t for t in order if t not in (":family", ":alias", ":groups", ":require", ":init", ":goal", ":measure")]
+    unknown = [t for t in order if t not in (":family", ":variant", ":groups", ":require", ":init", ":goal", ":measure")]
     if unknown:
         raise IDDLError(f"{where}: unknown section(s) {unknown}")
-    for required in (":family", ":alias", ":init", ":goal"):
+    for required in (":family", ":variant", ":init", ":goal"):
         if required not in sections:
             raise IDDLError(f"{where}: missing section {required}")
 
-    # ---- family / alias
+    # ---- family / variant
     fam = sections[":family"]
     if len(fam) != 1 or not isinstance(fam[0], str):
         raise IDDLError(f"{where}: (:family ...) must hold one symbol, got {fam!r}")
@@ -372,18 +372,18 @@ def parse(text: str, path: Optional[str] = None) -> IDDL:
         raise IDDLError(f"{where}: unknown family {family!r}; expected one of {FAMILIES}")
     if not (subtask == family or subtask.startswith(family + "-")):
         raise IDDLError(f"{where}: subtask id {subtask!r} must be the family or '<family>-<name>' for family {family!r}")
-    al = sections[":alias"]
+    al = sections[":variant"]
     if len(al) != 1 or not isinstance(al[0], str):
-        raise IDDLError(f"{where}: (:alias ...) must hold one template symbol, got {al!r}")
-    alias_template = al[0]
-    if not (alias_template == subtask or alias_template.startswith(subtask + "-")):
-        raise IDDLError(f"{where}: alias template {alias_template!r} must start with the subtask id {subtask!r}")
-    rest = alias_template[len(subtask):]
+        raise IDDLError(f"{where}: (:variant ...) must hold one template symbol, got {al!r}")
+    variant_template = al[0]
+    if not (variant_template == subtask or variant_template.startswith(subtask + "-")):
+        raise IDDLError(f"{where}: variant template {variant_template!r} must start with the subtask id {subtask!r}")
+    rest = variant_template[len(subtask):]
     if rest and not re.fullmatch(r"(?:-\{[a-z][a-z0-9_]*\})+", rest):
-        raise IDDLError(f"{where}: alias template {alias_template!r} must be '<subtask>[-{{role}}...]'")
-    slots = SLOT_RE.findall(alias_template)
+        raise IDDLError(f"{where}: variant template {variant_template!r} must be '<subtask>[-{{role}}...]'")
+    slots = SLOT_RE.findall(variant_template)
     if len(set(slots)) != len(slots):
-        raise IDDLError(f"{where}: alias template repeats a slot: {slots}")
+        raise IDDLError(f"{where}: variant template repeats a slot: {slots}")
 
     # ---- groups
     groups: Dict[str, List[str]] = {}
@@ -452,7 +452,7 @@ def parse(text: str, path: Optional[str] = None) -> IDDL:
     iddl = IDDL(
         subtask=subtask,
         family=family,
-        alias_template=alias_template,
+        variant_template=variant_template,
         groups=groups,
         require=require,
         init=init,
@@ -532,15 +532,15 @@ def _check_roles(iddl: IDDL, where: str) -> None:
     for r in iddl.require:
         if r.role not in roles:
             raise IDDLError(f"{where}: :require names {r.role!r}, which is not a role of the file (roles: {sorted(roles)})")
-    used = set(iddl.literal_roles()) | set(iddl.alias_slots)
+    used = set(iddl.literal_roles()) | set(iddl.variant_slots)
     for g, members in iddl.groups.items():
         if g not in used:
             raise IDDLError(f"{where}: composite group {g!r} is never used in a literal")
     if "agent" not in set(iddl.literal_roles()):
         raise IDDLError(f"{where}: the agent must appear in the literals ((ontop agent floor))")
-    for slot in iddl.alias_slots:
+    for slot in iddl.variant_slots:
         if slot in IMPLICIT_ROLES or slot in iddl.groups:
-            raise IDDLError(f"{where}: alias slot {{{slot}}} must be an explicit non-composite role")
+            raise IDDLError(f"{where}: variant slot {{{slot}}} must be an explicit non-composite role")
 
 
 # ----------------------------------------------------------------------------------------------------------------

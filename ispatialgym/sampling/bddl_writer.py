@@ -7,7 +7,7 @@ compiled with :mod:`ispatialgym.activity.problem` before it is written, so a mal
 
 Roles per activity (``*`` = list role):
 
-* camera_relocalization: floor [, obstacles* (obstructed variant: alias ``obstructed``, group ``ontop`` the floor)]
+* camera_relocalization: floor [, obstacles* (obstructed variant: variant ``obstructed``, group ``ontop`` the floor)]
 * object_scaling / mental_rotation: target, floor
 * disembedding: target, distractors*, tray_source, tray_dest, table, floor
 * configuration_matching-0 (block_design): blocks*, table, floor
@@ -117,7 +117,7 @@ def _q(name: str) -> str:
 def render_problem(
     activity: str,
     definition_id: int,
-    alias: Optional[str],
+    variant: Optional[str],
     bounds: Sequence[Bound],
     groups: Dict[str, List[str]],
     init: List[str],
@@ -126,8 +126,8 @@ def render_problem(
     comment: Optional[str] = None,
 ) -> str:
     lines = [f"(define (problem {activity}-{definition_id})", "    (:domain ispatialgym)"]
-    if alias:
-        lines.append(f"    (:alias {alias})")
+    if variant:
+        lines.append(f"    (:variant {variant})")
     if comment:
         lines.append("")
         for c in comment.splitlines():
@@ -169,7 +169,7 @@ def build_problem_text(activity: str, definition_id: int, b: Bindings) -> str:
     floor = b.one("floor").name
     on_floor = f"(ontop {agent} {floor})"
     if activity == "camera_relocalization":
-        init, groups, alias = [on_floor], {}, None
+        init, groups, variant = [on_floor], {}, None
         comment = ("Binary success: the head-camera sensor pose (TRO pose_targets[agent], link = sensor key) is within "
                    "both tolerances of the goal camera pose.")
         if b.has("obstacles"):
@@ -178,11 +178,11 @@ def build_problem_text(activity: str, definition_id: int, b: Bindings) -> str:
             g = GROUP_NAMES["obstacles"]
             groups = {g: [o.name for o in b.many("obstacles")]}
             init = [f"(ontop {g} {floor})", on_floor]
-            alias = "obstructed"
+            variant = "obstructed"
             comment += (" Obstructed: the obstacles group stands on the floor on the shortest path (never manipulated); "
                         "its footprints are recorded as scene_variant.blocked_footprints in the TRO.")
         return render_problem(
-            activity, definition_id, alias, b.all(), groups, init,
+            activity, definition_id, variant, b.all(), groups, init,
             [f"(pose_reached {_q(agent)})", f"(pose_settled {_q(agent)})"], [],
             comment=comment,
         )

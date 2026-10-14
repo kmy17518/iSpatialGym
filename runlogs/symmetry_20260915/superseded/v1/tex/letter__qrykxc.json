@@ -1,1 +1,0 @@
-{"key": "letter__qrykxc", "category": "letter", "model": "qrykxc", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.026573242017901056, "p95": 0.06143790849673202, "p99": 0.08627450980392157, "mad_union": 0.02634900455969226, "iou": 0.9999607773920888, "worst": "z180"}}, "render_s": 0.116}

@@ -1,1 +1,0 @@
-{"key": "first_aid_kit__flctdz", "category": "first_aid_kit", "model": "flctdz", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.061682488182430974, "p95": 0.3241830065359477, "p99": 0.3516339869281046, "mad_union": 0.11918347665519906, "iou": 0.8867781514993605, "worst": "x180"}}, "render_s": 0.118}

@@ -1,332 +1,56 @@
 {
-  "batch": "wave3_02",
-  "models": [
+ "models": [
+  {
+   "key": "lid__tnwisp",
+   "n_rows": 5,
+   "grasps": [
     {
-      "key": "mouse__cduwda",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm body pinch, asymmetric closure 39/0 but both pads touch"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"}
-      ],
-      "object_note": "All rows close one finger fully (x/0): mouse sits off gripper centreline but opening matches width."
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch across diameter at near-max opening"
     },
     {
-      "key": "mouse__pljjtu",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm body pinch, opening 41 vs 38 mm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm body pinch, both pads on mouse"}
-      ],
-      "object_note": "Same x/0 asymmetric closure as cduwda; opening exceeds width by 2-3 mm only."
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch across diameter at near-max opening"
     },
     {
-      "key": "tortilla_chips__dlkrgq",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "edge pinch, chip hangs below fingers"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "edge pinch, chip hangs below fingers"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "corner pinch, coverage 0.75; natural for a chip"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "edge pinch, chip hangs below fingers"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "edge pinch, one finger fully closed, both pads touch"}
-      ],
-      "object_note": "Thin chip standing on edge; all grasps are natural top-edge pinches."
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch across diameter, coverage 0.50"
     },
     {
-      "key": "tortilla_chips__mhbnsy",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "edge pinch, chip hangs below fingers"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "edge pinch, opening 6 vs 4 mm acceptable"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "edge pinch, opening 6 vs 4 mm acceptable"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "thin-edge pinch; planned 9 mm width not where pads closed"}
-      ],
-      "object_note": ""
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch at 97 mm, gripper at limit but both pads touch"
     },
     {
-      "key": "tortilla_chips__aiohfb",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "thin edge pinch, late attach (step 28) but closed"},
-        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "opening 14 mm on 4 mm chip; pads not both on chip"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "edge pinch, chip hangs below fingers"},
-        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "opening 10 mm on 4 mm chip; chip wedged diagonally"},
-        {"rank": 5, "verdict": "flag", "flags": ["gap"], "note": "opening 8 mm on 2 mm chip, coverage 0.50"}
-      ],
-      "object_note": "Strongly curved chip; fingers repeatedly stop well before the visual mesh (coarser hull)."
-    },
-    {
-      "key": "tortilla_chips__herjym",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["gap"], "note": "flat chip caught at rim by fingertips; width inf, coverage 0"}
-      ],
-      "object_note": "Chip lies flat; 78 mm opening, pads never contact chip faces."
-    },
-    {
-      "key": "tortilla_chips__kdjrni",
-      "n_rows": 2,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "edge pinch, large chip hangs below fingers"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "corner pinch, chip hangs; natural for a chip"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "chili__xhbpqh",
-      "n_rows": 2,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "tiny chili caught at tip by fingertip corners; width inf"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "tiny chili caught at tip by fingertip corners; width inf"}
-      ],
-      "object_note": "Gripper never descends around chili body; contacts only at fingertip corners, coverage 0."
-    },
-    {
-      "key": "chili__pbbkpz",
-      "n_rows": 3,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "stem end caught at fingertip corners; coverage 0, width inf"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "stem end caught at fingertip corners; coverage 0, width inf"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "tip end at fingertip corners, body sideways; coverage 0"}
-      ],
-      "object_note": "Small chili; all rows pinch an extreme end at fingertips, pads not on body."
-    },
-    {
-      "key": "chili__agecro",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body sideways; coverage 0"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body sideways; coverage 0"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body sideways; coverage 0"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body sideways; coverage 0"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body sideways; coverage 0"}
-      ],
-      "object_note": "Green chili ~50 mm; every grasp holds the very tip with width inf, antipodal 0."
-    },
-    {
-      "key": "chili__rafkbt",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "stem end at fingertips; opening 21 vs 7 mm, antipodal 0.33"},
-        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "stem end caught at fingertip corners; width inf, coverage 0"},
-        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body sideways; coverage 0"},
-        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body sideways; coverage 0"},
-        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pointed tip at fingertips, body hangs sideways; coverage 0"}
-      ],
-      "object_note": "Red chili ~60 mm; no grasp reaches the body, all end/tip contacts at fingertips."
-    },
-    {
-      "key": "lid__pwgbsb",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, both pads on rim, underside free"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, both pads on rim, underside free"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/10, width inf, coverage 0; lid not between pads"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, width inf, coverage 0; lid not between pads"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, width inf, coverage 0; lid not between pads"}
-      ],
-      "object_note": "Planned 12 mm knob grasp never achieved; fingers straddle ~90 mm dish, rows 3-5 only touch dish surface."
-    },
-    {
-      "key": "lid__tnwisp",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch across diameter at near-max opening"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch across diameter at near-max opening"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, coverage 0.50"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch at 97 mm, gripper at limit but both pads touch"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/13: rim-to-knob squeeze, lid strongly off-centre"}
-      ],
-      "object_note": "95 mm dome lid; planned knob grasp replaced by rim pinch at gripper limit."
-    },
-    {
-      "key": "lid__ugfmpq",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, handle and underside free"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, vertical approach, underside free"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, vertical approach, underside free"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, full coverage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, full coverage"}
-      ],
-      "object_note": "Planned 5 mm handle grasp; fingers instead pinch 90 mm flat rim (side grasp), acceptable."
-    },
-    {
-      "key": "lid__zkderg",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch across diameter; low antipodal 0.49 on flared rim"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11: rim-to-knob squeeze, lid strongly off-centre"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/10: rim-to-knob squeeze, lid strongly off-centre"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch across diameter, both pads on rim"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/9: rim-to-knob squeeze, lid strongly off-centre"}
-      ],
-      "object_note": "Saucer lid with mushroom knob; 50/small rows squeeze knob against far rim."
-    },
-    {
-      "key": "lid__qhlsdq",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "box pinched across flat faces, open side free"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "box pinched across flat faces, open side free"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch near one end but full pad contact on flat faces"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "end-region pinch, coverage 0.50, flat faces; acceptable"}
-      ],
-      "object_note": "Box-shaped lid ~90 mm wide; one finger stays fully open but both pads contact."
-    },
-    {
-      "key": "briefcase__fdpjtj",
-      "n_rows": 2,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-edge pinch of standing briefcase, full pad contact"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-edge pinch, briefcase slightly leaning, full contact"}
-      ],
-      "object_note": "Large object hangs below pinch when lifted; V4 saturated."
-    },
-    {
-      "key": "briefcase__uquevd",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-edge pinch across 77 mm bag, full coverage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-edge pinch, full coverage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-edge pinch, full coverage"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-edge pinch offset toward corner, still full pad contact"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-edge pinch, tilted approach, full coverage"}
-      ],
-      "object_note": "Soft bag standing on edge; gripper near max opening but both pads on bag."
-    },
-    {
-      "key": "briefcase__psvdau",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-edge pinch beside handle, full coverage"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-edge pinch, full coverage"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-edge pinch, antipodal 0.80 on rounded top"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-edge pinch, tilted approach, full coverage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-edge pinch, tilted approach, full coverage"}
-      ],
-      "object_note": "Thick briefcase at gripper limit (92-94 mm); V4 saturated."
-    },
-    {
-      "key": "briefcase__lwbctq",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-edge pinch of soft bag, coverage 0.50, acceptable"}
-      ],
-      "object_note": ""
-    },
-    {
-      "key": "sunflower__wpzsyk",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "head squeezed across petals (53 mm), stem grasp planned"},
-        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "pads on head/petals near stem; antipodal 0.40, coverage 0.50"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "pads on head rim/petals, not stem (24 vs 5 mm)"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "pads on head rim/petals, not stem (26 vs 5 mm)"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 50/0, head against one finger, antipodal 0.34"}
-      ],
-      "object_note": "Stem-top grasps planned but head collision hull stops fingers on petals in every row."
-    },
-    {
-      "key": "sunflower__mastuj",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 50/0, head pressed against open finger, petals"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 50/0, head pressed against open finger, petals"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "head rim/petals squeezed at 31 mm, stem (10 mm) planned"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "head rim/petals squeezed at 30 mm, stem (10 mm) planned"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 50/1, head squeezed across petals off-centre"}
-      ],
-      "object_note": "No row reaches the stem; all contacts on flower head."
-    },
-    {
-      "key": "sunflower__ooefvj",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 48/5, head against open finger, petals squeezed"},
-        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "head squeezed across petals (39 mm), stem 7 mm planned"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "head squeezed across petals (37 mm), coverage 0.50"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "head squeezed across petals (44 mm), coverage 0.50"}
-      ],
-      "object_note": "All rows pinch the head, not the stem."
-    },
-    {
-      "key": "sunflower__psrfmx",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 50/8, coverage 0; head at fingertip, petals"},
-        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "head rim/petals squeezed at 32 mm, neck 14 mm planned"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "tight pinch at head back/neck (19 mm), good antipodal"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "head squeezed at 35 mm, antipodal 0.51"}
-      ],
-      "object_note": "Only row 3 approximates the planned neck grasp."
-    },
-    {
-      "key": "sunflower__pibfxd",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["gap"], "note": "opening 10 mm on 3 mm stem, antipodal 0.35; daylight"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "stem pinched just above head, 11 mm on 7 mm neck"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile", "gap"], "note": "fingers 50/34 (84 mm); pads only at petal tips"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile", "gap"], "note": "fingers 50/34 (84 mm); pads only at petal tips"},
-        {"rank": 5, "verdict": "flag", "flags": ["fragile", "gap"], "note": "fingers 47/21 (68 mm), coverage 0.25; petal tips only"}
-      ],
-      "object_note": "Row 2 is the only clean stem-top grasp in this model."
-    },
-    {
-      "key": "sunflower__dkajbh",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["gap"], "note": "stem only at fingertip edge; coverage 0, antipodal 0.16"}
-      ],
-      "object_note": "Head sits beside gripper body; pads never enclose the stem."
-    },
-    {
-      "key": "sunflower__itrbng",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "fingers 47/14 (61 mm) on head petals, off-centre"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 50/7, antipodal 0.44; head against open finger"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "head rim/petals squeezed at 30 mm, neck 13 mm planned"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "head rim/petals squeezed at 28 mm, neck 13 mm planned"}
-      ],
-      "object_note": "All rows stop on the head hull instead of the stem."
-    },
-    {
-      "key": "sunflower__urpskm",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["fragile", "gap"], "note": "fingers 50/23 (73 mm); stem centred, pads at petal tips"},
-        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "stem at fingertip edge; coverage 0, antipodal 0.12"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "head squeezed at 35 mm, coverage 0.25, antipodal 0.63"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "fingers 50/6, head against open finger, petals"}
-      ],
-      "object_note": "No usable stem grasp; contacts on head or at fingertip edges only."
-    },
-    {
-      "key": "sunflower__rkwubf",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["gap"], "note": "stem diagonal at fingertips; 10 vs 6 mm, antipodal 0.26"}
-      ],
-      "object_note": "Mid-stem (t 0.45) pinch with poor contact geometry, coverage 0.50."
-    },
-    {
-      "key": "quartz__kilkpz",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near CoM, opening matches width"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near CoM, opening matches width"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch near CoM, opening matches width"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch on oblique facets, antipodal 0.50, full coverage"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch on oblique facets, antipodal 0.50, full coverage"}
-      ],
-      "object_note": "Crystal pinched across its prism; fingertips do not extend below the crystal."
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/13: rim-to-knob squeeze, lid strongly off-centre"
     }
-  ]
+   ],
+   "object_note": "95 mm dome lid; planned knob grasp replaced by rim pinch at gripper limit."
+  },
+  {
+   "key": "briefcase__lwbctq",
+   "n_rows": 1,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch of soft bag, coverage 0.50, acceptable"
+    }
+   ],
+   "object_note": ""
+  }
+ ]
 }

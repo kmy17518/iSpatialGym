@@ -1,9 +1,0 @@
-{
-  "category": "soap_dispenser",
-  "pages_opened": ["grids/pool_other/soap_dispenser__p1.png", "grids/pool_other/soap_dispenser__p2.png"],
-  "n_models": 22,
-  "exclude": [
-    {"model": "conditioner_dispenser/njqnuo", "reason": "lies on its side on the tray with the pump pointing at the camera, not standing (tilt 12.2 deg)"}
-  ],
-  "notes": "Other 21 bottles, pump dispensers, sprays, tubes and tier-2 perfume/cologne/face-cream are textured, intact and upright. detergent_atomizer/rhfpsb (10.5 deg) and spray_bottle/asztxi (6.8 deg) lean but stand. The upright conditioner/shampoo dispensers are pump bottles and thus close target lookalikes, kept per upstream category choice."
-}

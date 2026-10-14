@@ -3,7 +3,7 @@
   "instance_id": "alignment-axial-paperback_book-breakfast_table__house_single_floor__target-paperback_book-jhaltj__0000",
   "tro_sha256": "911628006d65c1b3054895b84f31c9d8a09e373d5a51a1baaf4c0ca013158e81",
   "task_family": "alignment",
-  "alias": "alignment-axial-paperback_book-breakfast_table",
+  "variant": "alignment-axial-paperback_book-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

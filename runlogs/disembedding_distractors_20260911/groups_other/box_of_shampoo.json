@@ -1,9 +1,0 @@
-{
-  "category": "box_of_shampoo",
-  "pages_opened": ["grids/pool_other/box_of_shampoo__p1.png", "grids/pool_other/box_of_shampoo__p2.png"],
-  "n_models": 24,
-  "exclude": [
-    {"model": "conditioner_dispenser/njqnuo", "reason": "rests inverted on its red pump head, 12 deg lean; not a natural upright pose"}
-  ],
-  "notes": "Remaining 23 are intact, textured boxes (cereal, rice, sugar, baking mix, crackers, coffee, granola, tissues, sanitary napkins, whiskey/rum/champagne gift boxes) plus upright shampoo bottle and soap/shampoo dispensers. Food boxes are only loosely related to a shampoo box but are boxes, so kept. Flat coffee and tissue boxes lie flat by design."
-}

@@ -18,7 +18,7 @@ sampling/
                     0.1 m strides), §3.8 stance transitions (swept trunk at s_T)
     tabletop.py     §4 Phases 1a / 1b / 1c / 2 / 3 (+ 4.7 disembedding placement stance) as functions on a sampler
     prompt0.py      §5.2 large-scale stance skeleton (Phase 1 ray, Phase 2 lattice, caches)
-    program_check.py §3.5 program check: expand(alias, draft sidecar) -> IK/collision-check every target
+    program_check.py §3.5 program check: expand(variant, draft sidecar) -> IK/collision-check every target
     core.py         SamplerV2 (extends the v1 TaskSampler pipeline: settle / validate / goal feasibility / TRO)
                     with the sidecar draft, transitions, program check, reload validation, constraints write-back
     tasks/          one module per subtask family, registered with @register("<subtask id>")
@@ -46,7 +46,7 @@ sampling/
 3. **Records** are the sidecar dataclasses of `ispatialgym.oracle.sidecar` (F6, spec §7). The sampler fills a
    *draft* `Sidecar` while it samples; `core.write_instance` finalises it (`tro_sha256`) next to the TRO.
 4. **Checks**: every eef pose the oracle will use is IK-checked here (screening at waypoints, exact at endpoints,
-   §3.6 / §3.9); the last stage of every attempt is the **program check** (`program_check.run(alias, sidecar)`:
+   §3.6 / §3.9); the last stage of every attempt is the **program check** (`program_check.run(variant, sidecar)`:
    `oracle.programs.expand` → `Action.targets()` → IK / collision per target in the recorded posture with the
    carried object attached). A failure is `Reject("program_check_failed", action=<name>)`; nothing is patched.
 5. **No fallbacks** (principle 2): candidate sets are enumerated (edges, stand-offs, trunks, feasible grasp sets,
@@ -101,7 +101,7 @@ out_dir, base_seed, customs_sha256, variant)`. Attributes a task module uses:
 | v1 helpers still available | `support_top(obj)`, `frustum_ok(cam, pts)`, `hull_corners_world(hull, pose)`, `world.footprint / bottom_offset / local_hull`, `bind_scene_object`, `spawn_role`, `tol(key, default)` |
 
 Hooks (override): `bind_scene_roles()`, `sample_template()`, `sample_instance(rng) -> Draft`, `goal(draft)`, `after_goal_check(draft)`,
-`record_constraints(draft) -> [records]`, `support_objects()`, `v1_role_aliases()` (facade only). Per attempt `core.run_instances`
+`record_constraints(draft) -> [records]`, `support_objects()`, `v1_role_variants()` (facade only). Per attempt `core.run_instances`
 runs: reset scene + park -> `sample` (= `sidecar.reset_instance()`, `sample_instance`, `goal`) -> `apply_draft` -> `settle_and_validate`
 -> `check_goal_feasible` (parked) -> `after_goal_check` -> `program_check` -> `save_template` (first instance) -> TRO + `<iid>.oracle.json`
 + `<iid>.summary.json` -> `constraints_write_back`. Every `Reject(reason)` is counted (first three examples kept in `template_meta.json`
@@ -177,14 +177,14 @@ contact_bands(s, arm="left", height=h)` then `reach_bands.ReachBands.load(scene,
 height_class=h)`; until one exists the gate is recorded as `template_facts.left_contact_band = "unavailable"` and the
 two-arm IK alone decides.
 
-### C5 — several aliases per process (`sample_isg --alias A --alias B …`)
+### C5 — several variants per process (`sample_isg --variant A --variant B …`)
 
 The world is reused when the **world key** `(scene, task rooms, removed chairs)` matches (`sample_isg.world_key`; log line
-`world reused for <alias>` / `world loaded for <alias> in Ns`); a failing alias is caught per alias (`summary.json`
-`aliases.<alias>.{time_s, world, n_written, templates, error}`, `errors[]`) and the chunk continues; `summary.json` /
+`world reused for <variant>` / `world loaded for <variant> in Ns`); a failing variant is caught per variant (`summary.json`
+`variants.<variant>.{time_s, world, n_written, templates, error}`, `errors[]`) and the chunk continues; `summary.json` /
 `SAMPLING_REPORT` carry `wall_time_s` and `world.{n_loads, load_time_s}` for the wall-time split.
-`python -m ispatialgym.sampling.sample_isg --world-key --alias A --alias B` prints `alias<TAB>scene|rooms=…|removed=…` per
-(alias, candidate scene) without a simulator (18 s for the imports), so the scheduler can group aliases by key.
+`python -m ispatialgym.sampling.sample_isg --world-key --variant A --variant B` prints `variant<TAB>scene|rooms=…|removed=…` per
+(variant, candidate scene) without a simulator (18 s for the imports), so the scheduler can group variants by key.
 
 ### Report layout changes (2026-09-16)
 
@@ -212,20 +212,20 @@ The world is reused when the **world key** `(scene, task rooms, removed chairs)`
 ## Running (D4)
 
 ```
-OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_isg --alias <alias> [--customs ispatialgym/assets/task_specs/isg_customs.json]
+OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_isg --variant <variant> [--customs ispatialgym/assets/task_specs/isg_customs.json]
     [--scene S] [--templates N] [--instances-per-template N] [--seed 0] [--out <root>] [--max-attempts 30] [--no-write-back]
-OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.multiply_isg --template <root>/<alias>/<template_id> --instances N [--path-buckets 3:10,5:10,10:5]
+OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.multiply_isg --template <root>/<variant>/<template_id> --instances N [--path-buckets 3:10,5:10,10:5]
 ```
 
 Reach bands: `sample_isg` / `multiply_isg` point `ISPATIALGYM_REACH_BANDS` at `runlogs/reach_bands_20260915/bands/` (the fleet
 results B3 collects) when the directory exists and the variable is unset; `ReachBands.load` searches it first, then the runlog
 root and `~/.cache/ispatialgym/reach_bands` — a hit logs `reach band cache hit ...` in `tabletop.ensure_bands` and skips the
-in-process computation. The BDDL is written both at `<root>/<alias>/activity_definitions/...` (§1) and inside the template
+in-process computation. The BDDL is written both at `<root>/<variant>/activity_definitions/...` (§1) and inside the template
 directory (`run_isg.build_env_config` and `validate_instances` read the latter). The `hold` constraint type written by the
 held-object module is added to `customs.CONSTRAINT_TYPES` by the D1 owner.
 
-`sample_isg` copies the customs list to `<root>/task_custom_lists.json`, writes `<root>/<alias>/activity_definitions/<activity>/problem<N>.bddl`,
-`<root>/<alias>/<template_id>/{template.json, template-partial_rooms.json, template_meta.json, instances/<iid>-tro_state.json,
+`sample_isg` copies the customs list to `<root>/task_custom_lists.json`, writes `<root>/<variant>/activity_definitions/<activity>/problem<N>.bddl`,
+`<root>/<variant>/<template_id>/{template.json, template-partial_rooms.json, template_meta.json, instances/<iid>-tro_state.json,
 <iid>.oracle.json, <iid>.summary.json}` and `<root>/summary.json`, and prints one `SAMPLING_REPORT {...}` line. Blacklists and
 constraints learned go back into the source customs file (§1) unless `--no-write-back`; the `<root>` copy always carries them.
 On the shared smoke pods (`scripts/runpod/remote_run.py`) pass explicit paths (`--out $SMOKE_OUT/run1`, `--customs ...`); the
@@ -253,7 +253,7 @@ reach band of a (support, object) pair is computed in-process on a cache miss (~
 
 ## Smoke (2026-09-15, pool pod L40S, run `194648-593f2d`)
 
-`sample_isg --alias inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table --templates 1
+`sample_isg --variant inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table --templates 1
 --instances-per-template 1` → template + instance 0000 in 191 s (4 attempts: `place_unreachable`, `stance_collision_with_objects`,
 `grasp_unreachable` once each), full checks (`checks.attached_object = true`, program check `expand` over `transition, grasp, lift,
 place, retreat`); `multiply_isg --instances 1` continued the template (same `template.json` sha, band cache hit) and wrote 0001 at
@@ -262,12 +262,12 @@ its first attempt (80 s); D5's `validate_instances` reloaded both in a fresh pro
 partner gap rule: cutting the §4.6 step-2 gap range per side to the manipulation trunk's reach band (the goal cell must be
 reachable) took `place_unreachable` from 15–21 to ≤ 5 per 40 attempts.
 
-### Multi-alias chunk smoke (2026-09-16, pool pod `htvfrubebp6tnj`, run `021545-064eb8`)
+### Multi-variant chunk smoke (2026-09-16, pool pod `htvfrubebp6tnj`, run `021545-064eb8`)
 
-`sample_isg --alias …ontop_small_scale-apple-plate-breakfast_table --alias …nextto-marker-colored_pencil-breakfast_table --alias
-mental_rotation-banana --templates 1 --instances-per-template 1 --max-attempts 6`: 3 / 3 aliases wrote their instance, wall 2090 s,
-two world loads (1096 s: 562 + 534 s on a cold pod — dining room vs living room are different world keys), the second alias
-**reused** the first world (134 s for the whole alias vs 961 / 984 s for the loading ones; template + instance 122 s); fleet
+`sample_isg --variant …ontop_small_scale-apple-plate-breakfast_table --variant …nextto-marker-colored_pencil-breakfast_table --variant
+mental_rotation-banana --templates 1 --instances-per-template 1 --max-attempts 6`: 3 / 3 variants wrote their instance, wall 2090 s,
+two world loads (1096 s: 562 + 534 s on a cold pod — dining room vs living room are different world keys), the second variant
+**reused** the first world (134 s for the whole variant vs 961 / 984 s for the loading ones; template + instance 122 s); fleet
 reach-band cache hits for apple and marker. Sidecars carry `idle_posture` / `arms_q` per stance and `ik_witnesses` per action.
 
 ### Simulator facts fixed in `sim_utils.py` (2026-09-16, from the disembedding root cause `9744b34`)

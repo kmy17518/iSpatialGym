@@ -2,7 +2,7 @@
 placement area for the target and the partner.
 
 The pairing is declared on the support row of ``roles/representatives.csv`` (note key ``neighbors=<support>[,<support>]``, scene
-objects of the row's scene), carried by ``ground_isg.support_surface`` into the alias's ``scenes.<scene>.bindings.support_surfaces``
+objects of the row's scene), carried by ``ground_isg.support_surface`` into the variant's ``scenes.<scene>.bindings.support_surfaces``
 entry (``"neighbors": [...]``) and read here:
 
 * :func:`union_top` (``tabletop.support_surface``): the support top united with each neighbour's top, :class:`UnionTop`. Each top
@@ -356,13 +356,13 @@ def union_top(s, support, top, spec: Optional[Dict[str, Any]], ignore: Sequence[
             objs.append(obj)
         facts.append(rec)
     fact["neighbors"] = facts
-    alias = getattr(getattr(s, "gp", None), "alias", "?")
+    variant = getattr(getattr(s, "gp", None), "variant", "?")
     if len(members) == 1:
-        log.info("%s: no usable neighbour top for %s (%s); its own top", alias, top.name, facts)
+        log.info("%s: no usable neighbour top for %s (%s); its own top", variant, top.name, facts)
         return top
     u = UnionTop.build(members, flush_tol=tol, edge_strip=gen("neighbor_edge_strip_m", EDGE_STRIP_M))
     s.neighbors_of = {top.name: objs}
-    log.info("%s: %s united with %s: %d free cells (own %d), heights above the floor %s, flush tolerance %.3f m", alias, top.name,
+    log.info("%s: %s united with %s: %d free cells (own %d), heights above the floor %s, flush tolerance %.3f m", variant, top.name,
              [m.name for m in members[1:]], int(u.free.sum()), int(top.free.sum()), [round(float(m.z) - floor_z, 3) for m in members], tol)
     return u
 

@@ -1,1 +1,0 @@
-{"key": "cookie_cutter__fvxiun", "category": "cookie_cutter", "model": "fvxiun", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.035824868922553064, "p95": 0.24444444444444446, "p99": 0.28104575163398693, "mad_union": 0.08614525282993972, "iou": 0.9327081840555781, "worst": "x180"}}, "render_s": 0.125}

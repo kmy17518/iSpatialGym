@@ -1,1 +1,0 @@
-{"key": "bell_pepper__ukkycp", "category": "bell_pepper", "model": "ukkycp", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x6": {"mad": 0.01423946185521642, "p95": 0.032679738562091505, "p99": 0.13856209150326798, "mad_union": 0.110790033983816, "iou": 0.8808538267997728, "worst": "x60"}}, "render_s": 0.105}

@@ -16,8 +16,8 @@ broke bar soap (wave 5), so nothing global changes; instead two checks switch on
 disembedding -> the destination tray, block design -> the other blocks and the board) that the task itself placed in
 the scene (not furniture: a scene object's name is ``<category>_<model>_<k>``), plus the action's own target until its
 intended contact begins. Distractors (only in negated atoms), source containers and furniture keep today's handling.
-A per-alias override lives in ``isg_customs.json``: ``"protection": {"exclude": [bddl names], "include": [...]}`` with a
-``_protection_note`` (note: any key added to an alias entry changes its spec hash, hence its sampling seeds).
+A per-subtask override lives in ``isg_customs.json``: ``"protection": {"exclude": [bddl names], "include": [...]}`` with a
+``_protection_note``.
 """
 
 from __future__ import annotations
@@ -107,14 +107,14 @@ def is_task_object(obj: Any) -> bool:
     return True
 
 
-def alias_override(alias: Optional[str], customs_path: Optional[str] = None) -> Dict[str, Any]:
-    """``isg_customs.json`` -> ``[alias]["protection"]`` (``{"exclude": [...], "include": [...]}``) or ``{}``."""
-    if not alias:
+def subtask_override(subtask: Optional[str], customs_path: Optional[str] = None) -> Dict[str, Any]:
+    """``isg_customs.json`` -> ``[subtask]["protection"]`` (``{"exclude": [...], "include": [...]}``) or ``{}``."""
+    if not subtask:
         return {}
     path = customs_path or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "task_specs", "isg_customs.json")
     try:
         with open(path) as f:
-            entry = json.load(f).get(alias) or {}
+            entry = json.load(f).get(subtask) or {}
     except Exception as e:  # noqa: BLE001
         log.debug("protection: customs unreadable (%r)", e)
         return {}

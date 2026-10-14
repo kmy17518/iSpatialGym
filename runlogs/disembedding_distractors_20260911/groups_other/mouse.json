@@ -1,9 +1,0 @@
-{
-  "category": "mouse",
-  "pages_opened": ["grids/pool_other/mouse__p1.png", "grids/pool_other/mouse__p2.png"],
-  "n_models": 24,
-  "exclude": [
-    {"model": "mousetrap/mwfwsv", "reason": "tier-2 word-pun match; a wooden mousetrap is unrelated to a computer mouse"}
-  ],
-  "notes": "Others are intact desk/pocket-sized everyday objects (webcam, calculator, stapler, soaps, soap dishes, wallet, sunglasses, keys, padlock, charger, watch, potatoes, tier-2 lighter, matchbox, cigarettes, tape dispenser) resting naturally. Both potato assets include a scanned doily mat under the potato; kept since they still read as potatoes. stapler/kgnsas is seen end-on so looks thin, but is intact."
-}

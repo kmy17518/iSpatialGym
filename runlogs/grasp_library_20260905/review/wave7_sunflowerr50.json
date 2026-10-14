@@ -1,5 +1,4 @@
 {
- "batch": "wave7_sunflowerr50 (2026-10-11, sunflower_r50 worker on strips/sunflower__dkajbh__r50.png and its frames with review_prompt.md, not the reviewer pool)",
  "models": [
   {
    "key": "sunflower__dkajbh__r50",

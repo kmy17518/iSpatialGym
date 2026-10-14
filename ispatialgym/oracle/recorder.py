@@ -16,7 +16,9 @@ One :class:`Recorder` hangs off the executor's ``env.step`` and writes, in **one
   ``observation.state`` proprio, ``action``, ``next.reward`` / ``next.terminated`` / ``next.truncated``, per-frame
   ``task`` = the fine-grained annotation of the running action, ``annotation.action_index``), frame ``i`` pairing
   the observation *before* ``action[i]`` exactly as the wrapper does; written under ``<out>/lerobot/``.
-* ``head_rgb.mp4`` — the head-camera rollout video (``--video``; the QA-only mode of §6.5),
+* ``<view>_rgb.mp4`` — the rollout videos of ``run_isg --record-view`` (:data:`VIEWS`: the head camera, the external
+  camera over the robot's shoulder, the two wrist cameras, and BEHAVIOR's JoyLo replay tiling of all four,
+  :func:`tiled_frame`),
 * ``annotations.json`` — the three annotation levels of §6.3 per action (fine-grained, with numbers, the demo-level
   family / template / instance descriptions) with step ranges and QA verdicts; the same JSON goes into the hdf5 attrs.
 
@@ -36,7 +38,7 @@ import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -47,6 +49,32 @@ log = logging.getLogger(__name__)
 
 PHASE_ORACLE, PHASE_SETTLE, PHASE_GOAL = 0, 1, 2
 PHASE_CODES = {"oracle": PHASE_ORACLE, "settle": PHASE_SETTLE, "goal": PHASE_GOAL}
+
+#: the views ``run_isg --record-view`` records, each to ``<view>_rgb.mp4``
+VIEWS: Tuple[str, ...] = ("tiled", "head", "external", "left_wrist", "right_wrist")
+#: BEHAVIOR's JoyLo replay video (``joylo/scripts/replay_data.py``): 480 px tiles
+TILE_PX = 480
+
+
+def _resized(frame: np.ndarray, width: int, height: int) -> np.ndarray:
+    if frame.shape[1] == width and frame.shape[0] == height:
+        return frame
+    from PIL import Image
+
+    return np.asarray(Image.fromarray(np.ascontiguousarray(frame)).resize((int(width), int(height)), Image.BILINEAR))
+
+
+def tiled_frame(left_wrist: Optional[np.ndarray], head: Optional[np.ndarray], right_wrist: Optional[np.ndarray], external: Optional[np.ndarray],
+                tile: int = TILE_PX) -> np.ndarray:
+    """BEHAVIOR's JoyLo replay frame: left wrist | head | right wrist (``tile`` px squares) over the external camera
+    (``3 tile`` x ``2 tile``), ``3 tile`` px square in all; a missing view is black."""
+    def fit(frame, width, height):
+        if frame is None:
+            return np.zeros((height, width, 3), dtype=np.uint8)
+        return _resized(np.asarray(frame)[..., :3], width, height)
+
+    top = np.concatenate([fit(left_wrist, tile, tile), fit(head, tile, tile), fit(right_wrist, tile, tile)], axis=1)
+    return np.concatenate([top, fit(external, 3 * tile, 2 * tile)], axis=0)
 
 
 def json_default(o):
@@ -136,13 +164,13 @@ class EpisodeAnnotations:
     family_description: str = ""
     template_description: str = ""
     instance_description: str = ""
-    alias: str = ""
+    variant: str = ""
     instance_id: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "family": self.family, "family_description": self.family_description, "template_description": self.template_description,
-            "instance_description": self.instance_description, "alias": self.alias, "instance_id": self.instance_id,
+            "instance_description": self.instance_description, "variant": self.variant, "instance_id": self.instance_id,
         }
 
 
@@ -201,7 +229,9 @@ class _StepFrames(dict):
 class RecorderConfig:
     hdf5: bool = True
     lerobot: bool = True
-    video: bool = False
+    #: the videos to write (:data:`VIEWS`), each to ``<view>_rgb.mp4``
+    views: Tuple[str, ...] = ()
+    #: every video scaled to this width (aspect kept)
     video_size: Optional[int] = None
     all_cameras: bool = False  # LeRobot: every rgb sensor, else the head camera only
     keep_rollbacks: bool = True
@@ -210,13 +240,13 @@ class RecorderConfig:
     lerobot_repo_id: Optional[str] = None
     lerobot_robot_type: str = "r1pro"
     lerobot_vcodec: str = "hevc"
-    #: (run_isg --dev) name of an env external sensor (``obs["external"][name]["rgb"]``) written to ``external_rgb.mp4``
-    #: next to the head video - the JoyLo replay viewpoint over the robot's shoulder
+    #: name of the env external sensor (``obs["external"][name]["rgb"]``) of the ``external`` / ``tiled`` views - the JoyLo
+    #: replay viewpoint over the robot's shoulder
     external_camera: Optional[str] = None
     #: ``<root>/<repo_id>`` of the LeRobot v3 shard the episode is appended to in BEHAVIOR's replay_obs format
     #: (:mod:`ispatialgym.oracle.behavior_lerobot`; the robot must carry replay_obs's sensors); None: not written
     behavior_shard: Optional[str] = None
-    #: task name of the shard's episodes (the alias)
+    #: task name of the shard's episodes (the variant)
     behavior_task: Optional[str] = None
     #: the shard's segments handed to BEHAVIOR's LeRobot writer from a background thread (same frames, same order), so the
     #: demo does not wait on the video encoders' queues. Default: ISPATIALGYM_ASYNC_SHARD=1 (off when unset)
@@ -282,13 +312,14 @@ class Recorder:
         self.actions: List[ActionAnnotation] = []
         self.episode = EpisodeAnnotations()
         self.current_task = self.task_name
-        # sinks
-        self.video_path = os.path.join(out_dir, "head_rgb.mp4") if self.cfg.video else None
-        self._writer = None
-        self.video_error: Optional[str] = None
-        self.external_video_path = os.path.join(out_dir, "external_rgb.mp4") if (self.cfg.video and self.cfg.external_camera) else None
-        self._ext_writer = None
-        self.external_video_error: Optional[str] = None
+        # sinks: one video writer per view
+        unknown = [v for v in self.cfg.views if v not in VIEWS]
+        if unknown:
+            raise ValueError(f"unknown record views {unknown}; choose from {', '.join(VIEWS)}")
+        self.view_paths: Dict[str, str] = {v: os.path.join(out_dir, f"{v}_rgb.mp4") for v in dict.fromkeys(self.cfg.views)}
+        self.view_errors: Dict[str, str] = {}
+        self._writers: Dict[str, Any] = {}
+        self._wrist_keys: Dict[str, Optional[str]] = {}
         self.last_rgb: Optional[np.ndarray] = None
         self.reset_obs = None
         self._last_obs_lerobot: Optional[Dict[str, Any]] = None
@@ -305,7 +336,7 @@ class Recorder:
         if self.cfg.physics_only:
             from ispatialgym.oracle import physics_only as PO
 
-            PO.check_recording(self.cfg.video, self.cfg.lerobot, self.cfg.behavior_shard)
+            PO.check_recording(bool(self.cfg.views), self.cfg.lerobot, self.cfg.behavior_shard)
         # behavior_proprio: the proprioception of the state the next recorded step starts from, the one of the last
         # committed state (a rollback to an empty pending segment returns to it) and the one after each pending step
         self._bproprio_last: Optional[np.ndarray] = None
@@ -330,7 +361,7 @@ class Recorder:
     def _step_frames(self, robs: Dict[str, Any]) -> Optional["_StepFrames"]:
         """``async_frames``: the step's frames, one per camera key, shared by every sink; None otherwise, and when no
         video or LeRobot sink takes frames (then only ``last_rgb`` is kept, as on the synchronous path)."""
-        if self._pipe is None or not (self.cfg.video or self.cfg.lerobot):
+        if self._pipe is None or not (self.cfg.views or self.cfg.lerobot):
             return None
         return _StepFrames(self._pipe, robs)
 
@@ -360,7 +391,7 @@ class Recorder:
         lazily converted copy with ``lazy_frames`` when no video sink needs the frame now, else the converted frame."""
         if self.cfg.physics_only:
             return
-        if self.cfg.lazy_frames and self._writer is None:
+        if self.cfg.lazy_frames and not self._writers:
             try:
                 self.last_rgb = _LazyRGB(self._robot_obs(obs)[self.cam_key]["rgb"])
             except Exception:  # noqa: BLE001  (as head_frame: a camera without an rgb image has no frame)
@@ -381,6 +412,15 @@ class Recorder:
             return None
         try:
             return to_uint8_rgb(obs["external"][self.cfg.external_camera]["rgb"])
+        except Exception:  # noqa: BLE001
+            return None
+
+    @staticmethod
+    def _camera_frame(robs: Dict[str, Any], key: Optional[str]) -> Optional[np.ndarray]:
+        if key is None:
+            return None
+        try:
+            return to_uint8_rgb(robs[key]["rgb"])
         except Exception:  # noqa: BLE001
             return None
 
@@ -416,8 +456,8 @@ class Recorder:
             self._pending_bproprio = []
         if self.cfg.hdf5:
             self._snapshot_scene()
-        if self.cfg.video:
-            self._open_video()
+        if self.view_paths:
+            self._open_views(robs)
         if self.cfg.lerobot:
             self._create_lerobot(robs)
         if self.cfg.behavior_shard:
@@ -450,30 +490,28 @@ class Recorder:
         except Exception as e:  # noqa: BLE001
             log.warning("scene snapshot for the hdf5 header failed: %r", e)
 
-    def _open_video(self) -> None:
-        try:
-            import imageio.v2 as imageio
-
-            self._writer = imageio.get_writer(
-                self.video_path, fps=self.fps, codec="libx264", pixelformat="yuv420p", macro_block_size=8,
-                ffmpeg_params=["-crf", str(self.cfg.video_crf), "-preset", "veryfast"],
-            )
-        except Exception as e:  # noqa: BLE001
-            self.video_error = repr(e)
-            self._writer = None
-            log.warning("video writer unavailable (%r); recording without video", e)
-        if self.external_video_path:
+    def _open_views(self, robs: Dict[str, Any]) -> None:
+        for arm in M.ARMS:
+            self._wrist_keys[arm] = next((k for k, v in robs.items() if f"{arm}_realsense_link" in k and isinstance(v, dict) and "rgb" in v), None)
+        sources = {"head": self.cam_key in robs, "external": bool(self.cfg.external_camera),
+                   "left_wrist": self._wrist_keys["left"] is not None, "right_wrist": self._wrist_keys["right"] is not None}
+        for view, path in self.view_paths.items():
+            if not sources.get(view, True):
+                self.view_errors[view] = "no camera" if view != "external" else "no external camera configured"
+                log.warning("%s video not recorded: %s", view, self.view_errors[view])
+                continue
+            if view == "tiled" and not all(sources.values()):
+                log.warning("tiled video: no %s camera, its tile stays black", ", ".join(v for v, ok in sources.items() if not ok))
             try:
                 import imageio.v2 as imageio
 
-                self._ext_writer = imageio.get_writer(
-                    self.external_video_path, fps=self.fps, codec="libx264", pixelformat="yuv420p", macro_block_size=8,
+                self._writers[view] = imageio.get_writer(
+                    path, fps=self.fps, codec="libx264", pixelformat="yuv420p", macro_block_size=8,
                     ffmpeg_params=["-crf", str(self.cfg.video_crf), "-preset", "veryfast"],
                 )
             except Exception as e:  # noqa: BLE001
-                self.external_video_error = repr(e)
-                self._ext_writer = None
-                log.warning("external video writer unavailable (%r)", e)
+                self.view_errors[view] = repr(e)
+                log.warning("%s video writer unavailable (%r); recording without it", view, e)
 
     # ------------------------------------------------------------------ LeRobot
 
@@ -602,23 +640,23 @@ class Recorder:
         if state is not None:
             self._pending_states.append(th.as_tensor(state).detach().cpu().float().clone())
         frames = self._step_frames(robs)
+        head = None
         if frames is not None:
             frame = frames.get(self.cam_key)
             if frame is not None:
                 self.last_rgb = frame
-                if self._writer is not None:
-                    self._pending_frames["video"].append(frame)
-        elif self._writer is not None:
-            frame = self.head_frame(obs)
-            if frame is not None:
-                self.last_rgb = frame
-                self._pending_frames["video"].append(_Frame(frame, self.cfg.frame_buffer))
+                if "head" in self._writers:
+                    self._pending_frames["head"].append(frame)
+        elif self._writers:
+            head = self.head_frame(obs)
+            if head is not None:
+                self.last_rgb = head
+                if "head" in self._writers:
+                    self._pending_frames["head"].append(_Frame(head, self.cfg.frame_buffer))
         else:
             self._keep_head_frame(obs)
-        if self._ext_writer is not None:
-            ext = self.external_frame(obs)
-            if ext is not None:
-                self._pending_frames["external"].append(_Frame(ext, self.cfg.frame_buffer))
+        if self._writers:
+            self._buffer_views(obs, robs, head, frames)
         if self.dataset is not None and self._last_obs_lerobot is not None:
             self._pending_lerobot.append(self._lerobot_frame(self._last_obs_lerobot, action, reward, terminated, truncated, action_index, self.current_task))
         if self.dataset is not None:
@@ -630,6 +668,27 @@ class Recorder:
                 log.warning("BEHAVIOR LeRobot step not written: %r", e)
                 self.behavior.abort()
                 self.behavior_status = f"error: {e!r}"
+
+    def _buffer_views(self, obs, robs: Dict[str, Any], head: Optional[np.ndarray], frames: Optional[_StepFrames]) -> None:
+        """Buffer the step's frame of every view but the head one (buffered with ``last_rgb``)."""
+        views = [v for v in self._writers if v != "head"]
+        if not views:
+            return
+        wrist = {arm: self._camera_frame(robs, self._wrist_keys.get(arm)) for arm in M.ARMS
+                 if f"{arm}_wrist" in views or "tiled" in views}
+        external = self.external_frame(obs) if ("external" in views or "tiled" in views) else None
+        for view in views:
+            if view == "tiled":
+                if head is None and frames is not None:
+                    frame = frames.get(self.cam_key)
+                    head = None if frame is None else frame.array()
+                frame = tiled_frame(wrist.get("left"), head, wrist.get("right"), external)
+            elif view == "external":
+                frame = external
+            else:
+                frame = wrist.get(view.split("_")[0])
+            if frame is not None:
+                self._pending_frames[view].append(_Frame(frame, self.cfg.frame_buffer))
 
     @property
     def n_pending(self) -> int:
@@ -653,22 +712,16 @@ class Recorder:
             self._bproprio_committed = self._bproprio_last
         if self._pipe is not None:
             # the sink thread writes them in this order; close() drains it before closing the sinks
-            if self._writer is not None:
-                for fr in self._pending_frames["video"]:
-                    self._pipe.sink(self._sink_video_frame, fr, False)
-            if self._ext_writer is not None:
-                for fr in self._pending_frames["external"]:
-                    self._pipe.sink(self._sink_video_frame, fr, True)
+            for view in list(self._writers):
+                for fr in self._pending_frames[view]:
+                    self._pipe.sink(self._sink_view_frame, fr, view)
             if self.dataset is not None:
                 for frame in self._pending_lerobot:
                     self._pipe.sink(self._sink_lerobot_frame, frame)
         else:
-            if self._writer is not None:
-                for fr in self._pending_frames["video"]:
-                    self._write_video_frame(fr.array())
-            if self._ext_writer is not None:
-                for fr in self._pending_frames["external"]:
-                    self._write_video_frame(fr.array(), external=True)
+            for view in list(self._writers):
+                for fr in self._pending_frames[view]:
+                    self._write_view_frame(view, fr.array())
             if self.dataset is not None:
                 for frame in self._pending_lerobot:
                     self._add_lerobot_frame(frame)
@@ -734,31 +787,23 @@ class Recorder:
         self._pending_frames = defaultdict(list)
         self._pending_lerobot = []
 
-    def _write_video_frame(self, frame: np.ndarray, external: bool = False) -> None:
-        try:
-            if self.cfg.video_size and frame.shape[0] != self.cfg.video_size:
-                from PIL import Image
-
-                frame = np.asarray(Image.fromarray(frame).resize((self.cfg.video_size, self.cfg.video_size), Image.BILINEAR))
-            (self._ext_writer if external else self._writer).append_data(frame)
-        except Exception as e:  # noqa: BLE001
-            if external:
-                self.external_video_error = repr(e)
-                log.warning("external video frame dropped (%r); closing that writer", e)
-                try:
-                    self._ext_writer.close()
-                except Exception:  # noqa: BLE001
-                    pass
-                self._ext_writer = None
-                return
-            self.video_error = repr(e)
-            log.warning("video frame dropped (%r); closing the writer", e)
-            self._close_writer()
-
-    def _sink_video_frame(self, fr: _Frame, external: bool) -> None:
-        if (self._ext_writer if external else self._writer) is None:
+    def _write_view_frame(self, view: str, frame: np.ndarray) -> None:
+        writer = self._writers.get(view)
+        if writer is None:
             return
-        self._write_video_frame(fr.array(), external=external)
+        try:
+            size = self.cfg.video_size
+            if size and frame.shape[1] != size:
+                frame = _resized(frame, size, int(round(frame.shape[0] * size / frame.shape[1])))
+            writer.append_data(frame)
+        except Exception as e:  # noqa: BLE001
+            self.view_errors[view] = repr(e)
+            log.warning("%s video frame dropped (%r); closing that writer", view, e)
+            self._close_writer(view)
+
+    def _sink_view_frame(self, fr: _Frame, view: str) -> None:
+        if view in self._writers:
+            self._write_view_frame(view, fr.array())
 
     def _sink_lerobot_frame(self, frame: Dict[str, Any]) -> None:
         if self.dataset is not None:
@@ -813,19 +858,18 @@ class Recorder:
 
     # ------------------------------------------------------------------ finish
 
-    def _close_writer(self) -> None:
-        if self._writer is not None:
-            try:
-                self._writer.close()
-            except Exception:  # noqa: BLE001
-                pass
-            self._writer = None
-        if self._ext_writer is not None:
-            try:
-                self._ext_writer.close()
-            except Exception:  # noqa: BLE001
-                pass
-            self._ext_writer = None
+    def _close_writer(self, view: Optional[str] = None) -> None:
+        for v in ([view] if view is not None else list(self._writers)):
+            writer = self._writers.pop(v, None)
+            if writer is not None:
+                try:
+                    writer.close()
+                except Exception:  # noqa: BLE001
+                    pass
+
+    def written_views(self) -> Dict[str, str]:
+        """The closed, complete videos: view -> path."""
+        return {v: p for v, p in self.view_paths.items() if v not in self._writers and v not in self.view_errors and os.path.exists(p)}
 
     def close(self, meta: dict, qa: Optional[Dict[str, Any]] = None, success: bool = False) -> Dict[str, Any]:
         """Flush everything; returns the paths written (``None`` where a sink was off or failed)."""
@@ -841,12 +885,10 @@ class Recorder:
             out["annotations"] = path
         except Exception as e:  # noqa: BLE001
             log.warning("annotations.json not written: %r", e)
-        if self.video_path and self._writer is None and self.video_error is None and os.path.exists(self.video_path):
-            out["video"] = self.video_path
-        if self.external_video_path:
-            out["external_video"] = self.external_video_path if (self.external_video_error is None and os.path.exists(self.external_video_path)) else None
-            if self.external_video_error:
-                out["external_video_error"] = self.external_video_error
+        out["views"] = self.written_views()
+        out["video"] = out["views"].get("head")
+        if self.view_errors:
+            out["view_errors"] = dict(self.view_errors)
         if self.cfg.hdf5 and self.n > 0:
             try:
                 out["hdf5"] = self._write_hdf5(meta, ann)
@@ -884,7 +926,7 @@ class Recorder:
                                        "needs_replay": bool(success) and index is None}
         if self._pipe is not None:
             self._pipe.close()
-        out["video_error"] = self.video_error
+        out["video_error"] = self.view_errors.get("head")
         out["lerobot_error"] = self.lerobot_error
         return out
 
@@ -917,8 +959,11 @@ class Recorder:
             data.attrs["fps"] = self.fps
             data.attrs["robot_name"] = self.robot.name
             data.attrs["head_camera_key"] = self.cam_key
-            if self.video_path and self.video_error is None and os.path.exists(self.video_path):
-                data.attrs["head_rgb_video"] = os.path.basename(self.video_path)
+            views = self.written_views()
+            if "head" in views:
+                data.attrs["head_rgb_video"] = os.path.basename(views["head"])
+            if views:
+                data.attrs["isg_videos"] = json.dumps({v: os.path.basename(p) for v, p in views.items()})
             demo = data.create_group("demo_0")
             demo.attrs["num_samples"] = T
             demo.attrs["transitions"] = json.dumps({})

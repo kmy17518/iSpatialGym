@@ -11,10 +11,11 @@ import torch as th
 
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.executor import ExecutorConfig, TorsoLoad
+from ispatialgym.oracle.executor import ExecutorConfig
+from ispatialgym.oracle.qa import TorsoLoad
 from ispatialgym.oracle.motions import as_world_pose
 from ispatialgym.oracle.programs import expand
-from ispatialgym.tests.test_v2_oracle import FakeRobot, _place_goal, iors_world, make_executor, success_eval
+from ispatialgym.tests.test_v2_oracle import FakeRobot, _place_goal, iors_world, make_executor, quiet_qa, success_eval
 
 
 def _motions():
@@ -202,36 +203,44 @@ def test_torso_load_records_the_peak_per_action_and_forgets_a_rolled_back_attemp
     assert tl.report()["max_deg"] == pytest.approx(0.8, abs=1e-3) and tl.report()["action"] == "grasp"
 
 
-@pytest.mark.parametrize("deg, gated", [(2.0, True), (0.5, False)])
-def test_robot_wobble_gate_discards_a_demo_whose_torso_a_load_bent_visibly(tmp_path, deg, gated, monkeypatch):
+@pytest.mark.parametrize("deg, hard", [(2.0, True), (0.5, False)])
+def test_robot_wobble_fails_an_oracle_demo_whose_torso_a_load_bent_visibly(tmp_path, deg, hard, monkeypatch):
+    quiet_qa(monkeypatch)
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("robot_wobble",)))
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, qa=True)
     seen = {"n": 0}
     real = TorsoLoad.observe
 
     def observe(self, step, action, name):
-        real(self, step, action, name)
+        dev = real(self, step, action, name)
         if name == "place" and seen["n"] < 3:
             seen["n"] += 1
             self.steps[int(step)] = (deg, name)  # the place's contact bent the torso this far at three steps
+            return deg
+        return dev
 
     monkeypatch.setattr(TorsoLoad, "observe", observe)
-    result = ex.run_program(expand(sc.alias, sc))
-    assert result["torso_load"]["max_deg"] == pytest.approx(deg, abs=1e-6) and result["torso_load"]["action"] == "place"
-    if gated:
-        assert not result["success"] and result["reason"] == "robot_wobble"
+    result = ex.run_program(expand(sc.variant, sc))
+    wobble = result["qa"]["metrics"]["robot_wobble"]
+    assert wobble["max_deg"] == pytest.approx(deg, abs=1e-6) and wobble["action"] == "place"
+    if hard:
+        assert not result["success"] and result["reason"] == "robot_wobble" and seen["n"] == 1  # stopped at the first bent step
     else:
         assert result["success"], result["verdict"]
+        assert not wobble["triggered"] and wobble["steps_over_note"] == 3
 
 
-def test_goal_occlusion_gate_discards_with_its_own_verdict(tmp_path, monkeypatch):
+def test_goal_occlusion_fails_an_oracle_demo_with_its_own_verdict(tmp_path, monkeypatch):
     from ispatialgym.oracle.executor import Executor
 
+    quiet_qa(monkeypatch)
+    monkeypatch.setenv("ISPATIALGYM_GOAL_OCCLUSION", "on")
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("goal_occlusion",)))
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, qa=True)
     rep = {"method": "live head-camera depth", "threshold": 0.5, "objects": {}, "max_occluded": 0.62, "worst": "target_apple_0", "occluded": True}
     monkeypatch.setattr(Executor, "goal_occlusion_report", lambda self: dict(rep))
-    result = ex.run_program(expand(sc.alias, sc))
-    assert not result["success"] and result["reason"] == "goal_occluded" and result["goal_occlusion"]["worst"] == "target_apple_0"
+    result = ex.run_program(expand(sc.variant, sc))
+    assert not result["success"] and result["reason"] == "goal_occlusion" and result["binary_success_final"]
+    assert result["qa"]["metrics"]["goal_occlusion"]["report"]["worst"] == "target_apple_0" and result["qa"]["stopped_by"] == "goal_occlusion"

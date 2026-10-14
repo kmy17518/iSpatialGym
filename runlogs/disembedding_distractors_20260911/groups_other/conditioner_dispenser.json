@@ -1,9 +1,0 @@
-{
-  "category": "conditioner_dispenser",
-  "pages_opened": ["grids/pool_other/conditioner_dispenser__p1.png", "grids/pool_other/conditioner_dispenser__p2.png"],
-  "n_models": 26,
-  "exclude": [
-    {"model": "bottle_of_conditioner/teafxb", "reason": "lies flat on its back on the tray with the cap pointing at the camera, not standing"}
-  ],
-  "notes": "Other dispensers, pump bottles, spray bottles, tubes, deodorants and tier-2 drink/medicine bottles are textured, intact and upright. detergent_atomizer/rhfpsb leans (10.5 deg) and spray_bottle/asztxi (6.8 deg) but both still stand, kept. Dark cologne/dispenser bodies are glossy, not missing material."
-}

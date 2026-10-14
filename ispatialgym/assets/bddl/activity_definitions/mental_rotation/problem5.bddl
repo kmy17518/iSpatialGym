@@ -1,27 +1,27 @@
 (define (problem mental_rotation-5)
     (:domain ispatialgym)
-    (:alias mental_rotation-carving_knife)
+    (:variant mental_rotation-soup_ladle)
 
-    ; ground_isg 2.0.0: mental_rotation-carving_knife (mental_rotation/mental_rotation.iddl; mental_rotation#06/representative)
+    ; ground_isg 2.0.0: mental_rotation-soup_ladle (mental_rotation/mental_rotation.iddl; mental_rotation#08/representative)
     ; Mental rotation. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a world-frame
     ; orientation of the target, its position unchanged (TRO pose target: orientation_metric = full, equivalences per model).
 
     (:objects
-        carving_knife.n.01_1 - carving_knife.n.01
+        soup_ladle.n.01_1 - soup_ladle.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
         (ontop agent.n.01_1 floor.n.01_1)
-        (grasped agent.n.01_1 carving_knife.n.01_1)
+        (grasped agent.n.01_1 soup_ladle.n.01_1)
     )
 
     (:goal
         (and
-            (grasped ?agent.n.01_1 ?carving_knife.n.01_1)
-            (pose_reached ?carving_knife.n.01_1)
-            (pose_settled ?carving_knife.n.01_1)
+            (grasped ?agent.n.01_1 ?soup_ladle.n.01_1)
+            (pose_reached ?soup_ladle.n.01_1)
+            (pose_settled ?soup_ladle.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

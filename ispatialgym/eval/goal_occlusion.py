@@ -57,13 +57,13 @@ def role(scene_name: str) -> Optional[str]:
     return None
 
 
-def exempt(subtask_or_alias: Optional[str]) -> bool:
-    return str(subtask_or_alias or "").startswith(EXEMPT_SUBTASK_PREFIXES)
+def exempt(subtask_or_variant: Optional[str]) -> bool:
+    return str(subtask_or_variant or "").startswith(EXEMPT_SUBTASK_PREFIXES)
 
 
-def contained_target(subtask_or_alias: Optional[str]) -> bool:
-    """Whether the goal of the subtask (or an alias of it) puts the target inside its partner (:data:`CONTAINED_TARGET_SUBTASK_PREFIXES`)."""
-    return str(subtask_or_alias or "").startswith(CONTAINED_TARGET_SUBTASK_PREFIXES)
+def contained_target(subtask_or_variant: Optional[str]) -> bool:
+    """Whether the goal of the subtask (or a variant of it) puts the target inside its partner (:data:`CONTAINED_TARGET_SUBTASK_PREFIXES`)."""
+    return str(subtask_or_variant or "").startswith(CONTAINED_TARGET_SUBTASK_PREFIXES)
 
 
 def quat_xyzw_to_matrix(q: Iterable[float]) -> np.ndarray:
@@ -174,7 +174,7 @@ def screen_scene(depth: np.ndarray, cam_pose: Tuple[Iterable[float], Iterable[fl
                  judged: Iterable[Any], depth_without_robot: Optional[np.ndarray] = None, revolute: Any = None,
                  subtask: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """Per judged object (by :func:`role`): the box screen of a target / partner, the panel screen of a fixture (needs the
-    depth rendered with the robot hidden). For an inside goal (:func:`contained_target` of ``subtask``, a subtask id or an alias)
+    depth rendered with the robot hidden). For an inside goal (:func:`contained_target` of ``subtask``, a subtask id or a variant)
     the target's record carries ``"judged": False``: measured, left out of :func:`worst`."""
     out: Dict[str, Dict[str, Any]] = {}
     for obj in judged:

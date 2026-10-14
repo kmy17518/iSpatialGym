@@ -1,1 +1,0 @@
-{"key": "toy_figure__usnnxe", "category": "toy_figure", "model": "usnnxe", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z5": {"mad": 0.03399846474004854, "p95": 0.12941176470588237, "p99": 0.19084967320261437, "mad_union": 0.2022544105361443, "iou": 0.7483639654692287, "worst": "z72"}}, "render_s": 0.107}

@@ -1,0 +1,28 @@
+(define (problem alignment-1)
+    (:domain ispatialgym)
+
+    (:variant world_vertical)
+
+    (:objects
+        painting.n.01_1 - painting.n.01
+        wall.n.01_1 - wall.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    ; The painting hangs on the wall through a TRO revolute constraint (not a BDDL literal).
+    ; Binary success: the painting is released and its orientation is within tolerance of the straight (world
+    ; vertical) goal (TRO pose_targets["painting.n.01_1"]: orientation_metric = "full", position_metric = null).
+    (:goal
+        (and
+            (pose_reached ?painting.n.01_1)
+            (not (grasped ?agent.n.01_1 ?painting.n.01_1))
+            (pose_settled ?painting.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

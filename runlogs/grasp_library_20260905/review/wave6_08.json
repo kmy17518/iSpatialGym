@@ -1,322 +1,124 @@
 {
- "batch": "wave6_08",
  "models": [
-  {
-   "key": "coffee_cup__ykuftq__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/5: cup pushed against open finger, ~22 mm off-centre"},
-    {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: cup pushed against open finger, ~22 mm off-centre"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch beside handle, symmetric close (10/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (10/0)"},
-    {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: cup pushed against open finger, ~22 mm off-centre"}
-   ],
-   "object_note": "square mug; rows 1,2,5 body pinches end with one finger fully open, pads 53 mm apart vs 40 mm width"
-  },
-  {
-   "key": "coffee_cup__fgizgn__t",
-   "n_rows": 1,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on plain cup, symmetric close (9/0)"}
-   ]
-  },
-  {
-   "key": "coffee_cup__ibhhfj__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "top-down body pinch, both pads on cup (48/32)"}
-   ],
-   "object_note": "wide 65 mm mug; every row keeps one finger at 50, cup ~10 mm off-centre but firmly held"
-  },
-  {
-   "key": "coffee_cup__rypdvd__t",
-   "n_rows": 1,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on cup, symmetric close (9/0)"}
-   ]
-  },
-  {
-   "key": "coffee_cup__xjdyon__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (14/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (15/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch opposite handle, symmetric close (17/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (14/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (13/0)"}
-   ]
-  },
-  {
-   "key": "coffee_cup__nbhcgu__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (14/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (16/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (16/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch near handle, symmetric close (15/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, 28-deg tilt, symmetric close (16/0)"}
-   ]
-  },
-  {
-   "key": "coffee_cup__ckkwmj__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch (4 mm rim), symmetric close (7/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch (7 mm rim), symmetric close (8/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch near handle, symmetric close (9/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (5/1)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric close (7/0)"}
-   ]
-  },
-  {
-   "key": "coffee_cup__nhzrei__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"}
-   ],
-   "object_note": "65 mm mug; every row keeps one finger at 50, mug ~12 mm off-centre, both pads on body; not flagged"
-  },
-  {
-   "key": "coffee_cup__skamgp__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "wide body pinch near rim, both pads on cup (50/42)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "wide body pinch near rim, both pads on cup (50/40)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "wide body pinch near rim, both pads on cup (50/40)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "wide body pinch near rim, both pads on cup (50/40)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch beside handle, symmetric close (11/0)"}
-   ]
-  },
-  {
-   "key": "coffee_cup__siksnl__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug, near-symmetric close (48/32)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug, near-symmetric close (48/32)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug (50/31), ~9 mm off-centre"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug, symmetric close (44/37)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, both pads on mug, near-symmetric close (47/33)"}
-   ]
-  },
-  {
-   "key": "canned_food__byakrm__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"},
-    {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"},
-    {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"},
-    {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"},
-    {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"}
-   ],
-   "object_note": "53 mm can; all rows end 50/4, can sits against the open finger; both pads touch but strongly off-centre"
-  },
   {
    "key": "canned_food__ycbspm__t",
    "n_rows": 5,
    "grasps": [
-    {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/9: can pushed against open finger, ~20 mm off-centre"},
-    {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"},
-    {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"},
-    {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/10: can pushed against open finger, ~19 mm off-centre"},
-    {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"}
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can pushed against open finger, ~20 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/10: can pushed against open finger, ~19 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"
+    }
    ],
    "object_note": "SPAM can 56 mm; every row ends 50/9-10 with can against open finger; otherwise clean body pinches"
-  },
-  {
-   "key": "canned_food__foetdd__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: box pushed against open finger, ~17 mm off-centre; lid-band pinch"},
-    {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: box pushed against open finger, ~17 mm off-centre; lid-band pinch"},
-    {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/15: box pushed against open finger, ~17 mm off-centre; lid-band pinch"},
-    {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/15: box pushed against open finger, ~17 mm off-centre; lid-band pinch"},
-    {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: box pushed against open finger, ~17 mm off-centre; 10-deg tilt"}
-   ],
-   "object_note": "tall box held at top lid band, hangs vertically (fine); every row keeps one finger at 50"
-  },
-  {
-   "key": "canned_food__qhgdys__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near top, both pads on can; 50/22 idle finger"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near top, both pads on can; 50/22 idle finger"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch near top, both pads on can; 50/22 idle finger"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch near top, both pads on can; 50/21 idle finger"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch near top, both pads on can; 50/22 idle finger"}
-   ],
-   "object_note": "70 mm can; one finger stays at 50 in all rows (~14 mm off-centre), borderline, not flagged"
-  },
-  {
-   "key": "canned_food__acgdtc__t",
-   "n_rows": 3,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at lid/shoulder of wide jar, both pads on body (50/41)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at lid/shoulder of wide jar, both pads on body (50/41)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at lid/shoulder of wide jar, both pads on body (50/31)"}
-   ],
-   "object_note": "89 mm bulbous jar nearly fills the opening; top grasps hold the shoulder, jar hangs below"
-  },
-  {
-   "key": "teacup__vckahe__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on small bowl cup, symmetric close (6/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on small bowl cup, symmetric close (8/0)"},
-    {"rank": 3, "verdict": "unsure", "flags": ["unsure"], "note": "pads ~26 mm apart vs 5 mm width; ring handle pinched, unclear"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on small bowl cup, symmetric close (8/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on small bowl cup, symmetric close (6/0)"}
-   ],
-   "object_note": "small bowl cup with ring handle; row 3 appears to pinch across the ring handle rather than the rim"
-  },
-  {
-   "key": "teacup__tfzfam__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on bowl-shaped cup, symmetric close (5/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on bowl-shaped cup, symmetric close (6/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on bowl-shaped cup, symmetric close (5/1)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on bowl-shaped cup, symmetric close (7/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on bowl-shaped cup, symmetric close (6/0)"}
-   ]
   },
   {
    "key": "teacup__zdvgol__t",
    "n_rows": 5,
    "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on fluted cup, symmetric close (9/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on fluted cup, symmetric close (8/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on fluted cup, symmetric close (9/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on fluted cup, symmetric close (9/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on fluted cup, symmetric close (10/0)"}
-   ]
-  },
-  {
-   "key": "teacup__oxfzfe__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on mug, symmetric close (8/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on mug, symmetric close (8/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on mug, symmetric close (9/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch above handle junction, symmetric close (8/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on mug, symmetric close (10/0)"}
-   ]
-  },
-  {
-   "key": "teacup__cpozxi__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on thick decorative rim, symmetric close (13/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on thick decorative rim, symmetric close (12/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on thick decorative rim, symmetric close (15/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on thick decorative rim, symmetric close (13/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on thick decorative rim, symmetric close (15/0)"}
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on fluted cup, symmetric close (9/0)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on fluted cup, symmetric close (8/0)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on fluted cup, symmetric close (9/0)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on fluted cup, symmetric close (9/0)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on fluted cup, symmetric close (10/0)"
+    }
    ]
   },
   {
    "key": "teacup__wopjex__t",
    "n_rows": 5,
    "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on flared lip (6 mm), symmetric close (10/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on flared lip (6 mm), symmetric close (10/0)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on flared lip (6 mm), symmetric close (12/0)"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on flared lip, 30-deg tilt, symmetric close (10/0)"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on flared lip (7 mm), symmetric close (13/0)"}
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on flared lip (6 mm), symmetric close (10/0)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on flared lip (6 mm), symmetric close (10/0)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on flared lip (6 mm), symmetric close (12/0)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on flared lip, 30-deg tilt, symmetric close (10/0)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on flared lip (7 mm), symmetric close (13/0)"
+    }
    ],
    "object_note": "translucent glass-like cup; all rows are rim pinches on a 6-7 mm lip, judged acceptable, not fragile"
-  },
-  {
-   "key": "toy_figure__psfkaj__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "claw pinch near body (CoM 26 mm), plush hangs"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on claw tip, CoM 50 mm away; plush hangs, borderline"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "claw pinch near body (CoM 31 mm), plush hangs"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "pincer pinch, full coverage, CoM 55 mm away; borderline"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "claw pinch, CoM 44 mm away; plush hangs"}
-   ],
-   "object_note": "plush crab, ~90 mm body; all rows hold a claw/arm (14-17 mm), body dangles; borderline but not flagged"
-  },
-  {
-   "key": "toy_figure__usnnxe__t",
-   "n_rows": 1,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "arm pinch 47 mm wide, body hangs; arm widens toward body"}
-   ],
-   "object_note": "large plush starfish; single grasp holds one arm 60 mm from centre with full pad coverage"
-  },
-  {
-   "key": "toy_figure__lfxygp__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near CoM; 39/0 asymmetric but firmly closed"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near CoM; 40/0 asymmetric but firmly closed"},
-    {"rank": 3, "verdict": "unsure", "flags": ["unsure"], "note": "pads ~66 mm apart vs 42 mm body; dorsal fin likely pinched"},
-    {"rank": 4, "verdict": "unsure", "flags": ["unsure"], "note": "pads ~66 mm apart vs 36 mm body; dorsal fin likely pinched"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch near CoM; 43/0 asymmetric but closed"}
-   ],
-   "object_note": "rigid shark; rows 3-4 approach from flank with finger spacing far above body height, pad contact unverifiable"
-  },
-  {
-   "key": "toy_figure__kitqln__t",
-   "n_rows": 1,
-   "grasps": [
-    {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pinches 12 mm ear/knob 78 mm from CoM; large plush dangles"}
-   ],
-   "object_note": "large lying animal plush; only grasp holds a tiny head protrusion far from centre of mass"
-  },
-  {
-   "key": "toy_figure__dgphap__t",
-   "n_rows": 4,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "88 mm head/body pinch, both pads on body (50/43)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "88 mm head/body pinch, 25-deg tilt, both pads on body (50/43)"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "limb pinch near body (21 mm), full coverage, plush hangs"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "limb pinch near body (21 mm), full coverage, 33-deg tilt"}
-   ]
-  },
-  {
-   "key": "toy_figure__nncqfn__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: plush pushed against open finger, ~20 mm off-centre"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric torso pinch (24/36), both pads on plush"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "torso pinch; idle finger at 50 (50/17), ~16 mm off-centre, borderline"},
-    {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: plush pushed against open finger, ~20 mm off-centre"},
-    {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: plush pushed against open finger, ~18 mm off-centre"}
-   ],
-   "object_note": "raccoon plush 55 mm torso; body pinches near CoM, but rows 1,4,5 keep one finger at 50"
-  },
-  {
-   "key": "toy_figure__acymin__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "ok", "flags": [], "note": "torso pinch at CoM, both pads closed on body (22/0)"},
-    {"rank": 2, "verdict": "ok", "flags": [], "note": "torso pinch near CoM (25/0), full coverage"},
-    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on upper body/limb base, CoM 38 mm, coverage 0.75"},
-    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on upper body/limb base, CoM 38 mm, 32-deg tilt"},
-    {"rank": 5, "verdict": "ok", "flags": [], "note": "limb pinch 14 mm wide, CoM 57 mm away, full coverage; borderline"}
-   ],
-   "object_note": "spiky multi-limbed figure; rows 1-2 torso, rows 3-5 progressively further out on limbs, all pads closed"
-  },
-  {
-   "key": "toy_figure__gyrsew__t",
-   "n_rows": 5,
-   "grasps": [
-    {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: head pushed fully against open finger, ~24 mm off-centre"},
-    {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: head pushed fully against open finger, ~24 mm off-centre"},
-    {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: head pushed fully against open finger, ~24 mm off-centre"},
-    {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/2: head pushed fully against open finger, ~23 mm off-centre"},
-    {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: head pushed fully against open finger, ~24 mm off-centre"}
-   ],
-   "object_note": "toy turtle; every row pinches the ~50 mm head, one finger fully open, other at closed limit"
   }
  ]
 }

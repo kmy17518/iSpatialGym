@@ -1,6 +1,0 @@
-{"key": "door__bandpe", "joint": "j_leaf1", "feasible": true,
- "proposal": {"face": "outer", "a": 0.75, "b": 0.45, "pinch": "horizontal", "approach": "front", "depth_mm": -20,
-              "expected_motion": "push"},
- "alternative": null,
- "note": "Push door (swings away from viewer). Nothing pinchable; close fingers and push the protruding full-width push plate near the free edge.",
- "confidence": "medium"}

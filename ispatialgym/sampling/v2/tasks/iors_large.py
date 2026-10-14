@@ -2,8 +2,8 @@
 
 Roles: ``target`` (spawned, library grasps), fixed ``partner`` (bed, sofa, desk, breakfast table, countertop), fixed
 ``support`` (the **init surface**: a support object within ``max_partner_geodesic`` of the partner, the partner's own
-top — under only — or the floor beside the partner; the class is an explicit choice of the alias / bindings, never a
-runtime fallback unless the alias sets ``generation.init_support_fallback``: owner 2026-10-12 item 2b), ``floor``. Three recorded stances: **A** init (tabletop Phase 1 at the support + the partner
+top — under only — or the floor beside the partner; the class is an explicit choice of the variant / bindings, never a
+runtime fallback unless the variant sets ``generation.init_support_fallback``: owner 2026-10-12 item 2b), ``floor``. Three recorded stances: **A** init (tabletop Phase 1 at the support + the partner
 visible: ≥ 4 of its 8 AABB corners and its centre in frame), **B** manipulation (tabletop Phase 2 at the support, band
 from the reach bands), **C** placement (base square to the partner edge nearest the init pose, stand-off {0.35, 0.45,
 0.55}, lateral along the edge, trunk from the band; ontop: goal cell = the band cell inside the partner's top face
@@ -339,20 +339,20 @@ YAWS = [k * math.pi / 4 for k in range(8)]
 # ----------------------------------------------------------------------------------------------------------------
 
 
-#: §5.6 / owner decision A5 (2026‑09‑16): the alias-level selection order of the init surface, applied by ``ground_isg``
-#: through fallback aliases (primary → fallback when the primary yields nothing); a module never switches class at run time
+#: §5.6 / owner decision A5 (2026‑09‑16): the variant-level selection order of the init surface, applied by ``ground_isg``
+#: through fallback variants (primary → fallback when the primary yields nothing); a module never switches class at run time
 SELECTION_ORDER = {"under": ("support", "partner", "floor"), "ontop": ("support", "floor")}
 
 
-def init_surface_class(relation: str, support_binding: Any, partner_names: Sequence[str], alias_support_token: Optional[str] = None,
-                       alias_partner_token: Optional[str] = None) -> str:
-    """§5.6 init-surface class fixed by the alias (A5: no runtime switching): ``"floor"`` (the binding / alias token
-    says floor, or the binding is a room dict), ``"partner"`` (the support binding names the partner, or the alias
+def init_surface_class(relation: str, support_binding: Any, partner_names: Sequence[str], variant_support_token: Optional[str] = None,
+                       variant_partner_token: Optional[str] = None) -> str:
+    """§5.6 init-surface class fixed by the variant (A5: no runtime switching): ``"floor"`` (the binding / variant token
+    says floor, or the binding is a room dict), ``"partner"`` (the support binding names the partner, or the variant
     repeats the partner token ``…-<partner>-<partner>``; under only) or ``"support"`` (a support object). ``ValueError``
     for the ontop + partner combination (the goal would hold at init)."""
     names = [n for n in support_binding if isinstance(n, str)] if isinstance(support_binding, list) else []
-    token = (alias_support_token or "").lower()
-    ptoken = (alias_partner_token or "").lower()
+    token = (variant_support_token or "").lower()
+    ptoken = (variant_partner_token or "").lower()
     if names == ["floor"] or token in ("floor", "floors") or (isinstance(support_binding, dict) and (support_binding.get("floor") or support_binding.get("room"))):
         return "floor"
     own_top = (names and all(n in set(partner_names) for n in names)) or (not names and token and ptoken and token == ptoken)
@@ -365,21 +365,21 @@ def init_surface_class(relation: str, support_binding: Any, partner_names: Seque
     return "support"
 
 
-def alias_tokens(alias: str, subtask: str) -> List[str]:
+def variant_tokens(variant: str, subtask: str) -> List[str]:
     """The ``{target}-{partner}-{support}`` tokens of ``<subtask>-{target}-{partner}-{support}`` ([] without tokens)."""
-    rest = alias[len(subtask):].strip("-") if alias.startswith(subtask) else ""
+    rest = variant[len(subtask):].strip("-") if variant.startswith(subtask) else ""
     return [p for p in rest.split("-") if p]
 
 
-def alias_support_token(alias: str, subtask: str) -> Optional[str]:
-    """The ``{support}`` token of ``<subtask>-{target}-{partner}-{support}`` (None when the alias has no tokens)."""
-    parts = alias_tokens(alias, subtask)
+def variant_support_token(variant: str, subtask: str) -> Optional[str]:
+    """The ``{support}`` token of ``<subtask>-{target}-{partner}-{support}`` (None when the variant has no tokens)."""
+    parts = variant_tokens(variant, subtask)
     return parts[-1] if len(parts) >= 3 else None
 
 
-def alias_partner_token(alias: str, subtask: str) -> Optional[str]:
-    """The ``{partner}`` token (None when the alias has fewer than three tokens)."""
-    parts = alias_tokens(alias, subtask)
+def variant_partner_token(variant: str, subtask: str) -> Optional[str]:
+    """The ``{partner}`` token (None when the variant has fewer than three tokens)."""
+    parts = variant_tokens(variant, subtask)
     return parts[-2] if len(parts) >= 3 else None
 
 
@@ -568,7 +568,7 @@ def pitched_palm_gap(pts: th.Tensor, direction_xy, eef_pos, eef_quat) -> Tuple[f
 
 
 #: owner 2026-10-12 item 2 (large-scale eval picks): generation keys that relax a rule of this module; unset (None / False) keeps the
-#: rule as before. The keys an alias sets are recorded in ``template_facts["relaxations"]``.
+#: rule as before. The keys a variant sets are recorded in ``template_facts["relaxations"]``.
 RELAXATION_KEYS = ("partner_view_min_points", "init_support_max_geodesic_m", "init_support_fallback", "under_axis_max_deg")
 
 
@@ -725,7 +725,7 @@ class IORSLarge(SamplerV2):
 
     def bind_scene_roles(self):
         if getattr(self, "finger_touch_error", None):
-            raise Reject("spec", f"{self.gp.alias}: generation.{self.finger_touch_error}")
+            raise Reject("spec", f"{self.gp.variant}: generation.{self.finger_touch_error}")
         if self.relation in MODE_HOOKS and self.relation_mode is None:
             self._adopt_mode(getattr(self, MODE_HOOKS[self.relation])())
             return self.bind_scene_roles()  # the mode's own, else the ontop / under flow from here on with the mode's overrides
@@ -739,7 +739,7 @@ class IORSLarge(SamplerV2):
             rooms = set(self.world.rooms or [])
             cands = sorted([o for o in self.world.scene.objects if o.category in cats and (not rooms or set(o.in_rooms or []) & rooms)], key=lambda o: o.name)
             if not cands:
-                raise Reject("spec", f"{self.gp.alias}: no partner candidate of {cats} in {sorted(rooms)}")
+                raise Reject("spec", f"{self.gp.variant}: no partner candidate of {cats} in {sorted(rooms)}")
             partner = cands[0]
         self.bind_scene_object("partner", partner)
         self.apply_partner_joint_init()
@@ -756,7 +756,7 @@ class IORSLarge(SamplerV2):
         try:
             spec, clamped = OJ.parse_joint_spec(req, list(partner.joints), OJ.joint_limits(partner))
         except ValueError as e:
-            raise Reject("spec", f"{self.gp.alias}: generation.partner_joint_init on {partner.name}: {e}")
+            raise Reject("spec", f"{self.gp.variant}: generation.partner_joint_init on {partner.name}: {e}")
         before = OJ.link_poses(partner)
         q0 = OJ.joint_dict(partner)
         OJ.set_joints(partner, spec)
@@ -773,10 +773,10 @@ class IORSLarge(SamplerV2):
                                                      "scene_file": {n: round(q0[n], 4) for n in spec}, "settled": settled, "max_settle_dev_rad": round(dev, 4),
                                                      "joints": {n: round(v, 4) for n, v in self.partner_joints.items()}, "moved_links": list(self.partner_moved),
                                                      "settle_residual": residual}
-        log.info("%s: generation.partner_joint_init on %s: %s -> settled %s (max deviation %.3f%s), moved links %s", self.gp.alias, partner.name, spec, settled, dev,
+        log.info("%s: generation.partner_joint_init on %s: %s -> settled %s (max deviation %.3f%s), moved links %s", self.gp.variant, partner.name, spec, settled, dev,
                  f"; clamped {clamped}" if clamped else "", self.partner_moved)
         if dev > 0.05:
-            log.warning("%s: %s's joints moved %.3f from the requested %s during the settle (settled %s)", self.gp.alias, partner.name, dev, spec, settled)
+            log.warning("%s: %s's joints moved %.3f from the requested %s during the settle (settled %s)", self.gp.variant, partner.name, dev, spec, settled)
 
     def partner_static_aabb(self) -> Tuple[th.Tensor, th.Tensor]:
         """The partner's AABB without the links ``partner_joint_init`` moved (the open door is no part of a stand-off)."""
@@ -894,8 +894,8 @@ class IORSLarge(SamplerV2):
         b = self.choice.bindings
         req = b.get("support")
         try:
-            kind = init_surface_class(self.relation, req, [self.partner.name], alias_support_token(self.gp.alias, self.subtask),
-                                      alias_partner_token(self.gp.alias, self.subtask))
+            kind = init_surface_class(self.relation, req, [self.partner.name], variant_support_token(self.gp.variant, self.subtask),
+                                      variant_partner_token(self.gp.variant, self.subtask))
         except ValueError as e:
             raise Reject("spec", str(e))
         self.template_facts["init_surface_selection_order"] = list(SELECTION_ORDER.get(self.relation, ()))
@@ -1005,7 +1005,7 @@ class IORSLarge(SamplerV2):
         relaxed = {k: self.gp.gen(k) for k in RELAXATION_KEYS if self.gp.gen(k) not in (None, False)}
         if relaxed:
             self.template_facts["relaxations"] = _jsonable(relaxed)
-            log.info("%s: relaxed rules (owner 2026-10-12 item 2): %s", self.gp.alias, relaxed)
+            log.info("%s: relaxed rules (owner 2026-10-12 item 2): %s", self.gp.variant, relaxed)
         tgt = self.target
         self.hull = self.world.local_hull(tgt)
         self.grasps, self.grasp_key, self.rest = TT.library_grasps(self, "target")
@@ -1015,12 +1015,12 @@ class IORSLarge(SamplerV2):
         kind, cands = self.surface_candidates()
         self.init_fallback = self.init_support_fallback(kind) if not cands else None
         if self.init_fallback is not None:
-            log.info("%s: no init support left (%s): the %s init instead (generation.init_support_fallback)", self.gp.alias, self.init_fallback["reason"],
+            log.info("%s: no init support left (%s): the %s init instead (generation.init_support_fallback)", self.gp.variant, self.init_fallback["reason"],
                      self.init_fallback["to"])
             kind = self.init_fallback["to"]
             cands = [self.obj("floor")] if kind == "floor" else [self.partner]
         if not cands:
-            raise Reject("no_init_surface", f"{self.gp.alias}: no candidate of the init-surface class {kind!r}")
+            raise Reject("no_init_surface", f"{self.gp.variant}: no candidate of the init-surface class {kind!r}")
         rng = np.random.default_rng(self.ctx.base_seed)
         order = [cands[int(i)] for i in rng.permutation(len(cands))]
         errors = []
@@ -1031,15 +1031,15 @@ class IORSLarge(SamplerV2):
                 errors.append(f"{cand.name}: {e.reason}: {e}")
                 continue
             if kind == "floor":
-                self.alias_role("support", self.bindings.one("floor"))
+                self.variant_role("support", self.bindings.one("floor"))
             elif kind == "partner":
-                self.alias_role("support", self.bindings.one("partner"))
+                self.variant_role("support", self.bindings.one("partner"))
             else:
                 self.bind_scene_object("support", cand)
             self.template_facts["init_surface"] = {"class": kind, "name": cand.name, "tried": len(errors) + 1,
                                                    **({"fallback": self.init_fallback} if self.init_fallback is not None else {})}
             return
-        raise Reject("no_init_surface", f"{self.gp.alias}: no {kind} candidate admits stances A–C: " + "; ".join(errors[-3:]))
+        raise Reject("no_init_surface", f"{self.gp.variant}: no {kind} candidate admits stances A–C: " + "; ".join(errors[-3:]))
 
     # ------------------------------------------------------------------ partner geometry for C
 
@@ -1467,7 +1467,7 @@ class IORSLarge(SamplerV2):
         kept = [y for y in yaws if self.push_yaw_kept(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), d2, offs.get(y))]
         if len(kept) < len(yaws):
             TT._count(self, "push_yaw_lock.removed")
-            log.info("%s: push-under yaw lock %s: kept %d of %d yaws at C (d %.2f λ %+.2f, carry yaw offset %+.2f): %s, offsets %s m", self.gp.alias, lock, len(kept),
+            log.info("%s: push-under yaw lock %s: kept %d of %d yaws at C (d %.2f λ %+.2f, carry yaw offset %+.2f): %s, offsets %s m", self.gp.variant, lock, len(kept),
                      len(yaws), place.stand_off or 0.0, place.lateral, d_yaw, [round(y, 2) for y in kept], [round(float(offs.get(y, -1.0)), 3) for y in kept])
         return kept
 
@@ -1497,14 +1497,14 @@ class IORSLarge(SamplerV2):
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not float(v) > 0.0:
             raise Reject("spec", f"generation.push_under_stroke_m {v!r}: a positive length (m)")
         if form == "two_point":
-            log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f) not recorded for the two-point hand: one stroke", self.gp.alias, float(v))
+            log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f) not recorded for the two-point hand: one stroke", self.gp.variant, float(v))
             return {}
         plan = push_stroke_plan(distance_m, float(v), int(self.num("push_under_strokes_max", PUSH_STROKES_MAX)),
                                 backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=float(self.num("push_under_reaim_max_m", 0.03)),
                                 yaw_gain_m_per_rad=float(self.num("push_under_reaim_yaw_gain", 0.0)),
                                 yaw_deadband_rad=math.radians(float(self.num("push_under_reaim_yaw_deadband_deg", 2.0))))
         log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f): %d strokes over %.3f m, the object's progress after each %s m, back-off %.3f m, "
-                 "re-aim within %.3f m, yaw gain %.3f m/rad", self.gp.alias, float(v), plan["n"], float(distance_m), plan["ends_m"], plan["backoff_m"], plan["reaim_max_m"],
+                 "re-aim within %.3f m, yaw gain %.3f m/rad", self.gp.variant, float(v), plan["n"], float(distance_m), plan["ends_m"], plan["backoff_m"], plan["reaim_max_m"],
                  plan["yaw_gain_m_per_rad"])
         return {"strokes": plan}
 
@@ -1617,18 +1617,18 @@ class IORSLarge(SamplerV2):
                 if palm:
                     standoff = TT.palm_half_extent(start_p[1], d3) + PUSH_UNDER_CLEARANCE_M
                     log.info("%s: push-under by the palm (generation.push_under_palm_contact): stand-off %.3f m (wrist %+.0f), contact offset %.3f m over the face "
-                             "above the tips", self.gp.alias, standoff, chosen.proposal.payload, half_d)
+                             "above the tips", self.gp.variant, standoff, chosen.proposal.payload, half_d)
                 if keyed:
                     TT._count(self, f"push_contact_form.{form}")
                     log.info("%s: push-under contact form %s (generation.push_under_contact %s): pitch %.0f, wrist %+.0f, stand-off %.3f m, contact offset %.3f m%s "
-                             "(C d %.2f λ %+.2f)", self.gp.alias, form, forms, pitch, chosen.proposal.payload, standoff, half_d,
+                             "(C d %.2f λ %+.2f)", self.gp.variant, form, forms, pitch, chosen.proposal.payload, standoff, half_d,
                              f", fingertips {rec['contact_width_m']:.3f} m apart" if form == "two_point" else "", place.stand_off or 0.0, place.lateral)
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
                         "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": chosen.proposal.payload,
                         "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low), "orient": decision, "seed": push_chain_seed(self.kit, chosen, arm),
                         **({"palm_contact": True} if palm else {}), **({"record": rec} if rec else {})}
             why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
-        log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.alias, place.stand_off or 0.0,
+        log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.variant, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)),
                  [round(float(v), 2) for v in P0.to_base_frame(th.tensor([float(cd[0]), float(cd[1]), 0.0]) - d3 * half_d, place.base_pose2d, P0.base_z(self)).tolist()],
                  [round(float(v), 2) for v in P0.to_base_frame(th.tensor([float(gc[0]), float(gc[1]), 0.0]) - d3 * half_d, place.base_pose2d, P0.base_z(self)).tolist()],
@@ -1704,7 +1704,7 @@ class IORSLarge(SamplerV2):
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 f = chosen.proposal.payload
                 log.info("%s: flat-hand contact height %.3f m vs centre of mass %.3f m (rung %d of %d from %.3f m, wrist turn %s; C d %.2f λ %+.2f trunk %s)",
-                         self.gp.alias, tip, com_h, k + 1, len(rungs), rungs[0], f["wrist_turn"], place.stand_off or 0.0, place.lateral,
+                         self.gp.variant, tip, com_h, k + 1, len(rungs), rungs[0], f["wrist_turn"], place.stand_off or 0.0, place.lateral,
                          (place.translate, round(place.tilt, 2)))
                 return {"pre": pre, "start": start_p, "mid": mid_p, "goal": goal_p, "direction": d3, "distance_m": distance, "pitch_deg": 90.0,
                         "blade_standoff_m": float(standoff), "push_height_m": f["fingertip_z_m"], "half_extent_m": f["half_extent_m"], "wrist_sign": f["wrist_turn"],
@@ -1715,7 +1715,7 @@ class IORSLarge(SamplerV2):
             if solved >= n_max:
                 why.append(f"{n_max} rungs IK-solved, the ladder stops")
                 break
-        log.info("%s: push-under flat-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; rungs %s, centre of mass %.3f m): %s", self.gp.alias,
+        log.info("%s: push-under flat-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; rungs %s, centre of mass %.3f m): %s", self.gp.variant,
                  place.stand_off or 0.0, place.lateral, (place.translate, round(place.tilt, 2)), [f"{r:.3f}" for r in rungs], com_h, "; ".join(why)[:1500])
         return None
 
@@ -1787,7 +1787,7 @@ class IORSLarge(SamplerV2):
                 f = chosen.proposal.payload
                 base_z = P0.base_z(self)
                 log.info("%s: push-under pitched hand SOLVED (d %.2f λ %+.2f trunk %s): pitch %.0f %s, tips %.3f m, contact %.3f m, centre of mass %.3f m, hand low %.3f m, "
-                         "palm gap %s (%s), stand-off %.3f m, contact offset %.3f m, start %s -> goal %s in base", self.gp.alias, place.stand_off or 0.0, place.lateral,
+                         "palm gap %s (%s), stand-off %.3f m, contact offset %.3f m, start %s -> goal %s in base", self.gp.variant, place.stand_off or 0.0, place.lateral,
                          (place.translate, round(place.tilt, 2)), f["pitch_deg"], f["wrist_turn"], f["fingertip_z_m"], f["contact_height_m"], com_h, f["hand_low_m"],
                          "none" if f["palm_gap_m"] is None else f"{f['palm_gap_m']:.3f} m", f["palm_part"], f["standoff_m"], f["half_extent_m"],
                          [round(float(v), 3) for v in P0.to_base_frame(start_p[0], place.base_pose2d, base_z).tolist()],
@@ -1801,7 +1801,7 @@ class IORSLarge(SamplerV2):
             why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
         ends = (f"start {[round(float(v), 2) for v in P0.to_base_frame(first.chain[1][0], place.base_pose2d, P0.base_z(self)).tolist()]}, goal "
                 f"{[round(float(v), 2) for v in P0.to_base_frame(first.chain[3][0], place.base_pose2d, P0.base_z(self)).tolist()]} in base" if first is not None else "no turn")
-        log.info("%s: push-under pitched-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; eef %s): %s", self.gp.alias, place.stand_off or 0.0,
+        log.info("%s: push-under pitched-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; eef %s): %s", self.gp.variant, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)), ends, "; ".join(why))
         return None
 
@@ -1850,7 +1850,7 @@ class IORSLarge(SamplerV2):
         if not why:
             return True, ""
         TT._count(self, "push_pinned_start.rejected")
-        log.info("%s: push-under pinned-start check: %s [%s, %s arm] passed over - %s (C d %.2f λ %+.2f trunk %s)", self.gp.alias, scored.proposal.label,
+        log.info("%s: push-under pinned-start check: %s [%s, %s arm] passed over - %s (C d %.2f λ %+.2f trunk %s)", self.gp.variant, scored.proposal.label,
                  "wrist-flipped" if scored.proposal.source == "map" else "solved", arm, why, stance.stand_off or 0.0, stance.lateral,
                  (stance.translate, round(stance.tilt, 2)))
         return False, why
@@ -1900,11 +1900,11 @@ class IORSLarge(SamplerV2):
         surface = TT.surface_band_kwargs(self) if (kind == "tabletop" and support_obj is self.surface.get("obj")) else {}
         try:
             rb = RB.ReachBands.load(self.world.scene_model, support, obj, self.grasp_key, under=under, scale=c.scale, **surface)
-            log.info("%s: reach band %s (%s) from %s", self.gp.alias, support, under or "-", rb.path)
+            log.info("%s: reach band %s (%s) from %s", self.gp.variant, support, under or "-", rb.path)
             # a band computed before the A6 posture retry can be empty (every trunk stance collided with the untucked
             # arms: the fleet's floor-under bands of the beds) — an empty band is a miss, recomputed with the current script
             if int(rb.meta.get("n_reachable_total", 1) or 0) == 0 and os.environ.get("ISG_REACH_BANDS_COMPUTE", "1") != "0":
-                log.info("%s: cached reach band %s (%s) is empty (computed with %s arms, no A6 retry): recomputing in-process", self.gp.alias, support, under or "-",
+                log.info("%s: cached reach band %s (%s) is empty (computed with %s arms, no A6 retry): recomputing in-process", self.gp.variant, support, under or "-",
                          rb.meta.get("arms"))
                 raise FileNotFoundError("empty band")
         except FileNotFoundError:
@@ -1921,7 +1921,7 @@ class IORSLarge(SamplerV2):
             # under stance at a blocked AABB edge of the partner): the stance search runs without the band filter and the
             # exact IK of the coupling decides (recorded in the template facts; the band owner gets the case)
             log.warning("%s: reach band %s (%s) is empty after the recompute: stance C candidates are taken from the goal cells without the band filter",
-                        self.gp.alias, support, under or "-")
+                        self.gp.variant, support, under or "-")
             self.template_facts.setdefault("empty_bands", []).append({"support": support, "under": under, "stance": rb.meta.get("stance")})
             rb = None
         memo[key] = rb
@@ -1937,10 +1937,10 @@ class IORSLarge(SamplerV2):
             rb = RB.ReachBands.load(self.world.scene_model, support, f"{c.category}/{c.model}", self.grasp_key, under=under, scale=c.scale, arm=arm)
             if int(rb.meta.get("n_reachable_total", 1) or 0) == 0:
                 raise FileNotFoundError("empty band")
-            log.info("%s: %s-arm reach band %s (%s) from %s", self.gp.alias, arm, support, under or "-", rb.path)
+            log.info("%s: %s-arm reach band %s (%s) from %s", self.gp.variant, arm, support, under or "-", rb.path)
         except FileNotFoundError:
             rb = base.mirrored() if RB.mirrorable(base.meta) else None
-            log.info("%s: %s-arm reach band %s (%s): %s", self.gp.alias, arm, support, under or "-",
+            log.info("%s: %s-arm reach band %s (%s): %s", self.gp.variant, arm, support, under or "-",
                      f"the {base.arm} arm's band mirrored ({base.path})" if rb is not None else f"none (the {base.arm} arm's band is not mirrored)")
         self.template_facts.setdefault("arm_bands_by_factor", {}).setdefault(f"{kind}:{support}{'-under-' + under if under else ''}", {})[arm] = TT.band_facts(rb)
         return rb
@@ -1991,7 +1991,7 @@ class IORSLarge(SamplerV2):
             trunks = RB.trunk_grid(z - self.floor_z)
             result = bc.compute(stance, lattice_world, z, pose_fn, self.grasps, ignore, arm="right", trunks=trunks, max_grasp_offset=max_off)
         except RB.BandDeadline as e:
-            raise Reject("band_budget", f"{self.gp.alias}: in-process {kind} band ({under_partner.name if under_partner is not None else '-'}) not finished: {e} "
+            raise Reject("band_budget", f"{self.gp.variant}: in-process {kind} band ({under_partner.name if under_partner is not None else '-'}) not finished: {e} "
                                         f"({time.time() - t0:.0f} s in); nothing written - a band job publishes it") from e
         finally:
             self.world.restore(parked)
@@ -2026,8 +2026,8 @@ class IORSLarge(SamplerV2):
                 json.dump(meta, f, indent=1, default=str)
             rb.path = os.path.join(out_dir, name + ".npz")
         except Exception as e:  # noqa: BLE001 - the band is still usable in memory
-            log.warning("%s: could not write the computed reach band: %r", self.gp.alias, e)
-        log.info("%s: reach band computed on miss (%s, %d cells, %.0fs)", self.gp.alias, meta["support"], meta["n_reachable_total"], meta["time_s"])
+            log.warning("%s: could not write the computed reach band: %r", self.gp.variant, e)
+        log.info("%s: reach band computed on miss (%s, %d cells, %.0fs)", self.gp.variant, meta["support"], meta["n_reachable_total"], meta["time_s"])
         return rb
 
     def band_cells_world(self, rb: Optional[RB.ReachBands], stance: Stance) -> th.Tensor:
@@ -2398,13 +2398,13 @@ class IORSLarge(SamplerV2):
                     st.extras["edge_rank"] = rank
                 if not pool:
                     if tried:
-                        log.info("%s: stance C: edge(s) %s nearest the init pose admit no stance; %s taken", self.gp.alias, tried, edge.name)
+                        log.info("%s: stance C: edge(s) %s nearest the init pose admit no stance; %s taken", self.gp.variant, tried, edge.name)
                     return out
                 out_all += out
             else:
                 tried.append(edge.name)
         if pool and out_all:
-            log.info("%s: stance C: %d survivors pooled over the edges %s%s", self.gp.alias, len(out_all), [e.name for e in edges if e.name not in tried],
+            log.info("%s: stance C: %d survivors pooled over the edges %s%s", self.gp.variant, len(out_all), [e.name for e in edges if e.name not in tried],
                      f" (no stance at {tried})" if tried else "")
         return out_all
 
@@ -2448,13 +2448,13 @@ class IORSLarge(SamplerV2):
                     cands.append(st)
         self.template_facts["placement_stats"] = stats
         if not cands:
-            log.info("%s: stance C at %s edge %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: stance C at %s edge %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         free = P0.body_free(self, cands)
         cands = [st for st, f in zip(cands, free.tolist()) if f]
         stats["collision_free"] = len(cands)
         if not cands:
-            log.info("%s: stance C at %s edge %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: stance C at %s edge %s: every candidate collides (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         cams = P0.camera_poses(self, cands)
         lo, hi = partner.aabb
@@ -2504,7 +2504,7 @@ class IORSLarge(SamplerV2):
             classed.append((st, k))
         stats["visible"] = len(classed)
         out = P0.best_class(classed)
-        log.info("%s: stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out), stats)
+        log.info("%s: stance C at %s edge %s: %d survivors (%s)", self.gp.variant, partner.name, edge.name, len(out), stats)
         if not out and cands:
             self.debug_placement_visibility(cands, cams, edge, init_xy)
         return out
@@ -2561,9 +2561,9 @@ class IORSLarge(SamplerV2):
             n_cone = sum(1 for r in rows if r["axis_angle_deg"] <= P0.AXIS_LOOSE_DEG)
             n_occ = sum(1 for r in rows if r["occluder"])
             log.info("%s: stance C visibility debug at %s edge %s: %d candidates — goal cell in frame %d, within the 20° cone %d, occluded %d; edges %s; per candidate %s",
-                     self.gp.alias, partner.name, edge.name, len(rows), n_in, n_cone, n_occ, edges, rows)
+                     self.gp.variant, partner.name, edge.name, len(rows), n_in, n_cone, n_occ, edges, rows)
         except Exception as e:  # noqa: BLE001 — diagnostics never fail the attempt
-            log.info("%s: stance C visibility debug failed: %r", self.gp.alias, e)
+            log.info("%s: stance C visibility debug failed: %r", self.gp.variant, e)
 
     def push_under_candidates(self, edge: EdgeFrame, init_xy, arm: Optional[str] = None) -> List[Stance]:
         """Stance C of the push-under (owner decision 2026‑09‑16 item 7): base square to the partner's near AABB edge,
@@ -2661,7 +2661,7 @@ class IORSLarge(SamplerV2):
                         stats["side_candidates"] += 1
         self.template_facts["placement_stats"] = stats
         if not cands:
-            log.info("%s: push-under stance C at %s edge %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: push-under stance C at %s edge %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         # the deep trunks (translate 0.95) are what reaches the floor (B3), and at a floor stance they trip the 1 cm margin
         # against the floor *mesh* (torso / head "within 1 cm of the floor" — B3 README; scene-specific, the floor object
@@ -2679,7 +2679,7 @@ class IORSLarge(SamplerV2):
             with self.ikc.ignoring([self.obj("floor")]):
                 P0.debug_collisions(self, deep_fail[len(deep_fail) // 2:len(deep_fail) // 2 + 2], arms_excluded=False)
         if not cands:
-            log.info("%s: push-under stance C at %s edge %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: push-under stance C at %s edge %s: every candidate collides (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         cams = P0.camera_poses(self, cands)
         lo, hi = partner.aabb
@@ -2700,7 +2700,7 @@ class IORSLarge(SamplerV2):
             if not P0.in_frame(self, cam, pts):
                 stats[f"{kind}_out_of_frame"] = stats.get(f"{kind}_out_of_frame", 0) + 1
                 if kind == "side" and stats[f"{kind}_out_of_frame"] == 1:
-                    log.info("%s: side stance C example out of frame: base %s trunk %s camera %s focus %s disc %s", self.gp.alias, [round(float(v), 2) for v in st.base_pose2d],
+                    log.info("%s: side stance C example out of frame: base %s trunk %s camera %s focus %s disc %s", self.gp.variant, [round(float(v), 2) for v in st.base_pose2d],
                              (st.translate, st.tilt), [round(float(v), 2) for v in cam[0].tolist()], [round(float(v), 2) for v in st.focus.tolist()],
                              [[round(float(v), 2) for v in p] for p in disc.tolist()])
                 continue
@@ -2711,7 +2711,7 @@ class IORSLarge(SamplerV2):
             if ang > math.radians(float(self.num("push_under_axis_max_deg", 45.0))):
                 stats[f"{kind}_axis_off"] = stats.get(f"{kind}_axis_off", 0) + 1
                 if kind == "side" and stats[f"{kind}_axis_off"] == 1:
-                    log.info("%s: side stance C example axis off by %.0f deg: trunk %s camera %s focus %s", self.gp.alias, math.degrees(ang), (st.translate, st.tilt),
+                    log.info("%s: side stance C example axis off by %.0f deg: trunk %s camera %s focus %s", self.gp.variant, math.degrees(ang), (st.translate, st.tilt),
                              [round(float(v), 2) for v in cam[0].tolist()], [round(float(v), 2) for v in st.focus.tolist()])
                 continue
             st.extras["angle_class"] = 1
@@ -2730,7 +2730,7 @@ class IORSLarge(SamplerV2):
             with self.ikc.ignoring([self.obj("floor")]):
                 P0.debug_collisions(self, side_fail[len(side_fail) // 2:len(side_fail) // 2 + 2], arms_excluded=False)
         stats["collision_free_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in cands})
-        log.info("%s: push-under stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out_), stats)
+        log.info("%s: push-under stance C at %s edge %s: %d survivors (%s)", self.gp.variant, partner.name, edge.name, len(out_), stats)
         return out_
 
     def debug_drop_ik(self, place: Stance, release_xy, yaws: Sequence[float]) -> str:
@@ -2849,7 +2849,7 @@ class IORSLarge(SamplerV2):
             dep = self.record_departure_transition(init, manip, b_trunk)
             r, l, _ = stance_arm_vectors(self.kit, manip)  # the oracle moves both arms to B's posture before the sweep
             path = self.record_path(init, manip, trunk=b_trunk, arm_q={"right": r, "left": l}, start_pose2d=NAV.departure_pose(init, dep.stand_off))
-            log.info("%s: A -> B: navigate-then-torso impossible (%s); torso-then-navigate at A (s_T %.2f, drive at trunk %s)", self.gp.alias, errors[-1], dep.stand_off,
+            log.info("%s: A -> B: navigate-then-torso impossible (%s); torso-then-navigate at A (s_T %.2f, drive at trunk %s)", self.gp.variant, errors[-1], dep.stand_off,
                      tuple(round(v, 2) for v in b_trunk))
             return {"order": "torso_then_navigate", "s_T": dep.stand_off, "path_m": round(path.length_m, 3), "primary_error": errors[-1]}
         except Reject as e:
@@ -2942,7 +2942,7 @@ class IORSLarge(SamplerV2):
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
                 self.record_transition(manip, place, carried=tname, arm=arm, trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
                 where = "at the grasp spot" if dep.stand_off <= (manip.stand_off or 0.0) + 1e-6 else "after a drive-back"
-                log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.alias, tuple(round(v, 2) for v in tt), dep.stand_off, where,
+                log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.variant, tuple(round(v, 2) for v in tt), dep.stand_off, where,
                          path.length_m)
                 self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
                                 "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors}
@@ -2960,7 +2960,7 @@ class IORSLarge(SamplerV2):
                 self._drop_leg_records(place.name)
                 path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=True)
             self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
-            log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.alias, "; ".join(errors),
+            log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.variant, "; ".join(errors),
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
             self._leg_bc = {"order": "drive_at_grasp_trunk", "travel_trunk": [manip.translate, manip.tilt], "path_m": round(path.length_m, 3),
@@ -3023,7 +3023,7 @@ class IORSLarge(SamplerV2):
                 why.append(f"{tag}: line from the lift {ok.reason}")
                 continue
             out.append((carry, wps, r.q[self.kit.robot.arm_control_idx[arm]].clone()))
-        log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.alias, carry_height,
+        log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.variant, carry_height,
                  [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
 
@@ -3045,7 +3045,7 @@ class IORSLarge(SamplerV2):
                 r = self.ikc.continue_chain(q_grasp, [eef, lift], arm, ignore=ignore, ignore_end=[], soft_stall_m=self.ikc.FREE_LEG_STALL_M,
                                             ignore_start=ignore + list(self.support_objects()), ground_along=not floor_class, ground_meshes_along=not floor_class)
                 if not r.ok:
-                    log.info("%s: lift %.2f m untrackable from the grasp configuration (%s): grasp skipped", self.gp.alias, carry_height, r.reason[:200])
+                    log.info("%s: lift %.2f m untrackable from the grasp configuration (%s): grasp skipped", self.gp.variant, carry_height, r.reason[:200])
                     return None
             else:
                 r = self.ikc.exact([lift], manip, arm, ignore_for_last=ignore, cache=False)
@@ -3156,7 +3156,7 @@ class IORSLarge(SamplerV2):
                 _screen(n_pre)
                 _offsets()
             lock = self.push_yaw_lock()
-            log.info("%s: pre-screen blade contact offsets at C per B%s: %s", self.gp.alias, f" (push-under yaw lock {lock})" if lock else "",
+            log.info("%s: pre-screen blade contact offsets at C per B%s: %s", self.gp.variant, f" (push-under yaw lock {lock})" if lock else "",
                      [round(pushable[i], 3) for i in range(len(pre))])
         min_off = float(self.num("push_min_contact_m", 0.10))
         idx_of = {id(t): i for i, t in enumerate(pre)}
@@ -3180,7 +3180,7 @@ class IORSLarge(SamplerV2):
             bucket = 0.01 if self.grasp_reach_margin() is not None else 0.05
             margins = {id(t): min(round(_margin(t) / bucket) * bucket, 0.30) for t in pre}
             pre.sort(key=lambda t: (push_rank(t), -margins[id(t)], 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
-            log.info("%s: pre-screen reach margins per B (trunk -> margin): %s", self.gp.alias,
+            log.info("%s: pre-screen reach margins per B (trunk -> margin): %s", self.gp.variant,
                      [(round(float(t[1].translate), 2), round(float(t[1].tilt), 2), round(_margin(t), 3)) for t in pre])
         elif order_mode == "compact":
             pre.sort(key=lambda t: (push_rank(t), 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
@@ -3191,12 +3191,12 @@ class IORSLarge(SamplerV2):
             # arm's reach, first (stable: the order above within each group) - the direct grasp's B often has the object deep on the support
             ranks = {id(t): self._overhang_b_rank(t, z_init, ov_opts) for t in pre}
             pre.sort(key=lambda t: ranks[id(t)][:2])
-            log.info("%s: overhang pick ranks per B (trunk, stand-off -> rank, reach margin at the push start, push): %s", self.gp.alias,
+            log.info("%s: overhang pick ranks per B (trunk, stand-off -> rank, reach margin at the push start, push): %s", self.gp.variant,
                      [(round(float(t[1].translate), 2), round(float(t[1].tilt), 2), t[1].stand_off, ranks[id(t)][0], round(ranks[id(t)][1], 3), ranks[id(t)][2]) for t in pre])
         self.template_facts.setdefault("F_init_prescreen", []).append([t[0] for t in pre])
         if len(offered) > 1:
             self.template_facts.setdefault("F_init_prescreen_arms", []).append([{a: len(F) for a, (_, F) in t[3].items()} for t in pre])
-        log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s%s", self.gp.alias, len(pre), len(yaws), [t[0] for t in pre],
+        log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s%s", self.gp.variant, len(pre), len(yaws), [t[0] for t in pre],
                  "" if len(offered) < 2 else f" (per arm {[{a: len(F) for a, (_, F) in t[3].items()} for t in pre]})")
         n_couple = int(self.num("b_candidates_max", 6))
         for i_b, (n_f, manip, F_init, by_arm) in enumerate(pre[:n_couple]):
@@ -3321,7 +3321,7 @@ class IORSLarge(SamplerV2):
                 seg.why.setdefault(arm, f"{e.reason}: {str(e)[:300]}")
                 errors.append(f"{arm} arm: {e.reason}: {e}")
                 last = e
-                log.info("%s: B (%.2f, %.2f): the %s arm's segment failed (%s)%s", self.gp.alias, manip.translate, manip.tilt, arm, e.reason,
+                log.info("%s: B (%.2f, %.2f): the %s arm's segment failed (%s)%s", self.gp.variant, manip.translate, manip.tilt, arm, e.reason,
                          f"; the {arms[k + 1]} arm's coupling next" if k + 1 < len(arms) else "")
         raise Reject(last.reason if last is not None else "grasp_unreachable", " | ".join(errors) or "no arm has pairs in F_init at B")
 
@@ -3380,7 +3380,7 @@ class IORSLarge(SamplerV2):
                 kept.append(o)
             else:
                 why.append(f"{getattr(o[0], 'name', o[0])}: {w[:160]}")
-        log.info("%s: grasp reach margin [%s] %.3f m deeper along the approach (%s arm, stance (%.2f, %.2f)): %s kept%s", self.gp.alias, where, m, arm,
+        log.info("%s: grasp reach margin [%s] %.3f m deeper along the approach (%s arm, stance (%.2f, %.2f)): %s kept%s", self.gp.variant, where, m, arm,
                  stance.translate, stance.tilt, [getattr(o[0], "name", o[0]) for o in kept] or "none", f"; {'; '.join(why)}" if why else "")
         if not kept:
             return None, "; ".join(why)
@@ -3408,7 +3408,7 @@ class IORSLarge(SamplerV2):
             if opts is None:
                 res = IK.IKResult(False, None, f"grasp reach margin: {why_m}", 2)
         if not res.ok:
-            log.info("%s: segment fallback: the %s arm's regrasp of %s at B fails (%s)", self.gp.alias, arm, getattr(g, "name", g), str(res.reason)[:200])
+            log.info("%s: segment fallback: the %s arm's regrasp of %s at B fails (%s)", self.gp.variant, arm, getattr(g, "name", g), str(res.reason)[:200])
             return None
         TT._count(self, f"segment_fallback_taken.{arm}")
         return opts
@@ -3430,7 +3430,7 @@ class IORSLarge(SamplerV2):
         try:
             return OH.options(self.gp.gen("pick_overhang_push"))
         except ValueError as e:
-            raise Reject("spec", f"{self.gp.alias}: {e}")
+            raise Reject("spec", f"{self.gp.variant}: {e}")
 
     def _overhang_edges(self, centre_xy, d, laterals: Sequence[float], z_top: float) -> List[Optional[float]]:
         """The support edge's distance along ``d`` from ``centre_xy`` on each lateral line (:func:`overhang.edge_from_hits`): vertical rays
@@ -3452,7 +3452,7 @@ class IORSLarge(SamplerV2):
                 body = str(h.get("rigidBody")) if h.get("hit") else ""
                 flat.append(bool(body) and (body in prims or any(body.startswith(pp + "/") for pp in prims)) and abs(float(h["position"][2]) - z_top) <= 0.01)
         except Exception as e:  # noqa: BLE001 - no raycast here: the 2 cm raster
-            log.info("%s: overhang edge probe by raycast unavailable (%r): the support-top raster instead", self.gp.alias, e)
+            log.info("%s: overhang edge probe by raycast unavailable (%r): the support-top raster instead", self.gp.variant, e)
             top = self.surface.get("top")
             flat = [bool(top is not None and top.contains(p)) for row in rows for p in row]
         return [OH.edge_from_hits(flat[i * n:(i + 1) * n]) for i in range(len(rows))]
@@ -3522,7 +3522,7 @@ class IORSLarge(SamplerV2):
                     extra.append((float(y), g))
         if extra:
             TT._count(self, "pick_overhang.pairs_added")
-        log.info("%s: overhang pick pairs at B (%.2f, %.2f) d %s: %d added to F_init's %d (yaws %s)%s", self.gp.alias, manip.translate, manip.tilt, manip.stand_off, len(extra),
+        log.info("%s: overhang pick pairs at B (%.2f, %.2f) d %s: %d added to F_init's %d (yaws %s)%s", self.gp.variant, manip.translate, manip.tilt, manip.stand_off, len(extra),
                  len(F_direct), sorted({round(y, 2) for y, _ in extra}), " - mode only: the direct pairs dropped" if only else "")
         return ([] if only else list(F_direct)) + extra
 
@@ -3742,7 +3742,7 @@ class IORSLarge(SamplerV2):
                          "chain": {k: chain[k] for k in ("fingers", "opening", "pitch_deg", "wrist", "contact_along_m", "hand_travel_m", "tip_m", "support_touch_m")}}
                 TT._count(self, "pick_overhang.found")
                 log.info("%s: overhang pick at B (%.2f, %.2f), %s arm, grasp %s yaw %.2f: push %.3f m toward the edge (edge %.3f m, overhang %.3f m, centre of mass "
-                         "%.3f m inside), %s hand pitch %.0f (%s), settle %s, grasp from %s", self.gp.alias, manip.translate, manip.tilt, arm, getattr(g, "name", g), yaw, push,
+                         "%.3f m inside), %s hand pitch %.0f (%s), settle %s, grasp from %s", self.gp.variant, manip.translate, manip.tilt, arm, getattr(g, "name", g), yaw, push,
                          geo["edge_finger_m"], overhang, facts["com_inside_m"], chain["fingers"], chain["pitch_deg"], chain["wrist"], sfacts,
                          "B" if grasp_st is st else f"B backed off to stand-off {grasp_st.stand_off:.2f} at trunk ({grasp_st.translate:.2f}, {grasp_st.tilt:.2f})")
                 return {"arm": arm, "stance": st, "grasp_stance": grasp_st, "t_pose": t_pose, "post_pose": settled, "predicted_pose": post, "eef": eef, "pre": pre, "res": res,
@@ -3950,7 +3950,7 @@ class IORSLarge(SamplerV2):
                 order = sorted(side + front, key=key_t)
                 if order:
                     k0 = order[0]
-                    log.info("%s: C order by travel from B %s: nearest %s (%.2f m, edge %s, d %.2f, λ %+.2f), farthest %.2f m over %d survivors", self.gp.alias,
+                    log.info("%s: C order by travel from B %s: nearest %s (%.2f m, edge %s, d %.2f, λ %+.2f), farthest %.2f m over %d survivors", self.gp.variant,
                              [round(float(v), 2) for v in manip.base_xy.tolist()], [round(float(v), 2) for v in c_pool[k0].base_xy.tolist()],
                              NAV.travel_length(self.kit, manip.base_xy, c_pool[k0].base_xy, trav_cache), c_pool[k0].extras.get("edge"), c_pool[k0].stand_off or 0.0,
                              c_pool[k0].lateral, max(NAV.travel_length(self.kit, manip.base_xy, c_pool[k].base_xy, trav_cache) for k in order), len(order))
@@ -4008,7 +4008,7 @@ class IORSLarge(SamplerV2):
                         except Exception:  # noqa: BLE001
                             pass
                         errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral:+.2f}): no room for the carried sweep at margin {carry_margin:.3f}{why_m}")
-                        log.info("%s: C skipped (d %.2f λ %+.2f edge %s): the body has no room for the carried sweep's margin %.3f at the travel trunk%s", self.gp.alias,
+                        log.info("%s: C skipped (d %.2f λ %+.2f edge %s): the body has no room for the carried sweep's margin %.3f at the travel trunk%s", self.gp.variant,
                                  place.stand_off or 0.0, place.lateral, place.extras.get("edge"), carry_margin, why_m)
                         carry_failed_bases.add(base_key)
                         continue
@@ -4071,7 +4071,7 @@ class IORSLarge(SamplerV2):
                         ch = chain_cache[ck]
                         pst = push_st if push_st is not None else place
                         log.info("%s: push chain SOLVED at C (d %.2f λ %+.2f push trunk (%.2f, %.2f), yaw %.2f offset %.3f m): blade start %s -> goal %s in base, pitch %.0f, tips %.3f m",
-                                 self.gp.alias, place.stand_off or 0.0, place.lateral, pst.translate, pst.tilt, y, offs[y],
+                                 self.gp.variant, place.stand_off or 0.0, place.lateral, pst.translate, pst.tilt, y, offs[y],
                                  [round(float(v), 2) for v in P0.to_base_frame(ch["start"][0], pst.base_pose2d, P0.base_z(self)).tolist()],
                                  [round(float(v), 2) for v in P0.to_base_frame(ch["goal"][0], pst.base_pose2d, P0.base_z(self)).tolist()], ch["pitch_deg"], ch["fingertip_z_m"])
                         break
@@ -4097,12 +4097,12 @@ class IORSLarge(SamplerV2):
                 F_goal, tilts_of = self.screen_release_tilts(F_goal, release_xy, yaws, d_yaw, place, arm, ignore_place, yaw_step)
             F = intersect_feasible(F_live, F_goal, yaw_step=yaw_step)
             if push:
-                log.info("%s: push-under C try %s d %.2f λ %+.2f trunk (%.2f, %.1f): F_init %d, F_goal %d, F %d at drop %s", self.gp.alias, place.extras.get("stance_kind"),
+                log.info("%s: push-under C try %s d %.2f λ %+.2f trunk (%.2f, %.1f): F_init %d, F_goal %d, F %d at drop %s", self.gp.variant, place.extras.get("stance_kind"),
                          place.stand_off or 0.0, place.lateral, place.translate, place.tilt, len(F_live), len(F_goal), len(F), [round(float(v), 2) for v in release_xy])
             if not F:
                 if push and not F_goal and not getattr(self, "_drop_debugged", False):
                     self._drop_debugged = True
-                    log.info("%s: drop IK debug — %s", self.gp.alias, self.debug_drop_ik(place, release_xy, yaws))
+                    log.info("%s: drop IK debug — %s", self.gp.variant, self.debug_drop_ik(place, release_xy, yaws))
                 errors.append(f"C: F_init ({len(F_live)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
             fails: Dict[str, int] = {}
@@ -4197,12 +4197,12 @@ class IORSLarge(SamplerV2):
                                 why_b.append(str(res.reason))
                         else:
                             why_b.append(f"overhang pick: {why_ov}")
-                            log.info("%s: overhang pick fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.alias, yaw0, getattr(g, "name", g),
+                            log.info("%s: overhang pick fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.variant, yaw0, getattr(g, "name", g),
                                      manip.translate, manip.tilt, why_ov[:900])
                     if res is None or not res.ok:
                         b_ik_cache[bk] = None
                         fails["B: [pre-grasp, grasp] exact IK"] = fails.get("B: [pre-grasp, grasp] exact IK", 0) + 1
-                        log.info("%s: B exact IK fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.alias, yaw0, getattr(g, "name", g), manip.translate, manip.tilt,
+                        log.info("%s: B exact IK fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.variant, yaw0, getattr(g, "name", g), manip.translate, manip.tilt,
                                  " | ".join(why_b)[:600])
                         continue
                     arm_b = overhang["arm"] if overhang is not None else (pick.arm if pick is not None else a0)
@@ -4248,7 +4248,7 @@ class IORSLarge(SamplerV2):
                     if seg.leg_ok[lk]:
                         # the A -> B drive was swept before the target had a pose (parked): a draw on the drive's corridor is dropped
                         fails["B: the A -> B drive passes the placed target"] = fails.get("B: the A -> B drive passes the placed target", 0) + 1
-                        log.info("%s: %s", self.gp.alias, seg.leg_ok[lk])
+                        log.info("%s: %s", self.gp.variant, seg.leg_ok[lk])
                         continue
                 elif seg.leg_ok[lk]:
                     fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
@@ -4285,7 +4285,7 @@ class IORSLarge(SamplerV2):
                         r2 = self.ikc.exact([pre_place, place_eef], place, arm, ignore_for_last=ignore_place, cache=False, q_seed=q_seed)
                         if not r2.ok and n_place_diag < self.PLACE_IK_DIAG_PER_C:
                             n_place_diag += 1
-                            log.info("%s: %s", self.gp.alias, self._place_ik_fail_line(r2, place, g, yaw, tilt, pre_place, place_eef, arm, q_seed, ignore_place,
+                            log.info("%s: %s", self.gp.variant, self._place_ik_fail_line(r2, place, g, yaw, tilt, pre_place, place_eef, arm, q_seed, ignore_place,
                                                                                        pre_before, push))
                     if not r2.ok:
                         c_fails.append(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached): {r2.reason[:200]}")
@@ -4306,7 +4306,7 @@ class IORSLarge(SamplerV2):
                 twin_facts = b_facts
                 if b_facts is not None and j_opt > 0:
                     twin_facts = dict(b_facts, chosen="twin" if flip else "row", late_flip=f"the {'row' if flip else 'twin'} failed at C: {c_fails[0]}")
-                    log.info("%s: grasp twin [C] %s: the %s's place failed at C (%s), the %s's passes", self.gp.alias, g.name, "row" if flip else "twin", c_fails[0],
+                    log.info("%s: grasp twin [C] %s: the %s's place failed at C (%s), the %s's passes", self.gp.variant, g.name, "row" if flip else "twin", c_fails[0],
                              "twin" if flip else "row")
                 if self.relation == "ontop" and not push:
                     # owner 2026-09-26 (shampoo, waves 6-8: 8 of 22 attempts rejected in goal_check 'place eef pose outside the placement image
@@ -4405,7 +4405,7 @@ class IORSLarge(SamplerV2):
                         try:
                             with self._floor_relaxed():  # the floor mesh out (deep-crouch 1 cm margin, as the stance / program checks); the ground slab stays
                                 path_bc = self.record_carry_leg(init, pick_st, place, tname, q_arm, max_len)
-                            log.info("%s: carry with lift %.2f m at the %s%s", self.gp.alias, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
+                            log.info("%s: carry with lift %.2f m at the %s%s", self.gp.variant, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
                             break
                         except Reject as e:
                             carry_errors.append(f"lift {h:.2f} m, {label}: {e.reason}: {str(e)[:700]}")
@@ -4416,7 +4416,7 @@ class IORSLarge(SamplerV2):
                 if path_bc is None:
                     errors.append("C: carry leg: " + "; ".join(carry_errors[-3:]))
                     seg.failed.setdefault(bk, "C: carry leg: " + (carry_errors[0][:300] if carry_errors else "no carry option"))
-                    log.info("%s: C (d %.2f λ %+.2f) carry leg failed: %s", self.gp.alias, place.stand_off or 0.0, place.lateral, " || ".join(carry_errors)[:1200])
+                    log.info("%s: C (d %.2f λ %+.2f) carry leg failed: %s", self.gp.variant, place.stand_off or 0.0, place.lateral, " || ".join(carry_errors)[:1200])
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
                     carry_failed_bases.add(base_key)
                     self.sidecar.stances.pop("placement", None)
@@ -4443,7 +4443,7 @@ class IORSLarge(SamplerV2):
                     reason = why_t if q_end is None else (r2b.reason if r2b is not None else "no IK")
                     errors.append(f"C: carry leg untrackable to the pre-place: {reason}")
                     seg.failed.setdefault(bk, f"C: carry leg untrackable to the pre-place: {str(reason)[:200]}")
-                    log.info("%s: C (d %.2f λ %+.2f) carry leg hand -> pre-place untrackable / drop IK from its end fails: %s", self.gp.alias, place.stand_off or 0.0, place.lateral, reason)
+                    log.info("%s: C (d %.2f λ %+.2f) carry leg hand -> pre-place untrackable / drop IK from its end fails: %s", self.gp.variant, place.stand_off or 0.0, place.lateral, reason)
                     fails["C: carry leg untrackable"] = fails.get("C: carry leg untrackable", 0) + 1
                     self._drop_leg_records("placement")
                     self.record_carry_arm_q(tname, arm, None)
@@ -4456,7 +4456,7 @@ class IORSLarge(SamplerV2):
                 if fin_swing > float(self.num("carry_finish_max_rad", 0.5)):
                     errors.append(f"C: pre-place witness {fin_swing:.2f} rad from the tracked carry end")
                     seg.failed.setdefault(bk, f"C: pre-place witness {fin_swing:.2f} rad from the tracked carry end")
-                    log.info("%s: C (d %.2f λ %+.2f) pre-place IK from the tracked carry end swings %.2f rad (> 0.5)", self.gp.alias, place.stand_off or 0.0, place.lateral, fin_swing)
+                    log.info("%s: C (d %.2f λ %+.2f) pre-place IK from the tracked carry end swings %.2f rad (> 0.5)", self.gp.variant, place.stand_off or 0.0, place.lateral, fin_swing)
                     fails["C: pre-place branch off the tracked carry"] = fails.get("C: pre-place branch off the tracked carry", 0) + 1
                     self._drop_leg_records("placement")
                     self.record_carry_arm_q(tname, arm, None)
@@ -4466,7 +4466,7 @@ class IORSLarge(SamplerV2):
                     self.sidecar.grasps.clear()
                     continue
                 self.carry_end_q[tname] = q_end[idx_r].clone()
-                log.info("%s: carry leg hand -> pre-place tracked at C (%.2f rad swing at the finish)", self.gp.alias, fin_swing)
+                log.info("%s: carry leg hand -> pre-place tracked at C (%.2f rad swing at the finish)", self.gp.variant, fin_swing)
                 if push:
                     chain = {**chain, "record": {**chain.get("record", {}),
                                                  **self.push_strokes_record(chain["distance_m"], chain.get("record", {}).get("push_contact_form"))}}
@@ -4495,7 +4495,7 @@ class IORSLarge(SamplerV2):
                                   "goal_quat": [float(v) for v in goal_quat], "carry_yaw_offset_rad": round(d_yaw, 4)})
                 if tilts_of:
                     d.summary.update({"release_tilt_deg": float(tilt), "release_level_quat": [float(v) for v in level_quat]})
-                    log.info("%s: inside release tilt %g deg coupled (yaw %.2f, grasp %s, C d %.2f λ %+.2f)", self.gp.alias, tilt, yaw, g.name, place.stand_off or 0.0, place.lateral)
+                    log.info("%s: inside release tilt %g deg coupled (yaw %.2f, grasp %s, C d %.2f λ %+.2f)", self.gp.variant, tilt, yaw, g.name, place.stand_off or 0.0, place.lateral)
                 d.summary["arm"] = TT.segment_arm_summary(grasp, offered)
                 if hit.get("overhang") is not None:
                     d.summary["pick_overhang"] = _jsonable(hit["overhang"]["facts"])
@@ -4505,7 +4505,7 @@ class IORSLarge(SamplerV2):
                 arms_here = (seg.arms_of(yaw0, g) if seg is not None else []) or [arm]
                 grasp.extras["arm_offer"] = TT.arm_offer_record(offered, [a for a in offered if a in arms_here] or [arm], grasp, TT.arm_offer(self)[1])
                 if arm != arm0 or fallback is not None:
-                    log.info("%s: segment grasp -> carry -> %s with the %s arm (%s)%s", self.gp.alias, "drop -> push" if push else "place", arm, d.summary["arm"]["reason"],
+                    log.info("%s: segment grasp -> carry -> %s with the %s arm (%s)%s", self.gp.variant, "drop -> push" if push else "place", arm, d.summary["arm"]["reason"],
                              f"; the {fallback['from_arm']} arm failed: {fallback['why'][:200]}" if fallback is not None else "")
                 if push:
                     d.summary["push_under"] = {"drop_cell": [float(v) for v in cd], "distance_m": chain["distance_m"], "pitch_deg": chain["pitch_deg"],
@@ -4525,7 +4525,7 @@ class IORSLarge(SamplerV2):
                     self.sidecar.describe(floor_name, "floor", push_distance_cm=100.0 * float(chain["distance_m"]))
                 return d
             errors.append(f"C (d {place.stand_off:.2f} trunk ({place.translate}, {place.tilt:.1f})): no (yaw, grasp) of F ({len(F)}) passes the exact IK at B and C — {fails}")
-            log.info("%s: C try exhausted (d %.2f λ %+.2f edge %s, push trunk %s): %s", self.gp.alias, place.stand_off or 0.0, place.lateral, place.extras.get("edge"),
+            log.info("%s: C try exhausted (d %.2f λ %+.2f edge %s, push trunk %s): %s", self.gp.variant, place.stand_off or 0.0, place.lateral, place.extras.get("edge"),
                      None if push_st is None else (push_st.translate, round(push_st.tilt, 2)), fails)
         raise Reject("grasp_unreachable", "; ".join(errors[-3:]) if errors else "no placement candidate")
 
@@ -4653,13 +4653,13 @@ class IORSLarge(SamplerV2):
                 res = self.ikc.exact(chain, stance, arm, cache=False, fingers=fingers, q_first=q_first)
                 if res.ok:
                     branch = {"map": "wrist-flipped", "ik": "solved"}.get(push.extras.get("chain_branch"), str(push.extras.get("chain_branch")))
-                    log.info("%s: push-under goal check re-solve: seeded ok (the sampled chain's %s branch, %s arm)", self.gp.alias, branch, arm)
+                    log.info("%s: push-under goal check re-solve: seeded ok (the sampled chain's %s branch, %s arm)", self.gp.variant, branch, arm)
                     return res, None
                 self.ikc.solutions.clear()
                 self.ikc.solutions.update(saved)
                 why = str(res.reason)
         res = self.ikc.exact(chain, stance, arm, cache=False, fingers=fingers)
-        log.info("%s: push-under goal check re-solve: %s -> unseeded %s", self.gp.alias, why if arm_q is None else f"seeded failed ({why[:300]})",
+        log.info("%s: push-under goal check re-solve: %s -> unseeded %s", self.gp.variant, why if arm_q is None else f"seeded failed ({why[:300]})",
                  "ok" if res.ok else "failed")
         return res, None if arm_q is None else why
 

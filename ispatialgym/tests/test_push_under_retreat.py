@@ -29,7 +29,7 @@ FIXTURE = os.path.join(os.path.dirname(__file__), "data", "sidecar_variants", "i
 TARGET, FLOOR, PARTNER = "briefcase.n.01_1", "floor.n.01_1", "breakfast_table.n.01_1"
 NO_HAND = SimpleNamespace(object_pose=lambda n: None)  # no live hand: the legs leave from the recorded push goal (the program check's view)
 
-#: under_large#01 c3_k0 (alias 133, code_27ee9069): the recorded push-under contact - the 'pitch 0-' blade along +x, the bed's -x face at 22.24
+#: under_large#01 c3_k0 (variant 133, code_27ee9069): the recorded push-under contact - the 'pitch 0-' blade along +x, the bed's -x face at 22.24
 C3K0_PUSH = {"pre": [21.86641502380371, 17.534568786621094, 0.14036628603935242], "init": [21.86641502380371, 17.534568786621094, 0.040366280823946],
              "mid": [22.01763153076172, 17.534568786621094, 0.040366280823946], "goal": [22.16884994506836, 17.53456687927246, 0.040366280823946]}
 C3K0_QUAT = [-0.7071067690849304, 0.7071067690849304, 0.0, 0.0]
@@ -70,7 +70,7 @@ def _roll(a: float) -> th.Tensor:
 
 def test_push_under_retreat_backs_out_along_the_push_then_lifts():
     sc = _fixture()
-    acts = expand(sc.alias, sc)
+    acts = expand(sc.variant, sc)
     assert [a.name for a in acts] == ["transition", "grasp", "lift", "navigate", "place", "retreat", "push", "retreat"]
     push, ret = acts[-2], acts[-1]
     assert isinstance(push, Push) and push.kind == "push_under" and isinstance(ret, Retreat) and ret.after is push
@@ -96,7 +96,7 @@ def test_push_under_retreat_leaves_from_where_the_hand_is_for_the_recorded_poses
     """The demo's leg starts where the push left the hand (2 cm on past the goal after its residual re-push, the loaded pad 4 mm low) and
     ends at the poses taken from the recorded goal - the poses the program check solved and recorded the witness of."""
     sc = _fixture()
-    push, ret = expand(sc.alias, sc)[-2:]
+    push, ret = expand(sc.variant, sc)[-2:]
     q = th.tensor(push.contact.goal.orientation)
     here = th.tensor(push.contact.goal.position) + th.tensor([0.003, 0.02, -0.004])
     st = SimpleNamespace(eef_pose=lambda arm: (here.clone(), q.clone()), object_pose=lambda n: None)
@@ -128,7 +128,7 @@ def test_c3_k0_record_retreats_clear_of_the_bed_edge():
     (z 0.040), then up to z 0.140 - the wrist camera's spheres 9.6 cm short of the bed's -x face while the hand rises, where the straight lift
     at x 22.169 put them at the face (z ~0.23)."""
     sc = _c3_k0()
-    push, ret = expand(sc.alias, sc)[-2:]
+    push, ret = expand(sc.variant, sc)[-2:]
     leg = [list(p.position) for p in ret.targets(sc, NO_HAND)["retreat"]]
     gx, gz = C3K0_PUSH["goal"][0], C3K0_PUSH["goal"][2]
     assert all(p[0] <= gx + 1e-6 for p in leg)  # never toward the bed
@@ -175,7 +175,7 @@ def _run_retreat(sc, ret, witnesses=None, witness_poses=None):
 
 def test_execute_retreat_runs_the_slide_then_lift_leg():
     sc = _fixture()
-    ret = expand(sc.alias, sc)[-1]
+    ret = expand(sc.variant, sc)[-1]
     motions, ctx = _run_retreat(sc, ret)
     assert ctx["retreat_escape"] == {"skipped": "push_under: back along the push at its height, then up"}
     leg = motions.legs[-1]
@@ -187,7 +187,7 @@ def test_retreat_witness_of_another_pose_is_not_used():
     """An old record's witness of the push-under retreat belongs to the straight lift off the goal (10 cm from the new leg's end): the
     finish must not plan back to it. A witness of the leg's own end is used, and the other retreats keep theirs as before."""
     sc = _fixture()
-    acts = expand(sc.alias, sc)
+    acts = expand(sc.variant, sc)
     ret = acts[-1]
     q = th.arange(28, dtype=th.float32) / 100.0
     goal = th.tensor(ret.after.contact.goal.position, dtype=th.float32)
@@ -240,7 +240,7 @@ def test_program_check_push_under_legs_never_ignore_the_partner():
     """On a bed-top init the init surface is the partner (``support_objects()`` = bed_rrcvaq_0, with the supports united with its top): the
     push and the retreats after the drop and after the push leave out the moved object and the floor only."""
     sc = _fixture()
-    place, ret1, push, ret2 = expand(sc.alias, sc)[4:]
+    place, ret1, push, ret2 = expand(sc.variant, sc)[4:]
     sampler, objs = _sampler([PARTNER, "nightstand.n.01_1"])
     for a in (ret1, push, ret2):
         assert PC._push_under_floor(a) == FLOOR
@@ -262,7 +262,7 @@ def test_program_check_push_under_legs_never_ignore_the_partner():
 
 def test_program_check_slab_off_for_the_retreat_that_slides_at_the_push_height():
     sc = _fixture()
-    place, ret1, push, ret2 = expand(sc.alias, sc)[4:]
+    place, ret1, push, ret2 = expand(sc.variant, sc)[4:]
     assert not PC._slab_off(push) and not PC._slab_off(ret2)
     push.contact.extra["ground_ignored"] = True  # the fingertips run below the slab's padding (< 4 cm above the floor)
     assert PC._slab_off(push) and PC._slab_off(ret2)
@@ -291,7 +291,7 @@ def test_vertical_angle_is_the_tilt_modulo_yaw():
 def _gate_executor(actions, q_now, category="briefcase", model="lwbctq", goal=None):
     ex = Executor.__new__(Executor)
     ex.program_actions = actions
-    ex.cfg = ExecutorConfig(demo_gating=("placed_orientation",))
+    ex.cfg = ExecutorConfig()
     tgt = SimpleNamespace(frame="world", orientation=_yaw(0.0025) if goal is None else goal, orientation_tolerance=0.2, orientation_metric="full",
                           orientation_equivalences=[])
     obj = SimpleNamespace(name=f"target_{category}_{model}_0", category=category, model=model)
@@ -301,7 +301,7 @@ def _gate_executor(actions, q_now, category="briefcase", model="lwbctq", goal=No
 
 def test_placed_orientation_judges_a_push_under_target_modulo_yaw():
     sc = _fixture()
-    acts = expand(sc.alias, sc)
+    acts = expand(sc.variant, sc)
     full = 0.605
     isg = {"errors": {"pose_errors": {TARGET: {"orientation_error": full, "gating": False}}}}
     ex = _gate_executor(acts, _yaw(0.0025 + full))  # c3_k0: 34.8 deg of yaw, lying flat
@@ -323,7 +323,7 @@ def test_placed_orientation_takes_the_smaller_reading_for_a_pushed_cylinder(monk
 
     monkeypatch.setattr(EXE, "revolution_axes", lambda path=EXE.REVOLUTION_AXES_PATH: {"trash_can/abc": {"axis": "x", "tags": ["xinf"]}})
     sc = _fixture()
-    acts = expand(sc.alias, sc)
+    acts = expand(sc.variant, sc)
     isg = {"errors": {"pose_errors": {TARGET: {"orientation_error": 1.6, "gating": False}}}}
     # yawed: the long axis swings in the floor plane (revolution reading 0.6), the vertical one is ~0
     rep = _gate_executor(acts, _yaw(0.6), "trash_can", "abc", goal=th.tensor([0.0, 0.0, 0.0, 1.0])).placed_orientation_report(isg)[TARGET]
@@ -335,7 +335,7 @@ def test_placed_orientation_takes_the_smaller_reading_for_a_pushed_cylinder(monk
 
 def test_goal_override_judges_a_push_under_target_modulo_yaw():
     sc = _fixture()
-    acts = expand(sc.alias, sc)
+    acts = expand(sc.variant, sc)
     goal_p, goal_q = th.tensor([6.5, 3.2, 0.03]), _yaw(0.0025)
     q_now = _yaw(0.0025 + 0.605)
     obj = SimpleNamespace(name="target_briefcase_lwbctq_0", links={}, aabb_extent=th.tensor([0.40, 0.12, 0.30]),

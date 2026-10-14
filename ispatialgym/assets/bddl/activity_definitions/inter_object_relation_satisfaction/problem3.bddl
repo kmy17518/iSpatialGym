@@ -1,37 +1,40 @@
 (define (problem inter_object_relation_satisfaction-3)
     (:domain ispatialgym)
+    (:variant inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table)
 
-    (:alias nextto)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#01~T1/representative)
+    ; IORS - touching. Target grasped and set down next to the partner (partner on the robot's left), then pushed against it
+    ; while the other gripper braces the partner's far side (push and brace computed geometrically, no artefact); the
+    ; partner must not move (> 5 mm) at the goal.
 
     (:objects
-        apple.n.01_1 - apple.n.01
-        bowl.n.01_1 - bowl.n.01
-        table.n.02_1 - table.n.02
+        box__of__sanitary_napkin.n.01_1 - box__of__sanitary_napkin.n.01
+        box__of__tissue.n.01_1 - box__of__tissue.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop apple.n.01_1 table.n.02_1)
-        (ontop bowl.n.01_1 table.n.02_1)
+        (ontop box__of__sanitary_napkin.n.01_1 breakfast_table.n.01_1)
+        (ontop box__of__tissue.n.01_1 breakfast_table.n.01_1)
+        (not (touching box__of__sanitary_napkin.n.01_1 box__of__tissue.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
-    ; Binary success: the pictured relation holds and both objects are released.
     (:goal
         (and
-            (nextto ?apple.n.01_1 ?bowl.n.01_1)
-            (not (grasped ?agent.n.01_1 ?apple.n.01_1))
-            (not (grasped ?agent.n.01_1 ?bowl.n.01_1))
-            (pose_settled ?apple.n.01_1)
-            (pose_settled ?bowl.n.01_1)
+            (touching ?box__of__sanitary_napkin.n.01_1 ?box__of__tissue.n.01_1)
+            (not (grasped ?agent.n.01_1 ?box__of__sanitary_napkin.n.01_1))
+            (not (grasped ?agent.n.01_1 ?box__of__tissue.n.01_1))
+            (pose_settled ?box__of__sanitary_napkin.n.01_1)
+            (pose_settled ?box__of__tissue.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
-    ; Non-gating: the exact pictured poses (TRO pose_targets) are reported only.
     (:measure
-        (pose_reached ?apple.n.01_1)
-        (pose_reached ?bowl.n.01_1)
+        (pose_reached ?box__of__sanitary_napkin.n.01_1)
+        (pose_reached ?box__of__tissue.n.01_1)
     )
 )

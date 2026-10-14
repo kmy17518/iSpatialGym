@@ -1,5 +1,0 @@
-{"key": "carton__causya", "joint": "j_link_0", "feasible": false,
- "proposal": null,
- "alternative": null,
- "note": "Marked face is empty air: flap bbox displaced ~0.3 m from visual lid, frame unusable; broken asset, nothing pinchable at markers.",
- "confidence": "high"}

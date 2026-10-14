@@ -329,7 +329,7 @@ def restrict_to_goal_region(s, cells: th.Tensor) -> Tuple[th.Tensor, Optional[Di
     try:
         region = goal_region(s.gp.gen("inside_goal_region"))
     except ValueError as e:
-        raise Reject("spec", f"{s.gp.alias}: {e}")
+        raise Reject("spec", f"{s.gp.variant}: {e}")
     if region is None:
         return cells, None
     origin, yaw = (0.0, 0.0), 0.0
@@ -338,10 +338,10 @@ def restrict_to_goal_region(s, cells: th.Tensor) -> Tuple[th.Tensor, Optional[Di
         origin, yaw = (float(p[0]), float(p[1])), float(G.yaw_of(q))
         region.update({"partner_origin": [round(v, 4) for v in origin], "partner_yaw": round(yaw, 4)})
     kept = cells[in_goal_region(cells, region, origin, yaw)] if len(cells) else cells
-    log.info("%s: inside goal region of %s (%s frame, x %s, y %s): %d -> %d goal cells (world %s -> %s)", s.gp.alias, s.partner.name, region["frame"],
+    log.info("%s: inside goal region of %s (%s frame, x %s, y %s): %d -> %d goal cells (world %s -> %s)", s.gp.variant, s.partner.name, region["frame"],
              region["x"] or "any", region["y"] or "any", len(cells), len(kept), cell_span(cells), cell_span(kept))
     if len(cells) and not len(kept):
-        raise Reject("spec", f"{s.gp.alias}: generation.inside_goal_region {s.gp.gen('inside_goal_region')} keeps none of the {len(cells)} goal cells of "
+        raise Reject("spec", f"{s.gp.variant}: generation.inside_goal_region {s.gp.gen('inside_goal_region')} keeps none of the {len(cells)} goal cells of "
                              f"{s.partner.name} (world {cell_span(cells)})")
     return kept, {**region, "n_before": int(len(cells)), "n_after": int(len(kept))}
 
@@ -355,12 +355,12 @@ class InsideMode:
     def inside_surface_spec(self) -> Dict[str, float]:
         z = self.gp.gen("inside_surface_z_m")
         if z is None:
-            raise Reject("spec", f"{self.gp.alias}: generation.inside_surface_z_m (the partner's interior surface, m above the floor) is required "
+            raise Reject("spec", f"{self.gp.variant}: generation.inside_surface_z_m (the partner's interior surface, m above the floor) is required "
                                  "for IORS large-scale inside")
         return {"z_m": float(z), "tol_m": float(self.gp.gen("inside_surface_tol_m", SURFACE_TOL_M))}
 
     def prepare_partner(self):
-        """The interior raster of the partner at the alias's height, the goal cells (headroom, the opening shrunk by the half extent +
+        """The interior raster of the partner at the variant's height, the goal cells (headroom, the opening shrunk by the half extent +
         ``opening_margin_m``, ``inside_goal_region``), the raster's sides as the stance-C edges (``inside_stance_side``) and the rim of the
         drop test."""
         partner = self.partner
@@ -388,7 +388,7 @@ class InsideMode:
         try:
             side = side_vector(self.gp.gen("inside_stance_side"))
         except ValueError as e:
-            raise Reject("spec", f"{self.gp.alias}: {e}")
+            raise Reject("spec", f"{self.gp.variant}: {e}")
         all_edges = [EdgeFrame.from_edge(name, mid, normal, length, overhang(mid, normal, lo, hi)) for name, mid, normal, length in itop.edges()]
         edges = edges_facing(all_edges, side)
         try:
@@ -410,7 +410,7 @@ class InsideMode:
         self.template_facts["inside_surface"] = facts
         self.template_facts["partner"] = {"name": partner.name, "n_goal_cells": int(len(goal_cells)), "edges": [e.to_json() for e in edges]}
         log.info("%s: inside surface of %s at %.3f m (requested %.2f +- %.2f above the floor): %d board / %d usable / %d goal cells (eroded %.2f m), rim %.3f (%s), "
-                 "stance sides %s", self.gp.alias, partner.name, float(itop.z), spec["z_m"], spec["tol_m"], int(itop.mask.sum()), len(cells), len(goal_cells), margin,
+                 "stance sides %s", self.gp.variant, partner.name, float(itop.z), spec["z_m"], spec["tol_m"], int(itop.mask.sum()), len(cells), len(goal_cells), margin,
                  rim_z, rim_src, [e.name for e in edges])
         if not edges:
             raise Reject("inside_no_side", f"{partner.name}: no side of the interior raster faces {self.gp.gen('inside_stance_side')!r} "
@@ -435,7 +435,7 @@ class InsideMode:
     # ------------------------------------------------------------------ the goal-side band
 
     def inside_band(self, arm: str) -> Optional[RB.ReachBands]:
-        """The goal-side band of ``arm`` (the target on the partner's interior surface, ``surface_z`` = the alias's requested height): the
+        """The goal-side band of ``arm`` (the target on the partner's interior surface, ``surface_z`` = the variant's requested height): the
         arm's own band, else (the other arm) the default arm's mirrored, else None - no band filter, the reach margin orders the trunks.
         An empty band counts as none. Never computed in-process (a band job publishes it)."""
         memo = self.__dict__.setdefault("_inside_bands", {})
@@ -457,7 +457,7 @@ class InsideMode:
             base = self.inside_band(arm0)
             if base is not None and RB.mirrorable(base.meta):
                 rb, why = base.mirrored(), f"the {arm0} arm's band mirrored"
-        log.info("%s: inside goal-side band (%s arm, surface_z %.2f%s): %s", self.gp.alias, arm, z, f", support joints {joints}" if joints else "",
+        log.info("%s: inside goal-side band (%s arm, surface_z %.2f%s): %s", self.gp.variant, arm, z, f", support joints {joints}" if joints else "",
                  rb.path if rb is not None and not why else why or "none")
         self.template_facts.setdefault("inside_bands", {})[arm] = None if rb is None else {**(TT.band_facts(rb) or {}), "n_cells": int(rb.meta.get("n_reachable_total", 0) or 0)}
         memo[arm] = rb
@@ -475,7 +475,7 @@ class InsideMode:
         try:
             postures = stance_postures(self.gp.gen("inside_stance_postures"))
         except ValueError as e:
-            raise Reject("spec", f"{self.gp.alias}: {e}")
+            raise Reject("spec", f"{self.gp.variant}: {e}")
         half, height = float(self.place["half"]), float(self.place["height"])
         rb = self.inside_band(arm)
         self.place["band"] = rb
@@ -516,14 +516,14 @@ class InsideMode:
                     cands.append(st)
         self.template_facts["placement_stats"] = stats
         if not cands:
-            log.info("%s: inside stance C at %s side %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: inside stance C at %s side %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         cands, by_posture = free_in_postures(self, cands, postures)
         stats["collision_free"] = len(cands)
         if postures != list(STANCE_POSTURES):
             stats["postures"] = by_posture
         if not cands:
-            log.info("%s: inside stance C at %s side %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
+            log.info("%s: inside stance C at %s side %s: every candidate collides (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         cone = self.gp.gen("inside_axis_cone_deg")
         classed = []
@@ -545,7 +545,7 @@ class InsideMode:
             classed = [(st, k) for st, k in classed if id(st) in kept]
             stats["no_band_kept"] = len(classed)
         out = P0.best_class(classed)
-        log.info("%s: inside stance C at %s side %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out), stats)
+        log.info("%s: inside stance C at %s side %s: %d survivors (%s)", self.gp.variant, partner.name, edge.name, len(out), stats)
         return out
 
     def carry_drive_arms(self, place: Stance, tname: str, arm: str) -> Optional[Dict[str, th.Tensor]]:
@@ -565,7 +565,7 @@ class InsideMode:
         try:
             return lift_per_grasp(self.gp.gen("release_lift_per_grasp"))
         except ValueError as e:
-            raise Reject("spec", f"{self.gp.alias}: {e}")
+            raise Reject("spec", f"{self.gp.variant}: {e}")
 
     def release_above(self, quat, eef_in_object=None) -> float:
         """Height of the target's bottom above the interior surface at the release: ``drop_height_m``, raised until the open gripper's
@@ -598,11 +598,11 @@ class InsideMode:
         per = ", ".join(f"{getattr(g, 'name', i)}: {release_lift([lo], z_s, clearance):.3f} m" for i, (g, lo) in enumerate(zip(self.grasps, lows)))
         if self.release_lift_per_grasp():
             log.info("%s: inside release lift per grasp: {%s}, used per grasp (release_lift_per_grasp: the drawn grasp's own; max %.3f m) (drop_height_m %.3f, "
-                     "release_clearance_m %.3f: the target's bottom drop_height_m + the drawn grasp's lift above the surface)", self.gp.alias, per,
+                     "release_clearance_m %.3f: the target's bottom drop_height_m + the drawn grasp's lift above the surface)", self.gp.variant, per,
                      release_lift(lows, z_s, clearance), drop, clearance)
             return
         log.info("%s: inside release lift per grasp: {%s}, used (max) %.3f m (drop_height_m %.3f, release_clearance_m %.3f: the target's bottom %.3f m "
-                 "above the surface)", self.gp.alias, per, release_lift(lows, z_s, clearance), drop, clearance, drop + release_lift(lows, z_s, clearance))
+                 "above the surface)", self.gp.variant, per, release_lift(lows, z_s, clearance), drop, clearance, drop + release_lift(lows, z_s, clearance))
 
     def goal_pose_at(self, goal_cell, quat, eef_in_object=None) -> G.Pose:
         """The release pose: the goal cell, the target's bottom :meth:`release_above` above the interior surface (the goal check settles it);
@@ -617,7 +617,7 @@ class InsideMode:
         try:
             return release_tilts(self.gp.gen("release_tilt_deg"))
         except ValueError as e:
-            raise Reject("spec", f"{self.gp.alias}: {e}")
+            raise Reject("spec", f"{self.gp.variant}: {e}")
 
     def release_quat(self, level_quat, grasp, tilt_deg: float):
         """IORSLarge's hook: the release orientation of ``grasp`` (a library row) at ``tilt_deg`` - :func:`tilted_quat` about the axis
@@ -651,7 +651,7 @@ class InsideMode:
                     tilts_of.setdefault(k, []).append(t)
                     n += 1
             counts.append((t, n))
-        log.info("%s: inside release tilt F_goal at C (d %.2f λ %+.2f trunk (%.2f, %.2f)) goal cell %s: %s", self.gp.alias, place.stand_off or 0.0, place.lateral,
+        log.info("%s: inside release tilt F_goal at C (d %.2f λ %+.2f trunk (%.2f, %.2f)) goal cell %s: %s", self.gp.variant, place.stand_off or 0.0, place.lateral,
                  place.translate, place.tilt, [round(float(v), 2) for v in release_xy], ", ".join(f"{t:g} deg: F_goal {n}" for t, n in counts))
         return out, tilts_of
 
@@ -713,7 +713,7 @@ class InsideMode:
             facts["release_tilt_deg"] = draft.summary["release_tilt_deg"]
         if self.release_lift_per_grasp() and rel is not None:
             facts.update({"release_lift_per_grasp": True, "release_above_max_m": round(self.release_above(rel[1]), 4)})
-            log.info("%s: inside release at the drawn grasp %s's own lift: %.3f m above the surface (every library grasp: %.3f m)", self.gp.alias,
+            log.info("%s: inside release at the drawn grasp %s's own lift: %.3f m above the surface (every library grasp: %.3f m)", self.gp.variant,
                      grasp.grasp_name, facts["release_above_m"], facts["release_above_max_m"])
         grasp.extras.update(facts)
         draft.summary["release"] = facts

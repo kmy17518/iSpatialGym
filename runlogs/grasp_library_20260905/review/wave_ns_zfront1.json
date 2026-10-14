@@ -1,39 +1,5 @@
 {
- "batch": "wave_ns_zfront1",
  "models": [
-  {
-   "key": "gym_shoe__kmcbym__t",
-   "n_rows": 4,
-   "grasps": [
-    {
-     "rank": 1,
-     "verdict": "flag",
-     "flags": [
-      "gap"
-     ],
-     "note": "Instep pinch 50/41; stuck pad ~1 cm off upper in V1"
-    },
-    {
-     "rank": 2,
-     "verdict": "ok",
-     "flags": [],
-     "note": "Collar side-wall pinch, one finger inside; outer pad touches; 25/0 tolerated"
-    },
-    {
-     "rank": 3,
-     "verdict": "ok",
-     "flags": [],
-     "note": "Rear collar side-wall pinch, finger inside; outer pad touches; 26/0 tolerated"
-    },
-    {
-     "rank": 4,
-     "verdict": "ok",
-     "flags": [],
-     "note": "front approach (shelf): Heel-counter pinch, both pads touch, 47/46 symmetric; natural shelf pick"
-    }
-   ],
-   "object_note": "Hull ~1 cm wider than visual upper at instep (rank 1); ranks 2-3: inside pads hidden in shoe. | merged 1 front-approach grasp(s) from gym_shoe__kmcbym__sf (wave_ns_front1)"
-  },
   {
    "key": "sandal__chgcrm",
    "n_rows": 6,

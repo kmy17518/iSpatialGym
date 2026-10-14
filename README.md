@@ -1,10 +1,62 @@
-# iSpatialGym
+# iSpatialGym — eval release
 
 iSpatialGym builds on [BEHAVIOR-1K](https://github.com/StanfordVL/BEHAVIOR-1K)
 (our fork [kmy17518/BEHAVIOR-1K](https://github.com/kmy17518/BEHAVIOR-1K), branch
 `ispatialgym`, checked out under `Behavior-1K/`) and upgrades the motion-planning
 backend from the StanfordVL cuRobo fork (v1 API) to upstream **NVlabs cuRobo
 v0.8.0 (cuRoboV2)**.
+
+This checkout is the eval release: the code and the 70 counted eval instances (one per subtask; 7 task families,
+23 tasks), with only the data that loading, replaying and the oracle need for them.
+
+## Eval instances
+
+The instances live next to BEHAVIOR's challenge instances in OmniGibson's data folder,
+`Behavior-1K/datasets/ispatialgym-eval-instances/` (`$OMNIGIBSON_DATA_PATH/ispatialgym-eval-instances`, or
+`$ISPATIALGYM_INSTANCES_PATH`), laid out like `2026-challenge-task-instances`; the demos replays use are the sibling dataset
+`ispatialgym-eval-demos/` (`$ISPATIALGYM_DEMOS_PATH`). The dataset's `README.md` lists the tasks and describes the files.
+Names go task family → task → subtask → instance, e.g. `alignment` → `alignment_axial` → `alignment_axial_board_game` → 0
+(a subtask is a task with its objects by category, the support left out; `ispatialgym.eval.names`). `isg_customs.json` is
+keyed by subtask. As in BEHAVIOR, the BDDL problems are not in the dataset: an instance names its problem
+(`<activity>-<id>`), loaded from this repository's `ispatialgym/assets/bddl/activity_definitions` (numbered from 0 per
+activity).
+
+```bash
+python -m ispatialgym.eval.instances list --level task          # tasks and their instance counts
+python -m ispatialgym.eval.instances show alignment_axial 0 1   # what the indices resolve to (files, goal image, demo)
+
+# GPU job, submitted from the repository root (scripts/eval_instances/env.sh sets up the environment); each instance
+# replays its own demo (--record video: no demo.hdf5 / LeRobot copy of the replay)
+sbatch scripts/eval_instances/job_run_isg.sh --task alignment_axial --instance-indices 0 1 --mode replay --record video --out runs/replay
+
+# the goal image at another size: replay at that size, then make the run's final frame the goal image
+sbatch scripts/eval_instances/job_run_isg.sh --task alignment_axial --instance-indices 0 --mode replay \
+    --image-size 720 --record video --out runs/goal_720
+python -m ispatialgym.eval.instances set-goal alignment_axial 0 --run runs/goal_720
+```
+
+`run_isg --task NAME --instance-indices I [J ...]` loads instances by name and index, as BEHAVIOR's `eval.py` does with a
+task name and instance ids; a task's instances are its subtasks' instances in index order. For an eval dataset instance
+`--max-steps` (the actions: policy steps, a replay, the oracle program) defaults to `max(300, 2 x` its demo's length from
+`metadata/episodes.jsonl` `)`, `--settle-steps` (the window after them) to 0.2 x that and `--wallclock` to 1 s per step;
+the episode is cut at `--max-steps + --settle-steps`. `--settle-eval` (default: off for `--mode policy`, on for oracle /
+replay) decides whether the settling evaluation (no motion over the settle window, else a second window) applies; off, the
+binary goal (every goal atom but `pose_settled`) at the end of the settle window decides. `--qa` (on by default, `--no-qa`
+turns it off) measures BEHAVIOR's demo QA metrics plus the former demo gates and logs them in `meta.qa` with the steps each
+fired at. The HARD metrics are robot touching objects or itself, pause, jerky motion, ghost hand, object tilt, goal
+occlusion, robot wobble and bad release. The SOFT ones are held object drift and stalled, gripper in view and failed grasp
+(oracle only), head camera upright, and arm / hand contacts. A HARD metric ends an oracle demo as failed; in replay and
+policy mode every metric is only logged and the goal decides. Held object drift, stalled, gripper in view and failed grasp
+are also the oracle's own retry rules: the oracle retries the action and fails the demo once the retries are used up,
+`--qa` or not, and QA logs every verdict. Settle steps (the settle windows, a replayed demo's settle rows, the oracle's hold
+and settle waits) never count as a pause or a stall. `--record-view` picks the videos, each written to `<view>_rgb.mp4`: `head`, `external`
+(BEHAVIOR's camera over the robot's shoulder), `left_wrist`, `right_wrist` and `tiled` (BEHAVIOR's JoyLo replay video:
+the wrist and head cameras over the external one). Each instance's goal image is the
+head camera's last frame of a successful replay of its demo (1080 x 1080), named by `files.goal_rgb` in the index and
+registered in the instance file (`ispatialgym.goal_observation`: `rgb_path`, size, camera; what the policy harness reads);
+which replay it came from is an internal record, `datasets/release_records/goal_images/` (untracked, not part of the
+dataset). `scripts/eval_instances/export_counted.py` rebuilds both datasets from the eval runs listed in
+`scripts/eval_instances/release_runs.tsv`.
 
 ## Quick start on a new machine (the `ispatialgym` conda env)
 
@@ -25,17 +77,12 @@ cd ispatialgym
 
 source "$(conda info --base)/etc/profile.d/conda.sh" && conda activate ispatialgym
 
-# Sanity checks: no-simulator unit tests, then one sampled task instance (launches Isaac Sim headless)
-pytest -q ispatialgym/tests/test_problem_parsing.py ispatialgym/tests/test_geometry_and_targets.py
-OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_instances \
-    --problem inter_object_relation_satisfaction-0 --n-instances 1 --max-templates 1 --seed 0 \
-    --out /tmp/isg-smoke
+# Sanity checks: no-simulator unit tests and the instance index
+pytest -q ispatialgym/tests/test_eval_instances.py ispatialgym/tests/test_geometry_and_targets.py
+python -m ispatialgym.eval.instances list
 ```
 
 Notes:
-- Cloud pods: see [`ispatialgym/docs/runpod_setup.md`](ispatialgym/docs/runpod_setup.md)
-  (RunPod template settings, SSH, one-time prep, install/verify commands, measured
-  timings and pitfalls; validated on an RTX 4090 pod).
 - `Behavior-1K/` is a separate git checkout (gitignored here). To use a different
   clone URL/branch set `ISPATIALGYM_B1K_URL` / `ISPATIALGYM_B1K_BRANCH` before
   running `setup.sh`; if SSH to GitHub is not set up the clone falls back to HTTPS.
@@ -43,10 +90,11 @@ Notes:
   Put them on a persistent volume on cloud machines; they are ~37 GB. The
   BEHAVIOR-1K assets come from the Hugging Face Hub: export `HF_TOKEN=<your token>`
   before `setup.sh --dataset` for authenticated (faster, rate-limit-free) downloads.
-- The sampler reads the validated grasp library from
-  `runlogs/grasp_library_20260905/{cands,results,review,artic/handles}` (committed;
-  override with `ISPATIALGYM_GRASP_LIBRARY`) and the object selections under
-  `runlogs/*_selection_*/` (committed, images excluded).
+- The oracle reads the grasp library entries of the eval instances (43 keys, plus 7 that
+  the oracle unit tests use) from `runlogs/grasp_library_20260905/{cands,results,review}`
+  (committed; override with `ISPATIALGYM_GRASP_LIBRARY`). Sampling new instances needs the data this release
+  leaves out (the full grasp library, reach bands, scene inventory, candidate lists):
+  use the main `ispatialgym` checkout for that.
 - `environment/ispatialgym.pip-freeze.txt` is the package list of the dev
   workstation's env, for debugging version drift (do not install from it).
 

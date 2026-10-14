@@ -1,53 +1,41 @@
 {
-  "batch": "wave_ns1_a",
-  "models": [
+ "models": [
+  {
+   "key": "storage_box__eicujj__t",
+   "n_rows": 5,
+   "grasps": [
     {
-      "key": "trash_can__hqdnjz__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["gap"], "note": "Both pads visibly off the thin visual wall; rim floats"},
-        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "Daylight between outer pad and thin wall; hull thicker than mesh"},
-        {"rank": 3, "verdict": "flag", "flags": ["gap"], "note": "Daylight between outer pad and thin wall; hull thicker than mesh"},
-        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "Daylight between outer pad and thin wall; hull thicker than mesh"},
-        {"rank": 5, "verdict": "flag", "flags": ["gap"], "note": "Both pads visibly off the thin visual wall; rim floats"}
-      ],
-      "object_note": "Collision hull of thin bin wall much thicker than visual mesh; pads 11-17 mm apart on ~3 mm wall"
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Mid-wall rim pinch; pads touch both faces of wall"
     },
     {
-      "key": "umbrella__ziqzqo__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "Mid-canopy pinch but fingers 50/18: pushed onto fully open finger"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "Fingers 50/21: canopy pushed onto open finger; contact hidden"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "Fingers 50/17: canopy pushed onto open finger; contact hidden"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "Fingers 50/17: canopy pushed onto open finger; contact hidden"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "Fingers 50/21: canopy pushed onto open finger; contact hidden"}
-      ],
-      "object_note": "One finger stays fully open (50 mm) in all rows; pad contacts mostly hidden by canopy"
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Mid-wall rim pinch; pads touch both faces of wall"
     },
     {
-      "key": "storage_box__eicujj__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Mid-wall rim pinch; pads touch both faces of wall"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Mid-wall rim pinch; pads touch both faces of wall"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Mid-wall rim pinch; pads touch both faces of wall"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Tilted rim pinch; V2 occluded, V3 shows clean wall contact"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Tilted mid-wall rim pinch; pads touch both faces of wall"}
-      ],
-      "object_note": "Open box; all grasps are mid-wall rim pinches on the 3 mm wall, pads touching both faces"
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Mid-wall rim pinch; pads touch both faces of wall"
     },
     {
-      "key": "steak__ppykkp__t",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "Top-edge pinch across thickness; both pads in contact"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "Top-edge pinch across thickness; both pads in contact"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "Tilted top-edge pinch across thickness; both pads in contact"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "Tilted top-edge pinch across thickness; both pads in contact"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "Tilted top-edge pinch; ~2 mm sliver at one pad, acceptable"}
-      ],
-      "object_note": "Steak stands on edge (x_down); all grasps pinch its thickness at the top edge"
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Tilted rim pinch; V2 occluded, V3 shows clean wall contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Tilted mid-wall rim pinch; pads touch both faces of wall"
     }
-  ]
+   ],
+   "object_note": "Open box; all grasps are mid-wall rim pinches on the 3 mm wall, pads touching both faces"
+  }
+ ]
 }

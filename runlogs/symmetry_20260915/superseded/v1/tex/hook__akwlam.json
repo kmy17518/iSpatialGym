@@ -1,1 +1,0 @@
-{"key": "hook__akwlam", "category": "hook", "model": "akwlam", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.001407561419431336, "p95": 0.00784313725490196, "p99": 0.03529411764705882, "mad_union": 0.0665231564194529, "iou": 0.8998058917561087, "worst": "z180"}}, "render_s": 0.104}

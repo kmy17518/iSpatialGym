@@ -1,9 +1,0 @@
-{
-  "category": "cellulose_tape",
-  "pages_opened": ["grids/pool_other/cellulose_tape__p1.png", "grids/pool_other/cellulose_tape__p2.png"],
-  "n_models": 25,
-  "exclude": [
-    {"model": "cap/arskxc", "reason": "translucent white blob with a black block; does not read as a cap or any everyday object"}
-  ],
-  "notes": "Mostly small round/disc objects (cookies, biscuit, caps, corks, coaster, cookie cutters, buns, peppermint) plus tape dispensers and one tier-2 soap bar; all intact and in natural rest poses. watch/ghobzn reads as a small open ring/band rather than a watch but is an everyday object, kept. 'seg label missing' on budhaz and fqxumh is a render-check note only; both look fine."
-}

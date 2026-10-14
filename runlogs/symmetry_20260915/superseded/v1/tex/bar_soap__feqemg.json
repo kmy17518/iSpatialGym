@@ -1,1 +1,0 @@
-{"key": "bar_soap__feqemg", "category": "bar_soap", "model": "feqemg", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0009354668789573301, "p95": 0.0, "p99": 0.0196078431372549, "mad_union": 0.028491174393637943, "iou": 0.9546131930747316, "worst": "z180"}}, "render_s": 0.11}

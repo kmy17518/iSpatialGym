@@ -1,37 +1,39 @@
 (define (problem inter_object_relation_satisfaction-2)
     (:domain ispatialgym)
+    (:variant inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf)
 
-    (:alias inside)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#03~T2/representative/fallback1:next_model)
+    ; fallback 1 (next_model) of inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-shelf: model = utgixp, slot = variation_geometry, primary_model = ofargb
+    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
+    ; its init orientation; the partner stays where it was. Both poses measured.
 
     (:objects
-        apple.n.01_1 - apple.n.01
-        bowl.n.01_1 - bowl.n.01
-        table.n.02_1 - table.n.02
+        bar_soap.n.01_1 - bar_soap.n.01
+        soap_dish.n.01_1 - soap_dish.n.01
+        shelf.n.01_1 - shelf.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
     (:init
-        (ontop apple.n.01_1 table.n.02_1)
-        (ontop bowl.n.01_1 table.n.02_1)
+        (ontop bar_soap.n.01_1 shelf.n.01_1)
+        (ontop soap_dish.n.01_1 shelf.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
-    ; Binary success: the pictured relation holds and both objects are released.
     (:goal
         (and
-            (inside ?apple.n.01_1 ?bowl.n.01_1)
-            (not (grasped ?agent.n.01_1 ?apple.n.01_1))
-            (not (grasped ?agent.n.01_1 ?bowl.n.01_1))
-            (pose_settled ?apple.n.01_1)
-            (pose_settled ?bowl.n.01_1)
+            (ontop ?bar_soap.n.01_1 ?soap_dish.n.01_1)
+            (not (grasped ?agent.n.01_1 ?bar_soap.n.01_1))
+            (not (grasped ?agent.n.01_1 ?soap_dish.n.01_1))
+            (pose_settled ?bar_soap.n.01_1)
+            (pose_settled ?soap_dish.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
-    ; Non-gating: the exact pictured poses (TRO pose_targets) are reported only.
     (:measure
-        (pose_reached ?apple.n.01_1)
-        (pose_reached ?bowl.n.01_1)
+        (pose_reached ?bar_soap.n.01_1)
+        (pose_reached ?soap_dish.n.01_1)
     )
 )

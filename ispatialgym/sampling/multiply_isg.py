@@ -2,16 +2,16 @@
 
 Example::
 
-    OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.multiply_isg --template <out>/<alias>/<template_id> --instances 5 \
+    OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.multiply_isg --template <out>/<variant>/<template_id> --instances 5 \
         [--path-buckets 3:10,5:10,10:5] [--seed 1 | --split eval] [--customs task_custom_lists.json]
 
-Reads ``template_meta.json`` (alias, scene, model choice, customs path), rebuilds the world of the template (same rooms
+Reads ``template_meta.json`` (variant, scene, model choice, customs path), rebuilds the world of the template (same rooms
 and scene variant), runs the sampler's ``setup()`` (template facts, cached) and ``run_instances(N)`` continuing the
 instance numbering after the existing instances (instance 0 exists from ``sample_isg``). Per instance the per-instance
 parts of the rules run (draws, exact IK, transitions, paths) with the customs constraints as priors; camera
 relocalization fills the path buckets (``--path-buckets max_m:n,...`` overrides ``generation.path_buckets``); every
 success appends constraints (written back to the customs source unless ``--no-write-back``); rejections are counted per
-reason in ``summary.json`` (``problems.<alias>.<template>.{n_written, time_s, rejections}``) and the run ends with the
+reason in ``summary.json`` (``problems.<variant>.<template>.{n_written, time_s, rejections}``) and the run ends with the
 ``SAMPLING_REPORT`` stdout line. A template sampled in a room its customs entry does not list (``sample_isg --room`` /
 ``--scene-from-split``) is continued in that room.
 
@@ -20,10 +20,10 @@ Train policy (owner 2026-10-11)::
     python -m ispatialgym.sampling.multiply_isg --split train --template <eval template> [--template ...] --instances N \
         --out <train root> --eval-run <eval run / index> [--start-index G] [--only-scene S [--only-room R]] [--plan]
 
-* seeds per alias and split: ``split_seeds.split_seed("train", alias, --seed-index)`` (``--seed`` overrides), never an eval
+* seeds per variant and split: ``split_seeds.split_seed("train", variant, --seed-index)`` (``--seed`` overrides), never an eval
   seed; the attempt seeds run over the train instance index, so every train instance has its own stream;
 * train instances never go into the eval run: ``--out`` (required; not an eval template's root) gets
-  ``<out>/<alias>/<template_id>/instances``, one template per (scene, room), created by its first instance and continued by
+  ``<out>/<variant>/<template_id>/instances``, one template per (scene, room), created by its first instance and continued by
   later runs;
 * a train instance must not repeat an eval instance of its task: with ``--eval-run`` (eval run directories, TRO files or
   ``instance_separation`` index files) an instance whose start and goal poses are all within ``--repeat-pos-m`` (0.25 m) and
@@ -32,16 +32,16 @@ Train policy (owner 2026-10-11)::
 * no distance rule among train instances (the eval 1 m separation does not apply to them);
 * camera relocalization: the path buckets fill by the sampler's deficit draw in the train template (``--path-buckets`` /
   ``generation.path_buckets``); object scaling: the start and goal depths are drawn as the sampler draws them (toward or away
-  at random); disembedding: the destination side is drawn per template (the eval aliases' ``destination_side`` is dropped);
-* object scaling / mental rotation: every train instance draws its own (scene, room), ``draw_scene_room("train", alias, g)``
+  at random); disembedding: the destination side is drawn per template (the eval variants' ``destination_side`` is dropped);
+* object scaling / mental rotation: every train instance draws its own (scene, room), ``draw_scene_room("train", variant, g)``
   for train instance g, and goes to the template of that scene / room with the eval template's models;
   ``--keep-template-scene`` keeps the eval template's scene and room. The draw picks one room among the eligible rooms of all
   candidate scenes (``split_seeds.eligible_rooms``: any room but an outdoor one, owner 2026-10-11 13:31, with at least 1 m^2 of
   robot-reachable floor), weighted by its reachable floor capped at 3x the median eligible room (owner 2026-10-11 ~13:50).
 
-The train instance indices g continue after the alias's train instances under ``--out``; ``--start-index`` fixes them (give
+The train instance indices g continue after the variant's train instances under ``--out``; ``--start-index`` fixes them (give
 the same value to processes that split one plan by world with ``--only-scene`` / ``--only-room``). ``--plan`` prints the plan
-(``PLAN <alias> <g> <scene> <room> <template dir>``) without the simulator. The instances of one (scene, room) run in one world,
+(``PLAN <variant> <g> <scene> <room> <template dir>``) without the simulator. The instances of one (scene, room) run in one world,
 shared by every template of the process.
 """
 
@@ -87,14 +87,16 @@ def parse_path_buckets(text: Optional[str]) -> Optional[List[Dict[str, Any]]]:
 
 
 def load_template(template_dir: str) -> Dict[str, Any]:
+    from ispatialgym.oracle.sidecar import from_legacy_keys
+
     with open(os.path.join(template_dir, "template_meta.json")) as f:
-        return json.load(f)
+        return from_legacy_keys(json.load(f))
 
 
 def problem_for_template(meta: Dict[str, Any], customs: Optional[str], bddl_root: Optional[str]) -> GroundedProblem:
     """The grounded problem of the template: from the customs file (``--customs``, else the one recorded in the meta,
-    else the copy next to the alias directory)."""
-    alias = meta["alias"]
+    else the copy next to the variant directory)."""
+    variant = meta["variant"]
     template_dir = meta.get("_dir")
     candidates = [customs, meta.get("customs")]
     if template_dir:
@@ -102,15 +104,15 @@ def problem_for_template(meta: Dict[str, Any], customs: Optional[str], bddl_root
     for c in candidates:
         if c and os.path.exists(c):
             try:
-                return GroundedProblem.load(alias, c, bddl_root)
+                return GroundedProblem.load(variant, c, bddl_root)
             except Exception as e:  # the copy may lack the grounded BDDL (v1 facade run): fall through
                 log.warning("customs %s: %s", c, e)
                 with open(c) as f:
                     data = json.load(f)
-                if alias in data:
-                    gp = GroundedProblem(alias, data[alias], customs_path=c, bddl_root=bddl_root, subtask=meta.get("subtask"))
+                if variant in data:
+                    gp = GroundedProblem(variant, data[variant], customs_path=c, bddl_root=bddl_root, subtask=meta.get("subtask"))
                     return gp
-    raise SystemExit(f"no customs entry for alias {alias!r} (tried {candidates})")
+    raise SystemExit(f"no customs entry for variant {variant!r} (tried {candidates})")
 
 
 def choice_for_template(gp: GroundedProblem, meta: Dict[str, Any]) -> TemplateChoice:
@@ -142,28 +144,28 @@ def next_index(template_dir: str) -> int:
     return best + 1
 
 
-def next_train_index(out_root: str, alias: str) -> int:
-    """One past the largest instance index of the alias's templates under ``out_root`` (train indices are per alias)."""
-    return max([0] + [next_index(d) for d in glob.glob(os.path.join(out_root, alias, "*")) if os.path.isdir(d)])
+def next_train_index(out_root: str, variant: str) -> int:
+    """One past the largest instance index of the variant's templates under ``out_root`` (train indices are per variant)."""
+    return max([0] + [next_index(d) for d in glob.glob(os.path.join(out_root, variant, "*")) if os.path.isdir(d)])
 
 
-def template_seed(args, alias: str) -> Tuple[int, Dict[str, Any]]:
-    """``--seed``, else ``split_seed(--split, alias, --seed-index)``, else 1; with its record."""
+def template_seed(args, variant: str) -> Tuple[int, Dict[str, Any]]:
+    """``--seed``, else ``split_seed(--split, variant, --seed-index)``, else 1; with its record."""
     if args.seed is not None:
         return int(args.seed), {"split": args.split, "index": None, "seed": int(args.seed), "seed_source": "--seed"}
     if args.split:
-        s = SS.split_seed(args.split, alias, args.seed_index)
+        s = SS.split_seed(args.split, variant, args.seed_index)
         return s, {"split": args.split, "index": int(args.seed_index), "seed": s, "seed_source": "split"}
     return 1, {"split": None, "index": None, "seed": 1, "seed_source": "default"}
 
 
-def train_plan(alias: str, choice: TemplateChoice, n: int, start: int, scene_draw: bool) -> List[Tuple[int, str, Optional[str]]]:
+def train_plan(variant: str, choice: TemplateChoice, n: int, start: int, scene_draw: bool) -> List[Tuple[int, str, Optional[str]]]:
     """``(g, scene, room)`` of the ``n`` train instances from index ``start``: with ``scene_draw`` each draws its own (scene, room)
-    (``draw_scene_room("train", alias, g)``), otherwise all stay in the template's scene and room."""
+    (``draw_scene_room("train", variant, g)``), otherwise all stay in the template's scene and room."""
     room = choice.rooms[0] if len(choice.rooms) == 1 else None
     out: List[Tuple[int, str, Optional[str]]] = []
     for g in range(int(start), int(start) + int(n)):
-        scene, r = SS.draw_scene_room("train", alias, g) if scene_draw else (choice.scene, room)
+        scene, r = SS.draw_scene_room("train", variant, g) if scene_draw else (choice.scene, room)
         out.append((g, scene, r))
     return out
 
@@ -175,19 +177,19 @@ def _under(path: str, root: str) -> bool:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--template", required=True, action="append", help="<out>/<alias>/<template_id> directory (several: --split train)")
+    parser.add_argument("--template", required=True, action="append", help="<out>/<variant>/<template_id> directory (several: --split train)")
     parser.add_argument("--instances", type=int, required=True, help="instances to add per template (instance 0 exists)")
     parser.add_argument("--path-buckets", default=None, help="camera relocalization: max_m:n,... (overrides generation.path_buckets)")
-    parser.add_argument("--seed", type=int, default=None, help="default: split_seeds.split_seed(--split, alias, --seed-index) with --split, else 1")
-    parser.add_argument("--split", choices=SS.SPLITS, default=None, help="per-alias split seeds; train: the train policy (module docstring)")
+    parser.add_argument("--seed", type=int, default=None, help="default: split_seeds.split_seed(--split, variant, --seed-index) with --split, else 1")
+    parser.add_argument("--split", choices=SS.SPLITS, default=None, help="per-variant split seeds; train: the train policy (module docstring)")
     parser.add_argument("--seed-index", type=int, default=0, help="k of the split seed")
     parser.add_argument("--out", default=None, help="root the instances go to (default: the template's root; required with --split train)")
     parser.add_argument("--eval-run", action="append", default=[],
                         help="--split train: eval instances a train instance must not repeat (run directory, TRO file or instance index file); repeatable")
     parser.add_argument("--repeat-pos-m", type=float, default=SEP.REPEAT_POS_M, help="train-repeat rule: position tolerance (m)")
     parser.add_argument("--repeat-ang-deg", type=float, default=SEP.REPEAT_ANG_DEG, help="train-repeat rule: angle tolerance (deg)")
-    parser.add_argument("--start-index", type=int, default=None, help="--split train: first train instance index (default: after the alias's under --out)")
-    parser.add_argument("--keep-template-scene", action="store_true", help="--split train, held-object aliases: no per-instance (scene, room) draw")
+    parser.add_argument("--start-index", type=int, default=None, help="--split train: first train instance index (default: after the variant's under --out)")
+    parser.add_argument("--keep-template-scene", action="store_true", help="--split train, held-object variants: no per-instance (scene, room) draw")
     parser.add_argument("--only-scene", default=None, help="--split train: only the planned instances in this scene")
     parser.add_argument("--only-room", default=None, help="--split train: only the planned instances in this room")
     parser.add_argument("--plan", action="store_true", help="--split train: print the plan and exit (no simulator)")
@@ -219,8 +221,8 @@ def main(argv=None):
     choice = choice_for_template(gp, meta)
     if choice.template_id != os.path.basename(template_dir):
         log.warning("template id of the meta (%s) differs from the directory (%s)", choice.template_id, os.path.basename(template_dir))
-    seed, seed_rec = template_seed(args, gp.alias)
-    target_dir = os.path.join(out_root, gp.alias, choice.template_id)
+    seed, seed_rec = template_seed(args, gp.variant)
+    target_dir = os.path.join(out_root, gp.variant, choice.template_id)
     report = new_run_summary(SAMPLER_VERSION, gp.customs_path, out_root, vars(args))
     import omnigibson as og
 
@@ -230,11 +232,11 @@ def main(argv=None):
     try:
         world, kit = pool.get(gp, choice.scene)
         existing = next_index(target_dir)
-        entry = run_template(gp, choice, world, kit, out_root, args.instances, seed * 7919 + existing, args.max_attempts, meta.get("variant"),
+        entry = run_template(gp, choice, world, kit, out_root, args.instances, seed * 7919 + existing, args.max_attempts,
                              None, start_index=existing, meta_extra={"split": seed_rec} if args.split else None)
         entry["start_index"] = existing
         entry["split"] = seed_rec
-        report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
+        report["problems"].setdefault(gp.variant, {})[choice.template_id] = entry
         pool.cleanup_template()
         if not args.no_write_back and gp.customs_path:
             gp.save_customs()  # §9: every successful instance appends its constraints to the source customs list
@@ -270,8 +272,8 @@ def main_train(args) -> int:
             raise SystemExit(f"--out {out_root} and the eval template's root {eval_root} overlap; train instances never go into the eval run")
         meta = load_template(template_dir)
         meta["_dir"] = template_dir
-        if any(j["gp"].alias == meta["alias"] for j in jobs):
-            raise SystemExit(f"two templates of {meta['alias']}: one --template per alias (the train indices are per alias)")
+        if any(j["gp"].variant == meta["variant"] for j in jobs):
+            raise SystemExit(f"two templates of {meta['variant']}: one --template per variant (the train indices are per variant)")
         gp = problem_for_template(meta, args.customs, args.bddl_root)
         if buckets is not None:
             gp.generation["path_buckets"] = buckets
@@ -281,10 +283,10 @@ def main_train(args) -> int:
         for k in EVAL_ONLY_GENERATION_KEYS:
             gp.generation.pop(k, None)
         choice = choice_for_template(gp, meta)
-        seed, seed_rec = template_seed(args, gp.alias)
+        seed, seed_rec = template_seed(args, gp.variant)
         scene_draw = SS.scene_draw_applies(gp.subtask) and not args.keep_template_scene
-        start = args.start_index if args.start_index is not None else next_train_index(out_root, gp.alias)
-        plan = [p for p in train_plan(gp.alias, choice, args.instances, start, scene_draw)
+        start = args.start_index if args.start_index is not None else next_train_index(out_root, gp.variant)
+        plan = [p for p in train_plan(gp.variant, choice, args.instances, start, scene_draw)
                 if (args.only_scene is None or p[1] == args.only_scene) and (args.only_room is None or p[2] == args.only_room)]
         jobs.append({"gp": gp, "meta": meta, "choice": choice, "dir": template_dir, "seed": seed, "seed_rec": seed_rec, "scene_draw": scene_draw,
                      "start": start, "plan": plan})
@@ -299,9 +301,9 @@ def main_train(args) -> int:
         for job in jobs:
             for g, scene, room in job["plan"]:
                 tid = choice_in_room(job["gp"], job["choice"], scene, room).template_id
-                print(f"PLAN\t{job['gp'].alias}\t{g}\t{scene}\t{room or ''}\t{os.path.join(out_root, job['gp'].alias, tid)}")
+                print(f"PLAN\t{job['gp'].variant}\t{g}\t{scene}\t{room or ''}\t{os.path.join(out_root, job['gp'].variant, tid)}")
         for (scene, room), members in sorted(groups.items()):
-            print(f"WORLD\t{scene}\t{room}\t{sum(len(i) for _, i in members)} instances\t{len(members)} aliases")
+            print(f"WORLD\t{scene}\t{room}\t{sum(len(i) for _, i in members)} instances\t{len(members)} variants")
         return 0
     notes: List[str] = []
     eval_recs = SEP.load_instances(args.eval_run, notes=notes) if args.eval_run else []
@@ -311,8 +313,8 @@ def main_train(args) -> int:
         log.warning("--split train without --eval-run: the train-repeat rule is off")
     report = new_run_summary(SAMPLER_VERSION, args.customs, out_root, vars(args))
     report["train"] = {"eval_instances": len(eval_recs), "repeat_pos_m": args.repeat_pos_m, "repeat_ang_deg": args.repeat_ang_deg,
-                       "plan": {j["gp"].alias: [[g, s, r] for g, s, r in j["plan"]] for j in jobs},
-                       "seeds": {j["gp"].alias: j["seed_rec"] for j in jobs}}
+                       "plan": {j["gp"].variant: [[g, s, r] for g, s, r in j["plan"]] for j in jobs},
+                       "seeds": {j["gp"].variant: j["seed_rec"] for j in jobs}}
     import omnigibson as og
 
     from ispatialgym.sampling.sample_isg import WorldPool, run_template
@@ -327,17 +329,17 @@ def main_train(args) -> int:
                     world, kit = pool.get(gp, scene)
                 except Exception as e:
                     log.error("traceback", exc_info=True)
-                    report["errors"].append({"alias": gp.alias, "scene": scene, "room": room, "error": f"scene load failed: {e!r}"})
+                    report["errors"].append({"variant": gp.variant, "scene": scene, "room": room, "error": f"scene load failed: {e!r}"})
                     pool.world, pool.kit, pool.key = None, None, None
                     continue
                 filt = SEP.repeat_filter(eval_recs, task=gp.activity, pos_m=args.repeat_pos_m, ang_deg=args.repeat_ang_deg) if eval_recs else None
                 split = {**job["seed_rec"], "scene": scene, "room": room or None, "scene_source": "split" if job["scene_draw"] else "template",
                          "source_template": job["dir"]}
-                entry = run_template(gp, choice, world, kit, out_root, len(idxs), job["seed"] * 7919, args.max_attempts, job["meta"].get("variant"), None,
+                entry = run_template(gp, choice, world, kit, out_root, len(idxs), job["seed"] * 7919, args.max_attempts, None,
                                      indices=idxs, instance_filter=filt, meta_extra={"split": split})
                 entry["indices"] = idxs
                 entry["split"] = split
-                report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
+                report["problems"].setdefault(gp.variant, {})[choice.template_id] = entry
                 pool.cleanup_template()
                 if not args.no_write_back and gp.customs_path:
                     gp.save_customs()

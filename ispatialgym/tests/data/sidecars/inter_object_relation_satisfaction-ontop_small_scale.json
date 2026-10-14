@@ -3,7 +3,7 @@
   "instance_id": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table__house_single_floor__target-apple-omzprq__partner-plate-pkkgzc__0000",
   "tro_sha256": "7ff2b68df24046adeac7a754206ce31dc94eadd8f68290074ed694d30e1d189a",
   "task_family": "inter_object_relation_satisfaction",
-  "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

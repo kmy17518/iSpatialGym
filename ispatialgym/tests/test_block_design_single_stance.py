@@ -13,7 +13,7 @@ import torch as th
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.v2.stances import Stance
 
-ALIAS = "configuration_matching-block_design-block_4-breakfast_table_board"
+VARIANT = "configuration_matching-block_design-block_4-breakfast_table_board"
 Q_ID = th.tensor([0.0, 0.0, 0.0, 1.0])
 
 
@@ -27,7 +27,7 @@ def _sampler(gen):
     BD = _bd()
     s = object.__new__(BD.BlockDesign)
     s.spec = SimpleNamespace(generation=dict(gen))
-    s.gp = SimpleNamespace(alias=ALIAS)
+    s.gp = SimpleNamespace(variant=VARIANT)
     s._centre = lambda pose: pose
     return BD, s
 

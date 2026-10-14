@@ -5,7 +5,7 @@
 ; list parameter (generation.groups.obstacles.size = 1), the candidate categories come from roles/candidates.csv.
 (define (iddl camera_relocalization-obstructed)
     (:family camera_relocalization)
-    (:alias camera_relocalization-obstructed-{obstacles})
+    (:variant camera_relocalization-obstructed-{obstacles})
     (:init
         (ontop obstacles floor)
         (ontop agent floor)

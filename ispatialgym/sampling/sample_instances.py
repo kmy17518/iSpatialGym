@@ -92,7 +92,7 @@ def main(argv=None):
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--max-attempts", type=int, default=30)
     parser.add_argument("--max-templates", type=int, default=None)
-    parser.add_argument("--variant", action="append", default=None, help="task sub-variant override (e.g. block pattern id, 'open'/'close', 'occluded')")
+    parser.add_argument("--sub-variant", action="append", default=None, help="task sub-variant override (e.g. block pattern id, 'open'/'close', 'occluded')")
     parser.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = parser.parse_args(argv)
 
@@ -176,8 +176,8 @@ def main(argv=None):
                     ctx = SamplerContext(pspec, scene_spec, choices, current_world, current_kit, out_dir, template_id, spec_file.sha256,
                                          base_seed=args.seed * 7919 + ti)
                     sampler = sampler_cls(ctx)
-                    if args.variant:
-                        sampler.variant_overrides = list(args.variant)
+                    if args.sub_variant:
+                        sampler.sub_variant_overrides = list(args.sub_variant)
                     try:
                         sampler.setup()
                         written = sampler.run(n_inst, max_attempts=args.max_attempts)

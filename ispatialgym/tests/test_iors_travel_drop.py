@@ -64,7 +64,7 @@ def _cand(pos, sides, view=0, name=None):
 
 def _sampler(cands, sides=(1.0, -1.0), **extra):
     s = IS.IORSSmall.__new__(IS.IORSSmall)
-    s.subtask, s.spec, s.gp = ONTOP, SimpleNamespace(generation={}), SimpleNamespace(alias="a")
+    s.subtask, s.spec, s.gp = ONTOP, SimpleNamespace(generation={}), SimpleNamespace(variant="a")
     s.manip_candidates, s.region_sides, s.region_side = list(cands), list(sides), None
     s.shelf_start = s.shelf_pose = None
     s.counters, s.template_meta = {}, {}
@@ -186,7 +186,7 @@ def _run_sampler(exc):
     s.deadline, s.objects, s.template_paths, s.template_meta, s.counters, s.rejections = None, {}, None, {}, {}, {}
     s.world = SimpleNamespace(reset_scene_objects=lambda *a, **k: 0)
     s.ikc, s.kit = SimpleNamespace(solutions={}, attempt=0), SimpleNamespace(stats_snapshot=lambda: {})
-    s.gp, s.ctx, s.rejection_log = SimpleNamespace(alias="a"), SimpleNamespace(base_seed=0), RejectionLog(keep=3)
+    s.gp, s.ctx, s.rejection_log = SimpleNamespace(variant="a"), SimpleNamespace(base_seed=0), RejectionLog(keep=3)
     s.park_robot = lambda: None
     s.on_reject = lambda e: None
     s.sample = sample

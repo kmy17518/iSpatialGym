@@ -1,343 +1,40 @@
 {
-  "batch": "wave2_06",
-  "models": [
+ "models": [
+  {
+   "key": "toy_dice__hbkqqp",
+   "n_rows": 5,
+   "grasps": [
     {
-      "key": "sunflower__ooefvj",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "closed 36 mm on head rim, planned 9 mm stem pinch"},
-        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "closed 41 mm on head petals, planned 9 mm stem"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "closed 28 mm across head petals, planned 18 mm"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "closed 35 mm on head petals, planned 9 mm stem"},
-        {"rank": 5, "verdict": "flag", "flags": ["fragile"], "note": "closed 29 mm across head petals, planned 17 mm"}
-      ],
-      "object_note": "small head; all closings stop on petal rim far wider than planned stem pinch; hull may be coarse"
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
     },
     {
-      "key": "sunflower__pibfxd",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "fingers 38/27 span head diameter on petal tips"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head clamped across petal tips"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head clamped across petal tips"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head clamped across petal tips"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head clamped across petal tips"}
-      ],
-      "object_note": "large head (~85 mm); every grasp clamps the full head diameter on petal tips, none on stem"
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
     },
     {
-      "key": "sunflower__psrfmx",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "closed 32 vs planned 20 mm; petal rim pinch, antipodal 0.28"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "head pinch 22 mm close to planned 17 mm"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "coverage 0.00; rim/petal contact, closed 33 mm"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "closed 32 vs planned 17 mm; fingers straddle head petals"},
-        {"rank": 5, "verdict": "flag", "flags": ["fragile"], "note": "closed 43 vs planned 29 mm; spans small head on petals"}
-      ],
-      "object_note": "small head; most closings stop on the petal rim wider than planned; hull may be coarse"
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
     },
     {
-      "key": "sunflower__rkwubf",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; spans head diameter on petals"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "head pinch 28 mm, planned 24, antipodal 0.98"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; spans head on petals"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "closed 9 mm on stem just below head"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "head pinch 28 mm, planned 25, antipodal 0.98"}
-      ],
-      "object_note": "rows 1/3 clamp the whole head at open limit; rows 2/5 tight head pinch, row 4 stem"
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
     },
     {
-      "key": "sunflower__urpskm",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head diameter clamp on petals"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head diameter clamp on petals"},
-        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "fingers 47/26 span head chord on petal tips"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "fingers 42/20 span head on petals, planned 31 mm"},
-        {"rank": 5, "verdict": "flag", "flags": ["fragile"], "note": "fingers 42/42 span head diameter on petal tips"}
-      ],
-      "object_note": "large head; every grasp clamps across the petals, none reaches the stem"
-    },
-    {
-      "key": "sunflower__wpzsyk",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head rim blocks planned stem pinch"},
-        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "fingers 34/20 on head petals, planned 4 mm stem"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; head rim blocks planned stem pinch"},
-        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "fingers 45/8 on head petals, antipodal 0.38"},
-        {"rank": 5, "verdict": "flag", "flags": ["fragile"], "note": "closed 37 mm on head rim, planned 4 mm stem"}
-      ],
-      "object_note": "planned 4 mm stem pinches all end on the head petals; head blocks the pads"
-    },
-    {
-      "key": "tortilla_chips__aiohfb",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch near CoM, chip hangs below fingertips"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, closed 15 mm on curved chip"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch near CoM, tilt 38"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch near CoM, tilt 34"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch near CoM, closed 8 mm"}
-      ]
-    },
-    {
-      "key": "tortilla_chips__dlkrgq",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "thin edge pinch, closed 1 mm, chip hangs below"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "edge pinch, fingers 3/1, tilt 30"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "edge pinch, closed 6 mm"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "edge pinch, closed 7 mm, CoM offset 10"}
-      ]
-    },
-    {
-      "key": "tortilla_chips__herjym",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "flat chip clamped edge-to-edge, antipodal 0, width inf"}
-      ],
-      "object_note": "single valid grasp spans the flat chip between wide-open pads; not a real pinch"
-    },
-    {
-      "key": "tortilla_chips__kdjrni",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "corner pinch, CoM offset 47 mm, closed to 1 mm"}
-      ]
-    },
-    {
-      "key": "tortilla_chips__mhbnsy",
-      "n_rows": 4,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch near CoM, closed 11 mm"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch near CoM, closed 6 mm"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "edge pinch, fingers 3/1, tilt 31"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, closed 6 mm, CoM offset 14"}
-      ]
-    },
-    {
-      "key": "toy_dice__cmqtch",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred face pinch 43/0; V1 partly occluded, V2-V4 fine"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch at 30 deg tilt, fingers 43/0"}
-      ]
-    },
-    {
-      "key": "toy_dice__gcevml",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch at 30 deg tilt, fingers 43/0"}
-      ]
-    },
-    {
-      "key": "toy_dice__hbkqqp",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch at 30 deg tilt, fingers 43/0"}
-      ]
-    },
-    {
-      "key": "toy_dice__mqvaaa",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred face pinch, fingers 43/0"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch at 30 deg tilt, fingers 43/0"}
-      ]
-    },
-    {
-      "key": "vegetable_peeler__wqtpjz",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch 16 mm near head, conf 0.97"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "thin arm/blade pinch 14 mm, coverage 1.00"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "clamps Y-head across 39 mm, antipodal 0.16"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "clamps Y-head across 41 mm, antipodal 0.05"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on Y-arm 20 mm, handle hangs, CoM 42"}
-      ],
-      "object_note": "rows 3/4 close much wider than planned width with near-zero antipodal; non-optimal but both pads on head"
-    },
-    {
-      "key": "video_game__apjpos",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/12, pad at open limit, in-plane edge clamp"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/12, pad at open limit, in-plane edge clamp"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/12, pad at open limit, tilt 33"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/12, pad at open limit, tilt 33"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/12, pad at open limit, tilt 31"}
-      ],
-      "object_note": "flat case held by its two long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__ceaxsd",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 43/22"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 42/22"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 45/20, tilt 30"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 41/24, tilt 30"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 42/22, tilt 30"}
-      ],
-      "object_note": "flat case held by its long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__ckugyi",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, pad at open limit"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, pad at open limit"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, pad at open limit, tilt 30"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, pad at open limit, tilt 30"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/18, pad at open limit"}
-      ],
-      "object_note": "every grasp leaves one pad at the open limit; case offset toward one finger; metrics failed"
-    },
-    {
-      "key": "video_game__coiafo",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 46/14"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 46/14"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/8, pad at open limit, tilt 30"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/9, pad at open limit, tilt 30"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 44/22"}
-      ],
-      "object_note": "flat case held by its long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__lfdpse",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 46/16"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 48/14, pad near open limit"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/18, pad at open limit"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, pad at open limit, tilt 30"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, pad at open limit, tilt 30"}
-      ],
-      "object_note": "flat case held by its long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__ppnzqm",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 43/22"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 43/22"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 47/18, tilt 30"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/21, pad at open limit"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/21, pad at open limit, tilt 30"}
-      ],
-      "object_note": "flat case held by its long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__pujfzk",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/14, pad at open limit"},
-        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/15, pad at open limit"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 45/20, tilt 30"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 48/17, pad near open limit, tilt 30"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 41/23, tilt 30"}
-      ],
-      "object_note": "flat case held by its long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__qsyyql",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "small case, in-plane edge pinch 40/0"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "small case, edge pinch 40/0, tilt 30"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "small case, in-plane edge pinch 40/0"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "small case, in-plane edge pinch 44/0"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "small case, edge pinch 40/0, tilt 30"}
-      ],
-      "object_note": "small case (~40 mm) spanned by both pads; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__quzjuo",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/10, pad at open limit"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 45/16"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 46/15, tilt 30"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/10, pad at open limit, tilt 30"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "in-plane edge pinch, fingers 44/24"}
-      ],
-      "object_note": "flat case held by its long edges in-plane; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__rzaxlj",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "small case, in-plane edge pinch 31/0"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "small case, in-plane edge pinch 31/0"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "small case, in-plane edge pinch 34/0"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "small case, in-plane edge pinch 34/0"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "small case, edge pinch 34/0, tilt 30"}
-      ],
-      "object_note": "small case (~30 mm) spanned by both pads; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__veodkq",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "tiny case pinched 25/0"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "tiny case pinched 25/0"},
-        {"rank": 3, "verdict": "ok", "flags": [], "note": "tiny case pinched 19/0"},
-        {"rank": 4, "verdict": "ok", "flags": [], "note": "tiny case pinched 19/0"},
-        {"rank": 5, "verdict": "ok", "flags": [], "note": "tiny case pinched 25/0, tilt 30"}
-      ],
-      "object_note": "very small case fully between the pads; sampler metrics failed (width inf, antipodal 0)"
-    },
-    {
-      "key": "video_game__yyvkel",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "ok", "flags": [], "note": "edge pinch across short side, fingers 46/16"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "edge pinch across short side, fingers 44/18, tilt 33"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/11, pad at open limit, tilt 34"},
-        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 49/37 across long side, pad near open limit"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/36 across long side, pad at open limit"}
-      ],
-      "object_note": "flat case held by its edges in-plane (short side ~62 mm, long side ~86 mm); metrics failed"
-    },
-    {
-      "key": "webcam__fabztm",
-      "n_rows": 5,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "gap"], "note": "fingers 50/38 span 88 mm vs 57 mm ball"},
-        {"rank": 2, "verdict": "ok", "flags": [], "note": "ball pinched 59 mm, planned 57, base free"},
-        {"rank": 3, "verdict": "flag", "flags": ["one_finger", "gap"], "note": "fingers 50/43 span 93 mm vs 57 mm ball"},
-        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "symmetric 36/35 spans 71 mm vs 55 mm ball"},
-        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 48/22, pad near open limit, ball+lens span"}
-      ],
-      "object_note": "closing spans 59-93 mm for a 57 mm ball; collision hull (ball+base) likely much larger than visual"
-    },
-    {
-      "key": "wreath__rkrxno",
-      "n_rows": 1,
-      "grasps": [
-        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "fragile"], "note": "pad at open limit; clamps loose foliage, antipodal 0.12"}
-      ],
-      "object_note": "single grasp spans 87 mm of foliage, coverage 0; attach point only 24 mm away"
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch at 30 deg tilt, fingers 43/0"
     }
-  ]
+   ]
+  }
+ ]
 }

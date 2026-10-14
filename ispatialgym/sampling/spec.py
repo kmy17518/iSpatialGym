@@ -3,7 +3,7 @@
 Schema (one entry per ``<activity>-<def_id>``)::
 
     {
-      "alias": null | "<variant>",                 # must equal the problem's (:alias)
+      "variant": null | "<variant>",                 # must equal the problem's (:variant)
       "roles": {
         "<role>": {"models": {"<category>": ["<model>", ...]}, "dataset": "behavior-1k-assets",
                    "grasps": {"key": "<grasp library key>"}},          # spawned role
@@ -177,7 +177,7 @@ class DistractorSpec:
 @dataclass
 class ProblemSpec:
     name: str  # <activity>-<def_id>
-    alias: Optional[str]
+    variant: Optional[str]
     roles: Dict[str, RoleSpec]
     scenes: Dict[str, SceneSpec]
     generation: Dict[str, Any]
@@ -369,7 +369,7 @@ def load_task_spec(path: str, check_ready: bool = True) -> TaskSpecFile:
             distractors = _parse_distractors(name, entry["distractors"], roles, check_ready)
         problems[name] = ProblemSpec(
             name=name,
-            alias=entry.get("alias"),
+            variant=entry.get("variant"),
             roles=roles,
             scenes=scenes,
             generation=dict(entry.get("generation") or {}),

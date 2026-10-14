@@ -1,39 +1,30 @@
 (define (problem configuration_matching-0)
     (:domain ispatialgym)
+    (:variant configuration_matching-articulation_close_large_scale-door)
 
-    (:alias block_design)
+    ; ground_isg 2.0.0: configuration_matching-articulation_close_large_scale-door (configuration_matching/articulation_close_large_scale.iddl; configuration_matching-articulation_close_large_scale#01/representative)
+    ; Configuration matching - articulation (large-scale, close). Scene articulated object (roles/candidates.csv kind scene, bound per
+    ; scene; joint from the customs list roles.target.joint / handle_key), one joint open at q_init in S (must satisfy Open)
+    ; -> closed limit. Handle grasp in this direction too; base / trunk primary, arm secondary.
 
-    ; toy_dice.n.01 (patterned cubes, 20 models) stands in for the interchangeable design blocks.
     (:objects
-        toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - toy_dice.n.01
-        table.n.02_1 - table.n.02
+        door.n.01_1 - door.n.01
         floor.n.01_1 - floor.n.01
         agent.n.01_1 - agent.n.01
     )
 
-    (:groups
-        toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - blocks_group.n.01_1
-    )
-
     (:init
-        (ontop blocks_group.n.01_1 table.n.02_1)
+        (open door.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
-    ; Binary success: every block is on the table, released, and the blocks reproduce the pictured relative
-    ; arrangement (TRO groups["blocks_group.n.01_1"].layout_relations, shared block-to-slot assignment).
     (:goal
         (and
-            (ontop ?blocks_group.n.01_1 ?table.n.02_1)
-            (layout_reached ?blocks_group.n.01_1)
-            (not (grasped ?agent.n.01_1 ?blocks_group.n.01_1))
-            (pose_settled ?blocks_group.n.01_1)
+            (not (open ?door.n.01_1))
+            (layout_reached ?door.n.01_1)
+            (not (grasped ?agent.n.01_1 ?door.n.01_1))
+            (pose_settled ?door.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
-    )
-
-    ; Non-gating: absolute placement of the blocks at the pictured slots (target_slots) is reported only.
-    (:measure
-        (pose_reached ?blocks_group.n.01_1)
     )
 )

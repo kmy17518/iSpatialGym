@@ -8,9 +8,9 @@ from.
 
 This document specifies the BDDL problem files for the seven public iSpatialGym
 tasks and the task-specific TRO metadata each one needs. Every task family has
-one activity directory; the 20 subtasks are distinguished by an `(:alias ...)`
+one activity directory; the 20 subtasks are distinguished by an `(:variant ...)`
 whose name also carries the grounded object categories (section "Files, problem
-names, and aliases"). The shipped files under
+names, and variants"). The shipped files under
 `ispatialgym/assets/bddl/activity_definitions/` are structural templates with
 representative synsets; `ground_isg` writes the concrete problems.
 
@@ -53,7 +53,7 @@ ends it at the first binary success instead.
 
 ## Shared conventions
 
-### Files, problem names, and aliases
+### Files, problem names, and variants
 
 Each public task is one activity directory:
 
@@ -66,17 +66,17 @@ activity_definitions/<activity>/problem1.bddl
 - Problem `N` is named `<activity>-N`. BEHAVIOR's knowledge base already
   enumerates every `problemN.bddl` in a directory (`get_instance_count`), and
   `BehaviorTask(activity_definition_id=N)` loads it. `ground_isg` allocates `N`
-  per alias, contiguously, and records the mapping in
-  `activity_definitions/<activity>/problems.json` (alias ↔ id).
-- Every problem declares `(:alias <name>)` directly after `:domain`. The alias
+  per variant, contiguously, and records the mapping in
+  `activity_definitions/<activity>/problems.json` (variant ↔ id).
+- Every problem declares `(:variant <name>)` directly after `:domain`. The variant
   names the **subtask and the grounded categories**:
   `<family>-<subtask>-<category slots>` (table below), e.g.
   `inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`.
   The parser records it as `task_variant`, the TRO's `task_variant` must equal
-  it, and results are reported per alias. Group slots list `<category>_<count>`
+  it, and results are reported per variant. Group slots list `<category>_<count>`
   tokens (`bottle_of_beer_3_bottle_of_sake_1`); the block design uses the custom
-  block token `block_4`. One alias = one BDDL = one category combination;
-  templates of that alias differ only by models.
+  block token `block_4`. One variant = one BDDL = one category combination;
+  templates of that variant differ only by models.
 - A problem may end with a `(:measure ...)` section (after `:goal`) listing
   `pose_reached` / `layout_reached` atoms that are **measured but never gate
   success**:
@@ -93,13 +93,13 @@ activity_definitions/<activity>/problem1.bddl
   `max_position_error`, `max_orientation_error`), with `"gating": false`, and
   the atoms are listed in `info["done"]["ispatialgym"]["measured"]`.
 - Stock `parse_problem` prints and ignores unrecognized sections. The
-  iSpatialGym parser (`ispatialgym.activity.problem`) implements `:alias`,
+  iSpatialGym parser (`ispatialgym.activity.problem`) implements `:variant`,
   `:groups` and `:measure` explicitly, validates every symbol against
   `:objects` / `:groups` and the domain predicates, and rejects a file whose
   group symbols would otherwise be undefined at scope resolution.
 - BEHAVIOR's `sample_b1k_tasks.py` hard-codes `activity_definition_id=0` and
   keys `task_custom_lists.json` (scene, room types, model pools) by activity
-  name. iSpatialGym generation reads its own customs list keyed by **alias**
+  name. iSpatialGym generation reads its own customs list keyed by **variant**
   (see "Task spec (customs list)" in `task_definition_and_evaluation.md`),
   because subtasks in one activity use disjoint object pools and may need
   different scenes.
@@ -144,12 +144,12 @@ declared instance keeps the normal form:
 ```
 
 Roles such as "target" and "distractor" are conveyed by which instances appear
-in which predicates (and by groups), not by aliases such as `target_1`.
+in which predicates (and by groups), not by variants such as `target_1`.
 
 Block design uses `toy_dice.n.01` for the custom Kohs block (`toy_dice/isgblk`
 in the `ispatialgym-assets` dataset); every declared synset must exist in the
 BEHAVIOR knowledge base, so the custom asset is registered under an existing
-category and the alias carries the token `block_4` instead.
+category and the variant carries the token `block_4` instead.
 
 Group names are derived from the iddl group role: `targets` → `targets_group.n.01_1`
 (blocks), `distractors` → `distractors_group.n.01_1`, the attachment assembly
@@ -291,7 +291,7 @@ values are explanatory and must be replaced in real files.
   loop that treats every non-`robot_poses` top-level key as a BDDL object;
   stock `Evaluator.load_task_instance()` would otherwise fail on it.
 - `activity_definition_id` equals the problem file number; `task_variant`
-  equals the problem's `:alias` (or is `null`).
+  equals the problem's `:variant` (or is `null`).
 - `scene` is read before environment construction because partial-room loading
   happens before the rest of the TRO is applied.
 - `object_bindings` records the exact materialized model for every physical
@@ -325,7 +325,7 @@ values are explanatory and must be replaced in real files.
   mentions is rejected. The BDDL is the single statement of *what* is
   evaluated (gating in the goal, reported only in `:measure`); the TRO only
   supplies the numbers. `ispatialgym.eval.tro.validate_tro_against_problem`
-  enforces both directions together with activity / definition id / alias
+  enforces both directions together with activity / definition id / variant
   agreement. This is how Disembedding, Configuration Matching and Inter-object
   Relation Satisfaction report pose errors while their binary success is purely
   relational.
@@ -443,9 +443,9 @@ Used by `pose_reached(g)` and `layout_reached(g)`:
 - Reported errors: `pose_reached` -> max member position / orientation error;
   `layout_reached` -> max relation position / orientation error.
 
-## Public task, subtask and alias mapping
+## Public task, subtask and variant mapping
 
-| Family (activity dir) | Subtask | Alias template | Scene roles in the alias (icl `kind = scene`) |
+| Family (activity dir) | Subtask | Variant template | Scene roles in the variant (icl `kind = scene`) |
 | --- | --- | --- | --- |
 | `camera_relocalization` | standard | `camera_relocalization-standard` | – |
 | `camera_relocalization` | obstructed | `camera_relocalization-obstructed-{obstacles}` | obstacle category (one for now) |
@@ -466,9 +466,9 @@ Used by `pose_reached(g)` and `layout_reached(g)`:
 | `inter_object_relation_satisfaction` | under, small-scale | `inter_object_relation_satisfaction-under_small_scale-{target}-{partner}-{support}` | support |
 | `inter_object_relation_satisfaction` | inside / nextto / touching | `inter_object_relation_satisfaction-{inside,nextto,touching}-{target}-{partner}-{support}` | support |
 
-Definition ids `N` are per alias (`problems.json`); the examples below keep the
+Definition ids `N` are per variant (`problems.json`); the examples below keep the
 representative synsets of the structural templates. The former names
-`world_alignment` (activity), `table_surface` (alias) and `iors` are retired:
+`world_alignment` (activity), `table_surface` (variant) and `iors` are retired:
 the activity directory is `alignment`, the table variant is `axial`, and the IORS
 activity keeps its full name.
 
@@ -527,7 +527,7 @@ Additional TRO specification:
 - The initial state must not already satisfy `pose_reached`.
 - The geodesic path-length bucket of the instance ((0, 3], (3, 5], (5, 10] m) is
   a generation parameter (`generation.path_buckets`) recorded in the oracle
-  sidecar, not part of the BDDL or the alias.
+  sidecar, not part of the BDDL or the variant.
 
 ### 1b. Obstructed (`camera_relocalization-obstructed-{obstacles}`)
 
@@ -539,7 +539,7 @@ shortest path changes; it is never touched.
 (define (problem camera_relocalization-1)
     (:domain ispatialgym)
 
-    (:alias camera_relocalization-obstructed-trash_can_1)
+    (:variant camera_relocalization-obstructed-trash_can_1)
 
     (:objects
         trash_can.n.01_1 - trash_can.n.01
@@ -714,7 +714,7 @@ Additional TRO specification:
 
 The template uses a low-rim source tray (`tray.n.01_1`) and a distinct
 destination tray (`tray.n.01_2`), one target (`mug.n.04_1`), and a distractor
-group. A table-only layout would be a second problem file with its own alias.
+group. A table-only layout would be a second problem file with its own variant.
 
 Path: `activity_definitions/disembedding/problem0.bddl`
 
@@ -801,15 +801,15 @@ Additional TRO specification:
 
 ## 5. Configuration Matching
 
-One activity, four problem files, three aliases.
+One activity, four problem files, three variants.
 
-### 5a. Block design (`problem0`, alias `block_design`)
+### 5a. Block design (`problem0`, variant `block_design`)
 
 ```lisp
 (define (problem configuration_matching-0)
     (:domain ispatialgym)
 
-    (:alias configuration_matching-block_design-block_4-table)
+    (:variant configuration_matching-block_design-block_4-table)
 
     (:objects
         toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - toy_dice.n.01
@@ -912,7 +912,7 @@ task joint; every other non-fixed joint is listed at its init value.
 (define (problem configuration_matching-1)
     (:domain ispatialgym)
 
-    (:alias configuration_matching-articulation_open_large_scale-cabinet)
+    (:variant configuration_matching-articulation_open_large_scale-cabinet)
 
     (:objects
         cabinet.n.01_1 - cabinet.n.01
@@ -941,7 +941,7 @@ task joint; every other non-fixed joint is listed at its init value.
 (define (problem configuration_matching-2)
     (:domain ispatialgym)
 
-    (:alias configuration_matching-articulation_close_large_scale-cabinet)
+    (:variant configuration_matching-articulation_close_large_scale-cabinet)
 
     (:objects
         cabinet.n.01_1 - cabinet.n.01
@@ -1014,13 +1014,13 @@ Additional TRO specification (both problems):
   whereas the joint targets enforce closure within the profile tolerance and
   supply the reported joint error.
 
-### 5c. Attachment (`problem3`, alias `attachment`)
+### 5c. Attachment (`problem3`, variant `attachment`)
 
 ```lisp
 (define (problem configuration_matching-3)
     (:domain ispatialgym)
 
-    (:alias configuration_matching-attachment-digital_camera-camera_tripod-table)
+    (:variant configuration_matching-attachment-digital_camera-camera_tripod-table)
 
     (:objects
         digital_camera.n.01_1 - digital_camera.n.01
@@ -1110,7 +1110,7 @@ Additional TRO specification:
 ## 6. Alignment (activity directory `alignment`, formerly `world_alignment`)
 
 One activity, two subtasks (the world-horizontal variant, formerly definition 2 /
-alias `alignment-world_horizontal-{target}-{support}`, was retired on 2026-09-23).
+variant `alignment-world_horizontal-{target}-{support}`, was retired on 2026-09-23).
 
 ### 6a. Axial (`alignment-axial-{target}-{support}`, formerly `table_surface`)
 
@@ -1118,7 +1118,7 @@ alias `alignment-world_horizontal-{target}-{support}`, was retired on 2026-09-23
 (define (problem alignment-0)
     (:domain ispatialgym)
 
-    (:alias alignment-axial-fishing_rod-table)
+    (:variant alignment-axial-fishing_rod-table)
 
     (:objects
         fishing_rod.n.01_1 - fishing_rod.n.01
@@ -1183,7 +1183,7 @@ the painting's center of mass; the goal is the straight (world-vertical) pose.
 (define (problem alignment-1)
     (:domain ispatialgym)
 
-    (:alias alignment-world_vertical-painting-wall)
+    (:variant alignment-world_vertical-painting-wall)
 
     (:objects
         painting.n.01_1 - painting.n.01
@@ -1269,7 +1269,7 @@ or (under only) the partner itself.
 (define (problem inter_object_relation_satisfaction-3)
     (:domain ispatialgym)
 
-    (:alias inter_object_relation_satisfaction-nextto-apple-bowl-table)
+    (:variant inter_object_relation_satisfaction-nextto-apple-bowl-table)
 
     (:objects
         apple.n.01_1 - apple.n.01
@@ -1386,12 +1386,12 @@ plus the narrow Behavior-1K extensions `bddl.predicates.LayoutReached`,
 `depth` / orientation-only / equivalence modes of
 `omnigibson.object_states.PoseReached`):
 
-1. Parser with `:alias`, `:groups` and the non-gating `:measure` section, group
+1. Parser with `:variant`, `:groups` and the non-gating `:measure` section, group
    expansion per the table above, validation of symbols, predicates, arities,
    `pose_settled` placement and the `:init` exclusions; `task_variant` recorded
-   from the alias.
+   from the variant.
 2. `isg-tro-v1` validation of the evaluation targets: schema version, ids,
-   alias / definition agreement, array lengths, unit quaternions, positive
+   variant / definition agreement, array lengths, unit quaternions, positive
    tolerances, metric / tolerance consistency, one slot per member, fixed
    assignment bijections, relation consistency with slots, and a one-to-one
    correspondence between targets and the `pose_reached` / `layout_reached`
@@ -1420,7 +1420,7 @@ Not yet implemented (instance restoration / generation):
    logs a warning when these records are present.
 3. Recomputing and validating Disembedding's `initial_occlusion` after settling.
 4. The v2 generation pipeline (`ground_isg` / `sample_isg` / `multiply_isg`,
-   `instance_sampling_spec.md`) with the 20 subtasks, grounded BDDL per alias,
+   `instance_sampling_spec.md`) with the 20 subtasks, grounded BDDL per variant,
    `problems.json`, the `alignment` activity rename and the oracle sidecar.
 5. `initial_occlusion`, `goal_observation` and hash fields are carried through
    but not checked beyond their presence.

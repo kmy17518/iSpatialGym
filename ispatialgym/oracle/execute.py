@@ -2788,7 +2788,7 @@ def clear_release_of_partner(action: Place, motions: Motions, state, targets: Di
 @dataclass
 class AttachCorrection:
     """The attach correction regime (owner 2026-09-20 23:39, attachment only): read from the sidecar's ``attach_correction``
-    (the sampler copies ``generation.attach_correction`` of the alias), else from the customs entry of the sidecar's alias
+    (the sampler copies ``generation.attach_correction`` of the variant), else from the customs entry of the sidecar's variant
     (a demo-only re-run of an older instance), else these defaults (two passes at ``attach_correct_min_m``). It drives the
     hover alignment (``_align_at_hover``, owner 2026-10-10): settle on arrival (at most ``settle_steps``) -> measure; each pass a
     lateral + yaw leg at ``soft_pos_tol_m`` -> settle -> re-measure; the loop stops when the lateral offset is within
@@ -2818,21 +2818,23 @@ def attach_correction_regime(ctx: Dict[str, Any], cfg: ExecuteConfig) -> AttachC
     source = "sidecar"
     if not isinstance(d, dict) or not d:
         d, source = None, "defaults"
-        alias = getattr(sidecar, "alias", None) if sidecar is not None else None
-        if alias:
+        key = getattr(sidecar, "variant", None) if sidecar is not None else None
+        if key:
             try:
                 import json
 
+                from ispatialgym.eval.names import subtask_name
                 from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH
 
+                subtask = subtask_name(key)
                 # a plain read (not the schema-validating Customs.load: an unrelated entry mid-edit must not cost the regime)
                 with open(DEFAULT_CUSTOMS_PATH) as f:
-                    entry = json.load(f).get(alias) or {}
+                    entry = json.load(f).get(subtask) or {}
                 g = entry.get("generation") or {}
                 if isinstance(g.get("attach_correction"), dict) and g["attach_correction"]:
-                    d, source = g["attach_correction"], f"customs[{alias}]"
+                    d, source = g["attach_correction"], f"customs[{subtask}]"
             except Exception as e:  # noqa: BLE001 - the customs are optional here
-                log.warning("attach correction: customs lookup for %s failed (%s); defaults", alias, e)
+                log.warning("attach correction: customs lookup for %s failed (%s); defaults", key, e)
     if d:
         for k in ("soft_pos_tol_m", "stop_when_improvement_below_m", "target_pos_m", "target_rot_rad"):
             if k in d:

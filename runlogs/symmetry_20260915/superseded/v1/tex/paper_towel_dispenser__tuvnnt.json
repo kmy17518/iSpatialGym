@@ -1,1 +1,0 @@
-{"key": "paper_towel_dispenser__tuvnnt", "category": "paper_towel_dispenser", "model": "tuvnnt", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.12633591800746102, "p95": 0.17647058823529413, "p99": 0.18823529411764706, "mad_union": 0.19596341957767607, "iou": 0.8690462982041812, "worst": "z180"}}, "render_s": 0.1}
