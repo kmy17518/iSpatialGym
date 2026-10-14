@@ -13,7 +13,9 @@ One draw per attempt (generation keys in :data:`DEFAULTS`, read by this mode onl
   the goal check reads; unreadable = left to the goal check).
 * **init**: ``distance`` ~ U(``push_distance_m``) back along d: footprint on free floor with the clearance, the AABB gap beyond the
   NextTo bound + ``init_gap_extra_m`` (NextTo false), the footprint swept init -> goal every ``sweep_step_m`` free (the partner never
-  overlapped).
+  overlapped) and, with ``push_single_floor`` (default true), on one ``floors`` object: a downward ray at its corners and centre at
+  every sweep step hits the same floor object (a seam between two floor objects catches a pushed object's feet; any other first hit,
+  e.g. a rug, counts as a different floor).
 * **push face**: the target's convex collision pieces cut at each of ``push_heights_m`` above the floor; the outermost material
   on the face's centre line, flat across the closed hand (probes ±``face_probe_m``: lateral, vertical; spread <=
   ``face_flat_tol_m``) and at most ``face_max_inset_m`` inside the AABB; when no height passes, twice the flatness and 10 cm more inset
@@ -90,6 +92,7 @@ DEFAULTS: Dict[str, Any] = {
     "floor_clearance_m": 0.05,
     "init_gap_extra_m": 0.20,
     "sweep_step_m": 0.05,
+    "push_single_floor": True,
     "push_heights_m": [0.45, 0.40, 0.50, 0.55, 0.35, 0.60],
     "face_probe_m": [0.03, 0.02],
     "face_flat_tol_m": 0.03,
@@ -207,6 +210,22 @@ def sweep_xys(init_xy, goal_xy, step: float) -> List[th.Tensor]:
     a, b = th.as_tensor(init_xy, dtype=th.float32), th.as_tensor(goal_xy, dtype=th.float32)
     n = max(1, int(math.ceil(float(th.linalg.norm(b - a)) / max(float(step), 1e-3))))
     return [a + (b - a) * (k / n) for k in range(n + 1)]
+
+
+def sweep_floor_points(lo, hi, init_xy, goal_xy, yaw: float, step: float) -> th.Tensor:
+    """``(N, 2)`` world xy where the swept footprint stands: its 4 corners and its root at every :func:`sweep_xys` sample init -> goal."""
+    return th.cat([th.cat([footprint(lo, hi, p, yaw), p.reshape(1, 2)]) for p in sweep_xys(init_xy, goal_xy, step)])
+
+
+def single_floor(names: Sequence[Optional[str]]) -> Optional[str]:
+    """Why the floor names under the swept footprint are not one floor object (None when they are; a None name - no floor object
+    first under the ray - counts as another floor)."""
+    seen = sorted({str(n) for n in names if n is not None})
+    if any(n is None for n in names):
+        return f"floor_change: no floor object under {sum(n is None for n in names)} of {len(names)} points ({', '.join(seen) or 'none'})"
+    if len(seen) > 1:
+        return f"floor_change: {' / '.join(seen)}"
+    return None
 
 
 def box_corners(lo2, hi2) -> th.Tensor:
@@ -485,6 +504,25 @@ def floor_ok(s, corners: th.Tensor, step: float = 0.08) -> Optional[str]:
     return None
 
 
+def floor_names_at(s, pts: th.Tensor) -> List[Optional[str]]:
+    """The ``floors`` object a downward ray (floor + 0.3 m -> floor - 0.3 m) hits first at each world xy of ``pts`` (the robot and the
+    target ignored); None where it hits nothing or another body."""
+    from omnigibson.utils.sampling_utils import raytest_batch
+
+    floors = s.place.get("floor_prims")
+    if floors is None:
+        floors = s.place["floor_prims"] = [(o.name, o.prim_path) for o in s.world.scene.objects if o.category == "floors"]
+    z0 = float(s.floor_z)
+    ignore = [lk.prim_path for lk in s.world.robot.links.values()] + [lk.prim_path for lk in s.target.links.values()]
+    hits = raytest_batch([[float(p[0]), float(p[1]), z0 + 0.3] for p in pts], [[float(p[0]), float(p[1]), z0 - 0.3] for p in pts],
+                         only_closest=True, ignore_bodies=ignore)
+    out: List[Optional[str]] = []
+    for h in hits:
+        body = str(h.get("rigidBody") or "") if h.get("hit") else ""
+        out.append(next((n for n, pp in floors if body and (body == pp or body.startswith(pp + "/"))), None))
+    return out
+
+
 def footprint_free(s, xy, yaw: float, clearance: float) -> Optional[str]:
     """Why the target's footprint at root ``xy`` / ``yaw`` is not free (None when it is): free floor in the task rooms, ``clearance``
     from every obstacle box, no overlap with the partner's AABB."""
@@ -582,6 +620,9 @@ def _draw(s, rng: np.random.Generator) -> Draft:
                 bad = next((p for p in sweep_xys(xy0, goal_xy, float(knob(s, "sweep_step_m")))[1:-1] if footprint_free(s, p, yaw, clearance) is not None), None)
                 if bad is not None:
                     count(stats, "sweep_blocked")
+                    continue
+                if bool(knob(s, "push_single_floor")) and single_floor(floor_names_at(s, sweep_floor_points(lo, hi, xy0, goal_xy, yaw, float(knob(s, "sweep_step_m"))))):
+                    count(stats, "floor_change")
                     continue
                 init_xy, dist = xy0, L
                 break

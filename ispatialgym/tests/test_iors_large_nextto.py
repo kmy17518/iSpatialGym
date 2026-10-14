@@ -391,3 +391,17 @@ def test_two_hand_program_pushes_with_both_arms_and_retreats_each():
     with pytest.raises(Exception, match="no left hand"):
         _sidecar_one = expand(_sidecar().alias, _sidecar())[2]
         _sidecar_one.hand("left")
+
+
+def test_push_path_on_one_floor_object():
+    """``push_single_floor`` (user 2026-10-13 ~18:50): the footprint swept init -> goal stands on one floors object - the corners and the
+    root at every sweep step are probed; two floor names or a point without one reject the goal."""
+    lo, hi = th.tensor([-0.2, -0.22]), th.tensor([0.2, 0.22])
+    pts = NT.sweep_floor_points(lo, hi, (11.0, 3.2), (9.2, 3.2), 0.0, 0.05)
+    assert pts.shape == (5 * len(NT.sweep_xys((11.0, 3.2), (9.2, 3.2), 0.05)), 2)  # every sweep pose: 4 corners + the root
+    assert th.allclose(pts[4], th.tensor([11.0, 3.2])) and th.allclose(pts[-1], th.tensor([9.2, 3.2]))
+    assert float(pts[:, 0].min()) == pytest.approx(9.0) and float(pts[:, 0].max()) == pytest.approx(11.2)
+    assert NT.single_floor(["floors_qgmjvd_0"] * 10) is None
+    assert NT.single_floor(["floors_uzsntg_0"] * 6 + ["floors_qgmjvd_0"] * 4) == "floor_change: floors_qgmjvd_0 / floors_uzsntg_0"
+    assert NT.single_floor(["floors_qgmjvd_0", None]).startswith("floor_change: no floor object under 1 of 2 points")
+    assert NT.DEFAULTS["push_single_floor"] is True
