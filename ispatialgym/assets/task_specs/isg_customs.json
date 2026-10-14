@@ -33273,7 +33273,7 @@
     ],
     "bindings": {
      "partner": [
-      "breakfast_table_skczfi_0"
+      "breakfast_table_skczfi_1"
      ],
      "support": {
       "room": "living_room_0"
@@ -33344,11 +33344,12 @@
     "Rs_int": [
      "straight_chair_amgwaw_0",
      "straight_chair_amgwaw_1",
-     "straight_chair_amgwaw_2"
+     "straight_chair_amgwaw_2",
+     "swivel_chair_qtqitn_0"
     ]
    },
    "_remove_objects_note": "the chairs at each partner's sides removed (where the cart's goal is): the six around breakfast_table_rhjoby_0 as in the sandal's floor aliases of this table; the four within 0.9 m of breakfast_table_xftrki_0 and the three within 0.65 m of breakfast_table_skczfi_0",
-   "_partners_note": "user 2026-10-13 ~18:50: the push path stays on one floor object (generation.push_single_floor, iors_large_nextto) - house_single_floor's partner rhjoby in dining_room_0 alone (its living_room_0 init crossed the floor seam where the cart tipped); the variant partner breakfast_table_xftrki_0 (house_double_floor_lower kitchen_0) and the held-out partner breakfast_table_skczfi_0 (Rs_int living_room_0) sampled in parallel",
+   "_partners_note": "user 2026-10-13 ~18:50: the push path stays on one floor object (generation.push_single_floor, iors_large_nextto) - house_single_floor's partner rhjoby in dining_room_0 alone (its living_room_0 init crossed the floor seam where the cart tipped); the variant partner breakfast_table_xftrki_0 (house_double_floor_lower kitchen_0) and the held-out partner breakfast_table_skczfi_0 (Rs_int living_room_0) sampled in parallel; Rs_int's held-out partner switched to the second instance breakfast_table_skczfi_1 (its swivel chair removed): skczfi_0's corner gave no push stance in ~100-500 attempts per seed (stance collisions / floor)",
    "push_distance_m": [
     1.5,
     2.5
