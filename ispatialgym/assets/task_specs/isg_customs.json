@@ -33382,6 +33382,356 @@
   },
   "constraints": []
  },
+ "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-pedestal_table-floor": {
+  "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+  "definition_id": 148,
+  "roles": {
+   "target": {
+    "category": "serving_cart",
+    "sampleable": true,
+    "representative": "heqtlk",
+    "orientation_equivalences": {
+     "serving_cart/heqtlk": []
+    }
+   },
+   "partner": {
+    "category": "pedestal_table",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "restaurant_diner": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "pedestal_table_nlfgwe_2"
+     ],
+     "support": {
+      "room": "dining_room_0"
+     },
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "serving_cart": [
+       "heqtlk"
+      ]
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.15,
+    "orientation": 0.35
+   },
+   "_tolerances_note": "pose_reached is measured, not the goal: the push stops nextto_push_on_m after NextTo first holds, short of the recorded goal (the goal's AABB gap is under half the NextTo bound), and the cart may turn a little under the hand",
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.9,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "remove_objects": {
+    "restaurant_diner": [
+     "straight_chair_nntxvr_6",
+     "straight_chair_nntxvr_3"
+    ]
+   },
+   "push_distance_m": [
+    1.5,
+    2.5
+   ],
+   "push_heights_m": [
+    0.45,
+    0.4,
+    0.5,
+    0.55,
+    0.35,
+    0.6
+   ],
+   "push_stand_offs_m": [
+    0.55,
+    0.5,
+    0.6,
+    0.65,
+    0.45
+   ],
+   "drift_tol_m": 0.1,
+   "nextto_push_on_m": 0.05,
+   "push_speed_m_s": 0.08,
+   "push_hands": 2,
+   "_push_hands_note": "owner 2026-10-12 ~20:17 item C: both closed hands on the cart's push face (iors_large_nextto: two spots ~0.3 m apart symmetric about the face's centre line, the base centred behind them, the second arm solved with the first locked; one hand when a face has no two spots) - both demos stopped with the cart turned 20 deg under the single hand, ~1 m short",
+   "attempt_budget_s": 1500,
+   "_nextto_note": "owner 2026-10-12 ~16:05 items 3 / 4: nextto_large#02 - the serving cart heqtlk (one rigid link, 0.39 x 0.44 x 0.85 m, spawned) pushed next to breakfast_table_rhjoby_0 by the base (oracle base_push, no grasp); hand-made from the sandal's under alias of the same table (scene, room, floor init, the six chairs removed); the base-push keys are the sampler's defaults (iors_large_nextto.DEFAULTS), written out to be tuned here",
+   "_partner_copy_note": "owner 2026-10-13 ~20:34 (nextto_large#02, partners beyond the breakfast tables): copy of inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor with the partner pedestal_table_nlfgwe_2 (pedestal_table.n.01, restaurant_diner dining_room_0; lane screen: the longest 0.75 m wide straight free lane in the room beside it 4.95 m); its instances count for nextto#02 only with the owner's OK"
+  },
+  "constraints": []
+ },
+ "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-coffee_table-floor": {
+  "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+  "definition_id": 149,
+  "roles": {
+   "target": {
+    "category": "serving_cart",
+    "sampleable": true,
+    "representative": "heqtlk",
+    "orientation_equivalences": {
+     "serving_cart/heqtlk": []
+    }
+   },
+   "partner": {
+    "category": "coffee_table",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "coffee_table_rlsebe_0"
+     ],
+     "support": {
+      "room": "living_room_0"
+     },
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "serving_cart": [
+       "heqtlk"
+      ]
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.15,
+    "orientation": 0.35
+   },
+   "_tolerances_note": "pose_reached is measured, not the goal: the push stops nextto_push_on_m after NextTo first holds, short of the recorded goal (the goal's AABB gap is under half the NextTo bound), and the cart may turn a little under the hand",
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.9,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "remove_objects": {},
+   "push_distance_m": [
+    1.5,
+    2.5
+   ],
+   "push_heights_m": [
+    0.45,
+    0.4,
+    0.5,
+    0.55,
+    0.35,
+    0.6
+   ],
+   "push_stand_offs_m": [
+    0.55,
+    0.5,
+    0.6,
+    0.65,
+    0.45
+   ],
+   "drift_tol_m": 0.1,
+   "nextto_push_on_m": 0.05,
+   "push_speed_m_s": 0.08,
+   "push_hands": 2,
+   "_push_hands_note": "owner 2026-10-12 ~20:17 item C: both closed hands on the cart's push face (iors_large_nextto: two spots ~0.3 m apart symmetric about the face's centre line, the base centred behind them, the second arm solved with the first locked; one hand when a face has no two spots) - both demos stopped with the cart turned 20 deg under the single hand, ~1 m short",
+   "attempt_budget_s": 1500,
+   "_nextto_note": "owner 2026-10-12 ~16:05 items 3 / 4: nextto_large#02 - the serving cart heqtlk (one rigid link, 0.39 x 0.44 x 0.85 m, spawned) pushed next to breakfast_table_rhjoby_0 by the base (oracle base_push, no grasp); hand-made from the sandal's under alias of the same table (scene, room, floor init, the six chairs removed); the base-push keys are the sampler's defaults (iors_large_nextto.DEFAULTS), written out to be tuned here",
+   "_partner_copy_note": "owner 2026-10-13 ~20:34 (nextto_large#02, partners beyond the breakfast tables): copy of inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor with the partner coffee_table_rlsebe_0 (coffee_table.n.01, house_single_floor living_room_0; lane screen: the longest 0.75 m wide straight free lane in the room beside it 4.45 m); its instances count for nextto#02 only with the owner's OK"
+  },
+  "constraints": []
+ },
+ "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-countertop-floor": {
+  "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+  "definition_id": 150,
+  "roles": {
+   "target": {
+    "category": "serving_cart",
+    "sampleable": true,
+    "representative": "heqtlk",
+    "orientation_equivalences": {
+     "serving_cart/heqtlk": []
+    }
+   },
+   "partner": {
+    "category": "countertop",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "partner": [
+      "countertop_kelker_0"
+     ],
+     "support": {
+      "room": "kitchen_0"
+     },
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "serving_cart": [
+       "heqtlk"
+      ]
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.15,
+    "orientation": 0.35
+   },
+   "_tolerances_note": "pose_reached is measured, not the goal: the push stops nextto_push_on_m after NextTo first holds, short of the recorded goal (the goal's AABB gap is under half the NextTo bound), and the cart may turn a little under the hand",
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.9,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "remove_objects": {},
+   "push_distance_m": [
+    1.5,
+    2.5
+   ],
+   "push_heights_m": [
+    0.45,
+    0.4,
+    0.5,
+    0.55,
+    0.35,
+    0.6
+   ],
+   "push_stand_offs_m": [
+    0.55,
+    0.5,
+    0.6,
+    0.65,
+    0.45
+   ],
+   "drift_tol_m": 0.1,
+   "nextto_push_on_m": 0.05,
+   "push_speed_m_s": 0.08,
+   "push_hands": 2,
+   "_push_hands_note": "owner 2026-10-12 ~20:17 item C: both closed hands on the cart's push face (iors_large_nextto: two spots ~0.3 m apart symmetric about the face's centre line, the base centred behind them, the second arm solved with the first locked; one hand when a face has no two spots) - both demos stopped with the cart turned 20 deg under the single hand, ~1 m short",
+   "attempt_budget_s": 1500,
+   "_nextto_note": "owner 2026-10-12 ~16:05 items 3 / 4: nextto_large#02 - the serving cart heqtlk (one rigid link, 0.39 x 0.44 x 0.85 m, spawned) pushed next to breakfast_table_rhjoby_0 by the base (oracle base_push, no grasp); hand-made from the sandal's under alias of the same table (scene, room, floor init, the six chairs removed); the base-push keys are the sampler's defaults (iors_large_nextto.DEFAULTS), written out to be tuned here",
+   "_partner_copy_note": "owner 2026-10-13 ~20:34 (nextto_large#02, partners beyond the breakfast tables): copy of inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor with the partner countertop_kelker_0 (countertop.n.01, house_single_floor kitchen_0; lane screen: the longest 0.75 m wide straight free lane in the room beside it 4.6 m); its instances count for nextto#02 only with the owner's OK"
+  },
+  "constraints": []
+ },
  "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk": {
   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
   "definition_id": 18,

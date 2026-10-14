@@ -1637,6 +1637,39 @@
    "pick": "inter_object_relation_satisfaction-inside_large_scale#02~shelf097",
    "slot": "representative",
    "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-pedestal_table-floor",
+   "id": 148,
+   "grounded": "2026-10-13",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-123 with the partner pedestal_table.n.01 (pedestal_table_nlfgwe_2), owner ~20:34 nextto_large#02)",
+   "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
+   "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto_large_scale#02~pedestal_table",
+   "slot": "variation_geometry",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-coffee_table-floor",
+   "id": 149,
+   "grounded": "2026-10-13",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-123 with the partner coffee_table.n.01 (coffee_table_rlsebe_0), owner ~20:34 nextto_large#02)",
+   "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
+   "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto_large_scale#02~coffee_table",
+   "slot": "variation_geometry",
+   "mode": "test"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-countertop-floor",
+   "id": 150,
+   "grounded": "2026-10-13",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-123 with the partner countertop.n.01 (countertop_kelker_0), owner ~20:34 nextto_large#02)",
+   "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
+   "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto_large_scale#02~countertop",
+   "slot": "variation_geometry",
+   "mode": "test"
   }
  ]
 }
