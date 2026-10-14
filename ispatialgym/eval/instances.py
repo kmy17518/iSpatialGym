@@ -36,14 +36,16 @@ record outside the dataset (``goal_record_path``: ``<records>/goal_images/<insta
 ``$ISPATIALGYM_RELEASE_RECORDS``, default ``<repo>/datasets/release_records``). For another image size, replay the instance at that size
 (``run_isg --task <name> --instance-indices <i> --mode replay --image-size N --record video --out <dir>``; a replay only
 logs its ``--qa`` metrics, so the demo's own contacts never stop it) and ``set-goal`` it with ``--run <dir>``; the instance
-keeps one goal image, and a re-export keeps a goal image set from such a run.
+keeps one goal image, and a re-export keeps a goal image set from such a run. ``--measured-targets`` also sets the pose targets
+of the instance's ``(:measure ...)``-only atoms to where that replay left them (its ``meta.json`` ``final_target_poses``), so the
+goal image and the measured targets show the same scene; the internal record keeps the values replaced.
 
 A name resolves at the most specific level that has it (subtask, then task, then task family); the instance indices count
 that level's instances in the index order (a task's instances are its subtasks' instances, subtask by subtask).
 
     python -m ispatialgym.eval.instances [--root R] list [--level task_family|task|subtask]
     python -m ispatialgym.eval.instances [--root R] show <name> [<index> ...]
-    python -m ispatialgym.eval.instances [--root R] set-goal <name> <index> [--run <run_isg out dir>]
+    python -m ispatialgym.eval.instances [--root R] set-goal <name> <index> [--run <run_isg out dir> [--measured-targets]]
 """
 from __future__ import annotations
 
@@ -255,8 +257,10 @@ def replay_dirs(rec: InstanceRecord) -> List[Tuple[str, str]]:
     return [("rerun", rerun), ("original", os.path.join(run_dir, "replay_log", demo_id))]
 
 
-def _usable_replay(rec: InstanceRecord, replay_dir: str) -> Tuple[Optional[dict], str]:
-    """``(meta, "")`` when ``replay_dir`` holds a successful replay of this instance with its final frame, else ``(None, why)``."""
+def _usable_replay(rec: InstanceRecord, replay_dir: str, measured_targets: bool = False) -> Tuple[Optional[dict], str]:
+    """``(meta, "")`` when ``replay_dir`` holds a successful replay of this instance with its final frame, else ``(None, why)``.
+    ``measured_targets``: the replay re-pins the measured targets, so its symbolic success suffices (its geometric success
+    failed only on the targets being re-pinned) and it must record their final poses (``final_target_poses``)."""
     meta_path = os.path.join(replay_dir, "meta.json")
     if not os.path.exists(meta_path):
         return None, "no meta.json"
@@ -269,22 +273,64 @@ def _usable_replay(rec: InstanceRecord, replay_dir: str) -> Tuple[Optional[dict]
         return None, f"a run of {meta.get('instance_id')!r}"
     if meta.get("mode") != "replay":
         return None, f"mode {meta.get('mode')!r}, not a replay"
-    if meta.get("success") is not True:
+    if measured_targets:
+        if meta.get("symbolic_success") is not True:
+            return None, f"symbolic_success = {meta.get('symbolic_success')!r}"
+        if not meta.get("final_target_poses"):
+            return None, "no final_target_poses (a replay before 2026-10-14)"
+    elif meta.get("success") is not True:
         return None, f"success = {meta.get('success')!r}"
     return meta, ""
 
 
-def set_goal(rec: InstanceRecord, run: Optional[str] = None) -> Dict[str, Any]:
+def repin_measured_targets(rec: InstanceRecord, final_poses: Dict[str, Any]) -> Dict[str, Any]:
+    """Set the pose targets of the instance's ``(:measure ...)``-only ``pose_reached`` atoms (not in ``:goal``) in its instance file
+    to ``final_poses`` (a replay's ``final_target_poses``: each target's pose in its own frame and link); a component the target
+    does not compare stays None. Returns ``{inst: {"position_was", "position", "orientation_was", "orientation"}}``; raises
+    :class:`GoalImageError` when a target has no final pose or another frame / link."""
+    from ispatialgym.activity.problem import load_problem
+
+    tro = rec.path("tro_state")
+    with open(tro) as f:
+        raw = json.load(f)
+    block = raw["ispatialgym"]
+    compiled = load_problem(block["activity"], int(block["activity_definition_id"])).compile()
+    changed: Dict[str, Any] = {}
+    for inst in compiled.measure_pose_reached_args:
+        if compiled.is_gating("pose_reached", inst) or inst not in block.get("pose_targets", {}):
+            continue
+        tgt, fin = block["pose_targets"][inst], final_poses.get(inst) or {}
+        if "position" not in fin or "orientation" not in fin:
+            raise GoalImageError(f"{rec.subtask}: no final pose of the measured target {inst} ({fin.get('error', 'not recorded')})")
+        if fin.get("frame") != tgt.get("frame") or fin.get("link") != tgt.get("link"):
+            raise GoalImageError(f"{rec.subtask}: the final pose of {inst} is in frame {fin.get('frame')!r} / link {fin.get('link')!r}, the target's "
+                                 f"{tgt.get('frame')!r} / {tgt.get('link')!r}")
+        rec_i: Dict[str, Any] = {}
+        for key in ("position", "orientation"):
+            if tgt.get(key) is not None:
+                rec_i.update({f"{key}_was": tgt[key], key: [float(v) for v in fin[key]]})
+                tgt[key] = rec_i[key]
+        changed[inst] = rec_i
+    with open(tro, "w") as f:
+        json.dump(raw, f, indent=2)
+    return changed
+
+
+def set_goal(rec: InstanceRecord, run: Optional[str] = None, measured_targets: bool = False) -> Dict[str, Any]:
     """Make the instance's goal image the head camera's last frame (``final_rgb.png``) of a successful replay of its demo:
     of ``run`` (a ``run_isg --out`` dir of a replay of this instance, or the ``<instance id>`` dir in it) when given, else of
     the first usable of ``replay_dirs``. Copies the frame to ``-goal_rgb.png``, writes the internal record
     (``goal_record_path``: the source, its success, the frame's sha256, the image size and the camera: the replay's head
     camera key and intrinsics, the pose of the demo's last ``isg/head_camera_pose`` row, which the replay holds through its
-    settle window) and registers the image in the instance file (``register_goal_image``). Returns the record; raises
-    :class:`GoalImageError` when no replay qualifies (the demo's own frame is never used)."""
+    settle window) and registers the image in the instance file (``register_goal_image``). ``measured_targets`` (needs
+    ``run``): the same replay also re-pins the measured targets (:func:`repin_measured_targets`; the replay's symbolic success
+    suffices), recorded in the internal record. Returns the record; raises :class:`GoalImageError` when no replay qualifies
+    (the demo's own frame is never used)."""
     import h5py
     from PIL import Image
 
+    if measured_targets and run is None:
+        raise GoalImageError(f"{rec.subtask} instance {rec.instance}: --measured-targets re-pins from one replay: give --run")
     if run is not None:
         run = os.path.abspath(run)
         candidates = [("run", run if os.path.exists(os.path.join(run, "meta.json")) else os.path.join(run, instance_id(rec)))]
@@ -292,7 +338,7 @@ def set_goal(rec: InstanceRecord, run: Optional[str] = None) -> Dict[str, Any]:
         candidates = replay_dirs(rec)
     tried = []
     for kind, replay_dir in candidates:
-        meta, why = _usable_replay(rec, replay_dir)
+        meta, why = _usable_replay(rec, replay_dir, measured_targets)
         if meta is not None:
             break
         tried.append(f"{kind} {replay_dir}: {why}")
@@ -307,13 +353,16 @@ def set_goal(rec: InstanceRecord, run: Optional[str] = None) -> Dict[str, Any]:
     os.makedirs(os.path.dirname(rec.path("goal_rgb")), exist_ok=True)
     shutil.copyfile(frame, rec.path("goal_rgb"))
     info = {
-        "source": {"replay": kind, "run_dir": run if kind == "run" else rec.source["run_dir"], "replay_dir": replay_dir, "success": True,
+        "source": {"replay": kind, "run_dir": run if kind == "run" else rec.source["run_dir"], "replay_dir": replay_dir, "success": meta.get("success") is True,
                    "frame": frame},
         "sha256": sha256_of(rec.path("goal_rgb")),
         "image_size": size,
         "camera": {"sensor_key": meta["loader"]["head_camera_key"], "intrinsics": (meta.get("monitors") or meta["qa"])["camera"], "position": pose[:3],
                    "orientation_xyzw": pose[3:7], "pose_from": "demo.hdf5 data/demo_0/isg/head_camera_pose[-1]"},
     }
+    if measured_targets:
+        info["source"]["measured_targets"] = True
+        info["measured_targets"] = repin_measured_targets(rec, meta["final_target_poses"])
     os.makedirs(os.path.dirname(goal_record_path(rec)), exist_ok=True)
     with open(goal_record_path(rec), "w") as f:
         json.dump(info, f, indent=1)
@@ -371,6 +420,9 @@ def main(argv=None) -> int:
     sg.add_argument("index", type=int)
     sg.add_argument("--run", default=None, help="a run_isg --out dir of a replay of this instance (e.g. at another --image-size); "
                                                 "default: the eval run's re-run replay, else its original replay")
+    sg.add_argument("--measured-targets", action="store_true",
+                    help="with --run: also set the pose targets of the (:measure ...)-only atoms to where that replay left them "
+                         "(meta.json final_target_poses; its symbolic success suffices), so the goal image and the measured targets agree")
     a = ap.parse_args(argv)
     if a.cmd == "list":
         for name, recs in by_level(load_index(a.root))[a.level].items():
@@ -379,12 +431,13 @@ def main(argv=None) -> int:
     if a.cmd == "set-goal":
         (rec,) = resolve(a.name, [a.index], a.root)
         try:
-            info = set_goal(rec, a.run)
+            info = set_goal(rec, a.run, measured_targets=a.measured_targets)
         except GoalImageError as e:
             print(f"set-goal: {e}", file=sys.stderr)
             return 1
         print(json.dumps({"subtask": rec.subtask, "instance": rec.instance, "goal_rgb": rec.path("goal_rgb"), "image_size": info["image_size"],
-                          "replay": info["source"]["replay"], "replay_dir": info["source"]["replay_dir"]}))
+                          "replay": info["source"]["replay"], "replay_dir": info["source"]["replay_dir"],
+                          "measured_targets": info.get("measured_targets")}))
         return 0
     for i, rec in zip(a.indices, resolve(a.name, a.indices, a.root)):
         print(json.dumps({"index": i, "task_family": rec.task_family, "task": rec.task, "subtask": rec.subtask, "instance": rec.instance,

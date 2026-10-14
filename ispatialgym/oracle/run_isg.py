@@ -899,6 +899,30 @@ def replay_rows(path: str, episode: int, n_action: int, n_settle: int) -> Iterat
             yield a
 
 
+def final_target_poses(task, tro_meta) -> Dict[str, Any]:
+    """Every pose target's evaluated pose at the end of the episode, in the target's own frame and link as ``pose_reached``
+    compares it (a camera-frame target: in the head camera's frame): ``{inst: {"frame", "link", "position", "orientation",
+    "in_goal", "in_measure"}}`` - what ``python -m ispatialgym.eval.instances set-goal --measured-targets`` re-pins."""
+    from omnigibson.object_states import PoseReached
+
+    out: Dict[str, Any] = {}
+    compiled = getattr(task, "compiled_task", None)
+    for inst, tgt in tro_meta.pose_targets.items():
+        ent = (task.object_scope or {}).get(inst)
+        st = ent.states[PoseReached] if ent is not None and PoseReached in getattr(ent, "states", {}) else None
+        if st is None:
+            continue
+        try:
+            pos, quat = st._pose_in_frame(*st._get_current_pose())
+        except Exception as e:  # noqa: BLE001  (a fact for set-goal, never a failure)
+            out[inst] = {"error": repr(e)}
+            continue
+        out[inst] = {"frame": tgt.frame, "link": tgt.link, "position": [float(v) for v in pos], "orientation": [float(v) for v in quat],
+                     "in_goal": bool(compiled.is_gating("pose_reached", inst)) if compiled is not None else None,
+                     "in_measure": bool(compiled.in_measure("pose_reached", inst)) if compiled is not None else None}
+    return out
+
+
 def _dataset_record(loader) -> Optional["INST.InstanceRecord"]:
     """The eval dataset's record of the instance ``loader`` loaded (its ``template_meta["_paths"]`` names the dataset)."""
     tro = os.path.abspath(loader.tro_path)
@@ -1404,6 +1428,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         timings.update({f"executor_{k}": v for k, v in episode.get("timings", {}).items()})
         if args.mode == "policy" and callable(getattr(policy, "finalize", None)):
             policy.finalize(episode)
+        meta["final_target_poses"] = final_target_poses(task, loader.tro.meta)
         joints_end = loader.joint_positions_report()  # the TRO's joint_positions constraints (a door opened at init) as the episode leaves them
         if joints_end:
             meta["joint_positions"] = joints_end

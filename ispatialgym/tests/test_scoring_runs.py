@@ -74,6 +74,33 @@ def test_rollback_restores_the_success_tracking(tmp_path):
     assert after["last"][0] == env._current_step and env._current_step - before["last"][0] == ex.n - cp.step <= 1
 
 
+def test_set_goal_measured_targets_repins_only_the_measure_only_targets(tmp_path):
+    from ispatialgym.activity.problem import load_problem
+    from ispatialgym.eval import instances as INST
+
+    compiled = load_problem("inter_object_relation_satisfaction", 1).compile()  # ontop_small_scale kielbasa / platter
+    measured = [i for i in compiled.measure_pose_reached_args if not compiled.is_gating("pose_reached", i)]
+    assert len(measured) == 2
+    target = {"link": None, "frame": "world", "position": [1.0, 2.0, 0.8], "orientation": [0.0, 0.0, 0.0, 1.0], "position_metric": "full",
+              "orientation_metric": "full", "position_tolerance": 0.03, "orientation_tolerance": 0.2}
+    tro = {"ispatialgym": {"activity": "inter_object_relation_satisfaction", "activity_definition_id": 1,
+                           "pose_targets": {measured[0]: dict(target), measured[1]: {**target, "orientation": None, "orientation_metric": None}}}}
+    (tmp_path / "x-tro_state.json").write_text(json.dumps(tro))
+    rec = INST.InstanceRecord(task_family="f", task="t", subtask="s", instance=0, task_instance=0, scene="x", files={"tro_state": "x-tro_state.json"},
+                              root=str(tmp_path))
+    final = {measured[0]: {"frame": "world", "link": None, "position": [1.01, 2.0, 0.8], "orientation": [0.0, 0.0, 0.38, 0.92]},
+             measured[1]: {"frame": "world", "link": None, "position": [1.0, 2.05, 0.8], "orientation": [0.0, 0.0, 0.0, 1.0]}}
+    changed = INST.repin_measured_targets(rec, final)
+    new = json.loads((tmp_path / "x-tro_state.json").read_text())["ispatialgym"]["pose_targets"]
+    assert new[measured[0]]["position"] == [1.01, 2.0, 0.8] and new[measured[0]]["orientation"] == [0.0, 0.0, 0.38, 0.92]
+    assert new[measured[1]]["position"] == [1.0, 2.05, 0.8] and new[measured[1]]["orientation"] is None  # not compared: stays None
+    assert changed[measured[0]]["position_was"] == [1.0, 2.0, 0.8] and "orientation_was" not in changed[measured[1]]
+    with pytest.raises(INST.GoalImageError, match="frame"):
+        INST.repin_measured_targets(rec, {**final, measured[0]: {**final[measured[0]], "frame": "robot_r1::zed_link:Camera:0"}})
+    with pytest.raises(INST.GoalImageError, match="give --run"):
+        INST.set_goal(rec, None, measured_targets=True)
+
+
 def _write_meta(root, name, meta):
     d = root / name
     d.mkdir(parents=True)

@@ -236,7 +236,8 @@ def main() -> int:
             with open(goal_record_path(rec)) as f:
                 prev = json.load(f).get("source") or {}
         try:
-            info = set_goal(rec, prev["run_dir"] if prev.get("replay") == "run" else None)
+            run = prev["run_dir"] if prev.get("replay") == "run" else None
+            info = set_goal(rec, run, measured_targets=bool(run and prev.get("measured_targets")))  # a re-pin of the measured targets stays
         except GoalImageError as e:
             failed.append(str(e))
             continue
