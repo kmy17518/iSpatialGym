@@ -2324,6 +2324,32 @@ The oracle's place (support kind) goes to that pose and opens +1; with `grasps[0
 (`Place.avoid`). Measured on the nextto#03 grasps (probe hulls, the chopstick at the 16 mm gap): the vertical grasps need 13–14 mm,
 `grasp_2` (30° tilt) 25 mm.
 
+**Touching, open-finger brace on a wide face and the push speed** (owner 2026‑10‑14 ~02:04, after the touching#02 pair1013_c8_k8
+replay: "left brace should be open gripper like touching 1 because it's wide (so make this situational key for the touching tasks)
+and right gripper should push more gently (slowly) - slow push should be parameter of pushes"). The brace candidates already try
+the **wide stop** first (`generation.brace_wide_stop`, default on): the fingers pre‑shaped to `fingers_opening_m` = (spread −
+0.027) / 2 so both fingertips land on the partner's far face, the spread (`brace_wide_spreads_m` 0.09 / 0.07 / 0.05) centred on the
+push line with 1 cm of flat face to each end; touching#01 c1_k0 braces that way (`brace_wide_h-`, 0.0315 m, 9 cm). Its face
+run is read off the partner hull's **vertices** within 3 cm of the brace height, and a box hull has its vertices at its top and
+bottom corners: c8_k8's dkhgxn showed 2 of its 56 points on its 15.5 cm face at mid height, 2.3 cm / 7.2 cm either side of the push
+line - no spread, so the stream went on to the closed tips (`brace_tip_h-`). `generation.brace_open_when_wide` (default false;
+touching without the shelf layout, else `Reject("spec")`) measures the face's width at the higher fingertip‑front brace height
+in the hull's horizontal cut instead (the crossings of every segment between a hull point below and one above that height; their
+convex hull is the exact cut), the run = the cut's points within 1 cm of its outermost offset. Wide = at least the smallest
+spread + 2 × 1 cm (0.07 m): the brace is then the open‑finger stop only — `brace_wide_h-` (camera up) and `brace_wide_h` at the
+higher height, `_lo` at the lower one when its cut takes the spread, the largest spread centred on the push line within the face —
+with no closed‑tip, blade or pad fallback; a draw where none passes (or the gate leaves the touching push‑only, or no spread
+straddles the push line) is rejected `brace_open_required` with the face width and the failures. A narrower face keeps today's
+candidates. Recorded: `summary.touching.brace_open_when_wide` (height, face width, minimum, push line from the face's centre,
+spread, required) and the brace's `open_when_wide`. `generation.push_speed_m_s` (default unset = the oracle's own speeds; touching
+only, a positive number) is recorded on the touching push (`contacts.push.push_speed_m_s`): the oracle runs every pad leg of that
+push at it (oracle doc, `Push`). Set on `...-touching-box_of_cereal_s080-box_of_cereal-bar` only: `brace_open_when_wide` true
+(dkhgxn's far face 0.151 m wide at the brace height → the 9 cm stop) and `push_speed_m_s` 0.02 — c8_k8's straight push ran at the
+arm's 0.10 m/s (9.4–10 cm/s in the demo), the 4.3 cm thick target tipped about its leading bottom edge without sliding (its centre
+moved 1.52 cm at 7.9°, rotation alone gives 1.51 cm) to 15.6° and fell back at the back‑off; the rock‑back round leaned both boxes
+~12°. At 0.02 m/s leaning the box onto the partner takes ~1.2 s against its ~0.12 s tipping time: quasi‑static, so no kick or
+rebound, but a mid‑height push still tips it (μ > b / h = 0.021 / 0.109) up to the place gap's lean (asin(0.0493 / 0.218) = 13°).
+
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 
 - ontop / under(small): the partner's top face admits the target footprint with ≥ 1 cm margin — tier `any_yaw`

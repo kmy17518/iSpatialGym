@@ -350,6 +350,11 @@ which can call it again. `iors_small.touching_contacts` builds the brace like ax
 horizontal, either wrist turn), then the top-down blade beside the face with `tabletop.blade_standoff` over the face
 height (pitches per `approach_pitch_order`); thin partners (< 4 cm) try the blade first. The record is a `tabletop.BraceRecord`
 with `blade_half_thickness_m`, `stop_clearance_m`, `blade_standoff_m`, `pose_class` (`summary.brace` mirrors it).
+`generation.brace_open_when_wide` (owner 2026-10-14 ~02:04, touching#02; spec §6.11 "Touching, open-finger brace on a wide face"):
+the far face's width at the brace height from the partner hull's horizontal cut (`face_run_at`; the wide stop's own rule reads the hull's
+vertices within 3 cm, a box hull has none at mid height); a face at least the smallest open spread + 2 cm wide is braced by the
+open-finger stop only (`brace_wide_h-` / `brace_wide_h` / `_lo`, `fingers_opening_m`), else `Reject("brace_open_required")`; a narrower
+face keeps the candidates above. `generation.push_speed_m_s`: recorded on the touching push, the oracle's pad speed for that push.
 
 ### Floor height per task room (2026-09-16, large-articulation diagnosis)
 

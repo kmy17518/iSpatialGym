@@ -12,7 +12,8 @@ stance after the goal settled, the touching push + brace, the constraints it lea
 partner start with their footprints along the support's edges, owner 2026-10-13), ``partner_aligned_to_target`` (the partner's long
 side along the target's long axis), ``pair_goal_align`` (nextto / touching: the target ends parallel to its partner, its front pointing
 the way the key says, side by side across the long axes, owner 2026-10-13 ~22:23), ``partner_flat_top`` (the partner's footprint on a
-part of the top seen from above as one flat face),
+part of the top seen from above as one flat face), ``brace_open_when_wide`` / ``push_speed_m_s`` (touching: the open-finger stop on a
+partner face wide enough for it, the push's pad speed, owner 2026-10-14 ~02:04),
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
 (inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
@@ -51,6 +52,10 @@ RETREAT_LITTLE_M = 0.05  # oracle ``actions.RETREAT_LITTLE``: the retreat after 
 #: Tip-to-tip spread of the CLOSED fingers (the finger joints sit at y = ±0.0135 in the gripper link; URDF ``gripper_finger_joint``):
 #: a wide stop with tip spread ``s`` pre-shapes each finger to ``(s - CLOSED_TIP_SPREAD_M) / 2``.
 CLOSED_TIP_SPREAD_M = 0.027
+#: ``generation.brace_open_when_wide``: flat face kept between each open fingertip and the braced face's end, and the depth band (m)
+#: within which the face's cut points count as its flat run (``wide_stop_spread``'s ``end_margin`` / ``face_depth_tol``)
+BRACE_OPEN_END_MARGIN_M = 0.01
+BRACE_OPEN_FACE_DEPTH_TOL_M = 0.01
 #: Wrist turns of a blade push in the order to try (owner 2026-09-18 19:39): the wrist camera (``right_realsense_link``, three
 #: r 1.8 cm spheres 4-7 cm to the side of the gripper at the palm-line height) lies on the eef's -y side; ``eef_quat(a, c·outward)``
 #: puts eef +y = c·outward, so c = +1 hangs the camera over the pushed object's top and c = -1 turns it away from it. The camera
@@ -256,6 +261,34 @@ def push_face_point(hull_w: th.Tensor, direction) -> th.Tensor:
     face = float((hull_w[:, :2] @ d).min())
     centre = hull_w.mean(dim=0)
     return th.tensor([*(centre[:2] + d * (face - float(centre[:2] @ d))).tolist(), z])
+
+
+def hull_cut_points(hull_w: th.Tensor, z: float) -> th.Tensor:
+    """The cut of a convex hull, given by its points (world xyz), by the horizontal plane at ``z``: the points where the segment between
+    every point at or below ``z`` and every point at or above it crosses the plane (N, 2; world xy). The hull's edges are among those
+    segments and every crossing lies inside the hull, so their convex hull is the exact cut. Empty when the hull does not reach ``z``."""
+    p = G.t(hull_w).float()
+    lo, hi = p[p[:, 2] <= z], p[p[:, 2] >= z]
+    if len(lo) == 0 or len(hi) == 0:
+        return th.zeros(0, 2)
+    a, b = lo[:, None, :], hi[None, :, :]
+    da, db = z - a[..., 2], b[..., 2] - z  # both >= 0
+    span = da + db
+    t = th.where(span > 1e-12, da / span.clamp(min=1e-12), th.zeros_like(span))
+    return (a[..., :2] + t[..., None] * (b[..., :2] - a[..., :2])).reshape(-1, 2)
+
+
+def face_run_at(hull_w: th.Tensor, z: float, outward: th.Tensor, side_h: th.Tensor, face_depth_tol: float = 0.01) -> Optional[Tuple[float, float]]:
+    """The flat run of the hull's face toward ``outward`` (horizontal unit) at height ``z``: ``(lo, hi)`` along ``side_h`` of the cut's
+    points (:func:`hull_cut_points`) within ``face_depth_tol`` of its outermost offset - the face's width at that height, whatever the
+    hull's vertices (a box hull has them at its top and bottom corners only). None when the hull does not reach ``z``."""
+    cut = hull_cut_points(hull_w, z)
+    if len(cut) == 0:
+        return None
+    off = cut @ G.t(outward)[:2].float()
+    face = cut[off >= float(off.max()) - face_depth_tol]
+    s = face @ G.t(side_h)[:2].float()
+    return float(s.min()), float(s.max())
 
 
 def footprint_laterals(pts: th.Tensor, tangent) -> Tuple[float, float]:
@@ -634,6 +667,8 @@ class IORSSmall(SamplerV2):
         self.template_facts["pair"] = self.pair
         self.template_facts["carry_clears"] = self.carry_rule()  # 4A: Reject("spec") before any phase
         self.template_facts["widest_faces"] = self.widest_faces()  # Reject("spec") before any phase
+        self.template_facts["brace_open_when_wide"] = self.brace_open_when_wide()  # Reject("spec") before any phase
+        self.template_facts["push_speed_m_s"] = self.push_speed()  # Reject("spec") before any phase
         self.template_facts["partner_sides"] = [TT.side_name(sd) for sd in self.template_sides()]  # A1: Reject("partner_side") before any phase
         self.template_facts["partner_on_meta_link"] = self.meta_link()
         self.template_facts["partner_aligned_to_target"] = self.partner_aligned_to_target()
@@ -1953,6 +1988,36 @@ class IORSSmall(SamplerV2):
             raise Reject("spec", f"{self.gp.alias}: generation.widest_faces {mode!r}: one of {WIDEST_FACES}, for touching with the edge alignment "
                                  f"and no shelf layout")
         return mode
+
+    def brace_open_when_wide(self) -> bool:
+        """Owner 2026-10-14 ~02:04 (touching#02: "left brace should be open gripper like touching 1 because it's wide (so make this
+        situational key for the touching tasks)"): ``generation.brace_open_when_wide`` (default false = off). On, a partner whose braced
+        face is wide enough for the open fingertips (:meth:`brace_open_rule`) is braced by the open-finger stop only - no closed tips,
+        blade or pad fallback, a draw without one is rejected (``brace_open_required``); a narrower face keeps today's candidates.
+        Touching without the shelf layout (which braces nothing) only, else ``Reject("spec")``."""
+        on = self.gen("brace_open_when_wide")
+        if on is None or on is False:
+            return False
+        if on is not True or self.relation != "touching" or getattr(self, "shelf_start", None) is not None:
+            raise Reject("spec", f"{self.gp.alias}: generation.brace_open_when_wide {on!r}: true / false, for touching without the shelf layout")
+        return True
+
+    def push_speed(self) -> Optional[float]:
+        """Owner 2026-10-14 ~02:04 (touching#02: "right gripper should push more gently (slowly) - slow push should be parameter of
+        pushes - so that the cereal box doesn't wobble that much"): ``generation.push_speed_m_s`` (default None = the oracle's own speeds:
+        the arm's Cartesian speed for a straight push, ``push_speed_arc`` for an arc), the pad speed recorded on the touching push
+        (``contacts.push.push_speed_m_s``) for every pad leg of it (oracle ``execute_push``). A positive number, touching only, else
+        ``Reject("spec")``."""
+        v = self.gen("push_speed_m_s")
+        if v is None:
+            return None
+        try:
+            speed = float(v)
+        except (TypeError, ValueError):
+            speed = float("nan")
+        if not speed > 0.0 or self.relation != "touching":
+            raise Reject("spec", f"{self.gp.alias}: generation.push_speed_m_s {v!r}: a positive speed (m/s), for touching only")
+        return speed
 
     def widest_face_normal_yaw(self, hull: th.Tensor, quat) -> float:
         """World yaw (rad, modulo pi) of the normal of the hull's widest upright face at ``quat``: the short axis of its footprint's
@@ -3371,6 +3436,12 @@ class IORSSmall(SamplerV2):
         pair = self.pair_goal_align()
         if pair is not None and pair["push_max_height_m"] is not None:
             draft.summary["touching"]["push_max_height_m"] = pair["push_max_height_m"]
+        open_rule = self.brace_open_rule(b_point, face_z, -direction, p_hull, p_init) if self.shelf_start is None else None
+        if open_rule is not None:
+            draft.summary["touching"]["brace_open_when_wide"] = open_rule
+            log.info("%s: brace_open_when_wide: the partner's braced face is %.3f m wide at z %.3f (min %.3f): %s", self.gp.alias, open_rule["face_width_m"],
+                     open_rule["height_m"], open_rule["min_width_m"], f"open-finger stop required, spread {open_rule['spread_m']}" if open_rule["required"]
+                     else "narrow - today's brace candidates")
         # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6).
         # Push candidates: the pads closing horizontally (default) then vertically (the other wrist roll — the horizontal
         # one put the right pre-contact out of reach on 5/8 attempts of the sanitary-napkins loop); brace candidates in
@@ -3407,7 +3478,20 @@ class IORSSmall(SamplerV2):
             raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the {manip.name} stance (push init at depth {d_i:.2f} "
                                                 f"lateral {l_i:+.2f} z {float(p_init[2]):.2f}, face z {t_face_z[0]:.2f}-{t_face_z[1]:.2f}, trunk {manip.translate}, "
                                                 f"{manip.tilt:.2f}; {'; '.join(why[-3:])})")
+        if brace_chosen is None and open_rule is not None and open_rule["required"]:
+            if not try_brace:
+                why_open = f"no joint two-arm placement ({gate.get('why')})"
+            elif open_rule["spread_m"] is None:
+                why_open = (f"the push line lies {open_rule['push_line_from_face_centre_m']:+.3f} m off the face's centre: no open spread "
+                            f"{self.gen('brace_wide_spreads_m', [0.09, 0.07, 0.05])} straddles it {BRACE_OPEN_END_MARGIN_M:.2f} m from the face's ends")
+            else:
+                why_open = f"no open-finger stop passed ({'; '.join([w for w in why if '/' in w][-3:]) or 'no candidate at a brace height'})"
+            raise Reject("brace_open_required", f"touching: the partner's braced face is {open_rule['face_width_m']:.3f} m wide at the brace height "
+                                                f"(>= {open_rule['min_width_m']:.3f} m: generation.brace_open_when_wide requires the open-finger stop) but {why_open}")
         push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
+        speed = self.push_speed()
+        if speed is not None:
+            push_extras = dict(push_extras, push_speed_m_s=speed)  # the oracle's pad speed for every leg of this push
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, "classes_failed": why[:6], **{k: v for k, v in push_extras.items() if v is not None}})
         log.info("%s: touching push class %s from the %s stance%s", self.gp.alias, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
@@ -3677,6 +3761,80 @@ class IORSSmall(SamplerV2):
                 return float(spread)
         return None
 
+    def brace_tip_heights(self, b_point: th.Tensor, face_z: Tuple[float, float]) -> List[float]:
+        """The fingertip-front brace heights on the partner's far face, the higher first: the braced point's height raised to
+        ``brace_tip_min_above_m`` above the face's bottom (the gripper body clears the table) and ``z0 + 0.075`` (at most 1 cm under the
+        top); heights within 1 cm of the top dropped."""
+        z0, z1 = face_z
+        heights = [max(float(b_point[2]), z0 + float(self.gen("brace_tip_min_above_m", 0.055))), min(z1 - 0.01, z0 + 0.075)]
+        return sorted({round(h, 4) for h in heights if h + 0.01 <= z1}, reverse=True)
+
+    def brace_open_rule(self, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor, partner_hull_w: Optional[th.Tensor],
+                        push_point: Optional[th.Tensor] = None) -> Optional[Dict[str, Any]]:
+        """``generation.brace_open_when_wide``: whether the partner's braced (far) face takes the open fingertips. The face's width = its
+        flat run at the higher brace height (:meth:`brace_tip_heights`) in the hull's horizontal cut (:func:`face_run_at`); wide = at least
+        the smallest open spread of ``brace_wide_spreads_m`` plus ``BRACE_OPEN_END_MARGIN_M`` at each end. The spread is the largest one
+        whose two tips straddle the push line (centred on it) with that margin to the face's ends, as the wide stop's rule
+        (:meth:`wide_stop_spread`) - which reads the run off the hull's VERTICES within 3 cm of the brace height: a box hull's lie at its
+        top and bottom corners, so a tall box's mid-height band holds few or none (touching#02 pair1013_c8_k8: two of dkhgxn's 56 points on
+        its 15.5 cm face, a 9.5 cm run off the push line - no spread, closed tips). None without the key, a partner hull or a brace height;
+        else the record (``required`` = wide: the open-finger stop or the draw is rejected)."""
+        if not self.brace_open_when_wide() or partner_hull_w is None:
+            return None
+        heights = self.brace_tip_heights(b_point, face_z)
+        if not heights:
+            return None
+        a = C.unit(G.t(a_face).float())
+        outward = -a
+        side_h = C.unit(th.cross(th.tensor([0.0, 0.0, 1.0]), outward, dim=0))
+        spreads = sorted((float(v) for v in self.gen("brace_wide_spreads_m", [0.09, 0.07, 0.05])), reverse=True)
+        end = BRACE_OPEN_END_MARGIN_M
+        min_width = min(spreads) + 2.0 * end
+        run = face_run_at(partner_hull_w, heights[0], outward, side_h, BRACE_OPEN_FACE_DEPTH_TOL_M)
+        s_b = float(G.t(b_point)[:2].float() @ side_h[:2])
+        s_push = float(G.t(push_point)[:2].float() @ side_h[:2]) if push_point is not None else s_b
+        width = 0.0 if run is None else run[1] - run[0]
+        rec: Dict[str, Any] = {"rule": "face width at the brace height >= the smallest open spread + 2 end margins", "height_m": round(heights[0], 4),
+                               "face_width_m": round(width, 4), "min_width_m": round(min_width, 4), "wide": bool(run is not None and width >= min_width - 1e-9),
+                               "push_line_from_face_centre_m": None if run is None else round(s_push - 0.5 * (run[0] + run[1]), 4),
+                               "push_line_side_m": round(s_push - s_b, 4), "spread_m": None, "required": False}
+        if rec["wide"]:
+            rec["required"] = True
+            rec["spread_m"] = next((s for s in spreads if run[0] + end <= s_push - s / 2 + 1e-9 and s_push + s / 2 <= run[1] - end + 1e-9), None)
+        return rec
+
+    def _open_brace_candidates(self, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor, partner_hull_w: th.Tensor,
+                               rule: Dict[str, Any], clearance: float):
+        """The open-finger stops of :meth:`brace_open_rule`: the fingertips ``clearance`` before the far face, pre-shaped to the rule's
+        spread straddling the push line, the hand horizontal along the brace direction - at each brace height whose cut takes the spread
+        (the higher first), both wrist turns (camera up first, ``brace_wide_h-``; ``brace_wide_h``; ``_lo`` at the lower height)."""
+        spread = rule.get("spread_m")
+        if spread is None:
+            return
+        a = C.unit(G.t(a_face).float())
+        side_h = C.unit(th.cross(th.tensor([0.0, 0.0, 1.0]), -a, dim=0))
+        heights = self.brace_tip_heights(b_point, face_z)
+        tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
+        shift = float(rule["push_line_side_m"])
+        s_b = float(G.t(b_point)[:2].float() @ side_h[:2])
+        q_open = max(0.0, min(C.FINGER_OPEN, (spread - CLOSED_TIP_SPREAD_M) / 2))
+        h_brace = C.default_closing_axis(a)
+        facts = {k: rule[k] for k in ("face_width_m", "min_width_m", "spread_m", "required")}
+        for z in heights:
+            run = face_run_at(partner_hull_w, z, -a, side_h, BRACE_OPEN_FACE_DEPTH_TOL_M)
+            if run is None or not (run[0] + BRACE_OPEN_END_MARGIN_M <= s_b + shift - spread / 2 + 1e-9 and s_b + shift + spread / 2 <= run[1] - BRACE_OPEN_END_MARGIN_M + 1e-9):
+                continue
+            tip_pt = th.tensor([float(b_point[0]), float(b_point[1]), z]) + side_h * shift
+            for c_sign in PUSH_WRIST_TURNS:
+                pose = C.fingertip_eef(tip_pt, a, c_sign * h_brace, clearance)  # c = -1: eef +y = -h, the camera (eef -x side) up
+                contact = (G.t(pose[0]), G.t(pose[1]))
+                kind = f"brace_wide_h{'' if c_sign > 0 else '-'}{'' if z == heights[0] else '_lo'}"
+                yield IK.pre_pose(contact, tip_pre), contact, kind, {
+                    "blade_half_thickness_m": None, "stop_clearance_m": clearance, "pose_class": kind, "tip_front": True, "pitch_deg": 0.0,
+                    "pre_dist_m": tip_pre, "contact_z": round(z, 4), "fingers_opening_m": round(q_open, 4), "stop_width_m": spread,
+                    "push_line_side_m": round(shift, 4), "open_when_wide": facts, "height_extra_m": requested_height_extra(self),
+                    "height_extra_effective_m": round(z - float(b_point[2]), 4), "height_extra_clip_reason": "gripper body above the table"}
+
     def touching_brace_candidates(self, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor,
                                   partner_hull_w: Optional[th.Tensor] = None, push_point: Optional[th.Tensor] = None):
         """Brace poses of the closed left gripper at the partner's far (robot-left) face, in the order to try — the axial
@@ -3693,6 +3851,11 @@ class IORSSmall(SamplerV2):
         side_h = C.unit(th.cross(z_axis, outward, dim=0))
         z0, z1 = face_z
         clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
+        rule = self.brace_open_rule(b_point, face_z, a_face, partner_hull_w, push_point)
+        if rule is not None and rule["required"]:
+            # generation.brace_open_when_wide on a wide face: the open-finger stop or nothing (``touching_contacts`` rejects the draw)
+            yield from self._open_brace_candidates(b_point, face_z, a_face, partner_hull_w, rule, clearance)
+            return
 
         # owner 2026-09-18 20:48: the FINGERTIP-FRONT brace first, mirrored from the push class that made 0918-200452 - the left
         # hand horizontal along -push direction, the closed tips ``clearance`` before the partner's far face, wrist camera UP
@@ -3701,8 +3864,7 @@ class IORSSmall(SamplerV2):
         # partner's mid height (0.85 on a 0.81 table) it sat on it and every brace pre-pose failed the IK. 5 cm pre.
         if bool(self.gen("brace_tip_first", True)):
             tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
-            heights = [max(float(b_point[2]), z0 + float(self.gen("brace_tip_min_above_m", 0.055))), min(z1 - 0.01, z0 + 0.075)]
-            heights = sorted({round(h, 4) for h in heights if h + 0.01 <= z1}, reverse=True)  # the higher first: the body further off the table
+            heights = self.brace_tip_heights(b_point, face_z)  # the higher first: the body further off the table
             # WIDE stop first when the rule admits it (``wide_stop_spread``): the fingers pre-shaped so both tips land on the far
             # face straddling the push line - the lever arm against the pivot a point stop cannot resist (0918-224622: the
             # partner yawed 0.8 deg about the closed tips and the pair lost contact). Camera-up wrist turn, same pose family.

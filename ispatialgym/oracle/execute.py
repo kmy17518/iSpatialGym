@@ -199,6 +199,7 @@ class ExecuteConfig:
     #: (0.6 rad/s on the painting) the viscous term alone was 3.6 of the 6.8 N.m the pad had to supply (~40 N at 0.17 m):
     #: the elbow drive saturated at its 25 N.m cap, the wrist drives went bang-bang against the contact and the painting
     #: shook. 3.5 cm/s (0.2 rad/s) roughly halves the required force. ``push_speed_line``: straight pushes (None = default).
+    #: A push contact's recorded ``push_speed_m_s`` (:func:`push_speed_of`) replaces both for that push's pad legs.
     push_speed_arc: float = 0.035
     push_speed_line: Optional[float] = None
     #: the arc of a hinged target is tracked CLOSED-LOOP (``Motions.arm_arc_closed_loop``: one differential-IK step per
@@ -3638,11 +3639,13 @@ def _pitched_blade(motions: Motions, state, arm: str, targets: Dict[str, Any], p
         return None
 
 
-def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: float, cfg: ExecuteConfig, label: str) -> Iterator[th.Tensor]:
+def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: float, cfg: ExecuteConfig, label: str,
+                speed: Optional[float] = None) -> Iterator[th.Tensor]:
     """Drive the base ``left`` (+ overshoot) along the push ``direction`` with the arm locked at its joints (the door
     base-follow mechanism): the pad in contact pushes the object the rest of the way when the arm sits at its reach
     boundary. The nudge goes a little past the goal (a touching goal is contact) and the tracker's tolerance shrinks with
-    the distance (0918-014040: a 7 mm nudge inside the 8 mm tolerance never moved the base)."""
+    the distance (0918-014040: a 7 mm nudge inside the 8 mm tolerance never moved the base). ``speed``: the push's recorded
+    pad speed (:func:`push_speed_of`) caps ``push_base_nudge_speed``."""
     d = C.as_tensor(direction).reshape(-1)[:3].float()
     d = d / max(float(th.linalg.norm(d)), 1e-9)
     move = float(left) + cfg.push_base_nudge_overshoot_m
@@ -3653,11 +3656,31 @@ def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: fl
              label, obj, float(left) * 1000, move * 1000, tol * 1000)
     q = motions.robot.get_joint_positions()
     motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
-    tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=tol)
+    v = cfg.push_base_nudge_speed if speed is None else min(cfg.push_base_nudge_speed, float(speed))
+    tcfg = replace(motions.cfg.base_tracker, v_max=(v, v, 0.2), pos_tol=tol)
     try:
         yield from motions.track_path([goal2d], tracker_cfg=tcfg)
     except SkillError as e:  # a tracker time-out keeps what the nudge achieved
         log.warning("%s(%s): base nudge did not settle (%s); keeping what it achieved", label, obj, e.message)
+
+
+def push_speed_of(contact) -> Optional[float]:
+    """The pad speed (m/s) a push contact records (``contacts.push.push_speed_m_s``, the sampler's ``generation.push_speed_m_s``, owner
+    2026-10-14 ~02:04: "slow push should be parameter of pushes"): every pad leg of that push runs at it - the approach from the lowered
+    pre-contact and the push, the re-push, the strokes, the closed-loop arc, the back-offs, the rock-back round's return onto the face -
+    and a base nudge at most at it; None (absent / not positive) = ``push_speed_line`` / ``push_speed_arc`` / the arm's speed."""
+    v = (getattr(contact, "extra", None) or {}).get("push_speed_m_s")
+    try:
+        v = None if v is None else float(v)
+    except (TypeError, ValueError):
+        return None
+    return v if v is not None and v > 0.0 else None
+
+
+def _speed_kw(ctx: Dict[str, Any]) -> Dict[str, float]:
+    """``arm_along`` keyword of the push's recorded pad speed (``ctx["push_speed_m_s"]``), empty without one (the arm's own speed)."""
+    v = ctx.get("push_speed_m_s")
+    return {} if v is None else {"speed": float(v)}
 
 
 def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[Any], geom: "PushGeometry", pose0, cfg: ExecuteConfig,
@@ -3669,6 +3692,8 @@ def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[A
     base sprang forward when the pad left) and squeezes the target against the brace (+0.1 rad relaxation)."""
     sign = 1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)
     margin = _push_stop_margin(state, obj, geom, cfg, ctx)
+    if speed is None:
+        speed = ctx.get("push_speed_m_s")  # the push's recorded pad speed (push_speed_of)
     if speed is None and ctx.get("push_articulation") is None:
         # ``push_speed_arc`` answers a viscous hinge (the painting's); a link on its joint is held by the loader's joint brake, a
         # Coulomb torque (constraints.joint_brake_spec) that does not grow with the pad's speed - its legs keep the arm's Cartesian speed
@@ -3721,6 +3746,7 @@ def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints
     margin = _push_stop_margin(state, obj, geom, cfg, ctx)
     q0_obj = as_world_pose(pose0)[1].float()
     axis = geom.axis
+    arc_speed = float(ctx.get("push_speed_m_s") or cfg.push_speed_arc)  # the push's recorded pad speed (push_speed_of) first
 
     def swept() -> float:  # the object's rotation about the hinge axis since the push began (the arc's sense)
         return _rotation_about(q0_obj, C.as_tensor(state.object_pose(obj)[1]).float(), axis)
@@ -3732,7 +3758,7 @@ def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints
     # the pose the sampler put the pad centre on the edge, on the recorded circle: handed over at the first touch
     # (0922-235343) the pad orbited the hinge from a point still in front of the face plane, the orbit has no component
     # toward the wall, and the edge slipped off the fist (the object turned 2 deg in 86 steps).
-    gen = motions.arm_along(arm, [waypoints[0]], loaded=True, speed=cfg.push_speed_arc)
+    gen = motions.arm_along(arm, [waypoints[0]], loaded=True, speed=arc_speed)
     k = 0
     first_contact: Optional[int] = None
     for a in gen:
@@ -3752,7 +3778,7 @@ def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints
     ctx["push_first_contact"] = {"approach_steps": first_contact, "swept_rad": round(abs(swept()), 4), "approach_total_steps": k}
 
     motions.stop_requested = False
-    gen = motions.arm_arc_closed_loop(arm, geom.pivot, axis, as_world_pose(waypoints[-1]), swept, float(geom.angle), speed=cfg.push_speed_arc,
+    gen = motions.arm_arc_closed_loop(arm, geom.pivot, axis, as_world_pose(waypoints[-1]), swept, float(geom.angle), speed=arc_speed,
                                       band_rad=float(margin) if margin is not None else 0.005, lag_factor=cfg.push_arc_lag_factor)
     k = 0
     info: Optional[Dict[str, Any]] = None
@@ -3777,7 +3803,7 @@ def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints
                 motions.stop_requested = True
     finally:
         motions.stop_requested = False
-    ctx["push_arc_closed_loop"] = {"steps": k, "speed_m_s": cfg.push_speed_arc, **({} if info is None else {kk: (round(v, 4) if isinstance(v, float) else v) for kk, v in info.items()})}
+    ctx["push_arc_closed_loop"] = {"steps": k, "speed_m_s": arc_speed, **({} if info is None else {kk: (round(v, 4) if isinstance(v, float) else v) for kk, v in info.items()})}
     log.info("%s(%s): closed-loop arc ended after %d steps (%s)", label, obj, k, None if info is None else info.get("stop"))
 
 
@@ -4042,7 +4068,7 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
     for k in range(1, int(plan["n"]) + 1):
         if k > 1:
             p_e, q_e = (C.as_tensor(x).float() for x in motions.eef_pose(arm))
-            yield from motions.arm_along(arm, [(p_e - d3 * float(plan["backoff_m"]), q_e)], loaded=True)
+            yield from motions.arm_along(arm, [(p_e - d3 * float(plan["backoff_m"]), q_e)], loaded=True, **_speed_kw(ctx))
             yield from _hold_until_still(motions, state, obj, cfg)
         p_o = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:3].float()
         e, _ = push_yaw_error(state, obj, pose0)
@@ -4188,6 +4214,9 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     arm = action.contact.arm
     obj = action.contact.object
     extra0 = getattr(action.contact, "extra", None) or {}
+    pad_speed = push_speed_of(action.contact)
+    if pad_speed is not None:
+        ctx["push_speed_m_s"] = pad_speed  # every pad leg below (_push_leg, _push_arc_closed_loop, _speed_kw) and the base nudges' cap
     _hook(ctx, "fov")(False)
     if extra0.get("fingers_opening_m") is not None:
         # an open-hand push (the overhang pick's: the open fingers straddle the object's far rim, a cradle it cannot slide off)
@@ -4450,7 +4479,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         if (geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m
                 and ctx.get("push_articulation") is None and not pick_push):
             # (no base nudge for a link on its joint: the lever's vertical lift 0920-201652 drove the base 51 mm with the fist under the flap)
-            yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push")
+            yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push", speed=ctx.get("push_speed_m_s"))
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))
             after_nudge, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
@@ -4465,7 +4494,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         ctx["push_hold"] = True
         motions.press_hold = {"arm": arm, "object": action.contact.object, "link": (extra.get("articulation") or {}).get("link")}
     elif cfg.push_backoff_m > 0:
-        yield from motions.arm_along(arm, [back], loaded=True)
+        yield from motions.arm_along(arm, [back], loaded=True, **_speed_kw(ctx))
     else:
         back = end_pose  # rush: ISG_PUSH_BACKOFF_M=0 keeps the pad on the target (the brace retreats first, ISG_BRACE_RETREATS_FIRST)
     ctx["push_end_pose"] = back
@@ -4482,12 +4511,12 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         rounds += 1
         log.info("push(%s): %.1f mm reopened after the back-off -> re-nudge round %d", obj, final * 1000, rounds)
         _hook(ctx, "fov")(True)
-        yield from motions.arm_along(arm, [end_pose], loaded=True, partial=True)  # back onto the face along the push line
-        yield from _base_nudge(motions, state, arm, obj, targets["direction"], final, cfg, f"re-nudge {rounds}")
+        yield from motions.arm_along(arm, [end_pose], loaded=True, partial=True, **_speed_kw(ctx))  # back onto the face along the push line
+        yield from _base_nudge(motions, state, arm, obj, targets["direction"], final, cfg, f"re-nudge {rounds}", speed=ctx.get("push_speed_m_s"))
         yield from _hold_until_still(motions, state, obj, cfg)
         end_pose = as_world_pose(state.eef_pose(arm))
         back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
-        yield from motions.arm_along(arm, [back], loaded=True)
+        yield from motions.arm_along(arm, [back], loaded=True, **_speed_kw(ctx))
         ctx["push_end_pose"] = back
         _hook(ctx, "fov")(False)
         yield from _hold_until_still(motions, state, obj, cfg)

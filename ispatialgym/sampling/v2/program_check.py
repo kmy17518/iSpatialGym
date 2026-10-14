@@ -72,7 +72,7 @@ def _push_stop_frac_arc() -> float:
 
 
 def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, direction, obj, supports: Sequence[Any], ignore: Sequence[Any],
-                    band_rad: float, retreat_distance: float) -> Tuple[bool, str, Dict[str, Any]]:
+                    band_rad: float, retreat_distance: float, speed_m_s: Optional[float] = None) -> Tuple[bool, str, Dict[str, Any]]:
     """A free-object arc push replayed kinematically as the oracle executes it (owner 2026-09-27, first-demo v2 A8; the object
     follows the pad): from the pre-contact witness ``q_pre`` the straight leg to the first contact pose (``execute_push`` ->
     ``_push_arc_closed_loop``: ``Motions.arm_along`` at the arm_along solver settings), then the TRUE arc of ``push_geometry``
@@ -81,7 +81,8 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     object reaches its goal band, then the contact retreat's escape leg from the arc's end (``execute_retreat``: radial off the
     object, then off its supports, the end probed for reach and shortened like ``_retreat_reach``; tracked with the retreat's
     joint-limit margin; a stall away from a joint limit is finished by IK, a partial retreat accepted as the oracle accepts it).
-    Every setting is read from the oracle's ``ExecuteConfig`` / ``MotionsConfig``. Returns ``(ok, why, report)``; a replay that
+    Every setting is read from the oracle's ``ExecuteConfig`` / ``MotionsConfig``; ``speed_m_s`` (the push's recorded
+    ``push_speed_m_s``, ``execute.push_speed_of``) replaces ``push_speed_arc``. Returns ``(ok, why, report)``; a replay that
     cannot follow the push (``ok`` False) is an ``approach_untrackable`` instance. Collisions are not judged (the oracle's contact
     legs run without a veto)."""
     import math
@@ -134,7 +135,7 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     sgn_joint = 1.0 if q_to >= 0 else -1.0
     r_now = radial(fk(q)[0])
     radius = max(float(th.linalg.norm(r_now)), 0.05)
-    step_ang = ecfg.push_speed_arc / radius * dt
+    step_ang = (float(speed_m_s) if speed_m_s else ecfg.push_speed_arc) / radius * dt
     arc_dir = signed_angle(r_now, radial(p_t))
     sgn = 1.0 if arc_dir >= 0 else -1.0
     max_steps = int(max(abs(q_to), abs(arc_dir)) / max(step_ang, 1e-6) * 3) + 60
@@ -2209,8 +2210,11 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             tol_o = (sampler.gp.gen("tolerances") or {}).get("orientation") if hasattr(sampler, "gp") else None
                             band = float(tol_o) * _push_stop_frac_arc() if tol_o else 0.005
                             obj_ = sampler.objects.get(getattr(getattr(action, "contact", None), "object", None))
+                            from ispatialgym.oracle.execute import push_speed_of
+
                             ok_r, why_r, rep_r = replay_arc_push(sampler, arm, q_ref, chain_ref[0], chain_ref[1:], targets.get("direction") if isinstance(targets, dict) else None,
-                                                                 obj_, list(sampler.support_objects()), list(ignore_all) + list(ignore_last), band, RETREAT_DIST)
+                                                                 obj_, list(sampler.support_objects()), list(ignore_all) + list(ignore_last), band, RETREAT_DIST,
+                                                                 speed_m_s=push_speed_of(getattr(action, "contact", None)))
                             if rep_r:
                                 log.info("program check: push replay of %s: %s %s", getattr(getattr(action, "contact", None), "object", None), why_r[:200], rep_r)
                             chain_notes[key] = why_r[:160]
