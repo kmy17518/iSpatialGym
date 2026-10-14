@@ -260,6 +260,29 @@ footprint as `blocked_footprints` in the same structure.
   ≥ 0.12 m² (`support_small`), at least one edge with a free-floor run for the stances of section 4 (`no_free_edge`),
   in a room the robot can stand in. Chairs are never supports; a cubicle desk is one object with several tops, each
   top is a separate support entry. Small-scale articulation targets taller than 0.6 m use the floor (5.4).
+- **Alignment support rules** (owner 2026-10-13 ~18:40: "Alignment axial: the support is rectangular; round tables (e.g. the
+  round coffee tables) are not supports." / "Alignment world vertical: transparent walls are not supports.";
+  `sampling/support_rules.py`). *Rectangular top* (alignment-axial): the convex outline of the support's top - the convex hull
+  of its B4 top raster (`scene_inventory/<scene>/supports/<name>.json` `top.hull_xy`, the 2 cm cells whose downward ray first
+  hits the support at its top height) - covers at least 0.94 (`MIN_TOP_RECTANGULARITY`) of its minimum-area bounding
+  rectangle. A disc or an ellipse covers π/4 = 0.785, a regular octagon 0.83, a stadium (oval) of aspect a 1 − (1 − π/4)/a
+  (0.89 at 2 : 1), an L-shaped corner desk's outline 0.82–0.84; a rectangle 1, with corners rounded to radius r
+  1 − (4 − π)·r²/(w·h) (0.94 at r = 0.22 m on 1.2 × 0.6 m). On the seven scenes the rectangular axial candidates measure
+  ≥ 0.966; excluded are the round lobby coffee table `coffee_table_mtchfd_0` (0.80) and the twelve-sided diner tables
+  `pedestal_table_nlfgwe_0/1/2` (0.80), the oval Rs_int coffee table `coffee_table_fqluyq_0` (0.90), the L-shaped
+  `cubicle_hzalfx_*` / `cubicle_deceti_*` (0.82–0.84) and `desk_uqcmzf_0` (0.84), the cut-corner `desk_pfsjbc_0` (0.87) and the
+  curved diner bar `bar_xxftww_0` (0.92). *Opaque wall* (alignment-world_vertical): the wall's BEHAVIOR-1K asset tags no link
+  `glass` (`objects/walls/<model>/misc/metadata.json` `link_tags`; OmniGibson binds the visual meshes of such a link to its glass
+  material); a wall with a glass link is excluded as a whole, frame included. Six of the 309 walls of the seven scenes have one:
+  the glass partitions `walls_dmcumz_0`, `walls_iuufle_0`, `walls_vaphll_0`, `walls_vkjkbk_0`, `walls_woavqu_0`
+  (office_cubicles_right) and the glass panel `walls_gjtspo_0` (hotel_suite_large). A support whose rule cannot be evaluated (no
+  B4 top outline, no asset metadata) is excluded too. Enforced: `ground_isg` skips a selection row whose support is excluded
+  (reason `excluded_support`, which `support_candidates` / eval85 `pick_candidates.py` show as the candidate's status
+  `not_grounded: excluded_support: <support>@<scene>: <why>`) and binds no excluded scene object; `sample_isg --support` of an
+  excluded support is an error (`GroundedProblem.override_support`); without `--support` the excluded supports leave each scene
+  block before its first template (`GroundedProblem.apply_support_rules`, summary `aliases.<alias>.excluded_supports`; a block
+  left without a support is an error of that scene); `multiply_isg` refuses a template bound to an excluded support; the axial
+  sampler refuses to bind one and the wall sampler drops spots on excluded walls (`template_facts.spot_search.excluded_walls`).
 - **Neighbouring supports** (owner decision 2026-10-12 A4). A support may be paired with the support(s) it touches, at
   any height: the pair is one placement area for target and partner. Declared on the support row of the representative
   sheet (note key `neighbors=<scene object>[,<scene object>]`, objects of the row's scene; `neighbours=` is read too),
@@ -1320,8 +1343,8 @@ Removed from v1: `lateral_center` −0.15, `lateral_half` 0.15, `depth_range` (b
 extents and a `level_axis` — was retired on 2026-09-23; this section describes world vertical only.)
 
 Roles: `target` (hung; iddl `(contacts target)`), scene `support` (the wall: `bindings.support` = allowed wall object
-names, `bindings.support_regions` = the surveyed wall segments). The hinge below is an initialization rule of this
-section, not an iddl requirement. Prompt 0 with the wall as the face (n = wall normal, P = hinge
+names, `bindings.support_regions` = the surveyed wall segments; never a transparent wall, §3.2). The hinge below is an
+initialization rule of this section, not an iddl requirement. Prompt 0 with the wall as the face (n = wall normal, P = hinge
 point on the wall at hang height). Arc lattice, single right-arm push into the wall and `view_translates` of v1 are
 replaced by the Phase 1 ray + Phase 2 lattice and the tangential push + brace below.
 
@@ -2084,6 +2107,7 @@ default. (World horizontal — the level goal of an elongated wall item — was 
 
 ### 6.10 Alignment — axial
 
+The support is rectangular: round, oval and L-shaped tops are not supports (§3.2 "Alignment support rules").
 Tabletop sections 4.2–4.6 with the axial rules: target yaw = aligned yaw ± U(20°, 70°); a vertical hinge through the
 COM (TRO constraint, parent = support) installed after settling, its anchor on the COM's vertical axis
 `generation.hinge_sink_m` = 1 mm below the support top so the object cannot rock — the target stays at its settled pose

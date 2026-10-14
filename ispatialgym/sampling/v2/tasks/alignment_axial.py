@@ -36,6 +36,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import generation_defaults as GD
+from ispatialgym.sampling import support_rules as SR
 from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, Hinge, create_hinge, hinge_resistance, remove_hinge
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
@@ -105,6 +106,7 @@ class AlignmentAxial(SamplerV2):
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
             raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+        SR.check_support(SUBTASK, self.scene, names[0])
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     @property

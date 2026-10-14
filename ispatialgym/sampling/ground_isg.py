@@ -79,6 +79,7 @@ from ispatialgym.sampling import customs as C
 from ispatialgym.sampling import generation_defaults as G
 from ispatialgym.sampling import iddl as I
 from ispatialgym.sampling import pair_rules as PR
+from ispatialgym.sampling import support_rules as SR
 from ispatialgym.sampling.bddl_from_iddl import (
     GROUNDER,
     GroundingError,
@@ -239,6 +240,13 @@ def _pad_clearance(pinch_width: float) -> float:
 def _scene_object_key(row: Dict[str, str]) -> str:
     """The name a scene candidate row is bound by: the wall region id for wall regions, else the scene object name."""
     return row.get("region_id") or row.get("model") or ""
+
+
+def _support_object_name(row: Dict[str, str]) -> str:
+    """The scene object a support row (selection or candidates sheet) binds: the wall of a wall region (``<room>/<wall>/<rNN>``),
+    else the row's object."""
+    key = row.get("name") or _scene_object_key(row)
+    return key.split("/")[1] if key.count("/") == 2 else key
 
 
 def footprint_dims(bbox: Sequence[float], pose: Optional[str] = None) -> Tuple[float, float]:
@@ -1116,7 +1124,8 @@ class Grounder:
                     if partner is not None:
                         rows_sel["partner"] = partner
                     if scat is not None:
-                        srow = next(r for r in self.icl.scene_rows(subtask, "support", category=scat) if self._marked(r))
+                        marked = [r for r in self.icl.scene_rows(subtask, "support", category=scat) if self._marked(r)]
+                        srow = next((r for r in marked if not SR.exclusion_reason(subtask, r["scene"], _support_object_name(r))), marked[0])
                         s = dict(srow)
                         s["name"] = s["model"]
                         rows_sel["support"] = s
@@ -1539,6 +1548,20 @@ class Grounder:
                 fake["room"] = m.group(1).strip(",")
             objects[scene].append(fake)
             comb.notes.append(f"{role}: {name}@{scene} is not a roles/candidates.csv row of {subtask} (bound from the selection only)")
+        if role == "support" and SR.rule_of(subtask):
+            # the alignment support rules (support_rules: rectangular tops, opaque walls) admit no other support
+            why = SR.exclusion_reason(subtask, scene, _support_object_name(row)) if scene else None
+            if why:
+                raise Skip(SR.SKIP_REASON, f"{_support_object_name(row)}@{scene}: {why}")
+            for sc in list(objects):
+                keep = []
+                for o in objects[sc]:
+                    why = SR.exclusion_reason(subtask, sc, _support_object_name(o))
+                    if why:
+                        comb.notes.append(f"{role}: {_support_object_name(o)}@{sc} not bound ({SR.SKIP_REASON}: {why})")
+                    else:
+                        keep.append(o)
+                objects[sc] = keep
         rp.scene_objects = dict(objects)
         if role == "support" and rp.same_as is None:
             rp.surface = support_surface(row, comb.pick)

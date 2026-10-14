@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 from ispatialgym import ASSETS_ROOT
+from ispatialgym.sampling import support_rules as SR
 from ispatialgym.sampling.spec import ModelChoice, RoleSpec, SceneSpec
 
 #: the D1 customs file (``customs.py`` writes ``isg_customs.json``); the v1 list is the fallback for the facade path
@@ -490,7 +491,7 @@ class GroundedProblem:
         carry its tag (:meth:`support_tag`); the entry's own block is what the source customs file gets back (:meth:`save_customs`).
         Returns the candidate record (``template_meta.candidate``; ``neighbors`` when the entry pairs the support with the supports it
         touches, ``edges`` when it keeps only some edges of the top); ``GroundingError`` when the scene, the support or the row is not
-        in the block."""
+        in the block, or when the support rule of the alias's subtask excludes the support (``support_rules``)."""
         if "support" not in self.roles:
             raise GroundingError(f"{self.alias}: no support role to select (roles {sorted(self.roles)})")
         own = self.scene_overrides[scene] if scene in self.scene_overrides else self.entry["scenes"].get(scene)
@@ -507,6 +508,9 @@ class GroundedProblem:
             names = [n for n in (req or []) if isinstance(n, str)]
             if support not in names:
                 raise GroundingError(f"{self.alias}: {support!r} is not a support of {scene} (bindings.support {names})")
+            why = SR.exclusion_reason(self.subtask, scene, support)
+            if why:
+                raise GroundingError(f"{self.alias}: {support} of {scene} is excluded by the {SR.rule_of(self.subtask)} support rule ({why})")
             b["support"] = [support]
             surfaces = [e for e in b.get("support_surfaces") or [] if isinstance(e, dict) and e.get("name") == support]
             regions = [r for r in b.get("support_regions") or [] if isinstance(r, dict) and r.get("wall") == support]
@@ -552,6 +556,38 @@ class GroundedProblem:
             self.scene_overrides[scene] = copy.deepcopy(own)
         self.entry["scenes"][scene] = blk
         return rec
+
+    def apply_support_rules(self, scene: str) -> Dict[str, str]:
+        """The support rule of the alias's subtask (``support_rules``: alignment-axial rectangular tops, alignment-world_vertical opaque
+        walls) on the scene block of ``scene``: the excluded supports leave ``bindings.support`` / ``support_surfaces`` /
+        ``support_regions``; a wall block whose floor room was only an excluded wall's moves its floor (and rooms) to the remaining
+        regions' rooms. The entry's own block is what the source customs file gets back (as with :meth:`override_support`). Returns
+        ``{excluded support: reason}`` ({} when nothing is excluded); ``GroundingError`` when the rule excludes every support of the
+        block."""
+        block = self.entry["scenes"].get(scene)
+        if SR.rule_of(self.subtask) is None or block is None or not isinstance((block.get("bindings") or {}).get("support"), list):
+            return {}
+        b = copy.deepcopy(block["bindings"])
+        keep, dropped = SR.split_supports(self.subtask, scene, [n for n in b["support"] if isinstance(n, str)])
+        if not dropped:
+            return {}
+        if not keep:
+            raise GroundingError(f"{self.alias}: the {SR.rule_of(self.subtask)} support rule excludes every support of {scene} ({dropped})")
+        b["support"] = keep
+        for key, attr in (("support_surfaces", "name"), ("support_regions", "wall")):
+            if key in b:
+                b[key] = [e for e in b[key] if not (isinstance(e, dict) and e.get(attr) in dropped)]
+        rooms = list(block.get("rooms") or [])
+        floor = b.get("floor")
+        region_rooms = list(dict.fromkeys(r["room"] for r in b.get("support_regions") or [] if isinstance(r, dict) and r.get("room")))
+        anchored = any(isinstance(b.get(r), list) and b.get(r) for r in self.scene_roles() if r not in ("support", "floor"))
+        if region_rooms and isinstance(floor, dict) and floor.get("room") not in region_rooms and not anchored:
+            b["floor"] = {**floor, "room": region_rooms[0]}
+            rooms = region_rooms
+        if scene not in self.scene_overrides:
+            self.scene_overrides[scene] = copy.deepcopy(block)
+        self.entry["scenes"][scene] = {**block, "rooms": rooms, "bindings": b}
+        return dropped
 
     def support_tag(self, scene: str) -> Optional[str]:
         """The support candidate of a block :meth:`override_support` narrowed (part of its template ids: one scene, several

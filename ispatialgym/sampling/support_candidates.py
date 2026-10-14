@@ -13,7 +13,8 @@ passes demo + replay (:func:`submission_order`).
 ``row`` is the combination label (exact), else - walls, floor supports, rows without ``top_z``, picks without a support role - the
 alias ``ground_isg`` gives the combination (its own combination code on the same icl, nothing written). It then checks the customs
 block the way the sampler will use it (``override_support``, a non-empty whitelist per sampleable role). ``status`` is ``ok`` or why
-the candidate cannot run: ``no_iddl``, ``not_grounded: <the grounder's skip reason>``, ``no_alias``, ``superseded_by:<alias>``,
+the candidate cannot run: ``no_iddl``, ``not_grounded: <the grounder's skip reason>`` (``not_grounded: excluded_support: <support>@<scene>:
+<why>`` for a support the alignment support rules exclude, ``support_rules``), ``no_alias``, ``superseded_by:<alias>``,
 ``no_scene_block``, ``not_bound: <reason>``, ``empty_whitelist:<roles>``, ``duplicate_of:c<n>`` (the same block as an earlier
 candidate of the pick: one job covers both).
 

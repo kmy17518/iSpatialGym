@@ -63,6 +63,7 @@ os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 
 from ispatialgym.sampling import instance_separation as SEP  # noqa: E402
 from ispatialgym.sampling import split_seeds as SS  # noqa: E402
+from ispatialgym.sampling import support_rules as SR  # noqa: E402
 from ispatialgym.sampling.sample_isg import FLEET_BANDS  # noqa: E402,F401  (sets ISPATIALGYM_REACH_BANDS to the fleet bands when present)
 from ispatialgym.sampling.v2 import SAMPLER_VERSION  # noqa: E402
 from ispatialgym.sampling.v2.problem import GroundedProblem, TemplateChoice, new_run_summary  # noqa: E402
@@ -115,8 +116,14 @@ def problem_for_template(meta: Dict[str, Any], customs: Optional[str], bddl_root
 
 def choice_for_template(gp: GroundedProblem, meta: Dict[str, Any]) -> TemplateChoice:
     """The template's model choice; a floor-only template's single room is (re)applied to the problem, so a room the customs entry
-    does not list (``sample_isg --room`` / ``--scene-from-split``) is sampled again (``GroundedProblem.override_scene_room``)."""
+    does not list (``sample_isg --room`` / ``--scene-from-split``) is sampled again (``GroundedProblem.override_scene_room``). A
+    template bound to a support the support rule of its subtask excludes (``support_rules``) is refused."""
     choice = TemplateChoice.from_json(meta["choice"])
+    req = choice.bindings.get("support")
+    _, excluded = SR.split_supports(gp.subtask, choice.scene, [n for n in req if isinstance(n, str)] if isinstance(req, list) else [])
+    if excluded:
+        raise SystemExit(f"{gp.alias}: template {choice.template_id} is bound to supports the support rules exclude ({excluded}); "
+                         f"re-sample it on an admitted support")
     if len(choice.rooms) == 1 and gp.floor_only():
         gp.override_scene_room(choice.scene, choice.rooms[0], note=f"multiply_isg: template {choice.template_id}")
     return choice

@@ -41,14 +41,14 @@ def _tabletop_entry():
 
 
 def _wall_entry():
-    regions = [{"id": "living_room_0/walls_a_0/r00", "wall": "walls_a_0", "room": "living_room_0"},
-               {"id": "corridor_0/walls_b_0/r01", "wall": "walls_b_0", "room": "corridor_0"},
-               {"id": "corridor_0/walls_b_0/r02", "wall": "walls_b_0", "room": "corridor_0"}]
+    regions = [{"id": "living_room_0/walls_dhsptd_0/r00", "wall": "walls_dhsptd_0", "room": "living_room_0"},
+               {"id": "corridor_0/walls_evgaml_0/r01", "wall": "walls_evgaml_0", "room": "corridor_0"},
+               {"id": "corridor_0/walls_evgaml_0/r02", "wall": "walls_evgaml_0", "room": "corridor_0"}]
     return {"iddl": "alignment/world_vertical.iddl", "definition_id": 0,
             "roles": {"target": {"category": "painting", "sampleable": True, "representative": "d"}, "support": {"category": "walls", "sampleable": False},
                       "floor": {"sampleable": False}},
             "scenes": {S: {"rooms": ["living_room_0", "corridor_0"],
-                           "bindings": {"support": ["walls_a_0", "walls_b_0"], "support_regions": regions, "floor": {"room": "living_room_0"}},
+                           "bindings": {"support": ["walls_dhsptd_0", "walls_evgaml_0"], "support_regions": regions, "floor": {"room": "living_room_0"}},
                            "whitelist": {"target": {"painting": ["d"]}}, "blacklist": {}}},
             "generation": {}, "constraints": []}
 
@@ -126,12 +126,12 @@ def test_override_support_rows_walls_floor_partner_and_errors():
         _gp(held, alias="object_scaling-apple").override_support(S, "floor")
     # a wall: its regions (a region id as the row), the region's room whatever the object's rooms say
     walls = _gp(_wall_entry(), alias="alignment-world_vertical-painting-walls")
-    rec = walls.override_support(S, "walls_b_0", rooms=["living_room_0", "corridor_0"])
-    assert walls.bindings(S)["support"] == ["walls_b_0"] and [r["id"] for r in walls.bindings(S)["support_regions"]] == ["corridor_0/walls_b_0/r01", "corridor_0/walls_b_0/r02"]
-    assert walls.rooms(S) == ["corridor_0"] and walls.bindings(S)["floor"] == {"room": "corridor_0"} and rec["tag"] == "walls_b_0" and rec["row"] is None
-    rec = walls.override_support(S, "walls_b_0", row="corridor_0/walls_b_0/r02")
-    assert [r["id"] for r in walls.bindings(S)["support_regions"]] == ["corridor_0/walls_b_0/r02"] and rec["tag"] == "walls_b_0-r02"
-    assert walls.override_support(S, "walls_a_0")["tag"] == "walls_a_0-r00" and walls.rooms(S) == ["living_room_0"]
+    rec = walls.override_support(S, "walls_evgaml_0", rooms=["living_room_0", "corridor_0"])
+    assert walls.bindings(S)["support"] == ["walls_evgaml_0"] and [r["id"] for r in walls.bindings(S)["support_regions"]] == ["corridor_0/walls_evgaml_0/r01", "corridor_0/walls_evgaml_0/r02"]
+    assert walls.rooms(S) == ["corridor_0"] and walls.bindings(S)["floor"] == {"room": "corridor_0"} and rec["tag"] == "walls_evgaml_0" and rec["row"] is None
+    rec = walls.override_support(S, "walls_evgaml_0", row="corridor_0/walls_evgaml_0/r02")
+    assert [r["id"] for r in walls.bindings(S)["support_regions"]] == ["corridor_0/walls_evgaml_0/r02"] and rec["tag"] == "walls_evgaml_0-r02"
+    assert walls.override_support(S, "walls_dhsptd_0")["tag"] == "walls_dhsptd_0-r00" and walls.rooms(S) == ["living_room_0"]
     # a floor-bound support (small-scale articulation of a tall target, §5.4): selected as "floor", the block unchanged
     fl = _tabletop_entry()
     fl["scenes"][S]["bindings"] = {"support": {"room": "kitchen_0"}, "floor": {"room": "kitchen_0"}}
@@ -289,10 +289,10 @@ def test_alignment_wall_spots_only_on_the_selected_region():
         return [(sp["wall_name"], sp["region"]) for sp in AlignmentWall.find_spots(s)]
 
     alias = "alignment-world_vertical-painting-walls"
-    assert {w for w, _ in spots(_gp(_wall_entry(), alias=alias))} == {"walls_a_0", "walls_b_0"}
+    assert {w for w, _ in spots(_gp(_wall_entry(), alias=alias))} == {"walls_dhsptd_0", "walls_evgaml_0"}
     gp = _gp(_wall_entry(), alias=alias)
-    gp.override_support(S, "walls_b_0", row="corridor_0/walls_b_0/r02")
-    assert spots(gp) == [("walls_b_0", "corridor_0/walls_b_0/r02")]
+    gp.override_support(S, "walls_evgaml_0", row="corridor_0/walls_evgaml_0/r02")
+    assert spots(gp) == [("walls_evgaml_0", "corridor_0/walls_evgaml_0/r02")]
 
 
 def test_iors_large_init_surface_is_the_selected_support():

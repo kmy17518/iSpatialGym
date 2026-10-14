@@ -41,6 +41,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
+from ispatialgym.sampling import support_rules as SR
 from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, Hinge, create_hinge, hinge_resistance, remove_hinge
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
@@ -850,9 +851,14 @@ class AlignmentWall(SamplerV2):
         spots = [s for s in spots if self._in_room(s["point"][:2] + s["normal"][:2] * test_d)]
         if allowed is not None:
             spots = [s for s in spots if s["wall_name"] in allowed]
+        _, excluded = SR.split_supports(self.subtask, self.scene, sorted({s["wall_name"] for s in spots}))
+        if excluded:
+            log.info("%s: spots on %s dropped by the support rule: %s", self.gp.alias, sorted(excluded), excluded)
+            spots = [s for s in spots if s["wall_name"] not in excluded]
         for i, s in enumerate(spots):
             s["id"] = i
-        self.template_facts["spot_search"] = {"regions": len(regions), "patch_wh": [w, h], "n_spots": len(spots), "walls": sorted({s["wall_name"] for s in spots})}
+        self.template_facts["spot_search"] = {"regions": len(regions), "patch_wh": [w, h], "n_spots": len(spots), "walls": sorted({s["wall_name"] for s in spots}),
+                                              "excluded_walls": excluded}
         return spots
 
     # ------------------------------------------------------------------ template (§5.5)

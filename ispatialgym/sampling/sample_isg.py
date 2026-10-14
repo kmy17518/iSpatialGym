@@ -38,6 +38,11 @@ stable scene json, a wall region's room); ``floor`` selects a floor-bound suppor
 ``aliases.<alias>.candidate`` of the summary and ``template_meta.candidate`` record the candidate; the source customs file keeps the
 entry's own blocks. ``support_candidates`` (eval85 ``pick_candidates.py``) lists every pick's candidates with these arguments.
 
+Support rules (``support_rules``: alignment-axial rectangular tops, alignment-world_vertical opaque walls): ``--support`` of an excluded
+support is an error; without it, the excluded supports leave each scene block before its first template
+(``GroundedProblem.apply_support_rules``; ``aliases.<alias>.excluded_supports`` of the summary), a block without an admitted support
+is an error of that scene.
+
 ``--v1-spec <spec.json> --v1-problem <activity>-<def_id> --subtask <id>`` builds the grounded problem from a v1 spec
 entry through the facade (``GroundedProblem.from_v1_spec``) until ``ground_isg`` (D1) produces customs entries.
 """
@@ -65,6 +70,7 @@ from ispatialgym.sampling.v2 import SAMPLER_VERSION  # noqa: E402
 from ispatialgym.sampling.v2.problem import (  # noqa: E402
     DEFAULT_CUSTOMS,
     GroundedProblem,
+    GroundingError,
     TemplateChoice,
     iter_template_choices,
     new_run_summary,
@@ -495,6 +501,15 @@ def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs
             report["errors"].append({"alias": alias, "scene": scene, "error": "scene not in the customs entry"})
             continue
         try:
+            dropped = gp.apply_support_rules(scene)
+        except GroundingError as e:
+            log.error("%s", e)
+            report["errors"].append({"alias": alias, "scene": scene, "error": str(e)})
+            continue
+        if dropped:
+            log.warning("%s: %s: supports left out by the support rules: %s", alias, scene, dropped)
+            report["aliases"].setdefault(alias, {}).setdefault("excluded_supports", {})[scene] = dropped
+        try:
             world, kit = pool.get(gp, scene)
         except Exception as e:
             log.error("traceback", exc_info=True)
@@ -599,6 +614,7 @@ def print_world_keys(args) -> None:
             continue
         for scene in ([split["scene"]] if split.get("scene") else gp.scene_names()):
             try:
+                gp.apply_support_rules(scene)
                 print(f"{alias}\t{world_key_str(world_key(gp, scene))}", flush=True)
             except Exception as e:
                 print(f"{alias}\tERROR {scene}: {e!r}")
