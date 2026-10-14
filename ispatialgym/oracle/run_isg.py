@@ -1019,8 +1019,8 @@ def parse_args(argv=None):
                    help="how symbolic and geometric success are decided (ispatialgym.eval.metrics): off = the first step the goal holds "
                         "(every goal atom but pose_settled; geometric: with every (:measure ...) atom within tolerance at that step); on = "
                         "the first step every pose_settled atom holds with the goal (geometric: and the measured targets) held at every step "
-                        "of its --settle-steps window; auto = off for --mode policy, on for oracle / replay. The other mode is reported too "
-                        "(meta.other_mode)")
+                        "of its --settle-steps window; auto = off for --mode policy, on for oracle / replay. With on, the off mode is "
+                        "reported too (meta.other_mode; null with off)")
     p.add_argument("--success-metric", default="geometric", choices=["geometric", "symbolic"],
                    help="what success, status and the exit code follow: geometric = the BDDL goal plus every (:measure ...) atom within "
                         "tolerance (default), symbolic = the BDDL goal; the episode ends at the geometric success either way")

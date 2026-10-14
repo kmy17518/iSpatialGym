@@ -69,7 +69,7 @@ def test_pass_through_both_modes():
     assert tr.first["on"] == {"symbolic": 3, "geometric": 4}
     assert tr.done and tr.goal_first_step == 1 and tr.errors_at["on"]["geometric"] == {"t": 4}
     off = run(MET.SuccessTracker(settle_eval=False, settle_steps=3), seq)
-    assert off.done and off.step_of("geometric") == 2 and off.mode == "off" and off.other_mode == "on"
+    assert off.done and off.step_of("geometric") == 2 and off.mode == "off" and off.other_mode is None
 
 
 def test_goal_lost_inside_the_window():
@@ -97,8 +97,19 @@ def test_never_settled_and_errors_at_the_cutoff():
     assert tr.evaluation_errors(current, "off") == {"t": 0}
 
 
+def test_settle_eval_off_follows_no_other_mode():
+    tr = run(MET.SuccessTracker(settle_eval=False, settle_steps=3), [(1, 1, 1)] * 6)  # an on-mode window would fill at step 2
+    assert set(tr.first) == set(tr.errors_at) == {"off"}
+    rep = tr.report({"t": "cutoff"}, [(POSE, "t")])
+    assert rep["other_mode"] is None and rep["geometric_success_step"] == 0 and rep["goal_first_step"] == 0
+    with pytest.raises(KeyError):
+        tr.step_of("geometric", "on")  # not followed, rather than never reached
+
+
 def test_no_goal_ever():
     tr = run(MET.SuccessTracker(settle_eval=False, settle_steps=1), [(0, 1, 1)] * 4)
+    assert tr.first == {"off": {"symbolic": None, "geometric": None}} and tr.goal_first_step is None
+    tr = run(MET.SuccessTracker(settle_eval=True, settle_steps=1), [(0, 1, 1)] * 4)
     assert tr.first == {"off": {"symbolic": None, "geometric": None}, "on": {"symbolic": None, "geometric": None}} and tr.goal_first_step is None
 
 

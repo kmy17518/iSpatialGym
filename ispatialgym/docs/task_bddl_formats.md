@@ -36,9 +36,9 @@ of `env.step` and summarized by `ispatialgym.eval.episode.summarize_episode`):
    `t` where every `pose_settled` atom holds (`S(t)`: its window of `settle_steps` steps ending at `t` is full
    and within the drift thresholds) and `G` (geometric: `G` and `M`) held at every step of that window.
 
-Both modes are tracked; the run's mode (`run_isg --settle-eval`, on for oracle / replay, off for policy) gives
-`task.success`, `official_success` and the episode's termination (its geometric success), the other is reported
-as `other_mode`. The errors of every `pose_reached` / `layout_reached` atom are reported each step with their
+The run's mode (`run_isg --settle-eval`, on for oracle / replay, off for policy) gives `task.success`,
+`official_success` and the episode's termination (its geometric success); a settle-eval-on run also reports the
+off mode as `other_mode` (null with settle-eval off). The errors of every `pose_reached` / `layout_reached` atom are reported each step with their
 tolerances; the episode's `errors` / `error_metric` are taken at the run mode's geometric success, or at the last
 step without it (see "Common metrics and logging" in `task_definition_and_evaluation.md`).
 

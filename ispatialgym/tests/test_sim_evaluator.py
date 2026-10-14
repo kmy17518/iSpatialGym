@@ -446,8 +446,7 @@ def test_alignment_task_symbolic_and_geometric_success(task_env):
     assert all(not g for (s, g, _, _) in trace if s < teleport_step)
     assert all(g and succ for (s, g, _, succ) in trace if s >= teleport_step)
     assert result["success"] and result["terminated"] and not result["truncated"]
-    # settle-eval on would need a full PoseSettled window after the teleport: not reached before the episode ended
-    assert result["other_mode"]["settle_eval"] is True and result["other_mode"]["geometric_success_step"] is None
+    assert result["other_mode"] is None  # settle-eval off reports no other mode
     # errors at the geometric success: an orientation-only target, in :goal and :measure, with its tolerance
     assert result["error_metric"]["case"] == "pose" and result["error_metric"]["position_error"] is None
     assert result["error_metric"]["orientation_error"] <= 0.05

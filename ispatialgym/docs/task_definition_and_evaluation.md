@@ -511,12 +511,14 @@ same step(s). The settle-eval switch defines both:
 | on | the first `t` with `S(t)` where `G` held at every step of the window | the first `t` with `S(t)` where `G` and `M` held at every step of the window |
 
 `ISpatialGymTask(settle_eval=..., settle_steps=...)` (or `configure_evaluation`
-per instance, before its reset) tracks both modes every step: the run's mode
-gives `info["success"]`, `official_success` and the termination (its
-geometric success); the other mode is reported as `other_mode`, a value the
-episode ended before reaching being null. `settle_steps` is also the
-`PoseSettled` window (`n_steps`) of every settled entity. A checkpoint rollback
-restores the tracking (`ISpatialGymTask.metrics_state`).
+per instance, before its reset) tracks the run's mode every step: it gives
+`info["success"]`, `official_success` and the termination (its geometric
+success), a value the episode ended before reaching being null. A
+settle-eval-on run also tracks the off mode and reports it as `other_mode`; a
+settle-eval-off run tracks no other mode (`other_mode` null: a policy run ends
+at its first success, before an on-mode window could fill). `settle_steps` is
+also the `PoseSettled` window (`n_steps`) of every settled entity. A checkpoint
+rollback restores the tracking (`ISpatialGymTask.metrics_state`).
 
 `run_isg`: `--settle-eval auto` is on for oracle and replay runs, off for
 policy runs. `--settle-steps` is the window in every mode: an oracle program's
@@ -614,7 +616,8 @@ episode result (`run_isg` writes the same keys into `meta.json` and its
   symbolic success); `symbolic_success` / `symbolic_success_step`,
   `geometric_success` / `geometric_success_step` (0-based episode steps, null
   when not reached); `settle_eval`, `settle_steps`; `other_mode`: the same four
-  values of the other settle-eval mode with its `error_metric`.
+  values of the off mode with its `error_metric` when `settle_eval` is on, else
+  null.
 - `errors`: the per-target error reports the run mode is judged by - at its
   geometric success, else at the last step (`errors_final_step`):
   `pose_errors` / `layout_errors`, each with its metric labels,

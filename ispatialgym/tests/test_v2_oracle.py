@@ -4609,7 +4609,7 @@ def test_ag_release_rule_is_the_tasks_not_the_oracles():
 def test_settle_eval_off_takes_the_first_step_the_goal_holds(tmp_path):
     """Settle-eval off (run_isg --settle-eval off, the default of --mode policy): symbolic success is the first step the goal
     holds, geometric success the first step it holds with every measured target within tolerance - no pose_settled window;
-    the settle-eval-on values are reported as ``other_mode``."""
+    no other mode is reported (``other_mode`` None)."""
     sc, env = iors_world()
     goal = _place_goal(sc)
 
@@ -4623,7 +4623,7 @@ def test_settle_eval_off_takes_the_first_step_the_goal_holds(tmp_path):
     ex, *_ = make_executor(env, sc, tmp_path / "a")
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    assert result["settle_eval"] is False and result["other_mode"]["settle_eval"] is True and not result["other_mode"]["symbolic_success"]
+    assert result["settle_eval"] is False and result["other_mode"] is None
     # a goal that held a few steps and then not any more still counts: its first step decides
     sc, env = iors_world()
     hits = {"n": 0}

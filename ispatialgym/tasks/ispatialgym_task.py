@@ -8,9 +8,9 @@ relative poses between group members); ``M(t)`` - every ``(:measure ...)`` atom 
 **Symbolic** success is the BDDL ``:goal``; **geometric** success (the primary metric) is symbolic success plus every
 ``:measure`` atom within tolerance at the same step(s). ``settle_eval`` off: symbolic = the first ``t`` with ``G(t)``,
 geometric = the first with ``G(t)`` and ``M(t)``; on: the first ``t`` with ``S(t)`` where ``G`` (``G`` and ``M``) held at every
-step of the window. Both modes are tracked; the run's mode gives ``info["success"]``, ``official_success`` and the termination
-(its geometric success), the other mode is reported in ``other_mode``. The tolerances are the ``isg-v2`` profile's
-(``ispatialgym.eval.tolerance_profile``, :meth:`ISpatialGymTask.apply_tolerance_profile` at load).
+step of the window. The run's mode gives ``info["success"]``, ``official_success`` and the termination (its geometric success);
+a settle-eval-on run also reports the off mode in ``other_mode`` (None with settle-eval off). The tolerances are the
+``isg-v2`` profile's (``ispatialgym.eval.tolerance_profile``, :meth:`ISpatialGymTask.apply_tolerance_profile` at load).
 
 Everything is surfaced in ``info["ispatialgym"]`` of ``env.step``; see :meth:`ISpatialGymTask._populate_isg_info`.
 """
@@ -144,7 +144,7 @@ class ISpatialGymTask(BehaviorTask):
         object_bindings (None or dict): ``{bddl_instance: scene_object_name}`` for every physical instance. If
             None, the TRO ``object_bindings`` are used, else the scene task metadata ``inst_to_name``.
         settle_eval (bool): the run's settle-eval mode (module docstring): its geometric success is ``task.success`` and
-            ends the episode; the other mode is reported.
+            ends the episode; with settle-eval on the off mode is reported too (``other_mode``).
         settle_steps (int): the ``pose_settled`` window (``PoseSettled`` ``n_steps``) and the settle-eval window, in steps.
         pose_settled_config (None or dict): kwargs forwarded to ``PoseSettled.activate`` for every settled entity, with
             ``n_steps`` = ``settle_steps`` (None = :data:`DEFAULT_POSE_SETTLED_CONFIG`'s drift thresholds; ``{}`` =
@@ -842,7 +842,7 @@ class ISpatialGymTask(BehaviorTask):
         """``info["ispatialgym"]`` of env ``env_idx``: this step's facts (``goal`` = G, ``measure_within`` = M, ``settled`` = S, its
         ``errors`` / ``error_metric`` / ``measured``), the run mode's symbolic and geometric success (steps: 0-based episode steps,
         None while not reached), ``evaluation`` (the errors the run mode is judged by: at its geometric success, else this step's),
-        ``other_mode`` and the goal conditions."""
+        ``other_mode`` (the off mode's success with settle-eval on, else None) and the goal conditions."""
         goal, within, settled, status = self._last_goal_evals[env_idx] or (False, False, False, info["goal_status"])
         errors = self._last_errors[env_idx]
         if errors is None:

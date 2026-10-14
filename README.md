@@ -46,7 +46,7 @@ off, the first step it holds; on, the first step every `pose_settled` atom holds
 held through its `--settle-steps` window. `--settle-steps` is that window in every mode: an oracle program's epilogue
 (exactly that long, reserved in the step budget; default 45), the first that many of a replayed demo's settle rows (default
 all of them), a policy run's window (default 45). The episode ends at the geometric success, else at `--max-steps` (an
-oracle program: plus its epilogue). Both settle-eval modes are reported (`meta.other_mode`). `--qa` (on by default, `--no-qa`
+oracle program: plus its epilogue). A settle-eval-on run also reports the off mode (`meta.other_mode`, null with off). `--qa` (on by default, `--no-qa`
 turns it off) measures BEHAVIOR's demo QA metrics plus the former demo gates and logs them in `meta.qa` with the steps each
 fired at. The HARD metrics are robot touching objects or itself, pause, jerky motion, ghost hand, object tilt, goal
 occlusion, robot wobble and bad release. The SOFT ones are held object drift and stalled, gripper in view and failed grasp

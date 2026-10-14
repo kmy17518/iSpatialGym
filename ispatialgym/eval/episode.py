@@ -23,7 +23,8 @@ def summarize_episode(last_info: Dict[str, Any], steps: int, terminated: bool, t
         ``success`` -- the run mode's geometric success (the BDDL goal plus every ``(:measure ...)`` atom within tolerance at
         the same step(s); ``settle_eval``: through a settled window of ``settle_steps`` steps).
         ``symbolic_success`` / ``symbolic_success_step``, ``geometric_success`` / ``geometric_success_step`` -- the run mode's
-        (steps: 0-based, None when not reached); ``other_mode`` -- the same for the other settle-eval mode.
+        (steps: 0-based, None when not reached); ``other_mode`` -- the same for the off mode when ``settle_eval`` is on,
+        else None.
         ``errors`` / ``error_metric`` / ``measured`` -- at the run mode's geometric success, else at the terminal step;
         ``errors_final_step`` -- at the terminal step.
     """

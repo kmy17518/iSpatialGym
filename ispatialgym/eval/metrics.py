@@ -15,9 +15,11 @@ tolerance at the same step(s). The settle-eval switch defines both:
 * on: symbolic = the first ``t`` with ``S(t)`` where ``G`` held at every step of the window (the ``settle_steps`` steps ending at
   ``t``); geometric = the first such ``t`` where ``G`` and ``M`` held at every step of the window.
 
-:class:`SuccessTracker` follows both modes at once (the run's mode decides, the other is reported); a value the episode ended
-before reaching is ``None``. Steps are the task's 0-based episode step indices, consecutive (a checkpoint rollback restores the
-tracker with the step counter, :meth:`SuccessTracker.state` / :meth:`SuccessTracker.load`).
+:class:`SuccessTracker` follows the run's mode, which decides. A settle-eval-on run also follows the off mode and reports it as
+``other_mode``; a settle-eval-off run follows no other mode (``other_mode`` None: a policy run ends at its first success, before an
+on-mode window could fill). A value the episode ended before reaching is ``None``. Steps are the task's 0-based episode step
+indices, consecutive (a checkpoint rollback restores the tracker with the step counter, :meth:`SuccessTracker.state` /
+:meth:`SuccessTracker.load`).
 
 :func:`error_metric` reduces the error reports of the ``:measure`` atoms to one position and one orientation error.
 """
@@ -106,7 +108,8 @@ def error_metric(errors: Dict[str, Any], atoms: Sequence[Tuple[str, str]], where
 
 
 class SuccessTracker:
-    """Symbolic and geometric success of both settle-eval modes, step by step (module docstring)."""
+    """Symbolic and geometric success of the run's settle-eval mode, and of the off mode alongside settle-eval on, step by step
+    (module docstring)."""
 
     def __init__(self, settle_eval: bool = False, settle_steps: int = 45):
         if int(settle_steps) < 1:
@@ -119,8 +122,8 @@ class SuccessTracker:
         #: consecutive steps up to the last update where G (G and M) held
         self.g_run = 0
         self.gm_run = 0
-        self.first: Dict[str, Dict[str, Optional[int]]] = {m: {k: None for k in KINDS} for m in MODES}
-        self.errors_at: Dict[str, Dict[str, Optional[Dict[str, Any]]]] = {m: {k: None for k in KINDS} for m in MODES}
+        self.first: Dict[str, Dict[str, Optional[int]]] = {m: {k: None for k in KINDS} for m in self.modes}
+        self.errors_at: Dict[str, Dict[str, Optional[Dict[str, Any]]]] = {m: {k: None for k in KINDS} for m in self.modes}
         self.last: Optional[Tuple[int, bool, bool, bool]] = None
 
     @property
@@ -128,8 +131,14 @@ class SuccessTracker:
         return mode_name(self.settle_eval)
 
     @property
-    def other_mode(self) -> str:
-        return mode_name(not self.settle_eval)
+    def other_mode(self) -> Optional[str]:
+        """The mode reported alongside the run's: the off mode of a settle-eval-on run, None with settle-eval off."""
+        return "off" if self.settle_eval else None
+
+    @property
+    def modes(self) -> Tuple[str, ...]:
+        """The modes followed: both with settle-eval on, only the off mode with settle-eval off."""
+        return MODES if self.settle_eval else ("off",)
 
     def update(self, t: int, goal: bool, within: bool, settled: bool, errors: Optional[Dict[str, Any]] = None) -> None:
         """The facts of step ``t`` (``G``, ``M``, ``S``) and its errors (kept at every first success)."""
@@ -137,8 +146,9 @@ class SuccessTracker:
         self.g_run = self.g_run + 1 if goal else 0
         self.gm_run = self.gm_run + 1 if (goal and within) else 0
         n = self.settle_steps
-        hits = {("off", "symbolic"): goal, ("off", "geometric"): goal and within,
-                ("on", "symbolic"): settled and self.g_run >= n, ("on", "geometric"): settled and self.gm_run >= n}
+        hits = {("off", "symbolic"): goal, ("off", "geometric"): goal and within}
+        if self.settle_eval:
+            hits.update({("on", "symbolic"): settled and self.g_run >= n, ("on", "geometric"): settled and self.gm_run >= n})
         for (mode, kind), hit in hits.items():
             if hit and self.first[mode][kind] is None:
                 self.first[mode][kind] = int(t)
@@ -173,11 +183,13 @@ class SuccessTracker:
                 "geometric_success_step": geo, "errors": errs, "error_metric": error_metric(errs, atoms, where) if atoms else None}
 
     def report(self, current: Dict[str, Any], atoms: Sequence[Tuple[str, str]], where: str = "") -> Dict[str, Any]:
-        """The run mode's report (its ``errors`` / ``error_metric`` at its geometric success, else at ``current``) with
-        ``other_mode`` (the same for the other mode, without its errors) and the settle window."""
+        """The run mode's report (its ``errors`` / ``error_metric`` at its geometric success, else at ``current``) with the settle
+        window and ``other_mode``: the same for the off mode, without its errors, with settle-eval on; None with settle-eval off."""
         out = self.mode_report(self.mode, current, atoms, where)
-        other = self.mode_report(self.other_mode, current, atoms, where)
-        other.pop("errors")
+        other = None
+        if self.other_mode is not None:
+            other = self.mode_report(self.other_mode, current, atoms, where)
+            other.pop("errors")
         out.update({"settle_steps": self.settle_steps, "goal_first_step": self.goal_first_step, "other_mode": other})
         return out
 
