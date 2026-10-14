@@ -1,12 +1,12 @@
 """run_isg adapter: ``run_isg --mode policy --policy ispatialgym.harness.policy:HarnessPolicy`` (configuration from
 ``ISG_HARNESS_CONFIG``). run_isg calls ``bind(...)`` once before the stream, the policy once per control step with the
-latest observation, and ``finalize(episode)`` after its epilogue. The environment side (instance load, executor,
-official success, epilogue verdict, recordings) is the same as for any served policy.
+latest observation, and ``finalize(episode)`` at the end. The environment side (instance load, executor, official success,
+verdict, recordings) is the same as for any served policy.
 
-Episode ends, as in RoboProbe: the task's official success ends the stream (run_isg's epilogue then gives the verdict);
-the step budget is the environment's own limit (verdict as usual); a planner stop (give_up, done, call budget,
-capability failure) is scored as a failure whatever the scene looks like; a provider or harness failure raises
-:class:`InfrastructureFailure`, which run_isg records as ``status: error`` and the summary does not score."""
+Episode ends, as in RoboProbe: the task's official success (its geometric success) ends the stream as a success; the step
+budget is the environment's own limit; a planner stop (give_up, done, call budget, capability failure) is scored as a
+failure whatever the scene looks like; a provider or harness failure raises :class:`InfrastructureFailure`, which run_isg
+records as ``status: error`` and the summary does not score."""
 
 from __future__ import annotations
 
@@ -20,10 +20,10 @@ from typing import Any, Dict, Optional
 from ispatialgym.harness.config import HarnessConfig
 from ispatialgym.harness.core.approver import SafetyAbort, TargetApprover, check_action
 from ispatialgym.harness.core.goal import goal_image
-from ispatialgym.harness.core.instructions import instruction_for
 from ispatialgym.harness.core.observation import ObservationEncoder
 from ispatialgym.harness.core.perturb import Perturbations
 from ispatialgym.harness.core.session import MotionSession
+from ispatialgym.harness.core.success_check import SUCCESS_CHECK
 from ispatialgym.harness.core.trace import EpisodeTrace, source_revision
 from ispatialgym.harness.core.types import ARMS, PLANNER_STOPS, InfrastructureFailure, MotionOutcome, MotionRejected, Observation
 from ispatialgym.harness.llm import make_client
@@ -33,6 +33,17 @@ log = logging.getLogger(__name__)
 
 EPISODE_KEYS = ("success", "reason", "success_metric", "settle_eval", "settle_steps", "symbolic_success", "symbolic_success_step",
                 "geometric_success", "geometric_success_step", "error_metric", "other_mode", "n_steps", "n_action_steps")
+
+
+#: run_isg's budget for an instance without a demo (``ispatialgym.eval.instances.DEFAULT_MAX_STEPS``)
+DEFAULT_MAX_STEPS = 3000
+
+
+def step_budget(meta: Optional[Dict[str, Any]], cfg: HarnessConfig) -> int:
+    """The episode's control steps: run_isg's own budget (``meta["budget"]["max_steps"]``: ``--max-steps``, else ``max(300, 2 x``
+    a dataset instance's demo length``)``), else the config's, else run_isg's default."""
+    budget = (meta or {}).get("budget") or {}
+    return int(budget.get("max_steps") or cfg.max_steps or DEFAULT_MAX_STEPS)
 
 
 def task_info(info) -> Dict[str, Any]:
@@ -46,6 +57,8 @@ class HarnessPolicy:
     def __init__(self, cfg: Optional[HarnessConfig] = None):
         self.cfg = cfg or HarnessConfig.from_env()
         self.step = 0
+        self.max_steps = step_budget(None, self.cfg)
+        self.alias = self.cfg.alias
         self.bound = False
         self.stopped: Optional[Dict[str, Any]] = None
         self.last_outcome: Optional[MotionOutcome] = None
@@ -62,6 +75,7 @@ class HarnessPolicy:
 
         cfg = self.cfg
         self.meta = meta if meta is not None else {}
+        self.max_steps = step_budget(self.meta, cfg)
         self.emb = R1ProEmbodiment(executor)
         self._init_holds(loader)
         boxes = build_world(self.emb)
@@ -72,16 +86,17 @@ class HarnessPolicy:
         self.trace = EpisodeTrace(trace_dir)
         self.perturb = Perturbations.from_dict(cfg.perturb)
         self.encoder = ObservationEncoder(cfg, self.perturb)
-        alias = cfg.alias or self.meta.get("alias")
+        alias = self.alias = cfg.alias or self.meta.get("variant") or self.meta.get("alias")
         goal_rgb, goal_src = goal_image(tro_path, cfg.goal_image)
-        instruction = cfg.instruction or instruction_for(alias, cfg.instruction_level)
+        check = SUCCESS_CHECK
         mounting = self.emb.mounting()
         step_limits = {arm: [round(float(v), 5) for v in self.layer.step_limits(arm)] for arm in ARMS}
         self.planner = make_planner(cfg.planner, client=make_client(cfg.model, **cfg.model_options), cfg=cfg, encoder=self.encoder, trace=self.trace)
-        self.planner.start(EpisodeContext(instruction=instruction, goal_rgb=goal_rgb, alias=alias, goal_source=goal_src, mounting=mounting))
-        self.meta["harness"] = {"planner": cfg.planner, "model": cfg.model, "instruction": instruction, "goal_image": goal_src, "trace_dir": trace_dir,
-                                "perturb": cfg.perturb, "max_calls": cfg.max_calls, "code": source_revision(), "planner_world": world}
-        self.trace.event("start", config=cfg.to_dict(), alias=alias, instruction=instruction, goal_image=goal_src, mounting=mounting,
+        self.planner.start(EpisodeContext(success_check=check, goal_rgb=goal_rgb, alias=alias, goal_source=goal_src, mounting=mounting))
+        self.meta["harness"] = {"planner": cfg.planner, "model": cfg.model, "success_check": check, "goal_image": goal_src, "trace_dir": trace_dir,
+                                "perturb": cfg.perturb, "max_calls": cfg.max_calls, "max_steps": self.max_steps, "code": source_revision(),
+                                "planner_world": world}
+        self.trace.event("start", config=cfg.to_dict(), alias=alias, success_check=check, goal_image=goal_src, mounting=mounting, max_steps=self.max_steps,
                          arm_step_limits_rad=step_limits, code=source_revision(), robot_state=self.emb.state(0).to_dict(), planner_world=world)
         self.bound = True
 
@@ -108,7 +123,7 @@ class HarnessPolicy:
         self.step += 1
         if self.cfg.stop_on_success and task_info(info).get("official_success"):
             return self._stop("success")
-        if self.step > self.cfg.max_steps:
+        if self.step > self.max_steps:
             return self._stop("step_budget")
         for _ in range(self.cfg.max_calls + 50):
             if not self.session.busy and not self._next_motion(obs):
@@ -135,7 +150,7 @@ class HarnessPolicy:
             episode["success"] = False
         summary = {"stop": self.stopped, "control_steps": self.step, "motions": self.motions_done, "wall_s": round(time.time() - self.t0, 1),
                    "forced_failure": forced, "epilogue_success": epilogue_success, "episode": {k: ep.get(k) for k in EPISODE_KEYS},
-                   "planner": self.planner.summary() if self.bound else {}, "model": self.cfg.model, "alias": self.cfg.alias}
+                   "planner": self.planner.summary() if self.bound else {}, "model": self.cfg.model, "alias": self.alias}
         if self.bound:
             self.trace.event("finalize", **summary)
             self.trace.summary(summary)
@@ -148,7 +163,7 @@ class HarnessPolicy:
     def _next_motion(self, obs) -> bool:
         try:
             o = Observation(step=self.step, images=self.emb.images(obs), state=self.emb.state(self.step),
-                            steps_remaining=max(0, self.cfg.max_steps - self.step))
+                            steps_remaining=max(0, self.max_steps - self.step))
             d = self.planner.decide(o, self.last_outcome)
             self.last_outcome = None
             while True:
@@ -185,6 +200,6 @@ class HarnessPolicy:
         self.meta.setdefault("harness", {}).update({"stop": self.stopped, "planner": planner, "failure_kind": "infrastructure"})
         if self.bound:
             self.trace.summary({"stop": self.stopped, "control_steps": self.step, "motions": self.motions_done, "planner": planner,
-                                "failure_kind": "infrastructure", "model": self.cfg.model, "alias": self.cfg.alias})
+                                "failure_kind": "infrastructure", "model": self.cfg.model, "alias": self.alias})
             self.trace.close()
         raise InfrastructureFailure(message)

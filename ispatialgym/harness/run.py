@@ -1,21 +1,28 @@
-"""Prepare (and optionally submit) one harness episode per eval instance.
+"""Prepare (and optionally submit) one harness episode per eval dataset instance, named as ``run_isg --task`` names them.
 
-    python -m ispatialgym.harness.run --instances eval85-counted --out <root> --model openai/gpt-6-astra \
-        [--model-option effort=medium ...] [--set max_calls=170 ...] [--perturb negate_xyz=true ...] [--only <substring>] \
-        [--limit N] [--submit [--sbatch-args "..."]]
-    python -m ispatialgym.harness.run --instances eval85-counted --out <root> --rerun-unscored
+    python -m ispatialgym.harness.run --task alignment_axial --instance-indices 0 1 --out <root> --model openai/gpt-6-astra \
+        [--model-option effort=medium ...] [--set max_calls=170 ...] [--perturb negate_xyz=true ...] \
+        [--max-steps N] [--settle-steps N] [--submit [--sbatch-args "..."]]
+    python -m ispatialgym.harness.run --all --out <root> ...         # every instance of the dataset
+    python -m ispatialgym.harness.run --out <root> --rerun-unscored
 
-``--instances``: ``eval85-counted`` (the 84 counted eval instances: s2_3tasks + the counted rows of s3_55tasks /
-iors_large ``SELECTED.tsv``) or a file with one eval run directory per line (``<run>/inst/...`` and ``<run>/demo/...``).
-Each episode directory ``<root>/<tag>/<rel>/`` gets a fresh copy of the post-demo instance (``instance/``), the goal
-image (the demo's ``final_rgb.png``), ``harness_config.json`` and, when run, ``run/<iid>/`` (run_isg's meta.json, videos,
-``harness/`` trace). Nothing is written into the eval run directories.
+The instances are the eval dataset's (``ispatialgym.eval.instances``: ``Behavior-1K/datasets/ispatialgym-eval-instances``):
+``--task`` (a task family, task or subtask) and ``--instance-indices`` resolve exactly as in ``run_isg --task``. Each episode
+directory ``<root>/<subtask>/<instance>/`` gets ``harness_config.json`` (the instance as its subtask and index there,
+``task`` / ``instance_index``) and ``source.json``, and when run ``run/<iid>/`` (run_isg's meta.json, videos, ``harness/``
+trace). The job (``scripts/harness/job_episode.sh``) runs ``run_isg --task <subtask> --instance-indices <instance> --mode
+policy --policy ispatialgym.harness.policy:HarnessPolicy``: the instance is loaded from the dataset and the step budget is
+run_isg's, ``max(300, 2 x`` the demo's length``)``, unless ``--max-steps`` sets it.
+
+Without this script, run_isg itself runs the harness the same way (several indices each in a process of its own):
+
+    ISG_HARNESS_CONFIG=<harness_config.json> python -m ispatialgym.oracle.run_isg --task alignment_axial --instance-indices 0 1 \
+        --mode policy --policy ispatialgym.harness.policy:HarnessPolicy --out <root>
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
 import glob
 import json
 import os
@@ -24,43 +31,16 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
+from ispatialgym.eval import instances as INST
 from ispatialgym.harness.config import HarnessConfig
 
-EVAL85 = "/vision/u/minyeong/projects/isg_home/eval85/runs"
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 JOB = os.path.join(REPO, "scripts", "harness", "job_episode.sh")
-#: viscam11 runs the Cursor server and is excluded until a warm Kit start there is re-verified (cluster rule)
-DEFAULT_SBATCH = "-p svl -A vision --gres=gpu:1 --constraint=turing|ampere|ada --exclude=visionlab-dgx1,viscam11 -c 8 --mem=24G --time=04:00:00"
-S2_FAMILIES = ("camera_relocalization", "mental_rotation", "object_scaling")
-
-
-def eval85_counted(root: str = EVAL85) -> List[Tuple[str, str, str]]:
-    """``(tag, rel, run_dir)`` of the counted eval instances."""
-    out: List[Tuple[str, str, str]] = []
-    s2 = os.path.join(root, "s2_3tasks")
-    for a in sorted(os.listdir(s2)):
-        d = os.path.join(s2, a)
-        if os.path.isdir(d) and "." not in a and a.split("-")[0] in S2_FAMILIES and glob.glob(f"{d}/demo/*/meta.json"):
-            out.append(("s2_3tasks", a, d))
-    for tag in ("s3_55tasks", "iors_large"):
-        with open(os.path.join(root, tag, "SELECTED.tsv")) as f:
-            for r in csv.DictReader(f, delimiter="\t"):
-                if r["counted"] == "yes":
-                    out.append((tag, r["run"], os.path.join(root, tag, r["run"])))
-    return out
-
-
-def instances_from_file(path: str) -> List[Tuple[str, str, str]]:
-    out = []
-    for line in open(path):
-        d = line.strip()
-        if not d or d.startswith("#"):
-            continue
-        d = os.path.abspath(d)
-        out.append((os.path.basename(os.path.dirname(d)), os.path.basename(d), d))
-    return out
+#: viscam7 / viscam11 stay excluded as in the eval release's job script (viscam11 runs the Cursor server: cluster rule)
+DEFAULT_SBATCH = "-p svl -A vision --gres=gpu:1 --constraint=turing|ampere|ada --exclude=viscam7,viscam11,visionlab-dgx1 -c 8 --mem=24G --time=04:00:00"
+MANIFEST_COLUMNS = ("subtask", "instance", "ep_dir", "alias", "max_steps", "job")
 
 
 def _parse_kv(items: List[str]) -> Dict[str, Any]:
@@ -76,38 +56,49 @@ def _parse_kv(items: List[str]) -> Dict[str, Any]:
     return d
 
 
-def prepare_episode(run_dir: str, ep_dir: str, base: Dict[str, Any], overwrite: bool = False) -> Dict[str, Any]:
-    tros = glob.glob(os.path.join(run_dir, "inst", "*", "*", "instances", "*-tro_state.json"))
-    if len(tros) != 1:
-        raise RuntimeError(f"{run_dir}: expected one instance, found {len(tros)}")
-    tro = tros[0]
-    iid = os.path.basename(tro)[: -len("-tro_state.json")]
-    alias = iid.split("__")[0]
-    goal = os.path.join(run_dir, "demo", iid, "final_rgb.png")
+def sampling_key(rec: INST.InstanceRecord) -> str:
+    """The instance's sampling key (run_isg's ``variant``): its dataset source, else its template metadata."""
+    key = (rec.source or {}).get("variant")
+    if not key and rec.files.get("template_meta"):
+        with open(rec.path("template_meta")) as f:
+            key = json.load(f).get("variant")
+    return key or rec.subtask
+
+
+def prepare_episode(rec: INST.InstanceRecord, ep_dir: str, base: Dict[str, Any], overwrite: bool = False) -> Dict[str, Any]:
+    """``harness_config.json`` and ``source.json`` of the episode of dataset instance ``rec``; the step budget run_isg will give it
+    (raises ValueError, as run_isg would, when the settle window does not fit)."""
     if os.path.exists(os.path.join(ep_dir, "harness_config.json")) and not overwrite:
         raise FileExistsError(f"{ep_dir} is already prepared (--overwrite to redo)")
+    budget = INST.step_budget(rec.episode.get("length"), base.get("max_steps"), base.get("settle_steps"), mode="policy")
     if os.path.exists(ep_dir) and overwrite:
         shutil.rmtree(ep_dir)
     os.makedirs(ep_dir, exist_ok=True)
-    shutil.copytree(os.path.dirname(os.path.dirname(tro)), os.path.join(ep_dir, "instance"))
-    cfg = HarnessConfig.from_dict({**base, "alias": alias, "goal_image": goal if os.path.exists(goal) else None})
+    alias = sampling_key(rec)
+    cfg = HarnessConfig.from_dict({**base, "task": rec.subtask, "instance_index": rec.instance, "alias": alias})
     cfg.save(os.path.join(ep_dir, "harness_config.json"))
+    source = {"task_family": rec.task_family, "task": rec.task, "subtask": rec.subtask, "instance": rec.instance, "alias": alias,
+              "tro": rec.path("tro_state"), "demo_length": rec.episode.get("length"), "max_steps": budget["max_steps"],
+              "settle_steps": budget["settle_steps"]}
     with open(os.path.join(ep_dir, "source.json"), "w") as f:
-        json.dump({"run_dir": run_dir, "iid": iid, "alias": alias, "tro": tro, "goal_image": cfg.goal_image}, f, indent=1)
-    return {"iid": iid, "alias": alias, "ep_dir": ep_dir}
+        json.dump(source, f, indent=1)
+    return {"alias": alias, "ep_dir": ep_dir, "max_steps": budget["max_steps"]}
 
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--instances", required=True, help="eval85-counted or a file of eval run directories")
+    p.add_argument("--task", default=None, help="a task family, task or subtask of the eval dataset (as run_isg --task)")
+    p.add_argument("--instance-indices", type=int, nargs="+", default=[0], help="--task: instance indices (as run_isg --instance-indices)")
+    p.add_argument("--all", action="store_true", help="every instance of the dataset")
+    p.add_argument("--instances-root", default=None, help="dataset root (default: the dataset in the simulator data path, as run_isg)")
     p.add_argument("--out", required=True, help="root of the episode directories")
     p.add_argument("--model", default=HarnessConfig.model)
     p.add_argument("--planner", default=HarnessConfig.planner)
     p.add_argument("--model-option", action="append", default=[], help="key=value (JSON values allowed), e.g. effort=medium")
     p.add_argument("--set", action="append", default=[], help="harness config key=value, e.g. max_calls=50")
     p.add_argument("--perturb", action="append", default=[], help="probe key=value, e.g. negate_xyz=true, mask_cameras='[\"head\"]'")
-    p.add_argument("--only", action="append", default=[], help="keep instances whose tag/rel contains this substring")
-    p.add_argument("--limit", type=int, default=0)
+    p.add_argument("--max-steps", type=int, default=None, help="run_isg --max-steps (default: run_isg's budget, max(300, 2 x the demo's length))")
+    p.add_argument("--settle-steps", type=int, default=None, help="run_isg --settle-steps (default 45; at most --max-steps)")
     p.add_argument("--overwrite", action="store_true")
     p.add_argument("--submit", action="store_true", help="sbatch one job per episode")
     p.add_argument("--rerun-unscored", action="store_true",
@@ -119,12 +110,12 @@ def main(argv=None) -> int:
 
     if args.rerun_unscored:
         return rerun_unscored(args)
-    insts = eval85_counted() if args.instances == "eval85-counted" else instances_from_file(args.instances)
-    if args.only:
-        insts = [t for t in insts if any(s in f"{t[0]}/{t[1]}" for s in args.only)]
-    if args.limit:
-        insts = insts[: args.limit]
-    base = {"planner": args.planner, "model": args.model, "model_options": _parse_kv(args.model_option), "perturb": _parse_kv(args.perturb)}
+    if bool(args.task) == bool(args.all):
+        p.error("give exactly one of --task and --all")
+    recs = INST.load_index(args.instances_root) if args.all else INST.resolve(args.task, args.instance_indices, args.instances_root)
+    base = {"planner": args.planner, "model": args.model, "model_options": _parse_kv(args.model_option), "perturb": _parse_kv(args.perturb),
+            "max_steps": args.max_steps, "settle_steps": args.settle_steps,
+            "instances_root": os.path.abspath(args.instances_root) if args.instances_root else None}
     base.update(_parse_kv(args.set))
     HarnessConfig.from_dict(base)  # fail fast on unknown keys
     os.makedirs(args.out, exist_ok=True)
@@ -132,17 +123,17 @@ def main(argv=None) -> int:
     new = not os.path.exists(manifest)
     with open(manifest, "a") as mf:
         if new:
-            mf.write("tag\trel\tep_dir\talias\tjob\n")
-        for tag, rel, run_dir in insts:
-            ep_dir = os.path.join(args.out, tag, rel)
+            mf.write("\t".join(MANIFEST_COLUMNS) + "\n")
+        for rec in recs:
+            ep_dir = os.path.join(os.path.abspath(args.out), rec.subtask, str(rec.instance))
             try:
-                info = prepare_episode(run_dir, ep_dir, base, overwrite=args.overwrite)
+                info = prepare_episode(rec, ep_dir, base, overwrite=args.overwrite)
             except FileExistsError as e:
                 print(f"skip: {e}", file=sys.stderr)
                 continue
             job = submit(ep_dir, args) if args.submit else ""
-            mf.write(f"{tag}\t{rel}\t{ep_dir}\t{info['alias']}\t{job}\n")
-            print(f"{tag}/{rel}\t{info['alias']}\t{job or 'prepared'}")
+            mf.write("\t".join([rec.subtask, str(rec.instance), ep_dir, info["alias"], str(info["max_steps"]), job]) + "\n")
+            print(f"{rec.subtask}/{rec.instance}\t{info['alias']}\tmax_steps {info['max_steps']}\t{job or 'prepared'}")
     return 0
 
 
@@ -164,10 +155,10 @@ def rerun_unscored(args) -> int:
                 continue
             os.rename(os.path.join(ep_dir, "run"), os.path.join(ep_dir, f"run_unscored_{stamp}"))
             job = submit(ep_dir, args)
-            rel = os.path.relpath(ep_dir, args.out)
-            alias = json.load(open(cfg_path)).get("alias") or ""
-            mf.write(f"{os.path.dirname(rel)}\t{os.path.basename(rel)}\t{ep_dir}\t{alias}\t{job}\n")
-            print(f"{rel}\t{alias}\trerun {job}")
+            cfg = json.load(open(cfg_path))
+            source = json.load(open(os.path.join(ep_dir, "source.json"))) if os.path.exists(os.path.join(ep_dir, "source.json")) else {}
+            mf.write("\t".join([str(cfg.get("task")), str(cfg.get("instance_index")), ep_dir, cfg.get("alias") or "", str(source.get("max_steps", "")), job]) + "\n")
+            print(f"{os.path.relpath(ep_dir, args.out)}\t{cfg.get('alias') or ''}\trerun {job}")
     return 0
 
 

@@ -19,8 +19,7 @@ from ispatialgym.harness.core.types import CapabilityFailure, Decision, MotionOu
 from ispatialgym.harness.llm.base import AssistantEntry, Entry, ImagePart, ModelClient, TextPart, ToolCall, ToolEntry, UserEntry, apply_image_horizon
 from ispatialgym.harness.planners.base import EpisodeContext, Planner
 from ispatialgym.harness.planners.l3_tools.docs import build_r1pro_docs
-from ispatialgym.harness.planners.l3_tools.prompts import goal_text, system_message
-from ispatialgym.harness.planners.l3_tools.recipes import task_recipe
+from ispatialgym.harness.planners.l3_tools.prompts import system_message
 from ispatialgym.harness.planners.l3_tools.tools import MOTION_TOOLS, ToolArgError, merge_parallel_calls, to_decision, tool_specs
 
 REPLY_WITH_TOOL = "Reply with exactly one tool call from the provided tools."
@@ -40,7 +39,7 @@ class L3ToolAgent(Planner):
         self.transcript: List[Entry] = []
         self.system = ""
         self.goal = ""
-        self.recipe: Optional[str] = None
+        self.goal_image: Optional[ImagePart] = None  # the observations' copy of the goal image
         self.ctx: Optional[EpisodeContext] = None
         self.calls = 0
         self.turns = 0  # observation turns sent; the camera labels' step
@@ -57,22 +56,25 @@ class L3ToolAgent(Planner):
     def start(self, ctx: EpisodeContext) -> None:
         self.ctx = ctx
         self.system = system_message(self.cfg, build_r1pro_docs(ctx.mounting))
-        recipe = task_recipe(ctx.alias) if self.cfg.use_recipe else None
-        self.recipe = recipe[0] if recipe else None
-        self.goal = goal_text(ctx.instruction, recipe[1] if recipe else None)
+        self.goal = ctx.success_check
         content: List[Any] = [TextPart(self.goal)]
-        content.append(self.enc.goal_part(ctx.goal_rgb) if ctx.goal_rgb is not None else TextPart("(No goal image is available for this task.)"))
+        if ctx.goal_rgb is not None:
+            content.append(self.enc.goal_part(ctx.goal_rgb))
+            self.goal_image = self.enc.goal_part(ctx.goal_rgb, pinned=False)
+        else:
+            content.append(TextPart("(No goal image is available for this task.)"))
         self.transcript.append(UserEntry(content))
         self.trace.event("system", text=self.system, tools=[asdict(t) for t in self.tools], model=self.client.model, client=self.client.name,
                          client_options={k: v for k, v in self.client.options.items() if "key" not in k.lower()})
-        self.trace.event("goal", text=self.goal, recipe=self.recipe, images=self._save_frames(content, "goal"))
+        self.trace.event("goal", text=self.goal, images=self._save_frames(content, "goal"))
 
     def decide(self, obs: Observation, outcome: Optional[MotionOutcome]) -> Decision:
         assert self.ctx is not None, "start() first"
         self.repairs = 0
-        content = self.enc.observation_content(obs, self.ctx.instruction, self.turns, arrival_lines(outcome.details if outcome else None))
+        content = self.enc.observation_content(obs, self.turns, arrival_lines(outcome.details if outcome else None), goal=self.goal_image)
         self.transcript.append(UserEntry(content))
-        self.trace.event("user", turn=self.turns, control_step=obs.step, text=self._text_of(content), images=self._save_frames(content, f"{self.turns:04d}"))
+        frames = self._save_frames([p for p in content if p is not self.goal_image], f"{self.turns:04d}")  # the goal frame is saved once, at start
+        self.trace.event("user", turn=self.turns, control_step=obs.step, text=self._text_of(content), goal_image=self.goal_image is not None, images=frames)
         self.turns += 1
         return self._ask()
 
@@ -196,5 +198,5 @@ class L3ToolAgent(Planner):
 
     def summary(self) -> Dict[str, Any]:
         return {"planner": self.name, "model": self.client.model, "calls": self.calls, "turns": self.turns, "repairs": self.repairs_total,
-                "unreachable": self.unreachable, "stop_reason": self.stop_reason, "hindsight": self.hindsight, "recipe": self.recipe,
+                "unreachable": self.unreachable, "stop_reason": self.stop_reason, "hindsight": self.hindsight,
                 "usage": dict(self.usage), "model_latency_s": round(self.latency_s, 1)}

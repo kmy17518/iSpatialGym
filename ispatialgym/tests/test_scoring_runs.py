@@ -136,3 +136,28 @@ def test_summary_of_new_and_old_meta(tmp_path, capsys):
     # orientation error: mean over all (0.02, 0.4, 1.0) and over the symbolically successful ones (0.02, 0.4)
     assert "0.4733 / 0.2100" in line and "- / -" in line  # no position component
     assert "flagged: 1 meta.json" in out and "unscored: err" in out
+
+
+def test_summary_reports_the_other_mode_only_for_settle_eval_on_runs(tmp_path, capsys):
+    from ispatialgym.harness.summarize import episode_rows, main
+
+    run = {"mode": "policy", "status": "success", "success": True, "task_family": "alignment", "settle_eval": False, "symbolic_success": True,
+           "geometric_success": True, "error_metric": {"position_error": None, "orientation_error": 0.02, "case": "pose"}, "other_mode": None}
+    _write_meta(tmp_path, "p", run)
+    # an older settle-eval-off meta.json that still records the on mode: ignored
+    _write_meta(tmp_path, "q", {**run, "other_mode": {"settle_eval": True, "symbolic_success": False, "geometric_success": False}})
+    rows = episode_rows(str(tmp_path))
+    assert all("other_geometric" not in r and "other_symbolic" not in r for r in rows)
+    main([str(tmp_path)])
+    out = capsys.readouterr().out
+    assert "other mode" not in out
+    line = next(ln for ln in out.splitlines() if ln.strip().startswith("alignment"))
+    assert line.split()[1:5] == ["2/2", "100.0%", "2/2", "100.0%"]
+    # with a settle-eval-on run in the root, the other mode's rates are over the settle-eval-on runs alone
+    _write_meta(tmp_path, "r", {**run, "mode": "replay", "settle_eval": True, "geometric_success": False, "success": False, "status": "oracle_failed",
+                                "other_mode": {"settle_eval": False, "symbolic_success": True, "geometric_success": True}})
+    main([str(tmp_path)])
+    out = capsys.readouterr().out
+    assert "other mode geometric" in out
+    line = next(ln for ln in out.splitlines() if ln.strip().startswith("alignment"))
+    assert line.split()[1:9] == ["2/3", "66.7%", "3/3", "100.0%", "1/1", "100.0%", "1/1", "100.0%"]

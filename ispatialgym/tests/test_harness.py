@@ -1,6 +1,7 @@
-"""Harness tests without the simulator: configuration, instructions, the pose convention, bounds, probes, the observation
-turn, image horizon, tool surface, the three provider wire formats and the retry policy, the RoboProbe turn loop of the L3
-agent (scripted model), the adapter's episode accounting, the code-agent bridge, recipes and the summary."""
+"""Harness tests without the simulator: configuration, the success check, the pose convention, bounds, probes, the
+observation turn, image horizon, tool surface, the three provider wire formats and the retry policy, the RoboProbe turn
+loop of the L3 agent (scripted model, image-only turns), the adapter's episode accounting, the code-agent bridge and the
+summary."""
 
 from __future__ import annotations
 
@@ -15,10 +16,10 @@ import pytest
 from ispatialgym.harness.config import HarnessConfig, MotionLimits
 from ispatialgym.harness.core import pose
 from ispatialgym.harness.core.approver import SafetyAbort, TargetApprover, check_action, parse_eef_targets
-from ispatialgym.harness.core.instructions import clean, instruction_for, parse_alias
-from ispatialgym.harness.core.observation import ObservationEncoder, state_lines
+from ispatialgym.harness.core.observation import GOAL_LABEL, GRASP_HEADER, ObservationEncoder, state_lines
 from ispatialgym.harness.core.perturb import Perturbations
 from ispatialgym.harness.core.session import MotionSession, RobotAPI, ThreadBridge, serve_bridge
+from ispatialgym.harness.core.success_check import SUCCESS_CHECK
 from ispatialgym.harness.core.trace import EpisodeTrace
 from ispatialgym.harness.core.types import (ArmState, CapabilityFailure, InfrastructureFailure, MotionOutcome, MotionPlan, MotionRejected,
                                             MotionRequest, Observation, RobotState, arrival_lines)
@@ -32,8 +33,7 @@ from ispatialgym.harness.llm.openai_responses import OpenAIResponsesClient
 from ispatialgym.harness.llm.scripted import ScriptedClient
 from ispatialgym.harness.planners import EpisodeContext, make_planner
 from ispatialgym.harness.planners.l3_tools.docs import build_r1pro_docs
-from ispatialgym.harness.planners.l3_tools.prompts import goal_text, system_message
-from ispatialgym.harness.planners.l3_tools.recipes import recipe_key, task_recipe
+from ispatialgym.harness.planners.l3_tools.prompts import system_message
 from ispatialgym.harness.planners.l3_tools.tools import ToolArgError, merge_parallel_calls, to_decision, tool_specs
 from ispatialgym.harness.policy import HarnessPolicy
 
@@ -56,7 +56,7 @@ def _obs(step=0, remaining=17000) -> Observation:
 def _agent(steps, **cfg_kw):
     cfg = HarnessConfig(model="scripted:x", **cfg_kw)
     agent = make_planner("l3_tools", client=ScriptedClient(steps=steps), cfg=cfg, encoder=ObservationEncoder(cfg))
-    agent.start(EpisodeContext("Move the bar soap on top of the soap dish.", np.zeros((16, 16, 3), np.uint8),
+    agent.start(EpisodeContext(SUCCESS_CHECK, np.zeros((16, 16, 3), np.uint8),
                                alias="inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf"))
     return agent
 
@@ -65,7 +65,7 @@ def _eef(note="move", **targets):
     return {"name": "move_eef", "arguments": {"targets": targets, "note": note}}
 
 
-# -- configuration / instructions ---------------------------------------------------------------------------------
+# -- configuration / success check --------------------------------------------------------------------------------
 def test_config_round_trip(tmp_path):
     cfg = HarnessConfig(model="anthropic/x", max_calls=7, limits=MotionLimits(max_duration_s=6.0))
     p = tmp_path / "c.json"
@@ -73,35 +73,18 @@ def test_config_round_trip(tmp_path):
     back = HarnessConfig.from_file(str(p))
     assert back.max_calls == 7 and back.limits.max_duration_s == 6.0 and back.model == "anthropic/x"
     assert HarnessConfig().max_calls == 170 and HarnessConfig().image_size is None and HarnessConfig().jpeg_quality == 95
+    assert HarnessConfig().settle_eval is False  # run_isg --settle-eval off
     with pytest.raises(ValueError):
         HarnessConfig.from_dict({"bogus": 1})
+    for gone in ("instruction", "instruction_level", "use_recipe"):  # image-only: no language instruction options
+        with pytest.raises(ValueError):
+            HarnessConfig.from_dict({gone: None})
 
 
-@pytest.mark.parametrize("alias,expect", [
-    ("inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar", "Move the beer glass so that the coaster is under it"),
-    ("inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl", "Move the sandal under the bed"),
-    ("inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf", "Move the bar soap on top of the soap dish"),
-    ("inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar", "Move the box of cereal so that it touches the box of cereal"),
-    ("inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar", "Move the plate inside the drop in sink"),
-    ("camera_relocalization-obstructed-trash_can_1", "A trash can may be in the way"),
-    ("mental_rotation-teaspoon", "You are holding the teaspoon"),
-    ("object_scaling-bottle_of_pop", "the same size as in the goal image"),
-    ("alignment-axial-tablespoon-breakfast_table", "The tablespoon lies on the breakfast table"),
-    ("alignment-world_vertical-wall_clock-walls", "The wall clock is mounted on a wall"),
-    ("configuration_matching-articulation_close_large_scale-door", "Close the door"),
-    ("configuration_matching-attachment-lid-teapot-bar", "Attach the lid to the teapot"),
-    ("configuration_matching-block_design-block_4-breakfast_table_board", "breakfast table (with a board)"),
-    ("disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-breakfast_table", "tablefork, table knife, tablespoon"),
-])
-def test_instructions(alias, expect):
-    assert expect in instruction_for(alias, "alias")
-
-
-def test_family_level_names_no_objects():
-    s = instruction_for("inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-commercial_kitchen_table", "family")
-    assert "knife" not in s and "cutting" not in s and "goal image" in s
-    assert parse_alias("camera_relocalization-standard")["variant"] == "standard"
-    assert clean("floor_pitched") == "floor" and clean("hamper_1") == "hamper"
+def test_success_check_text():
+    assert SUCCESS_CHECK.splitlines() == ["Success check:",
+                                          "Replicate the goal image exactly. The robot itself does not have to match it.",
+                                          "Avoid any contact with the environment other than through the grippers."]
 
 
 # -- pose convention ----------------------------------------------------------------------------------------------
@@ -176,16 +159,20 @@ def test_perturbations():
 
 
 def test_observation_turn():
-    lines = state_lines(_state(), "Do it.")
-    assert lines[0] == "Instruction: Do it." and "left_x=0.5500" in lines and "left_pitch_deg=0.0" in lines and "right_gripper=1.00" in lines
+    lines = state_lines(_state())
+    assert lines[0] == GRASP_HEADER and "left_x=0.5500" in lines and "left_pitch_deg=0.0" in lines and "right_gripper=1.00" in lines
     assert "base_x=0.1000" in lines and "torso_translate=0.50" in lines and "left_arm_joint7=0.6000" in lines
     assert lines.index("left_x=0.5500") < lines.index("right_x=0.5500") < lines.index("base_x=0.1000") < lines.index("left_arm_joint1=0.0000")
+    assert not any(line.startswith("Instruction") for line in lines)
     cfg = HarnessConfig(cameras=["head", "left_wrist"], perturb={"mask_cameras": ["head"]})
     enc = ObservationEncoder(cfg, Perturbations.from_dict(cfg.perturb))
-    content = enc.observation_content(_obs(remaining=123), "Do it.", 4, ["Arrival check for the previous move_eef target: left 4 mm and 0.6 deg away."])
-    text = content[0].text
-    assert "Env steps remaining before the episode ends: 123" in text and text.endswith("left 4 mm and 0.6 deg away.")
-    assert [p.label for p in content[1:]] == ["camera 'head' (step 4), MASKED", "camera 'left_wrist' (step 4)"]
+    goal = enc.goal_part(np.zeros((8, 8, 3), np.uint8), pinned=False)
+    content = enc.observation_content(_obs(remaining=123), 4, ["Arrival check for the previous move_eef target: left 4 mm and 0.6 deg away."], goal=goal)
+    assert content[0] is goal and content[0].label == GOAL_LABEL and not content[0].pinned  # the goal image opens the turn
+    text = content[1].text
+    assert text.startswith(GRASP_HEADER) and "Env steps remaining before the episode ends: 123" in text and text.endswith("left 4 mm and 0.6 deg away.")
+    assert [p.label for p in content[2:]] == ["camera 'head' (step 4), MASKED", "camera 'left_wrist' (step 4)"]
+    assert isinstance(enc.observation_content(_obs(), 0)[0], TextPart)  # without a goal image the state text opens it
     import base64
     import io
 
@@ -243,7 +230,7 @@ def test_planner_world_floor_clears_the_robot_at_the_start():
 
 # -- conversation ----------------------------------------------------------------------------------------------------
 def test_image_horizon_keeps_newest_observations_and_pinned():
-    tr = [UserEntry([TextPart("Goal: x"), ImagePart("goal", "AA", pinned=True)])]
+    tr = [UserEntry([TextPart("Success check: x"), ImagePart("goal", "AA", pinned=True)])]
     for i in range(4):
         tr.append(UserEntry([TextPart(f"obs {i}"), ImagePart(f"cam {i}", f"B{i}")]))
         tr.append(AssistantEntry(AssistantTurn(tool_calls=[ToolCall(f"c{i}", "move_eef", {})])))
@@ -287,11 +274,11 @@ def test_merge_parallel_calls():
 
 
 def _transcript():
-    return [UserEntry([TextPart("Goal: x"), ImagePart("goal image", "GG", pinned=True)]),
-            UserEntry([TextPart("Instruction: x"), ImagePart("camera 'head' (step 0)", "HH")]),
+    return [UserEntry([TextPart("Success check: x"), ImagePart("goal image", "GG", pinned=True)]),
+            UserEntry([TextPart("left_x=0.5"), ImagePart("camera 'head' (step 0)", "HH")]),
             AssistantEntry(AssistantTurn(text="thinking", tool_calls=[ToolCall("call_1", "move_eef", {"targets": {}}, '{"targets": {}}')])),
             ToolEntry("call_1", "move_eef", [TextPart("Accepted: playing 30 waypoints (1.0s).")]),
-            UserEntry([TextPart("Instruction: x"), ImagePart("camera 'head' (step 1)", "II")])]
+            UserEntry([TextPart("left_x=0.5"), ImagePart("camera 'head' (step 1)", "II")])]
 
 
 def test_openai_responses_wire():
@@ -382,17 +369,19 @@ def test_l3_agent_roboprobe_turns():
                     _eef("too far down", right_z=0.4),
                     _eef("pick", right_z=0.85, right_gripper=0),
                     {"name": "give_up", "arguments": {"reason": "cannot see it", "hindsight": "should have looked first"}}])
-    goal = agent.transcript[0].content
-    assert goal[0].text.startswith("Goal: Move the bar soap on top of the soap dish.\n\nTASK RECIPE:\n# Inter-object Relation Satisfaction")
-    assert isinstance(goal[1], ImagePart) and goal[1].pinned and agent.recipe == "inter_object_relation_satisfaction"
-    assert "170 LLM calls" in agent.system and "Embodiment notes:" in agent.system
+    goal = agent.transcript[0].content  # the first user turn: the success check, then the pinned goal image, nothing else
+    assert len(goal) == 2 and goal[0].text == SUCCESS_CHECK
+    assert isinstance(goal[1], ImagePart) and goal[1].pinned and goal[1].label == GOAL_LABEL
+    assert "170 LLM calls" in agent.system and "Embodiment notes:" in agent.system and "no written instruction states it" in agent.system
     d = agent.decide(_obs(0), None)
     assert d.kind == "motion" and d.request.params == {"targets": {"right_x": 0.6, "right_z": 0.9}} and d.request.note == "reach"
+    first = agent.transcript[1].content
+    assert isinstance(first[0], ImagePart) and first[0].label == GOAL_LABEL and not first[0].pinned and first[0].data_b64 == goal[1].data_b64
     agent.accepted(MotionPlan("move_eef", 45, 1 / 30, reports="grasp point"))
     assert agent.transcript[-1].content[0].text == "Accepted: playing 45 waypoints (1.5s). The next observation reports how close the grasp point landed."
     outcome = MotionOutcome(True, "x", details={"arrival": {"kind": "move_eef", "arms": {"right": {"pos_mm": 4.0, "rot_deg": 0.6}}}})
     d = agent.decide(_obs(46), outcome)
-    obs_text = agent.transcript[-2].content[0].text
+    obs_text = next(p.text for p in agent.transcript[-2].content if isinstance(p, TextPart))
     assert "Arrival check for the previous move_eef target: right 4 mm and 0.6 deg away." in obs_text and agent.turns == 2
     n = len(agent.transcript)
     d = agent.rejected("right arm pose unreachable (planner status: IK Fail). The robot did not move; choose another pose. Neither arm moved.", False)
@@ -405,7 +394,13 @@ def test_l3_agent_roboprobe_turns():
     assert d.kind == "stop" and d.reason == "give_up" and d.details == {"detail": "cannot see it", "hindsight": "should have looked first"}
     assert agent.transcript[-1].content[0].text == "Acknowledged give_up."
     labels = [p.label for p in agent.transcript[1].content if isinstance(p, ImagePart)]
-    assert labels == ["camera 'head' (step 0)", "camera 'left_wrist' (step 0)", "camera 'right_wrist' (step 0)"]
+    assert labels == [GOAL_LABEL, "camera 'head' (step 0)", "camera 'left_wrist' (step 0)", "camera 'right_wrist' (step 0)"]
+    request = apply_image_horizon(agent.transcript, agent.cfg.image_horizon)  # 3 observations: the oldest one's goal copy ages out
+    goal_copies = [i for i, e in enumerate(request) for p in getattr(e, "content", []) if isinstance(p, ImagePart) and p.label == GOAL_LABEL]
+    observations = [i for i, e in enumerate(agent.transcript) if isinstance(e, UserEntry)][1:]
+    assert goal_copies == [0] + observations[1:] and request[observations[0]].content[0] == TextPart(IMAGE_PLACEHOLDER)
+    texts = [p.text for e in agent.transcript for p in getattr(e, "content", []) if isinstance(p, TextPart)]
+    assert not any("Instruction" in t or t.startswith("Goal:") for t in texts)
     s = agent.summary()
     assert s["calls"] == 4 and s["turns"] == 3 and s["stop_reason"] == "give_up" and s["hindsight"] == "should have looked first"
 
@@ -491,29 +486,14 @@ def test_trace_takes_a_kind_field(tmp_path):
     assert rec["type"] == "motion_start" and rec["kind"] == "move_eef"
 
 
-# -- prompts / recipes ---------------------------------------------------------------------------------------------
-def test_system_message_docs_and_recipes():
+# -- prompts -------------------------------------------------------------------------------------------------------
+def test_system_message_and_docs():
     docs = build_r1pro_docs({"left shoulder": (0.1, 0.2, 1.3)})
     assert "pads are 50 mm long" in docs and "reach 31 mm past it" in docs and "97 mm" in docs
     assert docs.endswith("- left shoulder: (0.100, 0.200, 1.300) m")
     msg = system_message(HarnessConfig(max_calls=99), docs)
     assert "99 LLM calls" in msg and msg.index("Embodiment notes:") > msg.index("env steps remaining")
-    keys = {
-        "camera_relocalization-obstructed-trash_can_1": "camera_relocalization",
-        "configuration_matching-articulation_open_small_scale-cabinet-table": "configuration_matching-articulation",
-        "configuration_matching-block_design-block_4-breakfast_table": "configuration_matching-block_design",
-        "configuration_matching-attachment-lid-teapot-bar": "configuration_matching-attachment",
-        "alignment-world_vertical-wall_clock-walls": "alignment-world_vertical",
-        "alignment-axial-tablespoon-breakfast_table": "alignment-axial",
-        "mental_rotation-teaspoon": "mental_rotation", "object_scaling-mug": "object_scaling",
-        "disembedding-a-b_1-c": "disembedding", "inter_object_relation_satisfaction-nextto_small_scale-a-b-c": "inter_object_relation_satisfaction",
-    }
-    for alias, key in keys.items():
-        assert recipe_key(alias) == key
-        k, text = task_recipe(alias)
-        assert k == key and "## Success check" in text and "settling period" in text
-    assert task_recipe(None) is None and goal_text("Do it.") == "Goal: Do it."
-    assert goal_text("Do it.", "# R\n") == "Goal: Do it.\n\nTASK RECIPE:\n# R"
+    assert "and the success check. The goal image is the task: no written instruction states it." in msg and "task instruction" not in msg
 
 
 # -- code-agent bridge ----------------------------------------------------------------------------------------------
@@ -596,3 +576,66 @@ def test_summarize(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "2 scored, 1 unscored, 1 not run" in out and "1/2  50.0%" in out and "HTTP 503" in out
     assert "flagged: 2 meta.json" in out  # written before the scoring change: symbolic only
+
+
+def test_summarize_run_isg_harness_runs(tmp_path, capsys):
+    """run_isg --policy ispatialgym.harness.policy:HarnessPolicy writes <out>/<iid>/meta.json with no episode directory."""
+    from ispatialgym.harness.summarize import episode_rows, main
+
+    common = {"mode": "policy", "task_family": "alignment", "subtask": "alignment_axial_board_game", "settle_eval": False}
+    runs = {"iid_a": {**common, "status": "oracle_failed", "success": False, "geometric_success": False, "symbolic_success": False, "n_steps": 3,
+                      "harness": {"stop": None, "forced_failure": False, "planner": {"calls": 1, "usage": {"input_tokens": 8000, "output_tokens": 90}}}},
+            "iid_b": {**common, "status": "success", "success": False, "geometric_success": True, "symbolic_success": True, "n_steps": 40,
+                      "harness": {"stop": {"reason": "give_up"}, "forced_failure": True, "planner": {"calls": 2}}}}
+    for iid, m in runs.items():
+        (tmp_path / iid).mkdir()
+        (tmp_path / iid / "meta.json").write_text(json.dumps(m))
+    rows = {r["episode"]: r for r in episode_rows(str(tmp_path))}
+    assert rows["iid_a"]["calls"] == 1 and rows["iid_a"]["input_tokens"] == 8000 and rows["iid_a"]["family"] == "alignment"
+    assert rows["iid_b"]["stop"] == "give_up" and rows["iid_b"]["forced_failure"] and rows["iid_b"]["geometric"] is False  # a planner stop fails
+    main([str(tmp_path)])
+    assert "2 found, 2 scored" in capsys.readouterr().out
+
+
+def _fake_dataset(root):
+    (root / "metadata").mkdir(parents=True)
+    recs = [("alignment_axial_board_game", 100), ("alignment_axial_keyboard", 400)]
+    with open(root / "metadata" / "instances.jsonl", "w") as f:
+        for i, (sub, _n) in enumerate(recs):
+            f.write(json.dumps({"task_family": "alignment", "task": "alignment_axial", "subtask": sub, "instance": 0, "task_instance": i,
+                                "scene": "house", "files": {"tro_state": f"scenes/{sub}-tro_state.json"},
+                                "source": {"variant": f"alignment-axial-{sub.split('_')[-1]}-table"}}) + "\n")
+    with open(root / "metadata" / "episodes.jsonl", "w") as f:
+        for sub, n in recs:
+            f.write(json.dumps({"subtask": sub, "instance": 0, "length": n}) + "\n")
+
+
+def test_harness_run_prepares_dataset_episodes(tmp_path):
+    from ispatialgym.harness import run as RUN
+
+    _fake_dataset(tmp_path / "ds")
+    out = tmp_path / "out"
+    RUN.main(["--task", "alignment_axial", "--instance-indices", "0", "1", "--instances-root", str(tmp_path / "ds"), "--out", str(out), "--model", "scripted:x"])
+    cfg = json.loads((out / "alignment_axial_keyboard" / "0" / "harness_config.json").read_text())
+    assert cfg["task"] == "alignment_axial_keyboard" and cfg["instance_index"] == 0 and cfg["alias"] == "alignment-axial-keyboard-table"
+    assert cfg["max_steps"] is None and cfg["instances_root"] == str(tmp_path / "ds")  # run_isg's budget
+    budgets = [json.loads((out / s / "0" / "source.json").read_text())["max_steps"] for s in ("alignment_axial_board_game", "alignment_axial_keyboard")]
+    assert budgets == [300, 800]  # max(300, 2 x the demo's length)
+    rows = (out / "episodes.tsv").read_text().splitlines()
+    assert rows[0].split("\t") == list(RUN.MANIFEST_COLUMNS) and len(rows) == 3
+    with pytest.raises(ValueError, match="settle"):  # run_isg refuses a budget below the 45-step settle window: fail before submitting
+        RUN.main(["--task", "alignment_axial_board_game", "--instances-root", str(tmp_path / "ds"), "--out", str(tmp_path / "o2"), "--max-steps", "3"])
+    RUN.main(["--task", "alignment_axial_board_game", "--instances-root", str(tmp_path / "ds"), "--out", str(tmp_path / "o3"), "--max-steps", "3",
+              "--settle-steps", "1"])
+    cfg = json.loads((tmp_path / "o3" / "alignment_axial_board_game" / "0" / "harness_config.json").read_text())
+    assert cfg["max_steps"] == 3 and cfg["settle_steps"] == 1
+    with pytest.raises(SystemExit):
+        RUN.main(["--out", str(out)])  # neither --task nor --all
+
+
+def test_policy_step_budget_is_run_isgs():
+    from ispatialgym.harness.policy import DEFAULT_MAX_STEPS, step_budget
+
+    assert step_budget({"budget": {"max_steps": 300}}, HarnessConfig(max_steps=50)) == 300  # the run's own budget wins
+    assert step_budget(None, HarnessConfig(max_steps=50)) == 50 and step_budget({}, HarnessConfig()) == DEFAULT_MAX_STEPS == 3000
+    assert HarnessPolicy(HarnessConfig(model="scripted:x")).max_steps == 3000

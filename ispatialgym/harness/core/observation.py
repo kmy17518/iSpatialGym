@@ -1,5 +1,5 @@
-"""What the planner sees: one observation turn (instruction, state named as the tools take it, env steps remaining,
-the arrival check of the previous motion, labelled camera images) and the pinned goal image."""
+"""What the planner sees: one observation turn (the goal image, the state named as the tools take it, env steps remaining,
+the arrival check of the previous motion, labelled camera images) and the pinned goal image of the first turn."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from ispatialgym.harness.core.perturb import Perturbations
 from ispatialgym.harness.core.types import Observation, RobotState
 from ispatialgym.harness.llm.base import Content, ImagePart, TextPart
 
+GOAL_LABEL = "goal image (the head camera once the task is done)"
 GRASP_HEADER = "Base-frame grasp-point state, named as move_eef takes them (metres; degrees from the level forward reference):"
 BASE_HEADER = "Base pose relative to where the episode started, for context (metres; degrees; move_base moves relative to the current pose):"
 TORSO_HEADER = "Torso, named as move_torso takes it:"
@@ -35,9 +36,9 @@ def encode_rgb(rgb: np.ndarray, size: Optional[int], quality: int = 95) -> bytes
     return buf.getvalue()
 
 
-def state_lines(state: RobotState, instruction: str) -> List[str]:
+def state_lines(state: RobotState) -> List[str]:
     """The state block, every commandable dimension under the name its tool takes, in the model's frame."""
-    lines = [f"Instruction: {instruction or ''}", GRASP_HEADER]
+    lines = [GRASP_HEADER]
     for label in pose.labels():
         arm, axis = pose.split_label(label)
         s = state.arms.get(arm)
@@ -69,8 +70,9 @@ class ObservationEncoder:
         jpeg = encode_rgb(rgb, self.cfg.image_size, self.cfg.jpeg_quality)
         return ImagePart(label=label, data_b64=base64.b64encode(jpeg).decode("ascii"), pinned=pinned)
 
-    def goal_part(self, rgb: np.ndarray) -> ImagePart:
-        return self.image_part("goal image (the head camera once the task is done)", rgb, pinned=True)
+    def goal_part(self, rgb: np.ndarray, pinned: bool = True) -> ImagePart:
+        """The first turn's copy is pinned; an observation's copy ages out with the image horizon like the camera images."""
+        return self.image_part(GOAL_LABEL, rgb, pinned=pinned)
 
     def camera_parts(self, obs: Observation, turn: int) -> List[ImagePart]:
         parts = []
@@ -82,9 +84,11 @@ class ObservationEncoder:
             parts.append(self.image_part(label, self.perturb.view(name, img)))
         return parts
 
-    def observation_content(self, obs: Observation, instruction: str, turn: int, extra_lines: Sequence[str] = (), prefix: str = "") -> Content:
-        lines = ([prefix] if prefix else []) + state_lines(self.perturb.observed(obs.state), instruction)
+    def observation_content(self, obs: Observation, turn: int, extra_lines: Sequence[str] = (), prefix: str = "",
+                            goal: Optional[ImagePart] = None) -> Content:
+        """``goal`` (the goal image) opens the turn where RoboProbe's ``Instruction:`` line stands."""
+        lines = ([prefix] if prefix else []) + state_lines(self.perturb.observed(obs.state))
         if obs.steps_remaining is not None:
             lines.append(f"Env steps remaining before the episode ends: {obs.steps_remaining}")
         lines += list(extra_lines)
-        return [TextPart("\n".join(lines))] + list(self.camera_parts(obs, turn))
+        return ([goal] if goal is not None else []) + [TextPart("\n".join(lines))] + list(self.camera_parts(obs, turn))

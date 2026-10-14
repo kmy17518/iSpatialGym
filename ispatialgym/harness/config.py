@@ -29,17 +29,19 @@ class HarnessConfig:
     model: str = "openai/gpt-6-astra"  # provider/model: openai/..., anthropic/..., compat/..., scripted:<file.json>
     model_options: Dict[str, Any] = field(default_factory=dict)  # effort, max_output_tokens, base_url, timeout_s, ...
     max_calls: int = 170  # LLM calls per episode, every response counted (RoboProbe Inspect EEF: 170)
-    max_steps: int = 18000  # control steps per episode (30 Hz), reported to the model as env steps remaining
+    max_steps: Optional[int] = None  # run_isg --max-steps (None: run_isg's budget, max(300, 2 x the demo's length) for a dataset instance)
+    settle_steps: Optional[int] = None  # run_isg --settle-steps (None: its 45-step window, which must fit in max_steps)
     max_repairs: int = 3  # malformed calls on one observation before the episode ends as a capability failure
     image_horizon: Optional[int] = 2  # camera images kept in the newest N observation turns (None: all)
     image_size: Optional[int] = None  # longest side of every image sent to the model (None: the camera's own resolution)
     jpeg_quality: int = 95
     cameras: List[str] = field(default_factory=lambda: ["head", "left_wrist", "right_wrist"])
-    goal_image: Optional[str] = None  # PNG of the goal (head camera at the settled goal state)
-    alias: Optional[str] = None  # the instance's task alias (instruction templates, recipe)
-    instruction: Optional[str] = None  # explicit task statement (overrides the template)
-    instruction_level: str = "alias"  # "family" (no object names) | "alias" (object categories from the alias)
-    use_recipe: bool = True  # append the family's TASK RECIPE to the Goal turn
+    task: Optional[str] = None  # the eval dataset instance as run_isg --task / --instance-indices name it (scripts/harness/job_episode.sh)
+    instance_index: Optional[int] = None
+    instances_root: Optional[str] = None  # run_isg --instances-root (None: the dataset in the simulator data path)
+    goal_image: Optional[str] = None  # PNG overriding the goal image (None: the one registered in the instance file)
+    alias: Optional[str] = None  # the instance's sampling key (default: run_isg's variant); summarize groups by its family
+    settle_eval: bool = False  # run_isg --settle-eval: success also needs the settle window at rest
     stop_on_success: bool = True  # end the stream at the task's official success (the environment ends it, not the model)
     allow_done: bool = False  # probe only: offer a `done` tool (ends the episode as a failure, like give_up)
     disable_give_up: bool = False  # probe only: no give_up, the model acts until a budget ends the episode

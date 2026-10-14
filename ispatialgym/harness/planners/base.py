@@ -15,7 +15,7 @@ from ispatialgym.harness.core.types import Decision, MotionOutcome, MotionPlan, 
 
 @dataclass
 class EpisodeContext:
-    instruction: str
+    success_check: str  # the first user turn's text (core.success_check.SUCCESS_CHECK); the goal image states the task
     goal_rgb: Optional[np.ndarray]
     alias: Optional[str] = None
     goal_source: Optional[str] = None
