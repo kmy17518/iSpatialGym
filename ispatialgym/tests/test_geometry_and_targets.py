@@ -196,6 +196,23 @@ def test_group_target_validation():
         GroupTarget.from_dict("g", one_slot)
 
 
+def test_group_target_pinned_members():
+    d = _group_dict()
+    d["assignment"]["pinned"] = {"toy_dice.n.01_2": "slot_1"}
+    assert GroupTarget.from_dict("g", d).pinned == {"toy_dice.n.01_2": "slot_1"}
+    assert GroupTarget.from_dict("g", _group_dict()).pinned == {}
+    fixed = _group_dict(mode="fixed")
+    fixed["assignment"]["pinned"] = {"toy_dice.n.01_2": "slot_1"}
+    with pytest.raises(TROValidationError, match="for exchangeable groups"):
+        GroupTarget.from_dict("g", fixed)
+    for pinned, match in (({"mug.n.04_1": "slot_1"}, "non-members"), ({"toy_dice.n.01_2": "slot_9"}, "distinct target_slots"),
+                          ({"toy_dice.n.01_1": "slot_1", "toy_dice.n.01_2": "slot_1"}, "distinct target_slots")):
+        bad = _group_dict()
+        bad["assignment"]["pinned"] = pinned
+        with pytest.raises(TROValidationError, match=match):
+            GroupTarget.from_dict("g", bad)
+
+
 def _meta_dict(activity="world_alignment", definition_id=0, variant="table_surface", **overrides):
     d = {
         "schema_version": SCHEMA_VERSION,

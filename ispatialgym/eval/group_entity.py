@@ -282,18 +282,21 @@ class GroupEntity:
         target = self.target
         if target.assignment_mode == "fixed":
             return dict(target.member_to_slot)
-        slots = target.target_slots
+        pinned = target.pinned
+        slots = {s: sl for s, sl in target.target_slots.items() if s not in pinned.values()}
         if target.assignment_cost == "slot_position":
-            return assign_by_slot_position({m: p for m, (p, _) in poses.items()}, {s: sl.position for s, sl in slots.items()})
+            free = assign_by_slot_position({m: p for m, (p, _) in poses.items() if m not in pinned}, {s: sl.position for s, sl in slots.items()})
+            return dict(sorted({**free, **pinned}.items()))
 
         # Layout cost: the permutation whose relations best reproduce the stored relative poses (invariant to a
         # global rigid motion of the whole arrangement). Ties broken by orientation error, then lexicographically.
-        members, slot_ids = sorted(poses), sorted(slots)
+        members, slot_ids = sorted(m for m in poses if m not in pinned), sorted(slots)
         eqs = target.orientation_equivalences or None
         pos_tol, ori_tol = target.layout_tolerances if target.layout_tolerances else (None, None)
 
         def perm_cost(perm):
             slot_to_member = {slot_ids[j]: members[i] for i, j in enumerate(perm)}
+            slot_to_member.update({s: m for m, s in pinned.items()})
             total_pos, total_ori = 0.0, 0.0
             for k, rel in enumerate(target.layout_relations):
                 pos_err, ori_err = self._relation_error(
@@ -303,4 +306,4 @@ class GroupEntity:
                 total_ori += ori_err
             return (round(total_pos, 6), round(total_ori, 6))
 
-        return assign_by_cost_fn(members, slot_ids, perm_cost)
+        return dict(sorted({**assign_by_cost_fn(members, slot_ids, perm_cost), **pinned}.items()))

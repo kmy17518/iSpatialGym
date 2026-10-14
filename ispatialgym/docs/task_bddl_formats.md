@@ -415,6 +415,12 @@ Used by `pose_reached(g)` and `layout_reached(g)`:
   assignment is deterministic. `"layout"` is what block design needs once
   `pose_reached` no longer gates success: a correct design displaced or rotated
   on the table must still be matched to the right slots.
+- An `exchangeable` group may add `"pinned": {"INSTANCE": "SLOT_ID"}`: members
+  held to one slot while the others are matched among the remaining slots. A
+  pinned member is a reference of the layout that is not interchangeable with
+  the others, such as the puzzle board of block design's board variant: its
+  relations to the blocks make `layout_reached` judge the blocks relative to
+  the board.
 - `pose_reached(g)`: every member's world pose is within `pose_tolerances` of
   its assigned slot (requires `target_slots` and `pose_tolerances`).
 - `layout_reached(g)`: for every relation, the pose of the member assigned to
