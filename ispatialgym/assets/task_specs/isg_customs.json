@@ -31329,7 +31329,15 @@
     "gym_shoe/mcfcwq": "left"
    },
    "partner_side": "left",
-   "init_align_support": true
+   "init_align_support": true,
+   "pair_goal_align": {
+    "front": {
+     "gym_shoe/kmcbym": "+x",
+     "gym_shoe/mcfcwq": "+x"
+    },
+    "relative_yaw_deg": 0.0,
+    "facing": "away"
+   }
   },
   "constraints": []
  },
@@ -31877,7 +31885,15 @@
    "nextto_gap_extra_m": 0.03,
    "nextto_divisor": 6.0,
    "partner_side": "left",
-   "init_align_support": true
+   "init_align_support": true,
+   "pair_goal_align": {
+    "front": {
+     "marker/xakoic": "+x",
+     "colored_pencil/acumgp": "-x"
+    },
+    "relative_yaw_deg": 0.0,
+    "facing": "away"
+   }
   },
   "constraints": []
  },
@@ -33078,7 +33094,15 @@
    "nextto_gap_extra_m": 0.03,
    "nextto_divisor": 6.0,
    "partner_side": "right",
-   "init_align_support": true
+   "init_align_support": true,
+   "pair_goal_align": {
+    "front": {
+     "tablespoon/yxxfdj": "-x",
+     "chopstick/bcwuwv": "-x"
+    },
+    "relative_yaw_deg": 0.0,
+    "facing": "away"
+   }
   },
   "constraints": []
  },
@@ -38541,7 +38565,18 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "pair_goal_align": {
+    "front": {
+     "box_of_cereal/iucshm": "+x",
+     "box_of_cereal/dkhgxn": "-x"
+    },
+    "relative_yaw_deg": 0.0,
+    "facing": "any",
+    "faces": "widest",
+    "push_max_height_m": 0.035
+   },
+   "touching_place_gap_m": 0.05
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bar_udatjt_0 (row inter_object_relation_satisfaction-touching#02~B3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T3 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"

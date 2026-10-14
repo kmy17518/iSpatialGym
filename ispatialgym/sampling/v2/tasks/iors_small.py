@@ -10,7 +10,9 @@ stance after the goal settled, the touching push + brace, the constraints it lea
 (A5: the partner centred on one of the support's meta links of that type, e.g. a burner's ``heatsource``), ``start_region_on_neighbors``
 (with ``partner_on_meta_link``: the target starts on a neighbouring support's top, A4), ``init_align_support`` (the target and the
 partner start with their footprints along the support's edges, owner 2026-10-13), ``partner_aligned_to_target`` (the partner's long
-side along the target's long axis), ``partner_flat_top`` (the partner's footprint on a part of the top seen from above as one flat face),
+side along the target's long axis), ``pair_goal_align`` (nextto / touching: the target ends parallel to its partner, its front pointing
+the way the key says, side by side across the long axes, owner 2026-10-13 ~22:23), ``partner_flat_top`` (the partner's footprint on a
+part of the top seen from above as one flat face),
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
 (inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
@@ -169,6 +171,14 @@ CARRY_CLEARS = ("partner", "table", "auto")
 #: owner 2026-10-13 (touching#02): ``generation.widest_faces`` - the target's and the partner's widest upright faces parallel, their
 #: normals along the edge tangent or the stance's depth axis ("parallel"), along the tangent only ("tangent") or the depth only ("depth")
 WIDEST_FACES = ("parallel", "tangent", "depth")
+#: owner 2026-10-13 ~22:23 (pair goal alignment): ``generation.pair_goal_align.facing`` - where the target's front points in the stance's
+#: edge frame ("away" = along the edge's inward normal, "toward" against it, "left" / "right" = along / against the edge tangent, "any")
+PAIR_FACINGS = ("away", "toward", "left", "right", "any")
+#: the object axes ``pair_goal_align.front`` may name (the model's pointing end, in its own frame)
+PAIR_FRONT_AXES = {"+x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "+y": (0.0, 1.0, 0.0), "-y": (0.0, -1.0, 0.0)}
+#: ``pair_goal_align`` defaults: the settled goal's largest front / long-axis angle (deg) and stagger along the partner's long axis (m)
+PAIR_TOL_DEG = 5.0
+PAIR_STAGGER_MAX_M = 0.03
 #: A1 start region (owner 2026-10-12): Phase-1c lateral draws of the template before it is rejected when no partner side the template
 #: may draw has a start cell (``generation.start_region_lateral_draws``)
 START_REGION_LATERAL_DRAWS = 4
@@ -292,6 +302,12 @@ def target_aligned_partner_yaws(t_fp, p_fp_rest, across: bool) -> List[float]:
 def long_axes_angle_deg(a_fp, b_fp) -> float:
     """The angle (deg, 0-90) between the long axes of two footprints' minimum-area rectangles (0 = parallel)."""
     d = abs(min_area_rect(a_fp)[0] - min_area_rect(b_fp)[0]) % math.pi
+    return math.degrees(min(d, math.pi - d))
+
+
+def axes_angle_deg(a: float, b: float) -> float:
+    """The angle (deg, 0-90) between two horizontal axes given by their world angles (rad, either direction)."""
+    d = (float(a) - float(b)) % math.pi
     return math.degrees(min(d, math.pi - d))
 
 
@@ -599,6 +615,8 @@ class IORSSmall(SamplerV2):
         self.template_facts["partner_sides"] = [TT.side_name(sd) for sd in self.template_sides()]  # A1: Reject("partner_side") before any phase
         self.template_facts["partner_on_meta_link"] = self.meta_link()
         self.template_facts["partner_aligned_to_target"] = self.partner_aligned_to_target()
+        pair = self.pair_goal_align()  # Reject("spec") before any phase
+        self.template_facts["pair_goal_align"] = None if pair is None else {k: v for k, v in pair.items() if k != "front"}
         H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
         self.top = TT.support_surface(self, self.support, height=H_max)
         if int(self.top.free.sum()) < 50:
@@ -737,13 +755,17 @@ class IORSSmall(SamplerV2):
     def phase3_two_tier(self, manip: Stance, rng: np.random.Generator, arms: Optional[Sequence[str]] = None):
         """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
         feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp. ``arms``: the arms
-        offered for the segment at this focus (the chosen one is the record's ``arm``). :meth:`widest_faces`: F over
-        :meth:`widest_faces_target_yaws`, else with :meth:`init_align_support` over the four :meth:`support_aligned_yaws`; drawn without jitter."""
+        offered for the segment at this focus (the chosen one is the record's ``arm``). :meth:`pair_goal_align`: F over
+        :meth:`pair_target_yaws`, else :meth:`widest_faces`: over :meth:`widest_faces_target_yaws`, else with :meth:`init_align_support` over the
+        four :meth:`support_aligned_yaws`; drawn without jitter."""
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
         nb_top = self.neighbor_start_top()  # start_region_on_neighbors: the target is drawn on the neighbours' cells
-        yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.support_aligned_yaws("target", manip) if self.init_align_support() else None
+        if self.pair_goal_align() is not None:
+            yaws = self.pair_target_yaws(manip)
+        else:
+            yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.support_aligned_yaws("target", manip) if self.init_align_support() else None
         yaw_kw = {"yaws": yaws, "jitter": 0.0} if yaws is not None else {}
         last = None
         for i, gs in enumerate(tiers):
@@ -1094,7 +1116,19 @@ class IORSSmall(SamplerV2):
 
     def edge_partner_quats(self) -> List[th.Tensor]:
         """The partner's rest orientation turned so its footprint lies along the edge, and a quarter turn from there (only the first when
-        both footprints span the same along the edge): the orientations the start region tries."""
+        both footprints span the same along the edge): the orientations the start region tries. :meth:`pair_goal_align`: the partner
+        orientations the key admits beside a target at any of its :meth:`pair_target_yaws` (the first of equal spans)."""
+        if self.pair_goal_align() is not None:
+            rest = G.t(self.rest["target"])
+            quats = [G.qmul(G.quat_from_yaw(self.pair_partner_yaw((th.zeros(3), G.qmul(G.quat_from_yaw(y), rest)))), G.t(self.rest["partner"]))
+                     for y in self.pair_target_yaws(self.init_stance)]
+            out, spans = [], []
+            for q in quats:
+                a, b = footprint_laterals(self.world.footprint(self.hull["partner"], (th.zeros(3), q)), self.init_stance.tangent)
+                if all(abs((b - a) - s) >= 0.01 for s in spans):
+                    out.append(q)
+                    spans.append(b - a)
+            return out
         q0 = self.edge_aligned_quat(self.hull["partner"], self.rest["partner"], self.init_stance)
         q1 = G.qmul(G.quat_from_yaw(math.pi / 2), q0)
         (a0, b0), (a1, b1) = (footprint_laterals(self.world.footprint(self.hull["partner"], (th.zeros(3), q)), self.init_stance.tangent) for q in (q0, q1))
@@ -1546,6 +1580,9 @@ class IORSSmall(SamplerV2):
                 "partner_residual_deg": round(math.degrees(self.support_yaw_delta("partner", p_pose[1], manip)), 2),
                 "axis": {role: self.support_axis_angle(role, pose[1])[1] for role, pose in (("target", t_pose), ("partner", p_pose))},
             }
+        pair = self.pair_goal_align()
+        if pair is not None:
+            d.summary["pair_goal_align"] = dict({k: v for k, v in pair.items() if k != "front"}, init=self.pair_facts(t_pose, p_pose, manip))
         # §4.6 step 4: every object fully in frame (5 %) in the init image
         for role, pose in (("target", t_pose), ("partner", p_pose)):
             if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
@@ -1631,10 +1668,13 @@ class IORSSmall(SamplerV2):
         """One A1 partner draw at world ``yaw`` on ``side`` of the placed target: the start region's gap interval re-evaluated at the drawn target
         pose and this orientation (``tabletop.partner_gap_masks`` with :meth:`band_rule` at the band of the arm that makes the segment), a gap
         drawn uniformly from it, the pose checked as §4.6 step 2 checks it. ``(pose, "")`` or ``(None, why)``; the draw's facts in
-        ``partner_draw``."""
+        ``partner_draw``. :meth:`pair_goal_align`: the partner's footprint rectangle level with the target's along the stance's depth axis
+        (its origin at the target's origin depth otherwise)."""
         p_quat = G.qmul(G.quat_from_yaw(yaw), G.t(self.rest["partner"]))
         t_fp = self.world.footprint(self.hull["target"], t_pose)
         depth, t_c = manip.local(t_pose[0])
+        if self.pair_goal_align() is not None:
+            depth = self.pair_level_depth("partner", p_quat, min_area_rect(t_fp)[3], manip)
         reach, band = self.band_rule(manip, float(manip.world_to_base(t_pose[0][:2])[0]), (manip.working_arms or self.segment_arms)[:1])
         gs = TT.gap_grid(*self.gap_range(), step=0.5 * TT.START_REGION_GAP_STEP)
         masks = TT.partner_gap_masks(self, side, t_fp, depth, self.hull["partner"], p_quat, manip, gs, top=self.top, cam=cam, margin=self.margin_support,
@@ -1708,7 +1748,8 @@ class IORSSmall(SamplerV2):
         (:meth:`draw_partner_pose`: on the top, both footprints ``table_end_margin_m`` from the edge's ends, in the init image, and the reach
         rule cut to the band of the manipulation trunk - §4.1 / principle 3, the place pose of §6.11 needs its goal in the band).
         ``PARTNER_YAW_DRAWS`` random partner yaws, then the two edge-aligned ones (:meth:`edge_partner_quats`) - with :meth:`init_align_support`
-        the four edge-aligned yaws only, ``PARTNER_YAW_DRAWS`` tries; ``Reject("partner_placement")`` when none admits a gap. The shelf
+        the four edge-aligned yaws only, ``PARTNER_YAW_DRAWS`` tries; with :meth:`pair_goal_align` the one yaw of :meth:`pair_partner_yaw` at
+        every try (touching too); ``Reject("partner_placement")`` when none admits a gap. The shelf
         layout keeps its partner leaning against the opposite board; with ``partner_on_meta_link`` (A5) it stands on a meta-link spot
         (:meth:`draw_meta_partner_pose`)."""
         self.partner_draw = None
@@ -1722,8 +1763,11 @@ class IORSSmall(SamplerV2):
         if self.relation != "touching":
             # random yaws, then the two edge-aligned footprints the start region was computed with (a tight top admits little else);
             # init_align_support: the four edge-aligned yaws only, in random order, each tried with fresh gap draws; partner_aligned_to_target:
-            # the yaws along the target's drawn pose instead (the partner follows the target - edge-aligned too when the target is)
-            if self.partner_aligned_to_target():
+            # the yaws along the target's drawn pose instead (the partner follows the target - edge-aligned too when the target is);
+            # pair_goal_align: the one yaw that puts the partner's front at the required turn from the target's, fresh gap draws
+            if self.pair_goal_align() is not None:
+                yaws = [self.pair_partner_yaw(t_pose)] * PARTNER_YAW_DRAWS
+            elif self.partner_aligned_to_target():
                 yaws = self.aligned_partner_yaws(t_pose, rng)
             elif self.init_align_support():
                 aligned = self.support_aligned_yaws("partner", manip)
@@ -1748,6 +1792,8 @@ class IORSSmall(SamplerV2):
         left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=manip)
         self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
         faces_yaws = self.widest_faces_partner_yaws(t_pose, manip) if self.widest_faces() else None  # the two turns parallel to the target
+        if self.pair_goal_align() is not None:
+            faces_yaws = [self.pair_partner_yaw(t_pose)]  # the front at the required turn from the target's
         errors = []
         p_pose = None
         # edge alignment (owner 2026-09-18 13:50): the partner's footprint axes along the support edge - the two aligned
@@ -1935,22 +1981,199 @@ class IORSSmall(SamplerV2):
                 "target_goal_axis": self.widest_face_axis(self.hull["target"], q_goal, manip), "partner_axis": self.widest_face_axis(self.hull["partner"], p_pose[1], manip),
                 "init_deg": between(normal("target", t_pose[1]), p_n), "goal_deg": between(normal("target", q_goal), p_n)}
 
-    def target_goal_quat(self, t_pose: G.Pose, manip: Stance) -> th.Tensor:
+    # ------------------------------------------------------------------ pair goal alignment (owner 2026-10-13 ~22:23, touching#02 / nextto#01 / #03 / #04)
+
+    def pair_goal_align(self) -> Optional[Dict[str, Any]]:
+        """Owner 2026-10-13 ~22:23 (COMPLAINTS.md "Pair goal alignment": the target ends in a set orientation relative to its partner, the
+        way a person would put the pair down): ``generation.pair_goal_align`` (default None = off), nextto / touching only. ``front``:
+        ``{"<category>/<model>": "+x" | "-x" | "+y" | "-y"}`` - the end each model points with (a pencil's tip, a shoe's toe, a box's
+        printed front), in its own frame, for the drawn target and partner; ``relative_yaw_deg`` (0): the target's front is the partner's
+        turned by this about the vertical (0 = pointing the same way); ``facing`` (``"any"``): where the target's front points in the
+        stance's edge frame (:data:`PAIR_FACINGS`); ``faces`` (touching, optional): ``"widest"`` - the faces the boxes meet on are their
+        widest upright faces; ``tol_deg`` (5) / ``stagger_max_m`` (0.03): the settled goal's tolerances; ``push_max_height_m`` (touching,
+        optional): the push contact at most this high above the target's bottom (a thin box pushed across its thin axis tips above
+        b / mu). The pair stands side by side across their long axes (:meth:`pair_axis_angle`: the model's oriented box's longest side
+        lying, else the footprint's long side): the target's init yaw is one of :meth:`pair_target_yaws` (long axis across the edge, the
+        front per ``facing``), the partner's :meth:`pair_partner_yaw`, level with it (:meth:`pair_level_depth`), and the goal - the target
+        beside the partner along the edge, as for every nextto / touching goal - keeps that orientation (:meth:`pair_goal_quat`) at the
+        partner's level. ``Reject("spec")`` with another relation, the shelf layout, ``partner_on_meta_link``,
+        ``partner_aligned_to_target`` (it draws the partner's yaw itself) or a model without a ``front``."""
+        spec = self.gen("pair_goal_align")
+        if not spec:
+            return None
+        where = f"{self.gp.alias}: generation.pair_goal_align"
+        if not isinstance(spec, dict) or self.relation not in ("nextto", "touching"):
+            raise Reject("spec", f"{where} is a dict, for nextto / touching only")
+        if getattr(self, "shelf_start", None) is not None or self.meta_link() is not None or bool(self.gen("partner_aligned_to_target", False)):
+            raise Reject("spec", f"{where}: not with the shelf layout, partner_on_meta_link or partner_aligned_to_target")
+        fronts, names = {}, {}
+        for role in ("target", "partner"):
+            mc = self.choice.models[role]
+            key = f"{mc.category}/{mc.model}"
+            axis = (spec.get("front") or {}).get(key)
+            if axis not in PAIR_FRONT_AXES:
+                raise Reject("spec", f"{where}.front[{key!r}] must be one of {sorted(PAIR_FRONT_AXES)}, got {axis!r}")
+            fronts[role], names[role] = th.tensor(PAIR_FRONT_AXES[axis], dtype=th.float32), f"{key} {axis}"
+        facing, faces, push_h = spec.get("facing", "any"), spec.get("faces"), spec.get("push_max_height_m")
+        if facing not in PAIR_FACINGS or faces not in (None, "widest") or ((faces is not None or push_h is not None) and self.relation != "touching"):
+            raise Reject("spec", f"{where}: facing one of {PAIR_FACINGS}, faces 'widest' and push_max_height_m for touching only (got {facing!r}, {faces!r}, {push_h!r})")
+        return {"front": fronts, "front_axes": names, "relative_yaw_deg": float(spec.get("relative_yaw_deg", 0.0)), "facing": facing, "faces": faces,
+                "tol_deg": float(spec.get("tol_deg", PAIR_TOL_DEG)), "stagger_max_m": float(spec.get("stagger_max_m", PAIR_STAGGER_MAX_M)),
+                "push_max_height_m": None if push_h is None else float(push_h)}
+
+    def pair_axis_angle(self, role: str, quat) -> float:
+        """World angle (rad, either direction) of ``role``'s long axis at ``quat`` for :meth:`pair_goal_align`: :meth:`support_axis_angle`'s
+        model long axis when it lies, else the long side of the footprint's minimum-area rectangle (:func:`min_area_rect`) - the footprint
+        branch of support_axis_angle keeps the rectangle's axes modulo 90 deg only, and a box's long side must be told from its short one."""
+        angle, source = self.support_axis_angle(role, quat)
+        if source == "long_axis":
+            return angle
+        return min_area_rect(self.world.footprint(self.hull[role], (th.zeros(3), G.t(quat))))[0]
+
+    def front_yaw(self, role: str, quat) -> float:
+        """World yaw (rad) of ``role``'s front at ``quat`` (:meth:`pair_goal_align`): its named object axis projected on the floor, snapped to
+        the nearest of the four directions of its :meth:`pair_axis_angle` - along the long axis for a pencil or a shoe, across the
+        footprint's long side for a box's printed face (gym_shoe/mcfcwq's long axis is 4.6 deg off its +x)."""
+        v = C.quat_to_mat(G.t(quat)).float() @ self.pair_goal_align()["front"][role]
+        psi = math.atan2(float(v[1]), float(v[0]))
+        theta = self.pair_axis_angle(role, quat)
+        return G.wrap_angle(theta + round(G.wrap_angle(psi - theta) / (math.pi / 2)) * (math.pi / 2))
+
+    def pair_facing_yaw(self, manip: Stance) -> Optional[float]:
+        """World yaw (rad) the target's front must point to under :meth:`pair_goal_align`'s ``facing`` at ``manip``; None for ``"any"``."""
+        facing = self.pair_goal_align()["facing"]
+        if facing == "any":
+            return None
+        v = {"away": manip.inward, "toward": -manip.inward, "left": manip.tangent, "right": -manip.tangent}[facing]
+        return math.atan2(float(v[1]), float(v[0]))
+
+    def pair_target_yaws(self, manip: Stance) -> List[float]:
+        """The target's init yaws under :meth:`pair_goal_align` (applied to its rest orientation): those of its four :meth:`support_aligned_yaws`
+        whose long axis lies across the stance's edge - the partner beside it along the edge stands across their long axes - and whose front
+        points per ``facing``. The goal keeps the init yaw (the base does not turn between the grasp and the place)."""
+        rest = G.t(self.rest["target"])
+        inward = math.atan2(float(manip.inward[1]), float(manip.inward[0]))
+        want = self.pair_facing_yaw(manip)
+        out = []
+        for y in self.support_aligned_yaws("target", manip):
+            q = G.qmul(G.quat_from_yaw(y), rest)
+            if axes_angle_deg(self.pair_axis_angle("target", q), inward) > 45.0:
+                continue
+            if want is not None and abs(math.degrees(G.wrap_angle(self.front_yaw("target", q) - want))) > 45.0:
+                continue
+            out.append(y)
+        if not out:
+            raise Reject("spec", f"{self.gp.alias}: generation.pair_goal_align: no support-aligned yaw lays the target's long axis across the edge with "
+                                 f"its front {self.pair_goal_align()['facing']}")
+        return out
+
+    def pair_partner_yaw(self, t_pose: G.Pose) -> float:
+        """The partner's yaw (applied to its rest orientation) that puts its front at the target's front turned back by ``relative_yaw_deg``."""
+        rel = math.radians(self.pair_goal_align()["relative_yaw_deg"])
+        return G.wrap_angle(self.front_yaw("target", t_pose[1]) - rel - self.front_yaw("partner", self.rest["partner"]))
+
+    def pair_goal_quat(self, t_pose: G.Pose, p_pose: G.Pose) -> th.Tensor:
+        """The goal orientation under :meth:`pair_goal_align`: the target's init orientation turned about the vertical until its front is the
+        partner's (at ``p_pose``) turned by ``relative_yaw_deg`` - no turn at the draft (the partner was drawn so), the partner's settle
+        drift after it; ``Reject("pair_goal_align")`` beyond ``tol_deg``."""
+        spec = self.pair_goal_align()
+        d = G.wrap_angle(self.front_yaw("partner", p_pose[1]) + math.radians(spec["relative_yaw_deg"]) - self.front_yaw("target", t_pose[1]))
+        if abs(math.degrees(d)) > spec["tol_deg"]:
+            raise Reject("pair_goal_align", f"the target's front is {math.degrees(-d):+.1f} deg off the partner's turned by {spec['relative_yaw_deg']:.0f} deg "
+                                            f"(> {spec['tol_deg']:.0f})")
+        return G.qmul(G.quat_from_yaw(d), G.t(t_pose[1]))
+
+    def pair_level_depth(self, role: str, quat, centre_xy, manip: Stance) -> float:
+        """The depth (from the stance's front edge) of ``role``'s origin at ``quat`` that puts the centre of its footprint's minimum-area
+        rectangle at the depth of the world point ``centre_xy`` (the other object's rectangle centre): the long axes' midpoints level."""
+        d_c, _ = manip.local(G.t(centre_xy)[:2])
+        off = min_area_rect(self.world.footprint(self.hull[role], (th.zeros(3), G.t(quat))))[3]
+        return d_c - float(off.float() @ G.t(manip.inward).float())
+
+    def pair_facts(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> Dict[str, Any]:
+        """:meth:`pair_goal_align`'s residuals at the given poses: each front's yaw, ``rel_yaw_deg`` (the target's front against the partner's
+        turned by ``relative_yaw_deg``, signed), ``long_axes_deg`` (0 = parallel), each long axis against the stance's depth axis,
+        ``facing_deg`` (the target's front against ``facing``), ``offset_deg`` (the partner -> target offset of the footprint rectangles'
+        centres against the partner's long axis: 90 = side by side), ``stagger_m`` (that offset along the partner's long axis), ``side`` (the
+        target's side of the partner, robot frame) and ``pair_side`` (seen along the partner's front), ``gap_m`` (footprint clearance) and
+        ``faces`` (the upright face of each that faces the other: its widest one or a narrow one)."""
+        rel = math.radians(self.pair_goal_align()["relative_yaw_deg"])
+        q_t, q_p = G.t(t_pose[1]), G.t(p_pose[1])
+        phi_t, phi_p = self.front_yaw("target", q_t), self.front_yaw("partner", q_p)
+        th_t, th_p = self.pair_axis_angle("target", q_t), self.pair_axis_angle("partner", q_p)
+        fp_t, fp_p = self.world.footprint(self.hull["target"], t_pose), self.world.footprint(self.hull["partner"], p_pose)
+        off = (min_area_rect(fp_t)[3] - min_area_rect(fp_p)[3]).float()
+        along = float(off[0]) * math.cos(th_p) + float(off[1]) * math.sin(th_p)
+        across = abs(float(off[1]) * math.cos(th_p) - float(off[0]) * math.sin(th_p))
+        inward = math.atan2(float(manip.inward[1]), float(manip.inward[0]))
+        want = self.pair_facing_yaw(manip)
+        u = math.atan2(float(off[1]), float(off[0]))
+
+        def face(role, quat):
+            return "widest" if axes_angle_deg(self.widest_face_normal_yaw(self.hull[role], quat), u) < 45.0 else "narrow"
+
+        return {"front_yaw_deg": {"target": round(math.degrees(phi_t), 2), "partner": round(math.degrees(phi_p), 2)},
+                "rel_yaw_deg": round(math.degrees(G.wrap_angle(phi_t - phi_p - rel)), 2), "long_axes_deg": round(axes_angle_deg(th_t, th_p), 2),
+                "axis_vs_depth_deg": {"target": round(axes_angle_deg(th_t, inward), 2), "partner": round(axes_angle_deg(th_p, inward), 2)},
+                "facing_deg": None if want is None else round(abs(math.degrees(G.wrap_angle(phi_t - want))), 2),
+                "offset_deg": round(math.degrees(math.atan2(across, abs(along))), 2), "stagger_m": round(along, 4),
+                "side": "left" if float(off.float() @ G.t(manip.tangent).float()) > 0 else "right",
+                "pair_side": "left" if -float(off[0]) * math.sin(phi_p) + float(off[1]) * math.cos(phi_p) > 0 else "right",
+                "gap_m": round(TT.polygon_gap(fp_t, fp_p), 4), "faces": {"target": face("target", q_t), "partner": face("partner", q_p)}}
+
+    def pair_violation(self, facts: Dict[str, Any]) -> str:
+        """Why residuals of :meth:`pair_facts` break :meth:`pair_goal_align` (fronts / long axes beyond ``tol_deg``, the facing beyond it, the
+        target staggered more than ``stagger_max_m`` along the partner's long axis, the wrong side, other faces than ``faces``), else ``""``."""
+        spec, why = self.pair_goal_align(), []
+        tol = spec["tol_deg"]
+        if abs(facts["rel_yaw_deg"]) > tol:
+            why.append(f"fronts {facts['rel_yaw_deg']:+.1f} deg off the required turn")
+        if facts["long_axes_deg"] > tol:
+            why.append(f"long axes {facts['long_axes_deg']:.1f} deg apart")
+        if facts["facing_deg"] is not None and facts["facing_deg"] > tol:
+            why.append(f"front {facts['facing_deg']:.1f} deg off '{spec['facing']}'")
+        if abs(facts["stagger_m"]) > spec["stagger_max_m"]:
+            why.append(f"staggered {facts['stagger_m']:+.3f} m along the partner's long axis")
+        if self.goal_side is not None and facts["side"] != self.goal_side:
+            why.append(f"on the partner's {facts['side']}, not its {self.goal_side}")
+        if spec["faces"] is not None and (facts["faces"]["target"] != spec["faces"] or facts["faces"]["partner"] != spec["faces"]):
+            why.append(f"meeting on the {facts['faces']['target']} / {facts['faces']['partner']} faces")
+        return "; ".join(why)
+
+    def check_pair_goal(self, draft: Draft, tname: str, pname: str) -> None:
+        """:meth:`pair_goal_align` at the settled goal (both objects where the goal settle left them): ``summary.pair_goal_align.goal_settled``;
+        ``Reject("pair_goal_align")`` when :meth:`pair_violation` names a breach."""
+        poses = {role: tuple(v.float() for v in self.objects[name].get_position_orientation()) for role, name in (("target", tname), ("partner", pname))}
+        facts = self.pair_facts(poses["target"], poses["partner"], self.sidecar.stance("manipulation"))
+        rec = draft.summary.get("pair_goal_align")
+        if isinstance(rec, dict):
+            rec["goal_settled"] = facts
+        why = self.pair_violation(facts)
+        if why:
+            self.counters["pair_goal_align"] = self.counters.get("pair_goal_align", 0) + 1
+            raise Reject("pair_goal_align", f"settled goal: {why}")
+
+    def target_goal_quat(self, t_pose: G.Pose, manip: Stance, p_pose: Optional[G.Pose] = None) -> th.Tensor:
+        """The target's goal orientation; with :meth:`pair_goal_align` and the partner's pose, :meth:`pair_goal_quat`."""
         if self.shelf_start is not None:  # touching#03: the book ends resting against the partner, leaning like it
             return TT.mirrored_lean_quat(t_pose[1], self.edge, self.shelf_start["lean_side"], self.shelf_start["lean_deg"])
         if self.relation == "inside" and self.up_axis() is not None:
             return self.standing_goal_quat(t_pose[1], manip)
+        if p_pose is not None and self.pair_goal_align() is not None:
+            return self.pair_goal_quat(t_pose, p_pose)
         return self.edge_aligned_quat(self.hull["target"], t_pose[1], manip) if self.edge_aligned() else G.t(t_pose[1])
 
     def place_pose_for(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> G.Pose:
         """Target pose at its *place* position for a drafted partner pose: the nearer-side rule of ``goal_pose`` with the
-        place gap (nextto: g_NT - 1 cm; touching: the same, the push closes it)."""
-        t_quat = self.target_goal_quat(t_pose, manip)
+        place gap (nextto: g_NT - 1 cm; touching: the same, the push closes it); :meth:`pair_goal_align`: at the levelled depth."""
+        t_quat = self.target_goal_quat(t_pose, manip, p_pose)
         t_hull = G.local_points_world(self.hull["target"], (th.zeros(3), t_quat))
         p_hull_w = self.world.hull_at(self.hull["partner"], p_pose)
         p_lat = (p_hull_w[:, :2] - manip.base_xy) @ manip.tangent
         t_lat = t_hull[:, :2] @ manip.tangent
         depth_t, lat_init = manip.local(t_pose[0])
+        if self.pair_goal_align() is not None:
+            depth_t = self.pair_level_depth("target", t_quat, min_area_rect(self.world.footprint(self.hull["partner"], p_pose))[3], manip)
         _, lat = nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())), (float(t_lat.min()), float(t_lat.max())), self.place_gap())
         xy = manip.world(depth_t, lat)
         return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
@@ -2087,7 +2310,13 @@ class IORSSmall(SamplerV2):
         if self.goal_side is not None:
             draft.summary["goal_side"] = self.goal_side
         manip = self.sidecar.stance("manipulation")
+        self.note_pair_goal(draft, goal, draft.object_poses[pname], manip)
         self.sidecar.set_goal(manip.base_pose2d, manip.translate, manip.tilt, arms="same")
+
+    def note_pair_goal(self, draft: Draft, goal: G.Pose, p_pose: G.Pose, manip: Stance) -> None:
+        """:meth:`pair_goal_align`: the residuals of the drafted goal (target at ``goal``, partner at ``p_pose``) in ``summary.pair_goal_align.goal``."""
+        if self.pair_goal_align() is not None and isinstance(draft.summary.get("pair_goal_align"), dict):
+            draft.summary["pair_goal_align"]["goal"] = self.pair_facts(goal, p_pose, manip)
 
     def _set_target_goal(self, draft: Draft, tname: str, goal: G.Pose):
         tgt = draft.pose_targets[tname]
@@ -2102,9 +2331,11 @@ class IORSSmall(SamplerV2):
         recorded goal); nextto / touching -> the position closest to the init pose that satisfies the predicate: the
         target goes on the partner **side facing its init position** (nextto: AABB gap < g_NT; touching: contact,
         nudged in the goal check). ``self.goal_side`` = ``"left"`` / ``"right"`` (robot frame) records the chosen side.
-        Touching with :meth:`edge_aligned`: the goal orientation is the edge-aligned yaw nearest the init yaw."""
+        Touching with :meth:`edge_aligned`: the goal orientation is the edge-aligned yaw nearest the init yaw. :meth:`pair_goal_align`
+        (nextto / touching): the orientation of :meth:`pair_goal_quat` and the target's footprint rectangle level with the partner's
+        along the stance's depth axis - beside it across their long axes."""
         st = self.sidecar.stance("manipulation")
-        t_quat = self.target_goal_quat(t_pose, st)
+        t_quat = self.target_goal_quat(t_pose, st, p_pose if self.relation in ("nextto", "touching") else None)
         t_hull = G.local_points_world(self.hull["target"], (th.zeros(3), t_quat))
         p_hull_w = self.world.hull_at(self.hull["partner"], p_pose)
         self.goal_side = None
@@ -2145,6 +2376,8 @@ class IORSSmall(SamplerV2):
             # partner's right face, the brace holds its left face; a target starting left of the partner contradicts that
             raise Reject("touching_side", f"target init lateral {lat_init:+.2f} is left of the partner centre {0.5 * float(p_lat.min() + p_lat.max()):+.2f}")
         depth_t, _ = st.local(t_pose[0])
+        if self.pair_goal_align() is not None:
+            depth_t = self.pair_level_depth("target", t_quat, min_area_rect(p_hull_w)[3], st)
         if self.relation == "nextto":
             handed = (self.pair or {}).get("handedness")
             if handed and self.goal_side != handed["target_side"]:
@@ -2226,8 +2459,8 @@ class IORSSmall(SamplerV2):
                     rec.update({"remedy": f"gap {gap_v:.3f}", "gap_m": round(gap_v, 4)})
                 if best_c >= 0:
                     break
-        if best_c < 0 and self.target_orientation_free():
-            # (b) the place yaw turns the jaw away from the partner (the target's orientation is not constrained)
+        if best_c < 0 and self.target_orientation_free() and self.pair_goal_align() is None:
+            # (b) the place yaw turns the jaw away from the partner (the target's orientation is not constrained; pair_goal_align fixes it)
             for yaw_deg in (90.0, -90.0, 180.0):
                 q_yaw = G.compose((th.zeros(3), G.quat_from_yaw(math.radians(yaw_deg))), (th.zeros(3), t_quat))[1]  # world yaw applied to the rest pose
                 for gap_v in (gap, g_nt - 0.003):
@@ -2326,6 +2559,7 @@ class IORSSmall(SamplerV2):
         goal = self.goal_pose(draft.object_poses[tname], (p.clone(), q.clone()))
         draft.goal_poses[tname] = goal
         self._set_target_goal(draft, tname, goal)
+        self.note_pair_goal(draft, goal, (p.clone(), q.clone()), self.sidecar.stance("manipulation"))
         # the recorded grasp poses follow the settled target pose (what the oracle re-derives from the loaded instance)
         grasp = self.sidecar.grasp_of(tname)
         if grasp is not None and grasp.eef_in_object is not None:
@@ -2540,6 +2774,8 @@ class IORSSmall(SamplerV2):
             draft.summary["nextto_gap_m"] = round(gap, 4)
             if gap >= float(self.pair["g_NT"]):
                 raise Reject("goal_infeasible", f"nextto AABB gap {gap:.3f} >= g_NT {float(self.pair['g_NT']):.3f} after the settle")
+        if self.pair_goal_align() is not None:
+            self.check_pair_goal(draft, tname, pname)
         p, _ = self.obj("partner").get_position_orientation()
         tgt = draft.pose_targets[pname]
         moved = float(th.linalg.norm(p - th.tensor(tgt["position"])))
@@ -3014,6 +3250,9 @@ class IORSSmall(SamplerV2):
                                                              "push_direction": [round(float(v), 4) for v in direction]})
         dist = self.push_distance(gap_at_place)
         draft.summary.setdefault("touching", {}).update({"gap_at_place_m": round(gap_at_place, 4), "push_distance_m": round(dist, 4), "push_margin_m": round(self.push_margin(), 4)})
+        pair = self.pair_goal_align()
+        if pair is not None and pair["push_max_height_m"] is not None:
+            draft.summary["touching"]["push_max_height_m"] = pair["push_max_height_m"]
         # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6).
         # Push candidates: the pads closing horizontally (default) then vertically (the other wrist roll — the horizontal
         # one put the right pre-contact out of reach on 5/8 attempts of the sanitary-napkins loop); brace candidates in
@@ -3086,9 +3325,16 @@ class IORSSmall(SamplerV2):
         passes the exact IK on its own (the requirement; the brace is optional, owner 2026-09-16 17:10: the axial rule) and (2)
         the oracle's retreat after the push - 10 cm back along the approach axis from the push GOAL (above it for a blade) - has a
         configuration (a class without one dies in the program check, 9/16 of 0918-173814). ``arm``: the push arm (default the
-        right arm; the shelf layout's :meth:`shelf_push_arm`). Returns ``orient.choose_first``'s ``(chosen, decision, failures)``."""
+        right arm; the shelf layout's :meth:`shelf_push_arm`). :meth:`pair_goal_align`'s ``push_max_height_m``: only the candidates whose
+        contact (the fingertips of a blade, else the eef's height at the face) is at most that high above the target's bottom.
+        Returns ``orient.choose_first``'s ``(chosen, decision, failures)``."""
         if arm is None:
             arm = self.shelf_push_arm() if self.shelf_start is not None else "right"
+        cands = self.touching_push_candidates(st, p_init, t_face_z, direction)
+        pair = self.pair_goal_align()
+        if pair is not None and pair["push_max_height_m"] is not None:
+            h_max = float(pair["push_max_height_m"])
+            cands = (c for c in cands if float(c[2].get("fingertip_z") or G.t(c[1][0])[2]) - float(t_face_z[0]) <= h_max + 1e-9)
 
         def chain(c):
             _kind, init, extras = c
@@ -3108,7 +3354,7 @@ class IORSSmall(SamplerV2):
                 return False, r_push, None, f"retreat clear pose: {r_ret.reason}"
             return True, r_push, qs, ""
 
-        return O.choose_first(self.ikc, arm, self.touching_push_candidates(st, p_init, t_face_z, direction), key=lambda c: c[1], label=lambda c: c[0],
+        return O.choose_first(self.ikc, arm, cands, key=lambda c: c[1], label=lambda c: c[0],
                               chain=chain, evaluate=evaluate, q_start=self.ikc.q_locked(st), camera_idx=[1], stage="touching push")
 
     def _touching_brace_choice(self, st: Stance, push_chain: List[G.Pose], t_pose: G.Pose, p_pose: G.Pose, b_point: th.Tensor, face_z: Tuple[float, float],

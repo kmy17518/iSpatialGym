@@ -944,7 +944,7 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    exact IK from the manipulation stance (idle arm untucked and locked; support ignored for the grasp pose only). On
    failure draw the next element of F without replacement; reject the attempt when F is exhausted. Record
    `(yaw, grasp_key, grasp_name)` and both eef poses. A task that restricts the init yaws (touching's
-   `widest_faces`, §6.11; IORS small `init_align_support`, step 2) screens its own yaws, draws without jitter and keeps that F out of the band cache (the band
+   `widest_faces`, §6.11; IORS small `init_align_support` and `pair_goal_align`, step 2) screens its own yaws, draws without jitter and keeps that F out of the band cache (the band
    indexes F by the 8 yaws; an empty F over a subset would remove a cell the other yaws reach).
    - *Disembedding*: source tray at the focus, aligned with the edge; target inside it (yaw as above, footprint on
      the tray floor, 0.5 cm margin). Destination tray on the template's destination side (4.4, A2a), aligned with the edge and the
@@ -1055,6 +1055,14 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      the partner's at the goal (equal margins at both ends of the aligned long axes). Recorded: `partner_draw.long_axes_deg`
      (0 = parallel). With `init_align_support` too, this key decides the partner's yaw (the edge-aligned
      target makes it edge-aligned as well). Aliases without the key keep the random partner yaws.
+   - **Pair goal alignment** (owner decision 2026‑10‑13 ~22:23, touching#02 / nextto#01 / #03 / #04: the target ends in a set
+     orientation relative to its partner, the way a person would put the pair down; `generation.pair_goal_align`, nextto /
+     touching only, default off; §6.11). The partner is drawn at the one yaw that puts its front at the required turn from the
+     target's drawn front (16 tries, 8 for touching, each with a new gap), with the centre of its footprint's minimum-area
+     rectangle level with the target's along the stance's depth axis; the start region uses that orientation (beside a target at
+     any of its admitted init yaws). The target's init yaws (step 1, no jitter, F kept out of the band) are its support-aligned
+     yaws whose long axis lies across the edge and whose front points per `facing`. Takes precedence over `widest_faces` /
+     `init_align_support` for both yaws; with `partner_aligned_to_target`, `partner_on_meta_link` or the shelf layout a spec error.
    - **Partner on a flat part of the top** (owner decision 2026‑10‑13, under_small#04 "move the sheet to a flat part of the
      support"; `generation.partner_flat_top: true`). Once per template the support's visual meshes (the faces reaching within
      5 cm of the top) are rasterised as seen from straight above (`partner_flat_res_m`, 0.002 m cells; per cell the highest
@@ -2260,6 +2268,35 @@ face) or along the depth axis for `depth` (the wide faces face the robot). Its g
 tries the two edge‑aligned turns (180° apart) whose widest face is parallel to the drawn target's. Touching with the edge
 alignment and without the shelf layout only (`Reject("spec")` otherwise). `summary.widest_faces` records each face's axis
 and the angle between the two normals at init and at the goal.
+
+**Pair goal alignment** (owner decision 2026‑10‑13 ~22:23, COMPLAINTS.md "Pair goal alignment": touching#02, nextto#01 / #03 /
+#04; `generation.pair_goal_align`, default unset = off; nextto / touching only). The target ends parallel to its partner, side by
+side across their long axes, its front pointing a set way. Keys: `front` — per drawn model `{"<category>/<model>": "+x" | "-x" |
+"+y" | "-y"}`, the end it points with in its own frame (snapped onto the four directions of its long axis: the collision oriented
+box's longest side when it lies, else the long side of the footprint's minimum‑area rectangle — a box's printed face is the
+normal of that side); `relative_yaw_deg` (0: the target's front is the partner's turned by this about the vertical, 0 = the same
+way); `facing` (`away` / `toward` the robot = along / against the edge's inward normal, `left` / `right` = along / against the
+edge tangent, `any`); `faces` (touching: `widest` — the boxes meet on their widest upright faces); `tol_deg` (5) and
+`stagger_max_m` (0.03); `push_max_height_m` (touching: only push contacts at most this high above the target's bottom — the
+fingertips of a blade, else the eef at the face; a box pushed across a thin axis of half‑thickness b tips above b / μ before it
+slides). Draws (§4.6): the target's init yaw lays its long axis across the edge with its front per `facing`; the partner's yaw
+puts its front at the required turn from the target's, level with it. Goal: the nextto / touching goal (the target beside the
+partner along the edge) at the depth that levels the two footprint rectangles' centres, its orientation the init one turned
+about the vertical until its front is the partner's (settled) front turned by `relative_yaw_deg` (no turn at the draft; beyond
+`tol_deg` the attempt is rejected, `pair_goal_align`); nextto's release‑sweep remedy keeps the yaw. After the goal settle the
+residuals are measured on the settled poses and the attempt is rejected (`pair_goal_align`) for fronts or long axes beyond
+`tol_deg`, the front beyond it from `facing`, a stagger along the partner's long axis beyond `stagger_max_m`, the target on the
+other side or meeting on other faces than `faces`. Recorded: `template_facts.pair_goal_align` and the instance summary's
+`pair_goal_align` — the key and the residuals `init` (the draw), `goal` (the drafted goal), `goal_settled`: each front's yaw,
+`rel_yaw_deg`, `long_axes_deg`, each long axis against the depth axis, `facing_deg`, `offset_deg` (the partner → target offset of
+the rectangles' centres against the partner's long axis: 90 = side by side), `stagger_m`, `side` (robot frame) / `pair_side`
+(seen along the partner's front), `gap_m` (footprint clearance) and `faces`; touching also `summary.touching.push_max_height_m`.
+The four aliases (DECISIONS_LOG 2026‑10‑13 22:40; fronts from the models' cross‑sections, confirmed on renders): nextto#01
+marker/xakoic `+x` (cap) and colored_pencil/acumgp `-x` (tip), #03 tablespoon/yxxfdj `-x` (bowl) and chopstick/bcwuwv `-x`
+(tip), #04 gym_shoe/kmcbym and mcfcwq `+x` (toes) — `facing: away`, the pair pointing away from the robot side by side, the
+partner on `partner_side` (#04: the left shoe on the left, a wearable pair); touching#02 box_of_cereal/iucshm `+x` and dkhgxn
+`-x` (printed fronts), `facing: any`, `faces: widest`, `push_max_height_m` 0.035, with `touching_place_gap_m` 0.05 (one finger
+stands between the boxes at the place and opens (0.10 − 0.043) / 2 m further). Aliases without the key are sampled as before.
 
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 
