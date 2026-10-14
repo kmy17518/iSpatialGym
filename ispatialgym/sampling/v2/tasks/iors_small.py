@@ -159,6 +159,9 @@ THIN_PARTNER_HEIGHT = 0.04
 #: half width along eef x (conservative; only the open-gripper lowest point is derived from them)
 FINGER_THICKNESS = 0.012
 FINGER_HALF_WIDTH = 0.012
+#: ``generation.raised_release`` (nextto; owner 2026-10-14 ~01:51, nextto#03): the open jaw clears the partner by ``partner_clearance_m``
+#: at the release, raised in ``step_m`` steps up to ``max_raise_m`` (the owner: about 2 cm, "not too high")
+RAISED_RELEASE_DEFAULTS = {"partner_clearance_m": 0.005, "max_raise_m": 0.03, "step_m": 0.001}
 #: touching#03 shelf layout: the lift of the target before it is slid along the board to the partner's side (it never passes over
 #: the partner); 5 mm under the headroom the interior raster keeps above the tallest book at every free cell
 SHELF_CARRY_HEIGHT_M = TT.INTERIOR_HEADROOM_MARGIN_M - 0.005
@@ -461,6 +464,25 @@ def gripper_corners_world(eef: G.Pose, open_width: float = C.GRIPPER_OPEN_M, thi
             for sx in (-1.0, 1.0):
                 pts.append(pos + za * a + sc * (0.5 * float(open_width) + float(thickness)) * c + sx * float(half_width) * x)
     return th.stack(pts, dim=0)
+
+
+def hull_edge_points(pts: th.Tensor, spacing: float = 0.003) -> th.Tensor:
+    """The convex hull's vertices of ``pts`` (N, 3) plus points along its edges at most ``spacing`` apart: a slender hull (a chopstick's
+    rings at its ends and middle) has no vertex where the open jaw stands, though its edges pass through it."""
+    from scipy.spatial import ConvexHull
+
+    p = G.t(pts).double().numpy()
+    try:
+        hull = ConvexHull(p)
+    except Exception:  # noqa: BLE001 - a flat / degenerate set: the points as they are
+        return G.t(pts).float()
+    edges = {tuple(sorted((int(s[i]), int(s[(i + 1) % 3])))) for s in hull.simplices for i in range(3)}
+    out = [p[hull.vertices]]
+    for i, j in edges:
+        n = int(math.ceil(float(np.linalg.norm(p[j] - p[i])) / float(spacing)))
+        if n > 1:
+            out.append(p[i] + np.linspace(0.0, 1.0, n + 1)[1:-1, None] * (p[j] - p[i]))
+    return th.as_tensor(np.vstack(out), dtype=th.float32)
 
 
 @register(*RELATION_OF_SUBTASK)
@@ -2381,14 +2403,96 @@ class IORSSmall(SamplerV2):
         depth_t, _ = st.local(t_pose[0])
         if self.pair_goal_align() is not None:
             depth_t = self.pair_level_depth("target", t_quat, min_area_rect(p_hull_w)[3], st)
+        raised = self.raised_release() if self.relation == "nextto" else None
         if self.relation == "nextto":
             handed = (self.pair or {}).get("handedness")
             if handed and self.goal_side != handed["target_side"]:
                 # the partner was placed on the other side (``handed_ranges``): a target starting on the wrong side contradicts that
                 raise Reject("handedness_side", f"the {handed['target']} target would end {self.goal_side} of the {handed['partner']} partner")
-            lat, t_quat = self.avoid_release_sweep(st, depth_t, lat, t_quat, lat_init, p_lat, p_hull_w, gap)
+            if raised is None:
+                lat, t_quat = self.avoid_release_sweep(st, depth_t, lat, t_quat, lat_init, p_lat, p_hull_w, gap)
         xy = st.world(depth_t, lat)
-        return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
+        pos = th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])])
+        if raised is not None:
+            pos = pos + th.tensor([0.0, 0.0, self.release_raise(pos, t_quat, p_hull_w, raised)])
+        return pos, t_quat
+
+    # -- raised release (owner 2026-10-14 ~01:51, nextto#03: "try the higher release: lift the spoon about 2 cm so the fingers open above
+    #    the chopstick ... not too high - just so that the fingers don't touch") --
+
+    def raised_release(self) -> Optional[Dict[str, float]]:
+        """nextto ``generation.raised_release`` (default unset = off): ``true`` or ``{"partner_clearance_m", "max_raise_m", "step_m"}``
+        (defaults :data:`RAISED_RELEASE_DEFAULTS`). The release stays the open command (+1); the place rises over the resting goal to the
+        lowest height at which the fully open jaw clears the partner (:meth:`release_raise`), the goal check drops the target from there
+        and the settled pose is the recorded goal. None when unset or for another relation."""
+        v = self.gen("raised_release", None)
+        if self.relation != "nextto" or v is None or v is False:
+            return None
+        out = dict(RAISED_RELEASE_DEFAULTS)
+        if isinstance(v, dict):
+            unknown = sorted(set(v) - set(out))
+            if unknown:
+                raise Reject("spec", f"{self.gp.alias}: generation.raised_release: unknown keys {unknown} (known {sorted(out)})")
+            out.update({k: float(x) for k, x in v.items()})
+        elif v is not True:
+            raise Reject("spec", f"{self.gp.alias}: generation.raised_release: true or a dict, got {v!r}")
+        return out
+
+    def release_raise(self, pos: th.Tensor, t_quat: th.Tensor, p_hull_w: th.Tensor, raised: Dict[str, float]) -> float:
+        """The lowest raise (m, ``step_m`` steps from 0) of the target's resting goal ``(pos, t_quat)`` at which the fully open jaw of the
+        drawn grasp (:meth:`open_jaw_clearance`: from the fingertips up through the retreat, ``GRIPPER_OPEN_M``) clears the partner's hull
+        - its edges sampled (:func:`hull_edge_points`) - by ``partner_clearance_m``; ``Reject("release_sweep")`` when not even
+        ``max_raise_m`` does. 0 without a drawn grasp. ``self.raised_release_facts`` records it."""
+        self.raised_release_facts = None
+        grasp = self.sidecar.grasp_of(self.bindings.one("target").name)
+        if grasp is None or grasp.eef_in_object is None:
+            return 0.0
+        pts = hull_edge_points(p_hull_w)
+        need, top, step = float(raised["partner_clearance_m"]), float(raised["max_raise_m"]), max(float(raised["step_m"]), 1e-4)
+        q = G.t(t_quat)
+
+        def clearance(h: float) -> float:
+            return self.open_jaw_clearance(IK.grasp_pose((G.t(pos) + th.tensor([0.0, 0.0, h]), q), grasp.eef_in_object), pts)
+
+        c0 = clearance(0.0)
+        n = int(math.floor(top / step + 1e-9))
+        h, c = 0.0, c0
+        for i in range(n + 1):
+            h = i * step
+            c = clearance(h)
+            if c >= need:
+                break
+        place = IK.grasp_pose((G.t(pos) + th.tensor([0.0, 0.0, h]), q), grasp.eef_in_object)
+        low = float(gripper_corners_world(place, open_width=C.GRIPPER_OPEN_M)[:, 2].min())
+        self.raised_release_facts = {"raise_m": round(h, 4), "jaw_clearance_m": round(c, 4), "jaw_clearance_at_rest_m": round(c0, 4),
+                                     "partner_clearance_m": need, "max_raise_m": top, "open_gripper_lowest_z": round(low, 4),
+                                     "partner_top_z": round(float(p_hull_w[:, 2].max()), 4),
+                                     "open_gripper_lowest_above_partner_top_m": round(low - float(p_hull_w[:, 2].max()), 4)}
+        if c < need:
+            raise Reject("release_sweep", f"raised release: the fully open jaw clears the partner by {c * 1000:.1f} mm at the highest allowed raise "
+                                          f"({top * 1000:.0f} mm; {need * 1000:.0f} mm needed, {c0 * 1000:.1f} mm at rest)")
+        return h
+
+    def raised_release_record(self, draft: Draft, tname: str, place: G.Pose, p_hull_now: th.Tensor, raised: Dict[str, float]) -> Dict[str, Any]:
+        """The raised release at the recorded place (``after_goal_check``): :meth:`release_raise`'s facts, the open jaw's clearance from the
+        settled partner there (below 0 -> ``Reject("release_sweep")``), the lowest open-gripper point above the partner's top, and the drop
+        from the release pose (``draft.goal_poses``) to the settled goal (the pose target): ``drop_m`` (height), ``slide_m`` (horizontal),
+        ``turn_deg`` / ``yaw_deg``."""
+        rec: Dict[str, Any] = dict(getattr(self, "raised_release_facts", None) or {}, key=dict(raised))
+        c_place = self.open_jaw_clearance(place, hull_edge_points(p_hull_now))
+        low = float(gripper_corners_world(place, open_width=C.GRIPPER_OPEN_M)[:, 2].min())
+        rec.update({"jaw_clearance_at_place_m": round(c_place, 4), "open_gripper_lowest_above_partner_top_at_place_m": round(low - float(p_hull_now[:, 2].max()), 4)})
+        rel_pos, rel_quat = (G.t(v) for v in draft.goal_poses[tname])
+        tgt = draft.pose_targets[tname]
+        settled_pos = th.tensor(tgt["position"], dtype=th.float32)
+        rec.update({"release_z": round(float(rel_pos[2]), 4), "settled_z": round(float(settled_pos[2]), 4), "drop_m": round(float(rel_pos[2] - settled_pos[2]), 4),
+                    "slide_m": round(float(th.linalg.norm(settled_pos[:2] - rel_pos[:2])), 4)})
+        if tgt.get("orientation") is not None:
+            q1 = th.tensor(tgt["orientation"], dtype=th.float32)
+            rec.update({"turn_deg": round(math.degrees(G.quat_angle(rel_quat, q1)), 2), "yaw_deg": round(math.degrees(G.wrap_angle(G.yaw_of(q1) - G.yaw_of(rel_quat))), 2)})
+        if c_place < 0:
+            raise Reject("release_sweep", f"raised release: at the recorded place the fully open jaw reaches {-c_place * 1000:.1f} mm into the settled partner")
+        return rec
 
     # -- open-jaw footprint at the release (oracle nextto re-run 0916-181440: the opening finger swept the pencil 9 cm) --
 
@@ -2819,6 +2923,7 @@ class IORSSmall(SamplerV2):
         manip = self.sidecar.stance("manipulation")
         goal_pos = th.tensor(draft.pose_targets[tname]["position"])
         goal_quat = draft.goal_poses[tname][1] if draft.pose_targets[tname].get("orientation") is None else th.tensor(draft.pose_targets[tname]["orientation"])
+        raised = self.raised_release() if self.relation == "nextto" else None
         if self.relation == "inside":
             # the place is the release above the rim (``draft.goal_poses`` = the release pose of :meth:`release_pose`); the
             # recorded goal is what the drop settled to. The gripper never reaches into the partner, so it is not ignored.
@@ -2835,6 +2940,10 @@ class IORSSmall(SamplerV2):
             draft.summary["release"] = dict(self.release or {}, place_lowest_finger_z=round(low, 4), settled_goal_z=round(float(goal_pos[2]), 4))
         else:
             place_pos = goal_pos
+            if raised is not None:
+                # the place is the raised release (``draft.goal_poses``: the resting goal raised by :meth:`release_raise`); the recorded
+                # goal is what the drop from there settled to
+                place_pos, goal_quat = G.t(draft.goal_poses[tname][0]), G.t(draft.goal_poses[tname][1])
             if self.relation == "touching":
                 # the oracle program places at the *nextto* position and pushes the target into contact from there: the
                 # place is the settled contact position moved back (away from the partner, robot's right) by the push distance
@@ -2928,6 +3037,12 @@ class IORSSmall(SamplerV2):
                                               f"pre-place ignoring support+partner {_ok(r_pre_obj_ign)}, place {_ok(r_place_obj)}, place ignoring every object "
                                               f"{_ok(r_place_obj_free)}; goal lateral {lat:+.2f} m, trunk ({manip.translate}, {manip.tilt:.2f}), stand-off {manip.stand_off})")
         grasp.pre_place, grasp.place = pre_place, place
+        if raised is not None:
+            # the raised release at the recorded place, with the grasp that carries the target there (a re-selected one included)
+            p_now = self.obj("partner").get_position_orientation()
+            drop = self.raised_release_record(draft, tname, place, self.world.hull_at(self.hull["partner"], (p_now[0].float(), p_now[1].float())), raised)
+            grasp.extras["raised_release"] = drop
+            draft.summary["raised_release"] = drop
         if self.relation == "touching":
             # the oracle's place ends 10 cm back along the approach (release + lift-off) and its retreat goes 5 cm further: the
             # pose 15 cm back from the place, fingers open, the released box ignored, must have a configuration (the program

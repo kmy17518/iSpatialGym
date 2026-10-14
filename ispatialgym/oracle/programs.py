@@ -203,8 +203,8 @@ def _pick_actions(sc: Sidecar, g: GraspRecord, stance: str = "manipulation") -> 
     return [p, Retreat(arm=push.arm, object=push.object, after=p)] + to_grasp + [grasp, lift]
 
 
-def _place_and_retreat(g: GraspRecord, kind: str, relation: str = "on") -> List[Action]:
-    place = Place(kind=kind, arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on, relation=relation)
+def _place_and_retreat(g: GraspRecord, kind: str, relation: str = "on", avoid: Tuple[str, ...] = ()) -> List[Action]:
+    place = Place(kind=kind, arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on, relation=relation, avoid=avoid)
     return [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)]
 
 
@@ -1177,12 +1177,16 @@ def _second_hand(push: PushContact) -> Optional[PushContact]:
 
 def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     """init → manipulation stance → grasp → lift (orientation kept) → place at the recorded goal pose (centre of the
-    partner; nearest satisfying position for nextto; inside: drop into the fillable volume) → retreat."""
+    partner; nearest satisfying position for nextto; inside: drop into the fillable volume) → retreat. A nextto place with
+    ``grasps[0].raised_release`` (the sampler's ``generation.raised_release``, owner 2026-10-14 ~01:51: the place raised until the
+    fully open jaw clears the partner, the target let go at the open command drops onto the table) must not touch the partner
+    (``Place.avoid``)."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     grasp, lift = _pick(g)
     kind = "drop" if relation == "inside" else "support"
     word = _IORS_RELATION_WORDS["under_small" if relation == "under" else relation]
-    return _travel(sc, "init", "manipulation") + [grasp, lift] + _place_and_retreat(g, kind, word)
+    avoid = (g.place_on,) if relation == "nextto" and g.place_on and g.extra.get("raised_release") else ()
+    return _travel(sc, "init", "manipulation") + [grasp, lift] + _place_and_retreat(g, kind, word, avoid=avoid)
 
 
 def program_iors_touching(sc: Sidecar) -> List[Action]:

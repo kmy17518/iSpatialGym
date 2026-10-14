@@ -404,6 +404,10 @@ the nextto bound (gap up to g_NT − 3 mm), then — when the target's orientati
 away (±90°, 180°); `release_opening_max_m` = the largest symmetric opening that still clears the partner by 1 cm (for the
 oracle's pre-shaped release); when even pinch + 1 cm would sweep it → `Reject("release_sweep")`. Facts (`grasps[k].release_sweep`,
 `summary.release_sweep`) for nextto and touching (touching: at the nextto place the push starts from, facts only).
+nextto with `generation.raised_release` (owner 2026-10-14 ~01:51, COMPLAINTS.md nextto#03; spec §6.11 "Raised release"): no move along
+the bound; the goal rises to the lowest height at which the open jaw clears the partner's hull (edges sampled, `hull_edge_points`) by
+`partner_clearance_m` (`release_raise`, at most `max_raise_m`), the goal check drops the target from there, the settled pose is the
+goal and the place is the raised pose (`grasps[k].raised_release`, `summary.raised_release`: raise, drop, slide, turn).
 
 ### Robust `under` / `ontop` (D-007 option A, 2026-09-16 21:17)
 

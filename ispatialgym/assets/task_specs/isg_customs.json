@@ -33103,6 +33103,10 @@
     },
     "relative_yaw_deg": 0.0,
     "facing": "away"
+   },
+   "raised_release": {
+    "partner_clearance_m": 0.005,
+    "max_raise_m": 0.03
    }
   },
   "constraints": []

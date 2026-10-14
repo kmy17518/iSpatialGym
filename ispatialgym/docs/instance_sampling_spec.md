@@ -2304,6 +2304,26 @@ above b / μ ≈ 4.3 cm, μ ≈ 0.5) no leaning or low blade passed the exact IK
 (pair1013_c8_k3 / k4 / k5: every attempt `contact_unreachable`); the mid-height push may tip the box onto the taller partner,
 at most ≈ atan(0.05 / 0.218) = 13° before it rests against it. Aliases without the key are sampled as before.
 
+**Raised release** (owner decision 2026‑10‑14 ~01:51, COMPLAINTS.md nextto#03: "try the higher release: lift the spoon about 2 cm so
+the fingers open above the chopstick. The spoon then drops that far and may turn - but not too high - just so that the fingers don't
+touch"; the open command stays +1 and the object drops at it; `generation.raised_release`, default unset = off; nextto only; set on
+nextto#03 `tablespoon-chopstick-breakfast_table`). Side by side the spoon's fingertips (at table level, every
+`tablespoon__yxxfdj__st` grasp closes across it) open toward the chopstick, and the nextto bound left no admissible place
+(pair1013_c1_k5 / k6 / k7: `release_sweep`). With the key the nextto goal keeps the plain gap (g_NT − 1 cm, no move along the bound)
+and rises over its resting pose, in `step_m` (1 mm) steps, to the lowest height at which the fully open jaw of the drawn grasp
+(`open_jaw_clearance`: `GRIPPER_OPEN_M`, from the fingertips up through the retreat) clears the partner's hull by
+`partner_clearance_m` (5 mm); the hull's edges are sampled every 3 mm (`hull_edge_points`: the chopstick's collision hull has vertex
+rings only at its ends and middle, so its vertices alone miss the open jaw); above `max_raise_m` (3 cm, "not too high") the draw is
+rejected (`release_sweep`). That raised pose is the release: the goal check teleports the target there and lets it drop and settle
+(as inside's release above the rim), the settled pose is the recorded goal, and the nextto gap, `pair_goal_align` (fronts / long
+axes within `tol_deg`, facing, stagger, side) and partner-moved checks run on it as before. The place is the release pose ∘ the grasp
+(`after_goal_check`; the open jaw reaching the settled partner there rejects). Recorded in `grasps[k].raised_release` /
+`summary.raised_release`: `raise_m`, the jaw's clearance at the release and at rest, the lowest open-gripper point above the
+partner's top, `release_z` / `settled_z` / `drop_m`, `slide_m`, `turn_deg` / `yaw_deg` (release pose → settled goal) and the key.
+The oracle's place (support kind) goes to that pose and opens +1; with `grasps[0].raised_release` it must not touch the partner
+(`Place.avoid`). Measured on the nextto#03 grasps (probe hulls, the chopstick at the 16 mm gap): the vertical grasps need 13–14 mm,
+`grasp_2` (30° tilt) 25 mm.
+
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 
 - ontop / under(small): the partner's top face admits the target footprint with ≥ 1 cm margin — tier `any_yaw`
