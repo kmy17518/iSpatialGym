@@ -2828,6 +2828,14 @@ class IORSLarge(SamplerV2):
         ``goal_align_partner``); None here (the drawn yaw as screened), False for a pair the alignment cannot use."""
         return None
 
+    def alignable_draws(self, F: Sequence[Tuple[float, Any]], draw_order: Sequence[int], d_yaw: float) -> List[int]:
+        """``draw_order`` without the pairs of ``F`` that :meth:`end_aligned_init_yaw` rejects at this C's ``d_yaw`` (as is when no mode
+        aligns), so that the ``f_draws_max`` draws of a C are all usable."""
+        ends = [self.end_aligned_init_yaw(float(F[int(i)][0]), d_yaw) for i in draw_order]
+        if all(e is None for e in ends):
+            return list(draw_order)
+        return [i for i, e in zip(draw_order, ends) if e is not False]
+
     # ------------------------------------------------------------------ legs A -> B and B -> C (owner 2026‑09‑19 21:56)
 
     def _drop_leg_records(self, to: str) -> None:
@@ -4131,6 +4139,10 @@ class IORSLarge(SamplerV2):
                     draw_order = [i for i in draw_order if int(round(float(F[i][0]) / yaw_step)) in kept_b]
                     if not draw_order:
                         fails[f"C: the push-under yaw lock {self.push_yaw_lock()} keeps none of F's yaws"] = len(F)
+            n_draws = len(draw_order)
+            draw_order = self.alignable_draws(F, draw_order, d_yaw)
+            if n_draws and not draw_order:
+                fails["C: no aligned goal yaw near F's yaws"] = n_draws
             for i in draw_order[:int(self.num("f_draws_max", 8))]:  # failed B pairs are cached and skipped, so 8 draws cost little
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]

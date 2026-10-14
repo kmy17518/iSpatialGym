@@ -382,3 +382,21 @@ def test_touching_goal_yaw_on_the_partner_axes():
     assert s.goal_align_partner() and not s.init_align_partner() and len(s.yaws()) == 16 and s.init_yaw_jitter() == 0.0
     assert s.end_aligned_init_yaw(deg(67.5), deg(-28.8)) is False
     assert s.end_aligned_init_yaw(deg(112.5), deg(-28.8)) == pytest.approx(deg(118.8))
+
+
+def test_every_draw_of_a_c_is_alignable():
+    """alignable_draws runs before the f_draws_max slice of the draw loop: with goal_align_partner only the F pairs whose goal yaw can be
+    put on the partner's axes are drawn (4 of the 16 grid yaws at a -28.8 deg B -> C turn), in the draw order; without it, all."""
+    bookcase = SimpleNamespace(get_position_orientation=lambda: (th.zeros(3), G.quat_from_yaw(-math.pi / 2)))
+    s = _mode()
+    s.obj = lambda role: bookcase
+    F = [(k * 2.0 * math.pi / 16, f"grasp_{k % 3}") for k in range(16)]
+    d_yaw = math.radians(-28.8)
+    order = [int(i) for i in reversed(range(16))]
+    kept = s.alignable_draws(F, order, d_yaw)
+    assert len(kept) == 4 and kept == [i for i in order if s.end_aligned_init_yaw(F[i][0], d_yaw) is not False]
+    assert all(s.end_aligned_init_yaw(F[i][0], d_yaw) is not False for i in kept[:8])
+    assert _mode(goal_align_partner=False).alignable_draws(F, order, d_yaw) == order
+    b = _bare("ontop")
+    b.gp = _GP()
+    assert b.alignable_draws(F, order, d_yaw) == order
