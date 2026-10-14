@@ -48,8 +48,7 @@ KEYS = {
     "nextto01": {"front": {"marker/xakoic": "+x", "colored_pencil/acumgp": "-x"}, "relative_yaw_deg": 0.0, "facing": "away"},
     "nextto03": {"front": {"tablespoon/yxxfdj": "-x", "chopstick/bcwuwv": "-x"}, "relative_yaw_deg": 0.0, "facing": "away"},
     "nextto04": {"front": {"gym_shoe/kmcbym": "+x", "gym_shoe/mcfcwq": "+x"}, "relative_yaw_deg": 0.0, "facing": "away"},
-    "touching02": {"front": {"box_of_cereal/iucshm": "+x", "box_of_cereal/dkhgxn": "-x"}, "relative_yaw_deg": 0.0, "facing": "any", "faces": "widest",
-                   "push_max_height_m": 0.035},
+    "touching02": {"front": {"box_of_cereal/iucshm": "+x", "box_of_cereal/dkhgxn": "-x"}, "relative_yaw_deg": 0.0, "facing": "any", "faces": "widest"},
 }
 PAIRS = {"nextto01": ("marker/xakoic", "colored_pencil/acumgp"), "nextto03": ("tablespoon/yxxfdj", "chopstick/bcwuwv"),
          "nextto04": ("gym_shoe/kmcbym", "gym_shoe/mcfcwq"), "touching02": ("box_of_cereal/iucshm", "box_of_cereal/dkhgxn")}
@@ -334,8 +333,9 @@ def test_touching_push_candidates_above_the_cap_are_not_tried(monkeypatch):
     fake = [("push_tip_h", (th.tensor([1.3, 0.0, 1.16]), C.IDENTITY_QUAT.clone()), {"tip_front": True}),
             ("push_blade_lean20", (th.tensor([1.3, 0.0, 1.20]), C.IDENTITY_QUAT.clone()), {"fingertip_z": 1.075}),
             ("push_blade_0_high", (th.tensor([1.3, 0.0, 1.30]), C.IDENTITY_QUAT.clone()), {"fingertip_z": 1.173})]
+    capped = {"pair_goal_align": dict(KEYS["touching02"], push_max_height_m=0.035)}
     for gen, expect in (({}, ["push_tip_h", "push_blade_lean20", "push_blade_0_high"]), (None, ["push_blade_lean20"])):
-        s = _pair_sampler(monkeypatch, "touching02", g_nt=0.0496) if gen is None else _sampler("touching", pair={"g_NT": 0.0496})
+        s = _pair_sampler(monkeypatch, "touching02", gen=capped, g_nt=0.0496) if gen is None else _sampler("touching", pair={"g_NT": 0.0496})
         seen = []
         monkeypatch.setattr(IS.IORSSmall, "touching_push_candidates", lambda self, *a, **k: iter(fake))
         monkeypatch.setattr(IS.O, "choose_first", lambda ikc, arm, stream, **k: (seen.extend(c[0] for c in stream), (None, None, []))[1])

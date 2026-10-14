@@ -2298,8 +2298,11 @@ marker/xakoic `+x` (cap) and colored_pencil/acumgp `-x` (tip), #03 tablespoon/yx
 partner on `partner_side` (#04: the left shoe on the left, a wearable pair; `support_margin` 0.005 m: bench_pfjnnj_0's top raster is
 0.36 m deep across its long edge, the shoes 0.31 m long, and with 2 cm margins no start cell admitted the partner — its seeds 5-7
 were rejected at the template); touching#02 box_of_cereal/iucshm `+x` and dkhgxn
-`-x` (printed fronts), `facing: any`, `faces: widest`, `push_max_height_m` 0.035, with `touching_place_gap_m` 0.05 (one finger
-stands between the boxes at the place and opens (0.10 − 0.043) / 2 m further). Aliases without the key are sampled as before.
+`-x` (printed fronts), `facing: any`, `faces: widest`, with `touching_place_gap_m` 0.05 (one finger stands between the boxes at
+the place and opens (0.10 − 0.043) / 2 m further) and no push cap: with `push_max_height_m` 0.035 (the 4.3 cm thick box tips
+above b / μ ≈ 4.3 cm, μ ≈ 0.5) no leaning or low blade passed the exact IK from any push-stance lateral on bar_udatjt_0
+(pair1013_c8_k3 / k4 / k5: every attempt `contact_unreachable`); the mid-height push may tip the box onto the taller partner,
+at most ≈ atan(0.05 / 0.218) = 13° before it rests against it. Aliases without the key are sampled as before.
 
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 

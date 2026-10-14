@@ -38574,8 +38574,7 @@
     },
     "relative_yaw_deg": 0.0,
     "facing": "any",
-    "faces": "widest",
-    "push_max_height_m": 0.035
+    "faces": "widest"
    },
    "touching_place_gap_m": 0.05
   },
