@@ -20,7 +20,10 @@ One entry per subtask (``ispatialgym.eval.names.subtask_name``: the task and its
             "blacklist": {"target": {"spatula": {"pdqgzq": "ground_isg 2026-09-20: missing_grasps:tabletop"}}}
           }
         },
-        "generation": {...},            # sampling/generation_defaults.py seeds it
+        "generation": {...},            # sampling/generation_defaults.py seeds it; generation only (never read at evaluation)
+        "evaluation": {"tolerances": {"pose": {"position": m, "orientation": rad}, "layout": {...},
+                                      "joints": {"revolute": rad, "prismatic": m, "fraction": f}}},  # optional, hand-tuned
+                                      # evaluation tolerances overriding the isg-v2 profile (ispatialgym.eval.tolerance_profile)
         "constraints": [ {"scope": {...}, "type": "stance", ..., "hard": false, "source": {...}},
                          {"scope": {}, "type": "hold", "robot": "r1pro", "depth_m": 0.5, "trunk": [0.5, 0.0], "roll_deg": 15.0,
                           "eef_in_base": {"position": [], "orientation": []}, ..., "hard": false, "source": {...}} ]
@@ -91,7 +94,7 @@ HOLD_FIELDS = ("robot", "depth_m", "trunk", "roll_deg", "eef_in_base", "approach
 #: removed from the subtask; ``pick_note`` of the Rs_int drawer pick) — kept verbatim in ``CustomsEntry.notes`` and written
 #: back after the schema keys, never interpreted here.
 ENTRY_KEYS = ("iddl", "definition_id", "fallback_of", "fallback_rank", "fallback_kind", "fallback_params", "fallbacks", "superseded_by",
-              "roles", "scenes", "generation", "constraints")
+              "roles", "scenes", "generation", "constraints", "evaluation")
 #: ``fallback_kind`` values (see the module docstring).
 FALLBACK_KINDS = ("init_surface", "scale", "next_model")
 #: Keys of a role entry, in the order they are written (§2.3 + the documented extensions).
@@ -340,6 +343,8 @@ class CustomsEntry:
     scenes: Dict[str, SceneEntry] = field(default_factory=dict)
     generation: Dict[str, Any] = field(default_factory=dict)
     constraints: List[Constraint] = field(default_factory=list)
+    # read at evaluation only (``evaluation.tolerances``: ispatialgym.eval.tolerance_profile); empty unless tuned by hand
+    evaluation: Dict[str, Any] = field(default_factory=dict)
     # fallback fields (module docstring): set on a fallback entry ...
     fallback_of: Optional[str] = None
     fallback_rank: Optional[int] = None
@@ -428,6 +433,8 @@ class CustomsEntry:
                 "constraints": [c.to_dict() for c in self.constraints],
             }
         )
+        if self.evaluation:
+            d["evaluation"] = copy.deepcopy(self.evaluation)
         for k, v in self.notes.items():
             if k not in d:
                 d[k] = copy.deepcopy(v)
@@ -447,6 +454,7 @@ class CustomsEntry:
             scenes={s: SceneEntry.from_dict(e) for s, e in (d.get("scenes") or {}).items()},
             generation=copy.deepcopy(d.get("generation") or {}),
             constraints=[Constraint.from_dict(c) for c in (d.get("constraints") or [])],
+            evaluation=copy.deepcopy(d.get("evaluation") or {}),
             fallbacks=list(d.get("fallbacks") or []),
             superseded_by=d.get("superseded_by") or None,
             notes={k: copy.deepcopy(d[k]) for k in unknown},
