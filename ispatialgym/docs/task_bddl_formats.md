@@ -920,6 +920,15 @@ Additional TRO specification:
 - `(ontop ?targets_group.n.01_1 ?table.n.02_1)` restricts the template to a
   single layer. For stacked designs, drop it and let the layout relations carry
   the block-on-block structure.
+- Board variant (`problem11`, `...-block_4-breakfast_table_board`): the puzzle
+  board `tray.n.01_1` is the group's fifth member, with
+  `"pinned": {"tray.n.01_1": "slot_tray.n.01_1"}` in `assignment`, a slot at
+  the board's goal pose and a relation from it to every block slot. The goal
+  lists `(ontop ?toy_dice.n.01_k ?tray.n.01_1)` per block, since the group form
+  would include `(ontop ?tray.n.01_1 ?tray.n.01_1)`. The release's instance file
+  got the board's slot from `scripts/eval_instances/export_counted.py`: the
+  board's pose at the end of the eval run's demo, where the run's goal override
+  set the blocks' slots.
 
 ### 5b. Articulation (four subtasks: open / close × large-scale / small-scale)
 

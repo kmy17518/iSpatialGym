@@ -7,6 +7,8 @@
     ; pocket) standing on the breakfast table, then pushed against the pocket's far / left walls so they end packed; copy of
     ; problem32 with the board object, the blocks' goal support = the board.
     ; renumbered 82 -> 83 for the eval branch (owner 2026-10-12 ~03:30): 82 is configuration_matching-attachment-cork-wine_bottle-desk here
+    ; owner 2026-10-14: the board is a member of targets_group (pinned to its own slot in the instance file), so layout_reached
+    ; judges the blocks relative to the board; ontop is per block (on the group it would also put the board on itself)
 
     (:objects
         toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - toy_dice.n.01
@@ -17,22 +19,23 @@
     )
 
     (:groups
-        toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - targets_group.n.01_1
+        toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 tray.n.01_1 - targets_group.n.01_1
     )
 
     (:init
         (ontop targets_group.n.01_1 breakfast_table.n.01_1)
-        (ontop tray.n.01_1 breakfast_table.n.01_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?targets_group.n.01_1 ?tray.n.01_1)
+            (ontop ?toy_dice.n.01_1 ?tray.n.01_1)
+            (ontop ?toy_dice.n.01_2 ?tray.n.01_1)
+            (ontop ?toy_dice.n.01_3 ?tray.n.01_1)
+            (ontop ?toy_dice.n.01_4 ?tray.n.01_1)
             (layout_reached ?targets_group.n.01_1)
             (not (grasped ?agent.n.01_1 ?targets_group.n.01_1))
             (pose_settled ?targets_group.n.01_1)
-            (pose_settled ?tray.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )

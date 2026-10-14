@@ -372,6 +372,16 @@ groups without relations. `orientation_equivalences` handles block symmetry on
 both ends of every relation. `pose_settled(blocks_group)` expands per block and
 does not depend on the assignment.
 
+In the board variant (`problem11`, the release's block design: the blocks go
+into the pockets of a puzzle board, `tray.n.01_1`), the board is a member of
+the group too, pinned to a slot of its own (`assignment.pinned`), so it is never
+matched to a block's slot. Its relations to the blocks make `layout_reached`
+judge each block's pocket and face relative to the board: a design rotated or
+shifted on the board fails symbolically, and `pose_reached` also needs the
+board within the group's tolerance of where it stands in the goal image. The
+blocks' `ontop` goal is per block (on the group it would put the board on
+itself).
+
 ### Articulation variant
 
 `layout_reached(articulated_object)` is the object's internal configuration:
@@ -469,7 +479,7 @@ Required settlement entities are:
 | Object Scaling | manipulated object, agent |
 | Mental Rotation | manipulated object, agent |
 | Disembedding | selected object, agent |
-| Configuration Matching — block design | every block in the group, agent |
+| Configuration Matching — block design | every member of the group (the blocks, and the board in the board variant), agent |
 | Configuration Matching — articulation | articulated object, agent |
 | Configuration Matching — attachment | both attached objects, agent |
 | World Alignment — table surface | manipulated object, agent |

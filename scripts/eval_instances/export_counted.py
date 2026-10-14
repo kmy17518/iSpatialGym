@@ -8,8 +8,9 @@ task -> subtask hierarchy (ispatialgym.eval.names), the files renamed after BEHA
         [--demos-out <demos root>] [--runs scripts/eval_instances/release_runs.tsv | counted] [--clean]
 
 Per instance: template.json; template_meta.json with the problem name in the repository's BDDL tree (``isg_customs.json``
-``definition_id``; the run's own copy of the problem must be that problem) and an "eval" block with the names; the
--tro_state.json with that ``activity_definition_id``; the .oracle.json with the instance file's ``tro_sha256``; the
+``definition_id``; the run's own copy of the problem must be that problem, or that problem with members added to a group) and
+an "eval" block with the names; the -tro_state.json with that ``activity_definition_id`` and the added members in their
+group's target, pinned to their pose at the end of the run's demo; the .oracle.json with the instance file's ``tro_sha256``; the
 demo.hdf5 into the demos dataset. The BDDL problems stay in the repository (as BEHAVIOR's stay in its bddl package). Writes
 metadata/{instances.jsonl, episodes.jsonl, tasks.yaml, available_tasks.yaml, task.jsonl} and README.md; sets every
 instance's goal image from a successful replay of its demo (ispatialgym.eval.instances.set_goal, which keeps where it came
@@ -19,6 +20,7 @@ instances no longer exported.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import glob
 import json
@@ -107,18 +109,71 @@ def pick_number(pick: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def members_added(run, release) -> dict:
+    """``{group: [members]}`` that ``release`` adds to the groups of ``run`` (two ``ISGProblem``) when that is its only edit: the
+    same objects, init and group names, each run group's members kept, and the run's goal + measure atoms with only atoms on an
+    added member besides; None otherwise."""
+    run_key, rel_key = run.content_key(), release.content_key()
+    if run_key[0] != rel_key[0] or run_key[2] != rel_key[2] or set(run.groups) != set(release.groups):
+        return None
+    if not all(set(members) <= set(release.groups[g]) for g, members in run.groups.items()):
+        return None
+    added = {g: [m for m in release.groups[g] if m not in members] for g, members in run.groups.items()}
+    added = {g: ms for g, ms in added.items() if ms}
+    new = {m for ms in added.values() for m in ms}
+    extra = set(rel_key[3]) - set(run_key[3])
+    if not added or not set(run_key[3]) <= set(rel_key[3]) or not all(new & set(re.findall(r"[\w.]+", atom)) for atom in extra):
+        return None
+    return added
+
+
 def release_bddl(d: dict, customs: dict) -> tuple:
-    """``(activity, definition id, path)`` of the instance's problem in the release's BDDL tree; the run's own copy must be the
-    same problem under its old name: the same objects, init and goal + measure atoms (``ISGProblem.content_key``: the
-    2026-10-14 scoring change moved / copied atoms between the two sections)."""
+    """``(activity, definition id, path, members added)`` of the instance's problem in the release's BDDL tree; the run's own copy
+    must be the same problem under its old name: the same objects, init and goal + measure atoms (``ISGProblem.content_key``:
+    the 2026-10-14 scoring change moved / copied atoms between the two sections), or that problem with members added to a group
+    (:func:`members_added`, ``{group: [members]}``, else empty)."""
     entry = customs[d["subtask"]]
     activity, did = entry["iddl"].split("/")[0], int(entry["definition_id"])
     path = os.path.join(BDDL_ROOT, activity, f"problem{did}.bddl")
     with open(d["bddl"]) as f:
         run_text = f.read().replace(f"(define (problem {d['run_problem']})", f"(define (problem {activity}-{did})")
-    if parse_problem_string(run_text, activity, did).content_key() != parse_problem_file(path, activity, did).content_key():
+    run, release = parse_problem_string(run_text, activity, did), parse_problem_file(path, activity, did)
+    if run.content_key() == release.content_key():
+        return activity, did, path, {}
+    added = members_added(run, release)
+    if added is None:
         raise SystemExit(f"{d['subtask']}: {path} is not the run's problem {d['run_problem']} ({d['bddl']})")
-    return activity, did, path
+    return activity, did, path, added
+
+
+def pin_added_members(block: dict, added: dict, demo_hdf5: str) -> None:
+    """Add the members a release problem adds to a group (``added``) to that group's target in the instance file's ``ispatialgym``
+    block: each pinned to a slot of its own (``slot_<instance>``) at its pose at the end of the run's demo, where the run's goal
+    override set the other members' slots, with a relation to every other slot."""
+    import h5py
+    import torch as th
+
+    from ispatialgym.eval.geometry import relative_pose
+
+    with h5py.File(demo_hdf5, "r") as f:
+        final = {m: [float(v) for v in f["data"]["demo_0"]["isg"]["object_pose"][m][-1]] for ms in added.values() for m in ms}
+    block["groups"] = copy.deepcopy(block["groups"])
+    for g, members in added.items():
+        target = block["groups"][g]
+        assignment = dict(target.get("assignment") or {"mode": "exchangeable"})
+        if assignment.get("mode", "exchangeable") != "exchangeable":
+            raise SystemExit(f"{g}: members added to a {assignment['mode']!r} group")
+        pinned = dict(assignment.get("pinned") or {})
+        for m in members:
+            sid = f"slot_{m}"
+            pose = (th.tensor(final[m][:3]), th.tensor(final[m][3:7]))
+            for other, s in target["target_slots"].items():
+                p, q = relative_pose(pose, (th.tensor(s["position"]), th.tensor(s["orientation"])))
+                target["layout_relations"].append({"from": sid, "to": other, "position": [float(v) for v in p], "orientation": [float(v) for v in q]})
+            target["target_slots"][sid] = {"position": final[m][:3], "orientation": final[m][3:7]}
+            target["members"].append(m)
+            pinned[m] = sid
+        target["assignment"] = {**assignment, "pinned": pinned}
 
 
 def write_json(path: str, data, indent: int, newline: bool = False) -> None:
@@ -165,7 +220,7 @@ def main() -> int:
     task_counts = {}
     for d in items:
         scene, sub = d["scene"], d["subtask"]
-        activity, did, _ = release_bddl(d, customs)
+        activity, did, _, added = release_bddl(d, customs)
         json_dir = os.path.join("scenes", scene, "json")
         prefix = f"{scene}_task_{sub}"
         inst_dir = os.path.join(json_dir, f"{prefix}_instances")
@@ -190,6 +245,8 @@ def main() -> int:
         for key in ("task_variant", "instance_id"):  # the runs keep the names of their day (activity.problem.LEGACY_SUBTASK_IDS)
             if key in tro["ispatialgym"]:
                 tro["ispatialgym"][key] = canonical_variant(tro["ispatialgym"][key])
+        if added:
+            pin_added_members(tro["ispatialgym"], added, d["source"]["demo_hdf5"])
         write_json(os.path.join(out, files["tro_state"]), tro, 2)
         with open(os.path.join(d["tdir"], "instances", d["iid"] + ".oracle.json")) as f:
             sidecar = from_legacy_keys(json.load(f))

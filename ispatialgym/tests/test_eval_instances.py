@@ -1,12 +1,18 @@
 """ispatialgym.eval.instances and ispatialgym.eval.names: name / index resolution, the dataset layout's template files, the
-episodes (demos) and run_isg's step budget, goal images (no simulator)."""
+episodes (demos) and run_isg's step budget, goal images, the export's problem edits (no simulator)."""
+import importlib.util
 import json
 import os
 
 import pytest
 
+from ispatialgym.activity.problem import load_problem, parse_problem_string
 from ispatialgym.eval import instances as INST
 from ispatialgym.eval import names as N
+from ispatialgym.eval.targets import GroupTarget
+from ispatialgym.eval.tro import load_tro, validate_tro_against_problem
+
+EXPORT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts", "eval_instances", "export_counted.py")
 
 
 def _write(path, data):
@@ -232,6 +238,68 @@ def test_episodes_demos_and_roots(tmp_path, monkeypatch):
     assert INST.demos_root() == str(tmp_path / "og" / INST.DEMOS_NAME)
 
 
+def _export_module():
+    spec = importlib.util.spec_from_file_location("export_counted", EXPORT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+BOARD_PROBLEM = """(define (problem configuration_matching-11)
+    (:domain ispatialgym)
+    (:variant configuration_matching-block_design-block_4-breakfast_table_board)
+    (:objects toy_dice.n.01_1 toy_dice.n.01_2 - toy_dice.n.01 tray.n.01_1 - tray.n.01 breakfast_table.n.01_1 - breakfast_table.n.01
+              floor.n.01_1 - floor.n.01 agent.n.01_1 - agent.n.01)
+    (:groups {members} - targets_group.n.01_1)
+    (:init {init} (ontop agent.n.01_1 floor.n.01_1))
+    (:goal (and {ontop} (layout_reached ?targets_group.n.01_1) (not (grasped ?agent.n.01_1 ?targets_group.n.01_1))
+                (pose_settled ?targets_group.n.01_1) {settled} (pose_settled ?agent.n.01_1)))
+    (:measure (pose_reached ?targets_group.n.01_1) (layout_reached ?targets_group.n.01_1)))"""
+#: the run's problem (blocks only in the group) and the release's (the board added, ontop per block)
+RUN_PARTS = {"members": "toy_dice.n.01_1 toy_dice.n.01_2", "ontop": "(ontop ?targets_group.n.01_1 ?tray.n.01_1)", "settled": "(pose_settled ?tray.n.01_1)",
+             "init": "(ontop targets_group.n.01_1 breakfast_table.n.01_1) (ontop tray.n.01_1 breakfast_table.n.01_1)"}
+BOARD_PARTS = {"members": "toy_dice.n.01_1 toy_dice.n.01_2 tray.n.01_1", "ontop": "(ontop ?toy_dice.n.01_1 ?tray.n.01_1) (ontop ?toy_dice.n.01_2 ?tray.n.01_1)",
+               "settled": "", "init": "(ontop targets_group.n.01_1 breakfast_table.n.01_1)"}
+
+
+def _board_problem(**parts):
+    return parse_problem_string(BOARD_PROBLEM.format(**{**BOARD_PARTS, **parts}), "configuration_matching", 11)
+
+
+def test_export_accepts_members_added_to_a_group():
+    E = _export_module()
+    run = _board_problem(**RUN_PARTS)
+    assert E.members_added(run, _board_problem()) == {"targets_group.n.01_1": ["tray.n.01_1"]}
+    assert E.members_added(run, run) is None
+    for parts in ({"init": "(ontop targets_group.n.01_1 breakfast_table.n.01_1) (ontop tray.n.01_1 floor.n.01_1)"},  # init changed
+                  {"ontop": "(ontop ?toy_dice.n.01_1 ?tray.n.01_1)"},  # a goal atom of the run dropped
+                  {"ontop": BOARD_PARTS["ontop"] + " (ontop ?toy_dice.n.01_1 ?toy_dice.n.01_2)"},  # an atom not on the added member
+                  {"members": "toy_dice.n.01_1 tray.n.01_1"}):  # a run member dropped
+        assert E.members_added(run, _board_problem(**parts)) is None, parts
+
+
+def test_export_pins_added_members(tmp_path):
+    h5py = pytest.importorskip("h5py")
+    E = _export_module()
+    demo = tmp_path / "demo.hdf5"
+    with h5py.File(demo, "w") as f:  # the board at its start, then at the demo's end (turned 90 deg)
+        f.create_dataset("data/demo_0/isg/object_pose/tray.n.01_1", data=[[9.0, 9.0, 9.0, 0.0, 0.0, 0.0, 1.0],
+                                                                         [0.15, 0.1, 0.0, 0.0, 0.0, 0.70710678, 0.70710678]])
+    group = {"members": ["toy_dice.n.01_1", "toy_dice.n.01_2"], "assignment": {"mode": "exchangeable", "cost": "layout"},
+             "orientation_equivalences": [], "pose_tolerances": {"position": 0.01, "orientation": 0.15},
+             "target_slots": {"slot_0": {"position": [0.0, 0.0, 0.0], "orientation": [0, 0, 0, 1]},
+                              "slot_1": {"position": [0.1, 0.0, 0.0], "orientation": [0, 0, 0, 1]}},
+             "layout_relations": [{"from": "slot_0", "to": "slot_1", "position": [0.1, 0.0, 0.0], "orientation": [0, 0, 0, 1]}],
+             "layout_tolerances": {"position": 0.01, "orientation": 0.15}}
+    block = {"groups": {"targets_group.n.01_1": group}}
+    E.pin_added_members(block, {"targets_group.n.01_1": ["tray.n.01_1"]}, str(demo))
+    assert group["members"] == ["toy_dice.n.01_1", "toy_dice.n.01_2"] and len(group["layout_relations"]) == 1  # the run's data stays
+    g = GroupTarget.from_dict("targets_group.n.01_1", block["groups"]["targets_group.n.01_1"])  # the relations fit the slots
+    assert g.members == ["toy_dice.n.01_1", "toy_dice.n.01_2", "tray.n.01_1"] and g.pinned == {"tray.n.01_1": "slot_tray.n.01_1"}
+    assert g.target_slots["slot_tray.n.01_1"].position.tolist() == pytest.approx([0.15, 0.1, 0.0])
+    assert {(r.from_slot, r.to_slot) for r in g.layout_relations} == {("slot_0", "slot_1"), ("slot_tray.n.01_1", "slot_0"), ("slot_tray.n.01_1", "slot_1")}
+
+
 @pytest.mark.skipif(not os.path.exists(os.path.join(INST.default_root(), "metadata", "instances.jsonl")), reason="no exported dataset")
 def test_exported_dataset_consistent():
     index = INST.load_index()
@@ -253,7 +321,9 @@ def test_exported_dataset_consistent():
         # every instance has its goal image, registered in the instance file
         assert os.path.exists(rec.path("goal_rgb")) and os.path.exists(INST.goal_record_path(rec)), rec.subtask
         info = json.load(open(INST.goal_record_path(rec)))
-        assert info["source"]["success"] is True and info["sha256"] == INST.sha256_of(rec.path("goal_rgb")), rec.subtask
+        # a replay that re-pinned the measured targets qualified by its symbolic success (its geometric one failed on them)
+        assert info["source"]["success"] is True or info["source"].get("measured_targets") is True, rec.subtask
+        assert info["sha256"] == INST.sha256_of(rec.path("goal_rgb")), rec.subtask
         tro = json.load(open(rec.path("tro_state")))["ispatialgym"]
         go = tro.get("goal_observation")
         assert go and go["rgb_path"] == os.path.basename(rec.path("goal_rgb")) and go["rgb_sha256"] == info["sha256"], rec.subtask
@@ -271,6 +341,8 @@ def test_exported_dataset_consistent():
         assert f"(define (problem {activity}-{did})" in text and f"(:variant {tmeta['bddl_variant']})" in text, rec.subtask
         assert tmeta["problem"] == rec.extra["problem"] and int(tro["activity_definition_id"]) == int(did)
         problems.setdefault(activity, set()).add(int(did))
+        # the instance file fits its problem: a target per pose_reached / layout_reached atom, the groups' members
+        validate_tro_against_problem(load_tro(rec.path("tro_state")).meta, load_problem(activity, int(did)).compile(generate_ground_options=False))
         # the demo replays use, and its length the step budget
         assert rec.episode.get("length", 0) > 0 and os.path.exists(rec.demo_path()), rec.subtask
         assert INST.sha256_of(rec.demo_path()) == rec.episode["demo_sha256"], rec.subtask
