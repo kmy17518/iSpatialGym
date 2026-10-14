@@ -35,8 +35,9 @@
         )
     )
 
-    ; Non-gating: where the assembled pair stands (target_slots) is reported only.
+    ; Measured: the assembly (layout_reached, also gating) and where the assembled pair stands (target_slots).
     (:measure
         (pose_reached ?attachment_group.n.01_1)
+        (layout_reached ?attachment_group.n.01_1)
     )
 )

@@ -109,13 +109,14 @@ def pick_number(pick: str) -> int:
 
 def release_bddl(d: dict, customs: dict) -> tuple:
     """``(activity, definition id, path)`` of the instance's problem in the release's BDDL tree; the run's own copy must be the
-    same problem (sections, not comments) under its old name."""
+    same problem under its old name: the same objects, init and goal + measure atoms (``ISGProblem.content_key``: the
+    2026-10-14 scoring change moved / copied atoms between the two sections)."""
     entry = customs[d["subtask"]]
     activity, did = entry["iddl"].split("/")[0], int(entry["definition_id"])
     path = os.path.join(BDDL_ROOT, activity, f"problem{did}.bddl")
     with open(d["bddl"]) as f:
         run_text = f.read().replace(f"(define (problem {d['run_problem']})", f"(define (problem {activity}-{did})")
-    if parse_problem_string(run_text, activity, did).expanded_bddl() != parse_problem_file(path, activity, did).expanded_bddl():
+    if parse_problem_string(run_text, activity, did).content_key() != parse_problem_file(path, activity, did).content_key():
         raise SystemExit(f"{d['subtask']}: {path} is not the run's problem {d['run_problem']} ({d['bddl']})")
     return activity, did, path
 

@@ -28,5 +28,6 @@
     )
     (:measure
         (pose_reached ?assembly)
+        (layout_reached ?assembly)
     )
 )

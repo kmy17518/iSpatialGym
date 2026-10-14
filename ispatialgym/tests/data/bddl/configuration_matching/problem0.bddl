@@ -32,8 +32,9 @@
         )
     )
 
-    ; Non-gating: absolute placement of the blocks at the pictured slots (target_slots) is reported only.
+    ; Measured: the pattern (layout_reached, also gating) and the blocks' absolute placement at the pictured slots (target_slots).
     (:measure
         (pose_reached ?blocks_group.n.01_1)
+        (layout_reached ?blocks_group.n.01_1)
     )
 )

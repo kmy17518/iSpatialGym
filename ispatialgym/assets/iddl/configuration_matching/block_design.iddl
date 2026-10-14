@@ -1,7 +1,7 @@
 ; Configuration matching - block design. Four identical custom Kohs blocks (toy_dice/isgblk, ispatialgym-assets)
 ; scattered on the support; the goal is the pattern's top faces in a touching 2x2 grid anchored at the top-left block,
-; aligned with the support edges, reached by the smallest rotation (yaw-align, one adjacent flip). layout_reached gates,
-; pose_reached is measured. Group size and identical members are customs list parameters
+; aligned with the support edges, reached by the smallest rotation (yaw-align, one adjacent flip). layout_reached gates
+; and is measured, pose_reached is measured. Group size and identical members are customs list parameters
 ; (generation.groups.targets: size 4, draw same_model); the blocks use the generic cube grasp set, so no library grasps
 ; are required.
 (define (iddl configuration_matching-block_design)
@@ -22,5 +22,6 @@
     )
     (:measure
         (pose_reached ?targets)
+        (layout_reached ?targets)
     )
 )

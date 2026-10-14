@@ -18,4 +18,8 @@
             (pose_settled ?agent)
         )
     )
+
+    (:measure
+        (pose_reached ?target)
+    )
 )

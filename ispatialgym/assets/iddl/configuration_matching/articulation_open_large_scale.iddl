@@ -15,10 +15,13 @@
     (:goal
         (and
             (open ?target)
-            (layout_reached ?target)
             (not (grasped ?agent ?target))
             (pose_settled ?target)
             (pose_settled ?agent)
         )
+    )
+
+    (:measure
+        (layout_reached ?target)
     )
 )

@@ -25,4 +25,8 @@
             (pose_settled ?agent.n.01_1)
         )
     )
+
+    (:measure
+        (pose_reached ?can__of__soda.n.01_1)
+    )
 )

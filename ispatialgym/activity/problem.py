@@ -6,10 +6,10 @@ An iSpatialGym problem is a stock BDDL problem file in the ``ispatialgym`` domai
 * ``(:groups MEMBER MEMBER ... - GROUP_NAME ...)`` -- typed-list shaped like ``:objects``. Group names have the
   instance-name shape (``blocks_group.n.01_1``) but are not synsets: nothing is loaded for them and they must not
   be declared in ``:objects``.
-* ``(:measure (pose_reached ?x) (layout_reached ?g) ...)`` -- optional, after ``:goal``. Non-gating targets: the
-  listed ``pose_reached`` / ``layout_reached`` atoms are configured from the TRO and their position / orientation
-  errors are reported exactly like goal atoms, but they never decide success. An atom may not appear both in the
-  goal and in ``:measure``.
+* ``(:measure (pose_reached ?x) (layout_reached ?g) ...)`` -- after ``:goal``. The measured targets: the listed
+  ``pose_reached`` / ``layout_reached`` atoms are configured from the TRO, their errors are reported, and geometric
+  success requires every one of them within its tolerance; symbolic success is the goal alone. An atom may also
+  appear in the goal, where it gates symbolic success as well (``is_gating``: in ``:goal``).
 
 Groups are expanded on the parsed nested lists before compilation:
 
@@ -252,8 +252,16 @@ class ISGProblem:
     raw_measure: list = field(default_factory=list)  # (:measure ...) literals as written
     init: list = field(default_factory=list)  # expanded init literals
     goal: list = field(default_factory=list)  # expanded top-level goal conjuncts
-    measure: list = field(default_factory=list)  # non-gating pose_reached / layout_reached literals
+    measure: list = field(default_factory=list)  # measured pose_reached / layout_reached literals (may also be in the goal)
     path: Optional[str] = None
+
+    def content_key(self) -> tuple:
+        """The objects, groups, expanded init and the union of the goal and measure atoms: what two copies of a problem must share
+        whichever section an atom sits in (the 2026-10-14 scoring change copied / moved pose_reached / layout_reached into
+        ``:measure``)."""
+        flat = lambda exprs: sorted(" ".join(to_bddl(e).split()) for e in exprs)  # noqa: E731
+        return ({k: list(v) for k, v in sorted(self.objects.items())}, {k: list(v) for k, v in sorted(self.groups.items())}, flat(self.init),
+                sorted(set(flat(self.goal)) | set(flat(self.measure))))
 
     # ------------------------------------------------------------------ derived
 
@@ -433,7 +441,7 @@ class ISGCompiledTask:
         self.layout_reached_args: List[str] = _unique(
             a for head in self.goal_conditions for a in collect_predicate_args(head, "layout_reached")
         )
-        # ... and the non-gating ones from (:measure ...). Both kinds are configured from the TRO and reported.
+        # ... and the measured ones of (:measure ...) (an atom may be in both). Both kinds are configured from the TRO and reported.
         self.measure_pose_reached_args: List[str] = list(problem.measure_pose_reached_args)
         self.measure_layout_reached_args: List[str] = list(problem.measure_layout_reached_args)
 
@@ -447,8 +455,14 @@ class ISGCompiledTask:
         return _unique(self.layout_reached_args + self.measure_layout_reached_args)
 
     def is_gating(self, predicate: str, arg: str) -> bool:
+        """The atom ``(predicate arg)`` is in ``:goal``."""
         gated = self.pose_reached_args if predicate == "pose_reached" else self.layout_reached_args
         return arg in gated
+
+    def in_measure(self, predicate: str, arg: str) -> bool:
+        """The atom ``(predicate arg)`` is in ``:measure``."""
+        measured = self.measure_pose_reached_args if predicate == "pose_reached" else self.measure_layout_reached_args
+        return arg in measured
 
     # BehaviorTask-facing API ---------------------------------------------------------------------------------
 
@@ -871,9 +885,8 @@ def _validate_declarations(problem: ISGProblem) -> None:
 
 def _validate_measure(problem: ISGProblem, measure: list) -> list:
     """Validate the ``(:measure ...)`` literals: unary ``pose_reached`` / ``layout_reached`` atoms on declared
-    instances or groups, no duplicates, and disjoint from the goal's atoms of the same predicate."""
+    instances or groups, no duplicates (an atom may also be in the goal)."""
     symbols = set(problem.scope_symbols)
-    gated = {pred: set(problem.literal_args(pred, where="goal")) for pred in MEASURE_PREDICATES}
     out = []
     seen = set()
     for lit in measure:
@@ -887,8 +900,6 @@ def _validate_measure(problem: ISGProblem, measure: list) -> list:
         arg = _strip(lit[1])
         if arg not in symbols:
             raise ISGProblemError(f":measure: {arg!r} is not a declared instance or group in {lit}")
-        if arg in gated[pred]:
-            raise ISGProblemError(f":measure: ({pred} {arg}) is already a gating goal atom")
         if (pred, arg) in seen:
             raise ISGProblemError(f":measure lists ({pred} {arg}) more than once")
         seen.add((pred, arg))

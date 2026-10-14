@@ -21,10 +21,13 @@
     (:goal
         (and
             (not (open ?dishwasher.n.01_1))
-            (layout_reached ?dishwasher.n.01_1)
             (not (grasped ?agent.n.01_1 ?dishwasher.n.01_1))
             (pose_settled ?dishwasher.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
+    )
+
+    (:measure
+        (layout_reached ?dishwasher.n.01_1)
     )
 )
