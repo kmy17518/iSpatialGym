@@ -331,3 +331,37 @@ def test_push_stop_facts():
     assert rec["object_position"] == pytest.approx([0.0, -0.94, 0.04]) and rec["follow"] == {"name": "bookcase.n.01_1", "moved_m": 0.002, "moved_z_m": 0.0}
     rec = EX.push_stop_facts(SimpleNamespace(contact=action.contact, follow=None), state, {}, obj[0], None)
     assert rec["stop"] == "leg_end" and "follow" not in rec and rec["residual_final"] is None
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the init yaw aligned with the partner (user 2026-10-13 ~17:57)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _off_axes(a: float) -> float:
+    """``a`` modulo 90 deg in [-45, 45) deg (rad)."""
+    return (a + math.pi / 4) % (math.pi / 2) - math.pi / 4
+
+
+def test_partner_aligned_yaws():
+    assert [round(math.degrees(y), 6) for y in TM.partner_aligned_yaws(-math.pi / 2)] == [0.0, 90.0, 180.0, 270.0]  # the bookcase at -90
+    assert all(abs(_off_axes(y + 0.1 - 0.3)) < 1e-9 for y in TM.partner_aligned_yaws(0.3, rest_yaw=0.1))
+    for p in (math.pi / 4, -math.pi / 4, 3 * math.pi / 4):  # a partner at 45 deg: the half step of the 90 deg buckets
+        ys = TM.partner_aligned_yaws(p)
+        assert all(abs(_off_axes(y - p)) <= TM.ALIGN_TIE_MARGIN_RAD + 1e-9 for y in ys)
+        keys = {IL.pair_key(y, "g", math.pi / 2) for y in ys}
+        assert len(keys) == 4 and keys == {IL.pair_key(round(y, 4), "g", math.pi / 2) for y in ys}  # the cache's 4 decimals
+
+
+def test_touching_init_yaws_follow_the_partner():
+    bookcase = SimpleNamespace(get_position_orientation=lambda: (th.zeros(3), G.quat_from_yaw(-math.pi / 2)))
+    s = _mode()
+    s.obj = lambda role: bookcase
+    assert [round(math.degrees(y), 4) for y in s.yaws()] == [0.0, 90.0, 180.0, 270.0] and s.init_yaw_jitter() == 0.0
+    s.rest = G.quat_from_yaw(0.25)  # a rest turned 0.25 rad: the init yaws turn back by it
+    assert all(abs(_off_axes(y + 0.25 + math.pi / 2)) < 1e-6 for y in s.yaws())
+    s = _mode(init_align_partner=False)
+    assert len(s.yaws()) == 16 and s.init_yaw_jitter() == IL.TARGET_JITTER
+    b = _bare("ontop")
+    b.gp = _GP()
+    assert len(b.yaws()) == 16 and b.init_yaw_jitter() == IL.TARGET_JITTER  # the other relations keep the grid and the jitter

@@ -2819,6 +2819,10 @@ class IORSLarge(SamplerV2):
         n = int(self.num("n_yaws", 16))
         return [k * 2.0 * math.pi / n for k in range(n)]
 
+    def init_yaw_jitter(self) -> float:
+        """The init yaw's draw around the screened yaw (± this, rad; the B exact IK's retries too): :data:`TARGET_JITTER`."""
+        return TARGET_JITTER
+
     # ------------------------------------------------------------------ legs A -> B and B -> C (owner 2026‑09‑19 21:56)
 
     def _drop_leg_records(self, to: str) -> None:
@@ -4125,7 +4129,8 @@ class IORSLarge(SamplerV2):
             for i in draw_order[:int(self.num("f_draws_max", 8))]:  # failed B pairs are cached and skipped, so 8 draws cost little
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
-                yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
+                jit = self.init_yaw_jitter()
+                yaw = yaw0 + float(rng.uniform(-jit, jit))
                 if push:
                     # the push chain depends on the object's yaw (its half extent along the push), not on the grasp: solve it once per
                     # (C, yaw bucket) BEFORE the grasp IKs and skip the draw when this stance cannot push at that yaw
@@ -4153,7 +4158,7 @@ class IORSLarge(SamplerV2):
                     ov_opts = self.pick_overhang_opts()
                     overhang = None
                     for k_try in range(int(self.num("b_ik_tries", 3)) if ov_opts is None or ov_opts["mode"] != "only" else 0):
-                        yaw_k = yaw0 if k_try == 0 else yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
+                        yaw_k = yaw0 if k_try == 0 else yaw0 + float(rng.uniform(-jit, jit))
                         t_pose = None
                         for _ in range(5):
                             if self.surface["kind"] == "floor" or k_try == 0:

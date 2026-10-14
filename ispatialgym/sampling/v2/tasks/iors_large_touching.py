@@ -31,6 +31,9 @@ hands, a straight floor push of the closed gripper from stance C, exact IK on th
   touched.
 * **Goal check**: the target nudged 1 mm at a time along ``d`` until ``touching(target, partner)`` holds (the small-scale
   touching rule, ``generation.nudge_m`` / ``max_nudges``); the TRO goal is the touching pose.
+* **Init yaw** (``generation.init_align_partner``, default true; user 2026-10-13 ~17:57): the target starts parallel to the
+  partner's axes - the screened yaws are :func:`partner_aligned_yaws` and the draw adds no jitter. The carried target keeps its yaw
+  relative to the robot, so the goal yaw is the init yaw turned by the B -> C base yaw.
 """
 
 from __future__ import annotations
@@ -91,6 +94,8 @@ STAND_OFFS_M = tuple(round(0.5 + 0.05 * k, 2) for k in range(13))
 DROP_AHEAD_MAX_M = 0.80
 #: yaws of the blade profile (the carried yaw at C is any init yaw turned by the B -> C base yaw)
 PROFILE_YAWS = 16
+#: the partner-aligned init yaws stay this far (rad) from a half step of their 90 deg grid
+ALIGN_TIE_MARGIN_RAD = 1e-3
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -101,6 +106,16 @@ PROFILE_YAWS = 16
 def unit_xy(d) -> th.Tensor:
     v = th.as_tensor([float(d[0]), float(d[1])], dtype=th.float32)
     return v / max(float(th.linalg.norm(v)), 1e-9)
+
+
+def partner_aligned_yaws(partner_yaw: float, rest_yaw: float = 0.0) -> List[float]:
+    """The four init yaws that turn a target resting at ``rest_yaw`` parallel to the partner's axes (``partner_yaw - rest_yaw`` +
+    k x 90 deg, the first within +-45 deg). The yaw buckets round ``yaw / 90 deg`` and the feasible-set cache rounds yaws to 4
+    decimals, so the yaws keep ``ALIGN_TIE_MARGIN_RAD`` from a half step."""
+    q = 0.5 * math.pi
+    p = (float(partner_yaw) - float(rest_yaw) + 0.5 * q) % q - 0.5 * q
+    p = min(max(p, -0.5 * q + ALIGN_TIE_MARGIN_RAD), 0.5 * q - ALIGN_TIE_MARGIN_RAD)
+    return [p + k * q for k in range(4)]
 
 
 def extent_along(points_xy: th.Tensor, d) -> Tuple[float, float]:
@@ -233,6 +248,22 @@ class TouchingMode:
         so the partner's own top (under's fallback) is no init surface for it."""
         fb = super().init_support_fallback(kind)
         return None if fb is None else dict(fb, to="floor")
+
+    # ------------------------------------------------------------------ init yaw
+
+    def init_align_partner(self) -> bool:
+        """``generation.init_align_partner`` (default true): the target's init yaws are the partner's axes (:meth:`yaws`)."""
+        return bool(self.gp.gen("init_align_partner", True))
+
+    def yaws(self) -> List[float]:
+        """:func:`partner_aligned_yaws` of the partner's yaw and the target's rest yaw; IORSLarge's grid without the alignment."""
+        if not self.init_align_partner():
+            return super().yaws()
+        return partner_aligned_yaws(G.yaw_of(self.partner.get_position_orientation()[1]), G.yaw_of(self.rest))
+
+    def init_yaw_jitter(self) -> float:
+        """No jitter around an aligned yaw."""
+        return 0.0 if self.init_align_partner() else super().init_yaw_jitter()
 
     # ------------------------------------------------------------------ partner geometry for C
 
