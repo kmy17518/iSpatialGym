@@ -28,6 +28,7 @@ import os
 import re
 import shutil
 import sys
+import textwrap
 
 import yaml
 
@@ -277,15 +278,13 @@ def main() -> int:
         yaml.safe_dump(tasks, f, sort_keys=False, default_flow_style=False)
     with open(os.path.join(out, "metadata", "available_tasks.yaml"), "w") as f:
         yaml.safe_dump(available, f, sort_keys=False, default_flow_style=None)
-    with open(os.path.join(out, "README.md"), "w") as f:
-        f.write(readme(index, tasks))
     if os.path.isdir(os.path.join(out, "activity_definitions")):  # the problems are the repository's (exports before 2026-10-14 copied them)
         shutil.rmtree(os.path.join(out, "activity_definitions"))
     stale = delete_unindexed(out, ("scenes",), {p for rec in index for p in rec["files"].values()})
     stale += delete_unindexed(demos, ("scenes",), {e["demo"] for e in episodes})
     if stale:
         print(f"deleted {len(stale)} file(s) of instances no longer exported")
-    sources, failed = {}, []
+    sources, failed, repinned = {}, [], []
     for rec in load_index(out):
         # a goal image set from an explicit replay (set-goal --run, e.g. another image size) stays the instance's
         prev = {}
@@ -299,6 +298,10 @@ def main() -> int:
             failed.append(str(e))
             continue
         sources[info["source"]["replay"]] = sources.get(info["source"]["replay"], 0) + 1
+        if info["source"].get("measured_targets"):
+            repinned.append(rec)
+    with open(os.path.join(out, "README.md"), "w") as f:
+        f.write(readme(index, tasks, repinned))
     n_fam, n_task = len(tasks), sum(len(t) for t in tasks.values())
     print(f"{len(index)} instances (goal images from replays: {sources}), {n_task} tasks, {n_fam} task families -> {out}; demos -> {demos}")
     if failed:
@@ -322,8 +325,17 @@ def delete_unindexed(root: str, subdirs, keep_rel) -> list:
     return stale
 
 
-def readme(index, tasks) -> str:
+def readme(index, tasks, repinned=()) -> str:
     rows = "\n".join(f"| {fam} | {task} | {len(subs)} |" for fam, ts in tasks.items() for task, subs in ts.items())
+    repin = ""
+    if repinned:
+        names = ", ".join(f"`{r.subtask}` instance {r.instance}" for r in repinned)
+        repin = "\n\n" + textwrap.fill(
+            f"The measured targets of {len(repinned)} instance{'s' * (len(repinned) > 1)} were re-pinned from their goal image's replay (`python -m "
+            f"ispatialgym.eval.instances set-goal <name> <index> --run <replay> --measured-targets`): {names}. The pose targets of "
+            "their `(:measure ...)`-only atoms are where that replay left them (its `meta.json` `final_target_poses`), so the goal "
+            "image and the targets agree; such a replay needs only symbolic success, the targets it missed being the ones re-pinned.",
+            120, break_long_words=False, break_on_hyphens=False)
     return f"""# iSpatialGym eval instances
 
 {len(index)} eval instances, one per subtask, laid out like BEHAVIOR-1K's `2026-challenge-task-instances` and kept next to it
@@ -402,7 +414,7 @@ darker (3-4 % in shadows), because the renderer's bounced light depends on what 
 `files.goal_rgb` (here) names it, and its instance file registers it (`ispatialgym.goal_observation`, as `run_isg
 --goal-image` writes it: `rgb_path`, sha256, size, the head camera key and intrinsics, and the camera's world pose: the
 demo's last recorded head camera pose, which the replay holds through its settle window), which is where the policy
-harness reads it. The sidecar's `tro_sha256` follows the instance file.
+harness reads it. The sidecar's `tro_sha256` follows the instance file.{repin}
 
 Another image size: replay the instance at that size (`--record video`: no demo.hdf5 / LeRobot copy of the replay), then
 make that run's final frame the goal image (one goal image per instance; a re-export keeps it). The replay keeps going
@@ -410,7 +422,7 @@ through the demo's own contacts with the objects: run_isg only logs the QA metri
 at them.
 
 ```bash
-sbatch scripts/eval_instances/job_run_isg.sh --task alignment_axial --instance-indices 0 --mode replay \\
+python -m ispatialgym.oracle.run_isg --task alignment_axial --instance-indices 0 --mode replay \\
     --image-size 720 --record video --out <dir>
 python -m ispatialgym.eval.instances set-goal alignment_axial 0 --run <dir>
 python -m ispatialgym.eval.instances set-goal alignment_axial 0          # back to the eval run's replay (1080)
