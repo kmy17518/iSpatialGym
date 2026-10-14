@@ -2349,6 +2349,8 @@ arm's 0.10 m/s (9.4–10 cm/s in the demo), the 4.3 cm thick target tipped about
 moved 1.52 cm at 7.9°, rotation alone gives 1.51 cm) to 15.6° and fell back at the back‑off; the rock‑back round leaned both boxes
 ~12°. At 0.02 m/s leaning the box onto the partner takes ~1.2 s against its ~0.12 s tipping time: quasi‑static, so no kick or
 rebound, but a mid‑height push still tips it (μ > b / h = 0.021 / 0.109) up to the place gap's lean (asin(0.0493 / 0.218) = 13°).
+The oracle's base nudge (the rock‑back round) holds the brace hand where it stands (oracle doc, `Push`; owner 2026‑10‑14 ~04:25):
+carried with the base it left the partner, and pair1013b_c8_k9 / k10 / k12 needed a brace‑retry rung each (2.1–2.2 cm past the goal).
 
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 

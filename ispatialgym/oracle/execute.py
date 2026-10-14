@@ -241,6 +241,15 @@ class ExecuteConfig:
     push_base_nudge_max_m: float = 0.06
     push_base_nudge_min_m: float = 0.003
     push_base_nudge_speed: float = 0.05
+    #: (owner 2026-10-14 ~04:25, touching#02) a base nudge carries every arm with the base: a brace standing on the far side of
+    #: the pair (``ctx["braces_held"]``) left the braced object with the base and the nudge pushed the pair past the goal
+    #: (pair1013b_c8_k10: the partner 26.5 mm, a brace-retry rung in every demo). On: the brace arm is re-solved every control
+    #: step so its commanded hand pose stays where it was in the world (``_NudgeBraceHold``), and the nudge stops once the
+    #: pushed object is at its goal or the base has advanced less than ``push_nudge_stall_m`` over ``push_nudge_stall_steps``
+    #: steps (pressing the pair against the brace). Off: the former nudge (the brace moves with the base).
+    push_nudge_hold_brace: bool = True
+    push_nudge_stall_steps: int = 10
+    push_nudge_stall_m: float = 0.001
     push_base_nudge_tol_m: float = 0.008
     push_base_nudge_overshoot_m: float = 0.006
     #: further nudge rounds when the object rocks back after the pad's back-off (a blade high on a box tilts it)
@@ -3639,29 +3648,114 @@ def _pitched_blade(motions: Motions, state, arm: str, targets: Dict[str, Any], p
         return None
 
 
+def held_brace_arms(ctx: Dict[str, Any], push_arm: str, cfg: ExecuteConfig) -> List[str]:
+    """The arms whose braces stand through a push (``ctx["braces_held"]``: the executor's ``braces_held``, read off the program), other
+    than the push arm: held in the world during its base nudges when ``push_nudge_hold_brace`` is on, else none."""
+    if not cfg.push_nudge_hold_brace:
+        return []
+    return sorted({b["arm"] for b in (ctx.get("braces_held") or []) if b.get("arm") and b["arm"] != push_arm})
+
+
+class _NudgeBraceHold:
+    """The braces of ``arms`` held where they stand in the world while the base nudges (``push_nudge_hold_brace``; owner 2026-10-14
+    ~04:25: "the brace hand must stay where it is in the world while the base nudges"). At the start the world pose of each brace
+    hand's COMMANDED target is taken (the FK of the measured joints with the arm at its hold target: a loaded brace keeps its
+    wind-up, so its push on the object stays as it was); every control step one IK solve from that target, with the base where it
+    is now, moves the arm's target so the commanded hand stays on that pose (as ``Motions.arm_arc_closed_loop``, the joint step
+    bounded by ``diff_ik_joint_speed``). Called as ``Motions.track_path``'s ``on_step``: returns True to stop the base when
+    ``stop_when()`` says the pushed object is at its goal, or when the base, still more than ``tol`` short of the nudge's ``move``,
+    advanced less than ``cfg.push_nudge_stall_m`` over the last ``cfg.push_nudge_stall_steps`` steps (it presses the pair against
+    the brace). ``record``: per arm the measured hand's largest / final drift from its start, the IK misses, the steps, the base's
+    travel and why the nudge stopped."""
+
+    def __init__(self, motions: Motions, arms: Sequence[str], direction, cfg: ExecuteConfig, stop_when: Optional[Callable[[], bool]] = None,
+                 move: float = float("inf"), tol: float = 0.0):
+        self.m, self.arms, self.cfg, self.stop_when = motions, list(arms), cfg, stop_when
+        self.move, self.tol = float(move), float(tol)
+        d = C.as_tensor(direction).reshape(-1)[:3].float()
+        self.d = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
+        q = motions.robot.get_joint_positions().clone().float()
+        self.frames = {a: M.EEF_LINK[a] for a in self.arms}
+        self.targets: Dict[str, Any] = {}
+        for a in self.arms:
+            qt = q.clone()
+            qt[motions.robot.arm_control_idx[a]] = motions.state.arm_target[a].float()
+            self.targets[a] = as_world_pose(motions.backend.fk([self.frames[a]], qt)[self.frames[a]])
+        self.start = {a: C.as_tensor(motions.eef_pose(a)[0]).float().clone() for a in self.arms}
+        self.along: List[float] = [float(C.as_tensor(motions.base_pose2d()[:2]).float() @ self.d)]
+        self.record: Dict[str, Any] = {"arms": {a: {"max_drift_m": 0.0, "final_drift_m": 0.0, "ik_failures": 0} for a in self.arms}, "steps": 0, "stop": None}
+
+    def __call__(self) -> bool:
+        m = self.m
+        q = m.robot.get_joint_positions().clone().float()
+        for a in self.arms:
+            idx = m.robot.arm_control_idx[a]
+            q_s = q.clone()
+            q_s[idx] = m.state.arm_target[a].float()
+            res = m.backend.solve_ik_path(f"{a}_arm", [{self.frames[a]: self.targets[a]}], q_start=q_s, pos_tol=1e-4, rot_tol=5e-4, max_iters=20,
+                                          check_collisions=False, sync_world=False, soft_pos_tol=5e-4, soft_rot_tol=2e-3)
+            rec = self.record["arms"][a]
+            if res.success and res.q_traj is not None and len(res.q_traj) > 0:
+                q_cmd = C.as_tensor(res.q_traj[-1]).reshape(-1).float()
+                dq = float(th.max(th.abs(q_cmd[idx] - q_s[idx])))
+                step = m.cfg.diff_ik_joint_speed * m.dt
+                if dq > step:
+                    q_cmd = q_s.clone()
+                    q_cmd[idx] = q_s[idx] + (C.as_tensor(res.q_traj[-1]).reshape(-1).float()[idx] - q_s[idx]) * (step / dq)
+                m.state.set_from_q(q_cmd, arms=[a], trunk=False)
+            else:
+                rec["ik_failures"] += 1
+            drift = float(th.linalg.norm(C.as_tensor(m.eef_pose(a)[0]).float() - self.start[a]))
+            rec["max_drift_m"], rec["final_drift_m"] = max(rec["max_drift_m"], drift), drift
+        self.record["steps"] += 1
+        self.along.append(float(C.as_tensor(m.base_pose2d()[:2]).float() @ self.d))
+        self.record["base_moved_m"] = round(self.along[-1] - self.along[0], 4)
+        if self.stop_when is not None and self.stop_when():
+            self.record["stop"] = "object_at_goal"
+            return True
+        n = int(self.cfg.push_nudge_stall_steps)
+        short = self.move - (self.along[-1] - self.along[0]) > self.tol  # a base settling into the tracker's tolerance is no stall
+        if short and len(self.along) > n and self.along[-1] - self.along[-1 - n] < float(self.cfg.push_nudge_stall_m):
+            self.record["stop"] = "stalled_against_the_brace"
+            return True
+        return False
+
+
 def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: float, cfg: ExecuteConfig, label: str,
-                speed: Optional[float] = None) -> Iterator[th.Tensor]:
+                speed: Optional[float] = None, hold_arms: Sequence[str] = (), stop_when: Optional[Callable[[], bool]] = None) -> Generator[th.Tensor, None, Optional[Dict[str, Any]]]:
     """Drive the base ``left`` (+ overshoot) along the push ``direction`` with the arm locked at its joints (the door
     base-follow mechanism): the pad in contact pushes the object the rest of the way when the arm sits at its reach
     boundary. The nudge goes a little past the goal (a touching goal is contact) and the tracker's tolerance shrinks with
     the distance (0918-014040: a 7 mm nudge inside the 8 mm tolerance never moved the base). ``speed``: the push's recorded
-    pad speed (:func:`push_speed_of`) caps ``push_base_nudge_speed``."""
+    pad speed (:func:`push_speed_of`) caps ``push_base_nudge_speed``. ``hold_arms``: the arms bracing the object's partner
+    (``ctx["braces_held"]``), held in the world through the nudge (:class:`_NudgeBraceHold`, which also stops the base on
+    ``stop_when()`` - the object at its goal - or a stall); returns that hold's record (None without one)."""
     d = C.as_tensor(direction).reshape(-1)[:3].float()
     d = d / max(float(th.linalg.norm(d)), 1e-9)
     move = float(left) + cfg.push_base_nudge_overshoot_m
     tol = min(cfg.push_base_nudge_tol_m, max(0.002, 0.5 * float(left)))
     x, y, yaw = state.base_pose2d()
     goal2d = [x + float(d[0]) * move, y + float(d[1]) * move, yaw]
-    log.info("%s(%s): %.1f mm still missing with the arm at its reach boundary -> nudging the base %.1f mm along the push direction (tol %.0f mm), arm locked",
-             label, obj, float(left) * 1000, move * 1000, tol * 1000)
+    hold = _NudgeBraceHold(motions, hold_arms, d, cfg, stop_when=stop_when, move=move, tol=tol) if hold_arms else None
+    log.info("%s(%s): %.1f mm still missing with the arm at its reach boundary -> nudging the base %.1f mm along the push direction (tol %.0f mm), arm locked%s",
+             label, obj, float(left) * 1000, move * 1000, tol * 1000, f"; the {'/'.join(hold_arms)} brace held in the world" if hold is not None else "")
     q = motions.robot.get_joint_positions()
     motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
     v = cfg.push_base_nudge_speed if speed is None else min(cfg.push_base_nudge_speed, float(speed))
     tcfg = replace(motions.cfg.base_tracker, v_max=(v, v, 0.2), pos_tol=tol)
     try:
-        yield from motions.track_path([goal2d], tracker_cfg=tcfg)
+        yield from motions.track_path([goal2d], tracker_cfg=tcfg, on_step=hold)
     except SkillError as e:  # a tracker time-out keeps what the nudge achieved
         log.warning("%s(%s): base nudge did not settle (%s); keeping what it achieved", label, obj, e.message)
+        if hold is not None:
+            hold.record["stop"] = "tracker_timeout"
+    if hold is None:
+        return None
+    rec = dict(hold.record, label=label, stop=hold.record["stop"] or "nudge_goal")
+    rec["arms"] = {a: {k: (round(v_, 4) if isinstance(v_, float) else v_) for k, v_ in r.items()} for a, r in rec["arms"].items()}
+    log.info("%s(%s): the brace held through the nudge (%s): base %.1f mm, hand drift %s, IK misses %s", label, obj, rec["stop"], 1000 * float(rec.get("base_moved_m") or 0.0),
+             {a: f"{1000 * r['max_drift_m']:.1f} mm" for a, r in rec["arms"].items()}, {a: r["ik_failures"] for a, r in rec["arms"].items()})
+    return rec
 
 
 def push_speed_of(contact) -> Optional[float]:
@@ -4427,6 +4521,12 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         if lowered is not None and not ctx.get("push_pre_skipped"):
             leg = [targets["init"]] + leg
         yield from _push_leg(motions, state, arm, obj, leg, geom, pose0, cfg, ctx, "push")
+    nudge_hold_arms = held_brace_arms(ctx, arm, cfg)
+
+    def _object_at_goal() -> bool:
+        res_, src_ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
+        return res_ is not None and src_ in ("goal_position", "goal_orientation") and float(res_) <= 0.0
+
     # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
     yield from _hold_until_still(motions, state, obj, cfg)
     residual, source = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
@@ -4479,7 +4579,10 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         if (geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m
                 and ctx.get("push_articulation") is None and not pick_push):
             # (no base nudge for a link on its joint: the lever's vertical lift 0920-201652 drove the base 51 mm with the fist under the flap)
-            yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push", speed=ctx.get("push_speed_m_s"))
+            hold_rec = yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push", speed=ctx.get("push_speed_m_s"),
+                                              hold_arms=nudge_hold_arms, stop_when=_object_at_goal if nudge_hold_arms else None)
+            if hold_rec is not None:
+                ctx.setdefault("push_nudge_brace_hold", []).append(hold_rec)
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))
             after_nudge, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
@@ -4512,7 +4615,10 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         log.info("push(%s): %.1f mm reopened after the back-off -> re-nudge round %d", obj, final * 1000, rounds)
         _hook(ctx, "fov")(True)
         yield from motions.arm_along(arm, [end_pose], loaded=True, partial=True, **_speed_kw(ctx))  # back onto the face along the push line
-        yield from _base_nudge(motions, state, arm, obj, targets["direction"], final, cfg, f"re-nudge {rounds}", speed=ctx.get("push_speed_m_s"))
+        hold_rec = yield from _base_nudge(motions, state, arm, obj, targets["direction"], final, cfg, f"re-nudge {rounds}", speed=ctx.get("push_speed_m_s"),
+                                          hold_arms=nudge_hold_arms, stop_when=_object_at_goal if nudge_hold_arms else None)
+        if hold_rec is not None:
+            ctx.setdefault("push_nudge_brace_hold", []).append(hold_rec)
         yield from _hold_until_still(motions, state, obj, cfg)
         end_pose = as_world_pose(state.eef_pose(arm))
         back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])

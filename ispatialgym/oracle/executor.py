@@ -549,6 +549,9 @@ NOTE_KEYS = NOTE_KEYS + ("push_pre_lowered",)
 NOTE_KEYS = NOTE_KEYS + ("push_transit",)
 #: owner 2026-10-13 (disembedding): an axis-aligned leg's driven heading / corridor and its moves (``execute.post_navigate``)
 NOTE_KEYS = NOTE_KEYS + ("axis_leg",)
+#: owner 2026-10-14: a push's recorded pad speed (``execute.push_speed_of``) and, per base nudge with a brace standing, the brace hand held
+#: in the world (``execute._NudgeBraceHold``: its drift, the IK misses, why the nudge stopped)
+NOTE_KEYS = NOTE_KEYS + ("push_speed_m_s", "push_nudge_brace_hold")
 
 
 @dataclass
@@ -1443,6 +1446,27 @@ class Executor:
                 resolved.append((links, n))
         return resolved
 
+    def braces_held(self, index: int) -> List[Dict[str, Any]]:
+        """The braces standing while action ``index`` runs: from each ``Brace`` action to its arm's next ``Retreat`` (releasing
+        or not: a wide stop lifts off with its fingers open), exclusive at both ends; a brace with no retreat stands to the
+        program's end. Read off the program like :meth:`brace_allowed_pairs`, so a checkpoint restore / retry needs no state:
+        ``[{"arm", "object", "brace_index"}, ...]`` (``execute_push`` holds them in the world during a base nudge)."""
+        out: List[Dict[str, Any]] = []
+        active: Dict[str, Tuple[int, str]] = {}
+        for j, a in enumerate(list(getattr(self, "program_actions", None) or [])):
+            name = getattr(a, "name", "")
+            if name == "brace":
+                contact = getattr(a, "contact", None)
+                arm, obj = getattr(contact, "arm", None), getattr(contact, "object", None)
+                if arm and obj:
+                    active[arm] = (j, obj)
+            elif name == "retreat" and getattr(a, "arm", None) in active:
+                start, obj = active.pop(a.arm)
+                if start < index < j:
+                    out.append({"arm": a.arm, "object": obj, "brace_index": start})
+        out += [{"arm": arm, "object": obj, "brace_index": start} for arm, (start, obj) in active.items() if start < index]
+        return out
+
     def attempt(self, index: int, action: Action, attempt: int, watch: Sequence[Tuple[Sequence[str], str]] = ()) -> Tuple[Optional[Verdict], Dict[str, Any]]:
         """Execute ``action`` once under the monitors and check its postcondition. ``watch``: contact pairs the
         monitors log for the caller (``ctx["watch_hits"]``, episode steps)."""
@@ -1468,6 +1492,7 @@ class Executor:
         if isinstance(action, Grasp):
             ctx["next_place_kind"] = self.next_place_kind(index, action)
         ctx["sidecar"] = self.sidecar  # attachment: the hover alignment's regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
+        ctx["braces_held"] = self.braces_held(index)  # execute_push holds them in the world during a base nudge
         ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "alias", None) if self.sidecar is not None else None,
                           "index": index}
         if self.support_surface is not None:

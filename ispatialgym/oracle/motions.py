@@ -2015,13 +2015,15 @@ class Motions:
         return th.tensor(samples, dtype=th.float32)
 
     def track_path(self, waypoints: Sequence[Any], posture: Optional[str] = None, tracker_cfg: Optional[BaseTrackerConfig] = None,
-                   style: Optional[str] = None, corner_stop: bool = False) -> Iterator[th.Tensor]:
+                   style: Optional[str] = None, corner_stop: bool = False, on_step: Optional[Callable[[], bool]] = None) -> Iterator[th.Tensor]:
         """Follow a recorded ``[x, y, yaw]`` waypoint list with the joystick-like tracker (feed-forward + pose
         feedback, velocity / acceleration limited, smoothed; translation and rotation simultaneous). ``posture`` is the
         recorded navigation posture (informational: Layer 1 changes no posture). ``style`` (``Navigate.style``): the
         polyline as recorded (default) or the ``face_travel`` schedule of ``robot.base_path`` (``_base_reference``);
         ``corner_stop``: the recorded polyline with a stop and a hold at every interior waypoint (an axis-aligned leg).
-        Arm and trunk hold targets stay as they are. Raises ``execution`` when the tracker times out."""
+        Arm and trunk hold targets stay as they are, unless ``on_step`` (called every control step after the base command,
+        before it is emitted) changes them; ``on_step`` returning True stops the base there. Raises ``execution`` when the
+        tracker times out."""
         waypoints = list(waypoints)
         if not waypoints:
             return
@@ -2035,6 +2037,8 @@ class Motions:
             while True:
                 v, done = tracker.step(self.base_pose2d())
                 self.state.set_base_velocity(float(v[0]), float(v[1]), float(v[2]))
+                if on_step is not None and on_step():
+                    break
                 yield self._emit()
                 if done:
                     break
