@@ -178,6 +178,12 @@ class MotionsConfig:
     #: toward finger 1 (0916-202403) before the assisted grasp attached. With the targets frozen at the contact width the
     #: drift is bounded by the squeeze. None = the stock command (the fight).
     gripper_contact_squeeze_m: Optional[float] = 0.001
+    #: a thin pinch (a library pinch at most this wide, m: a tray's wall) closes at ``thin_pinch_close_rate`` and holds the pads at the
+    #: touch width less ``thin_pinch_squeeze_m``: at the ramp and squeeze above the pads strike a 3.2 mm wall at ~0.27 m/s and the
+    #: light tray rocks on it (+-17 mm) until the assisted grasp's window of uninterrupted contact completes. None = every pinch as above
+    thin_pinch_width_m: Optional[float] = 0.006
+    thin_pinch_close_rate: float = 0.0005
+    thin_pinch_squeeze_m: float = 0.0
     #: base tracking (paths) and base-follow (articulation) tracker configurations
     base_tracker: BaseTrackerConfig = field(default_factory=BaseTrackerConfig)
     base_follow_speed: float = 0.15  # m/s along the recorded b_k
@@ -595,14 +601,16 @@ class Motions:
         for _ in range(int(self.cfg.gripper_preshape_steps if steps is None else steps)):
             yield self._emit()
 
-    def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None) -> Iterator[th.Tensor]:
+    def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None,
+                squeeze: Optional[float] = None) -> Iterator[th.Tensor]:
         """Open / close the gripper and wait until the fingers stop moving (or an assisted grasp engages).
 
         Closing: ``rate`` (m per control step; ``execute_grasp`` passes ``cfg.gripper_close_rate``) ramps the smooth-mode
         command from the current opening to closed so both pads track the same target and reach the object in the same
         step even while one pad rubs the table (closure probe 2026-09-16: the stock step command let the free pad knock
         the un-pinched cylinder along the table and roll it 19-77 deg); the stock step command follows the ramp (and is
-        the whole command without a rate: the push / brace closures).
+        the whole command without a rate: the push / brace closures). ``squeeze`` replaces ``cfg.gripper_contact_squeeze_m``
+        (a thin pinch's ``thin_pinch_squeeze_m``).
 
         Opening (owner 2026-10-10): exactly the open command (+1) in one step, every release, the hand held where it is -
         no ramp, no partial or staged opening. A held object is released by that command alone: OmniGibson's assisted
@@ -616,6 +624,7 @@ class Motions:
         held_before = None if close else self.held_object(arm)
         if close:
             contact_hold = None
+            sq = self.cfg.gripper_contact_squeeze_m if squeeze is None else float(squeeze)
             if rate:
                 q_target = q_now
                 n = 0
@@ -626,12 +635,12 @@ class Motions:
                     n += 1
                     if n > 10 and self.held_object(arm) is not None:
                         break  # attached: finish with the full command below
-                    if self.cfg.gripper_contact_squeeze_m is not None and self.object_between_pads(arm):
+                    if sq is not None and self.object_between_pads(arm):
                         # symmetric closure: both pads touch the object - stop the ramp and hold the fingers at the contact
                         # width minus the squeeze, so the two saturated drives do not fight through the object (finger 2
                         # would win and shove the un-attached object toward finger 1: marker 8.5 mm, napkins box 15.4 mm)
                         q_touch = float(self.robot.get_joint_positions()[idx].float().mean())
-                        contact_hold = max(lo, q_touch - float(self.cfg.gripper_contact_squeeze_m))
+                        contact_hold = max(lo, q_touch - float(sq))
                         self.state.gripper_cmd[arm] = self.gripper_command(arm, contact_hold)
                         self.release_events.append({"arm": arm, "event": "contact_hold", "hold_m": round(contact_hold, 4), "touch_m": round(q_touch, 4),
                                                     "fingers_m": [round(float(v), 4) for v in self.robot.get_joint_positions()[idx].float().tolist()], "ramp_steps": n})

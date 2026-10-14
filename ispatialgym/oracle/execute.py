@@ -1564,6 +1564,16 @@ def grasp_pinch_width(action: Grasp) -> Optional[float]:
     return width if math.isfinite(width) and width > 0 else None
 
 
+def grasp_closure(action: Grasp, width: Optional[float], cfg) -> Tuple[Optional[float], Optional[float], bool]:
+    """``(rate, squeeze, thin)`` of a grasp's closure (:meth:`Motions.gripper`): a library pinch at most ``cfg.thin_pinch_width_m`` wide
+    closes at ``thin_pinch_close_rate`` and holds at the touch width less ``thin_pinch_squeeze_m``; every other grasp at
+    ``gripper_close_rate`` with the configured squeeze (``squeeze`` None)."""
+    thin_w = getattr(cfg, "thin_pinch_width_m", None)
+    if action.kind == "library" and width is not None and thin_w is not None and float(width) <= float(thin_w):
+        return float(cfg.thin_pinch_close_rate), float(cfg.thin_pinch_squeeze_m), True
+    return cfg.gripper_close_rate, None, False
+
+
 def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: str, supports: Sequence[Any], ignore_links: Sequence[Any]) -> Iterator[th.Tensor]:
     """The free move to the pre-grasp (``execute_grasp``): through a recorded standoff, a lever grasp's Cartesian detour, or
     the supports-present plan of ``reach_pre_pose`` (the supports-ignored plan as its fallback)."""
@@ -2059,8 +2069,11 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step. A handle's
     # link is attached with a FIXED joint by the task's rule (ISpatialGymTask: AG_MOVING_LINK_JOINT_TYPE), the only kind the
     # follow was designed for - the same rule an evaluated policy's grasp meets
-    yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
-    ctx["closure_rate_m_per_step"] = motions.cfg.gripper_close_rate
+    rate, squeeze, thin = grasp_closure(action, width, motions.cfg)
+    yield from motions.gripper(arm, close=True, rate=rate, squeeze=squeeze)
+    ctx["closure_rate_m_per_step"] = rate
+    if thin:
+        ctx["thin_pinch"] = {"width_m": round(float(width), 4), "rate_m_per_step": rate, "squeeze_m": squeeze}
     if action.kind == "handle":
         params = (getattr(motions.robot, "_ag_obj_constraint_params", None) or {}).get(arm) or {}
         ctx["ag_joint_type"] = params.get("joint_type")

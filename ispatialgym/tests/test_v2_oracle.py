@@ -2390,6 +2390,29 @@ def test_place_releases_with_the_open_command_at_the_place_pose(tmp_path):
     assert not result["release_check"]["violations"]
 
 
+def test_thin_pinch_closure_is_slow_and_holds_at_the_touch_width():
+    """A library pinch at most ``thin_pinch_width_m`` wide (a tray's 3.2 mm wall) closes at ``thin_pinch_close_rate`` and holds the pads
+    at the touch width (``thin_pinch_squeeze_m`` 0); a wider pinch, a handle / cube grasp or no width keep the ramp and the squeeze."""
+    cfg = MotionsConfig()
+    lib, handle = SimpleNamespace(kind="library"), SimpleNamespace(kind="handle")
+    assert EX.grasp_closure(lib, 0.0032, cfg) == (0.0005, 0.0, True)
+    assert EX.grasp_closure(lib, 0.0734, cfg) == (cfg.gripper_close_rate, None, False)
+    assert EX.grasp_closure(lib, None, cfg) == (cfg.gripper_close_rate, None, False)
+    assert EX.grasp_closure(handle, 0.0032, cfg) == (cfg.gripper_close_rate, None, False)
+    assert EX.grasp_closure(lib, 0.0032, replace(cfg, thin_pinch_width_m=None)) == (cfg.gripper_close_rate, None, False)
+    robot = FakeRobot()
+    env = FakeEnv(robot, {})
+    m = Motions(env, FakeBackend(robot), MotionsConfig(gripper_steps=30))
+    drive(env, m.gripper("right", close=False))
+    ep, _ = robot.eef_pose("right")
+    env.objects["ball"] = FakeObject("ball_0", ep.tolist())
+    drive(env, m.gripper_opening("right", 0.044))  # pre-shaped 3 mm outside the 8 cm ball's pads
+    drive(env, m.gripper("right", close=True, rate=0.0005, squeeze=0.0))
+    ev = m.release_events[-1]
+    assert robot._ag_obj_in_hand["right"] is env.objects["ball"] and ev["event"] == "contact_hold" and ev["ramp_steps"] >= 5
+    assert abs(ev["hold_m"] - ev["touch_m"]) < 1e-9 and "fallback" not in ev
+
+
 def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(tmp_path):
     """``execute_grasp`` pre-shapes the opening to pinch width / 2 + ``gripper_preshape_margin`` (the apple's library grasp:
     73.4 mm -> 46.7 mm per finger) before the descent and closes with ``gripper_close_rate``; both are recorded in the
