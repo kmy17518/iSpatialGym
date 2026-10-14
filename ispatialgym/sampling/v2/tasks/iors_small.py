@@ -756,8 +756,9 @@ class IORSSmall(SamplerV2):
         """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
         feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp. ``arms``: the arms
         offered for the segment at this focus (the chosen one is the record's ``arm``). :meth:`pair_goal_align`: F over
-        :meth:`pair_target_yaws`, else :meth:`widest_faces`: over :meth:`widest_faces_target_yaws`, else with :meth:`init_align_support` over the
-        four :meth:`support_aligned_yaws`; drawn without jitter."""
+        :meth:`pair_target_yaws` with the footprint ``support_margin`` (default 0.02, the start's usual margin) inside the top, else
+        :meth:`widest_faces`: over :meth:`widest_faces_target_yaws`, else with :meth:`init_align_support` over the four
+        :meth:`support_aligned_yaws`; drawn without jitter."""
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
@@ -767,6 +768,8 @@ class IORSSmall(SamplerV2):
         else:
             yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.support_aligned_yaws("target", manip) if self.init_align_support() else None
         yaw_kw = {"yaws": yaws, "jitter": 0.0} if yaws is not None else {}
+        if self.pair_goal_align() is not None:
+            yaw_kw["margin"] = self.margin_support  # the long axis across the edge may need the support's whole depth (the partner keeps it too)
         last = None
         for i, gs in enumerate(tiers):
             try:

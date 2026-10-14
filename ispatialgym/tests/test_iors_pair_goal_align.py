@@ -313,6 +313,19 @@ def test_phase3_two_tier_screens_the_pair_target_yaws_without_jitter(monkeypatch
     manip = _manip(s)
     assert s.phase3_two_tier(manip, np.random.default_rng(0)) == ("pose", "grasp")
     assert seen[0]["jitter"] == 0.0 and seen[0]["yaws"] == pytest.approx(s.pair_target_yaws(manip)) and len(seen[0]["yaws"]) == 1
+    assert seen[0]["margin"] == TT.SUPPORT_MARGIN  # support_margin's default: the start's usual 2 cm
+    # nextto#04's bench is 0.36 m deep across its long edge, the shoes 0.31 m long: the alias's support_margin goes to the target's start too
+    narrow = _pair_sampler(monkeypatch, "nextto04", gen={"support_margin": 0.005})
+    narrow.grasps = narrow.grasps_flush = ["g"]
+    narrow.support_objects = lambda: []
+    narrow.phase3_two_tier(_manip(narrow), np.random.default_rng(0))
+    assert seen[-1]["margin"] == 0.005
+    plain = _sampler("nextto", gen={"init_align_support": True, "support_margin": 0.005}, pair={"g_NT": 0.05})
+    plain.grasps = plain.grasps_flush = ["g"]
+    plain.support_objects = lambda: []
+    plain.choice = types.SimpleNamespace(models={"target": types.SimpleNamespace(scale=None)})
+    plain.phase3_two_tier(_manip(plain), np.random.default_rng(0))
+    assert "margin" not in seen[-1]  # without the key the start keeps phase3_target's default
 
 
 def test_touching_push_candidates_above_the_cap_are_not_tried(monkeypatch):
@@ -355,3 +368,4 @@ def test_the_four_aliases_carry_the_key_and_every_use_is_valid():
     assert customs["inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar"]["generation"]["touching_place_gap_m"] == 0.05
     for alias in list(want)[1:]:
         assert customs[alias]["generation"]["init_align_support"] is True
+    assert customs["inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench"]["generation"]["support_margin"] == 0.005

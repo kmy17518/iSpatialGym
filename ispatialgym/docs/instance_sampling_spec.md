@@ -1061,7 +1061,8 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      target's drawn front (16 tries, 8 for touching, each with a new gap), with the centre of its footprint's minimum-area
      rectangle level with the target's along the stance's depth axis; the start region uses that orientation (beside a target at
      any of its admitted init yaws). The target's init yaws (step 1, no jitter, F kept out of the band) are its support-aligned
-     yaws whose long axis lies across the edge and whose front points per `facing`. Takes precedence over `widest_faces` /
+     yaws whose long axis lies across the edge and whose front points per `facing`, its footprint `generation.support_margin`
+     (default 0.02 m, step 1's usual margin; the partner's already) inside the top. Takes precedence over `widest_faces` /
      `init_align_support` for both yaws; with `partner_aligned_to_target`, `partner_on_meta_link` or the shelf layout a spec error.
    - **Partner on a flat part of the top** (owner decision 2026‑10‑13, under_small#04 "move the sheet to a flat part of the
      support"; `generation.partner_flat_top: true`). Once per template the support's visual meshes (the faces reaching within
@@ -2294,7 +2295,9 @@ the rectangles' centres against the partner's long axis: 90 = side by side), `st
 The four aliases (DECISIONS_LOG 2026‑10‑13 22:40; fronts from the models' cross‑sections, confirmed on renders): nextto#01
 marker/xakoic `+x` (cap) and colored_pencil/acumgp `-x` (tip), #03 tablespoon/yxxfdj `-x` (bowl) and chopstick/bcwuwv `-x`
 (tip), #04 gym_shoe/kmcbym and mcfcwq `+x` (toes) — `facing: away`, the pair pointing away from the robot side by side, the
-partner on `partner_side` (#04: the left shoe on the left, a wearable pair); touching#02 box_of_cereal/iucshm `+x` and dkhgxn
+partner on `partner_side` (#04: the left shoe on the left, a wearable pair; `support_margin` 0.005 m: bench_pfjnnj_0's top raster is
+0.36 m deep across its long edge, the shoes 0.31 m long, and with 2 cm margins no start cell admitted the partner — its seeds 5-7
+were rejected at the template); touching#02 box_of_cereal/iucshm `+x` and dkhgxn
 `-x` (printed fronts), `facing: any`, `faces: widest`, `push_max_height_m` 0.035, with `touching_place_gap_m` 0.05 (one finger
 stands between the boxes at the place and opens (0.10 − 0.043) / 2 m further). Aliases without the key are sampled as before.
 
