@@ -78,7 +78,7 @@ def run_single(qa=True):
 def run_vec(qa=True):
     env, source, cfg = make_world("reach_then_stop")
     mon = FakeMonitors()
-    slot = Slot(idx=0, robot=env.robot, source=source, cfg=cfg, task=env.task, monitors=mon, tracked={}, held=lambda: [], never_held_window=None)
+    slot = Slot(idx=0, robot=env.robot, source=source, cfg=cfg, task=env.task, monitors=mon, tracked={}, held=lambda: [])
     (r,) = VecStreamExecutor(FakeVecEnv([env]), [slot], sim=None, qa=qa).run([env._obs()], [env._info()])
     return r, mon
 
@@ -87,7 +87,7 @@ def run_vec(qa=True):
 def test_a_stream_is_judged_by_its_goal_single_env_and_vectorized(qa):
     single, smon = run_single(qa)
     vec, vmon = run_vec(qa)
-    for k in ("success", "reason", "n_steps", "n_action_steps", "settle_windows", "first_success_step"):
+    for k in ("success", "reason", "n_steps", "n_action_steps", "epilogue_steps", "geometric_success_step", "symbolic_success_step"):
         assert vec[k] == single[k], (k, vec[k], single[k])
     assert single["success"] is True and single["reason"] is None and single["n_action_steps"] > HITS[-1]
     assert smon.collision_checks >= single["n_action_steps"] and vmon.collision_checks >= vec["n_action_steps"]  # statistics kept

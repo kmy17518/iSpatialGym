@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from ispatialgym.eval import metrics as MET
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.executor import Executor, ExecutorConfig
 from ispatialgym.oracle.programs import expand
@@ -68,6 +69,7 @@ class GripperDrive(Drive):
 def _grasp_world(kind):
     robot = FakeRobot()
     env = GraspEnv(robot, GoalTracker((0.5, 0.0)), drop_at=12 if kind == "drop" else None)
+    env.task.tracker = MET.SuccessTracker(settle_eval=False)  # scored as a policy stream (no settle window)
     return env, GripperDrive(robot, open_at=12 if kind == "open" else None), ExecutorConfig(max_steps=20000)
 
 
@@ -76,7 +78,7 @@ def test_vec_records_releases_with_the_single_env_rule_and_logs_a_bad_one(kind):
     env, source, cfg = _grasp_world(kind)
     single = _single(env, source, cfg)
     venv_env, vsource, vcfg = _grasp_world(kind)
-    slot = Slot(idx=0, robot=venv_env.robot, source=vsource, cfg=vcfg, task=venv_env.task, tracked={}, held=lambda: [], never_held_window=10)
+    slot = Slot(idx=0, robot=venv_env.robot, source=vsource, cfg=vcfg, task=venv_env.task, tracked={}, held=lambda: [])
     (r,) = VecStreamExecutor(FakeVecEnv([venv_env]), [slot], sim=None, qa=True).run([venv_env._obs()], [venv_env._info()])
     assert r["release_check"] == single["release_check"]
     (rel,) = r["release_check"]["releases"]

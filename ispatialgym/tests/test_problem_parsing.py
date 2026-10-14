@@ -34,80 +34,26 @@ from ispatialgym.activity.problem import parse_problem_file, parse_problem_strin
 #: release's problems only
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bddl")
 
-# Expected structure per problem: (variant, binary-success predicates, pose_settled args, gating pose_reached args,
-# gating layout_reached args, non-gating (:measure) pose_reached args). Binary predicates are the multiset of
-# predicate tokens of the expanded binary goal.
+# Expected structure per problem: (variant, binary-success predicates, pose_settled args, :goal pose_reached args,
+# :goal layout_reached args, :measure pose_reached args, :measure layout_reached args) - an atom may be in both sections
+# (2026-10-14). Binary predicates are the multiset of predicate tokens of the expanded binary goal.
 EXPECTED = {
-    # problem0 of these three = pick #01 of the representative sheet (grounded 2026-10-11; the hand-written mug problems before)
-    ("camera_relocalization", 0): ("camera_relocalization-standard", ["pose_reached"], ["agent.n.01_1"], ["agent.n.01_1"], [], []),
-    ("object_scaling", 0): ("object_scaling-canned_food", ["grasped", "pose_reached"], ["canned_food.n.01_1", "agent.n.01_1"], ["canned_food.n.01_1"], [], []),
-    ("mental_rotation", 0): ("mental_rotation-classroom_mock_up", ["grasped", "pose_reached"], ["mock-up.n.01_1", "agent.n.01_1"], ["mock-up.n.01_1"], [], []),
-    ("disembedding", 0): (
-        None,
-        ["ontop", "not ontop", "not ontop", "not ontop", "not grasped"],
-        ["mug.n.04_1", "agent.n.01_1"],
-        [],
-        [],
-        ["mug.n.04_1"],
-    ),
-    ("configuration_matching", 0): (
-        "block_design",
-        ["ontop"] * 4 + ["layout_reached"] + ["not grasped"] * 4,
-        ["toy_dice.n.01_1", "toy_dice.n.01_2", "toy_dice.n.01_3", "toy_dice.n.01_4", "agent.n.01_1"],
-        [],
-        ["blocks_group.n.01_1"],
-        ["blocks_group.n.01_1"],
-    ),
-    ("configuration_matching", 1): (
-        "articulation",
-        ["open", "layout_reached", "not grasped"],
-        ["cabinet.n.01_1", "agent.n.01_1"],
-        [],
-        ["cabinet.n.01_1"],
-        [],
-    ),
-    ("configuration_matching", 2): (
-        "articulation",
-        ["not open", "layout_reached", "not grasped"],
-        ["cabinet.n.01_1", "agent.n.01_1"],
-        [],
-        ["cabinet.n.01_1"],
-        [],
-    ),
-    ("configuration_matching", 3): (
-        "attachment",
-        ["attached", "ontop", "layout_reached", "not grasped", "not grasped"],
-        ["digital_camera.n.01_1", "camera_tripod.n.01_1", "agent.n.01_1"],
-        [],
-        ["attachment_group.n.01_1"],
-        ["attachment_group.n.01_1"],
-    ),
-    ("alignment", 0): (
-        "table_surface",
-        ["ontop", "pose_reached", "not grasped"],
-        ["fishing_rod.n.01_1", "agent.n.01_1"],
-        ["fishing_rod.n.01_1"],
-        [],
-        [],
-    ),
-    ("alignment", 1): (
-        "world_vertical",
-        ["pose_reached", "not grasped"],
-        ["painting.n.01_1", "agent.n.01_1"],
-        ["painting.n.01_1"],
-        [],
-        [],
-    ),
+    ('camera_relocalization', 0): ('camera_relocalization-standard', ['pose_reached'], ['agent.n.01_1'], ['agent.n.01_1'], [], ['agent.n.01_1'], []),
+    ('object_scaling', 0): ('object_scaling-canned_food', ['grasped', 'pose_reached'], ['canned_food.n.01_1', 'agent.n.01_1'], ['canned_food.n.01_1'], [], ['canned_food.n.01_1'], []),
+    ('mental_rotation', 0): ('mental_rotation-classroom_mock_up', ['grasped', 'pose_reached'], ['mock-up.n.01_1', 'agent.n.01_1'], ['mock-up.n.01_1'], [], ['mock-up.n.01_1'], []),
+    ('disembedding', 0): (None, ['ontop', 'not ontop', 'not ontop', 'not ontop', 'not grasped'], ['mug.n.04_1', 'agent.n.01_1'], [], [], ['mug.n.04_1'], []),
+    ('configuration_matching', 0): ('block_design', ['ontop', 'ontop', 'ontop', 'ontop', 'layout_reached', 'not grasped', 'not grasped', 'not grasped', 'not grasped'], ['toy_dice.n.01_1', 'toy_dice.n.01_2', 'toy_dice.n.01_3', 'toy_dice.n.01_4', 'agent.n.01_1'], [], ['blocks_group.n.01_1'], ['blocks_group.n.01_1'], ['blocks_group.n.01_1']),
+    ('configuration_matching', 1): ('articulation', ['open', 'not grasped'], ['cabinet.n.01_1', 'agent.n.01_1'], [], [], [], ['cabinet.n.01_1']),
+    ('configuration_matching', 2): ('articulation', ['not open', 'not grasped'], ['cabinet.n.01_1', 'agent.n.01_1'], [], [], [], ['cabinet.n.01_1']),
+    ('configuration_matching', 3): ('attachment', ['attached', 'ontop', 'layout_reached', 'not grasped', 'not grasped'], ['digital_camera.n.01_1', 'camera_tripod.n.01_1', 'agent.n.01_1'], [], ['attachment_group.n.01_1'], ['attachment_group.n.01_1'], ['attachment_group.n.01_1']),
+    ('alignment', 0): ('table_surface', ['ontop', 'pose_reached', 'not grasped'], ['fishing_rod.n.01_1', 'agent.n.01_1'], ['fishing_rod.n.01_1'], [], ['fishing_rod.n.01_1'], []),
+    ('alignment', 1): ('world_vertical', ['pose_reached', 'not grasped'], ['painting.n.01_1', 'agent.n.01_1'], ['painting.n.01_1'], [], ['painting.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 0): ('ontop', ['ontop', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 1): ('under', ['under', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 2): ('inside', ['inside', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 3): ('nextto', ['nextto', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 4): ('touching', ['touching', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
 }
-for i, rel in enumerate(["ontop", "under", "inside", "nextto", "touching"]):
-    EXPECTED[("inter_object_relation_satisfaction", i)] = (
-        rel,
-        [rel, "not grasped", "not grasped"],
-        ["apple.n.01_1", "bowl.n.01_1", "agent.n.01_1"],
-        [],
-        [],
-        ["apple.n.01_1", "bowl.n.01_1"],
-    )
 
 
 def _binary_tokens(problem):
@@ -150,7 +96,7 @@ def test_every_shipped_problem_compiles(activity, definition_id):
 
 @pytest.mark.parametrize("activity,definition_id", sorted(EXPECTED))
 def test_shipped_problem_structure(activity, definition_id):
-    variant, binary, settled, pose_reached, layout_reached, measured = EXPECTED[(activity, definition_id)]
+    variant, binary, settled, pose_reached, layout_reached, measure_pose, measure_layout = EXPECTED[(activity, definition_id)]
     problem = load_problem(activity, definition_id, root=FIXTURES)
     compiled = problem.compile()
     assert problem.name == f"{activity}-{definition_id}"
@@ -159,25 +105,15 @@ def test_shipped_problem_structure(activity, definition_id):
     assert compiled.pose_settled_insts == settled
     assert compiled.pose_reached_args == pose_reached
     assert compiled.layout_reached_args == layout_reached
-    assert compiled.measure_pose_reached_args == measured
-    assert compiled.measure_layout_reached_args == []
-    assert compiled.all_pose_reached_args == pose_reached + measured
-    for arg in pose_reached:
-        assert compiled.is_gating("pose_reached", arg)
-    for arg in measured:
-        assert not compiled.is_gating("pose_reached", arg)
-    # measured atoms never appear in the compiled goal
-    assert not any(a in measured for head in compiled.goal_conditions for a in collect_predicate_args(head, "pose_reached"))
-    # Binary heads + pose_settled heads partition the goal
-    assert sorted(compiled.binary_goal_head_idxs + compiled.pose_settled_head_idxs) == list(range(len(problem.goal)))
-    assert len(compiled.pose_settled_head_idxs) == len(settled)
-    # Exactly one ground option for these conjunctive goals
-    assert len(compiled.ground_goal_state_options) == 1
-    # No group symbol survives in a pointwise atom
-    for conj in problem.goal:
-        lit = conj[1] if conj[0] == "not" else conj
-        if lit[0] not in ("pose_reached", "layout_reached"):
-            assert not any(problem.is_group(a) for a in lit[1:]), conj
+    assert compiled.measure_pose_reached_args == measure_pose
+    assert compiled.measure_layout_reached_args == measure_layout
+    assert compiled.all_pose_reached_args == list(dict.fromkeys(pose_reached + measure_pose))
+    for pred, goal_args, measure_args in (("pose_reached", pose_reached, measure_pose), ("layout_reached", layout_reached, measure_layout)):
+        for arg in set(goal_args) | set(measure_args):
+            assert compiled.is_gating(pred, arg) == (arg in goal_args) and compiled.in_measure(pred, arg) == (arg in measure_args)
+    # an atom only in :measure never appears in the compiled goal
+    only_measured = [a for a in measure_pose if a not in pose_reached]
+    assert not any(a in only_measured for head in compiled.goal_conditions for a in collect_predicate_args(head, "pose_reached"))
 
 
 @pytest.mark.parametrize("activity,definition_id", sorted(EXPECTED))
@@ -288,11 +224,24 @@ def test_measure_section():
     assert "(:measure" in p.expanded_bddl()
 
 
+def test_an_atom_may_be_in_goal_and_measure():
+    """2026-10-14: a ``pose_reached`` / ``layout_reached`` atom may sit in :goal (gating) and in :measure (judged by geometric
+    success) at once; it is evaluated once per target."""
+    p = _parse(f"{HEADER} {OBJECTS} {GROUPS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_2) (layout_reached ?g.n.01_1)))")
+    compiled = p.compile()
+    assert compiled.pose_reached_args == ["mug.n.04_2"] and compiled.measure_pose_reached_args == ["mug.n.04_2"]
+    assert compiled.all_pose_reached_args == ["mug.n.04_2"]
+    assert compiled.is_gating("pose_reached", "mug.n.04_2") and compiled.in_measure("pose_reached", "mug.n.04_2")
+    assert not compiled.is_gating("layout_reached", "g.n.01_1") and compiled.in_measure("layout_reached", "g.n.01_1")
+    seen = []
+    compiled.check_goal(lambda cls, *ents: seen.append((cls.__name__, ents)) or True)
+    assert ("PoseReached", ("mug.n.04_2",)) in seen and ("LayoutReached", ("g.n.01_1",)) not in seen
+
+
 @pytest.mark.parametrize(
     "body,match",
     [
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (ontop ?mug.n.04_1 ?tray.n.01_1)))", "only accepts"),
-        (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_2)))", "already a gating"),
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_1) (pose_reached ?mug.n.04_1)))", "more than once"),
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?bowl.n.01_1)))", "not a declared"),
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_1 ?tray.n.01_1)))", "exactly one"),

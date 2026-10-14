@@ -594,4 +594,5 @@ def test_summarize(tmp_path, capsys):
     assert [r["status"] for r in rows] == ["scored", "scored", "unscored", "not run"] and rows[0]["calls"] == 3
     main([str(tmp_path)])
     out = capsys.readouterr().out
-    assert "2 scored, 1 unscored, 1 not run" in out and "1/2 = 50.0%" in out and "HTTP 503" in out
+    assert "2 scored, 1 unscored, 1 not run" in out and "1/2  50.0%" in out and "HTTP 503" in out
+    assert "flagged: 2 meta.json" in out  # written before the scoring change: symbolic only

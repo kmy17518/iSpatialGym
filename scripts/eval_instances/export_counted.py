@@ -329,8 +329,9 @@ python -m ispatialgym.eval.instances show alignment_axial 0 1   # what an index 
 
 `ISPATIALGYM_INSTANCES_PATH` (or `--instances-root`) points at this folder, `ISPATIALGYM_DEMOS_PATH` at the demos; the
 defaults are `$OMNIGIBSON_DATA_PATH/ispatialgym-eval-instances` and its sibling `ispatialgym-eval-demos`. With `--task`,
-run_isg gives an instance `max(300, 2 x its demo's length)` steps (`--max-steps`), a settle window of 0.2 x that
-(`--settle-steps`) and 1 s per step of wall clock (`--wallclock`), and replays its demo unless `--replay` names another.
+run_isg gives an instance `max(300, 2 x its demo's length)` steps (`--max-steps`) and 1 s per step of wall clock
+(`--wallclock`), a `pose_settled` / settle-eval window (`--settle-steps`) of 45 steps (oracle, policy) or all of its demo's
+settle rows (replay: `episodes.jsonl` `settle_steps`), and replays its demo unless `--replay` names another.
 run_isg never writes into this folder: runs go to `--out` (default `./runs`) and the goal / sidecar write-backs of oracle
 runs are skipped for dataset instances.
 

@@ -242,5 +242,5 @@ def test_goal_occlusion_fails_an_oracle_demo_with_its_own_verdict(tmp_path, monk
     rep = {"method": "live head-camera depth", "threshold": 0.5, "objects": {}, "max_occluded": 0.62, "worst": "target_apple_0", "occluded": True}
     monkeypatch.setattr(Executor, "goal_occlusion_report", lambda self: dict(rep))
     result = ex.run_program(expand(sc.variant, sc))
-    assert not result["success"] and result["reason"] == "goal_occlusion" and result["binary_success_final"]
+    assert not result["success"] and result["reason"] == "goal_occlusion" and result["geometric_success"]
     assert result["qa"]["metrics"]["goal_occlusion"]["report"]["worst"] == "target_apple_0" and result["qa"]["stopped_by"] == "goal_occlusion"

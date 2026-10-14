@@ -31,7 +31,7 @@ def _run(tmp_path, per_scene: bool, async_frames: bool, video: bool = False, cap
         env.sim.dump_state = forbidden
         env.sim.load_state = forbidden
     rcfg = RecorderConfig(hdf5=True, lerobot=False, views=("head",) if video else (), async_frames=async_frames, **(rcfg_kw or {}))
-    ecfg = ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, per_scene_state=per_scene, **(ecfg_kw or {}))
+    ecfg = ExecutorConfig(settle_steps=50, per_scene_state=per_scene, **(ecfg_kw or {}))
     state0 = env.scene.dump_state(serialized=True) if per_scene else env.sim.dump_state(serialized=True)
     ex, motions, backend, rec = make_executor(env, sc, None, exec_cfg=ecfg)
     rec = Recorder(str(tmp_path), env, env.robot, "robot_r1:zed_link:Camera:0", dict(env.objects), fps=30, cfg=rcfg, instance_id=sc.instance_id)

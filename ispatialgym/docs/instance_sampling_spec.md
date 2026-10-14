@@ -2268,10 +2268,11 @@ with I_z = m (long² + short²) / 12 of the target's footprint.
 
 ## 8. Error tolerances
 
-Gating tolerances follow the perceptual quantity a subtask tests; measured-only tasks report absolute and
-size-normalised errors.
+**Generation** writes a tolerance into the TRO per target from `generation.tolerances` (the customs list, per
+variant, never per instance) and the table below; the sampler, the oracle's program checks and the instance's own
+records use it. Continuous `orientation_equivalences` are enumerated at 5° (3.13), finer than every tolerance below.
 
-| subtask | gating target | tolerance |
+| subtask | target | generation tolerance |
 |---|---|---|
 | camera relocalization | camera pose | 0.05 m / 0.10 rad (fixed) |
 | object scaling | depth | max(0.02 m, 0.20·\|Δd\|) |
@@ -2281,12 +2282,28 @@ size-normalised errors.
 | attachment | layout relation | 0.01 m / 0.15 rad |
 | alignment vertical / horizontal | orientation | 0.08 rad |
 | alignment axial | orientation | 0.10 rad |
-| disembedding, IORS | measured only | 0.03 m / 0.20 rad; override threshold for "goal := settled pose" = max(0.01 m, 0.25 × smallest horizontal extent) / 0.20 rad |
+| disembedding, IORS | pose (in `:measure`) | 0.03 m / 0.20 rad |
 
-The tolerances are written into the TRO per target and pinned by the evaluation profile `isg-v1` together with the
-camera configuration and `n_render_iterations = 1` (`task_definition_and_evaluation.md`, observation timing);
-`generation.tolerances` in the customs list overrides per variant, never per instance. Continuous
-`orientation_equivalences` are enumerated at 5° (3.13), finer than every orientation tolerance above.
+**Evaluation** (2026-10-14) does not read those values: every target is judged with the `isg-v2` profile
+(`ispatialgym.eval.tolerance_profile`), computed at load from the target's error at the first step (after the
+loader's settle, before any action; "the change") and written over the loaded TRO in memory - one tolerance per
+target for the goal predicates, geometric success, the oracle's push loops and the goal override (the dataset is
+never written; the TRO fields stay, superseded):
+
+| scale group | targets | tolerance at scale 1 |
+|---|---|---|
+| micro | pose targets of object scaling, mental rotation, alignment | max(0.01 m, 10 % of the change) / max(0.05 rad, 10 % of the change) |
+| micro | articulation joints (per joint) | prismatic max(0.01 m, 10 % \|Δq\|), revolute max(0.05 rad, 10 % \|Δq\|) |
+| micro | block design / attachment relations | 0.01 m / 0.05 rad |
+| small | articulation small-scale root, block design / attachment slots, disembedding, IORS small-scale | 0.03 m / 0.10 rad |
+| large | camera relocalization, IORS large-scale | 0.05 m / 0.15 rad |
+
+Object scaling is compared on the full head-camera-frame position (its TRO depth metric becomes `full` at load).
+`run_isg --tolerance-scale` (default 3 for `--mode policy`, else 1) multiplies every tolerance; an
+`evaluation.tolerances` block in the subtask's customs entry (`pose` / `layout`: absolute `position` /
+`orientation`; `joints`: `revolute` / `prismatic` floors and `fraction`) overrides, still scaled; none is set yet.
+The profile is pinned with the camera configuration and `n_render_iterations = 1` (the evaluation profile,
+`task_definition_and_evaluation.md`, observation timing), and `meta.json` records it (`tolerance_profile`).
 
 ## 9. `ground_isg`, `sample_isg`, `multiply_isg`
 

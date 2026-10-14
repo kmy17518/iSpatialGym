@@ -368,7 +368,7 @@ def test_the_oracle_retries_a_stall_and_qa_logs_every_attempt(tmp_path, monkeypa
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, *_ = make_executor(env, sc, tmp_path, qa=True, qa_cfg=QA.QAConfig(stall_steps=20, fov_min_steps=100000),
-                           exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, retries=1))
+                           exec_cfg=ExecutorConfig(settle_steps=50, retries=1))
     result = ex.run_program(expand(sc.variant, sc))
     assert not result["success"] and result["reason"] == "stalled"
     stall = result["qa"]["metrics"]["stalled"]

@@ -27,6 +27,7 @@ import numpy as np
 import pytest
 import torch as th
 
+from ispatialgym.eval import metrics as MET
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
@@ -339,14 +340,22 @@ class FakeScene:
 
 
 class FakeTask:
+    """The task's scoring (``ispatialgym.eval.metrics``) over the fake world's per-step facts; ``metrics_state`` is what a
+    rollback restores (``executor.TASK_TRACKING_ATTRS``)."""
+
     def __init__(self, objects: Dict[str, Any], robot):
         self.object_scope = dict(objects)
         self.object_scope[AGENT_INSTANCE] = robot
         self.compiled_task = None
-        self._first_success_step = -1
-        self._first_settled_success_step = -1
-        self._errors_at_first_success = None
-        self._last_goal_eval = None
+        self.tracker = MET.SuccessTracker(settle_eval=True, settle_steps=45)
+
+    @property
+    def metrics_state(self):
+        return self.tracker.state()
+
+    @metrics_state.setter
+    def metrics_state(self, state):
+        self.tracker.load(state)
 
     def update_bddl_scope_metadata(self, env):
         pass
@@ -454,12 +463,35 @@ class FakeEnv:
         return {self.robot.name: {CAM_KEY: {"rgb": self._frame.clone()}, "proprio": self.robot.q.clone()}}
 
     def _info(self):
-        isg = self.evaluate(self)
-        isg.setdefault("binary_success_ever", isg.get("binary_success", False))
-        isg.setdefault("settled_success", isg.get("binary_success", False) and isg.get("settled", False))
-        isg.setdefault("errors", {})
+        """The task's ``info["ispatialgym"]`` of this step from ``evaluate``'s facts: ``goal`` (G; or ``binary_success``),
+        ``settled`` (S), ``measure_within`` (M; default every reported target within tolerance) and ``errors`` (each target a
+        ``(:measure ...)`` atom), scored by the fake task's tracker once per episode step."""
+        d = self.evaluate(self)
+        errors = d.get("errors") or {}
+        goal = bool(d.get("goal", d.get("binary_success", False)))
+        reps = [r for k in ("pose_errors", "layout_errors") for r in (errors.get(k) or {}).values() if isinstance(r, dict)]
+        within = bool(d.get("measure_within", all(r.get("within_tolerance", True) for r in reps)))
+        settled = bool(d.get("settled", False))
+        tr = self.task.tracker
+        if self._current_step > 0 and (tr.last is None or tr.last[0] != self._current_step):
+            tr.update(self._current_step, goal, within, settled, errors)
+        atoms = [("pose_reached", k) for k in (errors.get("pose_errors") or {})] + [("layout_reached", k) for k in (errors.get("layout_errors") or {})]
+        try:
+            rep = tr.report(errors, atoms)
+        except MET.ErrorMetricError:
+            rep = tr.report(errors, [])
+
+        def measured(errs):
+            return [{"bddl": f"({p} ?{a})", "kind": "measure", "within_tolerance": ((errs.get("pose_errors" if p == "pose_reached" else "layout_errors") or {})
+                                                                                   .get(a) or {}).get("within_tolerance")} for p, a in atoms]
+
+        isg = {**d, "goal": goal, "measure_within": within, "settled": settled, "settle_eval": rep["settle_eval"], "settle_steps": rep["settle_steps"],
+               "official_success": rep["geometric_success"], "symbolic_success": rep["symbolic_success"], "symbolic_success_step": rep["symbolic_success_step"],
+               "geometric_success": rep["geometric_success"], "geometric_success_step": rep["geometric_success_step"], "goal_first_step": rep["goal_first_step"],
+               "other_mode": rep["other_mode"], "evaluation": {"errors": rep["errors"], "error_metric": rep["error_metric"], "measured": measured(rep["errors"])},
+               "error_metric": rep["error_metric"]}
+        isg.setdefault("errors", errors)
         isg.setdefault("conditions", [])
-        isg.setdefault("first_settled_success_step", 0 if isg["settled_success"] else -1)
         return {"done": {"ispatialgym": isg}}
 
     def get_obs(self):
@@ -564,8 +596,9 @@ def make_executor(env, sc, tmp_path=None, recorder_cfg=None, exec_cfg=None, qa_c
     if tmp_path is not None:
         recorder = Recorder(str(tmp_path), env, env.robot, CAM_KEY, dict(env.objects), fps=30, cfg=recorder_cfg or RecorderConfig(hdf5=True, lerobot=False), instance_id=sc.instance_id)
         recorder.start(env.get_obs()[0], {}, state0=env.sim.dump_state(serialized=True))
-    cfg = exec_cfg or ExecutorConfig(settle_min_steps=50, settle_fraction=0.2)
+    cfg = exec_cfg or ExecutorConfig(settle_steps=50)
     cfg.qa = qa
+    env.task.tracker = MET.SuccessTracker(settle_eval=env.task.tracker.settle_eval, settle_steps=cfg.settle_steps)
     ex = Executor(env, env.task, sc, recorder=recorder, motions=motions, monitors=monitors, cfg=cfg, sim=env.sim, tracked_objects=dict(env.objects), cam_key=CAM_KEY)
     return ex, motions, backend, recorder
 
@@ -1296,7 +1329,7 @@ def axial_world(gain=1.0, stop=None, tol=0.10):
 
     def evaluate(env_):
         err = C.quat_angle(goal_q, board.quat)
-        return {"binary_success": err < tol, "settled": True, "errors": {"pose_errors": {obj: {"orientation_error": err, "within_tolerance": err < tol, "gating": True}}}}
+        return {"binary_success": err < tol, "settled": True, "errors": {"pose_errors": {obj: {"orientation_error": err, "within_tolerance": err < tol, "in_goal": True}}}}
 
     env.evaluate = evaluate
     a_init = math.atan2(float(push.contact.init.position[1] - geom.pivot[1]), float(push.contact.init.position[0] - geom.pivot[0]))
@@ -1381,12 +1414,13 @@ def test_brace_retry_ladder_short_and_overshoot(tmp_path):
     result = ex.run_program(actions)
     assert result["success"], result["verdict"]
     assert result["brace_retry"] == []
-    # (c) hopeless: the stop blocks at 60 % whatever the brace does and is touched every time -> every brace rung, then tolerance
+    # (c) hopeless: the stop blocks at 60 % whatever the brace does and is touched every time -> every brace rung, then the goal
+    # (its pose_reached atom) never holds: not_reached
     sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, stop=lambda off: 0.6)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path / "c")
     ex.monitors._contact_api = touch_while_blocked(ex, env, board, pushes=99)
     result = ex.run_program(actions)
-    assert result["reason"] == "tolerance"
+    assert result["reason"] == "not_reached"
     br = result["brace_retry"][0]
     assert [r["next_offset_m"] for r in br["retries"]] == [0.005, 0.010, 0.015, 0.020] and br["final_offset_m"] == 0.020 and br["final"]["reason"] == "short"
     # (d) short without a brace contact, out of tolerance (the board just slips back): the brace stays, the pad aims past the goal
@@ -1638,8 +1672,10 @@ def test_placed_orientation_is_reported_for_an_oracle_demo_and_fails_nothing(tmp
 
         def evaluate(env_):
             d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
-            # the evaluator reports the (non-gating) IORS pose target: orientation error as measured, never gating
-            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "gating": False, "within_tolerance": err_rad <= 0.2})
+            # the evaluator reports the IORS pose target (in :measure, not in :goal): orientation error as measured; its own
+            # (profile) tolerance is not under test here - the measured targets count as within
+            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "in_goal": False, "within_tolerance": err_rad <= 0.2})
+            d["measure_within"] = True
             return d
 
         env.evaluate = evaluate
@@ -1651,7 +1687,7 @@ def test_placed_orientation_is_reported_for_an_oracle_demo_and_fails_nothing(tmp
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
     po = result["placed_orientation"]
-    assert po["apple.n.01_1"] == {"orientation_error": 0.46, "tolerance": 0.2, "within": False, "metric": "full", "target_gating": False}
+    assert po["apple.n.01_1"] == {"orientation_error": 0.46, "tolerance": 0.2, "within": False, "metric": "full", "target_in_goal": False}
     assert "plate.n.04_1" not in po  # only the placed objects, not the partner
     # (b) within tolerance
     sc, env = world(0.12)
@@ -1690,7 +1726,8 @@ def test_placed_orientation_compares_cylinders_modulo_their_long_axis(tmp_path, 
 
         def evaluate(env_):
             d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
-            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "gating": False, "within_tolerance": err_rad <= 0.2})
+            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "in_goal": False, "within_tolerance": err_rad <= 0.2})
+            d["measure_within"] = True  # the profile's measured tolerance is not under test here
             return d
 
         env.evaluate = evaluate
@@ -1726,7 +1763,7 @@ def test_placed_orientation_compares_cylinders_modulo_their_long_axis(tmp_path, 
     rep = report(*world(1.6, category="apple", model="omzprq", quat_after=rolled), tmp_path / "d")
     assert rep["within"] is False and rep["orientation_error"] == 1.6 and "full_error" not in rep and "equivalence" not in rep
     # (e) the equivalence switched off: the marker's roll keeps the full error
-    rep = report(*world(1.6, quat_after=rolled), tmp_path / "e", ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_revolution_axes=False))
+    rep = report(*world(1.6, quat_after=rolled), tmp_path / "e", ExecutorConfig(settle_steps=50, demo_revolution_axes=False))
     assert rep["orientation_error"] == 1.6
     # (f) the category / model fall back to the scene object's name (<category>_<model>_<i>) when the attributes are missing
     sc, env = world(1.6, quat_after=rolled)
@@ -1752,13 +1789,14 @@ def test_revolution_axes_asset_tags_the_pilot_cylinders():
         assert v["axis"] in ("x", "y", "z") and f"{v['axis']}inf" in v["tags"] and v["ratio"] >= 1.5, (k, v)
 
 
-def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):
-    """Owner rule 2026-09-16: in the epilogue motion window an object's rotation counts only when the goal has an
-    orientation target for it; a spinning near-spherical object with a stable position passes; a second, 2x
-    longer window is the second chance before a not_settled verdict."""
+def test_epilogue_is_exactly_settle_steps_and_the_metrics_decide(tmp_path):
+    """2026-10-14: a program's epilogue is exactly ``settle_steps`` no-op steps (reserved in the step budget, no second window, no
+    motion rule) and the task's metrics decide: success = the run mode's geometric success; the goal held but never through a
+    settled window -> ``not_settled``; the goal held, the measured targets never within tolerance -> ``symbolic_only``. Motion over
+    the window is a fact (``motion_delta``)."""
     sc, env = iors_world()
     goal = _place_goal(sc)
-    env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)  # position-only target: orientation_error absent
+    env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)
     apple = env.objects["apple.n.01_1"]
 
     def spin(step_action):
@@ -1767,44 +1805,32 @@ def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp
             apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
 
     env.after_step = spin
-    ex, *_ = make_executor(env, sc, tmp_path)
+    ex, *_ = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_steps=40))
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    assert result["motion_delta"]["apple.n.01_1_rad"] > 0.1 and result["motion_delta"]["apple.n.01_1_m"] < 1e-6
-    assert result["settle_windows"] == [result["settle_window"]]
-    # with an orientation target on the apple the same spin is a not_settled verdict, after the second window
+    assert result["epilogue_steps"] == 40 and result["n_settle_steps"] == 40 and result["settle_steps"] == 40
+    assert result["geometric_success"] and result["geometric_success_step"] <= result["n_steps"] and result["symbolic_success"]
+    assert result["motion_delta"]["apple.n.01_1_rad"] > 0.1  # a fact, no verdict
+    assert result["other_mode"]["settle_eval"] is False and result["other_mode"]["geometric_success"]
+    # never settled: the goal holds, S never does
     sc, env = iors_world()
-
-    def eval_oriented(env_):
-        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
-        d["errors"]["pose_errors"]["apple.n.01_1"]["orientation_error"] = 0.0
-        return d
-
-    env.evaluate = eval_oriented
-    apple = env.objects["apple.n.01_1"]
-    env.after_step = spin
-    ex, *_ = make_executor(env, sc, tmp_path / "b")
+    env.evaluate = lambda env_: {**success_eval("apple.n.01_1", goal, tol=0.08)(env_), "settled": False}
+    ex, *_ = make_executor(env, sc, tmp_path / "b", exec_cfg=ExecutorConfig(settle_steps=40))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "not_settled" and len(result["settle_windows"]) == 2 and result["settle_windows"][1] == 2 * result["settle_windows"][0]
-    assert "first_window" in result["motion_delta"]
-    # a transient (the object stops during the second window) is a success
+    assert result["reason"] == "not_settled" and not result["symbolic_success"] and result["goal_first_step"] is not None
+    assert result["other_mode"]["symbolic_success"] and result["other_mode"]["geometric_success"]  # settle-eval off would pass
+    # symbolic only: the goal holds and settles, the measured target is outside its tolerance
     sc, env = iors_world()
-    env.evaluate = eval_oriented
-    apple = env.objects["apple.n.01_1"]
-    stop_at = {"step": None}
-
-    def spin_then_stop(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(goal))) < 0.08:
-            if stop_at["step"] is None:
-                stop_at["step"] = env._current_step + 120  # ~55 steps into the first no-op window
-            if env._current_step < stop_at["step"]:
-                yaw = 0.05 * env._current_step
-                apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
-
-    env.after_step = spin_then_stop
-    ex, *_ = make_executor(env, sc, tmp_path / "c")
+    env.evaluate = lambda env_: {**success_eval("apple.n.01_1", goal, tol=0.08)(env_), "measure_within": False}
+    ex, *_ = make_executor(env, sc, tmp_path / "c", exec_cfg=ExecutorConfig(settle_steps=40))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and len(result["settle_windows"]) == 2
+    assert result["reason"] == "symbolic_only" and result["symbolic_success"] and not result["geometric_success"]
+    # ... which the symbolic success metric accepts
+    sc, env = iors_world()
+    env.evaluate = lambda env_: {**success_eval("apple.n.01_1", goal, tol=0.08)(env_), "measure_within": False}
+    ex, *_ = make_executor(env, sc, tmp_path / "d", exec_cfg=ExecutorConfig(settle_steps=40, success_metric="symbolic"))
+    result = ex.run_program(expand(sc.variant, sc))
+    assert result["success"] and result["success_metric"] == "symbolic" and not result["geometric_success"]
 
 
 # ==========================================================================================
@@ -2395,9 +2421,8 @@ def test_program_runs_end_to_end_with_retry_from_checkpoint(tmp_path):
     # planner attachment follows the grasp / release
     assert backend._attached == {}
     assert env.robot._ag_obj_in_hand["right"] is None
-    # epilogue: the no-op window is max(50, 20 % of the action steps)
-    assert result["settle_window"] == max(50, math.ceil(0.2 * result["n_action_steps"]))
-    assert result["n_settle_steps"] == result["settle_window"]
+    # epilogue: exactly settle_steps no-op steps (50 in make_executor's configuration)
+    assert result["epilogue_steps"] == 50 and result["n_settle_steps"] == 50
     # the recorder: the failed attempt was rolled back, the demo holds only committed steps
     assert rec.n == result["n_steps"] and rec.n_pending == 0
     assert len(rec.rollbacks) == 1 and rec.rollbacks[0]["action_index"] == 1 and rec.rollbacks[0]["verdict"]["category"] == "failed_grasp"
@@ -2794,13 +2819,13 @@ def test_targets_failed_and_error_categories(tmp_path):
     assert result["actions"][1]["attempts"][0]["category"] == "targets_failed"
 
 
-def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
+def test_epilogue_verdicts_and_goal_image(tmp_path):
     # 1) the goal never holds -> not_reached, no goal image
     sc, env = iors_world()
     ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
     result = ex.run_program(expand(sc.variant, sc))
     assert result["reason"] == "not_reached" and result["goal_observation"] is None and env.sim.renders == 0
-    # 2) the goal holds but a measured error is above tolerance -> tolerance
+    # 2) the goal holds but a measured target is outside its tolerance -> symbolic_only (symbolic, no geometric success)
     sc, env = iors_world()
     goal = _place_goal(sc)
 
@@ -2812,10 +2837,9 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
     env.evaluate = eval_tol
     ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "tolerance" and result["verdict"]["details"]["targets"] == ["plate.n.04_1"]
-    # 3) the goal holds, nothing moves over the window, but the evaluator's pose_settled never fires: a success by
-    #    default (the §6.4 "motion after the window" is measured by the executor), not_settled when the evaluator's
-    #    verdict is required
+    assert result["reason"] == "symbolic_only" and result["verdict"]["details"]["outside"] == ["(pose_reached ?plate.n.04_1)"]
+    assert result["error_metric"] == {"position_error": 0.5, "orientation_error": None, "case": "poses"} and result["goal_observation"] is None
+    # 3) the goal holds, the evaluator's pose_settled never does -> not_settled (settle-eval on)
     sc, env = iors_world()
 
     def eval_unsettled(env_):
@@ -2824,15 +2848,10 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
         return d
 
     env.evaluate = eval_unsettled
-    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=False))
+    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["settled_success"] is False
-    sc, env = iors_world()
-    env.evaluate = eval_unsettled
-    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True, require_task_settled=True))
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "not_settled" and result["verdict"]["details"]["task_settled_success"] is False
-    # 3b) the goal held once but not at the last step -> not_settled
+    assert result["reason"] == "not_settled" and "never through a settled window of 45 steps" in result["verdict"]["message"]
+    # 3b) the goal held a few steps, then not any more -> not_settled
     sc, env = iors_world()
     hits = {"n": 0}
 
@@ -2842,13 +2861,12 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
             hits["n"] += 1
             if hits["n"] > 3:
                 d["binary_success"] = False
-                d["binary_success_ever"] = True
         return d
 
     env.evaluate = eval_transient
     ex, *_ = make_executor(env, sc)
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "not_settled" and "no longer holds" in result["verdict"]["message"]
+    assert result["reason"] == "not_settled" and result["goal_first_step"] is not None
     # 4) success: the goal image is captured after >= 3 renders with the physics-synced camera pose
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)
@@ -2863,22 +2881,25 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
 
 
 def test_replay_stream_holds_the_last_streamed_configuration(tmp_path):
-    """Replay / policy mode: the epilogue's no-op window must repeat the last streamed action (base stopped), not the
-    Layer-1 hold targets captured at construction (which would drive the robot back to its initial pose)."""
+    """Replay mode: the demo's action rows and its settle rows are streamed (no epilogue: the settle rows, recorded as settle
+    steps, are the window the metrics read), and nothing re-applies the Layer-1 hold targets captured at construction (which
+    would drive the robot back to its initial pose)."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
-    # record the oracle program's actions, then replay them through a fresh executor on a fresh world
+    # record the oracle program's actions and its settle window, then replay them through a fresh executor on a fresh world
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"]
-    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_action_steps"]]]
+    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_steps"]]]
+    n_action = result["n_action_steps"]
     sc2, env2 = iors_world()
     env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
     ex2, motions2, *_ = make_executor(env2, sc2, tmp_path / "replay")
+    ex2.stream_phases = [PHASE_ORACLE] * n_action + [PHASE_SETTLE] * (len(actions) - n_action)
     q_init = env2.robot.q.clone()
     result2 = ex2.run_stream(th.as_tensor(a) for a in actions)
     assert result2["success"], result2["verdict"]
-    assert result2["n_action_steps"] == len(actions) and result2["n_settle_steps"] == max(50, math.ceil(0.2 * len(actions)))
+    assert result2["n_steps"] == len(actions) and result2["n_settle_steps"] == 50 and result2["epilogue_steps"] == 0
     # the arm stayed where the stream left it (the initial hold targets were not re-applied)
     last = th.as_tensor(actions[-1])
     idx = env2.robot.controller_action_idx
@@ -3105,7 +3126,7 @@ def test_recorder_hdf5_schema_and_state_pairing(tmp_path):
         s1 = th.from_numpy(demo["state"][1][: int(demo["state_size"][1])])
         assert th.allclose(s1[:28], q_after0, atol=1e-6)
         isg = demo["isg"]
-        for key in ("step", "phase", "action_index", "attempt", "joint_positions", "joint_velocities", "base_pose", "eef_pose_left", "eef_pose_right", "head_camera_pose", "proprio", "eval/binary_success", "eval/max_position_error"):
+        for key in ("step", "phase", "action_index", "attempt", "joint_positions", "joint_velocities", "base_pose", "eef_pose_left", "eef_pose_right", "head_camera_pose", "proprio", "eval/symbolic", "eval/settled", "eval/geometric_within", "eval/position_error", "eval/orientation_error"):
             assert key in isg, key
         assert isg["object_pose/apple.n.01_1"].shape == (T, 7)
         phases = np.asarray(isg["phase"])
@@ -3184,7 +3205,9 @@ def test_apply_goal_override_writes_only_applied_targets():
     assert m["articulation_targets"]["c"]["joints"]["j"]["position"] == 1.25
 
 
-def test_goal_override_thresholds_measured_only_vs_gating():
+def test_goal_override_uses_each_targets_own_tolerance():
+    """One tolerance per target (the ``isg-v2`` profile's, which the loaded TRO carries): the goal override applies a settled
+    value within it, whether the target's atom is in :goal or only in :measure."""
     from ispatialgym.eval.targets import PoseTarget
 
     sc, env = iors_world()
@@ -3197,21 +3220,16 @@ def test_goal_override_thresholds_measured_only_vs_gating():
         def is_gating(self, pred, inst):
             return False
 
-    # measured only: threshold max(0.01, 0.25 * 0.08 m extent) = 0.02 m -> a 5 mm settled offset is applied
-    rec = ex._override_pose_target("apple.n.01_1", tgt, Compiled())
-    assert rec["applied"] and rec["position_tolerance"] == pytest.approx(0.02) and rec["position_error"] == pytest.approx(0.005, abs=1e-6)
-    apple.pos = apple.pos + th.tensor([0.05, 0.0, 0.0])
-    assert ex._override_pose_target("apple.n.01_1", tgt, Compiled())["applied"] is False
-
     class Gating(Compiled):
         def is_gating(self, pred, inst):
             return True
 
-    # gating: the target's own tolerance (3 cm) applies -> 5.5 cm still rejected, 2.5 cm accepted
-    assert ex._override_pose_target("apple.n.01_1", tgt, Gating())["applied"] is False
-    apple.pos = apple.pos - th.tensor([0.03, 0.0, 0.0])
-    rec = ex._override_pose_target("apple.n.01_1", tgt, Gating())
-    assert rec["applied"] and rec["position_tolerance"] == pytest.approx(0.03)
+    for compiled in (Compiled(), Gating()):
+        apple.pos = tgt.position.float() - th.tensor([0.005, 0.0, 0.0])
+        rec = ex._override_pose_target("apple.n.01_1", tgt, compiled)
+        assert rec["applied"] and rec["position_tolerance"] == pytest.approx(0.03) and rec["position_error"] == pytest.approx(0.005, abs=1e-6)
+        apple.pos = apple.pos + th.tensor([0.05, 0.0, 0.0])  # 5.5 cm off: rejected
+        assert ex._override_pose_target("apple.n.01_1", tgt, compiled)["applied"] is False
     depth = PoseTarget.from_dict("apple.n.01_1", {"position": [0, 0, -0.5], "position_metric": "depth", "frame": f"{AGENT_INSTANCE}::{CAM_KEY}", "position_tolerance": 0.02})
     assert ex._override_pose_target("apple.n.01_1", depth, Gating())["applied"] is False
 
@@ -3601,7 +3619,7 @@ def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):
     motions.relax_arms = relax_spy
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    assert result["n_settle_steps"] == result["settle_window"]  # the relax steps are the window's first steps
+    assert result["n_settle_steps"] == result["epilogue_steps"]  # the relax steps are the window's first steps
     assert set(result["epilogue_relax"]) == {"left", "right"} == set(relaxed_from)
     # the relaxed targets equal the measured joints (the fake joints follow their targets exactly: nothing to relax, 0 rad)
     for arm in M.ARMS:
@@ -3611,9 +3629,9 @@ def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):
     # with the relax off the window is pure no-op and nothing is reported
     sc2, env2 = iors_world()
     env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
-    ex2, _, _, _ = make_executor(env2, sc2, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, epilogue_relax_arms=False))
+    ex2, _, _, _ = make_executor(env2, sc2, tmp_path, exec_cfg=ExecutorConfig(settle_steps=50, epilogue_relax_arms=False))
     result2 = ex2.run_program(expand(sc2.variant, sc2))
-    assert result2["success"] and result2["epilogue_relax"] == {} and result2["n_settle_steps"] == result2["settle_window"]
+    assert result2["success"] and result2["epilogue_relax"] == {} and result2["n_settle_steps"] == result2["epilogue_steps"] == 50
 
 
 def test_a_push_on_a_braked_link_streams_at_the_cartesian_speed():
@@ -4588,33 +4606,12 @@ def test_ag_release_rule_is_the_tasks_not_the_oracles():
         assert "ag_release_on_pad_clear =" not in src and "ag_release_max_delay_s =" not in src, path
 
 
-def test_settle_eval_off_judges_the_binary_goal_at_the_end_of_the_settle_window(tmp_path):
-    """``ExecutorConfig.settle_eval`` False (run_isg --settle-eval off, the default of --mode policy): no motion check, no
-    second window, no ``pose_settled`` requirement; the binary goal at the end of the settle window decides."""
+def test_settle_eval_off_takes_the_first_step_the_goal_holds(tmp_path):
+    """Settle-eval off (run_isg --settle-eval off, the default of --mode policy): symbolic success is the first step the goal
+    holds, geometric success the first step it holds with every measured target within tolerance - no pose_settled window;
+    the settle-eval-on values are reported as ``other_mode``."""
     sc, env = iors_world()
     goal = _place_goal(sc)
-
-    def eval_oriented(env_):
-        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
-        d["errors"]["pose_errors"]["apple.n.01_1"]["orientation_error"] = 0.0
-        return d
-
-    env.evaluate = eval_oriented
-    apple = env.objects["apple.n.01_1"]
-
-    def spin(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(goal))) < 0.08:
-            yaw = 0.05 * env._current_step
-            apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
-
-    env.after_step = spin
-    ex, *_ = make_executor(env, sc, tmp_path / "a", exec_cfg=ExecutorConfig(settle_eval=False))
-    result = ex.run_program(expand(sc.variant, sc))
-    # with the settling evaluation this spin is a not_settled verdict after a second window (the motion rule test)
-    assert result["success"], result["verdict"]
-    assert result["settle_eval"] is False and result["settle_windows"] == [result["settle_window"]]
-    # the evaluator's pose_settled atoms are not required either
-    sc, env = iors_world()
 
     def eval_unsettled(env_):
         d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
@@ -4622,9 +4619,12 @@ def test_settle_eval_off_judges_the_binary_goal_at_the_end_of_the_settle_window(
         return d
 
     env.evaluate = eval_unsettled
-    ex, *_ = make_executor(env, sc, tmp_path / "b", exec_cfg=ExecutorConfig(settle_eval=False, require_task_settled=True))
-    assert ex.run_program(expand(sc.variant, sc))["success"]
-    # a goal that held once but not at the end of the settle window is not reached
+    env.task.tracker = MET.SuccessTracker(settle_eval=False)
+    ex, *_ = make_executor(env, sc, tmp_path / "a")
+    result = ex.run_program(expand(sc.variant, sc))
+    assert result["success"], result["verdict"]
+    assert result["settle_eval"] is False and result["other_mode"]["settle_eval"] is True and not result["other_mode"]["symbolic_success"]
+    # a goal that held a few steps and then not any more still counts: its first step decides
     sc, env = iors_world()
     hits = {"n": 0}
 
@@ -4634,18 +4634,19 @@ def test_settle_eval_off_judges_the_binary_goal_at_the_end_of_the_settle_window(
             hits["n"] += 1
             if hits["n"] > 3:
                 d["binary_success"] = False
-                d["binary_success_ever"] = True
         return d
 
     env.evaluate = eval_transient
-    ex, *_ = make_executor(env, sc, tmp_path / "c", exec_cfg=ExecutorConfig(settle_eval=False))
+    env.task.tracker = MET.SuccessTracker(settle_eval=False)
+    ex, *_ = make_executor(env, sc, tmp_path / "c")
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "not_reached" and "end of the settle window" in result["verdict"]["message"]
+    assert result["success"] and result["geometric_success_step"] == result["symbolic_success_step"] == result["goal_first_step"]
+    assert result["errors"] is not result["errors_final_step"]  # judged at the geometric success, not at the last step
 
 
 def test_wall_clock_ends_a_stream_and_times_out_a_program(tmp_path):
-    """``ExecutorConfig.max_wall_s``: a stream (replay / policy) stops taking actions and the epilogue still judges the
-    episode, as at the end of its steps; a program gets a ``timeout`` verdict."""
+    """``ExecutorConfig.max_wall_s``: a stream (replay / policy) stops taking actions and the task's metrics judge the episode,
+    as at the end of its steps; a program gets a ``timeout`` verdict."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
@@ -4656,8 +4657,8 @@ def test_wall_clock_ends_a_stream_and_times_out_a_program(tmp_path):
     env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
     ex2, *_ = make_executor(env2, sc2, tmp_path / "stream", exec_cfg=ExecutorConfig(max_wall_s=1e-9))
     result2 = ex2.run_stream(th.as_tensor(a) for a in actions)
-    assert result2["wall_clock_exceeded"] and result2["n_action_steps"] == 0 and result2["n_settle_steps"] > 0
-    assert not result2["success"] and result2["reason"] != "timeout"  # judged by the epilogue: the apple was never moved
+    assert result2["wall_clock_exceeded"] and result2["n_steps"] == 0 and result2["epilogue_steps"] == 0
+    assert not result2["success"] and result2["reason"] == "not_reached"  # judged by the metrics: the apple was never moved
     sc3, env3 = iors_world()
     env3.evaluate = success_eval("apple.n.01_1", _place_goal(sc3), tol=0.08)
     ex3, *_ = make_executor(env3, sc3, tmp_path / "program", exec_cfg=ExecutorConfig(max_wall_s=1e-9))
@@ -4665,18 +4666,32 @@ def test_wall_clock_ends_a_stream_and_times_out_a_program(tmp_path):
     assert result3["reason"] == "timeout" and "wall clock" in result3["verdict"]["message"] and result3["wall_clock_exceeded"]
 
 
-def test_settle_windows_stay_inside_the_step_budget(tmp_path):
-    """The settle windows are cut at ``ExecutorConfig.max_steps`` (run_isg: --max-steps + --settle-steps) instead of
-    running into a timeout verdict."""
+def test_program_epilogue_is_reserved_in_the_step_budget(tmp_path):
+    """A program's actions get ``max_steps - settle_steps`` steps (``Executor.action_budget``): its epilogue always fits; a program
+    that needs more times out before it (no epilogue then). A stream ends at ``max_steps`` without a timeout verdict and the
+    metrics judge it."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
     result = ex.run_program(expand(sc.variant, sc))
-    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_action_steps"]]]
+    n_action = result["n_action_steps"]
+    # exactly enough: the program and its 50-step epilogue
     sc2, env2 = iors_world()
     env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
-    cap = len(actions) + 20
-    ex2, *_ = make_executor(env2, sc2, tmp_path / "cap", exec_cfg=ExecutorConfig(max_steps=cap, settle_min_steps=50))
-    result2 = ex2.run_stream(th.as_tensor(a) for a in actions)
+    ex2, *_ = make_executor(env2, sc2, tmp_path / "fit", exec_cfg=ExecutorConfig(max_steps=n_action + 50, settle_steps=50))
+    result2 = ex2.run_program(expand(sc2.variant, sc2))
     assert result2["success"], result2["verdict"]
-    assert result2["settle_window"] == cap - len(actions) - 1 and result2["n_steps"] < cap
+    assert result2["n_steps"] == n_action + 50 and result2["epilogue_steps"] == 50 and ex2.action_budget == n_action
+    # one step short: the actions time out at the action budget, the epilogue is not cut into
+    sc3, env3 = iors_world()
+    env3.evaluate = success_eval("apple.n.01_1", _place_goal(sc3), tol=0.08)
+    ex3, *_ = make_executor(env3, sc3, tmp_path / "short", exec_cfg=ExecutorConfig(max_steps=n_action + 49, settle_steps=50))
+    result3 = ex3.run_program(expand(sc3.variant, sc3))
+    assert result3["reason"] == "timeout" and result3["epilogue_steps"] == 0 and result3["n_steps"] <= n_action
+    # a stream: cut at max_steps, judged by the metrics
+    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_steps"]]]
+    sc4, env4 = iors_world()
+    env4.evaluate = success_eval("apple.n.01_1", _place_goal(sc4), tol=0.08)
+    ex4, *_ = make_executor(env4, sc4, tmp_path / "stream", exec_cfg=ExecutorConfig(max_steps=20))
+    result4 = ex4.run_stream(th.as_tensor(a) for a in actions)
+    assert result4["n_steps"] == 20 and result4["reason"] == "not_reached"

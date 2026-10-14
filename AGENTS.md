@@ -43,8 +43,11 @@ the main checkout's samples) spell the variant the old way; the readers marked "
   repository root. It uses the warm Kit app-data helper (`/vision/u/minyeong/projects/cluster_tools/kit_appdata.sh`) and
   excludes viscam7 / viscam11.
 - `run_isg` step budget: `--max-steps` (the actions; default for a dataset instance `max(300, 2 x` its demo's length`)`,
-  else 3000), `--settle-steps` (default 0.2 x `--max-steps`), `--wallclock` (default 1 s x `--max-steps`); `--settle-eval`
-  defaults to off for `--mode policy` (the binary goal at the end of the settle window decides) and on for oracle / replay.
+  else 3000), `--wallclock` (default 1 s x `--max-steps`), `--settle-steps` (the `pose_settled` / settle-eval window: an
+  oracle program's epilogue, reserved in the budget, default 45; the first that many of a replay's settle rows, default all;
+  a policy run's window, default 45). Scoring (2026-10-14, `ispatialgym.eval.metrics`): success is geometric by default
+  (`--success-metric`), `--settle-eval` defaults to off for `--mode policy` and on for oracle / replay, the tolerances are
+  the `isg-v2` profile's (`--tolerance-scale`, default 3 for policy runs).
 - No-simulator tests: `python -m pytest -q ispatialgym/tests`.
 
 ## Rules

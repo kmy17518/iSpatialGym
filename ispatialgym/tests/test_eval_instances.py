@@ -186,13 +186,30 @@ def test_names_leave_out_the_support():
 
 
 def test_step_budget():
-    assert INST.step_budget(806) == {"max_steps": 1612, "settle_steps": 322, "wallclock_s": 1612.0, "demo_length": 806, "episode_cap": 1934}
+    assert INST.step_budget(806) == {"mode": "oracle", "max_steps": 1612, "settle_steps": 45, "wallclock_s": 1612.0, "demo_length": 806,
+                                     "demo_settle_steps": None, "episode_cap": 1657}  # the oracle's epilogue reserved on top
     assert INST.step_budget(100)["max_steps"] == 300  # at least 300 steps
-    assert INST.step_budget(None) == {"max_steps": 3000, "settle_steps": 600, "wallclock_s": 3000.0, "demo_length": None, "episode_cap": 3600}
-    b = INST.step_budget(806, max_steps=500)
-    assert (b["max_steps"], b["settle_steps"], b["wallclock_s"], b["episode_cap"]) == (500, 100, 500.0, 600)
+    assert INST.step_budget(None)["max_steps"] == 3000 and INST.step_budget(None)["episode_cap"] == 3045
     b = INST.step_budget(806, max_steps=500, settle_steps=10, wallclock_s=60.0)
     assert (b["max_steps"], b["settle_steps"], b["wallclock_s"], b["episode_cap"]) == (500, 10, 60.0, 510)
+    # a replay streams its demo's settle rows (all by default): no epilogue, the episode is max_steps
+    b = INST.step_budget(806, mode="replay", demo_settle_steps=322)
+    assert (b["settle_steps"], b["episode_cap"], b["demo_settle_steps"]) == (322, 1612, 322)
+    assert INST.step_budget(806, settle_steps=100, mode="replay", demo_settle_steps=322)["settle_steps"] == 100
+    b = INST.step_budget(806, mode="policy")
+    assert (b["settle_steps"], b["episode_cap"]) == (45, 1612)
+
+
+@pytest.mark.parametrize("kw,match", [
+    ({"settle_steps": 0}, "at least 1"),
+    ({"mode": "replay", "demo_settle_steps": 322, "settle_steps": 323}, "exceeds the demo's 322 settle rows"),
+    ({"mode": "replay"}, "settle rows are unknown"),
+    ({"mode": "policy", "max_steps": 40}, "exceeds --max-steps 40"),
+    ({"mode": "train"}, "mode must be"),
+])
+def test_step_budget_rejects_a_window_that_cannot_fit(kw, match):
+    with pytest.raises(ValueError, match=match):
+        INST.step_budget(806, **kw)
 
 
 def test_episodes_demos_and_roots(tmp_path, monkeypatch):

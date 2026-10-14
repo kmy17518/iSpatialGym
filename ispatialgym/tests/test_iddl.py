@@ -186,8 +186,8 @@ def test_measure_rules():
     assert iddl.measure == [["pose_reached", "?target"]] and iddl.pose_evaluated_roles() == ["target"]
     with pytest.raises(I.IDDLError, match="only accepts"):
         I.parse(WITH_MEASURE.replace("(:measure (pose_reached ?target))", "(:measure (ontop ?target ?support))"))
-    with pytest.raises(I.IDDLError, match="both a gating goal atom"):
-        I.parse(WITH_MEASURE.replace("(layout_reached ?target)", "(pose_reached ?target)"))
+    both = I.parse(WITH_MEASURE.replace("(layout_reached ?target)", "(pose_reached ?target)"))  # 2026-10-14: in :goal and :measure
+    assert ["pose_reached", "?target"] in both.goal and both.measure == [["pose_reached", "?target"]]
     with pytest.raises(I.IDDLError, match="twice"):
         I.parse(WITH_MEASURE.replace("(:measure (pose_reached ?target))", "(:measure (pose_reached ?target) (pose_reached ?target))"))
 

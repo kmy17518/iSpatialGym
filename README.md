@@ -38,10 +38,15 @@ python -m ispatialgym.eval.instances set-goal alignment_axial 0 --run runs/goal_
 `run_isg --task NAME --instance-indices I [J ...]` loads instances by name and index, as BEHAVIOR's `eval.py` does with a
 task name and instance ids; a task's instances are its subtasks' instances in index order. For an eval dataset instance
 `--max-steps` (the actions: policy steps, a replay, the oracle program) defaults to `max(300, 2 x` its demo's length from
-`metadata/episodes.jsonl` `)`, `--settle-steps` (the window after them) to 0.2 x that and `--wallclock` to 1 s per step;
-the episode is cut at `--max-steps + --settle-steps`. `--settle-eval` (default: off for `--mode policy`, on for oracle /
-replay) decides whether the settling evaluation (no motion over the settle window, else a second window) applies; off, the
-binary goal (every goal atom but `pose_settled`) at the end of the settle window decides. `--qa` (on by default, `--no-qa`
+`metadata/episodes.jsonl` `)` and `--wallclock` to 1 s per step. Success is **geometric** by default (the BDDL goal plus
+every `(:measure ...)` atom within its tolerance at the same step(s); `--success-metric symbolic`: the goal alone), with the
+`isg-v2` tolerances computed at load (`--tolerance-scale`, default 3 for policy runs; `ispatialgym.eval.tolerance_profile`).
+`--settle-eval` (default: off for `--mode policy`, on for oracle / replay) decides whether success needs a settled window:
+off, the first step it holds; on, the first step every `pose_settled` atom holds with the goal (and the measured targets)
+held through its `--settle-steps` window. `--settle-steps` is that window in every mode: an oracle program's epilogue
+(exactly that long, reserved in the step budget; default 45), the first that many of a replayed demo's settle rows (default
+all of them), a policy run's window (default 45). The episode ends at the geometric success, else at `--max-steps` (an
+oracle program: plus its epilogue). Both settle-eval modes are reported (`meta.other_mode`). `--qa` (on by default, `--no-qa`
 turns it off) measures BEHAVIOR's demo QA metrics plus the former demo gates and logs them in `meta.qa` with the steps each
 fired at. The HARD metrics are robot touching objects or itself, pause, jerky motion, ghost hand, object tilt, goal
 occlusion, robot wobble and bad release. The SOFT ones are held object drift and stalled, gripper in view and failed grasp
