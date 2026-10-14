@@ -1,9 +1,9 @@
 {
   "schema": "isg-oracle-v1",
-  "instance_id": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table__house_single_floor__target-salt_shaker-fonexa__partner-pepper_shaker-stbqbt__0000",
+  "instance_id": "inter_object_relation_satisfaction-nextto_small_scale-salt_shaker-pepper_shaker-breakfast_table__house_single_floor__target-salt_shaker-fonexa__partner-pepper_shaker-stbqbt__0000",
   "tro_sha256": "ad907fff14b31d0ba424988b040dbebfc00907b1251d72e61d1a0a34449e0e01",
   "task_family": "inter_object_relation_satisfaction",
-  "variant": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-nextto_small_scale-salt_shaker-pepper_shaker-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

@@ -505,7 +505,7 @@ def _write_activity(root, activity, variants, registry=None):
 def test_problem_registry_lookup_and_fallback():
     with tempfile.TemporaryDirectory() as root:
         act = "inter_object_relation_satisfaction"
-        second = act + "-nextto-spatula-soup_ladle-breakfast_table"
+        second = act + "-nextto_small_scale-spatula-soup_ladle-breakfast_table"
         directory = _write_activity(root, act, [V2_VARIANT, second, None], registry={V2_VARIANT: 0, second: 1})
         assert problem_registry_path(act, root) == os.path.join(directory, "problems.json")
         assert load_problem_registry(directory) == {V2_VARIANT: 0, second: 1}
@@ -518,7 +518,7 @@ def test_problem_registry_lookup_and_fallback():
         problem = load_problem(act, id_of_variant(act, V2_VARIANT, root), root=root)
         assert problem.task_variant == V2_VARIANT
         with pytest.raises(ISGProblemError, match="known variants"):
-            id_of_variant(act, act + "-inside-apple-bowl-breakfast_table", root)
+            id_of_variant(act, act + "-inside_small_scale-apple-bowl-breakfast_table", root)
         with pytest.raises(FileNotFoundError, match="no problem 5"):
             variant_of(act, 5, root)
 
@@ -575,7 +575,7 @@ def test_malformed_problem_registries_are_rejected(registry, match):
 def test_problem_registry_must_agree_with_the_files():
     with tempfile.TemporaryDirectory() as root:
         act = "inter_object_relation_satisfaction"
-        other = act + "-nextto-spatula-soup_ladle-breakfast_table"
+        other = act + "-nextto_small_scale-spatula-soup_ladle-breakfast_table"
         # stale registry: variant registered under an id whose file declares another variant
         _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 1, other: 0})
         with pytest.raises(ISGProblemError, match=r"registers .* -> 0 but .*problem0.bddl declares \(:variant"):
@@ -585,7 +585,7 @@ def test_problem_registry_must_agree_with_the_files():
         with pytest.raises(ISGProblemError, match="declares"):
             validate_problem_registry(act, root)
         # registered id without a file
-        _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 0, other: 1, act + "-touching-a-b-c": 2})
+        _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 0, other: 1, act + "-touching_small_scale-a-b-c": 2})
         with pytest.raises(ISGProblemError, match="problem2.bddl does not exist"):
             validate_problem_registry(act, root)
         with pytest.raises(ISGProblemError, match="does not exist"):

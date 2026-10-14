@@ -6816,8 +6816,8 @@
   },
   "constraints": []
  },
- "inter_object_relation_satisfaction_inside_brussels_sprouts_bowl": {
-  "iddl": "inter_object_relation_satisfaction/inside.iddl",
+ "inter_object_relation_satisfaction_inside_small_scale_brussels_sprouts_bowl": {
+  "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
   "definition_id": 0,
   "roles": {
    "target": {
@@ -6973,8 +6973,8 @@
   },
   "constraints": []
  },
- "inter_object_relation_satisfaction_inside_garlic_clove_saucepot": {
-  "iddl": "inter_object_relation_satisfaction/inside.iddl",
+ "inter_object_relation_satisfaction_inside_small_scale_garlic_clove_saucepot": {
+  "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
   "definition_id": 10,
   "roles": {
    "target": {
@@ -7111,8 +7111,8 @@
   },
   "constraints": []
  },
- "inter_object_relation_satisfaction_inside_hard_candy_hingeless_jar": {
-  "iddl": "inter_object_relation_satisfaction/inside.iddl",
+ "inter_object_relation_satisfaction_inside_small_scale_hard_candy_hingeless_jar": {
+  "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
   "definition_id": 8,
   "roles": {
    "target": {
@@ -7334,8 +7334,8 @@
   },
   "constraints": []
  },
- "inter_object_relation_satisfaction_inside_sunflower_vase": {
-  "iddl": "inter_object_relation_satisfaction/inside.iddl",
+ "inter_object_relation_satisfaction_inside_small_scale_sunflower_vase": {
+  "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
   "definition_id": 9,
   "roles": {
    "target": {
@@ -7603,8 +7603,8 @@
   "constraints": [],
   "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: plate/luhkiz into drop_in_sink_lkklqs_0 (set in bar_egwapq_0) from bar_egwapq_0 (the sink's own bar, ~0.3-1.2 m along it) / bar_byvbuc_0 (the L-joined bar along -y, ~1.7 m); the order pins one per step; the partner is the sheet's held-out drop_in_sink_lkklqs_0 (house_double_floor_lower kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V3 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
  },
- "inter_object_relation_satisfaction_nextto_salt_shaker_pepper_shaker": {
-  "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+ "inter_object_relation_satisfaction_nextto_small_scale_salt_shaker_pepper_shaker": {
+  "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
   "definition_id": 11,
   "roles": {
    "target": {
@@ -8359,8 +8359,8 @@
   },
   "constraints": []
  },
- "inter_object_relation_satisfaction_touching_box_of_sanitary_napkins_box_of_tissues": {
-  "iddl": "inter_object_relation_satisfaction/touching.iddl",
+ "inter_object_relation_satisfaction_touching_small_scale_box_of_sanitary_napkins_box_of_tissues": {
+  "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
   "definition_id": 3,
   "roles": {
    "target": {

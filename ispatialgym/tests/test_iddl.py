@@ -25,9 +25,9 @@ EXPECTED = {
     "alignment-world_vertical": (["target", "support"], ["contacts"], ["target", "support"], {}),
     "inter_object_relation_satisfaction-ontop_small_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-under_small_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
-    "inter_object_relation_satisfaction-inside": (["target", "partner", "support"], ["grasps:insert"], ["target", "partner", "support"], {}),
-    "inter_object_relation_satisfaction-nextto": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
-    "inter_object_relation_satisfaction-touching": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
+    "inter_object_relation_satisfaction-inside_small_scale": (["target", "partner", "support"], ["grasps:insert"], ["target", "partner", "support"], {}),
+    "inter_object_relation_satisfaction-nextto_small_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
+    "inter_object_relation_satisfaction-touching_small_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-ontop_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-under_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
     "inter_object_relation_satisfaction-inside_large_scale": (["target", "partner", "support"], ["grasps:tabletop"], ["target", "partner", "support"], {}),
@@ -99,13 +99,13 @@ def test_pose_evaluated_roles_and_measure():
     assert "pose_reached" in dis.predicates_on("target") and "ontop" in dis.predicates_on("distractors")
     att = IDDLS["configuration_matching-attachment"]
     assert att.pose_evaluated_roles() == ["assembly"] and att.is_composite("assembly")
-    assert IDDLS["inter_object_relation_satisfaction-nextto"].pose_evaluated_roles() == ["target", "partner"]
+    assert IDDLS["inter_object_relation_satisfaction-nextto_small_scale"].pose_evaluated_roles() == ["target", "partner"]
 
 
 def test_fill_variant():
-    iddl = IDDLS["inter_object_relation_satisfaction-nextto"]
+    iddl = IDDLS["inter_object_relation_satisfaction-nextto_small_scale"]
     assert iddl.fill_variant({"target": "spatula", "partner": "soup_ladle", "support": "breakfast_table"}) == \
-        "inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table"
+        "inter_object_relation_satisfaction-nextto_small_scale-spatula-soup_ladle-breakfast_table"
     with pytest.raises(I.IDDLError, match="slots without a value"):
         iddl.fill_variant({"target": "spatula"})
     assert IDDLS["camera_relocalization-standard"].fill_variant({}) == "camera_relocalization-standard"

@@ -18,7 +18,7 @@ from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.stances import Stance, nearer_side_lateral
 
 IORS = "inter_object_relation_satisfaction"
-ONTOP, UNDER, INSIDE, NEXTTO = (f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside", f"{IORS}-nextto")
+ONTOP, UNDER, INSIDE, NEXTTO = (f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside_small_scale", f"{IORS}-nextto_small_scale")
 
 
 # ---------------------------------------------------------------------------------------------------------------- pure rules

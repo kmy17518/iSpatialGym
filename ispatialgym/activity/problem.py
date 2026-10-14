@@ -70,6 +70,14 @@ AGENT_INSTANCE = "agent.n.01_1"
 LEGACY_ACTIVITIES: Dict[str, str] = {"world_alignment": "alignment"}
 #: Section names of problem files written before the rename (the sampler's outputs keep their own BDDL copies).
 LEGACY_SECTIONS: Dict[str, str] = {":alias": ":variant"}  # legacy spelling
+#: Subtask (iddl) ids renamed on 2026-10-14: the small-scale IORS tasks carry their scale, as ontop / under do. A variant, a
+#: variant template or an instance id written before (the eval85 runs, their BDDL copies, sidecars, template metadata and
+#: TROs) reads as its current name (:func:`canonical_variant`).
+LEGACY_SUBTASK_IDS: Dict[str, str] = {
+    "inter_object_relation_satisfaction-inside": "inter_object_relation_satisfaction-inside_small_scale",  # legacy spelling
+    "inter_object_relation_satisfaction-nextto": "inter_object_relation_satisfaction-nextto_small_scale",  # legacy spelling
+    "inter_object_relation_satisfaction-touching": "inter_object_relation_satisfaction-touching_small_scale",  # legacy spelling
+}
 
 #: Optional variant <-> definition id registry of an activity directory (``ground_isg`` allocates ids per variant).
 PROBLEM_REGISTRY_FILE = "problems.json"
@@ -135,6 +143,18 @@ def activity_names(activity: str) -> List[str]:
     """Every accepted spelling of ``activity``: the canonical name first, then its retired names."""
     canonical = canonical_activity(activity)
     return [canonical] + [old for old, new in LEGACY_ACTIVITIES.items() if new == canonical]
+
+
+def canonical_variant(variant):
+    """``variant`` (a subtask id, a variant, a variant template or an instance id starting with one) under its current
+    subtask id (:data:`LEGACY_SUBTASK_IDS`): ``inter_object_relation_satisfaction-touching-a-b-c`` (legacy spelling) ->
+    ``inter_object_relation_satisfaction-touching_small_scale-a-b-c``; anything else (other types included) unchanged."""
+    if not isinstance(variant, str):
+        return variant
+    for old, new in LEGACY_SUBTASK_IDS.items():
+        if variant == old or variant.startswith(old + "-"):
+            return new + variant[len(old):]
+    return variant
 
 
 def same_activity(a: str, b: str) -> bool:
@@ -588,7 +608,7 @@ def _read_variant(path: str) -> Optional[str]:
         if isinstance(section, list) and section and section[0] in (":variant", *LEGACY_SECTIONS):
             if len(section) != 2 or not isinstance(section[1], str):
                 raise ISGProblemError(f"{path}: (:variant ...) must hold exactly one symbol, got {section[1:]!r}")
-            return section[1]
+            return canonical_variant(section[1])
     return None
 
 
@@ -613,13 +633,14 @@ def _registry_entries(data, what: str):
             pid = rec.get("id", rec.get("definition_id"))
             if pid is None:
                 raise ISGProblemError(f"{what}: entry {i} ({rec.get('variant')!r}) has no 'id' / 'definition_id'")
-            yield rec["variant"], pid
+            yield canonical_variant(rec["variant"]), pid
     elif isinstance(data, dict):
         if data and all(isinstance(k, str) and k.isdigit() for k in data):  # inverse shape {"<id>": "<variant>"}
             for k, variant in data.items():
-                yield variant, int(k)
+                yield canonical_variant(variant), int(k)
         else:
-            yield from data.items()
+            for variant, pid in data.items():
+                yield canonical_variant(variant), pid
     else:
         raise ISGProblemError(f"{what}: must be a JSON object {{variant: id}} or a list of {{variant, id}} records")
 
@@ -697,6 +718,7 @@ def id_of_variant(activity: str, variant: str, root: Optional[str] = None) -> in
     From ``problems.json`` when it registers the variant (checked against the file when it exists), else by scanning
     the ``(:variant ...)`` of the problem files. Raises :class:`ISGProblemError` naming the known variants otherwise.
     """
+    variant = canonical_variant(variant)
     directory = activity_dir(activity, root)
     registry = load_problem_registry(directory, missing_ok=True)
     if variant in registry:
@@ -776,7 +798,7 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
         elif tag == ":variant":
             if len(group) != 2 or not isinstance(group[1], str):
                 raise ISGProblemError(f"(:variant ...) must hold exactly one symbol, got {group[1:]!r}")
-            variant = group[1]
+            variant = canonical_variant(group[1])
             if not VARIANT_RE.match(variant):
                 raise ISGProblemError(f"Invalid variant {variant!r}")
         elif tag == ":objects":

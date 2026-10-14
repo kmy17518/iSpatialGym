@@ -13,6 +13,7 @@ import functools
 import os
 import re
 
+from ispatialgym.activity.problem import canonical_variant
 from ispatialgym.eval.instances import data_root
 from ispatialgym.oracle.sidecar import family_of_subtask, subtask_of_variant, variant_templates
 
@@ -63,6 +64,7 @@ def task_name(variant: str) -> str:
 def subtask_name(variant: str) -> str:
     """``alignment-axial-board_game-breakfast_table`` -> ``alignment_axial_board_game`` (the support left out, object ids
     reduced to their category)."""
+    variant = canonical_variant(variant)
     template = _template(variant)[1]
     kept = [object_category(tok) for tok, slot in zip(variant.split("-"), template.split("-")) if _is_slot(slot) and slot != SUPPORT_SLOT]
     return "_".join([task_name(variant)] + kept)

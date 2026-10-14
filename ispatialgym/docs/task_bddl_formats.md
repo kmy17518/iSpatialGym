@@ -71,7 +71,7 @@ activity_definitions/<activity>/problem1.bddl
 - Every problem declares `(:variant <name>)` directly after `:domain`. The variant
   names the **subtask and the grounded categories**:
   `<family>-<subtask>-<category slots>` (table below), e.g.
-  `inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`.
+  `inter_object_relation_satisfaction-nextto_small_scale-spatula-soup_ladle-breakfast_table`.
   The parser records it as `task_variant`, the TRO's `task_variant` must equal
   it, and results are reported per variant. Group slots list `<category>_<count>`
   tokens (`bottle_of_beer_3_bottle_of_sake_1`); the block design uses the custom
@@ -1269,7 +1269,7 @@ or (under only) the partner itself.
 (define (problem inter_object_relation_satisfaction-3)
     (:domain ispatialgym)
 
-    (:variant inter_object_relation_satisfaction-nextto-apple-bowl-table)
+    (:variant inter_object_relation_satisfaction-nextto_small_scale-apple-bowl-table)
 
     (:objects
         apple.n.01_1 - apple.n.01

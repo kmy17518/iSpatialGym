@@ -75,9 +75,9 @@ def _with_orient(extras: Dict[str, Any], decision: Optional[Dict[str, Any]]) -> 
 RELATION_OF_SUBTASK = {
     "inter_object_relation_satisfaction-ontop_small_scale": "ontop",
     "inter_object_relation_satisfaction-under_small_scale": "under",
-    "inter_object_relation_satisfaction-inside": "inside",
-    "inter_object_relation_satisfaction-nextto": "nextto",
-    "inter_object_relation_satisfaction-touching": "touching",
+    "inter_object_relation_satisfaction-inside_small_scale": "inside",
+    "inter_object_relation_satisfaction-nextto_small_scale": "nextto",
+    "inter_object_relation_satisfaction-touching_small_scale": "touching",
 }
 #: v1 ``bddl_writer`` definition ids of the relations (facade rendering when the variant has no grounded BDDL)
 V1_DEFINITION_ID = {"ontop": 0, "under": 1, "inside": 2, "nextto": 3, "touching": 4}

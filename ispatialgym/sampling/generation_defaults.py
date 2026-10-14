@@ -441,7 +441,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "target_fit_scale_min": 0.5,  # owner 2026-10-11: a target bigger than its partner is shrunk at grounding time, never below x0.5 (ground_isg / pair_rules)
         "argument_order": ["partner", "target"],  # §6.11 / iddl: (under ?partner ?target) — the partner ends under the target
     },
-    "inter_object_relation_satisfaction-inside": {
+    "inter_object_relation_satisfaction-inside_small_scale": {
         **COMMON,
         **_TABLETOP_SPLIT_CONE,
         "phase2_split_fallback_classes_deg": [8.0, 20.0],
@@ -455,7 +455,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "max_protrusion_fraction": 0.5,  # §6.11 protrudes above the rim by ≤ half its height
         "target_fit_scale_min": 0.5,  # owner 2026-10-11: a target bigger than its partner is shrunk at grounding time, never below x0.5 (ground_isg / pair_rules)
     },
-    "inter_object_relation_satisfaction-nextto": {
+    "inter_object_relation_satisfaction-nextto_small_scale": {
         **COMMON,
         **_TABLETOP_SPLIT_CONE,
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
@@ -465,7 +465,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "nextto_gap_extra_m": 0.03,  # §4.4 / §4.6 g ∈ [g_NT + 0.03, D_p], g_NT = mean(dims_a + dims_b)/6 (OmniGibson NextTo)
         "nextto_divisor": 6.0,  # §4.4 g_NT = mean(dims_target + dims_partner) / 6
     },
-    "inter_object_relation_satisfaction-touching": {
+    "inter_object_relation_satisfaction-touching_small_scale": {
         **COMMON,
         **_TABLETOP_SPLIT_CONE,
         "tolerances": dict(TOLERANCES_MEASURED),  # §8

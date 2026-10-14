@@ -86,9 +86,9 @@ EXPECTED_SEQUENCE = {
     "inter_object_relation_satisfaction-nextto_large_scale": _WALL_IN + ["base_push", "retreat"],  # no grasp: the base pushes the floor-standing target
     "inter_object_relation_satisfaction-ontop_small_scale": _TABLE_IN + _PICK + _PLACE,
     "inter_object_relation_satisfaction-under_small_scale": _TABLE_IN + _PICK + _PLACE,
-    "inter_object_relation_satisfaction-inside": _TABLE_IN + _PICK + _PLACE,
-    "inter_object_relation_satisfaction-nextto": _TABLE_IN + _PICK + _PLACE,
-    "inter_object_relation_satisfaction-touching": _TABLE_IN + _PICK + _PLACE + _BRACE_PUSH,
+    "inter_object_relation_satisfaction-inside_small_scale": _TABLE_IN + _PICK + _PLACE,
+    "inter_object_relation_satisfaction-nextto_small_scale": _TABLE_IN + _PICK + _PLACE,
+    "inter_object_relation_satisfaction-touching_small_scale": _TABLE_IN + _PICK + _PLACE + _BRACE_PUSH,
 }
 
 # (name, arms, objects) of every action for the subtasks whose arm / object assignment the spec fixes.
@@ -130,7 +130,7 @@ EXPECTED_ARMS_OBJECTS = {
         ("retreat", ("right",), ("paperback_book.n.01_1",)),
         ("retreat", ("left",), ("paperback_book.n.01_1",)),
     ],
-    "inter_object_relation_satisfaction-touching": [
+    "inter_object_relation_satisfaction-touching_small_scale": [
         ("transition", (), ()),
         ("grasp", ("right",), ("can_of_soda.n.01_1",)),
         ("lift", ("right",), ("can_of_soda.n.01_1",)),
@@ -540,12 +540,13 @@ def test_disembedding_grasp_may_touch_the_tray_objects():
 
 def test_iors_place_kinds_and_relations():
     kinds = {}
-    for rel in ("ontop_small_scale", "under_small_scale", "inside", "nextto", "touching", "ontop_large_scale", "under_large_scale"):
+    for rel in ("ontop_small_scale", "under_small_scale", "inside_small_scale", "nextto_small_scale", "touching_small_scale", "ontop_large_scale",
+                "under_large_scale"):
         sc = load(f"inter_object_relation_satisfaction-{rel}")
         place = [a for a in expand(sc.variant, sc) if a.name == "place"][0]
         kinds[rel] = (place.kind, place.relation)
-    assert kinds["inside"] == ("drop", "into")
-    assert kinds["nextto"] == ("support", "next to") and kinds["touching"] == ("support", "next to")
+    assert kinds["inside_small_scale"] == ("drop", "into")
+    assert kinds["nextto_small_scale"] == ("support", "next to") and kinds["touching_small_scale"] == ("support", "next to")
     assert kinds["under_large_scale"] == ("support", "under")
     assert kinds["ontop_small_scale"] == kinds["under_small_scale"] == kinds["ontop_large_scale"] == ("support", "on")
     att = load("configuration_matching-attachment")
@@ -584,7 +585,7 @@ def test_annotation_numbers():
     sc = load("configuration_matching-articulation_open_large_scale")
     _, numbers = [a for a in expand(sc.variant, sc) if a.name == "base_follow"][0].annotate(sc)
     assert "77°" in numbers and "75 %" in numbers and "driving the base" in numbers
-    sc = load("inter_object_relation_satisfaction-touching")
+    sc = load("inter_object_relation_satisfaction-touching_small_scale")
     push = [a for a in expand(sc.variant, sc) if a.name == "push"][0]
     fine, numbers = push.annotate(sc)
     assert "to the left" in fine and "1.8 cm" in numbers  # partner on the robot's left
@@ -1112,7 +1113,7 @@ def test_touching_is_push_only_without_a_brace_record():
     when the joint placement exists): without it the program is the nextto chain (transition → grasp → lift → place at
     the nextto position → retreat) followed by push → retreat, the push closure being the stop; with the brace record
     the braced chain stays; the 17:54 / 18:30 / 18:53 napkins runs failed here with ``contacts.brace: required``."""
-    st = "inter_object_relation_satisfaction-touching"
+    st = "inter_object_relation_satisfaction-touching_small_scale"
     assert "contacts.brace" not in REQUIRED_BLOCKS[st] and {"grasps", "contacts.push"} <= set(REQUIRED_BLOCKS[st])
     with open(os.path.join(VARIANTS, f"{st}__push_only.json")) as f:
         d = json.load(f)
@@ -1517,7 +1518,7 @@ def test_attachment_without_a_brace_record_is_a_one_arm_attach():
         ("alignment-axial", lambda d: d["contacts"]["brace"].update(arm="right"), "same arm"),
         ("alignment-axial", lambda d: d["contacts"]["push"].update(direction=[0.5, 0.5, 0.0]), "unit vector"),
         ("alignment-axial", lambda d: d["contacts"]["push"].pop("mid"), "straight push"),
-        ("inter_object_relation_satisfaction-touching", lambda d: d["contacts"]["push"]["goal"]["position"].__setitem__(0, 9.0), "straight push"),
+        ("inter_object_relation_satisfaction-touching_small_scale", lambda d: d["contacts"]["push"]["goal"]["position"].__setitem__(0, 9.0), "straight push"),
         ("configuration_matching-block_design", lambda d: d["blocks"][1].update(order=0), "orders"),
         ("configuration_matching-block_design", lambda d: d["blocks"][1].update(flip_sign=0), "flip_axis"),
         ("configuration_matching-block_design", lambda d: d["blocks"][0].update(face_pair="w"), "face_pair"),

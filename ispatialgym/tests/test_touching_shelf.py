@@ -66,7 +66,7 @@ def _sampler(lean_side=1.0, **extra):
     fields = dict(shelf_start=None if lean_side is None else {"lean_side": float(lean_side), "lean_deg": 10.0}, relation="touching",
                   hull={"target": _book_hull(), "partner": _book_hull()}, world=SimpleNamespace(hull_at=_hull_at),
                   gen=lambda key, default=None: default, tol=lambda key, default=None: default, pair={"g_NT": 0.044},
-                  gp=SimpleNamespace(variant="inter_object_relation_satisfaction-touching-hardback-hardback-shelf"))
+                  gp=SimpleNamespace(variant="inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-shelf"))
     fields.update(extra)
     s = SimpleNamespace(**fields)
     for name in ("shelf_push_sign", "shelf_push_arm", "shelf_push_direction", "touching_points", "push_stance_for", "brace_gate_at", "push_chain_feasible",
@@ -448,7 +448,7 @@ def _shelf_record() -> dict:
     robot's right (the fixture's robot faces +y, so its right is +x)."""
     from ispatialgym.oracle.programs import TOUCHING_SHELF_LAYOUT
 
-    with open(os.path.join(VARIANTS, "inter_object_relation_satisfaction-touching__push_only.json")) as f:
+    with open(os.path.join(VARIANTS, "inter_object_relation_satisfaction-touching_small_scale__push_only.json")) as f:
         d = json.load(f)
     d["grasps"][0]["arm"] = "left"
     d["stances"]["manipulation"]["arms"] = ["left"]

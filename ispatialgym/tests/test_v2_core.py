@@ -63,7 +63,7 @@ def _problem(entry, lookalikes=None):
 def test_subtask_of_variant():
     assert subtask_of_variant("inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table") == "inter_object_relation_satisfaction-ontop_small_scale"
     assert subtask_of_variant("configuration_matching-block_design-block_4-breakfast_table") == "configuration_matching-block_design"
-    assert subtask_of_variant("x", "inter_object_relation_satisfaction/nextto.iddl") == "inter_object_relation_satisfaction-nextto"
+    assert subtask_of_variant("x", "inter_object_relation_satisfaction/nextto_small_scale.iddl") == "inter_object_relation_satisfaction-nextto_small_scale"
 
 
 def test_cycler_iterates_all_models_before_reuse():
@@ -473,7 +473,7 @@ def test_sidecar_draft_layout(tmp_path):
     assert d["grasps"][0]["grasp"]["position"] == pytest.approx([0.7, 0.0, 0.95])
     assert d["waypoint_policy"] == "checked" and "contacts" not in d and "paths" not in d
     assert PC.check_blocks("inter_object_relation_satisfaction-ontop_small_scale", d) == []
-    problems = PC.check_blocks("inter_object_relation_satisfaction-touching", d)
+    problems = PC.check_blocks("inter_object_relation_satisfaction-touching_small_scale", d)
     # touching: the push is required, the brace optional (owner 2026-09-16 17:10, the axial rule)
     assert any("contacts.push" in p for p in problems) and not any("contacts.brace" in p for p in problems)
     tro = tmp_path / "x-tro_state.json"

@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch as th
 
+from ispatialgym.activity.problem import canonical_variant
 from ispatialgym.eval.geometry import as_tensor, quat_angle, quat_normalize, relative_pose
 
 SCHEMA_VERSION = "isg-tro-v1"
@@ -418,8 +419,8 @@ class ISGTroMeta:
             schema_version=d["schema_version"],
             activity=d["activity"],
             activity_definition_id=definition_id,
-            task_variant=d.get("task_variant"),
-            instance_id=d.get("instance_id"),
+            task_variant=canonical_variant(d.get("task_variant")),
+            instance_id=canonical_variant(d.get("instance_id")),
             scene=dict(d.get("scene") or {}),
             object_bindings=dict(d.get("object_bindings") or {}),
             pose_targets=pose_targets,

@@ -4,7 +4,7 @@ One entry per subtask (``ispatialgym.eval.names.subtask_name``: the task and its
 
     {
       "<subtask>": {
-        "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+        "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
         "definition_id": 3,
         "roles": {
           "target":  {"category": "spatula", "sampleable": true, "require": {"grasps": "tabletop"}, "representative": "hkvsep"},

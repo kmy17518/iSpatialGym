@@ -31,7 +31,7 @@ import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, REPO)
-from ispatialgym.activity.problem import parse_problem_file, parse_problem_string  # noqa: E402
+from ispatialgym.activity.problem import canonical_variant, parse_problem_file, parse_problem_string  # noqa: E402
 from ispatialgym.eval import names as N  # noqa: E402
 from ispatialgym.eval.instances import DEMO_SUFFIX, GoalImageError, default_root, demos_root, goal_record_path, load_index, set_goal, sha256_of  # noqa: E402
 from ispatialgym.oracle.sidecar import from_legacy_keys  # noqa: E402
@@ -187,6 +187,9 @@ def main() -> int:
         write_json(os.path.join(out, files["template_meta"]), tmeta, 1)
         tro = dict(d["tro_json"])
         tro["ispatialgym"] = {**tro["ispatialgym"], "activity_definition_id": did}
+        for key in ("task_variant", "instance_id"):  # the runs keep the names of their day (activity.problem.LEGACY_SUBTASK_IDS)
+            if key in tro["ispatialgym"]:
+                tro["ispatialgym"][key] = canonical_variant(tro["ispatialgym"][key])
         write_json(os.path.join(out, files["tro_state"]), tro, 2)
         with open(os.path.join(d["tdir"], "instances", d["iid"] + ".oracle.json")) as f:
             sidecar = from_legacy_keys(json.load(f))

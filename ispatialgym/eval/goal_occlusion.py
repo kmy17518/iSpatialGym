@@ -29,6 +29,8 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 
 import numpy as np
 
+from ispatialgym.activity.problem import canonical_variant
+
 #: a target / partner hidden at least this much makes the demo invalid
 THRESHOLD = 0.5
 #: depth tolerance of the box / panel screens (m)
@@ -39,7 +41,7 @@ FIXTURE_CATEGORIES = ("dishwasher", "door")
 EXEMPT_SUBTASK_PREFIXES = ("camera_relocalization",)
 #: subtasks whose goal puts the target inside its partner: the target is not judged, the partner (the container) is (inside#02's candy
 #: was 100 % hidden in its jar in every check)
-CONTAINED_TARGET_SUBTASK_PREFIXES = ("inter_object_relation_satisfaction-inside",)
+CONTAINED_TARGET_SUBTASK_PREFIXES = ("inter_object_relation_satisfaction-inside_small_scale", "inter_object_relation_satisfaction-inside_large_scale")
 
 
 def enabled(environ=os.environ) -> bool:
@@ -63,7 +65,7 @@ def exempt(subtask_or_variant: Optional[str]) -> bool:
 
 def contained_target(subtask_or_variant: Optional[str]) -> bool:
     """Whether the goal of the subtask (or a variant of it) puts the target inside its partner (:data:`CONTAINED_TARGET_SUBTASK_PREFIXES`)."""
-    return str(subtask_or_variant or "").startswith(CONTAINED_TARGET_SUBTASK_PREFIXES)
+    return str(canonical_variant(subtask_or_variant) or "").startswith(CONTAINED_TARGET_SUBTASK_PREFIXES)
 
 
 def quat_xyzw_to_matrix(q: Iterable[float]) -> np.ndarray:

@@ -72,7 +72,7 @@ iSpatialGym therefore keeps one file (`task_custom_lists.json` in its own
 metadata directory, never BEHAVIOR's) with a different entry structure
 (schema and example in `instance_sampling_spec.md` §2.3):
 
-- **Key by variant** (`inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`):
+- **Key by variant** (`inter_object_relation_satisfaction-nextto_small_scale-spatula-soup_ladle-breakfast_table`):
   one entry per grounded BDDL problem. The definition id is recorded inside
   (`definition_id`, from `activity_definitions/<activity>/problems.json`).
 - **`roles`**: the roles of the grounded problem (from the icl `roles/candidates.csv`, the

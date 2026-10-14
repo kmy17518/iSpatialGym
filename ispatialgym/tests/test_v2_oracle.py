@@ -2704,7 +2704,7 @@ def test_grasp_may_touch_objects_must_stay_on_the_source_tray():
 
 def inside_world():
     """The IORS inside test sidecar as a fake world: robot at the init stance, sprout on the table, bowl at the drop."""
-    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-inside.json"))
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-inside_small_scale.json"))
     init = sc.stance("init")
     robot = FakeRobot(base=tuple(init.base_pose2d))
     g = sc.grasps[0]
@@ -3355,7 +3355,7 @@ def test_touching_brace_follows_a_shoved_partner():
     toward the stop, more than the stop's 5 mm clearance. Its brace follows the partner (``Brace.follow``): the recorded pre /
     contact / approach move with the partner's planar rigid motion since the program start, beyond ``brace_follow_min_m``;
     a brace of another program (axial, block design) keeps the recorded targets."""
-    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching_small_scale.json"))
     actions = expand(sc.variant, sc)
     brace = [a for a in actions if isinstance(a, QA_Brace)][0]
     push = [a for a in actions if isinstance(a, Push)][0]
@@ -3862,7 +3862,7 @@ def test_collision_monitor_allows_the_brace_fingers_on_the_braced_object():
     left_pad = f"{robot.prim_path}/{M.FINGER_LINKS['left'][0]}"
     right_pad = f"{robot.prim_path}/{M.FINGER_LINKS['right'][0]}"
     torso = f"{robot.prim_path}/torso_link4"
-    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching_small_scale.json"))
     push = next(a for a in expand(sc.variant, sc) if a.name == "push")
     allowed = [(list(M.FINGER_LINKS["left"]) + [M.GRIPPER_LINK["left"]], partner.name)]
     # the brace (left) pad presses the partner throughout the (right-arm) push: allowed
@@ -3893,7 +3893,7 @@ def test_collision_monitor_allows_the_brace_fingers_on_the_braced_object():
 def test_brace_allowed_pairs_span_the_brace_to_its_release():
     """Item 1: the executor derives the allowed pairs from the program - the brace arm's fingers vs the braced object for every
     action from the ``Brace`` through the brace arm's releasing ``Retreat`` (the push and the push arm's retreat included)."""
-    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching_small_scale.json"))
     actions = expand(sc.variant, sc)
     names = [a.name for a in actions]
     b = names.index("brace")

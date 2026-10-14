@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ispatialgym import ASSETS_ROOT
+from ispatialgym.activity.problem import canonical_variant
 
 SCHEMA = "isg-oracle-v1"
 ARMS = ("left", "right")
@@ -81,11 +82,11 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "inter_object_relation_satisfaction-nextto_large_scale": _TABLE + ("stances.placement", "contacts.push", "paths"),  # the base push (no grasp), ending at placement
     "inter_object_relation_satisfaction-ontop_small_scale": _TABLE + ("grasps",),
     "inter_object_relation_satisfaction-under_small_scale": _TABLE + ("grasps",),
-    "inter_object_relation_satisfaction-inside": _TABLE + ("grasps",),
-    "inter_object_relation_satisfaction-nextto": _TABLE + ("grasps",),
+    "inter_object_relation_satisfaction-inside_small_scale": _TABLE + ("grasps",),
+    "inter_object_relation_satisfaction-nextto_small_scale": _TABLE + ("grasps",),
     # touching is brace-optional like axial (owner decision 2026-09-16 17:10; core ``6de8803``): ``contacts.brace`` is
     # recorded only when the joint two-arm placement exists, the push chain is required, the push closure is the stop
-    "inter_object_relation_satisfaction-touching": _TABLE + ("grasps", "contacts.push"),
+    "inter_object_relation_satisfaction-touching_small_scale": _TABLE + ("grasps", "contacts.push"),
 }
 SUBTASKS: Tuple[str, ...] = tuple(REQUIRED_BLOCKS)
 
@@ -141,11 +142,15 @@ def _list(v: Any, where: str) -> List[Any]:
 _MISSING = object()
 
 LEGACY_KEYS = {"alias": "variant", "bddl_alias": "bddl_variant"}  # legacy spelling of sidecars / template metadata
+#: values naming a variant or a subtask id, read under their current names (``activity.problem.canonical_variant``)
+VARIANT_VALUED_KEYS = ("variant", "bddl_variant", "instance_id", "subtask")
 
 
 def from_legacy_keys(d: Dict[str, Any]) -> Dict[str, Any]:
-    """``d`` with the keys of :data:`LEGACY_KEYS` renamed, in order (files written before the rename)."""
-    return {LEGACY_KEYS.get(k, k): v for k, v in d.items()}
+    """``d`` with the keys of :data:`LEGACY_KEYS` renamed, in order, and the variants / subtask ids of
+    :data:`VARIANT_VALUED_KEYS` under their current names (files written before the renames)."""
+    out = {LEGACY_KEYS.get(k, k): v for k, v in d.items()}
+    return {k: (canonical_variant(v) if k in VARIANT_VALUED_KEYS else v) for k, v in out.items()}
 
 
 def _get(d: Dict[str, Any], key: str, where: str, default: Any = _MISSING) -> Any:
@@ -987,11 +992,13 @@ def variant_templates(root: str = IDDL_ROOT) -> Dict[str, Tuple[str, str]]:
 
 
 def subtask_of_variant(variant: str, root: str = IDDL_ROOT) -> str:
-    """Resolve a grounded variant (``inter_object_relation_satisfaction-inside-apple-bowl-breakfast_table``) or a variant
-    template itself to the iddl subtask id (``inter_object_relation_satisfaction-inside``). Slots ``{role}`` match one
-    ``-``-separated token of ``[a-z0-9_]+`` (category names, group tokens such as ``block_4``)."""
+    """Resolve a grounded variant (``inter_object_relation_satisfaction-inside_small_scale-apple-bowl-breakfast_table``) or a variant
+    template itself to the iddl subtask id (``inter_object_relation_satisfaction-inside_small_scale``). Slots ``{role}`` match one
+    ``-``-separated token of ``[a-z0-9_]+`` (category names, group tokens such as ``block_4``). A variant written before a
+    subtask was renamed resolves to the current subtask id."""
     if not isinstance(variant, str) or not variant:
         raise SidecarError(f"variant must be a non-empty string, got {variant!r}")
+    variant = canonical_variant(variant)
     templates = variant_templates(root)
     tokens = variant.split("-")
     matches = []
@@ -1021,7 +1028,7 @@ def subtask_of_variant(variant: str, root: str = IDDL_ROOT) -> str:
 
 def family_of_subtask(subtask: str, root: str = IDDL_ROOT) -> str:
     try:
-        return variant_templates(root)[subtask][0]
+        return variant_templates(root)[canonical_variant(subtask)][0]
     except KeyError:
         raise SidecarError(f"unknown subtask {subtask!r}") from None
 

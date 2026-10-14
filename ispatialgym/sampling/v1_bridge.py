@@ -66,9 +66,9 @@ V1_KEY = {
     f"{IORS}-ontop_large_scale": (f"{IORS}-0", "inter_object_relation_satisfaction/ontop_large_scale.iddl"),
     f"{IORS}-under_small_scale": (f"{IORS}-1", "inter_object_relation_satisfaction/under_small_scale.iddl"),
     f"{IORS}-under_large_scale": (f"{IORS}-1", "inter_object_relation_satisfaction/under_large_scale.iddl"),
-    f"{IORS}-inside": (f"{IORS}-2", "inter_object_relation_satisfaction/inside.iddl"),
-    f"{IORS}-nextto": (f"{IORS}-3", "inter_object_relation_satisfaction/nextto.iddl"),
-    f"{IORS}-touching": (f"{IORS}-4", "inter_object_relation_satisfaction/touching.iddl"),
+    f"{IORS}-inside_small_scale": (f"{IORS}-2", "inter_object_relation_satisfaction/inside_small_scale.iddl"),
+    f"{IORS}-nextto_small_scale": (f"{IORS}-3", "inter_object_relation_satisfaction/nextto_small_scale.iddl"),
+    f"{IORS}-touching_small_scale": (f"{IORS}-4", "inter_object_relation_satisfaction/touching_small_scale.iddl"),
     f"{IORS}-inside_large_scale": (f"{IORS}-2", "inter_object_relation_satisfaction/inside_large_scale.iddl"),
     f"{IORS}-nextto_large_scale": (f"{IORS}-3", "inter_object_relation_satisfaction/nextto_large_scale.iddl"),
     f"{IORS}-touching_large_scale": (f"{IORS}-4", "inter_object_relation_satisfaction/touching_large_scale.iddl"),
@@ -303,7 +303,7 @@ class Grounder:
                 fixed["wall"] = sorted({r["wall"] for r in regions})
             variant_fill["target"], variant_fill["support"] = target["category"], "walls"
         elif subtask.startswith(IORS):
-            pipeline = "insert" if subtask.endswith("inside") else "tabletop"
+            pipeline = "insert" if subtask == f"{IORS}-inside_small_scale" else "tabletop"
             spawned("target", target, pipeline)
             variant_fill["target"] = target["category"]
             if partner is not None and partner.get("kind") == "scene":

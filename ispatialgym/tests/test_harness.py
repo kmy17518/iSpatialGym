@@ -81,7 +81,7 @@ def test_config_round_trip(tmp_path):
     ("inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar", "Move the beer glass so that the coaster is under it"),
     ("inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl", "Move the sandal under the bed"),
     ("inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf", "Move the bar soap on top of the soap dish"),
-    ("inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar", "Move the box of cereal so that it touches the box of cereal"),
+    ("inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar", "Move the box of cereal so that it touches the box of cereal"),
     ("inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar", "Move the plate inside the drop in sink"),
     ("camera_relocalization-obstructed-trash_can_1", "A trash can may be in the way"),
     ("mental_rotation-teaspoon", "You are holding the teaspoon"),
@@ -506,7 +506,7 @@ def test_system_message_docs_and_recipes():
         "alignment-world_vertical-wall_clock-walls": "alignment-world_vertical",
         "alignment-axial-tablespoon-breakfast_table": "alignment-axial",
         "mental_rotation-teaspoon": "mental_rotation", "object_scaling-mug": "object_scaling",
-        "disembedding-a-b_1-c": "disembedding", "inter_object_relation_satisfaction-nextto-a-b-c": "inter_object_relation_satisfaction",
+        "disembedding-a-b_1-c": "disembedding", "inter_object_relation_satisfaction-nextto_small_scale-a-b-c": "inter_object_relation_satisfaction",
     }
     for alias, key in keys.items():
         assert recipe_key(alias) == key

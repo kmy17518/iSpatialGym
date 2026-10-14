@@ -2,12 +2,12 @@
   "activity": "inter_object_relation_satisfaction",
   "problems": [
     {
-      "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+      "variant": "inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table",
       "id": 0,
       "grounded": "2026-10-11",
       "by": "ground_isg 2.0.0",
-      "subtask": "inter_object_relation_satisfaction-inside",
-      "iddl": "inter_object_relation_satisfaction/inside.iddl",
+      "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+      "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
       "pick": "inter_object_relation_satisfaction-inside#01~T5",
       "slot": "representative",
       "mode": "representative"
@@ -38,12 +38,12 @@
       "fallback_kind": "next_model"
     },
     {
-      "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+      "variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
       "id": 3,
       "grounded": "2026-10-11",
       "by": "ground_isg 2.0.0",
-      "subtask": "inter_object_relation_satisfaction-touching",
-      "iddl": "inter_object_relation_satisfaction/touching.iddl",
+      "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+      "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
       "pick": "inter_object_relation_satisfaction-touching#01~T1",
       "slot": "representative",
       "mode": "representative"
@@ -93,45 +93,45 @@
       "mode": "representative"
     },
     {
-      "variant": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-coffee_table",
+      "variant": "inter_object_relation_satisfaction-inside_small_scale-hard_candy-hingeless_jar-coffee_table",
       "id": 8,
       "grounded": "2026-10-11",
       "by": "ground_isg 2.0.0",
-      "subtask": "inter_object_relation_satisfaction-inside",
-      "iddl": "inter_object_relation_satisfaction/inside.iddl",
+      "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+      "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
       "pick": "inter_object_relation_satisfaction-inside#02~T5",
       "slot": "representative",
       "mode": "representative"
     },
     {
-      "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-coffee_table",
+      "variant": "inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-coffee_table",
       "id": 9,
       "grounded": "2026-10-11",
       "by": "ground_isg 2.0.0",
-      "subtask": "inter_object_relation_satisfaction-inside",
-      "iddl": "inter_object_relation_satisfaction/inside.iddl",
+      "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+      "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
       "pick": "inter_object_relation_satisfaction-inside#03~T3",
       "slot": "representative",
       "mode": "representative"
     },
     {
-      "variant": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-commercial_kitchen_table",
+      "variant": "inter_object_relation_satisfaction-inside_small_scale-garlic_clove-saucepot-commercial_kitchen_table",
       "id": 10,
       "grounded": "2026-10-11",
       "by": "ground_isg 2.0.0",
-      "subtask": "inter_object_relation_satisfaction-inside",
-      "iddl": "inter_object_relation_satisfaction/inside.iddl",
+      "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+      "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
       "pick": "inter_object_relation_satisfaction-inside#04~T3",
       "slot": "representative",
       "mode": "representative"
     },
     {
-      "variant": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table",
+      "variant": "inter_object_relation_satisfaction-nextto_small_scale-salt_shaker-pepper_shaker-breakfast_table",
       "id": 11,
       "grounded": "2026-10-11",
       "by": "ground_isg 2.0.0",
-      "subtask": "inter_object_relation_satisfaction-nextto",
-      "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+      "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+      "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
       "pick": "inter_object_relation_satisfaction-nextto#02~T1",
       "slot": "representative",
       "mode": "representative"

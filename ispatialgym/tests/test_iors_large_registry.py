@@ -46,8 +46,8 @@ def test_subtask_lookups():
         assert SC.subtask_of_variant(variant) == st and SC.family_of_subtask(st) == IORS and st in SC.REQUIRED_BLOCKS
         assert VB.V1_KEY[st][1] == f"{IORS}/{st.split('-', 1)[1]}.iddl"
     # the small-scale subtasks still resolve to themselves
-    assert PB.subtask_of_variant(f"{IORS}-inside-apple-bowl-breakfast_table") == f"{IORS}-inside"
-    assert SC.subtask_of_variant(f"{IORS}-nextto-spatula-soup_ladle-breakfast_table") == f"{IORS}-nextto"
+    assert PB.subtask_of_variant(f"{IORS}-inside_small_scale-apple-bowl-breakfast_table") == f"{IORS}-inside_small_scale"
+    assert SC.subtask_of_variant(f"{IORS}-nextto_small_scale-spatula-soup_ladle-breakfast_table") == f"{IORS}-nextto_small_scale"
 
 
 def test_program_check_stance_lists():
@@ -56,8 +56,8 @@ def test_program_check_stance_lists():
     assert PC.subtask_blocks(NEW["touching"]) == ontop + ("contacts.push",)
     assert PC.subtask_blocks(NEW["nextto"]) == ("stances.init", "stances.manipulation", "stances.placement", "transitions", "paths", "contacts.push")
     # ``...-inside_large_scale`` also starts with ``...-inside``: the small-scale lists are unchanged
-    assert PC.subtask_blocks(f"{IORS}-inside") == ("stances.init", "stances.manipulation", "transitions", "grasps")
-    assert PC.subtask_blocks(f"{IORS}-touching") == ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.push")
+    assert PC.subtask_blocks(f"{IORS}-inside_small_scale") == ("stances.init", "stances.manipulation", "transitions", "grasps")
+    assert PC.subtask_blocks(f"{IORS}-touching_small_scale") == ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.push")
 
 
 def test_generation_defaults_are_ontop_large_copies():

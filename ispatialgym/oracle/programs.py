@@ -1278,9 +1278,9 @@ PROGRAMS: Dict[str, Tuple[Callable[..., List[Action]], Dict[str, object]]] = {
     "inter_object_relation_satisfaction-nextto_large_scale": (program_iors_large, {"relation": "nextto"}),
     "inter_object_relation_satisfaction-ontop_small_scale": (program_iors_small, {"relation": "ontop"}),
     "inter_object_relation_satisfaction-under_small_scale": (program_iors_small, {"relation": "under"}),
-    "inter_object_relation_satisfaction-inside": (program_iors_small, {"relation": "inside"}),
-    "inter_object_relation_satisfaction-nextto": (program_iors_small, {"relation": "nextto"}),
-    "inter_object_relation_satisfaction-touching": (program_iors_touching, {}),
+    "inter_object_relation_satisfaction-inside_small_scale": (program_iors_small, {"relation": "inside"}),
+    "inter_object_relation_satisfaction-nextto_small_scale": (program_iors_small, {"relation": "nextto"}),
+    "inter_object_relation_satisfaction-touching_small_scale": (program_iors_touching, {}),
 }
 
 

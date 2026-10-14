@@ -240,8 +240,8 @@ def test_split_cone_on_from_the_subtask_defaults():
     for sub in ("disembedding", "configuration_matching-block_design", "configuration_matching-articulation_open_small_scale",
                 "configuration_matching-articulation_close_small_scale", "configuration_matching-attachment", "alignment-axial",
                 "inter_object_relation_satisfaction-ontop_small_scale", "inter_object_relation_satisfaction-under_small_scale",
-                "inter_object_relation_satisfaction-inside", "inter_object_relation_satisfaction-nextto", "inter_object_relation_satisfaction-touching"):
-        fallback = (8.0, 20.0) if sub in ("alignment-axial", "inter_object_relation_satisfaction-inside") else (20.0, 30.0)
+                "inter_object_relation_satisfaction-inside_small_scale", "inter_object_relation_satisfaction-nextto_small_scale", "inter_object_relation_satisfaction-touching_small_scale"):
+        fallback = (8.0, 20.0) if sub in ("alignment-axial", "inter_object_relation_satisfaction-inside_small_scale") else (20.0, 30.0)
         assert TT.split_cone_opts(sampler(sub, {})) == {**on, "fallback_classes_deg": fallback}, sub
     assert TT.split_cone_opts(sampler("alignment-axial", {"phase2_split_cone": False})) is None
     assert TT.split_cone_opts(sampler("alignment-axial", {"phase2_tight_class_deg": 5}))["work_classes_deg"] == (5.0, 20.0)

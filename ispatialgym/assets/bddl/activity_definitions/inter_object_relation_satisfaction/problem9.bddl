@@ -1,12 +1,12 @@
 (define (problem inter_object_relation_satisfaction-9)
     (:domain ispatialgym)
-    (:variant inter_object_relation_satisfaction-inside-sunflower-vase-coffee_table)
+    (:variant inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-coffee_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside-sunflower-vase-coffee_table (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#03~T3/representative)
-    ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is
-    ; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured. The
-    ; insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container; flowers held
-    ; by the upper stem) is required.
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-coffee_table (inter_object_relation_satisfaction/inside_small_scale.iddl; inter_object_relation_satisfaction-inside#03~T3/representative)
+    ; IORS - inside (small-scale). Target lowered into the partner (fillable container) on the support; the target's
+    ; goal orientation is whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both
+    ; poses measured. The insert grasp pipeline (pads on the upper part of the object so the lower body can enter the
+    ; container; flowers held by the upper stem) is required.
 
     (:objects
         sunflower.n.01_1 - sunflower.n.01
