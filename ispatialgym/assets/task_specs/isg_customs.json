@@ -33223,12 +33223,57 @@
   "scenes": {
    "house_single_floor": {
     "rooms": [
-     "living_room_0",
      "dining_room_0"
     ],
     "bindings": {
      "partner": [
       "breakfast_table_rhjoby_0"
+     ],
+     "support": {
+      "room": "dining_room_0"
+     },
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "serving_cart": [
+       "heqtlk"
+      ]
+     }
+    }
+   },
+   "house_double_floor_lower": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "partner": [
+      "breakfast_table_xftrki_0"
+     ],
+     "support": {
+      "room": "kitchen_0"
+     },
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "serving_cart": [
+       "heqtlk"
+      ]
+     }
+    }
+   },
+   "Rs_int": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "breakfast_table_skczfi_0"
      ],
      "support": {
       "room": "living_room_0"
@@ -33289,57 +33334,33 @@
      "straight_chair_jgoolz_3",
      "straight_chair_jgoolz_4",
      "straight_chair_jgoolz_5"
+    ],
+    "house_double_floor_lower": [
+     "straight_chair_zdhnyg_0",
+     "straight_chair_hgunnf_0",
+     "straight_chair_uofiqj_1",
+     "straight_chair_uofiqj_0"
+    ],
+    "Rs_int": [
+     "straight_chair_amgwaw_0",
+     "straight_chair_amgwaw_1",
+     "straight_chair_amgwaw_2"
     ]
    },
-   "_remove_objects_note": "the six chairs around breakfast_table_rhjoby_0 removed as in the sandal's floor aliases of this table: they stand at its sides, where the cart's goal is",
+   "_remove_objects_note": "the chairs at each partner's sides removed (where the cart's goal is): the six around breakfast_table_rhjoby_0 as in the sandal's floor aliases of this table; the four within 0.9 m of breakfast_table_xftrki_0 and the three within 0.65 m of breakfast_table_skczfi_0",
+   "_partners_note": "user 2026-10-13 ~18:50: the push path stays on one floor object (generation.push_single_floor, iors_large_nextto) - house_single_floor's partner rhjoby in dining_room_0 alone (its living_room_0 init crossed the floor seam where the cart tipped); the variant partner breakfast_table_xftrki_0 (house_double_floor_lower kitchen_0) and the held-out partner breakfast_table_skczfi_0 (Rs_int living_room_0) sampled in parallel",
    "push_distance_m": [
     1.5,
     2.5
    ],
    "push_heights_m": [
-    0.15,
-    0.12,
-    0.1,
-    0.14,
-    0.13,
-    0.16
+    0.45,
+    0.4,
+    0.5,
+    0.55,
+    0.35,
+    0.6
    ],
-   "_push_heights_note": "user 2026-10-13 ~17:12 / ~17:48: the cart (one rigid link, no wheel joints) pushed at 0.40 m tipped forward where its feet cross the living_room_0 / dining_room_0 floor seam (x 9.37; separate floor objects, no step: their feet catch on the edge), and NextTo needs the upright cart 0.26 m past it. Floor probe 17852422 across the seam: 0.40 m tipped (25 deg), 0.15 / 0.10 m crossed upright after a 10-14 s stall at ~1 m g (0.25 m crossed cleanly but the cart has no flat face at 0.18-0.30 m): the bottom shelf's line",
-   "push_trunks": [
-    [
-     1.5,
-     0.0
-    ],
-    [
-     1.5,
-     -0.3
-    ],
-    [
-     1.25,
-     -0.3
-    ],
-    [
-     1.75,
-     0.0
-    ],
-    [
-     2.0,
-     0.0
-    ],
-    [
-     0.95,
-     -0.6
-    ],
-    [
-     1.25,
-     0.0
-    ],
-    [
-     0.95,
-     -0.3
-    ]
-   ],
-   "_push_trunks_note": "the default push trunks reach no push line at 0.20 m or below (two-hand reach margin within push_reach_margin_m [0.03, 0.45] at the stand-offs); these reach 0.10-0.15 m",
    "push_stand_offs_m": [
     0.55,
     0.5,
