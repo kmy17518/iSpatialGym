@@ -1031,16 +1031,20 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      (`no_start_region`); the key without `partner_on_meta_link` is a spec error. Recorded:
      `template_facts.start_region.on_neighbors` / `off_neighbors`. Aliases without the key are sampled as before.
    - **Support-aligned init** (owner decision 2026‑10‑13, nextto#01 / #03 / #04; `generation.init_align_support: true`,
-     default false; any small-scale relation). The target and the partner start with their footprints along the support
-     top's edges: the init yaw (about the vertical, applied to the rest orientation) is one of the 4 edge-aligned ones that
-     put the footprint's minimum-area rectangle on the axes of the stance's support edge (+ k × 90°: the long axis along or
-     across the edge). Step 1 screens F over those 4 yaws (not the 8 fixed ones), draws without the ±22.5° jitter and keeps
-     F out of the band (as for `widest_faces`, which takes precedence for the target). The partner's yaw is one of its 4
-     in random order, 16 tries (each with a new gap draw) in place of the 16 random yaws + 2 edge-aligned ones; on a meta
-     link the 4 in random order per spot; touching aligns it as with `edge_aligned`. The goal is not drawn anew: a nextto
-     target keeps its init orientation (a free orientation's release turn is a multiple of 90°), so it ends aligned too.
-     Recorded: the instance summary's `init_align_support` (edge yaw, both drafted footprints' residuals). Aliases without
-     the key are sampled as before.
+     default false; any small-scale relation). The target and the partner start with their long axes along the support
+     top's edges: the init yaw (about the vertical, applied to the rest orientation) is one of the 4 that put the object's
+     long axis on the axes of the stance's support edge (+ k × 90°: along or across the edge). The long axis is the longest
+     side of the model's collision oriented bounding box (`misc/metadata.json` `link_bounding_boxes.base_link.collision.
+     oriented`, stretched by the object's scale; none when the next side is within 10 %), projected on the floor at the rest
+     orientation; without one, or when it stands more than 60° off the floor, the footprint's minimum-area rectangle. The
+     rectangle alone sits off a tapered model's long axis (tablespoon/yxxfdj 3.3°, its bowl; within 0.3° for the marker,
+     pencil, chopstick and gym shoes of nextto#01 / #04). Step 1 screens F over those 4 yaws (not the 8 fixed ones), draws
+     without the ±22.5° jitter and keeps F out of the band (as for `widest_faces`, which takes precedence for the target).
+     The partner's yaw is one of its 4 in random order, 16 tries (each with a new gap draw) in place of the 16 random yaws +
+     2 edge-aligned ones; on a meta link the 4 in random order per spot; touching aligns it as with `edge_aligned`. The goal
+     is not drawn anew: a nextto target keeps its init orientation (a free orientation's release turn is a multiple of
+     90°), so it ends aligned too. Recorded: the instance summary's `init_align_support` (edge yaw, both drafted residuals,
+     the axis each used). Aliases without the key are sampled as before.
    - **Partner along the target** (owner decision 2026‑10‑13, under_small#04 "align the spatula with the paper sheet";
      `generation.partner_aligned_to_target: true`; the plain partner draw of ontop / under / inside / nextto — touching and
      `partner_on_meta_link` reject it as a spec error). The attempt draws the partner only at the yaws that lay the longer

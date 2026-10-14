@@ -295,6 +295,20 @@ def long_axes_angle_deg(a_fp, b_fp) -> float:
     return math.degrees(min(d, math.pi - d))
 
 
+def obb_long_axis(metadata: Dict[str, Any]) -> Optional[th.Tensor]:
+    """The long axis (unit, object frame) of a model's oriented bounding box - ``link_bounding_boxes.base_link.collision.oriented`` of its
+    ``misc/metadata.json``: the box axis (a column of its ``transform``) of the largest ``extent``; None without the box, or when the next
+    extent is within 10 % of it (no long axis)."""
+    box = (((metadata.get("link_bounding_boxes") or {}).get("base_link") or {}).get("collision") or {}).get("oriented") or {}
+    if "extent" not in box or "transform" not in box:
+        return None
+    ext = [float(v) for v in box["extent"]]
+    i, j = sorted(range(3), key=lambda k: -ext[k])[:2]
+    if ext[j] >= 0.9 * ext[i]:
+        return None
+    return th.tensor(box["transform"], dtype=th.float32)[:3, i]
+
+
 def raster_from_above(tri: np.ndarray, x0: float, y0: float, nx: int, ny: int, res: float) -> Tuple[np.ndarray, np.ndarray]:
     """What is seen from straight above: per cell centre ``(x0 + (i + 0.5) res, y0 + (j + 0.5) res)`` the z of the highest triangle of ``tri``
     (M, 3, 3; world) over it and that triangle's |normal z|, NaN where none covers it (vertical triangles are not seen)."""
@@ -724,12 +738,12 @@ class IORSSmall(SamplerV2):
         """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
         feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp. ``arms``: the arms
         offered for the segment at this focus (the chosen one is the record's ``arm``). :meth:`widest_faces`: F over
-        :meth:`widest_faces_target_yaws`, else with :meth:`init_align_support` over the four :meth:`edge_aligned_yaws`; drawn without jitter."""
+        :meth:`widest_faces_target_yaws`, else with :meth:`init_align_support` over the four :meth:`support_aligned_yaws`; drawn without jitter."""
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
         nb_top = self.neighbor_start_top()  # start_region_on_neighbors: the target is drawn on the neighbours' cells
-        yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.edge_aligned_yaws("target", manip) if self.init_align_support() else None
+        yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.support_aligned_yaws("target", manip) if self.init_align_support() else None
         yaw_kw = {"yaws": yaws, "jitter": 0.0} if yaws is not None else {}
         last = None
         for i, gs in enumerate(tiers):
@@ -1528,8 +1542,9 @@ class IORSSmall(SamplerV2):
         if self.init_align_support():
             d.summary["init_align_support"] = {
                 "edge_yaw_deg": round(math.degrees(math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))), 1),
-                "target_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["target"], t_pose[1], manip)), 2),
-                "partner_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["partner"], p_pose[1], manip)), 2),
+                "target_residual_deg": round(math.degrees(self.support_yaw_delta("target", t_pose[1], manip)), 2),
+                "partner_residual_deg": round(math.degrees(self.support_yaw_delta("partner", p_pose[1], manip)), 2),
+                "axis": {role: self.support_axis_angle(role, pose[1])[1] for role, pose in (("target", t_pose), ("partner", p_pose))},
             }
         # §4.6 step 4: every object fully in frame (5 %) in the init image
         for role, pose in (("target", t_pose), ("partner", p_pose)):
@@ -1650,7 +1665,7 @@ class IORSSmall(SamplerV2):
         """A5 (owner 2026-10-12): the partner centred on one of the candidate's meta-link spots for ``side`` (drawn uniformly) at a random yaw,
         checked at the drawn target pose - on ``side`` of it at a lateral gap of the gap range, the reach rule with the band of the segment's
         arm (:meth:`band_rule`), at least ``footprint_gap_min_m`` from the target, fully in the init image (the spot is on the top,
-        :meth:`find_meta_spots`). Up to ``PARTNER_YAW_DRAWS`` yaws per spot (:meth:`init_align_support`: the four edge-aligned ones in
+        :meth:`find_meta_spots`). Up to ``PARTNER_YAW_DRAWS`` yaws per spot (:meth:`init_align_support`: its four support-aligned ones in
         random order); ``Reject("partner_placement")`` when none passes."""
         g_lo, g_hi = self.gap_range()
         t_fp = self.world.footprint(self.hull["target"], t_pose)
@@ -1659,7 +1674,7 @@ class IORSSmall(SamplerV2):
         reach, band = self.band_rule(manip, float(manip.world_to_base(t_pose[0][:2])[0]), (manip.working_arms or self.segment_arms)[:1])
         misses: List[str] = []
         spots = (manip.extras.get(META_SPOTS) or {}).get(TT.side_name(side), [])
-        aligned = self.edge_aligned_yaws("partner", manip) if self.init_align_support() else None
+        aligned = self.support_aligned_yaws("partner", manip) if self.init_align_support() else None
         for k in rng.permutation(len(spots)):
             mid, xy = self.meta_spots[spots[int(k)]]
             yaws = [aligned[int(j)] for j in rng.permutation(4)] if aligned else (float(rng.uniform(-math.pi, math.pi)) for _ in range(PARTNER_YAW_DRAWS))
@@ -1711,7 +1726,7 @@ class IORSSmall(SamplerV2):
             if self.partner_aligned_to_target():
                 yaws = self.aligned_partner_yaws(t_pose, rng)
             elif self.init_align_support():
-                aligned = self.edge_aligned_yaws("partner", manip)
+                aligned = self.support_aligned_yaws("partner", manip)
                 yaws = [aligned[int(k)] for k in rng.permutation(4)] * (PARTNER_YAW_DRAWS // 4)
             else:
                 yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip)
@@ -1737,7 +1752,8 @@ class IORSSmall(SamplerV2):
         p_pose = None
         # edge alignment (owner 2026-09-18 13:50): the partner's footprint axes along the support edge - the two aligned
         # footprints (long side along / across the edge) alternate over the tries; without it a random yaw per try
-        yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() or self.init_align_support() else None
+        yaw0 = (self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() else
+                self.support_yaw_delta("partner", self.rest["partner"], manip) if self.init_align_support() else None)
         for i in range(8):
             yaw = yaw0 + (i % 2) * (math.pi / 2) if yaw0 is not None else float(rng.uniform(-math.pi, math.pi))
             if faces_yaws:
@@ -1774,9 +1790,53 @@ class IORSSmall(SamplerV2):
 
     def init_align_support(self) -> bool:
         """Owner 2026-10-13 (nextto#01 / #03 / #04): ``generation.init_align_support`` (default false) - the target and the partner start
-        with their footprint axes along the support top's edges: the target's init yaw is one of its :meth:`edge_aligned_yaws` (no
-        jitter), and so is the partner's (in place of the random yaws)."""
+        with their long axes along the support top's edges: the target's init yaw is one of its :meth:`support_aligned_yaws` (no jitter),
+        and so is the partner's (in place of the random yaws)."""
         return bool(self.gen("init_align_support", False))
+
+    def model_long_axis(self, role: str) -> Optional[th.Tensor]:
+        """``role``'s long axis in its object frame: :func:`obb_long_axis` of its model's ``misc/metadata.json`` (beside its USD), stretched by
+        its scale; None without one."""
+        import json
+        import os
+
+        obj = self.obj(role)
+        scale = G.t(obj.scale).float().reshape(-1)
+        key = (obj.name, tuple(round(float(v), 6) for v in scale.tolist()))
+        cache = self.__dict__.setdefault("_long_axes", {})
+        if key not in cache:
+            usd, axis = getattr(obj, "usd_path", None), None
+            if usd:
+                try:
+                    with open(os.path.join(os.path.dirname(os.path.dirname(usd)), "misc", "metadata.json")) as f:
+                        axis = obb_long_axis(json.load(f))
+                except (OSError, ValueError):
+                    axis = None
+            cache[key] = None if axis is None else axis * scale[:3]
+        return cache[key]
+
+    def support_axis_angle(self, role: str, quat) -> Tuple[float, str]:
+        """World angle (rad) of the axis :meth:`init_align_support` lays along the support's edges for ``role`` at ``quat``, and its source:
+        the model's long axis (:meth:`model_long_axis`, ``"long_axis"``) unless it stands more than 60 deg off the floor, else the
+        footprint's minimum-area rectangle (:meth:`footprint_axis_angle`, ``"footprint"``). The rectangle can sit a few degrees off a tapered
+        model's long axis (tablespoon/yxxfdj: 3.3 deg)."""
+        axis = self.model_long_axis(role)
+        if axis is not None:
+            v = C.quat_to_mat(G.t(quat)).float() @ axis.float()
+            if float(th.linalg.norm(v[:2])) >= 0.5 * float(th.linalg.norm(v)):
+                return math.atan2(float(v[1]), float(v[0])), "long_axis"
+        return self.footprint_axis_angle(self.hull[role], quat), "footprint"
+
+    def support_yaw_delta(self, role: str, quat, manip: Stance) -> float:
+        """Smallest world yaw (rad, in [-pi/4, pi/4]) that turns ``role``'s :meth:`support_axis_angle` at ``quat`` onto the stance's edge frame."""
+        phi = math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))
+        return (phi - self.support_axis_angle(role, quat)[0] + math.pi / 4) % (math.pi / 2) - math.pi / 4
+
+    def support_aligned_yaws(self, role: str, manip: Stance) -> List[float]:
+        """:meth:`init_align_support`'s four world yaws (applied to ``role``'s rest orientation): its :meth:`support_axis_angle` along or across
+        the stance's support edge."""
+        yaw0 = self.support_yaw_delta(role, self.rest[role], manip)
+        return [yaw0 + k * math.pi / 2 for k in range(4)]
 
     def footprint_axis_angle(self, hull: th.Tensor, quat) -> float:
         """World angle (rad, modulo pi/2) of the minimum-area bounding rectangle of the hull's footprint at ``quat``."""

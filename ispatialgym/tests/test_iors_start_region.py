@@ -5,6 +5,7 @@ partner draw. No simulator."""
 
 from __future__ import annotations
 
+import json
 import math
 import types
 
@@ -395,31 +396,71 @@ def _off_edge_deg(s, role, quat, manip):
     return abs(math.degrees(s.edge_yaw_delta(s.hull[role], quat, manip)))
 
 
-def test_init_align_support_yaws_put_the_footprint_along_the_edge():
-    """Owner 2026-10-13 (nextto#01 / #03 / #04, ``generation.init_align_support``): the four edge-aligned yaws turn the rest footprint's
-    rectangle onto the support edge's axes, the long side along or across the edge - also for an edge off the world axes and a rest
-    orientation turned about the vertical."""
+#: tablespoon/yxxfdj's collision oriented bounding box (misc/metadata.json): its long axis 0.3 deg off the model's -x, 2.4 deg up
+SPOON_OBB = {"extent": [0.01198, 0.03813, 0.16766], "transform": [[-0.04262, -0.0049, -0.99908, 0.01496], [-0.00027, -0.99999, 0.00492, -0.00041],
+                                                                   [-0.99909, 0.00048, 0.04262, -0.00132], [0.0, 0.0, 0.0, 1.0]]}
+
+
+def _no_long_axis(monkeypatch):
+    monkeypatch.setattr(IS.IORSSmall, "model_long_axis", lambda self, role: None)
+
+
+def test_obb_long_axis_is_the_collision_boxs_longest_side():
+    meta = {"link_bounding_boxes": {"base_link": {"collision": {"oriented": SPOON_OBB}}}}
+    assert IS.obb_long_axis(meta).tolist() == pytest.approx([-0.99908, 0.00492, 0.04262], abs=1e-6)
+    assert IS.obb_long_axis({}) is None and IS.obb_long_axis({"link_bounding_boxes": {"base_link": {"collision": {}}}}) is None
+    squarish = {"extent": [0.10, 0.095, 0.02], "transform": SPOON_OBB["transform"]}  # no long axis: the next side within 10 %
+    assert IS.obb_long_axis({"link_bounding_boxes": {"base_link": {"collision": {"oriented": squarish}}}}) is None
+
+
+def test_model_long_axis_reads_the_metadata_beside_the_usd_and_stretches_it(tmp_path):
+    misc, usd = tmp_path / "objects" / "tablespoon" / "yxxfdj" / "misc", tmp_path / "objects" / "tablespoon" / "yxxfdj" / "usd"
+    misc.mkdir(parents=True)
+    usd.mkdir()
+    (misc / "metadata.json").write_text(json.dumps({"link_bounding_boxes": {"base_link": {"collision": {"oriented": SPOON_OBB}}}}))
+    s = _sampler("nextto", pair={"g_NT": 0.05})
+    obj = types.SimpleNamespace(name="target_tablespoon_yxxfdj_0", scale=th.tensor([1.0, 1.0, 1.75]), usd_path=str(usd / "yxxfdj.usd"))
+    s.obj = lambda role: obj
+    assert s.model_long_axis("target").tolist() == pytest.approx([-0.99908, 0.00492, 1.75 * 0.04262], abs=1e-5)
+    missing = types.SimpleNamespace(name="partner_x_0", scale=th.ones(3), usd_path=str(tmp_path / "nowhere" / "usd" / "x.usd"))
+    s.obj = lambda role: missing
+    assert s.model_long_axis("partner") is None
+
+
+def test_init_align_support_yaws_put_the_long_axis_along_the_edge(monkeypatch):
+    """Owner 2026-10-13 (nextto#01 / #03 / #04, ``generation.init_align_support``): the four yaws lay the model's long axis along or across
+    the support edge - for an edge off the world axes, a rest orientation turned about the vertical and an axis a little off the floor;
+    the footprint's minimum-area rectangle when the model has no long axis or it stands up."""
     s = _sampler("nextto", pair={"g_NT": 0.05})
     s.hull["partner"], s.rest["partner"] = _box(0.10, 0.02, 0.01), G.quat_from_yaw(0.4)
     edge = EdgeFrame.from_edge("e", th.tensor([1.0, 0.0]), th.tensor([-math.cos(0.3), -math.sin(0.3)]), 2.0)  # tangent at 0.3 + 90 deg
     st = Stance("manipulation", (0.55, 0.0, 0.3), 0.5, 0.0, 0.45, edge)
-    yaws = s.edge_aligned_yaws("partner", st)
+    monkeypatch.setattr(IS.IORSSmall, "model_long_axis", lambda self, role: th.tensor([math.cos(0.2), math.sin(0.2), 0.05]))
+    yaws = s.support_aligned_yaws("partner", st)
     assert [y - yaws[0] for y in yaws] == pytest.approx([0.0, math.pi / 2, math.pi, 1.5 * math.pi])
     for y in yaws:
-        assert _off_edge_deg(s, "partner", G.qmul(G.quat_from_yaw(y), s.rest["partner"]), st) < 1e-3
-        r = (y + 0.4 - 0.3) % (math.pi / 2)  # the box's long (local x) axis at y + 0.4 against the edge's axes
-        assert min(r, math.pi / 2 - r) < 1e-4
+        r = (y + 0.4 + 0.2 - 0.3) % (math.pi / 2)  # the long axis at y + 0.4 + 0.2 against the edge's axes
+        assert min(r, math.pi / 2 - r) < 1e-4 and abs(s.support_yaw_delta("partner", G.qmul(G.quat_from_yaw(y), s.rest["partner"]), st)) < 1e-4
+    assert s.support_axis_angle("partner", s.rest["partner"])[1] == "long_axis"
+    for axis in (None, th.tensor([0.0, 0.1, 1.0])):  # no long axis / one standing up: the footprint rectangle (the box's local x)
+        monkeypatch.setattr(IS.IORSSmall, "model_long_axis", lambda self, role, a=axis: a)
+        assert s.support_axis_angle("partner", s.rest["partner"])[1] == "footprint"
+        for y in s.support_aligned_yaws("partner", st):
+            assert _off_edge_deg(s, "partner", G.qmul(G.quat_from_yaw(y), s.rest["partner"]), st) < 1e-3
+            r = (y + 0.4 - 0.3) % (math.pi / 2)
+            assert min(r, math.pi / 2 - r) < 1e-4
     assert not s.init_align_support() and _sampler(gen={"init_align_support": True}).init_align_support()
 
 
-def test_init_align_support_partner_draws_only_support_aligned_yaws():
-    """With the key the partner's yaw is one of the four support-aligned yaws, in random order (each with a fresh gap draw); without it the
-    random yaws come first, as before."""
+def test_init_align_support_partner_draws_only_support_aligned_yaws(monkeypatch):
+    """With the key the partner's yaw is one of the four support-aligned yaws, in random order (each with a fresh gap draw) - its long axis
+    along the edge where the model has one, though its footprint rectangle is then off it; without the key the random yaws come first."""
     def sampler(gen):
         s = _sampler("nextto", L=3.0, gen=gen, pair={"g_NT": 0.05})
         s.hull["partner"], s.rest["partner"] = _box(0.10, 0.03, 0.02), G.quat_from_yaw(0.4)
         return s
 
+    _no_long_axis(monkeypatch)
     s = sampler({"init_align_support": True})
     manip, t_pose = _attempt(s, -0.24, 1.0)
     quarter_turns = set()
@@ -428,6 +469,10 @@ def test_init_align_support_partner_draws_only_support_aligned_yaws():
         assert _off_edge_deg(s, "partner", p_pose[1], manip) < 1e-3
         quarter_turns.add(round((s.partner_draw["yaw_deg"] + math.degrees(0.4)) / 90.0) % 4)
     assert len(quarter_turns) >= 3
+    monkeypatch.setattr(IS.IORSSmall, "model_long_axis", lambda self, role: th.tensor([math.cos(0.25), math.sin(0.25), 0.0]))
+    for seed in range(4):
+        p_pose = s.place_partner(np.random.default_rng(seed), t_pose, manip, None)
+        assert abs(s.support_yaw_delta("partner", p_pose[1], manip)) < 1e-4 and _off_edge_deg(s, "partner", p_pose[1], manip) == pytest.approx(14.32, abs=0.01)
     plain = sampler({})
     manip, t_pose = _attempt(plain, -0.24, 1.0)
     off = [_off_edge_deg(plain, "partner", plain.place_partner(np.random.default_rng(seed), t_pose, manip, None)[1], manip) for seed in range(16)]
@@ -435,6 +480,7 @@ def test_init_align_support_partner_draws_only_support_aligned_yaws():
 
 
 def test_init_align_support_meta_link_partner_takes_a_support_aligned_yaw(monkeypatch):
+    _no_long_axis(monkeypatch)
     s = _meta_sampler(monkeypatch, SPOTS, gen={"init_align_support": True})
     s.hull["partner"], s.rest["partner"] = _box(0.10, 0.08, 0.02), G.quat_from_yaw(0.4)
     manip, t_pose = _attempt(s, -0.16, -1.0)
@@ -446,6 +492,7 @@ def test_init_align_support_meta_link_partner_takes_a_support_aligned_yaw(monkey
 def test_init_align_support_touching_partner_without_edge_alignment(monkeypatch):
     """Touching aligns its partner with ``edge_aligned`` (default on); with that off the key still aligns it."""
     yaws = []
+    _no_long_axis(monkeypatch)
     monkeypatch.setattr(IS, "left_contact_band_cells", lambda *a, **k: None)
     monkeypatch.setattr(IS.IORSSmall, "draw_partner_pose", lambda self, rng, side, t_pose, manip, cam, yaw: (yaws.append(yaw), ((th.zeros(3), C.IDENTITY_QUAT.clone()), ""))[1])
     for gen, expected in (({"edge_aligned": False, "init_align_support": True}, True), ({"edge_aligned": False}, False)):
@@ -458,6 +505,7 @@ def test_init_align_support_touching_partner_without_edge_alignment(monkeypatch)
 
 def test_init_align_support_target_is_screened_at_the_support_aligned_yaws_without_jitter(monkeypatch):
     seen = []
+    _no_long_axis(monkeypatch)
     monkeypatch.setattr(TT, "phase3_target", lambda self, manip, rng, gs, *a, **k: seen.append(k) or ("pose", "grasp"))
     for gen in ({"init_align_support": True}, {}):
         s = _sampler("nextto", gen=gen, pair={"g_NT": 0.05})
