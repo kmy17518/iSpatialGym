@@ -164,6 +164,9 @@ CARRY_CLEARANCE_M = 0.03
 #: 4A: ``generation.carry_clears`` - the partner's top ("partner"), only the table ("table"), or the table unless the carried drive to
 #: the touching push stance takes the box over the partner ("auto"); default "auto" for touching, "partner" for the other relations
 CARRY_CLEARS = ("partner", "table", "auto")
+#: owner 2026-10-13 (touching#02): ``generation.widest_faces`` - the target's and the partner's widest upright faces parallel, their
+#: normals along the edge tangent or the stance's depth axis ("parallel"), along the tangent only ("tangent") or the depth only ("depth")
+WIDEST_FACES = ("parallel", "tangent", "depth")
 #: A1 start region (owner 2026-10-12): Phase-1c lateral draws of the template before it is rejected when no partner side the template
 #: may draw has a start cell (``generation.start_region_lateral_draws``)
 START_REGION_LATERAL_DRAWS = 4
@@ -434,6 +437,7 @@ class IORSSmall(SamplerV2):
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair
         self.template_facts["carry_clears"] = self.carry_rule()  # 4A: Reject("spec") before any phase
+        self.template_facts["widest_faces"] = self.widest_faces()  # Reject("spec") before any phase
         self.template_facts["partner_sides"] = [TT.side_name(sd) for sd in self.template_sides()]  # A1: Reject("partner_side") before any phase
         self.template_facts["partner_on_meta_link"] = self.meta_link()
         H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
@@ -573,17 +577,19 @@ class IORSSmall(SamplerV2):
     def phase3_two_tier(self, manip: Stance, rng: np.random.Generator, arms: Optional[Sequence[str]] = None):
         """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
         feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp. ``arms``: the arms
-        offered for the segment at this focus (the chosen one is the record's ``arm``)."""
+        offered for the segment at this focus (the chosen one is the record's ``arm``). :meth:`widest_faces`: F over
+        :meth:`widest_faces_target_yaws`, drawn without jitter."""
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
         nb_top = self.neighbor_start_top()  # start_region_on_neighbors: the target is drawn on the neighbours' cells
+        faces_kw = {"yaws": self.widest_faces_target_yaws(manip), "jitter": 0.0} if self.widest_faces() else {}
         last = None
         for i, gs in enumerate(tiers):
             try:
                 t_pose, grasp = TT.phase3_target(self, manip, rng, gs, self.hull["target"], self.rest["target"], self.support_objects(),
                                                  top=self.top if nb_top is None else nb_top, scale_key=self.choice.models["target"].scale, arms=arms,
-                                                 arm_bands=getattr(self, "arm_bands", None) or None)
+                                                 arm_bands=getattr(self, "arm_bands", None) or None, **faces_kw)
                 if i > 0:
                     log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.alias, grasp.grasp_name)
                 return t_pose, grasp
@@ -1290,6 +1296,8 @@ class IORSSmall(SamplerV2):
                 "partner_yaw_deg": round(math.degrees(G.yaw_of(p_pose[1])), 1),
                 "partner_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["partner"], p_pose[1], manip)), 2),
             }
+        if self.widest_faces():
+            d.summary["widest_faces"] = self.widest_faces_facts(t_pose, p_pose, manip)
         # §4.6 step 4: every object fully in frame (5 %) in the init image
         for role, pose in (("target", t_pose), ("partner", p_pose)):
             if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
@@ -1467,6 +1475,7 @@ class IORSSmall(SamplerV2):
         right_cells = self.bands.band(manip.translate, manip.tilt, **TT.band_kw(self.bands, manip)) if getattr(self, "bands", None) is not None else None
         left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=manip)
         self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
+        faces_yaws = self.widest_faces_partner_yaws(t_pose, manip) if self.widest_faces() else None  # the two turns parallel to the target
         errors = []
         p_pose = None
         # edge alignment (owner 2026-09-18 13:50): the partner's footprint axes along the support edge - the two aligned
@@ -1474,6 +1483,8 @@ class IORSSmall(SamplerV2):
         yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() else None
         for i in range(8):
             yaw = yaw0 + (i % 2) * (math.pi / 2) if yaw0 is not None else float(rng.uniform(-math.pi, math.pi))
+            if faces_yaws:
+                yaw = faces_yaws[i % len(faces_yaws)]
             pose, why = self.draw_partner_pose(rng, side, t_pose, manip, cam, yaw)
             if pose is None:
                 misses.append(f"yaw {math.degrees(yaw):+.0f}: {why}")
@@ -1531,6 +1542,75 @@ class IORSSmall(SamplerV2):
     def edge_aligned_quat(self, hull: th.Tensor, quat, manip: Stance) -> th.Tensor:
         """``quat`` turned about world z by :meth:`edge_yaw_delta`."""
         return G.qmul(G.quat_from_yaw(self.edge_yaw_delta(hull, quat, manip)), G.t(quat))
+
+    # ------------------------------------------------------------------ widest faces (owner 2026-10-13, touching#02)
+
+    def widest_faces(self) -> Optional[str]:
+        """Owner 2026-10-13 (touching#02: "aligned means their widest faces point the same way; now they are perpendicular"):
+        ``generation.widest_faces`` (default None = off), one of :data:`WIDEST_FACES` - the target's and the partner's widest upright
+        faces are parallel at init and at the goal. The target's init yaw is one of :meth:`widest_faces_target_yaws` (no jitter), so its
+        goal yaw (the edge-aligned yaw nearest the init yaw) is the init yaw; the partner takes the two edge-aligned turns parallel to
+        the target's drawn pose (:meth:`widest_faces_partner_yaws`). The faces come from the hulls at their rest orientations, whatever
+        each model's local frame. Touching with the edge alignment and no shelf layout only, else ``Reject("spec")``."""
+        mode = self.gen("widest_faces")
+        if mode is None:
+            return None
+        if mode not in WIDEST_FACES or self.relation != "touching" or not self.edge_aligned() or getattr(self, "shelf_start", None) is not None:
+            raise Reject("spec", f"{self.gp.alias}: generation.widest_faces {mode!r}: one of {WIDEST_FACES}, for touching with the edge alignment "
+                                 f"and no shelf layout")
+        return mode
+
+    def widest_face_normal_yaw(self, hull: th.Tensor, quat) -> float:
+        """World yaw (rad, modulo pi) of the normal of the hull's widest upright face at ``quat``: the short axis of its footprint's
+        minimum-area bounding rectangle (:meth:`footprint_axis_angle`)."""
+        theta = self.footprint_axis_angle(hull, quat)
+        pts = self.world.footprint(hull, (th.zeros(3), G.t(quat)))
+        u = pts[:, 0] * math.cos(theta) + pts[:, 1] * math.sin(theta)
+        v = -pts[:, 0] * math.sin(theta) + pts[:, 1] * math.cos(theta)
+        return (theta if float(u.max() - u.min()) <= float(v.max() - v.min()) else theta + math.pi / 2) % math.pi
+
+    def widest_face_axis(self, hull: th.Tensor, quat, manip: Stance) -> str:
+        """``"tangent"`` / ``"depth"``: the axis of ``manip``'s edge frame nearer the normal of the hull's widest upright face at ``quat``."""
+        d = (self.widest_face_normal_yaw(hull, quat) - math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))) % math.pi
+        return "tangent" if min(d, math.pi - d) < math.pi / 4 else "depth"
+
+    def edge_aligned_yaws(self, role: str, manip: Stance) -> List[float]:
+        """The four world yaws (applied to ``role``'s rest orientation) that put its footprint along the stance's edge frame."""
+        yaw0 = self.edge_yaw_delta(self.hull[role], self.rest[role], manip)
+        return [yaw0 + k * math.pi / 2 for k in range(4)]
+
+    def _yaws_with_axis(self, role: str, manip: Stance, axis: str) -> List[float]:
+        """``role``'s edge-aligned yaws whose widest face's normal lies along ``axis`` (all four for a square footprint, which has none)."""
+        yaws = self.edge_aligned_yaws(role, manip)
+        rest = G.t(self.rest[role])
+        match = [y for y in yaws if self.widest_face_axis(self.hull[role], G.qmul(G.quat_from_yaw(y), rest), manip) == axis]
+        return match or yaws
+
+    def widest_faces_target_yaws(self, manip: Stance) -> List[float]:
+        """The target's init yaws under :meth:`widest_faces`: its four edge-aligned yaws ("parallel"), or the two whose widest face's
+        normal lies along the edge tangent ("tangent") / the stance's depth axis ("depth")."""
+        mode = self.widest_faces()
+        return self.edge_aligned_yaws("target", manip) if mode == "parallel" else self._yaws_with_axis("target", manip, mode)
+
+    def widest_faces_partner_yaws(self, t_pose: G.Pose, manip: Stance) -> List[float]:
+        """The partner's two edge-aligned yaws (180 deg apart) whose widest face is parallel to the target's at ``t_pose``."""
+        return self._yaws_with_axis("partner", manip, self.widest_face_axis(self.hull["target"], t_pose[1], manip))
+
+    def widest_faces_facts(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> Dict[str, Any]:
+        """``summary["widest_faces"]``: the mode, each widest face's axis and the angle (deg) between the two normals at init and at the
+        goal orientation (:meth:`target_goal_quat`)."""
+        def normal(role, quat):
+            return self.widest_face_normal_yaw(self.hull[role], quat)
+
+        def between(a, b):
+            d = (a - b) % math.pi
+            return round(math.degrees(min(d, math.pi - d)), 2)
+
+        q_goal = self.target_goal_quat(t_pose, manip)
+        p_n = normal("partner", p_pose[1])
+        return {"mode": self.widest_faces(), "target_init_axis": self.widest_face_axis(self.hull["target"], t_pose[1], manip),
+                "target_goal_axis": self.widest_face_axis(self.hull["target"], q_goal, manip), "partner_axis": self.widest_face_axis(self.hull["partner"], p_pose[1], manip),
+                "init_deg": between(normal("target", t_pose[1]), p_n), "goal_deg": between(normal("target", q_goal), p_n)}
 
     def target_goal_quat(self, t_pose: G.Pose, manip: Stance) -> th.Tensor:
         if self.shelf_start is not None:  # touching#03: the book ends resting against the partner, leaning like it

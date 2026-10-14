@@ -2932,9 +2932,12 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     The record carries the chosen arm; ``manip`` is switched to that arm's working arm and idle posture in place.
 
     ``fixed = (xy, yaw)``: the object's pose is given (a part of a fixed layout: the embedded-figure target): F is screened at that
-    pose only and drawn there without jitter or offset; it is not stored in the band (its cell and single yaw are not the band's)."""
+    pose only and drawn there without jitter or offset; it is not stored in the band (its cell and single yaw are not the band's).
+    ``yaws`` other than the band's 8 (:data:`YAWS`): F over those is not stored either - the band indexes F by the 8 yaws, and an
+    empty F over a subset would remove a cell other yaws reach."""
     IK = _ik()
     top = _top(s, top)
+    band_yaws = len(yaws) == len(YAWS) and all(abs(C.wrap_angle(float(a) - float(b))) < 1e-6 for a, b in zip(yaws, YAWS))
     z = float(support_z) if support_z is not None else float(top.z)
     focus = manip.focus
     if focus is None:
@@ -2969,7 +2972,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     F_of: Dict[str, List[Tuple[float, Any]]] = {}
     for a in offered:
         F_of[a] = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of).get(0, [])
-        if fixed is None:
+        if fixed is None and band_yaws:
             store_feasible_set(band_of.get(a), st_of[a], F_of[a], yaws)
         if (band_of.get(a) is not None) and band_of[a].meta.get("mirrored_from"):
             _count(s, "arm_band_mirrored.foci")

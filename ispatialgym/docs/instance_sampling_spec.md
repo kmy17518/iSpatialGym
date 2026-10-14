@@ -905,7 +905,9 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    object pose — grasp = object pose ∘ T_obj→eef, pre-grasp 10 cm back along the approach — and confirm both with the
    exact IK from the manipulation stance (idle arm untucked and locked; support ignored for the grasp pose only). On
    failure draw the next element of F without replacement; reject the attempt when F is exhausted. Record
-   `(yaw, grasp_key, grasp_name)` and both eef poses.
+   `(yaw, grasp_key, grasp_name)` and both eef poses. A task that restricts the init yaws (touching's
+   `widest_faces`, §6.11) screens its own yaws, draws without jitter and keeps that F out of the band cache (the band
+   indexes F by the 8 yaws; an empty F over a subset would remove a cell the other yaws reach).
    - *Disembedding*: source tray at the focus, aligned with the edge; target inside it (yaw as above, footprint on
      the tray floor, 0.5 cm margin). Destination tray on the template's destination side (4.4, A2a), aligned with the edge and the
      source tray (same depth), at the lateral position where exactly 4 cm of it is inside the **init** image (border
@@ -963,7 +965,8 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    - **Attempt.** The target starts on a cell of the side's region (within 5 cm of its focus, step 1); the partner gets
      a gap drawn uniformly from that cell's interval re‑evaluated at the drawn target pose, the segment's arm and the
      partner yaw (5 mm grid; 16 random yaws, then the two edge‑aligned footprints the region was computed with; touching
-     the two edge‑aligned footprints in turn, 8 tries), then the checks above. This
+     the two edge‑aligned footprints in turn, 8 tries — with `widest_faces` the two turns parallel to the target, §6.11),
+     then the checks above. This
      replaces the 40 blind tries of a random gap; the shelf layout (touching, §6.11) keeps its partner leaning against
      the opposite board. Recorded: `template_facts.start_region` (edge, L, L_min, lateral, cells and candidates per
      side, gap range, failed lateral draws) and the instance's `partner_draw` (side, gap, intervals).
@@ -2154,6 +2157,22 @@ multi‑bay compartment, which the ray starts in) is no board: `shelf_wall`. Bet
 `generation.shelf_free_span_min_m` (0.15 m) must stay free (`shelf_width`). The arm on the target's side grasps, places it
 beside the partner and pushes it toward the partner; nothing braces the partner. Goal: the target leans against the
 partner, its start lean mirrored.
+
+**Touching, edge alignment and widest faces.** With `generation.edge_aligned` (touching's default, owner 2026‑09‑18) the
+partner stands with its footprint's axes along the support edge (the two turns, long side along / across the edge,
+alternate over the 8 partner tries) and the target's place / goal yaw is the edge‑aligned yaw nearest its init yaw (an
+in‑hand turn ≤ 45°). The two turns are chosen independently, so two boxes can meet with perpendicular wide faces
+(touching#02 c8_k0: the target's widest face along the edge, the partner's facing the robot). `generation.widest_faces`
+(owner 2026‑10‑13, touching#02: "aligned means their widest faces point the same way"; default unset = off; set on the 12
+touching#02 aliases) keeps the target's and the partner's widest upright faces parallel at init and at the goal. A widest
+face's normal is the short axis of the footprint's minimum‑area rectangle at the rest orientation, so the rule does not
+depend on the models' local frames. The target's init yaws are its edge‑aligned yaws, screened and drawn without jitter
+(§4.6 step 1): all four for `parallel` (the two normals along the edge tangent or both along the stance's depth axis,
+whichever the draw gives), the two whose normal lies along the tangent for `tangent` (the boxes meet wide face to wide
+face) or along the depth axis for `depth` (the wide faces face the robot). Its goal yaw is then its init yaw. The partner
+tries the two edge‑aligned turns (180° apart) whose widest face is parallel to the drawn target's. Touching with the edge
+alignment and without the shelf layout only (`Reject("spec")` otherwise). `summary.widest_faces` records each face's axis
+and the angle between the two normals at init and at the goal.
 
 **Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
 

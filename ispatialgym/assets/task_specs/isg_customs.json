@@ -37454,7 +37454,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": []
  },
@@ -37598,7 +37599,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": []
  },
@@ -37742,7 +37744,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": []
  },
@@ -37886,7 +37889,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": []
  },
@@ -38030,7 +38034,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": []
  },
@@ -38181,7 +38186,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bar_udatjt_0 (row inter_object_relation_satisfaction-touching#02~B3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T3 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -38333,7 +38339,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bookcase_jpdtvg_0 (row inter_object_relation_satisfaction-touching#02~B5); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T5 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -38485,7 +38492,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on breakfast_table_rhjoby_0 (row inter_object_relation_satisfaction-touching#02~B2, = C2); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T2 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -38637,7 +38645,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on commercial_kitchen_table_vxvtec_0 (row inter_object_relation_satisfaction-touching#02~B4, = C4); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T4 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -38788,7 +38797,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 C: touching#02 variant C - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on conference_table_fpkmyw_0 (row inter_object_relation_satisfaction-touching#02~C5); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T7 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -38940,7 +38950,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on countertop_kelzer_0 (row inter_object_relation_satisfaction-touching#02~B1, = C1); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T1 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -39091,7 +39102,8 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "widest_faces": "parallel"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 C: touching#02 variant C - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on desk_mdhelw_1 (row inter_object_relation_satisfaction-touching#02~C3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T6 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
