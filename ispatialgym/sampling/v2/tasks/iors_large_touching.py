@@ -31,9 +31,11 @@ hands, a straight floor push of the closed gripper from stance C, exact IK on th
   touched.
 * **Goal check**: the target nudged 1 mm at a time along ``d`` until ``touching(target, partner)`` holds (the small-scale
   touching rule, ``generation.nudge_m`` / ``max_nudges``); the TRO goal is the touching pose.
-* **Init yaw** (``generation.init_align_partner``, default true; user 2026-10-13 ~17:57): the target starts parallel to the
-  partner's axes - the screened yaws are :func:`partner_aligned_yaws` and the draw adds no jitter. The carried target keeps its yaw
-  relative to the robot, so the goal yaw is the init yaw turned by the B -> C base yaw.
+* **Goal yaw** (``generation.goal_align_partner``, default true; user 2026-10-13 ~18:50): the target ends parallel to the partner's
+  axes. The carried target keeps its yaw relative to the robot (goal yaw = init yaw + the B -> C base yaw), so per C candidate a pair
+  of F is drawn only when its goal yaw lies within half a screening step of the partner's axes, at the init yaw that puts the goal yaw
+  on them (:func:`end_aligned_yaw`, no jitter). ``generation.init_align_partner`` (default false) aligns the init yaw instead
+  (:func:`partner_aligned_yaws`).
 """
 
 from __future__ import annotations
@@ -116,6 +118,16 @@ def partner_aligned_yaws(partner_yaw: float, rest_yaw: float = 0.0) -> List[floa
     p = (float(partner_yaw) - float(rest_yaw) + 0.5 * q) % q - 0.5 * q
     p = min(max(p, -0.5 * q + ALIGN_TIE_MARGIN_RAD), 0.5 * q - ALIGN_TIE_MARGIN_RAD)
     return [p + k * q for k in range(4)]
+
+
+def end_aligned_yaw(yaw0: float, d_yaw: float, axes_yaw: float, max_snap: float) -> Optional[float]:
+    """The init yaw nearest ``yaw0`` whose goal yaw ``+ d_yaw`` lies on the partner's axes (``axes_yaw`` + k x 90 deg); None when it is
+    more than ``max_snap`` from ``yaw0``."""
+    q = 0.5 * math.pi
+    off = (float(yaw0) + float(d_yaw) - float(axes_yaw) + 0.5 * q) % q - 0.5 * q
+    if abs(off) > float(max_snap) + 1e-9:
+        return None
+    return float(yaw0) - off
 
 
 def extent_along(points_xy: th.Tensor, d) -> Tuple[float, float]:
@@ -252,18 +264,33 @@ class TouchingMode:
     # ------------------------------------------------------------------ init yaw
 
     def init_align_partner(self) -> bool:
-        """``generation.init_align_partner`` (default true): the target's init yaws are the partner's axes (:meth:`yaws`)."""
-        return bool(self.gp.gen("init_align_partner", True))
+        """``generation.init_align_partner`` (default false): the target's init yaws are the partner's axes (:meth:`yaws`)."""
+        return bool(self.gp.gen("init_align_partner", False))
+
+    def goal_align_partner(self) -> bool:
+        """``generation.goal_align_partner`` (default true): the target's goal yaw is on the partner's axes (:meth:`end_aligned_init_yaw`)."""
+        return bool(self.gp.gen("goal_align_partner", True))
+
+    def partner_axes_yaw(self) -> float:
+        """The init / goal yaw that turns the target at its rest orientation parallel to the partner's axes (mod 90 deg)."""
+        return G.yaw_of(self.partner.get_position_orientation()[1]) - G.yaw_of(self.rest)
 
     def yaws(self) -> List[float]:
-        """:func:`partner_aligned_yaws` of the partner's yaw and the target's rest yaw; IORSLarge's grid without the alignment."""
+        """:func:`partner_aligned_yaws` with ``init_align_partner``; IORSLarge's grid otherwise."""
         if not self.init_align_partner():
             return super().yaws()
-        return partner_aligned_yaws(G.yaw_of(self.partner.get_position_orientation()[1]), G.yaw_of(self.rest))
+        return partner_aligned_yaws(self.partner_axes_yaw())
 
     def init_yaw_jitter(self) -> float:
         """No jitter around an aligned yaw."""
-        return 0.0 if self.init_align_partner() else super().init_yaw_jitter()
+        return 0.0 if self.init_align_partner() or self.goal_align_partner() else super().init_yaw_jitter()
+
+    def end_aligned_init_yaw(self, yaw0: float, d_yaw: float):
+        """With ``goal_align_partner``: :func:`end_aligned_yaw` within half a screening step of ``yaw0`` (False when none lies there)."""
+        if not self.goal_align_partner():
+            return super().end_aligned_init_yaw(yaw0, d_yaw)
+        y = end_aligned_yaw(yaw0, d_yaw, self.partner_axes_yaw(), math.pi / max(1, len(self.yaws())))
+        return False if y is None else y
 
     # ------------------------------------------------------------------ partner geometry for C
 

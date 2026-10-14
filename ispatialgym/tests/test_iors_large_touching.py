@@ -355,13 +355,30 @@ def test_partner_aligned_yaws():
 
 def test_touching_init_yaws_follow_the_partner():
     bookcase = SimpleNamespace(get_position_orientation=lambda: (th.zeros(3), G.quat_from_yaw(-math.pi / 2)))
-    s = _mode()
+    s = _mode(init_align_partner=True)
     s.obj = lambda role: bookcase
     assert [round(math.degrees(y), 4) for y in s.yaws()] == [0.0, 90.0, 180.0, 270.0] and s.init_yaw_jitter() == 0.0
     s.rest = G.quat_from_yaw(0.25)  # a rest turned 0.25 rad: the init yaws turn back by it
     assert all(abs(_off_axes(y + 0.25 + math.pi / 2)) < 1e-6 for y in s.yaws())
-    s = _mode(init_align_partner=False)
-    assert len(s.yaws()) == 16 and s.init_yaw_jitter() == IL.TARGET_JITTER
+    s = _mode(goal_align_partner=False)
+    s.obj = lambda role: bookcase
+    assert len(s.yaws()) == 16 and s.init_yaw_jitter() == IL.TARGET_JITTER and s.end_aligned_init_yaw(1.0, 0.3) is None
     b = _bare("ontop")
     b.gp = _GP()
-    assert len(b.yaws()) == 16 and b.init_yaw_jitter() == IL.TARGET_JITTER  # the other relations keep the grid and the jitter
+    assert len(b.yaws()) == 16 and b.init_yaw_jitter() == IL.TARGET_JITTER and b.end_aligned_init_yaw(1.0, 0.3) is None  # other relations
+
+
+def test_touching_goal_yaw_on_the_partner_axes():
+    """``goal_align_partner`` (default; user 2026-10-13 ~18:50 "end alignment"): the init yaw that puts the carried goal yaw (init + the
+    B -> C base turn) on the partner's axes, within half a screening step of the screened yaw, else the pair is not drawn."""
+    deg = math.radians
+    # c2_k0: init 67.5 deg, a B -> C turn of -28.8 deg, the bookcase at -90 deg - the goal 38.7 deg off its axes, no aligned yaw within 11.25
+    assert TM.end_aligned_yaw(deg(67.5), deg(-28.8), deg(-90.0), deg(11.25)) is None
+    y = TM.end_aligned_yaw(deg(112.5), deg(-28.8), deg(-90.0), deg(11.25))  # the goal at 83.7 deg: the init yaw turns on by 6.3 deg
+    assert y == pytest.approx(deg(118.8)) and abs(_off_axes(y + deg(-28.8) + deg(90.0))) < 1e-9
+    bookcase = SimpleNamespace(get_position_orientation=lambda: (th.zeros(3), G.quat_from_yaw(-math.pi / 2)))
+    s = _mode()
+    s.obj = lambda role: bookcase
+    assert s.goal_align_partner() and not s.init_align_partner() and len(s.yaws()) == 16 and s.init_yaw_jitter() == 0.0
+    assert s.end_aligned_init_yaw(deg(67.5), deg(-28.8)) is False
+    assert s.end_aligned_init_yaw(deg(112.5), deg(-28.8)) == pytest.approx(deg(118.8))

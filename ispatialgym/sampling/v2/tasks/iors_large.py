@@ -2823,6 +2823,11 @@ class IORSLarge(SamplerV2):
         """The init yaw's draw around the screened yaw (± this, rad; the B exact IK's retries too): :data:`TARGET_JITTER`."""
         return TARGET_JITTER
 
+    def end_aligned_init_yaw(self, yaw0: float, d_yaw: float):
+        """The init yaw near the screened ``yaw0`` whose carried goal yaw (``+ d_yaw``) a mode aligns (the touching mode's
+        ``goal_align_partner``); None here (the drawn yaw as screened), False for a pair the alignment cannot use."""
+        return None
+
     # ------------------------------------------------------------------ legs A -> B and B -> C (owner 2026‑09‑19 21:56)
 
     def _drop_leg_records(self, to: str) -> None:
@@ -4129,21 +4134,26 @@ class IORSLarge(SamplerV2):
             for i in draw_order[:int(self.num("f_draws_max", 8))]:  # failed B pairs are cached and skipped, so 8 draws cost little
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
+                y_end = self.end_aligned_init_yaw(yaw0, d_yaw)
+                if y_end is False:
+                    fails["C: no aligned goal yaw near the pair's"] = fails.get("C: no aligned goal yaw near the pair's", 0) + 1
+                    continue
+                y_init = yaw0 if y_end is None else float(y_end)
                 jit = self.init_yaw_jitter()
-                yaw = yaw0 + float(rng.uniform(-jit, jit))
+                yaw = y_init + float(rng.uniform(-jit, jit))
                 if push:
                     # the push chain depends on the object's yaw (its half extent along the push), not on the grasp: solve it once per
                     # (C, yaw bucket) BEFORE the grasp IKs and skip the draw when this stance cannot push at that yaw
-                    ck = (int(kc), int(round(yaw0 / yaw_step)))
+                    ck = (int(kc), int(round(yaw0 / yaw_step))) if y_end is None else (int(kc), "aligned", round(y_init, 4))
                     if ck not in chain_cache:
-                        q_chain = G.qmul(G.quat_from_yaw(yaw0 + d_yaw), self.rest)
+                        q_chain = G.qmul(G.quat_from_yaw(y_init + d_yaw), self.rest)
                         chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, q_chain, cd, gc, place.extras["push_dir"])
                     if chain_cache[ck] is None:
                         fails["C: push chain unreachable at this yaw"] = fails.get("C: push chain unreachable at this yaw", 0) + 1
                         continue
                 # the grasp side (target pose at B's focus, pre-grasp + grasp exact IK from B) does not depend on C: solved once per
                 # (yaw bucket, grasp) for this B and reused across the C candidates (a failed pair is skipped everywhere)
-                bk = (int(round(yaw0 / yaw_step)), getattr(g, "name", str(g)))
+                bk = (int(round(yaw0 / yaw_step)) if y_end is None else round(y_init, 4), getattr(g, "name", str(g)))
                 if bk not in b_ik_cache:
                     # the exact IK at B is tried at the screened pose first (the focus cell, the grid yaw: what F_init passed) and then
                     # at up to two jittered poses; a pair is cached as infeasible only when all fail, with the reasons logged
@@ -4158,7 +4168,7 @@ class IORSLarge(SamplerV2):
                     ov_opts = self.pick_overhang_opts()
                     overhang = None
                     for k_try in range(int(self.num("b_ik_tries", 3)) if ov_opts is None or ov_opts["mode"] != "only" else 0):
-                        yaw_k = yaw0 if k_try == 0 else yaw0 + float(rng.uniform(-jit, jit))
+                        yaw_k = y_init if k_try == 0 else y_init + float(rng.uniform(-jit, jit))
                         t_pose = None
                         for _ in range(5):
                             if self.surface["kind"] == "floor" or k_try == 0:
