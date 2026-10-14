@@ -11,12 +11,13 @@ lines should be separate parts)"; 18:46: the figure uses the same trays as every
 Design (``figure_geometry.py`` holds every number and the part geometry):
 
 * the 300 px drawing becomes a 20 cm square (line centres; the border bars' outer faces span 21.2 cm); every drawn line is
-  a black bar 12 mm wide and 20 mm tall, the same for every line and every part, and the cells are empty;
+  a bar 12 mm wide and 20 mm tall, the same for every line and every part, and the cells are empty;
 * four parts: the target (the triangle's three sides only), the context frame (the border and every other bar outside
   the triangle, one rigid piece), and the two pieces of lines A and B inside the triangle (loose). Where a line meets or
   continues past the target it stops 0.3 mm short of the target's bars, so the target lifts straight up without touching
   anything; the empty cells beside its bars leave room for the fingers;
-* the pieces are wood of the ARAT block's density (421 kg/m^3) painted black; the figure has no tray of its own: it lies
+* the pieces are wood of the ARAT block's density (421 kg/m^3) painted gray, every part the same (black until the owner's
+  2026-10-13 "Make the whole puzzle gray"); the figure has no tray of its own: it lies
   on the standard disembedding source tray like every other disembedding pick.
 
 Every part's collision is its convex pieces (one OBJ each: prisms of the clipped bar polygons); its visual is their
@@ -51,7 +52,7 @@ import figure_geometry as G  # noqa: E402
 
 OUT = HERE / "model"
 PIECE_CATEGORY = "jigsaw_puzzle_piece"
-INK = (0.02, 0.02, 0.02, 1.0)
+INK = (0.2159, 0.2159, 0.2159, 1.0)  # linear base colour: sRGB 0.5 gray (MTL Kd -> OmniPBR diffuse_color_constant)
 ROLES = {
     G.TARGET: ("target", "the target triangle of 011.png: its three sides only (G / C / E), no inner lines"),
     G.FRAME: ("context_frame", "the square's border and every bar outside the target triangle, one rigid piece"),
@@ -256,7 +257,7 @@ def build_part(model: str, pieces, ink):
         "mass_kg": r6(mass),
         "volume_m3": float(f"{vol:.6g}"),
         "density_kg_m3": G.DENSITY,
-        "finish": "matte black paint",
+        "finish": "matte gray paint",
         "pieces": {name: [[r6(x - centre[0]), r6(y - centre[1])] for x, y in poly] for name, poly in pieces},
         "origin_in_figure_m": [r6(centre[0]), r6(centre[1]), 0.0],
         "com_m": [r6(v) for v in com],

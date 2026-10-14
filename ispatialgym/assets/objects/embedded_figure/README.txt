@@ -1,7 +1,7 @@
 Embedded figure, EFT item 11 (iSpatialGym disembedding) - 12 mm bars, built 2026-10-11
 
 WHAT IT IS
-  The context figure of 011a.png made only of its lines: black bars 12 mm wide and 20 mm tall, centred on the lines of
+  The context figure of 011a.png made only of its lines: gray bars 12 mm wide and 20 mm tall, centred on the lines of
   a 20 cm square (outer size 212 x 212 mm). The target (the triangle of 011.png) is its own part and lifts straight out.
   It has no tray of its own: lay it on the standard disembedding source tray (tray/uekqey, spawned at 1.25 scale);
   the target goes to the standard destination tray.
@@ -47,6 +47,12 @@ GRASP HINT
 CHECKS (2026-10-11)
   Geometry: every gap between the target and the context parts is 0.3 mm; the frame is one connected piece.
   Meshes: visual meshes closed, collision pieces convex; URDF mass / centre of mass / inertia from the closed mesh
-  (wood 421 kg/m^3, painted black).
+  (wood 421 kg/m^3, painted gray).
   OmniGibson on tray/uekqey x1.25: the parts settle (0.5 mm release, <= 0.18 deg tilt); lifting the target 6 cm moves
   the other parts <= 0.01 mm.
+
+COLOUR (2026-10-13)
+  Every part is the same gray (owner: "Make the whole puzzle gray"; black before): material bar_ink, linear 0.2159
+  (sRGB 0.5) - OmniPBR diffuse_color_constant in the four USDs (was 0.02, set in place: geometry, collision and physics
+  unchanged), Kd in the MTLs, INK in build_embedded_figure_blender.py. embedded_figure.blend and previews/ still show
+  the black build.
