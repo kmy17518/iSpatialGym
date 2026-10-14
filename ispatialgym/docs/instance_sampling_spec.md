@@ -1823,6 +1823,14 @@ must stay connected). The obstacle is not a look-alike of any object the init vi
 - Feasibility: the goal arm configuration is solved with the **right-arm embodiment only** (the oracle moves the arm,
   not the torso); the motion between init and goal (straight line along the camera ray / SLERP about the object) is
   checked at 3 intermediate waypoints (3.9); whole-body collision-free with the object attached at every checked pose.
+  Mental rotation with `generation.orbit_limit_margin_rad` set (owner 2026-10-13, mental_rotation-walker: "the robot
+  seems to stutter"; set for that alias only, 0.02 rad): the start configuration must keep that much room to every arm
+  joint limit, and the orbit is also tracked densely from it as the oracle's `arm_along` tracks it (1 cm / 0.05 rad
+  steps, differential IK with the oracle's soft tolerances, once more at half spacing on a joint jump); a goal whose
+  tracked configurations come closer than the margin to an arm joint limit, or whose tracking fails, is not drawn.
+  The walker's removed instance started 22 mrad from right_arm_joint6's lower limit; the oracle's differential IK froze
+  the joint 8 mrad from the limit for 36 of the orbit's 50 steps and turned joints 3 and 7 by ~1 rad each instead,
+  then released it with a jolt.
 - Kept from v1 §5.2: the options (the depth windows, or the mental-rotation start set) are precomputed **once per
   template** — they depend on the hold and the object, not on the base pose — and each instance draws from the
   precomputed feasible set; an assisted-grasp attach that fails at the hold for a library row is a rejection of that

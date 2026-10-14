@@ -867,15 +867,15 @@ def demo_gating_for(mode: str, demo_gating: str) -> Tuple[str, ...]:
     gate, ExecutorConfig.demo_revolution_axes), the operated articulated roots (owner 2026-09-27: the body of an object whose
     lid / flap / door the robot works stays put), the torso a load bent visibly off its command (owner 2026-10-09: "if
     unpreventable discard"), a target / partner at least half hidden in the goal image (ispatialgym.eval.goal_occlusion,
-    ISPATIALGYM_GOAL_OCCLUSION=off drops it) for the oracle; the release by the gripper command for the oracle and for replays
-    of its demos; nothing for an evaluated policy."""
+    ISPATIALGYM_GOAL_OCCLUSION=off drops it) for the oracle; the release by the gripper command and the arm stutter (owner
+    2026-10-13: "make the QA check catch it") for the oracle and for replays of its demos; nothing for an evaluated policy."""
     if demo_gating != "auto":
         return () if demo_gating == "none" else (demo_gating,)
     gating: Tuple[str, ...] = ("placed_orientation", "root_moved", "robot_wobble") if mode == "oracle" else ()
     if mode == "oracle" and goal_occlusion.enabled():
         gating += ("goal_occlusion",)
     if mode in ("oracle", "replay"):
-        gating += ("release_commanded",)
+        gating += ("release_commanded", "arm_stutter")
     return gating
 
 
@@ -910,15 +910,16 @@ def parse_args(argv=None):
                         "pushes have no intended contacts); off = only the timeout ends the episode (the collision monitor keeps its "
                         "contact statistics)")
     p.add_argument("--demo-gating", default="auto",
-                   choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "robot_wobble", "release_commanded", "none"],
+                   choices=["auto", "placed_tilt", "placed_orientation", "root_moved", "goal_occlusion", "robot_wobble", "release_commanded", "arm_stutter", "none"],
                    help="demo-collection gate after the epilogue: placed_orientation = every placed object within its recorded orientation tolerance (full error; "
                         "an object with a continuous symmetry about its long axis per the ICL survey - marker, pencil, bottles - modulo rotation about that axis); "
                         "root_moved = the root of a free-standing articulated object whose joint the program works stays within 5 mm / 0.02 rad at the end and "
                         "10 mm / 0.04 rad of tilt throughout; goal_occlusion = no target / partner >= 50%% hidden in the settled goal image; robot_wobble = no "
                         "load the hands bear bends the torso more than 1 deg off its command; release_commanded = every assisted-grasp release comes from a "
-                        "gripper command of +1 (meta.release_check records the releases in every case) (auto = the five on for --mode oracle, "
-                        "release_commanded alone for --mode replay, none for --mode policy); placed_tilt = the retracted principal-axis tilt variant "
-                        "(unused by default); none")
+                        "gripper command of +1 (meta.release_check records the releases in every case); arm_stutter = no arm's commanded joint motion "
+                        "jolts (velocity change >= 0.6 rad/s per step while moving) 3 times within 6 steps of one action (meta.arm_stutter in every "
+                        "case) (auto = the six on for --mode oracle, release_commanded + arm_stutter for --mode replay, none for --mode policy); "
+                        "placed_tilt = the retracted principal-axis tilt variant (unused by default); none")
     p.add_argument("--carry-leg", default="straight", choices=["straight", "trajopt"],
                    help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
     p.add_argument("--max-steps", type=int, default=6000, help="episode step budget (30 Hz control steps)")

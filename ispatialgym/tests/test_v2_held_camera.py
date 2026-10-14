@@ -1000,6 +1000,53 @@ def test_one_template_and_attempt_seed_draw_one_start_and_goal(monkeypatch):
     assert draw(12, 5)[1]["start"] != goal["start"]
 
 
+def test_orbit_limit_margin_skips_starts_and_goals_whose_orbit_runs_into_a_joint_limit(monkeypatch):
+    """Owner 2026-10-13 (mental_rotation-walker: "the robot seems to stutter"): with ``generation.orbit_limit_margin_rad`` a start
+    within the margin of an arm joint limit is skipped and every confirmed goal's orbit is tracked from the start as the oracle's
+    arm_along tracks it (``IKChecker.track_chain`` with the oracle's acceptance, ``refine_jumps``, the margin); a goal whose
+    tracking fails is not drawn. Without the key nothing is tracked (every other alias)."""
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    s = _mr_sampler(monkeypatch, _MRKit())
+    s.precompute_options()
+    s.ikc.track_chain = lambda *a, **k: pytest.fail("orbit tracked without generation.orbit_limit_margin_rad")
+    s.ikc.joint_limit_margin = lambda *a, **k: pytest.fail("start margin read without generation.orbit_limit_margin_rad")
+    assert "orbit_tracked" not in s.sample_instance(np.random.default_rng(0)).summary["goal"]
+
+    def with_margin():
+        s = _mr_sampler(monkeypatch, _MRKit())
+        gen = s.gen
+        s.gen = lambda key, default=None: 0.02 if key == "orbit_limit_margin_rad" else gen(key, default)
+        for k in ("ORACLE_SOFT_POS_TOL", "ORACLE_SOFT_ROT_TOL", "ORACLE_DIFF_IK_MAX_ITERS"):
+            setattr(s.ikc, k, getattr(IKChecker, k))
+        s.precompute_options()
+        return s
+
+    s = with_margin()
+    starts, tracks = [], []
+    s.ikc.joint_limit_margin = lambda q, arm: (starts.append(q) or (0.012 if len(starts) == 1 else 0.3), "right_arm_joint6")
+
+    def track(q, poses, arm, **kw):
+        tracks.append((q, len(poses), kw))
+        return (None, "joint_limit: chain tracking (24 dense poses): right_arm_joint6 8.2 mrad from its limit at dense pose 2 (< 20 mrad)") if len(tracks) == 1 else (q.clone(), "ok")
+
+    s.ikc.track_chain = track
+    d = s.sample_instance(np.random.default_rng(0))
+    assert len(starts) == 2  # the first start (12 mrad from the limit) skipped, the next one used
+    assert len(tracks) == 2 and all(n == 4 + 1 for _, n, _ in tracks)  # [start eef] + 3 intermediate + the goal
+    assert th.equal(tracks[-1][0], d.robot_q) and th.equal(starts[-1], d.robot_q)
+    assert tracks[0][2] == {"soft_pos_tol": IKChecker.ORACLE_SOFT_POS_TOL, "soft_rot_tol": IKChecker.ORACLE_SOFT_ROT_TOL,
+                            "max_iters": IKChecker.ORACLE_DIFF_IK_MAX_ITERS, "refine_jumps": True, "min_limit_margin": 0.02}
+    assert d.summary["goal"]["orbit_tracked"] == {"limit_margin_rad": 0.02}
+    s = with_margin()
+    s.ikc.joint_limit_margin = lambda q, arm: (0.3, "right_arm_joint2")
+    s.ikc.track_chain = lambda q, poses, arm, **kw: (None, "joint_limit: chain tracking (24 dense poses): right_arm_joint6 8.2 mrad from its limit")
+    with pytest.raises(Reject) as e:
+        s.sample_instance(np.random.default_rng(0))
+    assert e.value.reason == "goal_infeasible" and "joint_limit" in str(e.value)
+
+
 def test_mental_rotation_without_a_reachable_goal_rejects_the_attempt(monkeypatch):
     from ispatialgym.sampling.sim_utils import Reject
 

@@ -1,4 +1,4 @@
-"""The release check as a demo gate (``release_commanded``): the gate per ``--mode`` under ``--demo-gating auto``, the
+"""The release check as a demo gate (``release_commanded``): the gates per ``--mode`` under ``--demo-gating auto``, the
 verdict only with the gate on, ``release_check`` recorded as a fact in every mode - by the single-env executor and, with
 the same rule, per slot by ``VecStreamExecutor``."""
 
@@ -22,8 +22,8 @@ def test_demo_gating_per_mode(monkeypatch, occlusion):
     from ispatialgym.oracle import run_isg as R
 
     monkeypatch.setattr(R.goal_occlusion, "enabled", lambda: occlusion)
-    assert R.demo_gating_for("oracle", "auto") == ORACLE_GATES + (("goal_occlusion",) if occlusion else ()) + ("release_commanded",)
-    assert R.demo_gating_for("replay", "auto") == ("release_commanded",)
+    assert R.demo_gating_for("oracle", "auto") == ORACLE_GATES + (("goal_occlusion",) if occlusion else ()) + ("release_commanded", "arm_stutter")
+    assert R.demo_gating_for("replay", "auto") == ("release_commanded", "arm_stutter")
     assert R.demo_gating_for("policy", "auto") == ()
     for mode in ("oracle", "replay", "policy"):
         assert R.demo_gating_for(mode, "none") == ()

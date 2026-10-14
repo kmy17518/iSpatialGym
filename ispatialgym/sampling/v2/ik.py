@@ -1121,7 +1121,8 @@ class IKChecker:
                     soft_stall_m: Optional[float] = None, clear_links: Sequence[str] = (), clear_margin: float = 0.0,
                     finish_max_excursion: Optional[float] = None, soft_pos_tol: Optional[float] = None, soft_rot_tol: Optional[float] = None,
                     max_iters: int = 60, limit_margin: float = 0.0, ignore_start: Sequence[Any] = (), ground_at_start: bool = True,
-                    ground_along: bool = True, ground_meshes_along: bool = True) -> Tuple[Optional[th.Tensor], str]:
+                    ground_along: bool = True, ground_meshes_along: bool = True, refine_jumps: bool = False,
+                    min_limit_margin: Optional[float] = None) -> Tuple[Optional[th.Tensor], str]:
         """Differential-IK tracking of a whole eef chain (a reorient: yaw-align orbit, in-hand flip) from ``q_from`` (which
         reaches ``waypoints[0]``) exactly as the oracle's ``arm_along`` tracks it - every segment densified by position
         (``TRACK_STEP_M``) AND rotation (``TRACK_STEP_RAD``), no joint step above ``APPROACH_MAX_STEP`` - the configurations
@@ -1134,7 +1135,13 @@ class IKChecker:
         no joint jump, residual below this - by ``arm_to`` to the leg's end pose (``ApproachFinish``); with it set, such a stall
         is finished here by the exact IK of the end pose seeded from the last tracked configuration and the chain passes
         (``"ok (stall .. mm finished)"``). A joint jump or a collision fails the chain either way; a reorient (no finish in the
-        oracle) is checked without it."""
+        oracle) is checked without it.
+
+        ``refine_jumps``: a chain failing on a joint jump is tracked once more at half the dense spacing, as ``arm_along`` does
+        (``Motions.arm_along(refine_jumps=True)``). ``min_limit_margin`` (rad): every tracked configuration after the start must
+        keep this much room to every arm joint limit (``joint_limit:`` otherwise) - the oracle's differential IK freezes a joint
+        that would cross its limit and swings the others in its place (mental_rotation-walker 2026-10-13: right_arm_joint6 held
+        8 mrad from its lower limit for 36 of the orbit's 50 steps, joints 3 / 7 turning 1 rad each, the robot stuttered)."""
         from ispatialgym.oracle import r1pro_model as M
 
         wps = [(G.t(w[0]), G.t(w[1])) for w in waypoints]
@@ -1154,9 +1161,22 @@ class IKChecker:
             extra_kw["soft_rot_tol"] = float(soft_rot_tol)
         if limit_margin > 0.0:
             extra_kw["limit_margin"] = float(limit_margin)
-        with self.ignoring(list(ignore)):
-            res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in dense], q_start=G.t(q_from),
-                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=int(max_iters), **extra_kw)
+
+        def solve(poses):
+            with self.ignoring(list(ignore)):
+                return self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in poses], q_start=G.t(q_from),
+                                                      check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=int(max_iters), **extra_kw)
+
+        res = solve(dense)
+        if refine_jumps and not res.success and str(res.status).startswith("joint jump"):
+            finer: List[Pose] = []
+            prev = wps[0]
+            for w in dense:
+                finer.extend(tuple(x) for x in C.line_waypoints(prev, w, 2))
+                prev = w
+            res2 = solve(finer)
+            if res2.success:
+                res, dense = res2, finer
         self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1
         finished = ""
         self.last_track_stall = None
@@ -1191,6 +1211,12 @@ class IKChecker:
                 return None, f"approach_untrackable: chain tracking ({len(dense)} dense poses): {res.status}"
         else:
             traj = res.q_traj
+        if min_limit_margin is not None:
+            for j in range(1, len(traj)):
+                m_j, jn = self.joint_limit_margin(traj[j], arm)
+                if m_j < float(min_limit_margin):
+                    return None, (f"joint_limit: chain tracking ({len(dense)} dense poses): {jn} {m_j * 1000:.1f} mrad from its limit at dense pose {j} "
+                                  f"(< {float(min_limit_margin) * 1000:.0f} mrad)")
         # the configurations within APPROACH_WAYPOINT_M of the START leave a contact (the grasped object still on its support, the
         # pads around the object just released): checked with ``ignore_start`` removed and the ground slab off, as ``track_segment``
         # checks the first centimetres of a leg (the chains that began 3.3 cm past their start never saw them: IORS floor class

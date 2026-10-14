@@ -20,6 +20,8 @@ Verdict categories (the executor's verdict / ``SkillError.reason``; this module 
                             ``ispatialgym.eval.goal_occlusion``)
 ``robot_wobble``            a load the hands bore bent the torso visibly off its command (epilogue demo gate,
                             ``executor.TorsoLoad``)
+``robot_stutter``           an arm's commanded joint motion jolted repeatedly within a fraction of a second inside one
+                            action (epilogue gate ``arm_stutter`` of demos and replays, :class:`ArmStutter`)
 ``release_not_commanded``   an assisted-grasp release did not come from a gripper command of +1 (epilogue demo gate
                             ``release_commanded``, ``Executor.release_check``)
 ``failed_grasp``            the assisted grasp did not attach (grasp actions; push / brace exempt)
@@ -110,6 +112,7 @@ CATEGORIES: Tuple[str, ...] = (
     "goal_occluded",
     "robot_wobble",
     "release_not_commanded",
+    "robot_stutter",
 )
 #: categories the per-step monitors can raise (``protected_*``: the transit span of oracle.protection, owner 2026-09-26)
 STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "gripper_out_of_fov", "timeout", "protected_contact", "protected_moved")
@@ -118,7 +121,7 @@ STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "grippe
 #: of an articulated object whose joint the program works; ``goal_occluded`` / ``robot_wobble`` = the demo gates on the goal
 #: image and on the torso a load bent; policy evaluation is unchanged)
 EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation", "placed_tilt", "root_moved", "goal_occluded",
-                                        "robot_wobble", "release_not_commanded")
+                                        "robot_wobble", "release_not_commanded", "robot_stutter")
 
 #: contacts with these object categories never count (the robot stands / drives on them)
 GROUND_CATEGORIES = frozenset({"floors", "carpet", "rug", "mat", "gym_mat", "yoga_mat", "lawn", "driveway", "ceramic_tile"})
@@ -766,7 +769,169 @@ class Monitors:
         }
 
 
+# ==========================================================================================
+# arm stutter (epilogue gate ``arm_stutter``)
+# ==========================================================================================
+
+
+@dataclass
+class StutterConfig:
+    """``arm_stutter`` (owner 2026-10-13, mental_rotation-walker: "the robot seems to stutter"). A **jolt** is a control step at
+    which the commanded joint-velocity vector of one arm changes by at least ``jolt_rad_s`` (rad/s, from one step's finite
+    difference to the next) while the arm moves at ``move_rad_s`` or more (its fastest joint) on both sides; ``min_jolts`` jolts
+    within ``window_steps`` steps of one motion (an action attempt; a replay stream is one) are a stutter. The joints of the
+    7-DOF arm only; the trunk, base and grippers are not judged.
+
+    The walker demo (code 14a2f58b): right_arm_joint6 pinned 8 mrad from its lower limit by the differential IK of the in-hand
+    orbit, the other joints swinging - 3 jolts of 0.74 / 1.04 / 0.99 rad/s at steps 2-4 and of 1.75 / 0.84 / 0.95 rad/s at steps
+    37-40 (joint 3 reversing from +0.90 to -0.33 rad/s, joint 5 at 0.24 -> 1.41 -> 0.77 -> 1.43 rad/s). The other 70 counted demos
+    of 2026-10-13 (s2_3tasks, s3_55tasks, iors_large) have at most 2 jolts of 0.6 rad/s in any 6 steps: a single kink where two
+    legs of an action join, or a one-step speed blip of the per-waypoint step rounding."""
+
+    jolt_rad_s: float = 0.6
+    move_rad_s: float = 0.3
+    window_steps: int = 6
+    min_jolts: int = 3
+    dt: float = 1.0 / 30.0
+
+
+def find_stutters(q, segment, cfg: Optional[StutterConfig] = None) -> Dict[str, Any]:
+    """The jolts and stutters of one arm's joint trace. ``q``: (T, n) joint positions per control step (the commanded
+    targets); ``segment``: (T,) motion id per step - steps of one id are one motion, a negative id belongs to none. Returns
+    ``{"jolts": [(index, |dv| rad/s)], "stutters": [{"first", "last", "n_jolts", "max_jolt_rad_s"}]}`` with indices into the
+    trace (a jolt's index is the step at which the velocity changes); overlapping windows merge into one stutter."""
+    import numpy as np
+
+    cfg = cfg or StutterConfig()
+    q = np.asarray(q, dtype=np.float64)
+    seg = np.asarray(segment).reshape(-1)
+    jolts: List[Tuple[int, float]] = []
+    start = 0
+    for t in range(1, len(seg) + 1):
+        if t < len(seg) and seg[t] == seg[start]:
+            continue
+        if seg[start] >= 0 and t - start >= 3:
+            v = np.diff(q[start:t], axis=0) / cfg.dt
+            speed = np.abs(v).max(axis=1)
+            for i in range(1, len(v)):
+                if min(speed[i - 1], speed[i]) >= cfg.move_rad_s:
+                    dv = float(np.linalg.norm(v[i] - v[i - 1]))
+                    if dv >= cfg.jolt_rad_s:
+                        jolts.append((start + i, dv))
+        start = t
+    stutters: List[Dict[str, Any]] = []
+    for k, (t0, _) in enumerate(jolts):
+        inside = [(t, dv) for t, dv in jolts[k:] if t - t0 < cfg.window_steps and seg[t] == seg[t0]]
+        if len(inside) < cfg.min_jolts:
+            continue
+        last = inside[-1][0]
+        peak = max(dv for _, dv in inside)
+        if stutters and t0 <= stutters[-1]["last"] and seg[t0] == seg[stutters[-1]["first"]]:
+            s = stutters[-1]
+            s["n_jolts"] = len({t for t, _ in jolts if s["first"] <= t <= max(s["last"], last)})
+            s["last"] = max(s["last"], last)
+            s["max_jolt_rad_s"] = max(s["max_jolt_rad_s"], peak)
+        else:
+            stutters.append({"first": t0, "last": last, "n_jolts": len(inside), "max_jolt_rad_s": peak})
+    for s in stutters:
+        s["max_jolt_rad_s"] = round(s["max_jolt_rad_s"], 3)
+    return {"jolts": [(t, round(dv, 3)) for t, dv in jolts], "stutters": stutters}
+
+
+class ArmStutter:
+    """QA fact and ``arm_stutter`` gate: the commanded arm joint targets of every control step (``observe``), judged per arm
+    by :func:`find_stutters` at the end (``report``). ``segment`` groups the steps of one motion (an action attempt; the
+    executor passes a negative id outside the program's actions); a rolled-back attempt's steps leave the record (``trim``)."""
+
+    def __init__(self, robot, cfg: Optional[StutterConfig] = None):
+        self.cfg = cfg or StutterConfig()
+        self.idx_action = {arm: th.as_tensor(robot.controller_action_idx[f"arm_{arm}"]).long() for arm in M.ARMS}
+        self.rows: List[Tuple[int, int, Optional[str], Dict[str, List[float]]]] = []
+
+    def observe(self, step: int, action, segment: int, action_name: Optional[str] = None) -> None:
+        a = th.as_tensor(action).reshape(-1).float()
+        self.rows.append((int(step), int(segment), action_name, {arm: a[idx].tolist() for arm, idx in self.idx_action.items()}))
+
+    def trim(self, step: int) -> None:
+        self.rows = [r for r in self.rows if r[0] <= step]
+
+    def report(self) -> Dict[str, Any]:
+        cfg = self.cfg
+        out: Dict[str, Any] = {"flagged": False, "stutters": [], "max_jolt_rad_s": 0.0,
+                               "thresholds": {"jolt_rad_s": cfg.jolt_rad_s, "move_rad_s": cfg.move_rad_s, "window_steps": cfg.window_steps,
+                                              "min_jolts": cfg.min_jolts}}
+        if len(self.rows) < 3:
+            return out
+        steps = [r[0] for r in self.rows]
+        segment = [r[1] for r in self.rows]
+        names = [r[2] for r in self.rows]
+        for arm in self.idx_action:
+            res = find_stutters([r[3][arm] for r in self.rows], segment, cfg)
+            if res["jolts"]:
+                out["max_jolt_rad_s"] = max(out["max_jolt_rad_s"], max(dv for _, dv in res["jolts"]))
+            for s in res["stutters"]:
+                out["stutters"].append({"arm": arm, "first_step": steps[s["first"]], "last_step": steps[s["last"]], "n_jolts": s["n_jolts"],
+                                        "max_jolt_rad_s": s["max_jolt_rad_s"], "action": names[s["first"]]})
+        out["flagged"] = bool(out["stutters"])
+        if out["stutters"]:
+            out["worst"] = max(out["stutters"], key=lambda s: (s["n_jolts"], s["max_jolt_rad_s"]))
+        return out
+
+
+def stutter_report_hdf5(path: str, cfg: Optional[StutterConfig] = None) -> Dict[str, Any]:
+    """:class:`ArmStutter`'s report of a recorded demo (``isg-demo-v2`` hdf5): the commanded arm targets of ``data/demo_0/action``
+    over the action steps (``isg/action_index`` >= 0, one motion per action index and attempt), steps numbered as ``isg/step``."""
+    import json
+
+    import h5py
+    import numpy as np
+
+    with h5py.File(path, "r") as f:
+        g = f["data/demo_0"]
+        order = json.loads(f["data"].attrs["controller_order"])
+        dims = json.loads(f["data"].attrs["controller_dims"])
+        act = np.asarray(g["action"][:], dtype=np.float64)
+        aidx = np.asarray(g["isg/action_index"][:]).astype(int)
+        att = np.asarray(g["isg/attempt"][:]).astype(int)
+        steps = np.asarray(g["isg/step"][:]).astype(int)
+        ann = json.loads(g.attrs.get("isg_annotations", "{}") or "{}")
+    names = {int(a["index"]): a.get("name") for a in ann.get("actions", [])}
+    offsets, o = {}, 0
+    for k in order:
+        offsets[k] = (o, o + int(dims[k]))
+        o += int(dims[k])
+    idx = {arm: list(range(*offsets[f"arm_{arm}"])) for arm in M.ARMS}
+
+    class _Robot:
+        controller_action_idx = {f"arm_{arm}": idx[arm] for arm in M.ARMS}
+
+    st = ArmStutter(_Robot(), cfg)
+    for t in range(len(act)):
+        seg = int(aidx[t]) * 1000 + int(att[t]) if aidx[t] >= 0 else -1
+        st.observe(int(steps[t]), act[t], seg, names.get(int(aidx[t])))
+    return st.report()
+
+
+def _main(argv: Optional[Sequence[str]] = None) -> int:
+    import argparse
+    import json
+
+    p = argparse.ArgumentParser(description="arm_stutter report of recorded demos (data/demo_0/action of an isg-demo-v2 hdf5)")
+    p.add_argument("hdf5", nargs="+")
+    args = p.parse_args(argv)
+    flagged = 0
+    for path in args.hdf5:
+        rep = stutter_report_hdf5(path)
+        flagged += int(rep["flagged"])
+        print(json.dumps({"hdf5": path, **rep}))
+    return 1 if flagged else 0
+
+
 __all__ = [
     "CATEGORIES", "STEP_CATEGORIES", "EPILOGUE_CATEGORIES", "GROUND_CATEGORIES", "Verdict", "category_of", "QAStats",
-    "CameraModel", "QAConfig", "Monitors",
+    "CameraModel", "QAConfig", "Monitors", "StutterConfig", "find_stutters", "ArmStutter", "stutter_report_hdf5",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

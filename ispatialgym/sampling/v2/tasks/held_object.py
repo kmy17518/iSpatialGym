@@ -1602,6 +1602,7 @@ class MentalRotationV2(HeldObjectV2):
         goal_range = self.g("goal_angle_range_deg")
         n_draws = int(self.g("goal_draws_per_start"))
         scale_key = self.choice.models["target"].scale
+        orbit_margin = self.gen("orbit_limit_margin_rad")
         chosen = None
         errors: List[str] = []
         order = self.grasp_order(rng)
@@ -1626,6 +1627,11 @@ class MentalRotationV2(HeldObjectV2):
                 self.kit.sync_world()
                 init = Stance("init", base2d, hc.translate, hc.tilt, arms=[self.arm], carried=tname)
                 init.q = q_init
+                if orbit_margin is not None:
+                    m0, j0 = self.ikc.joint_limit_margin(q_init, self.arm)
+                    if m0 < float(orbit_margin):
+                        errors.append(f"{tag}: the start holds {j0} {m0 * 1000:.1f} mrad from its limit (< orbit_limit_margin_rad)")
+                        continue
                 with attached(self.kit, self.arm, target):
                     if not bool(self.kit.collision_free(q_init, margin=0.01)[0]):
                         errors.append(f"{tag}: start collides with the object attached")
@@ -1652,6 +1658,15 @@ class MentalRotationV2(HeldObjectV2):
                         if not res.ok:
                             errors.append(f"{tag} -> {cands[ci][1]['angle_deg']:+.1f} deg: {res.reason}")
                             continue
+                        if orbit_margin is not None:
+                            # the orbit as the oracle's arm_along tracks it from the start configuration (owner 2026-10-13, walker stutter)
+                            q_end, why = self.ikc.track_chain(q_init, [eef0] + wps_all[ci], self.arm, soft_pos_tol=self.ikc.ORACLE_SOFT_POS_TOL,
+                                                              soft_rot_tol=self.ikc.ORACLE_SOFT_ROT_TOL, max_iters=self.ikc.ORACLE_DIFF_IK_MAX_ITERS,
+                                                              refine_jumps=True, min_limit_margin=float(orbit_margin))
+                            if q_end is None:
+                                errors.append(f"{tag} -> {cands[ci][1]['angle_deg']:+.1f} deg: {why}")
+                                continue
+                            cands[ci][1]["orbit_tracked"] = {"limit_margin_rad": float(orbit_margin)}
                         chosen = (g, obj0, eef0, cands[ci][0], dict(cands[ci][1]), res.q, wps_all[ci], base2d, cam, init, opt)
                         break
                 if chosen is not None:

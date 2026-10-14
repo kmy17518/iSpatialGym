@@ -58,7 +58,7 @@ from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action, Brace, Grasp, Navigate, Place, Push, Transition
 from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
 from ispatialgym.oracle.motions import Motions, SkillError
-from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
+from ispatialgym.oracle.qa import ArmStutter, CameraModel, Monitors, QAStats, Verdict, category_of
 from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
 from ispatialgym.robot import conventions as C
 
@@ -148,6 +148,8 @@ class ExecutorConfig:
     #: full error. ``demo_revolution_axes`` switches that equivalence off (full error for everything).
     #: ``release_commanded``: an assisted-grasp release that did not come from a gripper command of exactly +1 fails the
     #: episode (``release_not_commanded``); ``result.release_check`` records the releases whether the gate is on or not.
+    #: ``arm_stutter``: repeated jolts of an arm's commanded joint motion inside one action (``qa.ArmStutter``, thresholds
+    #: ``qa.StutterConfig``) fail the episode (``robot_stutter``); ``result.arm_stutter`` is recorded whether the gate is on or not.
     demo_gating: Tuple[str, ...] = ()
     #: replay / policy streams: ``stop`` = a QA monitor verdict (collision, ghost hand, ...) ends the episode as it does an
     #: oracle action; ``log`` = it is recorded (``result.stream_qa``) and the stream goes on, so the episode is judged by its
@@ -913,6 +915,7 @@ class Executor:
         self.verdict: Optional[Verdict] = None
         self.support_load: Optional[SupportLoad] = None  # the support loading fact (meta.support_disturbance), built by run_program
         self.torso_load: Optional[TorsoLoad] = None  # the torso deflection fact (meta.torso_load, gate robot_wobble), built per episode
+        self.arm_stutter: Optional[ArmStutter] = None  # the commanded arm jolts (meta.arm_stutter, gate arm_stutter), built per episode
         self.root_watch: Optional[RootWatch] = None  # the operated articulated roots (meta.articulated_root, gate root_moved), built by run_program
 
     # ------------------------------------------------------------------ sim access
@@ -1010,6 +1013,14 @@ class Executor:
             except Exception as e:  # noqa: BLE001  (a fact; the gate then has nothing to judge)
                 log.warning("torso load monitor failed (%r); disabled", e)
                 self.torso_load = None
+        if self.arm_stutter is not None:
+            try:
+                in_action = action_index >= 0 and phase == PHASE_ORACLE
+                self.arm_stutter.observe(self.n, action, action_index * 1000 + attempt if in_action else -1,
+                                         self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None)
+            except Exception as e:  # noqa: BLE001  (a fact; the gate then has nothing to judge)
+                log.warning("arm stutter monitor failed (%r); disabled", e)
+                self.arm_stutter = None
         if self.root_watch is not None:
             self.root_watch.observe(self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None, self.n)
         if self.recorder is not None:
@@ -1119,6 +1130,8 @@ class Executor:
             self.release_check[k] = [r for r in self.release_check[k] if r["step"] <= cp.step]
         if self.torso_load is not None:
             self.torso_load.trim(cp.step)
+        if self.arm_stutter is not None:
+            self.arm_stutter.trim(cp.step)
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
         if ag is not None:
@@ -1590,6 +1603,11 @@ class Executor:
         except Exception as e:  # noqa: BLE001  (a robot without a trunk controller: no fact, no gate)
             log.warning("torso load monitor unavailable (%r)", e)
             self.torso_load = None
+        try:
+            self.arm_stutter = ArmStutter(self.robot)
+        except Exception as e:  # noqa: BLE001  (a robot without arm controllers: no fact, no gate)
+            log.warning("arm stutter monitor unavailable (%r)", e)
+            self.arm_stutter = None
 
     def operated_roots(self) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """``(watched, skipped)``: the tracked articulated objects whose joint the program works without moving them as a whole -
@@ -2241,6 +2259,14 @@ class Executor:
                                               f"({torso_report['action']}; > {self.cfg.demo_torso_deflection_max_deg:.2f} deg): the robot visibly wobbles", step=self.n,
                               details={"torso_load": torso_report})
             self.stats.record(verdict)
+        stutter_report = self.arm_stutter.report() if self.arm_stutter is not None else {}
+        if "arm_stutter" in self.cfg.demo_gating and stutter_report.get("flagged") and verdict is None:
+            w, thr = stutter_report["worst"], stutter_report["thresholds"]
+            verdict = Verdict("robot_stutter", f"the {w['arm']} arm's commanded joint motion jolted {w['n_jolts']} times in steps {w['first_step']}-{w['last_step']} "
+                                               f"({w['action'] or 'stream'}; velocity changes >= {thr['jolt_rad_s']} rad/s per step, up to {w['max_jolt_rad_s']:.2f}, "
+                                               f">= {thr['min_jolts']} within {thr['window_steps']} steps): the robot visibly stutters", step=self.n,
+                              details={"arm_stutter": stutter_report})
+            self.stats.record(verdict)
         bad = self.release_check["violations"]
         if verdict is None and bad and "release_commanded" in self.cfg.demo_gating:
             msg = "; ".join(f"step {v['step']} {v['arm']} {v['object']}: {v['kind']}" + (f" ({v['gripper_command']})" if "gripper_command" in v else "") for v in bad)
@@ -2291,6 +2317,8 @@ class Executor:
             "articulated_root": root_report,
             # owner 2026-10-09: how far a load the hands bore bent the torso off its command (gate robot_wobble)
             "torso_load": torso_report,
+            # owner 2026-10-13: repeated jolts of an arm's commanded joint motion (gate arm_stutter)
+            "arm_stutter": stutter_report,
             "settled_success": settled_task,
             "pose_settled_config": isg.get("pose_settled_config"),
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
