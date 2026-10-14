@@ -8,7 +8,8 @@ whose partner fits at some gap of its interval), the goal pose per relation, the
 stance after the goal settled, the touching push + brace, the constraints it learned. Every number comes from the customs
 ``generation`` block (D1 ``generation_defaults``): ``table_end_margin_m``, ``start_region_lateral_draws``, ``partner_on_meta_link``
 (A5: the partner centred on one of the support's meta links of that type, e.g. a burner's ``heatsource``), ``start_region_on_neighbors``
-(with ``partner_on_meta_link``: the target starts on a neighbouring support's top, A4),
+(with ``partner_on_meta_link``: the target starts on a neighbouring support's top, A4), ``init_align_support`` (the target and the
+partner start with their footprints along the support's edges, owner 2026-10-13),
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
 (inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
@@ -578,18 +579,19 @@ class IORSSmall(SamplerV2):
         """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
         feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp. ``arms``: the arms
         offered for the segment at this focus (the chosen one is the record's ``arm``). :meth:`widest_faces`: F over
-        :meth:`widest_faces_target_yaws`, drawn without jitter."""
+        :meth:`widest_faces_target_yaws`, else with :meth:`init_align_support` over the four :meth:`edge_aligned_yaws`; drawn without jitter."""
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
         nb_top = self.neighbor_start_top()  # start_region_on_neighbors: the target is drawn on the neighbours' cells
-        faces_kw = {"yaws": self.widest_faces_target_yaws(manip), "jitter": 0.0} if self.widest_faces() else {}
+        yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.edge_aligned_yaws("target", manip) if self.init_align_support() else None
+        yaw_kw = {"yaws": yaws, "jitter": 0.0} if yaws is not None else {}
         last = None
         for i, gs in enumerate(tiers):
             try:
                 t_pose, grasp = TT.phase3_target(self, manip, rng, gs, self.hull["target"], self.rest["target"], self.support_objects(),
                                                  top=self.top if nb_top is None else nb_top, scale_key=self.choice.models["target"].scale, arms=arms,
-                                                 arm_bands=getattr(self, "arm_bands", None) or None, **faces_kw)
+                                                 arm_bands=getattr(self, "arm_bands", None) or None, **yaw_kw)
                 if i > 0:
                     log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.alias, grasp.grasp_name)
                 return t_pose, grasp
@@ -1298,6 +1300,12 @@ class IORSSmall(SamplerV2):
             }
         if self.widest_faces():
             d.summary["widest_faces"] = self.widest_faces_facts(t_pose, p_pose, manip)
+        if self.init_align_support():
+            d.summary["init_align_support"] = {
+                "edge_yaw_deg": round(math.degrees(math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))), 1),
+                "target_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["target"], t_pose[1], manip)), 2),
+                "partner_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["partner"], p_pose[1], manip)), 2),
+            }
         # §4.6 step 4: every object fully in frame (5 %) in the init image
         for role, pose in (("target", t_pose), ("partner", p_pose)):
             if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
@@ -1407,7 +1415,8 @@ class IORSSmall(SamplerV2):
         """A5 (owner 2026-10-12): the partner centred on one of the candidate's meta-link spots for ``side`` (drawn uniformly) at a random yaw,
         checked at the drawn target pose - on ``side`` of it at a lateral gap of the gap range, the reach rule with the band of the segment's
         arm (:meth:`band_rule`), at least ``footprint_gap_min_m`` from the target, fully in the init image (the spot is on the top,
-        :meth:`find_meta_spots`). Up to ``PARTNER_YAW_DRAWS`` yaws per spot; ``Reject("partner_placement")`` when none passes."""
+        :meth:`find_meta_spots`). Up to ``PARTNER_YAW_DRAWS`` yaws per spot (:meth:`init_align_support`: the four edge-aligned ones in
+        random order); ``Reject("partner_placement")`` when none passes."""
         g_lo, g_hi = self.gap_range()
         t_fp = self.world.footprint(self.hull["target"], t_pose)
         t_lo, t_hi = footprint_laterals(t_fp - manip.base_xy, manip.tangent)
@@ -1415,10 +1424,11 @@ class IORSSmall(SamplerV2):
         reach, band = self.band_rule(manip, float(manip.world_to_base(t_pose[0][:2])[0]), (manip.working_arms or self.segment_arms)[:1])
         misses: List[str] = []
         spots = (manip.extras.get(META_SPOTS) or {}).get(TT.side_name(side), [])
+        aligned = self.edge_aligned_yaws("partner", manip) if self.init_align_support() else None
         for k in rng.permutation(len(spots)):
             mid, xy = self.meta_spots[spots[int(k)]]
-            for _ in range(PARTNER_YAW_DRAWS):
-                yaw = float(rng.uniform(-math.pi, math.pi))
+            yaws = [aligned[int(j)] for j in rng.permutation(4)] if aligned else (float(rng.uniform(-math.pi, math.pi)) for _ in range(PARTNER_YAW_DRAWS))
+            for yaw in yaws:
                 pose = TT.pose_centred_on(self, self.hull["partner"], G.qmul(G.quat_from_yaw(yaw), G.t(self.rest["partner"])), xy, top=self.top)
                 p_fp = self.world.footprint(self.hull["partner"], pose)
                 p_lo, p_hi = footprint_laterals(p_fp - manip.base_xy, manip.tangent)
@@ -1447,9 +1457,10 @@ class IORSSmall(SamplerV2):
         was placed; touching the robot's left) at a gap of the start region's interval re-evaluated at the drawn target pose
         (:meth:`draw_partner_pose`: on the top, both footprints ``table_end_margin_m`` from the edge's ends, in the init image, and the reach
         rule cut to the band of the manipulation trunk - §4.1 / principle 3, the place pose of §6.11 needs its goal in the band).
-        ``PARTNER_YAW_DRAWS`` random partner yaws, then the two edge-aligned ones (:meth:`edge_partner_quats`); ``Reject("partner_placement")``
-        when none admits a gap. The shelf layout keeps its partner leaning against the opposite board; with ``partner_on_meta_link`` (A5) it
-        stands on a meta-link spot (:meth:`draw_meta_partner_pose`)."""
+        ``PARTNER_YAW_DRAWS`` random partner yaws, then the two edge-aligned ones (:meth:`edge_partner_quats`) - with :meth:`init_align_support`
+        the four edge-aligned yaws only, ``PARTNER_YAW_DRAWS`` tries; ``Reject("partner_placement")`` when none admits a gap. The shelf
+        layout keeps its partner leaning against the opposite board; with ``partner_on_meta_link`` (A5) it stands on a meta-link spot
+        (:meth:`draw_meta_partner_pose`)."""
         self.partner_draw = None
         if self.shelf_partner_pose is not None:
             self._brace_gate = {"ok": False, "why": "shelf (owner 2026-10-11): the side board holds the partner, no brace"}
@@ -1459,9 +1470,14 @@ class IORSSmall(SamplerV2):
         if self.meta_spots is not None:
             return self.draw_meta_partner_pose(rng, side, t_pose, manip, cam)
         if self.relation != "touching":
-            # random yaws, then the two edge-aligned footprints the start region was computed with (a tight top admits little else)
-            yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip)
-            yaws = [float(rng.uniform(-math.pi, math.pi)) for _ in range(PARTNER_YAW_DRAWS)] + [yaw0, yaw0 + math.pi / 2]
+            # random yaws, then the two edge-aligned footprints the start region was computed with (a tight top admits little else);
+            # init_align_support: the four edge-aligned yaws only, in random order, each tried with fresh gap draws
+            if self.init_align_support():
+                aligned = self.edge_aligned_yaws("partner", manip)
+                yaws = [aligned[int(k)] for k in rng.permutation(4)] * (PARTNER_YAW_DRAWS // 4)
+            else:
+                yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip)
+                yaws = [float(rng.uniform(-math.pi, math.pi)) for _ in range(PARTNER_YAW_DRAWS)] + [yaw0, yaw0 + math.pi / 2]
             for yaw in yaws:
                 p_pose, why = self.draw_partner_pose(rng, side, t_pose, manip, cam, yaw)
                 if p_pose is not None:
@@ -1480,7 +1496,7 @@ class IORSSmall(SamplerV2):
         p_pose = None
         # edge alignment (owner 2026-09-18 13:50): the partner's footprint axes along the support edge - the two aligned
         # footprints (long side along / across the edge) alternate over the tries; without it a random yaw per try
-        yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() else None
+        yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() or self.init_align_support() else None
         for i in range(8):
             yaw = yaw0 + (i % 2) * (math.pi / 2) if yaw0 is not None else float(rng.uniform(-math.pi, math.pi))
             if faces_yaws:
@@ -1514,6 +1530,12 @@ class IORSSmall(SamplerV2):
         target's goal / place orientation is the edge-aligned yaw nearest its init yaw (an in-hand rotation <= 45 deg) -
         the boxes meet face to face; ``generation.edge_aligned`` (default on for touching)."""
         return self.relation == "touching" and bool(self.gen("edge_aligned", True))
+
+    def init_align_support(self) -> bool:
+        """Owner 2026-10-13 (nextto#01 / #03 / #04): ``generation.init_align_support`` (default false) - the target and the partner start
+        with their footprint axes along the support top's edges: the target's init yaw is one of its :meth:`edge_aligned_yaws` (no
+        jitter), and so is the partner's (in place of the random yaws)."""
+        return bool(self.gen("init_align_support", False))
 
     def footprint_axis_angle(self, hull: th.Tensor, quat) -> float:
         """World angle (rad, modulo pi/2) of the minimum-area bounding rectangle of the hull's footprint at ``quat``."""

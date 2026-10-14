@@ -944,7 +944,7 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    exact IK from the manipulation stance (idle arm untucked and locked; support ignored for the grasp pose only). On
    failure draw the next element of F without replacement; reject the attempt when F is exhausted. Record
    `(yaw, grasp_key, grasp_name)` and both eef poses. A task that restricts the init yaws (touching's
-   `widest_faces`, §6.11) screens its own yaws, draws without jitter and keeps that F out of the band cache (the band
+   `widest_faces`, §6.11; IORS small `init_align_support`, step 2) screens its own yaws, draws without jitter and keeps that F out of the band cache (the band
    indexes F by the 8 yaws; an empty F over a subset would remove a cell the other yaws reach).
    - *Disembedding*: source tray at the focus, aligned with the edge; target inside it (yaw as above, footprint on
      the tray floor, 0.5 cm margin). Destination tray on the template's destination side (4.4, A2a), aligned with the edge and the
@@ -1029,6 +1029,17 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      `grasps[].grasp_from` = the neighbour, 7). A support with no neighbour top united to it rejects the template
      (`no_start_region`); the key without `partner_on_meta_link` is a spec error. Recorded:
      `template_facts.start_region.on_neighbors` / `off_neighbors`. Aliases without the key are sampled as before.
+   - **Support-aligned init** (owner decision 2026‑10‑13, nextto#01 / #03 / #04; `generation.init_align_support: true`,
+     default false; any small-scale relation). The target and the partner start with their footprints along the support
+     top's edges: the init yaw (about the vertical, applied to the rest orientation) is one of the 4 edge-aligned ones that
+     put the footprint's minimum-area rectangle on the axes of the stance's support edge (+ k × 90°: the long axis along or
+     across the edge). Step 1 screens F over those 4 yaws (not the 8 fixed ones), draws without the ±22.5° jitter and keeps
+     F out of the band (as for `widest_faces`, which takes precedence for the target). The partner's yaw is one of its 4
+     in random order, 16 tries (each with a new gap draw) in place of the 16 random yaws + 2 edge-aligned ones; on a meta
+     link the 4 in random order per spot; touching aligns it as with `edge_aligned`. The goal is not drawn anew: a nextto
+     target keeps its init orientation (a free orientation's release turn is a multiple of 90°), so it ends aligned too.
+     Recorded: the instance summary's `init_align_support` (edge yaw, both drafted footprints' residuals). Aliases without
+     the key are sampled as before.
 3. **Distractors** (disembedding) on the source tray, footprints ≥ 1 cm from each other and from the target, within
    `tray_budget` (6.4); they may occlude the target up to **30 %** of its visible area (segmentation render, distractors
    visible vs hidden); no other occlusion bucket exists. *Owner decision 2026‑10‑12 (A2b):* no spacing along the drawn

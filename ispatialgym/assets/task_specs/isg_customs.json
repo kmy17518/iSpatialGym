@@ -31328,7 +31328,8 @@
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
    },
-   "partner_side": "left"
+   "partner_side": "left",
+   "init_align_support": true
   },
   "constraints": []
  },
@@ -31875,7 +31876,8 @@
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
    "nextto_divisor": 6.0,
-   "partner_side": "left"
+   "partner_side": "left",
+   "init_align_support": true
   },
   "constraints": []
  },
@@ -33075,7 +33077,8 @@
    "goal_drop_m": 0.01,
    "nextto_gap_extra_m": 0.03,
    "nextto_divisor": 6.0,
-   "partner_side": "right"
+   "partner_side": "right",
+   "init_align_support": true
   },
   "constraints": []
  },
