@@ -47946,9 +47946,9 @@
     "require": {
      "grasps": "floating"
     },
-    "representative": "pnrdxh",
+    "representative": "ogpans",
     "grasp_keys": {
-     "beefsteak_tomato/pnrdxh": "beefsteak_tomato__pnrdxh__f"
+     "beefsteak_tomato/ogpans": "beefsteak_tomato__ogpans__f"
     }
    },
    "floor": {
@@ -47968,14 +47968,14 @@
     "whitelist": {
      "target": {
       "beefsteak_tomato": [
-       "pnrdxh"
+       "ogpans"
       ]
      }
     },
     "blacklist": {
      "target": {
       "beefsteak_tomato": {
-       "eevvzv": "ground_isg 2026-10-11: heldout"
+       "eevvzv": "ground_isg 2026-10-13: heldout"
       }
      }
     }
@@ -48381,9 +48381,9 @@
     "require": {
      "grasps": "floating"
     },
-    "representative": "jnoksl",
+    "representative": "ubazru",
     "grasp_keys": {
-     "bottle_of_pop/jnoksl": "bottle_of_pop__jnoksl"
+     "bottle_of_pop/ubazru": "bottle_of_pop__ubazru"
     }
    },
    "floor": {
@@ -48403,14 +48403,15 @@
     "whitelist": {
      "target": {
       "bottle_of_pop": [
-       "jnoksl"
+       "ubazru"
       ]
      }
     },
     "blacklist": {
      "target": {
       "bottle_of_pop": {
-       "iynssk": "ground_isg 2026-10-11: heldout"
+       "iynssk": "ground_isg 2026-10-13: heldout",
+       "jnoksl": "owner 2026-10-13 ~19:00 (COMPLAINTS.md object_scaling#02): blacklisted, ubazru replaces it"
       }
      }
     }
