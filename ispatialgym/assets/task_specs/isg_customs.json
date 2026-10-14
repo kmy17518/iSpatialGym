@@ -33103,13 +33103,6 @@
     },
     "relative_yaw_deg": 0.0,
     "facing": "away"
-   },
-   "partial_release": {
-    "loosen_m": 0.002,
-    "overshoot_m": 0.0085,
-    "pad_clear_m": 0.004,
-    "partner_margin_m": 0.005,
-    "touch_extra_m": 0.0035
    }
   },
   "constraints": []

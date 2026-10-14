@@ -2192,161 +2192,6 @@ def _release(motions: Motions, state, arm: str) -> Iterator[th.Tensor]:
     motions.backend.detach_object(arm)
 
 
-#: the partial-opening release: steps the loosened pads may take to leave the part / the release opening to settle
-PARTIAL_LOOSEN_STEPS = 15
-PARTIAL_SETTLE_STEPS = 15
-
-
-def partial_release_of(ctx: Dict[str, Any]) -> Optional[Dict[str, float]]:
-    """The instance's partial-opening release regime (``sidecar.extra["partial_release"]``, which the sampler copies from the alias's
-    ``generation.partial_release``; ``conventions.partial_release_regime``), None without one (the full opening, unchanged)."""
-    extra = getattr(ctx.get("sidecar"), "extra", None) or {}
-    try:
-        return C.partial_release_regime(extra.get("partial_release"))
-    except ValueError as e:
-        log.warning("partial release: %s; the full opening is used", e)
-        return None
-
-
-def _release_plan(action: Place, ctx: Dict[str, Any]) -> Dict[str, Any]:
-    """The sampler's release facts for the placed object (its grasp record's ``release_sweep``), ``{}`` without them."""
-    for g in getattr(ctx.get("sidecar"), "grasps", None) or []:
-        if getattr(g, "object", None) == action.object and getattr(g, "arm", None) in (None, action.arm):
-            rec = (getattr(g, "extra", None) or {}).get("release_sweep")
-            return dict(rec) if isinstance(rec, dict) else {}
-    return {}
-
-
-def _weld_held(motions: Motions, arm: str) -> bool:
-    """Whether the assisted-grasp joint of ``arm`` exists (the in-hand registry outlives it by OmniGibson's release window)."""
-    cons = getattr(motions.robot, "_ag_obj_constraints", None)
-    if isinstance(cons, dict):
-        return cons.get(arm) is not None
-    return motions.held_object(arm) is not None
-
-
-def partial_release_peak(motions: Motions, arm: str, reg: Dict[str, float]) -> float:
-    """The widest finger opening (per finger, m) the partial-opening release reaches from the fingers' present hold: the touch (their
-    widest reading + the contact squeeze) + ``loosen_m`` + ``overshoot_m``, at most the open limit."""
-    idx = motions.robot.gripper_control_idx[arm]
-    q_now = float(motions.robot.get_joint_positions()[idx].float().max())
-    _lo, hi = motions._gripper_limits(arm)
-    return min(hi, q_now + float(motions.cfg.gripper_contact_squeeze_m or 0.0) + reg["loosen_m"] + reg["overshoot_m"])
-
-
-def _partial_release(action: Place, motions: Motions, state, ctx: Dict[str, Any], reg: Dict[str, float]) -> Iterator[th.Tensor]:
-    """The partial-opening release (owner 2026-10-14 ~00:43, COMPLAINTS.md nextto#03: "open only as far as the clearance the sampler
-    already records, and let go there"). Gripper commands only - the replay of the recorded actions lets go the same way:
-    (1) the pads loosen to ``loosen_m`` beyond the touch (2x, 3x while both still touch) with the weld holding the part, until
-    OmniGibson's in-hand rule no longer sees the part between both pads; (2) the open command (+1), the assisted grasp's only release
-    condition, until the weld is gone - with the pads clear its first physics step (pressing pads kept it 4-8 physics steps); (3) the
-    release opening, the sampler's ``release_opening_m`` (at most its ``release_opening_max_m``, at least ``pad_clear_m`` beyond the
-    touch), held through the release window; the place keeps it through the retreat. ``ctx["partial_release"]`` records the facts."""
-    arm = action.arm
-    robot = motions.robot
-    idx = robot.gripper_control_idx[arm]
-    _lo, hi = motions._gripper_limits(arm)
-
-    def fingers() -> List[float]:
-        return [float(v) for v in robot.get_joint_positions()[idx].float().tolist()]
-
-    def position(name: Optional[str]) -> Optional[th.Tensor]:
-        try:
-            return state.object_pose(name)[0].float() if name else None
-        except Exception:  # noqa: BLE001
-            return None
-
-    held = state.held_object(arm)
-    if held is None:
-        raise SkillError("execution", f"partial release: the {arm} hand holds nothing at the place", arm=arm)
-    q0 = fingers()
-    touch = max(q0) + float(motions.cfg.gripper_contact_squeeze_m or 0.0)
-    plan = _release_plan(action, ctx)
-    least = touch + reg["pad_clear_m"]
-    q_rel = least if plan.get("release_opening_m") is None else max(least, 0.5 * float(plan["release_opening_m"]))
-    if plan.get("release_opening_max_m") is not None:
-        q_rel = max(least, min(q_rel, 0.5 * float(plan["release_opening_max_m"])))
-    q_rel = min(hi, q_rel)
-    p0, t0 = position(action.on), position(action.object)
-    rec: Dict[str, Any] = {"regime": dict(reg), "fingers_at_place_m": [round(v, 4) for v in q0], "touch_m": round(touch, 4),
-                           "planned_opening_m": plan.get("release_opening_m"), "opening_max_m": plan.get("release_opening_max_m"),
-                           "commanded_q_m": round(q_rel, 4), "commanded_opening_m": round(2.0 * q_rel, 4)}
-    ctx["partial_release"] = rec
-    # (1) loosen: the weld holds the part, the pads leave it (wider, up to 3 x loosen_m, while both still touch it)
-    clear_run, n = 0, 0
-    for level in (1, 2, 3):
-        q_loose = min(hi, touch + level * reg["loosen_m"])
-        motions.state.gripper_cmd[arm] = motions.gripper_command(arm, q_loose)
-        for _ in range(PARTIAL_LOOSEN_STEPS // 3):
-            yield from motions.hold(1)
-            n += 1
-            clear_run = 0 if motions.object_between_pads(arm) else clear_run + 1
-            if clear_run >= 2 and max(abs(v - q_loose) for v in fingers()) < 5e-4:
-                break
-        if clear_run >= 2:
-            break
-    rec.update({"loosen_q_m": round(q_loose, 4), "loosen_steps": n, "pads_clear_before_open": clear_run >= 1, "fingers_loosened_m": [round(v, 4) for v in fingers()]})
-    # (2) the open command until the weld is gone
-    motions.gripper_intent_closed[arm] = False
-    motions.release_events.append({"arm": arm, "event": "instant_open", "from_m": round(max(fingers()), 4), "object": getattr(held, "name", None), "partial": True})
-    motions.state.set_gripper(arm, False)
-    n_open = 0
-    while _weld_held(motions, arm):
-        if n_open >= RELEASE_WAIT_STEPS:
-            raise SkillError("execution", f"the assisted grasp of {arm} did not let go within {n_open} steps of the open command", arm=arm)
-        yield from motions.hold(1)
-        n_open += 1
-    f_rel = fingers()
-    rec.update({"open_steps": n_open, "fingers_at_weld_release_m": [round(v, 4) for v in f_rel]})
-    # (3) the release opening through the release window
-    motions.state.gripper_cmd[arm] = motions.gripper_command(arm, q_rel)
-    peak = max(f_rel)
-    for n in range(1, PARTIAL_SETTLE_STEPS + 1):
-        yield from motions.hold(1)
-        peak = max(peak, max(fingers()))
-        if n >= 3 and state.held_object(arm) is None and float(robot.get_joint_velocities()[idx].abs().max()) < 1e-3:
-            break
-    if state.held_object(arm) is not None:
-        raise SkillError("execution", f"the assisted grasp of {arm} still names the part {n} steps after its weld went", arm=arm)
-    motions.backend.detach_object(arm)
-    p1, t1 = position(action.on), position(action.object)
-    rec.update({"fingers_released_m": [round(v, 4) for v in fingers()], "finger_max_m": round(peak, 4), "overshoot_m": round(peak - q_rel, 4),
-                "partner_moved_release_m": None if p0 is None or p1 is None else round(float(th.linalg.norm(p1 - p0)), 4),
-                "target_moved_release_m": None if t0 is None or t1 is None else round(float(th.linalg.norm(t1 - t0)), 4)})
-    ctx["partial_release_partner_start"] = p0
-    log.info("place(%s): partial release - loosened to %.1f mm in %d steps, let go after %d open step(s) at %s mm, release opening %.1f mm per finger, "
-             "widest %.1f mm, %s moved %s mm", action.object, q_loose * 1000, rec["loosen_steps"], n_open, [round(v * 1000, 1) for v in f_rel], q_rel * 1000,
-             peak * 1000, action.on, None if rec["partner_moved_release_m"] is None else round(rec["partner_moved_release_m"] * 1000, 2))
-
-
-def _track_finger_peak(gen: Iterator[th.Tensor], motions: Motions, arm: str, rec: Dict[str, Any]) -> Iterator[th.Tensor]:
-    """Stream ``gen``, keeping ``rec["finger_max_m"]`` at the widest finger reading after each step."""
-    idx = motions.robot.gripper_control_idx[arm]
-    try:
-        for a in gen:
-            yield a
-            rec["finger_max_m"] = round(max(float(rec.get("finger_max_m") or 0.0), float(motions.robot.get_joint_positions()[idx].float().max())), 4)
-    finally:
-        close = getattr(gen, "close", None)
-        if close is not None:
-            close()
-
-
-def _partial_release_end(action: Place, motions: Motions, state, ctx: Dict[str, Any]) -> Iterator[th.Tensor]:
-    """After the retreat of a partial-opening release: the partner's displacement and the widest finger opening over the release and
-    the retreat, then the full opening - the hand is clear of the part and its partner, so the gripper ends open as after any place."""
-    rec = ctx["partial_release"]
-    p0 = ctx.pop("partial_release_partner_start", None)
-    try:
-        p2 = state.object_pose(action.on)[0].float()
-    except Exception:  # noqa: BLE001
-        p2 = None
-    rec["partner_moved_retreat_m"] = None if p0 is None or p2 is None else round(float(th.linalg.norm(p2 - p0)), 4)
-    rec["overshoot_m"] = round(float(rec["finger_max_m"]) - float(rec["commanded_q_m"]), 4)
-    yield from motions.gripper(action.arm, close=False)
-    rec["opened_after_retreat"] = True
-
-
 def offset_brace(brace: Brace, offset_m: float) -> Brace:
     """The brace with its ``pre`` / ``contact`` poses moved ``offset_m`` **outward** along −``direction`` (the recorded
     approach points into the face): +5 / +10 mm let a short target rotate further, −5 / −10 mm stop an overshoot
@@ -2536,7 +2381,6 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     if split is not None and split.links:
         finish.ignore_links = list(split.links)
-    partial = partial_release_of(ctx) if action.kind == "support" and action.on and action.relation not in ("on", "into", "under") else None
     with attach_hold_kept(action, motions, state, ctx):
         # an attach's insertion leg tracks the rotation to the attach tolerance (owner 2026-09-25, cork 0925-195316: the male arrived
         # tilted 4.4 deg with the default 0.03 rad soft tolerance on the re-aim move and the descent); other places keep the default
@@ -2578,11 +2422,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             # support place sets the object down
             if drop and cfg.drop_lower_max_m > 0:
                 yield from lower_drop(action, motions, state, ctx, cfg)
-            if partial is not None:
-                yield from _partial_release(action, motions, state, ctx, partial)
-            else:
-                yield from motions.gripper(arm, close=False)
-                yield from _release(motions, state, arm)
+            yield from motions.gripper(arm, close=False)
+            yield from _release(motions, state, arm)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
     # release: a differential-IK stall is finished by arm_to like the Retreat action's leg (touching 0917-203045: the
@@ -2595,13 +2436,9 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore_retreat, cfg)
     if split is not None and split.links:
         finish.ignore_links = list(split.links)
-    leg = motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-    partial_rec = ctx.get("partial_release") if partial is not None else None
-    yield from (_track_finger_peak(leg, motions, arm, partial_rec) if isinstance(partial_rec, dict) else leg)
+    yield from motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
     if finish.used:
         ctx["retreat_finish"] = finish.info
-    if isinstance(partial_rec, dict):
-        yield from _partial_release_end(action, motions, state, ctx)
     if drop:
         yield from motions.hold(cfg.drop_settle_steps)  # the object falls and comes to rest in the container
     else:
@@ -2940,22 +2777,17 @@ def clear_release_of_partner(action: Place, motions: Motions, state, targets: Di
     The opening at the recorded place pose is swept against the partner (``_open_fingers_meet``); when it comes within
     ``place_partner_clear_m`` of it, every place target moves away from the partner by what is missing (``partner_clear_shift``, up to
     ``place_partner_clear_max_m``) and the move is kept for the push that closes the gap after the release (``Motions.place_shifts``:
-    ``execute_push`` extends its line by it). With a partial-opening release (``partial_release_of``) the fingers open only to its peak
-    (``partial_release_peak``), not to the open limit. ``ctx["partner_release_clearance"]`` records the facts."""
+    ``execute_push`` extends its line by it). ``ctx["partner_release_clearance"]`` records the facts."""
     rec: Dict[str, Any] = {"applied": False}
     ctx["partner_release_clearance"] = rec
     if not cfg.place_partner_clear_max_m > 0 or targets.get("place") is None:
         return targets
     arm = action.arm
-    reg = partial_release_of(ctx)
     try:
         partner = state.object(action.on)
         idx = motions.robot.gripper_control_idx[arm]
         q_now = [float(v) for v in motions.robot.get_joint_positions()[idx].tolist()]
         _lo, hi = motions._gripper_limits(arm)
-        if reg is not None:
-            hi = partial_release_peak(motions, arm, reg)
-            rec["partial_release_peak_m"] = round(hi, 4)
         over, n_rays, bodies, axis_w = _open_fingers_meet(arm, q_now, hi, targets["place"], partner, cfg)
         lo_p, hi_p = partner.aabb
         centre = 0.5 * (C.as_tensor(lo_p).float() + C.as_tensor(hi_p).float())

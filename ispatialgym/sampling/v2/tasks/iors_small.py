@@ -159,11 +159,6 @@ THIN_PARTNER_HEIGHT = 0.04
 #: half width along eef x (conservative; only the open-gripper lowest point is derived from them)
 FINGER_THICKNESS = 0.012
 FINGER_HALF_WIDTH = 0.012
-#: the oracle's contact hold (``MotionsConfig.gripper_contact_squeeze_m``): the closed pads stand this far inside the touch, and the
-#: oracle's partial release reads the touch as the fingers' widest reading + this
-CONTACT_SQUEEZE = 0.001
-#: points along the hull edges of the partner / the swept fingers at most this far apart (:class:`HullProbe`)
-HULL_EDGE_SPACING = 0.002
 #: touching#03 shelf layout: the lift of the target before it is slid along the board to the partner's side (it never passes over
 #: the partner); 5 mm under the headroom the interior raster keeps above the tallest book at every free cell
 SHELF_CARRY_HEIGHT_M = TT.INTERIOR_HEADROOM_MARGIN_M - 0.005
@@ -200,49 +195,6 @@ META_SPOTS = "meta_link_spots"
 TRAVEL_REASONS = ("no_transition", "no_path", "path_collision", "path_too_long")
 #: 7e: extras key of a Phase-2 candidate dropped after such a failure (the failure)
 TRAVEL_DROPPED = "travel_dropped"
-
-
-class HullProbe:
-    """The convex hull of a point set (world, m): its facet planes ``eq`` (``n · p + d <= 0`` inside, unit ``n``) and its vertices
-    plus points along its edges at most ``spacing`` apart (``pts``), for :func:`convex_gap`."""
-
-    def __init__(self, pts: Any, spacing: float = HULL_EDGE_SPACING):
-        from scipy.spatial import ConvexHull
-
-        pts = np.asarray(pts, dtype=float)
-        hull = ConvexHull(pts)
-        self.eq = hull.equations
-        edges = {tuple(sorted((int(s[i]), int(s[(i + 1) % 3])))) for s in hull.simplices for i in range(3)}
-        out = [pts[hull.vertices]]
-        for a, b in edges:
-            n = int(math.ceil(float(np.linalg.norm(pts[b] - pts[a])) / float(spacing)))
-            if n > 1:
-                t = np.linspace(0.0, 1.0, n + 1)[1:-1, None]
-                out.append(pts[a] + t * (pts[b] - pts[a]))
-        self.pts = np.vstack(out)
-
-
-def convex_gap(a: HullProbe, b: HullProbe) -> float:
-    """A lower bound of the distance (m) between two convex hulls, negative when they overlap: each one's vertex and edge points against
-    the other's facet planes (a point's largest signed plane distance never exceeds its distance to the hull)."""
-    return float(min((b.pts @ a.eq[:, :3].T + a.eq[:, 3]).max(axis=1).min(), (a.pts @ b.eq[:, :3].T + b.eq[:, 3]).max(axis=1).min()))
-
-
-def finger_sweep_regions(arm: str, q_from: float, q_peak: float, q_rel: float, retreat: float) -> Optional[List[np.ndarray]]:
-    """Points (eef frame of the place) of the convex regions the two fingers (``r1pro_model.finger_hulls_eef``, the finger joint ``q``
-    moves a finger by ``q`` along its slide axis) sweep at a partial-opening release: each finger from ``q_from`` to ``q_peak`` at the
-    place, then at ``q_rel`` up through the retreat (``retreat`` m back along -a). None without the finger assets."""
-    from ispatialgym.oracle import r1pro_model as RM
-
-    hulls = RM.finger_hulls_eef(arm)
-    if not hulls:
-        return None
-    back = np.array([0.0, 0.0, -float(retreat)])
-    out = []
-    for pts, ax in hulls:
-        out.append(np.vstack([pts + float(q_from) * ax, pts + float(q_peak) * ax]))
-        out.append(np.vstack([pts + float(q_rel) * ax, pts + float(q_rel) * ax + back]))
-    return out
 
 
 def travel_failure_deterministic(err: Reject, world) -> bool:
@@ -2470,91 +2422,12 @@ class IORSSmall(SamplerV2):
         c_min = float(local[in_xa, 1].abs().min())
         return max(0.0, min(float(C.GRIPPER_OPEN_M), 2.0 * (c_min - FINGER_THICKNESS - 0.01)))
 
-    # -- partial-opening release (owner 2026-10-14 ~00:43, COMPLAINTS.md nextto#03: "open only as far as the clearance the sampler already
-    #    records, and let go there") --
-
-    def partial_release(self) -> Optional[Dict[str, float]]:
-        """nextto ``generation.partial_release`` (default unset = off): the regime of the oracle's partial-opening release
-        (``conventions.partial_release_regime``). With it the release that will happen is judged (:meth:`partial_release_gap`) instead
-        of the fully open jaw. None when unset or for another relation."""
-        if self.relation != "nextto":
-            return None
-        return C.partial_release_regime(self.gen("partial_release", None))
-
-    def partial_release_plan(self, grasp: GraspRecord, reg: Dict[str, float]) -> Dict[str, Any]:
-        """Per finger (m) at the drawn grasp: the touch - half the width the pads close on (the library row's pinch width, else the hull
-        chord between the pads, :meth:`pinch_chord`, else the narrow hull extent) + ``touch_extra_m`` -, the peak the release reaches
-        (touch + the contact squeeze + ``loosen_m`` + ``overshoot_m``) and the least release opening (touch + ``pad_clear_m``)."""
-        width, source = None, None
-        try:
-            w = float((C.grasp_entry(grasp.grasp_key, grasp.grasp_name).meta or {}).get("width"))
-            if math.isfinite(w) and w > 0:
-                width, source = w, "library"
-        except (KeyError, TypeError, ValueError):
-            pass
-        if width is None and grasp.eef_in_object is not None:
-            chord = self.pinch_chord(grasp.eef_in_object)
-            if chord:
-                width, source = chord, "hull_chord"
-        if width is None:
-            ext = TT.hull_extents(self.hull["target"], self.rest["target"])
-            width, source = float(min(ext[0], ext[1])), "hull_extent"
-        touch = 0.5 * width + reg["touch_extra_m"]
-        return {"pinch_held_m": round(width, 4), "pinch_source": source, "touch_q_m": round(touch, 4),
-                "peak_q_m": round(min(C.FINGER_OPEN, touch + CONTACT_SQUEEZE + reg["loosen_m"] + reg["overshoot_m"]), 4),
-                "least_q_m": round(min(C.FINGER_OPEN, touch + reg["pad_clear_m"]), 4)}
-
-    def partial_release_gap(self, place_eef: G.Pose, partner: HullProbe, arm: str, q_from: float, q_peak: float, q_rel: float) -> float:
-        """Lower bound of the distance (m) between the partner (a :class:`HullProbe` of its world hull points) and the fingers of a partial
-        release at the place eef pose (:func:`finger_sweep_regions`: from ``q_from`` to ``q_peak``, then at ``q_rel`` through the retreat);
-        without the finger assets (or a degenerate hull) the box of :meth:`open_jaw_clearance` opened to ``q_peak``."""
-        regions = finger_sweep_regions(arm, q_from, q_peak, q_rel, C.PRE_DIST)
-        if regions is not None:
-            pos, quat = G.t(place_eef[0]).double().numpy(), G.t(place_eef[1])
-            R = C.quat_to_mat(quat).double().numpy()
-            try:
-                return min(convex_gap(HullProbe(r @ R.T + pos), partner) for r in regions)
-            except (RuntimeError, ValueError) as e:  # scipy's QhullError is a RuntimeError
-                log.warning("partial release: finger sweep hull failed (%r); the open-jaw box at the peak is used", e)
-        return self.open_jaw_clearance(place_eef, th.as_tensor(partner.pts, dtype=th.float32), open_width=2.0 * float(q_peak))
-
-    def partial_release_opening_max(self, place_eef: G.Pose, partner: HullProbe, arm: str, q_from: float, margin: float) -> float:
-        """The widest release opening per finger (m) whose fingers - opened from ``q_from`` and held there through the retreat - keep
-        ``margin`` from the partner (bisection to 0.5 mm); ``q_from`` when even that does not, the open limit when it does."""
-        def ok(q: float) -> bool:
-            return self.partial_release_gap(place_eef, partner, arm, q_from, q, q) >= margin
-
-        lo, hi = float(q_from), float(C.FINGER_OPEN)
-        if ok(hi):
-            return hi
-        if not ok(lo):
-            return lo
-        while hi - lo > 5e-4:
-            mid = 0.5 * (lo + hi)
-            lo, hi = (mid, hi) if ok(mid) else (lo, mid)
-        return lo
-
-    def partial_release_facts(self, place_eef: G.Pose, p_hull_w: th.Tensor, grasp: GraspRecord, reg: Dict[str, float]) -> Dict[str, Any]:
-        """The partial release at a place: :meth:`partial_release_plan`, the swept fingers' gap to the partner at the peak
-        (``clearance_peak_m``), the widest release opening keeping ``partner_margin_m`` (``release_opening_max_m``, both fingers) and the
-        opening the oracle commands (``release_opening_m`` = 2 x the least release opening, at most that maximum)."""
-        plan = self.partial_release_plan(grasp, reg)
-        partner = HullProbe(G.t(p_hull_w).double().numpy())
-        q_max = self.partial_release_opening_max(place_eef, partner, grasp.arm, plan["touch_q_m"], reg["partner_margin_m"])
-        q_rel = min(plan["least_q_m"], max(q_max, plan["touch_q_m"]))
-        gap = self.partial_release_gap(place_eef, partner, grasp.arm, plan["touch_q_m"], plan["peak_q_m"], q_rel)
-        return dict(plan, partial_release=True, regime=dict(reg), clearance_peak_m=round(gap, 4), release_opening_max_m=round(2.0 * q_max, 4),
-                    release_opening_m=round(2.0 * q_rel, 4))
-
     def avoid_release_sweep(self, st: Stance, depth_t: float, lat: float, t_quat: th.Tensor, lat_init: float, p_lat: th.Tensor, p_hull_w: th.Tensor,
                             gap: float) -> Tuple[float, th.Tensor]:
         """nextto (owner 2026-09-16 20:29): the partner must lie outside the open-jaw footprint at the place; otherwise the
         place moves along the nextto bound away from the partner (gap up to g_NT - 3 mm), then — when the target's orientation
         is free — the place yaw turns the jaw away (±90°, 180°). ``self.release_sweep`` records the clearance, the remedy and
-        the largest release opening that clears the partner by 1 cm (``release_opening_max_m``, for the oracle). With
-        :meth:`partial_release` the judged release is the oracle's partial one instead: the fingers (their meshes' hulls) swept from the
-        touch at the drawn grasp to the release's peak, then held at the release opening through the retreat, must keep
-        ``partner_margin_m`` from the partner (the same move along the bound, no yaw turn); the record adds :meth:`partial_release_facts`."""
+        the largest release opening that clears the partner by 1 cm (``release_opening_max_m``, for the oracle)."""
         tname = self.bindings.one("target").name
         grasp = self.sidecar.grasp_of(tname)
         self.release_sweep = None
@@ -2574,39 +2447,6 @@ class IORSSmall(SamplerV2):
             t_l = t_hull[:, :2] @ st.tangent
             return nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())), (float(t_l.min()), float(t_l.max())), gap_v)[1]
 
-        reg = self.partial_release()
-        if reg is not None:
-            # the oracle's partial-opening release: the fingers swept from the touch to the release's peak, then held at the release
-            # opening through the retreat, keep partner_margin_m from the partner - else the place moves along the nextto bound (the yaw
-            # stays: pair_goal_align fixes it)
-            margin = float(reg["partner_margin_m"])
-            plan = self.partial_release_plan(grasp, reg)
-            partner = HullProbe(G.t(p_hull_w).double().numpy())
-
-            def gap_at(lat_v: float) -> float:
-                return self.partial_release_gap(place_of(lat_v, t_quat), partner, grasp.arm, plan["touch_q_m"], plan["peak_q_m"], plan["least_q_m"])
-
-            best_lat, best_c = lat, gap_at(lat)
-            prec: Dict[str, Any] = {"clearance_m": round(best_c, 4), "remedy": None}
-            if best_c < margin:
-                for gap_v in (g_nt - 0.006, g_nt - 0.003):
-                    if gap_v <= gap:
-                        continue
-                    lat_v = lat_of(t_quat, gap_v)
-                    c_v = gap_at(lat_v)
-                    if c_v > best_c:
-                        best_lat, best_c = lat_v, c_v
-                        prec.update({"remedy": f"gap {gap_v:.3f}", "gap_m": round(gap_v, 4)})
-                    if best_c >= margin:
-                        break
-            prec.update(self.partial_release_facts(place_of(best_lat, t_quat), p_hull_w, grasp, reg))
-            prec["clearance_after_m"] = prec["clearance_peak_m"]
-            self.release_sweep = prec
-            if prec["clearance_peak_m"] < margin:
-                raise Reject("release_sweep", f"partial release: the fingers at its peak ({plan['peak_q_m'] * 1000:.1f} mm per finger) come within "
-                                              f"{prec['clearance_peak_m'] * 1000:.1f} mm of the partner at every admissible place (gap up to g_NT - 3 mm; "
-                                              f"{margin * 1000:.0f} mm needed)")
-            return best_lat, t_quat
         c0 = self.open_jaw_clearance(place_of(lat, t_quat), p_hull_w)
         rec: Dict[str, Any] = {"clearance_m": round(c0, 4), "remedy": None, "open_width_m": C.GRIPPER_OPEN_M}
         best_lat, best_quat, best_c = lat, t_quat, c0
@@ -3015,18 +2855,8 @@ class IORSSmall(SamplerV2):
                 p_hull_now = self.world.hull_at(self.hull["partner"], (p_now[0].float(), p_now[1].float()))
                 c_place = self.open_jaw_clearance(place, p_hull_now)
                 rec = dict(self.release_sweep or {})
-                rec.update({"clearance_at_place_m": round(c_place, 4), "partner_inside_jaw_at_place": c_place < 0})
-                reg = self.partial_release()
-                if reg is not None:
-                    # the release the oracle performs, at the recorded place: its opening and the widest one the oracle may command
-                    facts = self.partial_release_facts(place, p_hull_now, grasp, reg)
-                    rec.update(facts, clearance_peak_at_place_m=facts["clearance_peak_m"])
-                    self.sidecar.extra["partial_release"] = dict(reg)
-                    if facts["clearance_peak_m"] < 0:
-                        raise Reject("release_sweep", f"partial release: at the recorded place the fingers at its peak reach "
-                                                      f"{-facts['clearance_peak_m'] * 1000:.1f} mm into the partner")
-                else:
-                    rec["release_opening_max_m"] = round(self.open_jaw_opening_max(place, p_hull_now), 4)
+                rec.update({"clearance_at_place_m": round(c_place, 4), "partner_inside_jaw_at_place": c_place < 0,
+                            "release_opening_max_m": round(self.open_jaw_opening_max(place, p_hull_now), 4)})
                 grasp.extras["release_sweep"] = rec
                 draft.summary["release_sweep"] = rec
             if self.relation in ("ontop", "under"):

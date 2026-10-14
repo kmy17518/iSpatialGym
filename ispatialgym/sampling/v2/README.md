@@ -404,12 +404,6 @@ the nextto bound (gap up to g_NT − 3 mm), then — when the target's orientati
 away (±90°, 180°); `release_opening_max_m` = the largest symmetric opening that still clears the partner by 1 cm (for the
 oracle's pre-shaped release); when even pinch + 1 cm would sweep it → `Reject("release_sweep")`. Facts (`grasps[k].release_sweep`,
 `summary.release_sweep`) for nextto and touching (touching: at the nextto place the push starts from, facts only).
-nextto with `generation.partial_release` (owner 2026-10-14 ~00:43, COMPLAINTS.md nextto#03; spec §6.11 "Partial-opening release"):
-the judged release is the oracle's partial one - the fingers' mesh hulls swept from the touch at the drawn grasp to the release's
-peak (touch + squeeze + `loosen_m` + `overshoot_m`), then held at the release opening up through the retreat, keep
-`partner_margin_m` from the partner's hull (`partial_release_gap`, `HullProbe` / `convex_gap`); `release_opening_m` (the opening
-the oracle commands) and `release_opening_max_m` (the widest keeping the margin) are recorded for the oracle, the regime in
-`sidecar.extra["partial_release"]`.
 
 ### Robust `under` / `ontop` (D-007 option A, 2026-09-16 21:17)
 
