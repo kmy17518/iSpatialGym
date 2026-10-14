@@ -46262,7 +46262,10 @@
      "grasp_key": "spatula__hkvsep__t076"
     }
    },
-   "partner_side": "right"
+   "partner_side": "right",
+   "partner_aligned_to_target": true,
+   "partner_flat_top": true,
+   "_under04_note": "owner 2026-10-13 ~18:40 (COMPLAINTS.md under_small#04): align the spatula with the paper sheet and move the sheet to a flat part of the support - the sheet is drawn with its long side along the spatula (the 0.76 spatula fits on it only along its 0.29 m side; c3_k1's were 58 deg apart) and the spatula's footprint is centred on it at the goal; the sheet keeps > 1 cm from every part of the top not seen from above as one flat face (c3_k1's lay across the 7.8 mm seam between commercial_kitchen_table_vxvtec_0's two units at y -3.58, which only the visual mesh has: the collision top is one flat hull)"
   },
   "constraints": []
  },

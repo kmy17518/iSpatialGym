@@ -1003,7 +1003,8 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    - **Attempt.** The target starts on a cell of the side's region (within 5 cm of its focus, step 1); the partner gets
      a gap drawn uniformly from that cell's interval re‑evaluated at the drawn target pose, the segment's arm and the
      partner yaw (5 mm grid; 16 random yaws, then the two edge‑aligned footprints the region was computed with; touching
-     the two edge‑aligned footprints in turn, 8 tries — with `widest_faces` the two turns parallel to the target, §6.11),
+     the two edge‑aligned footprints in turn, 8 tries — with `widest_faces` the two turns parallel to the target, §6.11;
+     the yaws along the target with `partner_aligned_to_target`, below),
      then the checks above. This
      replaces the 40 blind tries of a random gap; the shelf layout (touching, §6.11) keeps its partner leaning against
      the opposite board. Recorded: `template_facts.start_region` (edge, L, L_min, lateral, cells and candidates per
@@ -1040,6 +1041,29 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      target keeps its init orientation (a free orientation's release turn is a multiple of 90°), so it ends aligned too.
      Recorded: the instance summary's `init_align_support` (edge yaw, both drafted footprints' residuals). Aliases without
      the key are sampled as before.
+   - **Partner along the target** (owner decision 2026‑10‑13, under_small#04 "align the spatula with the paper sheet";
+     `generation.partner_aligned_to_target: true`; the plain partner draw of ontop / under / inside / nextto — touching and
+     `partner_on_meta_link` reject it as a spec error). The attempt draws the partner only at the yaws that lay the longer
+     side of its footprint's minimum-area rectangle along the target's long axis at the drawn target pose: the two half a
+     turn apart, and a quarter turn from them too when the pair fits at any yaw (no fit tier, or `any_yaw`); shuffled and
+     repeated up to 16 tries, each with its own gap. The target keeps its init yaw to the goal (6.11), so it lies parallel to
+     the partner's edges at init and at the goal; ontop / under centre the target's footprint rectangle, not its origin, on
+     the partner's at the goal (equal margins at both ends of the aligned long axes). Recorded: `partner_draw.long_axes_deg`
+     (0 = parallel). With `init_align_support` too, this key decides the partner's yaw (the edge-aligned
+     target makes it edge-aligned as well). Aliases without the key keep the random partner yaws.
+   - **Partner on a flat part of the top** (owner decision 2026‑10‑13, under_small#04 "move the sheet to a flat part of the
+     support"; `generation.partner_flat_top: true`). Once per template the support's visual meshes (the faces reaching within
+     5 cm of the top) are rasterised as seen from straight above (`partner_flat_res_m`, 0.002 m cells; per cell the highest
+     face over its centre); a cell is flat when that face is horizontal (|normal z| ≥ `partner_flat_normal_min`, 0.99) within
+     `partner_flat_tol_m` (0.003 m) of the top's height (the most common height of the horizontal cells, 1 mm bins, within
+     3 cm of the collision top). Each drawn gap's partner footprint must keep more than `partner_flat_margin_m` (0.01 m) from
+     every cell that is not flat — an extra mask of the gap interval (`flat`), re-checked at the drawn pose: no seam between
+     two table units, edge, rim, lip or opening under the partner. The visual meshes, not raycasts:
+     commercial_kitchen_table_vxvtec_0's collision top is one flat hull (z 0.8705 across the whole top, 0.5 mm scans flat),
+     while its render shows a 7.8 mm seam between its two table units (y −3.583 / −3.576, chamfered) that c3_k1's sheet lay
+     across. A support without a flat cell rejects the template (`support_flat`). Recorded: `template_facts.partner_flat_top`
+     (cells, flat cells, `z_ref`, faces, build time) and `partner_draw.flat_top` (clearance up to 0.10 m, the seen height range
+     under the footprint relative to `z_ref`). Aliases without the key are sampled as before.
 3. **Distractors** (disembedding) on the source tray, footprints ≥ 1 cm from each other and from the target, within
    `tray_budget` (6.4); they may occlude the target up to **30 %** of its visible area (segmentation render, distractors
    visible vs hidden); no other occlusion bucket exists. *Owner decision 2026‑10‑12 (A2b):* no spacing along the drawn
@@ -2237,7 +2261,10 @@ and the angle between the two normals at init and at the goal.
 
 - ontop / under(small): the partner's top face admits the target footprint with ≥ 1 cm margin — tier `any_yaw`
   (fits at every yaw; preferred), `aligned` (fits only with the long axes aligned: the goal yaw set is restricted to
-  those yaws), `centred` (fits only centred: the goal offset is 0); no tier → `partner_too_small`.
+  those yaws), `centred` (fits only centred: the goal offset is 0); no tier → `partner_too_small`. The goal keeps the
+  init yaw, so the long axes are aligned only with `generation.partner_aligned_to_target` (4.6 step 2: the partner is
+  drawn along the target); without it the partner's yaw is random (under_small#04 c3_k1: the 0.76 spatula 58° off the
+  sheet's long side, overhanging it at the goal).
 - inside: opening ≥ target footprint + 1 cm at the target's standing or lying orientation, and a **drop test**
   (target released 5 mm above the rim at the `fillable` centroid, settled 120 steps): `Inside` true and the target
   protrudes above the rim by ≤ half its height (`does_not_fit_inside`). Flowers (stem grasps) use the standing

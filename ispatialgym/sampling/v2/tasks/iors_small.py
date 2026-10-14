@@ -9,7 +9,8 @@ stance after the goal settled, the touching push + brace, the constraints it lea
 ``generation`` block (D1 ``generation_defaults``): ``table_end_margin_m``, ``start_region_lateral_draws``, ``partner_on_meta_link``
 (A5: the partner centred on one of the support's meta links of that type, e.g. a burner's ``heatsource``), ``start_region_on_neighbors``
 (with ``partner_on_meta_link``: the target starts on a neighbouring support's top, A4), ``init_align_support`` (the target and the
-partner start with their footprints along the support's edges, owner 2026-10-13),
+partner start with their footprints along the support's edges, owner 2026-10-13), ``partner_aligned_to_target`` (the partner's long
+side along the target's long axis), ``partner_flat_top`` (the partner's footprint on a part of the top seen from above as one flat face),
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
 ``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
 (inside), ``handedness`` (nextto mirror pairs: the target ends on its own side of the partner), ``target_up_axis`` (inside: the
@@ -250,6 +251,147 @@ def footprint_laterals(pts: th.Tensor, tangent) -> Tuple[float, float]:
     return float(v.min()), float(v.max())
 
 
+def min_area_rect(pts) -> Tuple[float, float, float, th.Tensor]:
+    """The minimum-area bounding rectangle of the points ``pts`` (N, 2+; world xy, e.g. a footprint polygon): ``(angle, long, short, centre)``
+    - the world angle (rad, in [0, pi)) of its longer side, the lengths of its two sides (one side lies along an edge of the convex hull)
+    and its centre (world xy)."""
+    xy = G.t(pts)[:, :2].float()
+    hull = G.convex_hull_2d(xy) if len(xy) > 2 else xy
+    best = None
+    for i in range(len(hull)):
+        e = hull[(i + 1) % len(hull)] - hull[i]
+        if float(th.linalg.norm(e)) < 1e-9:
+            continue
+        ang = math.atan2(float(e[1]), float(e[0]))
+        c, s = math.cos(ang), math.sin(ang)
+        u, v = hull[:, 0] * c + hull[:, 1] * s, -hull[:, 0] * s + hull[:, 1] * c
+        a, b = float(u.max() - u.min()), float(v.max() - v.min())
+        if best is None or a * b < best[0] - 1e-12:
+            uc, vc = 0.5 * float(u.max() + u.min()), 0.5 * float(v.max() + v.min())
+            best = (a * b, ang, a, b, th.tensor([uc * c - vc * s, uc * s + vc * c]))
+    if best is None:
+        return 0.0, 0.0, 0.0, (xy.mean(dim=0) if len(xy) else th.zeros(2))
+    _, ang, a, b, centre = best
+    if b > a:
+        ang, a, b = ang + math.pi / 2, b, a
+    return ang % math.pi, a, b, centre
+
+
+def target_aligned_partner_yaws(t_fp, p_fp_rest, across: bool) -> List[float]:
+    """``generation.partner_aligned_to_target``: the partner yaws (rad, about world z, applied to its rest orientation as ``draw_partner_pose``
+    applies them) that lay the longer side of its footprint along the target's long axis - ``t_fp`` the target's footprint at its init pose,
+    ``p_fp_rest`` the partner's at its rest orientation: the two half a turn apart, then with ``across`` the two a quarter turn from them (the
+    partner's long side across the target)."""
+    y = G.wrap_angle(min_area_rect(t_fp)[0] - min_area_rect(p_fp_rest)[0])
+    out = [y, G.wrap_angle(y + math.pi)]
+    if across:
+        out += [G.wrap_angle(y + math.pi / 2), G.wrap_angle(y - math.pi / 2)]
+    return out
+
+
+def long_axes_angle_deg(a_fp, b_fp) -> float:
+    """The angle (deg, 0-90) between the long axes of two footprints' minimum-area rectangles (0 = parallel)."""
+    d = abs(min_area_rect(a_fp)[0] - min_area_rect(b_fp)[0]) % math.pi
+    return math.degrees(min(d, math.pi - d))
+
+
+def raster_from_above(tri: np.ndarray, x0: float, y0: float, nx: int, ny: int, res: float) -> Tuple[np.ndarray, np.ndarray]:
+    """What is seen from straight above: per cell centre ``(x0 + (i + 0.5) res, y0 + (j + 0.5) res)`` the z of the highest triangle of ``tri``
+    (M, 3, 3; world) over it and that triangle's |normal z|, NaN where none covers it (vertical triangles are not seen)."""
+    zbuf, nbuf = np.full((nx, ny), np.nan), np.full((nx, ny), np.nan)
+    tri = np.asarray(tri, dtype=float).reshape(-1, 3, 3)
+    n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    nn = np.linalg.norm(n, axis=1)
+    for k in np.nonzero(nn > 1e-12)[0]:
+        anz = abs(float(n[k, 2])) / float(nn[k])
+        if anz < 1e-3:
+            continue
+        (ax, ay, az), (bx, by, bz), (cx, cy, cz) = tri[k]
+        lo, hi = tri[k, :, :2].min(axis=0), tri[k, :, :2].max(axis=0)
+        i0, i1 = max(int(math.floor((lo[0] - x0) / res - 0.5)), 0), min(int(math.ceil((hi[0] - x0) / res - 0.5)), nx - 1)
+        j0, j1 = max(int(math.floor((lo[1] - y0) / res - 0.5)), 0), min(int(math.ceil((hi[1] - y0) / res - 0.5)), ny - 1)
+        d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+        if i1 < i0 or j1 < j0 or abs(d) < 1e-15:
+            continue
+        X, Y = np.meshgrid(x0 + (np.arange(i0, i1 + 1) + 0.5) * res, y0 + (np.arange(j0, j1 + 1) + 0.5) * res, indexing="ij")
+        w1 = ((by - cy) * (X - cx) + (cx - bx) * (Y - cy)) / d
+        w2 = ((cy - ay) * (X - cx) + (ax - cx) * (Y - cy)) / d
+        w3 = 1.0 - w1 - w2
+        z = w1 * az + w2 * bz + w3 * cz
+        sub_z, sub_n = zbuf[i0:i1 + 1, j0:j1 + 1], nbuf[i0:i1 + 1, j0:j1 + 1]
+        better = (w1 >= -1e-9) & (w2 >= -1e-9) & (w3 >= -1e-9) & (np.isnan(sub_z) | (z > sub_z))
+        sub_z[better], sub_n[better] = z[better], anz
+    return zbuf, nbuf
+
+
+def polygon_signed_distance(pts, poly) -> np.ndarray:
+    """Signed distance (m) of the points ``pts`` (N, 2) from the convex CCW polygon ``poly`` (V, 2): the largest distance beyond its edge lines
+    (positive outside, negative inside; beyond a corner the distance to the nearer edge line)."""
+    pts, poly = np.asarray(pts, dtype=float).reshape(-1, 2), np.asarray(poly, dtype=float).reshape(-1, 2)
+    e = np.roll(poly, -1, axis=0) - poly
+    nrm = np.stack([e[:, 1], -e[:, 0]], axis=1)  # outward for a CCW polygon
+    nrm = nrm / np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-12)
+    return ((pts[:, None, :] - poly[None, :, :]) * nrm[None, :, :]).sum(axis=2).max(axis=1)
+
+
+class FlatTop:
+    """``generation.partner_flat_top`` (under_small#04, owner 2026-10-13 ~18:40: "move the sheet to a flat part of the support"): the cells of a
+    support's top that are seen from straight above as one flat face - the highest face over the cell centre horizontal (|normal z| >=
+    ``normal_min``) within ``tol`` of the top's height ``z_ref``. A seam between two table units, an edge, a rim, a lip or an opening is not
+    flat. Cell (i, j) is centred at ``(x0 + (i + 0.5) res, y0 + (j + 0.5) res)``; ``z`` the seen height (NaN where nothing is seen)."""
+
+    def __init__(self, x0: float, y0: float, res: float, z: np.ndarray, flat: np.ndarray, z_ref: float):
+        self.x0, self.y0, self.res, self.z, self.flat, self.z_ref = float(x0), float(y0), float(res), np.asarray(z), np.asarray(flat, dtype=bool), float(z_ref)
+
+    @classmethod
+    def from_raster(cls, x0: float, y0: float, res: float, zbuf: np.ndarray, nbuf: np.ndarray, z_hint: float, tol: float, normal_min: float,
+                    band: float = 0.03) -> "FlatTop":
+        """From :func:`raster_from_above`: ``z_ref`` = the most common height (1 mm bins) of the horizontal cells within ``band`` of ``z_hint``
+        (the collision top's height), else ``z_hint``."""
+        horiz = ~np.isnan(zbuf) & (np.nan_to_num(nbuf) >= normal_min) & (np.abs(np.nan_to_num(zbuf, nan=-1e9) - z_hint) <= band)
+        z_ref = float(z_hint)
+        if horiz.any():
+            bins, counts = np.unique(np.round(zbuf[horiz] * 1000.0).astype(np.int64), return_counts=True)
+            mode = int(bins[int(np.argmax(counts))])
+            z_ref = float(np.median(zbuf[horiz][np.round(zbuf[horiz] * 1000.0).astype(np.int64) == mode]))
+        flat = horiz & (np.abs(np.nan_to_num(zbuf, nan=-1e9) - z_ref) <= tol)
+        return cls(x0, y0, res, zbuf, flat, z_ref)
+
+    def _window(self, lo, hi) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """The cells centred within the world box ``lo`` .. ``hi``: their centres' x and y, and their flat / z sub-arrays (a cell outside the
+        raster is not flat, its z NaN)."""
+        i = np.arange(math.ceil((float(lo[0]) - self.x0) / self.res - 0.5), math.floor((float(hi[0]) - self.x0) / self.res - 0.5) + 1)
+        j = np.arange(math.ceil((float(lo[1]) - self.y0) / self.res - 0.5), math.floor((float(hi[1]) - self.y0) / self.res - 0.5) + 1)
+        flat, z = np.zeros((len(i), len(j)), dtype=bool), np.full((len(i), len(j)), np.nan)
+        ii, jj = (i >= 0) & (i < self.flat.shape[0]), (j >= 0) & (j < self.flat.shape[1])
+        if ii.any() and jj.any():
+            flat[np.ix_(ii, jj)] = self.flat[np.ix_(i[ii], j[jj])]
+            z[np.ix_(ii, jj)] = self.z[np.ix_(i[ii], j[jj])]
+        return self.x0 + (i + 0.5) * self.res, self.y0 + (j + 0.5) * self.res, flat, z
+
+    def clearance(self, poly, reach: float) -> float:
+        """The distance (m) from the footprint polygon ``poly`` (world xy, convex CCW) to the nearest cell centre that is not flat, looked for
+        within ``reach`` of it; ``reach`` when none is nearer, negative when one lies inside it."""
+        p = np.asarray(poly, dtype=float).reshape(-1, 2)
+        xs, ys, flat, _ = self._window(p.min(axis=0) - reach, p.max(axis=0) + reach)
+        a, b = np.nonzero(~flat)
+        if not len(a):
+            return float(reach)
+        return min(float(reach), float(polygon_signed_distance(np.stack([xs[a], ys[b]], axis=1), p).min()))
+
+    def heights(self, poly) -> Optional[Tuple[float, float]]:
+        """(min, max) of the seen height over the cells whose centres lie inside ``poly``; None when it covers none."""
+        p = np.asarray(poly, dtype=float).reshape(-1, 2)
+        xs, ys, _, z = self._window(p.min(axis=0), p.max(axis=0))
+        X, Y = np.meshgrid(xs, ys, indexing="ij")
+        inside = (polygon_signed_distance(np.stack([X.ravel(), Y.ravel()], axis=1), p) <= 0.0).reshape(X.shape) & ~np.isnan(z)
+        return (float(z[inside].min()), float(z[inside].max())) if inside.any() else None
+
+    def facts(self) -> Dict[str, Any]:
+        return {"res_m": self.res, "z_ref": round(self.z_ref, 5), "n_cells": int(self.flat.size), "n_flat": int(self.flat.sum()),
+                "n_seen": int((~np.isnan(self.z)).sum())}
+
+
 def gap_along(behind_w: th.Tensor, ahead_w: th.Tensor, direction) -> float:
     """Gap (m) along ``direction`` (world, horizontal) from a hull to the hull ahead of it, both world points: the nearest extent of
     ``ahead_w`` minus the farthest of ``behind_w`` (negative when they overlap along it)."""
@@ -330,6 +472,7 @@ class IORSSmall(SamplerV2):
         self.region_side: Optional[float] = None  # A1: the partner side of the current attempt (+1 = the robot's left of the target)
         self.partner_draw: Optional[Dict[str, Any]] = None  # A1: the drawn partner's side, gap and the gap interval it came from
         self.meta_spots: Optional[List[Tuple[str, th.Tensor]]] = None  # A5: (meta link, world xy) the partner may be centred on
+        self.flat_top: Optional[FlatTop] = None  # generation.partner_flat_top: the flat cells of the support's top (build_flat_top)
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -441,10 +584,12 @@ class IORSSmall(SamplerV2):
         self.template_facts["widest_faces"] = self.widest_faces()  # Reject("spec") before any phase
         self.template_facts["partner_sides"] = [TT.side_name(sd) for sd in self.template_sides()]  # A1: Reject("partner_side") before any phase
         self.template_facts["partner_on_meta_link"] = self.meta_link()
+        self.template_facts["partner_aligned_to_target"] = self.partner_aligned_to_target()
         H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
         self.top = TT.support_surface(self, self.support, height=H_max)
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{self.support.name}: too little free top")
+        self.flat_top = self.build_flat_top()
         self.target_tremble_screen()  # 7g: before the bands and the stances
         nb_top = self.neighbor_start_top()  # start_region_on_neighbors (rejected here without a neighbour top): Phase 2's foci on its cells
         margins = self.lateral_margins()
@@ -965,6 +1110,86 @@ class IORSSmall(SamplerV2):
             raise Reject("spec", f"{self.gp.alias}: generation.partner_on_meta_link is for ontop / under / inside / nextto (touching braces its partner)")
         return str(link) if link else None
 
+    def partner_aligned_to_target(self) -> bool:
+        """under_small#04 (owner 2026-10-13 ~18:40: "align the spatula with the paper sheet"), ``generation.partner_aligned_to_target``
+        (default off): the partner is drawn only at the yaws that lay its footprint's long side along the target's long axis at the drawn
+        target pose (:meth:`aligned_partner_yaws`) instead of random yaws. The target keeps its init yaw to the goal (§6.11), so it lies
+        parallel to the partner's edges at init and at the goal - for ontop / under of tier ``aligned`` / ``centred`` the long axes
+        parallel, the only yaws at which the target fits on the partner. ``Reject("spec")`` with touching (edge-aligned, :meth:`edge_aligned`)
+        or ``partner_on_meta_link`` (a random yaw per spot)."""
+        on = bool(self.gen("partner_aligned_to_target", False))
+        if on and (self.relation == "touching" or self.meta_link() is not None):
+            raise Reject("spec", f"{self.gp.alias}: generation.partner_aligned_to_target is for the plain partner draw of ontop / under / inside / nextto "
+                                 f"(not touching, not partner_on_meta_link)")
+        return on
+
+    def aligned_partner_yaws(self, t_pose: G.Pose, rng: np.random.Generator) -> List[float]:
+        """The partner yaws an attempt tries with :meth:`partner_aligned_to_target`: :func:`target_aligned_partner_yaws` at the drawn target
+        pose - the long side across the target too only when the pair fits at any yaw (no fit tier, or ``any_yaw``) -, shuffled and repeated
+        up to ``PARTNER_YAW_DRAWS`` tries (each try draws its own gap)."""
+        t_fp = self.world.footprint(self.hull["target"], t_pose)
+        p_fp = self.world.footprint(self.hull["partner"], (th.zeros(3), G.t(self.rest["partner"])))
+        base = target_aligned_partner_yaws(t_fp, p_fp, across=(self.pair or {}).get("tier") in (None, "any_yaw"))
+        return [base[int(i)] for _ in range(max(1, PARTNER_YAW_DRAWS // len(base))) for i in rng.permutation(len(base))]
+
+    @property
+    def flat_margin(self) -> float:
+        return float(self.gen("partner_flat_margin_m", 0.01))
+
+    def build_flat_top(self) -> Optional[FlatTop]:
+        """under_small#04 (owner 2026-10-13 ~18:40: "move the sheet to a flat part of the support"), ``generation.partner_flat_top`` (default
+        off): the partner's footprint, grown by ``partner_flat_margin_m`` (0.01), must lie on cells of the support's top that are seen from
+        straight above as one flat face (:class:`FlatTop`). Built once per template from the support's visual meshes (the faces reaching
+        within 5 cm of the top), rasterised at ``partner_flat_res_m`` (0.002) with ``partner_flat_tol_m`` (0.003) and
+        ``partner_flat_normal_min`` (0.99). The visual meshes, not raycasts: commercial_kitchen_table_vxvtec_0's collision top is one flat
+        hull (z 0.8705 across its whole top), while its render shows the seam between its two table units, which c3_k1's sheet covered.
+        None without the key."""
+        if not self.gen("partner_flat_top", False):
+            return None
+        import time
+
+        t0 = time.time()
+        res, tol = float(self.gen("partner_flat_res_m", 0.002)), float(self.gen("partner_flat_tol_m", 0.003))
+        normal_min = float(self.gen("partner_flat_normal_min", 0.99))
+        z_top = float(self.top.z)
+        self.world.sync_render_transforms()
+        tris = []
+        for link in self.support.links.values():
+            for mesh in link.visual_meshes.values():
+                tri = mesh.points_in_world_frame.float().numpy()[mesh.faces.long().numpy()]
+                tris.append(tri[tri[:, :, 2].max(axis=1) >= z_top - 0.05])
+        tri = np.concatenate(tris) if tris else np.zeros((0, 3, 3))
+        lo, hi = (G.t(v).float() for v in self.support.aabb)
+        x0, y0 = float(lo[0]) - res, float(lo[1]) - res
+        nx, ny = int(math.ceil((float(hi[0]) - x0) / res)) + 2, int(math.ceil((float(hi[1]) - y0) / res)) + 2
+        zbuf, nbuf = raster_from_above(tri, x0, y0, nx, ny, res)
+        flat = FlatTop.from_raster(x0, y0, res, zbuf, nbuf, z_top, tol, normal_min)
+        facts = dict(flat.facts(), tol_m=tol, normal_min=normal_min, margin_m=self.flat_margin, collision_top_z=round(z_top, 5), n_triangles=int(len(tri)),
+                     build_s=round(time.time() - t0, 2))
+        self.template_facts["partner_flat_top"] = facts
+        log.info("%s: partner_flat_top on %s: %d of %d cells flat at z %.4f (collision top %.4f), %d faces, %.1f s", self.gp.alias, self.support.name, facts["n_flat"],
+                 facts["n_cells"], flat.z_ref, z_top, len(tri), facts["build_s"])
+        if not facts["n_flat"]:
+            raise Reject("support_flat", f"{self.support.name}: no flat cell on its top seen from above ({len(tri)} faces near the top)")
+        return flat
+
+    def flat_gap_mask(self, side: float, t_fp: th.Tensor, depth: float, p_quat, manip: Stance, gs: Sequence[float]) -> np.ndarray:
+        """``generation.partner_flat_top``: per gap of ``gs``, the partner footprint at ``p_quat`` laid out as ``tabletop.partner_gap_masks``
+        lays it out keeps more than ``partner_flat_margin_m`` from every cell of the top that is not flat."""
+        t_lat = (G.t(t_fp)[:, :2].float() - manip.base_xy) @ manip.tangent
+        fp = self.world.footprint(self.hull["partner"], (th.zeros(3), G.t(p_quat))).float()
+        p_lat = fp @ manip.tangent
+        xy = TT.partner_origin_xy(side, (float(t_lat.min()), float(t_lat.max())), (float(p_lat.min()), float(p_lat.max())), depth, manip, gs)
+        reach = self.flat_margin + 2 * self.flat_top.res
+        return np.array([self.flat_top.clearance(fp + xy[k], reach) > self.flat_margin for k in range(len(xy))], dtype=bool)
+
+    def flat_pose_why(self, p_pose: G.Pose) -> Optional[str]:
+        """``generation.partner_flat_top`` at a drawn partner pose: why its footprint is too near a part of the top that is not flat, else None."""
+        c = self.flat_top.clearance(self.world.footprint(self.hull["partner"], p_pose), self.flat_margin + 2 * self.flat_top.res)
+        if c <= self.flat_margin:
+            return f"partner footprint {100 * c:.1f} cm from a part of the top that is not flat (needs > {100 * self.flat_margin:.1f} cm)"
+        return None
+
     def neighbor_start_top(self) -> Optional["NB.UnionTop"]:
         """Owner 2026-10-12 (ontop_small#02 6d), ``generation.start_region_on_neighbors``: the partner stands on a meta link of the support
         (:meth:`meta_link`) and the target starts on a neighbouring support's top (A4) - the union top with the support's own cells taken
@@ -1399,16 +1624,26 @@ class IORSSmall(SamplerV2):
         gs = TT.gap_grid(*self.gap_range(), step=0.5 * TT.START_REGION_GAP_STEP)
         masks = TT.partner_gap_masks(self, side, t_fp, depth, self.hull["partner"], p_quat, manip, gs, top=self.top, cam=cam, margin=self.margin_support,
                                      m_end=self.table_end_margin, band=band, reach=reach, t_origin=t_c, place_gap=self.place_gap())
+        flat = getattr(self, "flat_top", None)
+        if flat is not None and len(gs):
+            masks["flat"] = self.flat_gap_mask(side, t_fp, depth, p_quat, manip, gs)
         run = TT.longest_run(gs, np.logical_and.reduce([np.ones(len(gs), dtype=bool)] + list(masks.values())))
         if run is None:
             return None, TT.gap_masks_why(gs, masks)
         g = float(rng.uniform(run[0], run[1]))
         pose = TT.partner_pose_at(self, side, t_fp, depth, self.hull["partner"], p_quat, manip, g, top=self.top)
         why = TT.partner_pose_why(self, t_fp, self.hull["partner"], pose, top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
+        if not why and flat is not None:
+            why = self.flat_pose_why(pose)
         if why:
             return None, f"gap {g:.3f}: {why}"
         self.partner_draw = {"side": TT.side_name(side), "gap_m": round(g, 4), "gap_interval_m": [round(run[0], 4), round(run[1], 4)],
                              "yaw_deg": round(math.degrees(yaw), 1), "cell_interval_m": (manip.extras.get(TT.START_REGION) or {}).get(TT.side_name(side))}
+        if flat is not None:
+            p_fp = self.world.footprint(self.hull["partner"], pose)
+            zr = flat.heights(p_fp)
+            self.partner_draw["flat_top"] = {"clearance_m": round(flat.clearance(p_fp, 0.10), 4),
+                                             "seen_height_range_mm": None if zr is None else [round(1000 * (v - flat.z_ref), 2) for v in zr]}
         return pose, ""
 
     def draw_meta_partner_pose(self, rng: np.random.Generator, side: float, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
@@ -1471,8 +1706,11 @@ class IORSSmall(SamplerV2):
             return self.draw_meta_partner_pose(rng, side, t_pose, manip, cam)
         if self.relation != "touching":
             # random yaws, then the two edge-aligned footprints the start region was computed with (a tight top admits little else);
-            # init_align_support: the four edge-aligned yaws only, in random order, each tried with fresh gap draws
-            if self.init_align_support():
+            # init_align_support: the four edge-aligned yaws only, in random order, each tried with fresh gap draws; partner_aligned_to_target:
+            # the yaws along the target's drawn pose instead (the partner follows the target - edge-aligned too when the target is)
+            if self.partner_aligned_to_target():
+                yaws = self.aligned_partner_yaws(t_pose, rng)
+            elif self.init_align_support():
                 aligned = self.edge_aligned_yaws("partner", manip)
                 yaws = [aligned[int(k)] for k in rng.permutation(4)] * (PARTNER_YAW_DRAWS // 4)
             else:
@@ -1481,6 +1719,9 @@ class IORSSmall(SamplerV2):
             for yaw in yaws:
                 p_pose, why = self.draw_partner_pose(rng, side, t_pose, manip, cam, yaw)
                 if p_pose is not None:
+                    if self.partner_aligned_to_target():
+                        self.partner_draw["long_axes_deg"] = round(long_axes_angle_deg(self.world.footprint(self.hull["target"], t_pose),
+                                                                                       self.world.footprint(self.hull["partner"], p_pose)), 2)
                     return p_pose
                 misses.append(f"yaw {math.degrees(yaw):+.0f}: {why}")
             raise Reject("partner_placement", f"no partner yaw of {len(yaws)} admits a gap on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
@@ -1809,6 +2050,12 @@ class IORSSmall(SamplerV2):
         self.goal_side = None
         if self.relation in ("ontop", "under"):
             xy = (p_hull_w[:, :2].max(dim=0).values + p_hull_w[:, :2].min(dim=0).values) / 2
+            origin_off = th.zeros(2)
+            if self.partner_aligned_to_target():
+                # the target's footprint (its minimum-area rectangle), not its origin, centred on the partner's: the aligned long axes keep
+                # equal margins at both ends (the spatula's origin sits 1.6 cm toward its blade, the sheet leaves 1 cm per end)
+                xy = min_area_rect(p_hull_w)[3]
+                origin_off = min_area_rect(t_hull)[3]
             top = float(p_hull_w[:, 2].max())
             # owner item 3 (2026-09-16 10:15): release 1 cm above the *actual* surface under the footprint centre (saucer
             # well, plate centre) — a downward raycast from above the partner, the target ignored — instead of goal_drop
@@ -1824,7 +2071,7 @@ class IORSSmall(SamplerV2):
             above += contact_height_extra(self, "release")[0]  # A/B knob: the release height lifted by the constant
             self.release_above_m = above
             z = base_z + above - float(t_hull[:, 2].min())
-            return th.tensor([float(xy[0]), float(xy[1]), z]), t_quat
+            return th.tensor([float(xy[0] - origin_off[0]), float(xy[1] - origin_off[1]), z]), t_quat
         if self.relation == "inside":
             return self.release_pose(t_quat, t_hull, p_hull_w, p_pose)
         gap = 0.0 if self.relation == "touching" else max(0.0, float(self.pair["g_NT"]) - 0.01)
