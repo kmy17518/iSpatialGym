@@ -1,0 +1,35 @@
+(define (problem configuration_matching-6)
+    (:domain ispatialgym)
+    (:variant configuration_matching-articulation_open_small_scale-blender-breakfast_table)
+
+    ; Configuration matching (articulation, small scale, open): open the object to the goal joint configuration; its
+    ; root pose is measured, not gated.
+
+    (:objects
+        blender.n.01_1 - blender.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (not (open blender.n.01_1))
+        (ontop blender.n.01_1 breakfast_table.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (open ?blender.n.01_1)
+            (ontop ?blender.n.01_1 ?breakfast_table.n.01_1)
+            (not (grasped ?agent.n.01_1 ?blender.n.01_1))
+            (pose_settled ?blender.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?blender.n.01_1)
+        (layout_reached ?blender.n.01_1)
+    )
+)

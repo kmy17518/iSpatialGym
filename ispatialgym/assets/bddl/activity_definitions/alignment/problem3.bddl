@@ -1,0 +1,31 @@
+(define (problem alignment-3)
+    (:domain ispatialgym)
+    (:variant alignment-world_vertical-painting-walls)
+
+    ; Alignment (vertical): the target hangs on the wall from a hinge at its centre of mass, its axis along the wall
+    ; normal. Turn it upright.
+
+    (:objects
+        painting.n.01_1 - painting.n.01
+        wall.n.01_1 - wall.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (pose_reached ?painting.n.01_1)
+            (not (grasped ?agent.n.01_1 ?painting.n.01_1))
+            (pose_settled ?painting.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?painting.n.01_1)
+    )
+)

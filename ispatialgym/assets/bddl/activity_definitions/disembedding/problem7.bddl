@@ -1,0 +1,43 @@
+(define (problem disembedding-7)
+    (:domain ispatialgym)
+    (:variant disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-breakfast_table)
+
+    ; Disembedding: find the target among the distractors on the source tray and place it on the destination tray; no
+    ; distractor may end there.
+
+    (:objects
+        jigsaw_puzzle_piece.n.01_1 jigsaw_puzzle_piece.n.01_2 jigsaw_puzzle_piece.n.01_3 jigsaw_puzzle_piece.n.01_4 - jigsaw_puzzle_piece.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        tray.n.01_1 tray.n.01_2 - tray.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:groups
+        jigsaw_puzzle_piece.n.01_2 jigsaw_puzzle_piece.n.01_3 jigsaw_puzzle_piece.n.01_4 - distractors_group.n.01_1
+    )
+
+    (:init
+        (ontop tray.n.01_1 breakfast_table.n.01_1)
+        (ontop tray.n.01_2 breakfast_table.n.01_1)
+        (ontop jigsaw_puzzle_piece.n.01_1 tray.n.01_1)
+        (ontop distractors_group.n.01_1 tray.n.01_1)
+        (not (ontop jigsaw_puzzle_piece.n.01_1 tray.n.01_2))
+        (not (ontop distractors_group.n.01_1 tray.n.01_2))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (ontop ?jigsaw_puzzle_piece.n.01_1 ?tray.n.01_2)
+            (not (ontop ?distractors_group.n.01_1 ?tray.n.01_2))
+            (not (grasped ?agent.n.01_1 ?jigsaw_puzzle_piece.n.01_1))
+            (pose_settled ?jigsaw_puzzle_piece.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?jigsaw_puzzle_piece.n.01_1)
+    )
+)

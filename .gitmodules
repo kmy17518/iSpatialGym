@@ -1,0 +1,4 @@
+[submodule "Behavior-1K"]
+	path = Behavior-1K
+	url = https://github.com/kmy17518/BEHAVIOR-1K.git
+	branch = ispatialgym-eval

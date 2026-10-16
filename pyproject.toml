@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ispatialgym"
+dynamic = ["version"]
+description = "iSpatialGym is a comprehensive simulation benchmark for testing embodied AI agents on spatial intelligence."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+# Isaac Sim, OmniGibson and BDDL are installed from the Behavior-1K submodule (see setup.sh).
+dependencies = [
+    "huggingface-hub>=0.34.4",
+    "imageio>=2.33.1",
+    "imageio-ffmpeg>=0.4.9",
+    "numpy>=1.23.5,<2",
+    "opencv-python>=4.8.1",
+    "pillow",
+    "pyyaml>=6.0.1",
+    "scipy>=1.10.1",
+    "torch",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.6"]
+
+[project.urls]
+Repository = "https://github.com/kmy17518/iSpatialGym"
+Dataset = "https://huggingface.co/datasets/kmy17518/ispatialgym-eval-data"
+
+[tool.setuptools.dynamic]
+version = { attr = "ispatialgym.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["ispatialgym*"]
+
+[tool.setuptools.package-data]
+ispatialgym = ["assets/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = ["Behavior-1K"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ispatialgym"]
