@@ -106,6 +106,13 @@ def test_settle_eval_off_follows_no_other_mode():
         tr.step_of("geometric", "on")  # not followed, rather than never reached
 
 
+def test_errors_fall_back_to_symbolic_success_when_geometric_not_reached():
+    tr = run(MET.SuccessTracker(settle_eval=False, settle_steps=2), [(0, 0, 0), (1, 0, 0), (0, 0, 0)])
+    rep = tr.report({"t": "cutoff"}, [(POSE, "t")])
+    assert rep["symbolic_success"] and rep["symbolic_success_step"] == 1
+    assert not rep["geometric_success"] and rep["errors"] == {"t": 1}
+
+
 def test_no_goal_ever():
     tr = run(MET.SuccessTracker(settle_eval=False, settle_steps=1), [(0, 1, 1)] * 4)
     assert tr.first == {"off": {"symbolic": None, "geometric": None}} and tr.goal_first_step is None

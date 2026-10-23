@@ -2,8 +2,6 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor (inter_object_relation_satisfaction/ontop_large_scale.iddl; inter_object_relation_satisfaction-ontop_large_scale#01~T5/representative)
-    ; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c2: hand-made from this grounding - soap_dispenser/zwudcz onto countertop_fjkase_0 from the floor of utility_room_0; registry mode test
     ; IORS - ontop (large-scale). The target starts on a support (a table within 3 m of the partner, or the floor beside it -
     ; an explicit support choice made by ground_isg, never a runtime fallback) and ends on top of a large scene partner
     ; (bed, sofa, desk, breakfast table, countertop; roles/candidates.csv kind scene). Three recorded stances: init A, manipulation B,

@@ -2,7 +2,6 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-commercial_kitchen_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-commercial_kitchen_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#04~T4/representative)
     ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
     ; its init orientation; the partner stays where it was. Both poses measured.
 

@@ -2,7 +2,6 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table (inter_object_relation_satisfaction/nextto_small_scale.iddl; inter_object_relation_satisfaction-nextto#01~T1/representative)
     ; IORS - nextto (small-scale). Target and partner on the support with an init gap above the NextTo bound; the target
     ; is moved to the nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same
     ; orientation.

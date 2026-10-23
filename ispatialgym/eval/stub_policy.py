@@ -44,23 +44,27 @@ class DemoPolicy:
 
 
 class HoldPolicy:
-    def __init__(self):
-        self.n = int(os.environ.get("ISG_STUB_HOLD_STEPS", "150"))
+    def __init__(self, steps: Optional[int] = None):
+        self.n = int(os.environ.get("ISG_STUB_HOLD_STEPS", "150")) if steps is None else int(steps)
         self.action: Optional[th.Tensor] = None
         self.i = 0
 
     def bind(self, executor=None, loader=None, meta=None, out_dir=None, tro_path=None):
         from ispatialgym.oracle import r1pro_model as M
 
-        robot = executor.robot
-        q = th.as_tensor(robot.get_joint_positions(), dtype=th.float32).reshape(-1)
-        idx = robot.controller_action_idx
-        a = th.zeros(M.ACTION_DIM)
-        a[idx["trunk"]] = q[robot.trunk_control_idx]
-        for arm in M.ARMS:
-            a[idx[f"arm_{arm}"]] = q[robot.arm_control_idx[arm]]
-            a[idx[f"gripper_{arm}"]] = 1.0
-        self.action = a
+        hold = getattr(loader, "hold", None)
+        if hold is not None and callable(getattr(hold, "action", None)):
+            self.action = hold.action()
+        else:
+            robot = executor.robot
+            q = th.as_tensor(robot.get_joint_positions(), dtype=th.float32).reshape(-1)
+            idx = robot.controller_action_idx
+            a = th.zeros(M.ACTION_DIM)
+            a[idx["trunk"]] = q[robot.trunk_control_idx]
+            for arm in M.ARMS:
+                a[idx[f"arm_{arm}"]] = q[robot.arm_control_idx[arm]]
+                a[idx[f"gripper_{arm}"]] = 1.0
+            self.action = a
         if meta is not None:
             meta["stub_policy"] = {"policy": "HoldPolicy", "n_steps": self.n}
 

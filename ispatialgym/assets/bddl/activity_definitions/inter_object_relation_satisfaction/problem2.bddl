@@ -2,10 +2,9 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#03~T2/representative/fallback1:next_model)
-    ; fallback 1 (next_model) of inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-shelf: model = utgixp, slot = variation_geometry, primary_model = ofargb
     ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
     ; its init orientation; the partner stays where it was. Both poses measured.
+    ; Here the target is the bar soap model utgixp.
 
     (:objects
         bar_soap.n.01_1 - bar_soap.n.01

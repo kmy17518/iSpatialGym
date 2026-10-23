@@ -2,10 +2,9 @@
     (:domain ispatialgym)
     (:variant camera_relocalization-obstructed-straight_chair_1)
 
-    ; ground_isg 2.0.0: camera_relocalization-obstructed-straight_chair_1 (camera_relocalization/obstructed.iddl; camera_relocalization-obstructed#08/representative)
     ; Camera relocalization - obstructed. As standard, plus an obstacle group placed on the eroded shortest path so that the
     ; shortest path changes; the obstacle must be in the head camera's view at a waypoint of the new path *before* the path
-    ; departs from the unobstructed shortest path (owner decision 2026-09-15; spec 6.2); the new path must stay inside the
+    ; departs from the unobstructed shortest path; the new path must stay inside the
     ; instance's length bucket. Never manipulated. One obstacle for now: the group size is a customs
     ; list parameter (generation.groups.obstacles.size = 1), the candidate categories come from roles/candidates.csv.
 

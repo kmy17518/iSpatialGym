@@ -2,13 +2,11 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-floor)
 
-    ; hand-grounded (owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c2, sheet ~T5): inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-floor
-    ; (inter_object_relation_satisfaction/touching_large_scale.iddl; registry mode test). The tray storage_box/eicujj starts on the floor of living_room_0 in house_double_floor_upper/living_room_0
-    ; and ends on the floor touching bookcase_otwukr_1's face nearest the init (dropped in front of it, pushed along the floor).
     ; IORS - touching (large-scale). The target starts on a support (a table near the partner, or the floor beside it - an
     ; explicit support choice made by ground_isg, never a runtime fallback) and ends touching a large scene partner (a copy of
-    ; ontop_large_scale with the goal predicate touching; registered 2026-10-12, the sampler mode comes next). Three recorded
-    ; stances: init A, manipulation B, placement C.
+    ; ontop_large_scale with the goal predicate touching). Three recorded stances: init A, manipulation B, placement C.
+    ; Here the tray storage_box/eicujj starts on the floor of house_double_floor_upper/living_room_0 and ends on the floor
+    ; touching bookcase_otwukr_1's face nearest the init (dropped in front of it, pushed along the floor).
 
     (:objects
         storage_container.n.01_1 - storage_container.n.01

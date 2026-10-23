@@ -62,6 +62,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 ROOT_ENV = "ISPATIALGYM_INSTANCES_PATH"
 DEMOS_ENV = "ISPATIALGYM_DEMOS_PATH"
 RECORDS_ENV = "ISPATIALGYM_RELEASE_RECORDS"
+HF_REPO_ID = "kmy17518/ispatialgym-eval-data"
+HF_REVISION = "v1.0"
 DATASET_NAME = "ispatialgym-eval-instances"
 DEMOS_NAME = "ispatialgym-eval-demos"
 TRO_SUFFIX = "-tro_state.json"
@@ -102,20 +104,46 @@ def demos_root(root: Optional[str] = None) -> str:
     return os.environ.get(DEMOS_ENV) or os.path.join(os.path.dirname(os.path.abspath(root or default_root())), DEMOS_NAME)
 
 
+def download(
+    local_dir: Optional[str] = None,
+    revision: str = HF_REVISION,
+    repo_id: str = HF_REPO_ID,
+    demos: bool = False,
+) -> str:
+    """Download the dataset from the Hugging Face Hub into ``local_dir`` (default :func:`data_root`)."""
+    from huggingface_hub import snapshot_download
+
+    local_dir = local_dir or data_root()
+    patterns = [f"{DATASET_NAME}/*"] + ([f"{DEMOS_NAME}/*"] if demos else [])
+    snapshot_download(
+        repo_id=repo_id,
+        repo_type="dataset",
+        revision=revision,
+        local_dir=local_dir,
+        allow_patterns=patterns,
+    )
+    return os.path.join(local_dir, DATASET_NAME)
+
+
 def step_budget(length: Optional[int], max_steps: Optional[int] = None, settle_steps: Optional[int] = None,
-                wallclock_s: Optional[float] = None, mode: str = "oracle", demo_settle_steps: Optional[int] = None) -> Dict[str, Any]:
+                wallclock_s: Optional[float] = None, mode: str = "oracle", demo_settle_steps: Optional[int] = None,
+                instance_max_steps: Optional[int] = None) -> Dict[str, Any]:
     """``run_isg``'s step budget. ``max_steps`` (the actions: policy steps, a replay, an oracle program) given, else
-    ``max(300, 2 x length)`` for a demo of ``length`` steps, else 3000; ``wallclock_s`` (seconds the actions may take) given, else
-    1 s x ``max_steps``. ``settle_steps`` - the ``pose_settled`` and settle-eval window, in every mode - given, else 45 (oracle,
-    policy) or the demo's settle rows (replay: ``demo_settle_steps``). An oracle program's epilogue is exactly ``settle_steps``
-    long and reserved: its episode is cut at ``max_steps + settle_steps``; a replay streams its demo's action rows and the first
-    ``settle_steps`` settle rows, a policy acts until ``max_steps``: theirs at ``max_steps``. Raises ValueError when the window
-    cannot fit: below one step, a replay without settle rows or with fewer than ``settle_steps``, a policy whose ``max_steps``
-    is shorter than it."""
+    ``instance_max_steps`` when given, else ``max(300, 2 x length)`` for a demo of ``length`` steps, else 3000;
+    ``wallclock_s`` (seconds the actions may take) given, else 1 s x ``max_steps``. ``settle_steps`` - the
+    ``pose_settled`` and settle-eval window, in every mode - given, else 45 (oracle, policy) or the demo's settle rows
+    (replay: ``demo_settle_steps``). An oracle program's epilogue is exactly ``settle_steps`` long and reserved: its
+    episode is cut at ``max_steps + settle_steps``; a replay streams its demo's action rows and the first
+    ``settle_steps`` settle rows, a policy acts until ``max_steps``: theirs at ``max_steps``. Raises ValueError when the
+    window cannot fit: below one step, a replay without settle rows or with fewer than ``settle_steps``, a policy whose
+    ``max_steps`` is shorter than it."""
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     if max_steps is None:
-        max_steps = max(MIN_MAX_STEPS, DEMO_STEP_FACTOR * int(length)) if length else DEFAULT_MAX_STEPS
+        if instance_max_steps is not None:
+            max_steps = int(instance_max_steps)
+        else:
+            max_steps = max(MIN_MAX_STEPS, DEMO_STEP_FACTOR * int(length)) if length else DEFAULT_MAX_STEPS
     if mode == "replay" and demo_settle_steps is None:
         raise ValueError("--mode replay: the demo's settle rows are unknown (isg/phase, or the eval dataset's settle_steps of a LeRobot "
                          "episode), so the --settle-steps window cannot be placed")
@@ -155,9 +183,23 @@ class InstanceRecord:
     def path(self, kind: str) -> str:
         return os.path.join(self.root, self.files[kind])
 
-    def demo_path(self) -> Optional[str]:
-        """The instance's demo (``<demos>/<episode["demo"]>``), None when the dataset records none."""
-        return os.path.join(demos_root(self.root), self.episode["demo"]) if self.episode.get("demo") else None
+    def demo_path(self, kind: str = "demo") -> Optional[str]:
+        """The instance's demo (``<demos>/<episode[kind]>``), None when the dataset records none."""
+        rel = self.episode.get(kind)
+        return os.path.join(demos_root(self.root), rel) if rel else None
+
+    @property
+    def instance_id(self) -> str:
+        """The instance's id in the dataset (its instance file's name; ``run_isg`` writes a run to ``<out>/<id>/``)."""
+        return os.path.basename(self.files["tro_state"])[: -len(TRO_SUFFIX)]
+
+    @property
+    def max_steps(self) -> Optional[int]:
+        """The instance's ``max_steps`` from ``instances.jsonl``, else ``max(300, 2 * length)`` when a demo length is known."""
+        if self.extra.get("max_steps") is not None:
+            return int(self.extra["max_steps"])
+        length = self.extra.get("length") or self.episode.get("length")
+        return max(MIN_MAX_STEPS, DEMO_STEP_FACTOR * int(length)) if length else None
 
 
 def load_index(root: Optional[str] = None) -> List[InstanceRecord]:
@@ -204,6 +246,12 @@ def resolve(name: str, indices: Sequence[int] = (0,), root: Optional[str] = None
                 raise IndexError(f"{lvl} {name} has {len(recs)} instance(s) (indices 0-{len(recs) - 1}); got {bad}")
             return [recs[int(i)] for i in indices]
     raise KeyError(f"{name!r} is not a subtask, task or task family of the dataset; see `python -m ispatialgym.eval.instances list`")
+
+
+def record_of(tro_path: str, root: Optional[str] = None) -> Optional[InstanceRecord]:
+    """The index record of an instance file, None when it is not in the index."""
+    tro_path = os.path.abspath(tro_path)
+    return next((r for r in load_index(root) if os.path.abspath(r.path("tro_state")) == tro_path), None)
 
 
 def template_files(tro_path: str) -> Optional[Dict[str, str]]:
@@ -407,9 +455,13 @@ def register_goal_image(rec: InstanceRecord) -> bool:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="List / resolve the eval instances (task family -> task -> subtask -> instances).")
+    ap = argparse.ArgumentParser(description="Download / list / resolve the eval instances (task family -> task -> subtask -> instances).")
     ap.add_argument("--root", default=None, help=f"dataset root (default ${ROOT_ENV} or <repo>/datasets/{DATASET_NAME})")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    dl = sub.add_parser("download", help="download the dataset from the Hugging Face Hub into the data path")
+    dl.add_argument("--revision", default=HF_REVISION)
+    dl.add_argument("--local-dir", default=None, help="download target (default: OmniGibson's data path)")
+    dl.add_argument("--demos", action="store_true", help=f"also download {DEMOS_NAME} (HDF5 demos and rollout videos)")
     ls = sub.add_parser("list")
     ls.add_argument("--level", choices=("task_family", "task", "subtask"), default="task")
     sh = sub.add_parser("show")
@@ -424,6 +476,9 @@ def main(argv=None) -> int:
                     help="with --run: also set the pose targets of the (:measure ...)-only atoms to where that replay left them "
                          "(meta.json final_target_poses; its symbolic success suffices), so the goal image and the measured targets agree")
     a = ap.parse_args(argv)
+    if a.cmd == "download":
+        print(download(a.local_dir, revision=a.revision, demos=a.demos))
+        return 0
     if a.cmd == "list":
         for name, recs in by_level(load_index(a.root))[a.level].items():
             print(f"{name}\t{len(recs)}")

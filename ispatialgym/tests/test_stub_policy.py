@@ -34,6 +34,8 @@ def test_demo_policy_plays_the_demo_back_then_ends(tmp_path, monkeypatch):
 
 
 def test_hold_policy_holds_the_start_configuration(monkeypatch):
+    from ispatialgym.eval.policy import HoldPolicy as EvalHoldPolicy, import_policy, make_policy
+
     monkeypatch.setenv("ISG_STUB_HOLD_STEPS", "2")
     robot = FakeRobot()
     policy = HoldPolicy()
@@ -43,3 +45,11 @@ def test_hold_policy_holds_the_start_configuration(monkeypatch):
     assert th.equal(a[idx["arm_right"]], robot.q[robot.arm_control_idx["right"]]) and th.equal(a[idx["trunk"]], robot.q[robot.trunk_control_idx])
     assert th.equal(a[idx["base"]], th.zeros(3)) and float(a[idx["gripper_left"]]) == float(a[idx["gripper_right"]]) == 1.0
     assert policy(None, None) is not None and policy(None, None) is None
+
+    # with loader.hold (preserved controller_targets and smooth gripper command)
+    hold_vec = th.arange(23, dtype=th.float32)
+    loader = SimpleNamespace(hold=SimpleNamespace(action=lambda: hold_vec.clone()))
+    ep = make_policy(import_policy("ispatialgym.eval.policy:HoldPolicy"), {"steps": 1})
+    assert isinstance(ep, EvalHoldPolicy)
+    ep.bind(loader=loader)
+    assert th.equal(ep(None, None), hold_vec) and ep(None, None) is None

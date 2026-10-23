@@ -841,8 +841,8 @@ class ISpatialGymTask(BehaviorTask):
     def _populate_isg_info(self, env, info, env_idx: int = 0):
         """``info["ispatialgym"]`` of env ``env_idx``: this step's facts (``goal`` = G, ``measure_within`` = M, ``settled`` = S, its
         ``errors`` / ``error_metric`` / ``measured``), the run mode's symbolic and geometric success (steps: 0-based episode steps,
-        None while not reached), ``evaluation`` (the errors the run mode is judged by: at its geometric success, else this step's),
-        ``other_mode`` (the off mode's success with settle-eval on, else None) and the goal conditions."""
+        None while not reached), ``evaluation`` (the errors the run mode is judged by: at its geometric success, else its symbolic
+        success, else this step's), ``other_mode`` (the off mode's success with settle-eval on, else None) and the goal conditions."""
         goal, within, settled, status = self._last_goal_evals[env_idx] or (False, False, False, info["goal_status"])
         errors = self._last_errors[env_idx]
         if errors is None:

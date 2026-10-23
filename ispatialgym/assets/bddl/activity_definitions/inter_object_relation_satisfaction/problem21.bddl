@@ -2,11 +2,10 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching_small_scale-box_of_cereal-box_of_cereal-bar (inter_object_relation_satisfaction/touching_small_scale.iddl; inter_object_relation_satisfaction-touching#02~T3/representative)
-    ; owner 2026-10-12 ~10:25 item 4 touching#02 variant B (inter_object_relation_satisfaction-touching#02~B3): hand-made from this grounding - target box_of_cereal/iucshm x0.8 (box_of_cereal__iucshm__s080), registry mode test
     ; IORS - touching (small-scale). Target grasped and set down next to the partner (partner on the robot's left), then
     ; pushed against it while the other gripper braces the partner's far side (push and brace computed geometrically, no
     ; artefact); the partner must not move (> 5 mm) at the goal.
+    ; Here the target is box_of_cereal/iucshm scaled by 0.8 (box_of_cereal__iucshm__s080).
 
     (:objects
         box__of__cereal.n.01_1 box__of__cereal.n.01_2 - box__of__cereal.n.01

@@ -2,7 +2,6 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-booth)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-booth (inter_object_relation_satisfaction/under_small_scale.iddl; inter_object_relation_satisfaction-under_small_scale#02~T5/representative)
     ; IORS - under (small-scale). Both objects on the support; the manipulated target (glass, teacup, fries, bottle) is set
     ; down centred on the partner (coaster, saucer, platter, tray) so that the PARTNER ends under the target. Argument order
     ; is therefore (under partner target). Both poses measured.

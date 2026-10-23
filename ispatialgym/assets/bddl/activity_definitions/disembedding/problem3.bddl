@@ -2,7 +2,6 @@
     (:domain ispatialgym)
     (:variant disembedding-pencil_case-sunglasses_1_pencil_1_pen_1-desk)
 
-    ; ground_isg 2.0.0: disembedding-pencil_case-sunglasses_1_pencil_1_pen_1-desk (disembedding/disembedding.iddl; disembedding#08~T5/representative)
     ; Disembedding. Target and distractors on the source tray, destination tray beside it on the support; the target ends on
     ; the destination tray (centre, init orientation), no distractor does. Distractor categories come from the icl pools
     ; (roles/constraints_compatible.csv same-category / other-category), the member count (1-3) from the customs list

@@ -2,13 +2,11 @@
     (:domain ispatialgym)
     (:variant configuration_matching-block_design-block_4-breakfast_table_board)
 
-    ; hand-grounded 2026-09-19 23:xx (owner 21:47 request, option 2 of the packing experiment): the four Kohs blocks are placed
-    ; into the pocket of a wooden board (tray/isgboard, ispatialgym-assets: a plate with a 12 mm rim around a 9 cm square
-    ; pocket) standing on the breakfast table, then pushed against the pocket's far / left walls so they end packed; copy of
-    ; problem32 with the board object, the blocks' goal support = the board.
-    ; renumbered 82 -> 83 for the eval branch (owner 2026-10-12 ~03:30): 82 is configuration_matching-attachment-cork-wine_bottle-desk here
-    ; owner 2026-10-14: the board is a member of targets_group (pinned to its own slot in the instance file), so layout_reached
-    ; judges the blocks relative to the board; ontop is per block (on the group it would also put the board on itself)
+    ; The four Kohs blocks are placed into the pocket of a wooden board (tray/isgboard, ispatialgym-assets: a plate with a
+    ; 12 mm rim around a 9 cm square pocket) standing on the breakfast table, then pushed against the pocket's far / left
+    ; walls so they end packed; the blocks' goal support is the board. The board is a member of targets_group (pinned to
+    ; its own slot in the instance file), so layout_reached judges the blocks relative to the board; ontop is per block
+    ; (on the group it would also put the board on itself).
 
     (:objects
         toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - toy_dice.n.01

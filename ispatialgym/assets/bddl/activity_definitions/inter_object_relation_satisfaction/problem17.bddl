@@ -2,13 +2,11 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_pitched)
 
-    ; owner 2026-10-12 ~20:55: under_large variant 'pitched' - problem115 copied for inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_pitched
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#03/representative)
-    ; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c1: hand-made from this grounding - trash_can/jlawet under desk_mdhelw_1 from the floor of private_office_2, push-under; registry mode test
     ; IORS - under (large-scale). The target starts on a support (a table near the partner, the floor beside it, or the
     ; partner's own top) and ends on the floor under a large scene partner (bed, sofa, desk, breakfast table; roles/candidates.csv
     ; kind scene) at a goal cell where an upward ray hits the partner above target height + 3 cm. Argument order: the
     ; target is under the partner. When partner and support are the same scene object the BDDL declares it once.
+    ; Here the trash can (trash_can/jlawet) starts on the floor of private_office_2 and is pushed under desk_mdhelw_1.
 
     (:objects
         ashcan.n.01_1 - ashcan.n.01

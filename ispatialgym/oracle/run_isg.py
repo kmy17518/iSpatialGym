@@ -65,6 +65,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
+os.environ.setdefault("OMNIGIBSON_CHANGE_DETECTION_NUMPY", "1")
 
 import torch as th  # noqa: E402
 
@@ -786,6 +787,12 @@ class InstanceLoader:
     # -- accessors ------------------------------------------------------------------------------------------------
 
     @property
+    def goal_image_path(self) -> Optional[str]:
+        """The instance's goal image (the TRO's ``goal_observation.rgb_path``)."""
+        path = (self.tro.meta.goal_observation or {}).get("rgb_path")
+        return None if not path else os.path.join(os.path.dirname(self.tro_path), path)
+
+    @property
     def tracked(self) -> Dict[str, Any]:
         return {k: v for k, v in self.physical.items() if k != AGENT_INSTANCE and getattr(v, "category", None) != "floors"}
 
@@ -929,11 +936,11 @@ def _dataset_record(loader) -> Optional["INST.InstanceRecord"]:
     return next((r for r in INST.load_index(loader.tmeta["_paths"]["dataset_root"]) if os.path.abspath(r.path("tro_state")) == tro), None)
 
 
-def load_policy(spec: str):
+def load_policy(spec: str, kwargs: Optional[Dict[str, Any]] = None):
     """``module:callable`` → ``policy(obs, info) -> action``."""
-    mod, _, name = spec.partition(":")
-    fn = getattr(importlib.import_module(mod), name or "policy")
-    return fn() if isinstance(fn, type) else fn
+    from ispatialgym.eval.policy import import_policy, make_policy
+
+    return make_policy(import_policy(spec), kwargs)
 
 
 def policy_actions(policy, executor: Executor, obs0, info0, max_steps: int) -> Iterator[th.Tensor]:
@@ -951,6 +958,9 @@ def policy_actions(policy, executor: Executor, obs0, info0, max_steps: int) -> I
 # ==========================================================================================
 
 
+INSTANCE_OPTIONS = ("task", "instance_indices", "instances_root", "instance", "queue", "claims", "done_file", "results", "deadline", "max_instances", "poll_s")
+
+
 def record_views(text: str) -> Tuple[str, ...]:
     """``--record-view``: a comma-separated list of :data:`~ispatialgym.oracle.recorder.VIEWS`."""
     views = tuple(dict.fromkeys(v.strip() for v in text.split(",") if v.strip()))
@@ -960,8 +970,9 @@ def record_views(text: str) -> Tuple[str, ...]:
     return views
 
 
-def parse_args(argv=None):
+def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--config", default=None, help="YAML file of option values; command-line options override it")
     p.add_argument("--instance", default=None, help="path to <iid>-tro_state.json of a sampled instance")
     p.add_argument("--task", default=None,
                    help="instead of --instance: a task family, task or subtask of the eval dataset (ispatialgym.eval.instances); runs "
@@ -984,6 +995,7 @@ def parse_args(argv=None):
     p.add_argument("--replay", default=None, help="replay mode: LeRobot dataset root or demo.hdf5 (default for an eval dataset instance: its demo)")
     p.add_argument("--episode", type=int, default=0, help="replay mode: episode index")
     p.add_argument("--policy", default=None, help="policy mode: module:callable -> policy(obs, info) -> action")
+    p.add_argument("--policy-kwargs", type=json.loads, default={}, metavar="JSON", help="keyword arguments of the policy class")
     p.add_argument("--out", default=None, help="output root; the run goes to <out>/<iid>/ (default: <template_dir>/runs)")
     p.add_argument("--record", default="full", choices=["full", "hdf5", "video"],
                    help="full = hdf5 + LeRobot; hdf5 = hdf5 only; video = the --record-view videos and meta only")
@@ -1040,9 +1052,64 @@ def parse_args(argv=None):
     p.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     p.add_argument("--load-only", action="store_true", help="load the instance, record its start state (meta.start_state) and exit: no program, no demo, no "
                                                             "TRO writes - the fresh-reload reference a warm demo's start state is compared with")
-    args = p.parse_args(argv)
+    return p
+
+
+def config_argv(path: str, parser: argparse.ArgumentParser) -> List[str]:
+    """A YAML config as command-line tokens, so argparse converts and validates its values like the options."""
+    import yaml
+
+    with open(path) as f:
+        config = yaml.safe_load(f) or {}
+    if not isinstance(config, dict):
+        raise SystemExit(f"{path}: a config is a mapping of option names to values")
+    known = {
+        a.dest: a.option_strings[0] for a in parser._actions if a.option_strings and a.dest not in ("help", "config")
+    }
+    unknown = sorted(set(config) - set(known))
+    if unknown:
+        raise SystemExit(f"{path}: unknown option(s) {unknown}; known: {sorted(known)}")
+    argv: List[str] = []
+    for key, value in config.items():
+        if value is None or (isinstance(value, (list, tuple)) and not value):
+            continue
+        if key == "settle_eval" and isinstance(value, bool):  # YAML reads a bare on / off as a boolean
+            value = "on" if value else "off"
+        if key == "record_view" and isinstance(value, (list, tuple)):
+            value = ",".join(value)
+        if isinstance(value, bool):
+            if key == "qa":
+                argv.append("--qa" if value else "--no-qa")
+            elif value:
+                argv.append(known[key])
+            continue
+        if isinstance(value, dict):
+            value = json.dumps(value)
+        argv += [known[key], *map(str, value)] if isinstance(value, (list, tuple)) else [known[key], str(value)]
+    return argv
+
+
+def run_options(args: argparse.Namespace) -> Dict[str, Any]:
+    """The resolved options of one instance's run (``config.yaml``)."""
+    skip = set(INSTANCE_OPTIONS) | {"config"}
+    out = {k: v for k, v in vars(args).items() if k not in skip}
+    out["record_view"] = list(out["record_view"])
+    return out
+
+
+def parse_args(argv=None, default_policy: bool = False):
+    p = build_parser()
+    if default_policy:
+        p.set_defaults(mode="policy", out="runs", settle_eval="off", settle_steps=45, tolerance_scale=3.0)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    config = p.parse_known_args(argv)[0].config
+    args = p.parse_args((config_argv(config, p) if config else []) + argv)
     if sum(x is not None for x in (args.instance, args.queue, args.task)) != 1:
         p.error("exactly one of --instance, --queue and --task")
+    if args.mode == "policy" and not args.policy:
+        p.error("--policy is required")
+    if args.mode == "policy" and not isinstance(args.policy_kwargs, dict):
+        p.error("--policy-kwargs must be a JSON object")
     if args.task and args.replay and len(args.instance_indices) > 1:
         p.error("--replay names one demo: give one --instance-indices value (without --replay each instance replays its own demo)")
     if args.all_cameras and M.head_camera_only():
@@ -1116,8 +1183,12 @@ def _apply_program_hook(spec: str, actions, sidecar, loader):
     return out
 
 
-def main(argv=None) -> int:
-    args = parse_args(argv)
+def main(argv=None, default_policy: bool = False) -> int:
+    args = parse_args(argv, default_policy=default_policy)
+    return _run_with_args(args, argv)
+
+
+def _run_with_args(args, argv=None) -> int:
     logging.getLogger("ispatialgym").setLevel(args.log_level)
     if args.queue:
         return run_queue(args)
@@ -1181,11 +1252,19 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         out_root = args.out or (os.path.join(os.getcwd(), "runs") if loader.tmeta.get("_paths") else os.path.join(loader.template_dir, "runs"))
         out_dir = os.path.join(out_root, iid)
         os.makedirs(out_dir, exist_ok=True)
+        try:
+            import yaml
+
+            with open(os.path.join(out_dir, "config.yaml"), "w") as f:
+                yaml.safe_dump(run_options(args), f, sort_keys=False)
+        except Exception as e:  # noqa: BLE001
+            log.warning("config.yaml not written: %r", e)
+        meta["config"] = run_options(args)
         meta.update({
             "instance_id": iid, "template_dir": loader.template_dir, "template_id": loader.tmeta.get("template_id"), "problem": loader.tmeta["problem"],
             "activity": loader.activity, "activity_definition_id": loader.did, "variant": loader.tmeta.get("variant") or loader.tro.meta.task_variant,
             "scene": loader.tmeta.get("scene"), "load_room_instances": loader.tmeta.get("load_room_instances"), "tro_path": tro_path,
-            "robot_name": loader.robot_name, "out_dir": out_dir,
+            "goal_image": loader.goal_image_path, "robot_name": loader.robot_name, "out_dir": out_dir,
         })
         # task family / task / subtask (isg_customs.json is keyed by subtask): the eval dataset's names, else from the sampling key
         names = {k: v for k, v in (loader.tmeta.get("eval") or {}).items() if k in ("task_family", "task", "subtask")}
@@ -1207,7 +1286,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             replay_n = replay_counts(replay, args.episode, dataset_rec.episode if dataset_rec else None)
         length = dataset_rec.episode.get("length") if dataset_rec else (sum(replay_n) if replay_n else None)
         budget = INST.step_budget(length, args.max_steps, args.settle_steps, args.wallclock, mode=args.mode,
-                                  demo_settle_steps=replay_n[1] if replay_n else None)
+                                  demo_settle_steps=replay_n[1] if replay_n else None,
+                                  instance_max_steps=dataset_rec.max_steps if dataset_rec else None)
         settle_eval = args.settle_eval == "on" or (args.settle_eval == "auto" and args.mode != "policy")
         meta.update({"budget": budget, "settle_eval": settle_eval, "settle_steps": budget["settle_steps"], "success_metric": args.success_metric})
         result.update({"instance": iid, **names, "activity": loader.activity, "variant": meta["variant"], "out": out_dir})
@@ -1419,7 +1499,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         else:
             if not args.policy:
                 raise ValueError("--mode policy needs --policy module:callable")
-            policy = load_policy(args.policy)
+            policy = load_policy(args.policy, args.policy_kwargs)
             bind = getattr(policy, "bind", None)
             if callable(bind):  # a policy driving the robot-level motion layer (ispatialgym.harness) gets the executor
                 bind(executor=executor, loader=loader, meta=meta, out_dir=out_dir, tro_path=tro_path)
@@ -1428,6 +1508,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         timings.update({f"executor_{k}": v for k, v in episode.get("timings", {}).items()})
         if args.mode == "policy" and callable(getattr(policy, "finalize", None)):
             policy.finalize(episode)
+        if episode.get("forced_failure"):
+            episode.update({"success": False, "reason": episode.get("reason") or "forced_failure"})
         meta["final_target_poses"] = final_target_poses(task, loader.tro.meta)
         joints_end = loader.joint_positions_report()  # the TRO's joint_positions constraints (a door opened at init) as the episode leaves them
         if joints_end:

@@ -172,8 +172,9 @@ class SuccessTracker:
         return self.first["off"]["symbolic"]
 
     def evaluation_errors(self, current: Dict[str, Any], mode: Optional[str] = None) -> Dict[str, Any]:
-        """The errors a mode is judged by: at its geometric success, else ``current`` (the cutoff)."""
-        snap = self.errors_at[mode or self.mode]["geometric"]
+        """The errors a mode is judged by: at its geometric success, else its symbolic success, else ``current``."""
+        snaps = self.errors_at[mode or self.mode]
+        snap = snaps["geometric"] if snaps["geometric"] is not None else snaps["symbolic"]
         return snap if snap is not None else current
 
     def mode_report(self, mode: str, current: Dict[str, Any], atoms: Sequence[Tuple[str, str]], where: str = "") -> Dict[str, Any]:
@@ -183,8 +184,9 @@ class SuccessTracker:
                 "geometric_success_step": geo, "errors": errs, "error_metric": error_metric(errs, atoms, where) if atoms else None}
 
     def report(self, current: Dict[str, Any], atoms: Sequence[Tuple[str, str]], where: str = "") -> Dict[str, Any]:
-        """The run mode's report (its ``errors`` / ``error_metric`` at its geometric success, else at ``current``) with the settle
-        window and ``other_mode``: the same for the off mode, without its errors, with settle-eval on; None with settle-eval off."""
+        """The run mode's report (its ``errors`` / ``error_metric`` at its geometric success, else its symbolic success, else at
+        ``current``) with the settle window and ``other_mode``: the same for the off mode, without its errors, with settle-eval on;
+        None with settle-eval off."""
         out = self.mode_report(self.mode, current, atoms, where)
         other = None
         if self.other_mode is not None:

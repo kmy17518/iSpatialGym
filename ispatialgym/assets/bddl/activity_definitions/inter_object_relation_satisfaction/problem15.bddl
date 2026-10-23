@@ -2,13 +2,11 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl)
 
-    ; owner 2026-10-12 ~19:20: under_large#01 in the iors_large tag - problem74 copied for inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#01/representative/fallback1:init_surface)
-    ; fallback 1 (init_surface) of inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk: init_surface = partner
     ; IORS - under (large-scale). The target starts on a support (a table near the partner, the floor beside it, or the
     ; partner's own top) and ends on the floor under a large scene partner (bed, sofa, desk, breakfast table; roles/candidates.csv
     ; kind scene) at a goal cell where an upward ray hits the partner above target height + 3 cm. Argument order: the
     ; target is under the partner. When partner and support are the same scene object the BDDL declares it once.
+    ; Here the target starts on the partner's own top (the bed).
 
     (:objects
         sandal.n.01_1 - sandal.n.01

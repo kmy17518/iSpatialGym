@@ -2,7 +2,6 @@
     (:domain ispatialgym)
     (:variant inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table (inter_object_relation_satisfaction/touching_small_scale.iddl; inter_object_relation_satisfaction-touching#01~T1/representative)
     ; IORS - touching (small-scale). Target grasped and set down next to the partner (partner on the robot's left), then
     ; pushed against it while the other gripper braces the partner's far side (push and brace computed geometrically, no
     ; artefact); the partner must not move (> 5 mm) at the goal.

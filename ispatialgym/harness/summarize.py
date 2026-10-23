@@ -82,8 +82,8 @@ def episode_rows(root: str) -> List[Dict[str, Any]]:
             if m.get("status") == "error":
                 row.update({"status": "unscored", "error": m.get("error"), "failure_kind": h.get("failure_kind") or "infrastructure"})
             else:
-                forced = bool(h.get("forced_failure"))
-                row.update({"status": "scored", "success": bool(m.get("success")), "forced_failure": forced, **score_fields(m, forced)})
+                forced = bool(h.get("forced_failure") or m.get("forced_failure"))
+                row.update({"status": "scored", "success": bool(m.get("success")) and not forced, "forced_failure": forced, **score_fields(m, forced)})
         rows.append(row)
     for meta_path in sorted(glob.glob(os.path.join(root, "**", "meta.json"), recursive=True)):
         if any(os.path.abspath(meta_path).startswith(d) for d in harness_dirs):
@@ -104,9 +104,9 @@ def episode_rows(root: str) -> List[Dict[str, Any]]:
             if h:
                 row["failure_kind"] = h.get("failure_kind") or "infrastructure"
         else:
-            forced = bool((h or {}).get("forced_failure"))
-            row.update({"status": "scored", "success": bool(m.get("success")), **score_fields(m, forced)})
-            if h:
+            forced = bool((h or {}).get("forced_failure") or m.get("forced_failure"))
+            row.update({"status": "scored", "success": bool(m.get("success")) and not forced, **score_fields(m, forced)})
+            if h or m.get("forced_failure") is not None:
                 row["forced_failure"] = forced
         rows.append(row)
     return rows
