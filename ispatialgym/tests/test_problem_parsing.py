@@ -209,6 +209,33 @@ def test_group_expansion_rules():
 GOAL = "(:goal (and (ontop ?mug.n.04_1 ?tray.n.01_1) (pose_reached ?mug.n.04_2)))"
 
 
+def test_a_problem_written_before_the_measure_migration_reads_as_after_it():
+    """The BDDL copies of sampler templates and runs predate the 2026-10-14 :measure migration: they read with the atom the migration
+    measures copied from the goal (activity.problem.legacy_measure), the goal as written; a migrated problem is read as written."""
+    def problem(act, variant, goal, measure=""):
+        return parse_problem_string(f"(define (problem {act}-0) (:domain ispatialgym) (:variant {variant}) {OBJECTS} {INIT} "
+                                    f"(:goal (and {goal})){measure})", act, 0)
+
+    old = problem("alignment", "alignment-axial-mug-tray", "(pose_reached ?mug.n.04_1) (not (grasped ?agent.n.01_1 ?mug.n.04_1))")
+    new = problem("alignment", "alignment-axial-mug-tray", "(pose_reached ?mug.n.04_1) (not (grasped ?agent.n.01_1 ?mug.n.04_1))",
+                  " (:measure (pose_reached ?mug.n.04_1))")
+    assert old.measure == new.measure == [["pose_reached", "?mug.n.04_1"]] and old.measure_legacy == [["pose_reached", "?mug.n.04_1"]]
+    assert new.measure_legacy == [] and old.goal == new.goal and old.content_key() == new.content_key()
+    # small articulation: its :measure held the root pose; the migration moved the joint target there, an old copy keeps it in the goal
+    art = "configuration_matching-articulation_open_small_scale-mug-tray"
+    old = problem("configuration_matching", art, "(layout_reached ?mug.n.04_1) (not (grasped ?agent.n.01_1 ?mug.n.04_1))",
+                  " (:measure (pose_reached ?mug.n.04_1))")
+    new = problem("configuration_matching", art, "(not (grasped ?agent.n.01_1 ?mug.n.04_1))",
+                  " (:measure (pose_reached ?mug.n.04_1) (layout_reached ?mug.n.04_1))")
+    assert sorted(map(tuple, old.measure)) == sorted(map(tuple, new.measure)) and old.content_key() == new.content_key()
+    assert ["layout_reached", "?mug.n.04_1"] in old.goal and new.measure_legacy == []
+    # a family the migration leaves alone, and a goal without the rule's atom: as written
+    iors = problem("inter_object_relation_satisfaction", "inter_object_relation_satisfaction-ontop_small_scale-mug-tray-floor",
+                   "(ontop ?mug.n.04_1 ?tray.n.01_1)")
+    assert iors.measure == [] and iors.measure_legacy == []
+    assert problem("alignment", "alignment-axial-mug-tray", "(not (grasped ?agent.n.01_1 ?mug.n.04_1))").measure == []
+
+
 def test_measure_section():
     p = _parse(f"{HEADER} {OBJECTS} {GROUPS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_1) (layout_reached ?g.n.01_1)))")
     assert p.measure == [["pose_reached", "?mug.n.04_1"], ["layout_reached", "?g.n.01_1"]]

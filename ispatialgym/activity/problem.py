@@ -79,6 +79,15 @@ LEGACY_SUBTASK_IDS: Dict[str, str] = {
     "inter_object_relation_satisfaction-touching": "inter_object_relation_satisfaction-touching_small_scale",  # legacy spelling
 }
 
+#: The ``(:measure ...)`` migration of 2026-10-14 (eval release, ``datasets/conversions/2026-10-14_measure_migration``): per activity
+#: (configuration_matching: per task prefix) the goal predicate whose atom every problem measures since. A problem written before it
+#: (the BDDL copies in sampler templates and runs) reads with that atom copied from its goal (:func:`legacy_measure`); its goal stays
+#: as written - the migration moved articulation's ``layout_reached`` out of the goal, an older copy keeps it there.
+LEGACY_MEASURE_RULES: Dict[str, str] = {"alignment": "pose_reached", "camera_relocalization": "pose_reached", "mental_rotation": "pose_reached",
+                                        "object_scaling": "pose_reached"}
+LEGACY_MEASURE_TASK_RULES: Dict[str, Dict[str, str]] = {"configuration_matching": {"articulation": "layout_reached", "attachment": "layout_reached",
+                                                                                   "block_design": "layout_reached"}}
+
 #: Optional variant <-> definition id registry of an activity directory (``ground_isg`` allocates ids per variant).
 PROBLEM_REGISTRY_FILE = "problems.json"
 
@@ -137,6 +146,21 @@ def is_agent_instance(instance: str) -> bool:
 def canonical_activity(activity: str) -> str:
     """Canonical name of ``activity``: ``world_alignment`` -> ``alignment``; canonical names map to themselves."""
     return LEGACY_ACTIVITIES.get(activity, activity)
+
+
+def legacy_measure(activity: str, variant: Optional[str], raw_goal: list, raw_measure: list) -> list:
+    """``raw_measure`` plus the atom the 2026-10-14 migration measures (:data:`LEGACY_MEASURE_RULES`) when the problem predates it: the
+    goal holds exactly one top-level atom of that predicate and no ``:measure`` atom has the predicate (the migration's rule and its
+    variant -> task split, ``migrate_measure.rule`` / ``variant_task``). A problem written since is returned unchanged."""
+    act = canonical_activity(activity)
+    pred = LEGACY_MEASURE_RULES.get(act)
+    if pred is None and act in LEGACY_MEASURE_TASK_RULES and variant:
+        task = variant.split("-")[1] if variant.startswith(act + "-") else variant
+        pred = next((p for prefix, p in LEGACY_MEASURE_TASK_RULES[act].items() if task == prefix or (prefix == "articulation" and task.startswith(prefix))), None)
+    if pred is None or any(isinstance(m, list) and m[:1] == [pred] for m in raw_measure):
+        return raw_measure
+    atoms = [g for g in raw_goal if isinstance(g, list) and len(g) == 2 and g[0] == pred and isinstance(g[1], str)]
+    return list(raw_measure) + [list(atoms[0])] if len(atoms) == 1 else raw_measure
 
 
 def activity_names(activity: str) -> List[str]:
@@ -273,6 +297,8 @@ class ISGProblem:
     init: list = field(default_factory=list)  # expanded init literals
     goal: list = field(default_factory=list)  # expanded top-level goal conjuncts
     measure: list = field(default_factory=list)  # measured pose_reached / layout_reached literals (may also be in the goal)
+    #: the ``:measure`` atoms read into a problem written before the 2026-10-14 migration (:func:`legacy_measure`); empty for a current one
+    measure_legacy: list = field(default_factory=list)
     path: Optional[str] = None
 
     def content_key(self) -> tuple:
@@ -862,7 +888,9 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
     expander = _GroupExpander(problem)
     problem.init = expander.expand_init(init)
     problem.goal = expander.expand_goal(goal)
-    problem.measure = _validate_measure(problem, measure)
+    read = legacy_measure(activity, variant, goal, measure)
+    problem.measure_legacy = copy.deepcopy(read[len(measure):])
+    problem.measure = _validate_measure(problem, read)
     _validate_conditions(problem)
     return problem
 
