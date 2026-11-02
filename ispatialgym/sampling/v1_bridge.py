@@ -34,6 +34,7 @@ import re
 from typing import Dict, List, Optional
 
 from ispatialgym import REPO_ROOT
+from ispatialgym.activity.problem import canonical_variant
 
 ICL = os.path.join(REPO_ROOT, "ispatialgym", "assets", "icl")
 IDDL = os.path.join(REPO_ROOT, "ispatialgym", "assets", "iddl")
@@ -182,7 +183,7 @@ class Grounder:
 
     # -- grounding ------------------------------------------------------------------------------------------------------
     def ground_pick(self, pick: str, roles: Dict[str, Dict[str, dict]], slot: str) -> None:
-        subtask = pick.split("#")[0]
+        subtask = canonical_variant(pick.split("#")[0])  # a pick id keeps its recorded spelling (activity.problem.LEGACY_SUBTASK_IDS)
         v1_key, iddl_file = V1_KEY[subtask]
         iddl = parse_iddl(os.path.join(IDDL, iddl_file))
         v1_entry = self.v1.get(v1_key, {})
@@ -358,7 +359,7 @@ class Grounder:
 
     def run(self, subtasks: Optional[List[str]] = None) -> None:
         for pick in sorted(self.picks):
-            subtask = pick.split("#")[0]
+            subtask = canonical_variant(pick.split("#")[0])
             if subtasks and subtask not in subtasks:
                 continue
             for slot in self.slots:

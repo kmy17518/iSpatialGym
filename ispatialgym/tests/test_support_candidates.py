@@ -347,7 +347,7 @@ def grounded(tmp_path_factory):
     os.symlink(SHEET, os.path.join(icl_root, "roles", "representatives.csv"))
     customs_path = os.path.join(root, "isg_customs.json")
     icl, iddls = GI.ICL(icl_root), I.load_all()
-    subtasks = sorted({p.split("#")[0] for p in icl.picks})
+    subtasks = sorted({GI.subtask_of_pick(p) for p in icl.picks})
     GI.Grounder(iddls, icl, Customs.load(customs_path), bddl_root=os.path.join(root, "bddl"), options=GI.Options(representative_test=False)).run(subtasks)
     with open(customs_path) as f:
         customs = json.load(f)
@@ -359,7 +359,7 @@ def test_launch55_is_the_55_representative_tasks():
     from ispatialgym.sampling import ground_isg as GI
 
     icl = GI.ICL()
-    assert len([p for p in icl.picks if p.split("#")[0] in SC.LAUNCH_55_SUBTASKS]) == 55
+    assert len([p for p in icl.picks if GI.subtask_of_pick(p) in SC.LAUNCH_55_SUBTASKS]) == 55
     assert not any(s.split("-")[0] in ("camera_relocalization", "object_scaling", "mental_rotation") or "_large_scale" in s and "inter_object" in s
                    for s in SC.LAUNCH_55_SUBTASKS)
 
@@ -372,9 +372,9 @@ def test_pick_variants_are_the_grounders_combinations(grounded):
     icl = GI.ICL()
     g = GI.Grounder(grounded.iddls, icl, Customs(), options=GI.Options(dry_run=True, representative_test=False))
     n = 0
-    for st in sorted({p.split("#")[0] for p in icl.picks} & set(grounded.iddls)):
+    for st in sorted({GI.subtask_of_pick(p) for p in icl.picks} & set(grounded.iddls)):
         built = [c.pick for c in g.combinations(st)] + [lbl.rsplit("/", 1)[0] for lbl, _ in g.report.skipped.get(st, [])]
-        ours = [lbl for p in sorted(p for p in icl.picks if p.split("#")[0] == st) for lbl, _ in SC.pick_variants(icl, p)]
+        ours = [lbl for p in sorted(p for p in icl.picks if GI.subtask_of_pick(p) == st) for lbl, _ in SC.pick_variants(icl, p)]
         assert sorted(built) == sorted(ours), st
         n += len(ours)
     assert n > 250

@@ -378,7 +378,7 @@ def test_bddl_variant_falls_back_to_the_parser_spelling(monkeypatch):
     assert B.bddl_variant(variant) == variant  # the parser accepts the v2 variant
     monkeypatch.setattr(B, "VARIANT_RE", re.compile(r"^[a-z][a-z0-9_]*$"))  # the pre-A4 parser: no '-'
     spelled = B.bddl_variant(variant)
-    assert spelled == "inter_object_relation_satisfaction__nextto__spatula__soup_ladle__breakfast_table"
+    assert spelled == "inter_object_relation_satisfaction__nextto_small_scale__spatula__soup_ladle__breakfast_table"
     assert B.full_variant_of(spelled) == variant
 
 

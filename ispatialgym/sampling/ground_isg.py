@@ -195,6 +195,15 @@ _TRUE = ("1", "true", "True", "yes")
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def subtask_of_pick(pick: str) -> str:
+    """The iddl subtask id of an icl pick (``inter_object_relation_satisfaction-nextto#01`` -> its subtask). Pick ids are eval85
+    references and keep the spelling they were recorded with; a subtask renamed since (``activity.problem.LEGACY_SUBTASK_IDS``:
+    ``...-nextto`` -> ``...-nextto_small_scale``) resolves to its current id, as the sheets' ``subtask`` column reads."""
+    from ispatialgym.activity.problem import canonical_variant
+
+    return canonical_variant(pick.split("#")[0])
+
+
 def _read_csv(path: str) -> List[Dict[str, str]]:
     if not os.path.exists(path):
         return []
@@ -1040,7 +1049,7 @@ class Grounder:
 
     def _combinations_from_picks(self, iddl: I.IDDL) -> List[Combination]:
         subtask = iddl.subtask
-        picks = sorted(p for p in self.icl.picks if p.split("#")[0] == subtask)
+        picks = sorted(p for p in self.icl.picks if subtask_of_pick(p) == subtask)
         out: List[Combination] = []
         if not picks:
             # no object pick (camera_relocalization-standard): one combination from the room rows
@@ -2265,7 +2274,7 @@ class Grounder:
 
     def _in_selection(self, subtask: str, role: str, cat: str, m: str) -> bool:
         if self.opt.mode == "representative":
-            return any(r.get("category") == cat and r.get("model") == m for p, roles in self.icl.picks.items() if p.split("#")[0] == subtask
+            return any(r.get("category") == cat and r.get("model") == m for p, roles in self.icl.picks.items() if subtask_of_pick(p) == subtask
                        for rows in roles.get(role, {}).values() for r in rows)
         row = self.icl.row(subtask, role, cat, m)
         return row is not None and self._marked(row)

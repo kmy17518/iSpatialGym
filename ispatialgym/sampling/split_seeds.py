@@ -292,7 +292,7 @@ def eval_assignment(variants: Iterable[str], table: Optional[Dict[str, Dict[str,
     out: Dict[str, Tuple[str, str]] = {}
     orders: Dict[str, List[Tuple[str, str]]] = {}
     for task in SCENE_DRAW_SUBTASKS:
-        als = _hash_order(sorted({a for a in variants if scene_draw_task(a) == task}), f"eval-room:{task}:variant")
+        als = _hash_order(sorted({a for a in variants if scene_draw_task(a) == task}), f"eval-room:{task}:alias")  # legacy spelling: the salt EVAL_ROOMS was frozen with
         if not als:
             continue
         if len(als) > len(rooms):

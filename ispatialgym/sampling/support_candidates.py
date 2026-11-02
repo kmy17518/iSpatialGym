@@ -210,11 +210,11 @@ def pick_candidates(customs: Dict[str, Any], icl=None, iddls: Optional[Dict[str,
 
     icl = icl if icl is not None else GI.ICL()
     iddls = iddls if iddls is not None else I.load_all(GI.DEFAULT_IDDL)
-    wanted = [p for p in icl.picks if (not subtasks or p.split("#")[0] in subtasks) and (not picks or p in picks)]
+    wanted = [p for p in icl.picks if (not subtasks or GI.subtask_of_pick(p) in subtasks) and (not picks or p in picks)]
     grounder = GI.Grounder(iddls, icl, Customs(), options=GI.Options(dry_run=True, representative_test=False, fallbacks=False))
     combos: Dict[str, Any] = {}
     skipped: Dict[str, str] = {}
-    for st in dict.fromkeys(p.split("#")[0] for p in wanted):
+    for st in dict.fromkeys(GI.subtask_of_pick(p) for p in wanted):
         if st not in iddls:
             continue
         for comb in grounder.combinations(st):
@@ -224,7 +224,7 @@ def pick_candidates(customs: Dict[str, Any], icl=None, iddls: Optional[Dict[str,
     surfaces = _surface_index(customs)
     out: Dict[str, List[Candidate]] = {}
     for pick in wanted:
-        st = pick.split("#")[0]
+        st = GI.subtask_of_pick(pick)
         cands: List[Candidate] = []
         for i, (label, rows) in enumerate(pick_variants(icl, pick), start=1):
             c = Candidate(pick, i, label, st)
