@@ -32,7 +32,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import math
 import os
 import random
 import sys
@@ -62,6 +61,7 @@ from ispatialgym.eval import instances as INST  # noqa: E402
 from ispatialgym.eval.clone_frames import scene_translation  # noqa: E402
 from ispatialgym.oracle.executor import ExecutorConfig, SimState  # noqa: E402
 from ispatialgym.oracle.qa import Monitors, QAConfig  # noqa: E402
+from ispatialgym.oracle import sleep_assist as SA  # noqa: E402
 from ispatialgym.oracle.recorder import PHASE_ORACLE, PHASE_SETTLE, dump_json, json_default, save_png  # noqa: E402
 from ispatialgym.oracle.vec_loader import RENDER_SETTING_KEYS, VecInstanceLoader  # noqa: E402
 from ispatialgym.oracle.vec_rooms import FrameDumper, RoomVisibility, parse_dump_spec, resolve_rooms_override  # noqa: E402
@@ -69,46 +69,6 @@ from ispatialgym.oracle.vec_rooms import FrameDumper, RoomVisibility, parse_dump
 _SLEEP_TRACE_EVERY = int(os.environ.get("ISG_SLEEP_TRACE_EVERY", "30")) if os.environ.get("ISG_SLEEP_TRACE", "0") == "1" else 0
 
 
-def sleep_assist_config() -> Optional[Tuple[int, float, float]]:
-    """``ISG_SLEEP_ASSIST=W,POS_MM,ROT_MRAD`` (set from ``--sleep-assist``): a free task object that moved less than POS_MM / ROT_MRAD over the
-    last W control steps and does not touch the robot is put to sleep (vec_next 2026-10-30: PhysX's own sleep filter never fires on the
-    convex-hull chatter of a resting object - probe F1: a forced sleep sticks). None = off."""
-    raw = os.environ.get("ISG_SLEEP_ASSIST", "").strip()
-    if not raw or raw in ("0", "off"):
-        return None
-    w, pos_mm, rot_mrad = (raw.replace("+", ",").replace(":", ",").split(",") + ["", ""])[:3]
-    return int(w or 30), float(pos_mm or 1.0) / 1000.0, float(rot_mrad or 3.0) / 1000.0
-
-
-_ASSIST_DEBUG = os.environ.get("ISG_SLEEP_ASSIST_DEBUG", "0") == "1"
-
-
-def sleep_assist_mode() -> str:
-    """``ISG_SLEEP_ASSIST_MODE`` (``--sleep-assist-mode``): ``clamp`` (default) zeroes the resting object's velocities every control step and
-    leaves it awake; ``sleep`` calls ``obj.sleep()`` (PhysX putToSleep) - a body the robot touches again later wakes with a violent kick
-    (round D sleep mode: the brussels sprout spun 180-385 mrad per step when the gripper came back to the bowl), so sleep is for experiments."""
-    m = os.environ.get("ISG_SLEEP_ASSIST_MODE", "sleep").strip().lower()
-    return m if m in ("clamp", "sleep") else "sleep"
-
-
-def sleep_assist_max_mass() -> float:
-    """``ISG_SLEEP_ASSIST_MAX_KG`` (``--sleep-assist-max-mass``): heavier free objects (free furniture such as a breakfast table) are never
-    assist-slept - they do not chatter, and putting a support to sleep under awake bodies jolts them (kielbasa: the pack rotated 20-90 mrad
-    per step when the table under its platter was slept at step 751, and landed 0.43 rad off in 2 of 8 slots)."""
-    try:
-        return float(os.environ.get("ISG_SLEEP_ASSIST_MAX_KG", "5"))
-    except ValueError:
-        return 5.0
-
-
-def sleep_assist_wake_radius() -> float:
-    """``ISG_SLEEP_ASSIST_WAKE_M`` (``--sleep-assist-wake-radius``): a slept object is woken (PhysX wakeUp) as soon as one of the robot's
-    end effectors comes within this distance of its bounding box, so it is awake BEFORE the gripper touches it (the kick of round D: the
-    gripper, an articulation link, does not wake a slept body in time; the contact then resolves a deep penetration at once)."""
-    try:
-        return float(os.environ.get("ISG_SLEEP_ASSIST_WAKE_M", "0.05"))
-    except ValueError:
-        return 0.05
 from ispatialgym.oracle.vec_stream import Slot, VecStreamExecutor, isg_of  # noqa: E402
 from ispatialgym.oracle.vec_video import VideoSink, grid_frame, label, tiled_frame, to_uint8_rgb  # noqa: E402
 from ispatialgym.robot import conventions as C  # noqa: E402
@@ -264,19 +224,8 @@ class SlotRecorder:
         self.last_frames: Optional[Dict[str, Optional[np.ndarray]]] = None
         self.n = 0
         self._wrist: Dict[str, Optional[str]] = {}
-        self._assist = sleep_assist_config()
-        self._assist_mode = sleep_assist_mode()
-        self._assist_wake_m = sleep_assist_wake_radius()
-        self._assist_max_kg = sleep_assist_max_mass()
-        self._assist_eef_prev: Dict[str, Any] = {}
-        self._assist_eef_speed: Dict[str, float] = {}
-        self._assist_slept: Dict[str, bool] = {}
-        self._assist_wakes: Dict[str, List[int]] = {}
-        self._assist_radius: Dict[str, float] = {}
-        self._assist_clamped: Dict[str, int] = {}
-        self._assist_hist: Dict[str, list] = {}
-        self._assist_free: Dict[str, bool] = {}
-        self._assist_sleeps: Dict[str, List[int]] = {}
+        # --sleep-assist (ispatialgym.oracle.sleep_assist, shared with run_isg): the tracked task objects of this slot
+        self._sleep = SA.SleepAssist(robot, self.tracked, name) if SA.sleep_assist_config() is not None else None
         self._offset = scene_translation(scene)
         # campaign rooms (2026-10-28): lossless frame dumps at chosen steps and the per-camera room-visibility probe
         self.dumper = FrameDumper(out_dir, dump_spec) if dump_spec is not None else None
@@ -298,164 +247,6 @@ class SlotRecorder:
                 save_png(os.path.join(d, f"step_{int(step):04d}_{cam}.png"), fr[cam])
                 if tag:
                     save_png(os.path.join(d, f"{tag}_{cam}.png"), fr[cam])
-
-    def _sleep_assist(self, step: int) -> None:
-        """--sleep-assist (vec_next 2026-10-30, the small-object trembling): every free, non-articulated tracked object that is awake, has
-        moved less than the configured distance / angle over the last W control steps and does not touch the robot is put to sleep
-        (``obj.sleep()``: PhysX zeroes its velocities and keeps it still until an awake body touches it or a joint to one moves it). The
-        windowed net-motion test is the ``pose_settled`` notion; PhysX's own filter sums the per-frame velocities and never fires on a
-        convex-hull chatter that has no net motion. Recorded per object in ``meta.sleep_assist``."""
-        W, pos_tol, rot_tol = self._assist
-        try:
-            from omnigibson.object_states import Touching
-        except Exception:  # noqa: BLE001
-            Touching = None
-        # the end effectors' positions and speeds this step (a PARKED gripper 3 cm from a released pack must not block its sleep for the
-        # whole tail - kielbasa; only a MOVING gripper within the radius wakes / blocks)
-        eefs: Dict[str, Any] = {}
-        try:
-            for arm in self.robot.arm_names:
-                pe = th.as_tensor(self.robot.get_eef_position(arm)).detach().clone()
-                prev = self._assist_eef_prev.get(arm)
-                self._assist_eef_speed[arm] = float(th.linalg.norm(pe - prev)) if prev is not None else 0.0
-                self._assist_eef_prev[arm] = pe
-                eefs[arm] = pe
-        except Exception:  # noqa: BLE001
-            eefs = {}
-        for inst, obj in self.tracked.items():
-            free = self._assist_free.get(inst)
-            if free is None:
-                try:
-                    from ispatialgym.oracle.vec_loader import VecInstanceLoader
-
-                    free = bool(VecInstanceLoader._is_free_rigid(obj))
-                    if free and self._assist_max_kg > 0:
-                        try:
-                            free = float(obj.mass) <= self._assist_max_kg  # free furniture is never assist-slept (see sleep_assist_max_mass)
-                        except Exception:  # noqa: BLE001
-                            pass
-                except Exception:  # noqa: BLE001
-                    free = False
-                self._assist_free[inst] = free
-            if not free:
-                continue
-            try:
-                pos, quat = obj.get_position_orientation()
-            except Exception:  # noqa: BLE001
-                continue
-            hist = self._assist_hist.setdefault(inst, [])
-            hist.append((pos.detach().clone(), quat.detach().clone()))
-            if len(hist) > W:
-                del hist[0]
-            try:
-                asleep = obj.is_asleep() if callable(getattr(obj, "is_asleep", None)) else bool(getattr(obj, "is_asleep", False))
-            except Exception:  # noqa: BLE001
-                asleep = False
-            # proactive wake: a gripper approaching a slept object wakes it before the contact (sleep mode)
-            near = False
-            if self._assist_mode == "sleep" and self._assist_wake_m > 0:
-                try:
-                    lo, hi = obj.aabb  # the distance from each MOVING end effector to the object's axis-aligned box (0 inside)
-                    lo, hi = th.as_tensor(lo), th.as_tensor(hi)
-                    dmin = float("inf")
-                    for arm, pe in eefs.items():
-                        if self._assist_eef_speed.get(arm, 0.0) < 0.0003:  # parked (< 0.3 mm per control step = 1 cm/s): no approach
-                            continue
-                        gap = th.maximum(th.maximum(lo - pe, pe - hi), th.zeros(3))
-                        dmin = min(dmin, float(th.linalg.norm(gap)))
-                    near = dmin < self._assist_wake_m
-                except Exception:  # noqa: BLE001
-                    near = False
-                if near and asleep and self._assist_slept.get(inst):
-                    try:
-                        obj.wake()
-                        self._assist_slept[inst] = False
-                        self._assist_wakes.setdefault(inst, []).append(step)
-                        if len(self._assist_wakes[inst]) <= 3:
-                            print(f"SLEEP_ASSIST {self.name} step {step}: {inst} woken (a moving gripper {dmin * 100:.1f} cm from its box, radius {self._assist_wake_m * 100:.0f} cm)", flush=True)
-                    except Exception as ex:  # noqa: BLE001
-                        print(f"SLEEP_ASSIST {self.name} step {step}: {inst} wake() failed: {ex!r}", flush=True)
-                    continue
-            debug = _ASSIST_DEBUG and step % 30 == 0
-            # the rest window must be free of robot contact (vec_next 2026-10-31): an object held still by a motionless gripper
-            # otherwise passes the window and is slept on the very step the fingers let go (tablespoon slot 1, step 549), freezing
-            # the release mid-way. Every contact with the robot restarts the window.
-            if not asleep and Touching is not None and hasattr(obj, "states") and Touching in obj.states:
-                try:
-                    if bool(obj.states[Touching].get_value(self.robot)):
-                        hist.clear()
-                        if debug:
-                            print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: touching the robot (window restarted)", flush=True)
-                        continue
-                except Exception as ex:  # noqa: BLE001
-                    if debug:
-                        print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: Touching(robot) failed {ex!r}", flush=True)
-            if asleep or near or len(hist) < W:
-                if debug:
-                    print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: asleep={asleep} near={near} hist={len(hist)}", flush=True)
-                continue
-            p0, q0 = hist[0]
-            dp = max(float(th.linalg.norm(pp - p0)) for pp, _ in hist)
-            dq = max(2.0 * math.acos(min(1.0, abs(float(th.dot(q0, qq))))) for _, qq in hist)
-            if dp >= pos_tol or dq >= rot_tol:
-                if debug:
-                    print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: moving dp={dp * 1000:.2f}mm dq={dq * 1000:.2f}mrad", flush=True)
-                continue
-            if Touching is not None and hasattr(obj, "states") and Touching in obj.states:
-                try:
-                    if bool(obj.states[Touching].get_value(self.robot)):
-                        if debug:
-                            print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: at rest but touching the robot", flush=True)
-                        continue
-                except Exception as ex:  # noqa: BLE001
-                    if debug:
-                        print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: Touching(robot) failed {ex!r}", flush=True)
-                # never sleep a SUPPORT while an awake tracked free body rests on it: putting the support to sleep under it jolts it
-                # (kielbasa, step 751). "Rests on" = touching and higher (its box centre above this object's); the top of a stack sleeps
-                # first, the support follows once everything on it is asleep (a symmetric rule deadlocked pack and platter).
-                blocked = False
-                try:
-                    z_self = float(th.as_tensor(obj.aabb_center)[2])
-                except Exception:  # noqa: BLE001
-                    z_self = float(pos[2])
-                for inst2, obj2 in self.tracked.items():
-                    if inst2 == inst or not self._assist_free.get(inst2):
-                        continue
-                    try:
-                        asleep2 = obj2.is_asleep() if callable(getattr(obj2, "is_asleep", None)) else bool(getattr(obj2, "is_asleep", False))
-                        if asleep2:
-                            continue
-                        z2 = float(th.as_tensor(obj2.aabb_center)[2])
-                        if z2 > z_self and bool(obj.states[Touching].get_value(obj2)):
-                            blocked = True
-                            break
-                    except Exception:  # noqa: BLE001
-                        continue
-                if blocked:
-                    if debug:
-                        print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: at rest but an awake tracked body rests on it", flush=True)
-                    continue
-            try:
-                if self._assist_mode == "sleep":
-                    obj.sleep()
-                    self._assist_slept[inst] = True
-                    self._assist_sleeps.setdefault(inst, []).append(step)
-                    if len(self._assist_sleeps[inst]) <= 3:
-                        print(f"SLEEP_ASSIST {self.name} step {step}: {inst} put to sleep (net motion over {W} steps {dp * 1000:.2f} mm / {dq * 1000:.2f} mrad)", flush=True)
-                else:
-                    obj.keep_still()  # zero the velocities, stay awake: the chatter cannot grow into rocking, contacts keep responding normally
-                    n = self._assist_clamped.get(inst, 0)
-                    self._assist_clamped[inst] = n + 1
-                    runs = self._assist_sleeps.setdefault(inst, [])
-                    if not runs or step - runs[-1] > 1:  # the start of a clamp run (consecutive steps are one run)
-                        if len(runs) < 60:
-                            runs.append(step)
-                        if len(runs) <= 3:
-                            print(f"SLEEP_ASSIST {self.name} step {step}: {inst} clamp run starts (net motion over {W} steps {dp * 1000:.2f} mm / {dq * 1000:.2f} mrad)", flush=True)
-                    else:
-                        runs[-1] = step  # extend: the list keeps run starts as [start, ..., last] pairs implicitly via the counter below
-            except Exception as ex:  # noqa: BLE001
-                print(f"SLEEP_ASSIST {self.name} step {step}: {inst} assist failed: {ex!r}", flush=True)
 
     def _sleep_trace(self, step: int) -> None:
         """ISG_SLEEP_TRACE=1 (vec_next, the small-object trembling): one stdout line per slot every ISG_SLEEP_TRACE_EVERY steps with the tracked
@@ -599,8 +390,8 @@ class SlotRecorder:
             v = metric.get(key)
             r[f"eval/{key}"].append(float("nan") if v is None else float(v))
         self.n = int(step)
-        if self._assist is not None:
-            self._sleep_assist(int(step))
+        if self._sleep is not None:
+            self._sleep.step(int(step))
         if _SLEEP_TRACE_EVERY and int(step) % _SLEEP_TRACE_EVERY == 0:
             self._sleep_trace(int(step))
         self.timers["record_rows_s"] = self.timers.get("record_rows_s", 0.0) + (time.time() - t0)
@@ -619,12 +410,8 @@ class SlotRecorder:
 
     def close(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {}
-        if self._assist is not None:
-            W, pos_tol, rot_tol = self._assist
-            out["sleep_assist"] = {"mode": self._assist_mode, "window_steps": W, "pos_tol_mm": pos_tol * 1000, "rot_tol_mrad": rot_tol * 1000,
-                                   "wake_radius_m": self._assist_wake_m, "max_mass_kg": self._assist_max_kg, "wakes": {k: v[:50] for k, v in self._assist_wakes.items()},
-                                   "sleeps" if self._assist_mode == "sleep" else "clamp_run_steps": {k: v[:50] for k, v in self._assist_sleeps.items()},
-                                   "clamped_steps": dict(self._assist_clamped), "free_objects": [k for k, v in self._assist_free.items() if v]}
+        if self._sleep is not None:
+            out["sleep_assist"] = self._sleep.report()
         out.update(self._close_rest())
         return out
 
@@ -745,29 +532,7 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--layout", default="grid-centered", choices=["grid", "grid-centered", "line"],
                    help="clone placement: grid-centered (default since 2026-10-29: scene 0 at the origin, the clones on the cells around it nearest first; "
                         "the vec_speed ladder re-verification), grid (the 2026-10-23 production layout growing towards +x/+y), line (OmniGibson's row along +x)")
-    w.add_argument("--rigid-sleep-threshold", type=float, default=0.005,
-                   help="physxRigidBody:sleepThreshold (mass-normalised kinetic energy) of every free non-articulated object; articulations and the robot keep "
-                        "OmniGibson's 5e-5. Default 0.005 = the PhysX default (adopted 2026-10-30: at 5e-5 a placed light object's TGS rocking keeps its stack awake "
-                        "forever and in some clone configurations the rocking never decays - the 'not_settled' failures; at 0.005 the stack sleeps within 0.4 s). "
-                        "0 = stock 5e-5")
-    w.add_argument("--rigid-solver-iterations", default=None, metavar="POS,VEL",
-                   help="solver position,velocity iteration counts of every free non-articulated object (scene objects at the build, task objects at the "
-                        "restore); articulations and the robot keep OmniGibson's 32,1. vec_next 2026-10-30: the teapot's convex-hull base chatters on the "
-                        "bar forever at 32,1 (never asleep at any sleep threshold up to 0.05) and sleeps within 0.5 s at 64,8 (probe R7). None = stock")
-    w.add_argument("--sleep-assist", default="30,1,3", metavar="W,POS_MM,ROT_MRAD",
-                   help="put a free non-articulated task object to sleep once it has moved less than POS_MM / ROT_MRAD over the last W control steps and does "
-                        "not touch the robot (vec_next 2026-10-30: PhysX's sleep filter never fires on a resting convex hull's 120 Hz chatter, so the stack "
-                        "rocks for the rest of the episode in some clones; a forced sleep sticks). Default 30,1,3 = 1 s, 1 mm, 3 mrad (adopted 2026-10-30: "
-                        "the lid-on-teapot alias 8/8 slots at step 1002 like N=1 and the demo; stock 3/8). Recorded per object in meta.sleep_assist. 'off' = stock")
-    w.add_argument("--sleep-assist-mode", default="sleep", choices=["sleep", "clamp"],
-                   help="sleep (default): PhysX putToSleep once at rest, woken again when a gripper comes within --sleep-assist-wake-radius of its box (without "
-                        "the wake a gripper touching a slept body kicks it: round D sleep mode, sprout 180-385 mrad/step); clamp: zero the velocities every "
-                        "control step and stay awake (holds the lid-on-teapot stack in 5 of 8 slots only)")
-    w.add_argument("--sleep-assist-max-mass", type=float, default=5.0, metavar="KG",
-                   help="sleep assist: objects heavier than this are never assist-slept (free furniture; a support slept under awake bodies jolts them). 0 = no cap")
-    w.add_argument("--sleep-assist-wake-radius", type=float, default=0.05, metavar="M",
-                   help="sleep mode: wake a slept object when an end effector is within this distance of its bounding box, and do not sleep it while one is "
-                        "(default 0.05 m: at 0.15 the gripper hovering over the released lid kept the teapot stack awake for the whole settle tail; 0 = never)")
+    SA.add_arguments(w)  # --rigid-sleep-threshold, --rigid-solver-iterations, --sleep-assist* (shared with run_isg)
     w.add_argument("--physics-override", action="append", default=[], metavar="KEY=VALUE",
                    help="EXPERIMENT (vec_next, the small-object trembling): physics settings - solver=TGS|PGS, broadphase=MBP|SAP|GPU, gpu_dynamics=0|1, "
                         "num_threads=N, enhanced_determinism=0|1 (scene, applied stopped after the build); sleep_threshold=F, solver_position_iterations=N, "
@@ -901,11 +666,7 @@ def _parse_override(s: str):
 def parse_args(argv=None):
     p = build_parser()
     args = p.parse_args(argv)
-    if getattr(args, "sleep_assist", None) is not None:
-        os.environ["ISG_SLEEP_ASSIST"] = str(args.sleep_assist)  # read by SlotRecorder (sleep_assist_config); 'off' / '0' disable
-    os.environ["ISG_SLEEP_ASSIST_MODE"] = str(getattr(args, "sleep_assist_mode", "sleep"))
-    os.environ["ISG_SLEEP_ASSIST_WAKE_M"] = str(getattr(args, "sleep_assist_wake_radius", 0.05))
-    os.environ["ISG_SLEEP_ASSIST_MAX_KG"] = str(getattr(args, "sleep_assist_max_mass", 5.0))
+    SA.export_env(args)  # read by SlotRecorder's SleepAssist
     if (args.task is None) == (args.instances is None):
         p.error("exactly one of --task and --instances")
     if args.num_envs < 1:
@@ -1219,14 +980,7 @@ def _physics_overrides(args) -> Optional[Dict[str, Any]]:
     ov: Dict[str, Any] = {}
     if getattr(args, "physics_threads", None):
         ov["num_threads"] = int(args.physics_threads)
-    if getattr(args, "rigid_sleep_threshold", 0.0):
-        ov["rigid_sleep_threshold"] = float(args.rigid_sleep_threshold)  # an explicit --physics-override rigid_sleep_threshold=... below wins
-    if getattr(args, "rigid_solver_iterations", None):
-        pos_it, _, vel_it = str(args.rigid_solver_iterations).replace("+", ",").replace(":", ",").partition(",")  # 64+8 for sbatch --export
-        if pos_it.strip():
-            ov["rigid_solver_position_iterations"] = int(pos_it)
-        if vel_it.strip():
-            ov["rigid_solver_velocity_iterations"] = int(vel_it)
+    ov.update(SA.rigid_overrides(args))  # an explicit --physics-override rigid_sleep_threshold=... below wins
     for item in getattr(args, "physics_override", None) or []:
         key, _, val = item.partition("=")
         key = key.strip()

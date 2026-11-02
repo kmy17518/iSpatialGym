@@ -39,6 +39,7 @@ from omnigibson.macros import gm
 from ispatialgym.eval.group_entity import GroupEntity
 from ispatialgym.eval.tro import TROFile, load_tro
 from ispatialgym.oracle import r1pro_model as M
+from ispatialgym.oracle import sleep_assist as SA
 from ispatialgym.oracle.action import ActionState, apply_recorded_targets
 from ispatialgym.oracle.run_isg import (DEFAULT_HEAD_APERTURE_MM, DEFAULT_IMAGE_SIZE, InstanceLoader, LoadError, _copy_map, _first_key, build_env_config, gripper_command_for,
                                         resolve_instance, robot_name_from_tro)
@@ -490,11 +491,8 @@ class VecInstanceLoader:
 
     @staticmethod
     def _is_free_rigid(obj) -> bool:
-        """A free (not fixed, not kinematic), non-articulated (no movable joint) object that is not the robot: the objects the rigid-body
-        overrides apply to. Fixed-joint-only assets (the meta-link articulations of the teapot or a lid) count as rigid."""
-        if getattr(obj, "fixed_base", False) or getattr(obj, "kinematic_only", False) or getattr(obj, "category", "") == "agent":
-            return False
-        return not (int(getattr(obj, "n_dof", 0) or 0) > 0 or len(getattr(obj, "joints", {}) or {}) > 0)
+        """:func:`ispatialgym.oracle.sleep_assist.is_free_rigid` (shared with run_isg)."""
+        return SA.is_free_rigid(obj)
 
     def _apply_rigid_sleep_threshold(self, objs) -> Optional[Dict[str, Any]]:
         """vec_next (2026-10-30): the rigid-body physics overrides for a slot's TASK objects, which the TRO restore adds after the world build
@@ -502,32 +500,7 @@ class VecInstanceLoader:
         ``objs`` gets ``rigid_sleep_threshold`` (physxRigidBody / physxArticulation sleepThreshold) and ``rigid_solver_position_iterations`` /
         ``rigid_solver_velocity_iterations`` (the solver iteration counts; the teapot-on-bar chatter that never sleeps at OmniGibson's 32 / 1
         sleeps within 0.5 s at 64 / 8, probe R7 2026-10-30). Returns the report entry (None when no override is on)."""
-        ov = self.physics_overrides or {}
-        thr = ov.get("rigid_sleep_threshold")
-        pos_it, vel_it = ov.get("rigid_solver_position_iterations"), ov.get("rigid_solver_velocity_iterations")
-        if thr is None and pos_it is None and vel_it is None:
-            return None
-        names, skipped = [], []
-        for obj in objs:
-            if not self._is_free_rigid(obj):
-                skipped.append(obj.name)
-                continue
-            try:
-                if thr is not None:
-                    obj.sleep_threshold = float(thr)
-                if pos_it is not None:
-                    obj.solver_position_iteration_count = int(pos_it)
-                if vel_it is not None:
-                    obj.solver_velocity_iteration_count = int(vel_it)
-                names.append(obj.name)
-            except Exception as ex:  # noqa: BLE001
-                skipped.append(f"{obj.name}!{type(ex).__name__}")
-        out: Dict[str, Any] = {"set": names, "skipped": skipped}
-        if thr is not None:
-            out["threshold"] = float(thr)
-        if pos_it is not None or vel_it is not None:
-            out["solver_iterations"] = {"position": None if pos_it is None else int(pos_it), "velocity": None if vel_it is None else int(vel_it)}
-        return out
+        return SA.apply_to_objects(objs, self.physics_overrides or {})
 
     @staticmethod
     def _apply_physics_overrides(ov: Dict[str, Any]) -> Dict[str, Any]:
@@ -546,44 +519,7 @@ class VecInstanceLoader:
             if "gpu_dynamics" in ov:
                 ctx.enable_gpu_dynamics(bool(ov["gpu_dynamics"]))
                 out["gpu_dynamics"] = bool(ov["gpu_dynamics"])
-        if "rigid_sleep_threshold" in ov:
-            # vec_next (2026-10-30, the small-object trembling): physxRigidBody:sleepThreshold of every FREE, NON-ARTICULATED object (no joints,
-            # not fixed_base, not kinematic, not the robot) - the resting light objects whose stack never sleeps at OmniGibson's 5e-5 and whose
-            # TGS residual then drives a limit cycle in some clone configurations. Articulations (doors, drawers, robots) keep the stock value.
-            thr = float(ov["rigid_sleep_threshold"])
-            n_set, names = 0, []
-            for scene in og.sim.scenes:
-                for obj in scene.objects:
-                    if getattr(obj, "fixed_base", False) or getattr(obj, "kinematic_only", False) or getattr(obj, "category", "") == "agent":
-                        continue
-                    if int(getattr(obj, "n_dof", 0) or 0) > 0 or len(getattr(obj, "joints", {}) or {}) > 0:
-                        continue
-                    try:
-                        obj.sleep_threshold = thr
-                        n_set += 1
-                        if scene.idx == 0:
-                            names.append(obj.name)
-                    except Exception:  # noqa: BLE001
-                        pass
-            out["rigid_sleep_threshold"] = {"threshold": thr, "objects": n_set, "scene0_names": names[:40]}
-        if "rigid_solver_position_iterations" in ov or "rigid_solver_velocity_iterations" in ov:
-            # vec_next (2026-10-30, the teapot-on-bar chatter): solver iteration counts of every free non-articulated scene object (the task
-            # objects get theirs at the restore, _apply_rigid_sleep_threshold); articulations and the robot keep OmniGibson's 32 / 1
-            pos_it, vel_it = ov.get("rigid_solver_position_iterations"), ov.get("rigid_solver_velocity_iterations")
-            n_set = 0
-            for scene in og.sim.scenes:
-                for obj in scene.objects:
-                    if not VecInstanceLoader._is_free_rigid(obj):
-                        continue
-                    try:
-                        if pos_it is not None:
-                            obj.solver_position_iteration_count = int(pos_it)
-                        if vel_it is not None:
-                            obj.solver_velocity_iteration_count = int(vel_it)
-                        n_set += 1
-                    except Exception:  # noqa: BLE001
-                        pass
-            out["rigid_solver_iterations"] = {"position": pos_it, "velocity": vel_it, "objects": n_set}
+        out.update(SA.apply_to_scenes(og.sim.scenes, ov))  # rigid_sleep_threshold / rigid_solver_* (shared with run_isg)
         if "stabilization" in ov:
             # physxScene:enableStabilization on the physics scene prim + physxRigidBody:stabilizationThreshold on every free object
             thr = float(ov["stabilization"])
