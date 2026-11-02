@@ -1078,6 +1078,7 @@ class SimWorld:
         task_names = set(task_object_names) | set(self.spawned) | {self.robot.name}
         ref = self.stable_scene["state"]["registry"]["object_registry"]
         moved_objects = []
+        reloaded: List[str] = []
         for o in self.scene.objects:
             if o.name in task_names or o.name not in ref:
                 continue
@@ -1090,6 +1091,10 @@ class SimWorld:
             if moved or o.n_joints > 0:  # articulated scene objects (doors, drawers) can drift in their joints too
                 o.load_state(recursively_convert_to_torch(copy.deepcopy(ref[o.name])), serialized=False)
                 o.keep_still()
+                reloaded.append(o.name)
+        #: every object whose state this call re-wrote (the moved ones and all articulated ones) - what a partial cuRobo re-sync
+        #: after the park must refresh besides the task objects (train-fast PARK_ONCE, ``SamplerV2._sync_after_park``)
+        self.last_reloaded = reloaded
         self.last_reset = sorted(moved_objects, key=lambda m: -m[1])
         if self.last_reset:
             shown = ", ".join(f"{n} {d * 1000:.1f} mm / {math.degrees(a):.1f} deg" for n, d, a in self.last_reset[:12])

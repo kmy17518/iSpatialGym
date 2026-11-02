@@ -115,6 +115,7 @@ from curobo.types import Pose as CuPose
 
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.poses import Pose, as_tensor, quat_wxyz_to_xyzw, quat_xyzw_to_wxyz
+from ispatialgym.fastflags import fast_on, fast_value  # 2026-10-31 train-fast: switches / tunables of the batched IK (off = the former behaviour)
 
 log = logging.getLogger(__name__)
 
@@ -159,7 +160,12 @@ def _sphere_fit_key(obstacles, num_spheres: int) -> str:
         h.update(np.ascontiguousarray(ob.vertices, dtype=np.float32).tobytes())
         h.update(np.ascontiguousarray(ob.faces, dtype=np.int64).tobytes())
         h.update(np.asarray(1.0 if ob.scale is None else ob.scale, dtype=np.float32).tobytes())
-        h.update(np.asarray(ob.pose, dtype=np.float32).tobytes())
+        pose = np.asarray(ob.pose, dtype=np.float32)
+        if fast_on("ATTACH_FAST"):
+            # train-fast 2026-10-31: the mesh pose in the eef frame differs by float noise between two attaches of the same grasp (the object
+            # teleported into the hand each time), which made every SEEDED_SPHERE_FIT=cache lookup miss; rounded to 1 mm / 1e-3 quaternion units
+            pose = np.round(pose, 3)
+        h.update(pose.tobytes())
     h.update(str(int(num_spheres)).encode())
     return h.hexdigest()
 
@@ -344,6 +350,9 @@ class R1ProCuRobo:
         self.orientation_tolerance = orientation_tolerance
         self.num_ik_seeds = num_ik_seeds
         self.num_trajopt_seeds = num_trajopt_seeds
+        # 2026-10-31 train-fast (BATCH_SEEDS): seeds of the batched screening solvers (``_batch_ik_entry``), 12 as before unless
+        # ISPATIALGYM_FAST_BATCH_IK_SEEDS=<n>; a caller may still ask for other seeds per call (``solve_ik_batch(seeds=...)``)
+        self.batch_ik_seeds = int(fast_value("BATCH_IK_SEEDS", 12))
         self.use_cuda_graph = use_cuda_graph
         self.warmup_iterations = int(os.environ.get("ISPATIALGYM_CUROBO_WARMUP_ITERS", warmup_iterations))
 
@@ -606,13 +615,23 @@ class R1ProCuRobo:
                     yield obj, link, cm, (pos, quat)
 
     def _mesh_geometry(self, cm):
-        if cm.geom_type == "Mesh":
-            verts = cm.points.numpy().astype(np.float32)
-            faces = cm.faces.numpy().astype(np.int64)
+        # train-fast 2026-10-31 (ATTACH_FAST): a collision mesh's vertices / faces never change in a process, yet every attach_object
+        # (6-8 per sampler attempt; every carried action of the oracle) re-read them through USD - cached per prim path; the world
+        # scale is read live (an object scaling task sets it at spawn).
+        cache = self.__dict__.setdefault("_mesh_geom_cache", {}) if fast_on("ATTACH_FAST") else None
+        key = getattr(cm, "prim_path", None)
+        if cache is not None and key in cache:
+            verts, faces = cache[key]
         else:
-            tm = mesh_prim_shape_to_trimesh_mesh(cm.prim)
-            verts = np.asarray(tm.vertices, dtype=np.float32)
-            faces = np.asarray(tm.faces, dtype=np.int64)
+            if cm.geom_type == "Mesh":
+                verts = cm.points.numpy().astype(np.float32)
+                faces = cm.faces.numpy().astype(np.int64)
+            else:
+                tm = mesh_prim_shape_to_trimesh_mesh(cm.prim)
+                verts = np.asarray(tm.vertices, dtype=np.float32)
+                faces = np.asarray(tm.faces, dtype=np.int64)
+            if cache is not None and key is not None:
+                cache[key] = (verts, faces)
         scale = cm.get_world_scale().numpy().astype(np.float32)
         return verts, faces, scale
 
@@ -1651,10 +1670,12 @@ class R1ProCuRobo:
 
     # ------------------------------------------------------------------ batched IK (reachability queries)
 
-    def _batch_ik_entry(self, emb_name: str, batch_size: int) -> _PlannerEntry:
+    def _batch_ik_entry(self, emb_name: str, batch_size: int, seeds: Optional[int] = None) -> _PlannerEntry:
         """Dedicated IK solver (``max_batch_size = batch_size``) for ``emb_name`` sharing the scene checker; the
-        collision spheres / self-collision data are the planner's, so results agree with :meth:`solve_ik`."""
-        seeds = int(getattr(self, "batch_ik_seeds", 12))
+        collision spheres / self-collision data are the planner's, so results agree with :meth:`solve_ik`.
+        ``seeds`` (2026-10-31 train-fast): seeds of that solver, default :attr:`batch_ik_seeds`; one solver is cached per
+        (embodiment, batch size, seeds)."""
+        seeds = int(getattr(self, "batch_ik_seeds", 12)) if seeds is None else int(seeds)
         key = (emb_name, int(batch_size), seeds)
         cache = getattr(self, "_batch_ik", None)
         if cache is None:
@@ -1700,15 +1721,34 @@ class R1ProCuRobo:
             for i, jn in enumerate(lock_js.joint_names):
                 lock_js.position[..., i] = float(q_full[self._jidx[jn]])
 
-    def solve_ik_batch(self, emb_name: str, frame: str, poses: Sequence[Pose], q_seed: th.Tensor, batch_size: int = 64, sync_world: bool = False):
+    @staticmethod
+    def _batch_size_ladder() -> List[int]:
+        """Solver sizes BATCH_SIZE_FIT picks from (``ISPATIALGYM_FAST_BATCH_SIZES``, comma separated; default ``8,16,32,64``)."""
+        raw = str(fast_value("BATCH_SIZES", "8,16,32,64"))
+        out = sorted({int(t) for t in raw.replace(";", ",").split(",") if t.strip().isdigit() and int(t) > 0})
+        return out or [8, 16, 32, 64]
+
+    def solve_ik_batch(self, emb_name: str, frame: str, poses: Sequence[Pose], q_seed: th.Tensor, batch_size: int = 64, sync_world: bool = False,
+                       seeds: Optional[int] = None):
         """Collision-aware IK for many world poses of one tool frame at once.
 
         Returns ``(success (N,) bool, q (N, 28))`` where ``q[i]`` is the best solution (full configuration, locked
         joints from ``q_seed``) when ``success[i]``. Poses are solved in chunks of ``batch_size``.
+
+        ``seeds`` (2026-10-31 train-fast): seeds of the batched solver (default :attr:`batch_ik_seeds`, 12). BATCH_SIZE_FIT
+        (``ISPATIALGYM_FAST_BATCH_SIZE_FIT=0`` off): the solver's batch is the smallest rung of :meth:`_batch_size_ladder` that
+        holds every pose, never above ``batch_size`` - every chunk was padded to a full ``batch_size`` (64) before, so one pose cost
+        a 64-problem x seeds solve (5-10 s against a large mesh store: the sphere-vs-mesh kernel scales with the store's capacity);
+        a solver per (embodiment, size, seeds) is built once (a few seconds) and cached. More poses than the largest rung are
+        chunked by ``batch_size`` as before.
         """
         if sync_world:
             self.update_world()
-        entry = self._batch_ik_entry(emb_name, batch_size)
+        if fast_on("BATCH_SIZE_FIT") and len(poses) > 0:
+            fit = [b for b in self._batch_size_ladder() if len(poses) <= b <= int(batch_size)]
+            if fit:
+                batch_size = min(fit)
+        entry = self._batch_ik_entry(emb_name, batch_size, seeds=seeds)
         ik: IKSolver = entry.rsc
         q_seed = as_tensor(q_seed)
         self._refresh_locked_entry(entry, q_seed)

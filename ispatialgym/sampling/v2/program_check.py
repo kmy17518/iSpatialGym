@@ -22,10 +22,13 @@ from __future__ import annotations
 
 import logging
 import os
+import time
+from contextlib import nullcontext
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch as th
 
+from ispatialgym.fastflags import fast_on  # train-fast switches (2026-10-31): EARLY_FRAME_GATE, SYNC_ONLY_OBJECTS, ATTACH_REUSE
 from ispatialgym.sampling.v2.ik import IKResult
 from ispatialgym.sampling.v2.stances import PathRecord, SidecarDraft, Stance, pose_from_sidecar
 
@@ -334,6 +337,112 @@ def push_pre_standoff(sampler, arm: str, q_pre: th.Tensor, pre_pose, supports: S
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
+# ----------------------------------------------------------------------------------------------------------------
+# train-fast (2026-10-31): run statistics, partial world syncs, attachment reuse
+# ----------------------------------------------------------------------------------------------------------------
+
+#: the statistics of the last :func:`run` in this process (``core`` reads them into the attempt's timing summary): ``program_check_s``,
+#: ``n_actions``, ``n_poses``, ``n_ik_single``, ``n_chains``, ``n_sync``, ``sync_s``, ``n_attach``, ``early_gate_poses``, ``rejected``
+last_stats: Optional[Dict[str, Any]] = None
+#: the counters of the run in progress (None outside :func:`run`: the helpers below then count nothing)
+_STATS: Optional[Dict[str, Any]] = None
+_FAST_LOGGED: set = set()
+
+
+def _fast_note(name: str, msg: str) -> None:
+    """One INFO line the first time a train-fast path is taken in this process."""
+    if name not in _FAST_LOGGED:
+        _FAST_LOGGED.add(name)
+        log.info("program check (train-fast %s): %s", name, msg)
+
+
+def _count(key: str, n: int = 1) -> None:
+    if _STATS is not None:
+        _STATS[key] = _STATS.get(key, 0) + n
+
+
+def _partial_sync_ok(kit, objects: Sequence[Any]) -> bool:
+    """Whether ``RobotKit.sync_world(only_objects=objects)`` is equivalent to a full sync for the step that moved ``objects``: the
+    cuRobo world is loaded and every collision mesh of every object is already in it (``R1ProCuRobo.update_world``'s partial path only
+    re-poses meshes it holds - a mesh it does not hold would be skipped silently where the full sync adds it). A fake backend without
+    these attributes (tests) gets the full sync, as before."""
+    backend = getattr(kit, "backend", None)
+    names = getattr(backend, "_world_mesh_names", None)
+    if not objects or not getattr(backend, "_world_loaded", False) or not isinstance(names, (set, frozenset)):
+        return False
+    # a mesh the backend disabled (``_disabled_obstacles``: attached to a hand, or unseen by the last full pass) is re-enabled by a FULL
+    # sync and left alone by the partial one: such an object gets the full sync, as before
+    disabled = getattr(backend, "_disabled_obstacles", None) or set()
+    for obj in objects:
+        if obj is None:
+            return False
+        for link in (getattr(obj, "links", None) or {}).values():
+            for cm in (getattr(link, "collision_meshes", None) or {}).values():
+                name = getattr(cm, "prim_path", None)
+                if name not in names or name in disabled:
+                    return False
+    return True
+
+
+def _reset_graph_buffers(kit) -> None:
+    """What the full ``update_world`` does after a pose change and its partial path does not: drop the PRM graph planners' cached graphs,
+    so a joint-space plan after the step (``check_repose`` with ``sync_world=False``) does not re-use seed paths validated against the
+    old poses."""
+    entries = getattr(getattr(kit, "backend", None), "_entries", None)
+    if not isinstance(entries, dict):
+        return
+    for e in entries.values():
+        gp = getattr(getattr(e, "planner", None), "graph_planner", None)
+        if gp is not None:
+            try:
+                gp.reset_buffer()
+            except Exception:  # noqa: BLE001 - a planner without a buffer: nothing to drop
+                pass
+
+
+def _sync(kit, objects: Optional[Sequence[Any]] = None) -> None:
+    """``kit.sync_world()`` for the program check's kinematic advances. ``objects`` = the sim objects whose poses / joints the step just
+    changed; with ``SYNC_ONLY_OBJECTS`` (train-fast 2026-10-31) their collision meshes alone are re-posed (``RobotKit.sync_world(
+    only_objects=...)``: pose updates of meshes the loaded world already holds, nothing enabled, disabled or added) instead of the full
+    pass over the scene's meshes (0.5-13 s) - the robot root never moves during the check (the kit falls back to a full sync by itself
+    when it drifted), no ignore / attach context is open where the advances run (nothing a full sync would re-enable), and the graph
+    buffers are reset as the full sync resets them. The full sync stays when ``objects`` is None (the moved set is unknown), when the
+    switch is off, when the world is not loaded or when one of the objects' meshes is not in it (:func:`_partial_sync_ok`). Counted
+    and timed into :data:`last_stats`."""
+    t0 = time.time()
+    try:
+        if objects is not None and fast_on("SYNC_ONLY_OBJECTS") and _partial_sync_ok(kit, objects):
+            _fast_note("SYNC_ONLY_OBJECTS", "the advances re-pose the moved objects' meshes only (kit.sync_world(only_objects=...))")
+            kit.sync_world(only_objects=list(objects))
+            _reset_graph_buffers(kit)
+        else:
+            kit.sync_world()
+    finally:
+        _count("n_sync")
+        if _STATS is not None:
+            _STATS["sync_s"] = _STATS.get("sync_s", 0.0) + (time.time() - t0)
+
+
+def _attach_ctx(kit, arm: Optional[str], obj: Any, eef_in_object=None, nested: bool = False):
+    """``navigation.attached`` for the checks inside (counted into :data:`last_stats`). ``nested``: the same (arm, object, eef_in_object)
+    an enclosing context of this action already attached - the carried base poses of a navigate / transition inside the action's own
+    attached context (the lift-end solve and the drive check, per base pose). With ``ATTACH_REUSE`` (train-fast 2026-10-31) that
+    attachment is kept when the backend holds this object on this arm: no second teleport into the hand (a no-op there), ``og.sim.
+    step_physics()`` and sphere fit of the same geometry (the fit is seeded: the same spheres), and no detach at the nested exit (which
+    today drops the enclosing attachment too, until the next nested enter re-fits it). Off, or with nothing attached: the plain context,
+    as before. ``navigation.attached`` itself does not no-op on a nested identical attach - it re-fits and its exit detaches."""
+    from ispatialgym.sampling.v2.navigation import attached, attached_checks_enabled
+
+    if nested and obj is not None and arm is not None and fast_on("ATTACH_REUSE"):
+        cur = (getattr(getattr(kit, "backend", None), "_attached", None) or {}).get(arm)
+        if isinstance(cur, dict) and cur.get("obj") is obj:
+            _fast_note("ATTACH_REUSE", "a nested attach of the object already attached to the arm is skipped (the enclosing context's fit is kept)")
+            return nullcontext()
+    if obj is not None and arm is not None and attached_checks_enabled():
+        _count("n_attach")
+    return attached(kit, arm, obj, eef_in_object=eef_in_object)
+
+
 #: which sidecar blocks each subtask's program consumes (oracle doc §6.2; used by the stub and as a sanity list)
 PROGRAM_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "camera_relocalization": ("stances.init", "goal", "paths"),
@@ -633,7 +742,8 @@ class _released_placed:
                 log.debug("departure arms: %s not moved to its release pose (%r)", obj_name, e)
                 self.saved.pop(obj_name, None)
         if self.saved:
-            self.sampler.kit.sync_world()
+            # train-fast 2026-10-31: the released objects moved, nothing else (the robot stands still) - re-pose their meshes alone
+            _sync(self.sampler.kit, [self.sampler.objects[n] for n in self.saved if self.sampler.objects.get(n) is not None])
         return self
 
     def __exit__(self, *exc):
@@ -643,7 +753,7 @@ class _released_placed:
                 obj.set_position_orientation(p0, q0)
                 obj.keep_still()
         if self.saved:
-            self.sampler.kit.sync_world()
+            _sync(self.sampler.kit, [self.sampler.objects[n] for n in self.saved if self.sampler.objects.get(n) is not None])  # train-fast 2026-10-31
         self.saved.clear()
         return False
 
@@ -808,6 +918,8 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
 
     import os
 
+    global _STATS, last_stats
+
     subtask = subtask or getattr(sampler, "subtask", alias)
     sd = sidecar.to_dict()
     problems = check_blocks(subtask, sd)
@@ -823,6 +935,11 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
     except Exception as e:  # a program that cannot expand is a sampler-side bug too
         raise Reject("program_check_failed", f"expand failed: {e!r}", action="expand")
     report: Dict[str, Any] = {"mode": "expand", "actions": []}
+    # train-fast 2026-10-31 (PC_TIMING, always on): the run's counters - IK singles / chains, world syncs and their time, attachments -
+    # collected by the helpers while it runs, published as ``program_check.last_stats`` (and ``report["stats"]``) and one INFO line
+    t_run = time.time()
+    prev_stats, _STATS = _STATS, {"program_check_s": 0.0, "n_actions": len(actions), "n_actions_checked": 0, "n_poses": 0, "n_ik_single": 0, "n_chains": 0,
+                                  "n_sync": 0, "sync_s": 0.0, "n_attach": 0, "early_gate_poses": 0, "rejected": True}
     tracker = _Tracker(sidecar)
     state = _SamplerState(sampler, tracker)
     # joint state carried through the program (2026-09-19, two-flap cartons): a push with an ``articulation`` record leaves its
@@ -840,7 +957,7 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
         qs[list(obj.joints).index(joint)] = float(q)
         obj.set_joint_positions(qs)
         obj.keep_still()
-        sampler.kit.sync_world()
+        _sync(sampler.kit, [obj])  # train-fast 2026-10-31: only this object's links moved
 
     def _carry_joint_state(action):
         nm = getattr(action, "name", "")
@@ -867,6 +984,11 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
 
     travel_handled: set = set()
     try:
+        if fast_on("EARLY_FRAME_GATE") and os.environ.get("ISG_FINGERTIP_FRAME_CHECK", "on").lower() not in ("off", "0", "false"):
+            # train-fast 2026-10-31: the camera-frame gate of every action whose poses are known now, before the first IK (the per-action
+            # gate below stays and simply passes for them)
+            _fast_note("EARLY_FRAME_GATE", "the fingertip frame gate runs over the static targets of every action before any IK")
+            _STATS["early_gate_poses"] = _early_frame_gate(sidecar, sc, sampler, actions)
         for i, action in enumerate(actions):
             name = getattr(action, "name", type(action).__name__)
             if name in ("navigate", "transition") and i not in travel_handled:
@@ -929,15 +1051,33 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
             if repose_note is not None:
                 entry["repose"] = repose_note
             report["actions"].append(entry)
+            _STATS["n_actions_checked"] += 1
+            _STATS["n_poses"] += int(n)
+        _STATS["rejected"] = False
     finally:
         tracker.restore_moved(sampler)  # block records advanced through the program go back to their init poses (the TRO is written from the live world)
+        restored_joints: List[Any] = []
         for obj_name, qs in joint_saved.items():
             obj = sampler.objects.get(obj_name)
             if obj is not None:
                 obj.set_joint_positions(qs)
                 obj.keep_still()
+                restored_joints.append(obj)
         if joint_saved:
-            sampler.kit.sync_world()
+            _sync(sampler.kit, restored_joints)  # train-fast 2026-10-31: the restored articulated objects alone
+        # PC_TIMING: the run's statistics (``last_stats`` for core, ``report["stats"]``) and one INFO line
+        _STATS["program_check_s"] = round(time.time() - t_run, 3)
+        _STATS["sync_s"] = round(float(_STATS["sync_s"]), 3)
+        st, _STATS = _STATS, prev_stats
+        last_stats = st
+        report["stats"] = dict(st)
+        try:
+            sampler.last_stats = dict(st)  # core.py reads ``self.last_stats`` on the sampler when present (its agent's contract, 2026-10-31)
+        except Exception:  # noqa: BLE001 - a read-only sampler stand-in (tests)
+            pass
+        log.info("program_check: %d actions, %d poses, %d singles, %d chains, %d syncs (%.1fs), %d attach, total %.1fs%s", st["n_actions"], st["n_poses"],
+                 st["n_ik_single"], st["n_chains"], st["n_sync"], st["sync_s"], st["n_attach"], st["program_check_s"],
+                 "" if not st["rejected"] else f", rejected after {st['n_actions_checked']} actions")
     # the recorded joint solutions (28-D, arm joints + trunk + fingers meaningful) per checked end pose: D5 verifies them as
     # witnesses (FK + collision) instead of re-solving the randomised IK
     sidecar.ik_witnesses = [{"action": e["index"], "name": e["name"], "stance": e["stance"], "arm": (e["arms"] or ["right"])[0], "carried": e["carried"],
@@ -1039,7 +1179,7 @@ class _Tracker:
             self.moved[name] = (p0.clone(), q0.clone())
         obj.set_position_orientation(th.tensor([float(v) for v in target["position"]]), th.tensor([float(v) for v in target["orientation"]]))
         obj.keep_still()
-        sampler.kit.sync_world()
+        _sync(sampler.kit, [obj])  # train-fast 2026-10-31: the advanced block alone
 
     def advance_push(self, action, sampler) -> None:
         """Block design packing tail (owner 2026-09-19 21:47): a push of ``sidecar.pack`` moves its cube (and, for a wall push, the
@@ -1083,6 +1223,7 @@ class _Tracker:
         pushed = sampler.objects[name]
         p_c, _ = pushed.get_position_orientation()
         edge = float(getattr(sampler, "edge", 0.0254))
+        shifted: List[Any] = []  # train-fast 2026-10-31: the cubes this push moves (the partial sync re-poses these alone)
         for other, obj in sampler.objects.items():
             if other == name or not any(other == b.get("instance") for b in (getattr(self.sidecar, "blocks", None) or [])):
                 continue
@@ -1098,9 +1239,9 @@ class _Tracker:
                 gap = max(0.0, along - edge - g_pack)
                 move = max(0.0, travel - gap)
                 if move > 1e-4:
-                    self._shift(other, obj, d * move, sampler)
-        self._shift(name, pushed, d * travel, sampler)
-        sampler.kit.sync_world()
+                    shifted.append(self._shift(other, obj, d * move, sampler))
+        shifted.append(self._shift(name, pushed, d * travel, sampler))
+        _sync(sampler.kit, shifted)
 
     def advance_pick_push(self, action, sampler) -> None:
         """The overhang pick's push (``contacts.push_pick``, kind ``pick_overhang``; owner 2026-10-13 ~03:15 item 4): the pushed object is
@@ -1118,7 +1259,7 @@ class _Tracker:
             self.moved[name] = (p0.clone(), q0.clone())
         obj.set_position_orientation(th.tensor([float(v) for v in post["position"]]), th.tensor([float(v) for v in post["orientation"]]))
         obj.keep_still()
-        sampler.kit.sync_world()
+        _sync(sampler.kit, [obj])  # train-fast 2026-10-31: the pushed object alone
 
     def advance_base_push(self, action, sampler) -> None:
         """A base push (IORS nextto large-scale): the robot ends at the push's recorded ``end_stance`` and the pushed object
@@ -1136,26 +1277,31 @@ class _Tracker:
         d[2] = 0.0
         if float(th.linalg.norm(d)) < 1e-6:
             return
-        self._shift(name, sampler.objects[name], d / th.linalg.norm(d) * float(contact.distance_m), sampler)
-        sampler.kit.sync_world()
+        # the tracker's STANCE changed above, not the sim robot (the checks pose the base through the virtual base joints): the pushed
+        # object is the only mesh that moved (train-fast 2026-10-31)
+        _sync(sampler.kit, [self._shift(name, sampler.objects[name], d / th.linalg.norm(d) * float(contact.distance_m), sampler)])
 
-    def _shift(self, name: str, obj, delta: th.Tensor, sampler) -> None:
+    def _shift(self, name: str, obj, delta: th.Tensor, sampler):
+        """Moves ``obj`` by ``delta`` (its init pose remembered for :meth:`restore_moved`); returns ``obj`` (the caller syncs)."""
         p0, q0 = obj.get_position_orientation()
         if name not in self.moved:
             self.moved[name] = (p0.clone(), q0.clone())
         obj.set_position_orientation(p0 + delta, q0)
         obj.keep_still()
+        return obj
 
     def restore_moved(self, sampler) -> None:
         if not self.moved or sampler is None:
             return
+        restored: List[Any] = []
         for name, (p0, q0) in self.moved.items():
             obj = sampler.objects.get(name)
             if obj is not None:
                 obj.set_position_orientation(p0, q0)
                 obj.keep_still()
+                restored.append(obj)
         self.moved.clear()
-        sampler.kit.sync_world()
+        _sync(sampler.kit, restored)  # train-fast 2026-10-31: the objects put back alone
 
     def note_arm_end(self, action, end_q: Optional[th.Tensor]) -> None:
         """Remember where an arm action left the acting arm (``check_action_targets``' raw end witness); a base motion forgets it."""
@@ -1301,8 +1447,9 @@ def check_base_follow_handles(sidecar: SidecarDraft, sampler, action, targets: D
                 q_all[joint_idx] = float(qs[k])
                 obj.set_joint_positions(q_all)
                 obj.keep_still()
-                sampler.kit.sync_world()
+                _sync(sampler.kit, [obj])  # train-fast 2026-10-31: one joint of one object per handle pose (was a full pass per k)
             p = _as_pose(pose)
+            _count("n_ik_single")
             res = sampler.ikc.exact([p], stance, arm, ignore_for_last=ignore, cache=False, approached=[obj] if obj is not None else [])
             n += 1
             if not res.ok:
@@ -1320,7 +1467,7 @@ def check_base_follow_handles(sidecar: SidecarDraft, sampler, action, targets: D
         if joint_idx is not None and q_saved is not None:
             obj.set_joint_positions(q_saved)
             obj.keep_still()
-            sampler.kit.sync_world()
+            _sync(sampler.kit, [obj])  # train-fast 2026-10-31
     return n
 
 
@@ -1811,6 +1958,7 @@ def second_hand_chain(sampler, stance: Stance, arm1: str, q_pre1: th.Tensor, q_c
     idx1, idx2 = kit.robot.arm_control_idx[arm1], kit.robot.arm_control_idx[arm2]
     q_seed = ikc.q_locked(stance, fingers=fingers).clone()
     q_seed[idx1] = th.as_tensor(q_pre1, dtype=th.float32).reshape(-1)[idx1]
+    _count("n_ik_single")
     r_pre = ikc.exact([pre], stance, arm2, cache=False, fingers=fingers, q_seed=q_seed)
     if not r_pre.ok or r_pre.q is None:
         return {"ok": False, "why": f"pre-contact with the {arm1} hand at its pre-contact: {r_pre.reason}"}
@@ -1819,6 +1967,7 @@ def second_hand_chain(sampler, stance: Stance, arm1: str, q_pre1: th.Tensor, q_c
     q_first = q_lock.clone()
     q_first[idx2] = r_pre.q[idx2]
     with ikc.ignoring([target] if target is not None else []):
+        _count("n_chains")
         r = ikc.waypoints_ok([pre] + list(approach), stance, arm2, cache=False, fingers=fingers, q_seed=q_lock, q_first=q_first)
         if not r.ok or r.q is None:
             return {"ok": False, "why": f"approach with the {arm1} hand at its contact: {r.reason}"}
@@ -1893,6 +2042,112 @@ def _with_held_start(chain: List[Any], q_held: Optional[th.Tensor], sampler, arm
     if q_held is None or not chain or sampler.ikc.reaches(q_held, chain[0], arm):
         return list(chain), False
     return [sampler.kit.eef_pose(q_held, arm)] + list(chain), True
+
+
+def _where_of(action, name: str, stance_name: str, arm: str, carried: Optional[str], locked) -> str:
+    """The ``(...)`` tail of every rejection message of :func:`check_action_targets` (the early frame gate builds the same one)."""
+    where = f"stance {stance_name}, arm {arm}, carried {carried}" + (f", {'/'.join(sorted(locked))} arm locked at its contact" if locked else "")
+    if name == "retreat" and getattr(action, "after", None) is not None:
+        where += f", after {getattr(action.after, 'name', type(action.after).__name__)}"
+    if name in ("push", "brace") and getattr(action, "contact", None) is not None:
+        c_ = action.contact
+        where += f", {name} of {getattr(c_, 'object', None)} {(getattr(c_, 'extra', None) or {}).get('pose_class') or ''}".rstrip()
+    return where
+
+
+#: actions whose ``targets()`` are recorded poses or poses of the objects' init poses - known before the program moved anything - and so
+#: are judged by the early frame gate (train-fast 2026-10-31); lift / reorient (the hand's position), retreat (unwatched) are not
+_EARLY_GATE_ACTIONS = ("grasp", "place", "push", "brace", "base_push")
+
+
+def _world_advances(sidecar, action) -> bool:
+    """Whether the check's world changes AFTER ``action`` (``_Tracker.after`` / ``run._carry_joint_state``), so later actions' targets
+    are not the static ones: a place while block records exist (``advance_block``), a push while a packing tail exists (``advance_push``),
+    a pick-overhang push (``advance_pick_push``), a push - or the retreat after one - with an articulation record (its joint), a base
+    push (the object and the stance), a base follow (its joint; a hybrid end stance)."""
+    name = getattr(action, "name", "")
+    if name in ("base_push", "base_follow"):
+        return True
+    if name == "place":
+        return bool(getattr(sidecar, "blocks", None))
+    if name == "push":
+        extra = getattr(getattr(action, "contact", None), "extra", None) or {}
+        pack = getattr(sidecar, "pack", None)
+        if not isinstance(pack, dict):
+            pack = (sidecar.extra or {}).get("pack") if isinstance(getattr(sidecar, "extra", None), dict) else None
+        return bool(extra.get("articulation")) or str(extra.get("kind") or "") == "pick_overhang" or isinstance(pack, dict)
+    if name == "retreat":
+        after = getattr(action, "after", None)
+        if getattr(after, "name", "") == "push":
+            return bool((getattr(getattr(after, "contact", None), "extra", None) or {}).get("articulation"))
+    return False
+
+
+def _gate_pose_targets(sidecar, sampler, action, name: str, arm: str, targets: Any) -> List[Tuple[str, List[Any]]]:
+    """The ``(key, poses)`` list the frame gate of :func:`check_action_targets` sees for an action whose chains leave from no earlier
+    configuration: ``iter_pose_targets``, a pack push's ``pre`` merged into its chain, ``_place_order`` / ``_chain_order``, the skipped
+    keys out - the same keys, indices and order, so the early gate's message is the per-action gate's."""
+    pose_targets = list(iter_pose_targets(targets))
+    if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
+        pre_l = [(k, p_) for k, p_ in pose_targets if k == "pre"]
+        wps_l = [(k, p_) for k, p_ in pose_targets if k == "waypoints"]
+        if pre_l and wps_l:
+            rest = [(k, p_) for k, p_ in pose_targets if k not in ("pre", "waypoints")]
+            pose_targets = [("waypoints", list(pre_l[0][1]) + list(wps_l[0][1]))] + rest
+    pose_targets = _place_order(pose_targets, None, sampler, arm) if name == "place" else _chain_order(pose_targets)
+    skip = _skipped_target_keys(name, action, targets)
+    return [(k_, p_) for k_, p_ in pose_targets if k_.split(".")[0] not in skip]
+
+
+def _early_frame_gate(sidecar: SidecarDraft, sc, sampler, actions: Sequence[Any]) -> int:
+    """train-fast 2026-10-31 (``EARLY_FRAME_GATE``): the fingertip frame gate of :func:`check_action_targets` (:func:`fingertips_in_frame`,
+    a camera projection of the recorded poses, no IK) over every action whose targets are known before the program has moved anything,
+    BEFORE the first IK of the run - the per-action gate judges an action only when its turn comes, after the IK of every action before
+    it. Covered: ``grasp`` (pre_grasp + approach from the object's init pose), ``place`` (pre_place + descent from the recorded place;
+    the carry leg needs the lift's end and stays with the per-action gate), ``push`` (pre + waypoints), ``brace`` (pre + approach),
+    ``base_push`` (pre + approach; the second hand has its own gate). A shadow :class:`_Tracker` follows the stance (navigate /
+    transition), the carried object (grasp / place) and the braced arms (brace / retreat) for the stance and the ``where`` of the message;
+    the walk stops after the first action that changes the check's world (:func:`_world_advances`) - from there the per-action gate
+    judges, as before. Raises the per-action gate's ``Reject("gripper_not_in_frame", ...)`` with its message; returns the number of
+    poses projected."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    shadow = _Tracker(sidecar)
+    state = _SamplerState(sampler, None)  # no arm configuration: ``targets()`` keep their recorded-pose fallbacks (a place has no carry leg)
+    braced: set = set()
+    n_checked = 0
+    for i, action in enumerate(actions):
+        name = getattr(action, "name", type(action).__name__)
+        stance_name, carried = shadow.before(action)
+        if name in _EARLY_GATE_ACTIONS:
+            try:
+                targets = action.targets(sc, state)
+                stance = sidecar.stance(stance_name)
+            except Exception as e:  # noqa: BLE001 - the per-action path raises its own Reject for this action, in program order
+                log.debug("early frame gate: %s skipped (%r)", name, e)
+                targets, stance = None, None
+            if targets is not None:
+                arm = (list(getattr(action, "arms", ()) or ["right"]))[0]
+                g = sidecar.grasp_of(carried) if carried else None
+                if carried and sampler.objects.get(carried) is not None and g is not None and g.arm and name in ("lift", "reorient", "place", "navigate", "transition", "set_torso"):
+                    arm = g.arm
+                items = _gate_pose_targets(sidecar, sampler, action, name, arm, targets)
+                out = fingertips_in_frame(sampler, stance, name, items)
+                n_checked += sum(len(p_) for _, p_ in items)
+                if out is not None:
+                    where = _where_of(action, name, stance_name, arm, carried, {a for a in braced if a != arm})
+                    log.info("program check: the early frame gate rejects %s.%s (the per-action gate would have, after the IK of %d actions)", name, out["key"], i)
+                    raise Reject("gripper_not_in_frame", f"{name}.{out['key']}[{out['index']}/{out['n']}]: the fingertip point projects outside the stance "
+                                                         f"camera's image (5 %): u={out['u']}, v={out['v']}, depth={out['depth_m']} m ({where})", action=name)
+        if _world_advances(sidecar, action):
+            break
+        arms_ = list(getattr(action, "arms", ()) or [])
+        if name == "brace" and arms_:
+            braced.add(arms_[0])
+        elif name == "retreat" and arms_:
+            braced.discard(arms_[0])
+        shadow.after(action, None, None)
+    return n_checked
 
 
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
@@ -2023,12 +2278,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 log.info("program check: retreat after the follow verified from the search's witness (residual %.1f mm, margin %.3f rad at %s)", residual * 1000, margin, jn)
                 return 1, witnesses
             log.info("program check: the search's retreat witness fails (residual %.1f mm, free %s, margin %.3f at %s): re-solving the retreat", residual * 1000, free, margin, jn)
-    where = f"stance {stance_name}, arm {arm}, carried {carried}" + (f", {'/'.join(sorted(locked))} arm locked at its contact" if locked else "")
-    if name == "retreat" and getattr(action, "after", None) is not None:
-        where += f", after {getattr(action.after, 'name', type(action.after).__name__)}"
-    if name in ("push", "brace") and getattr(action, "contact", None) is not None:
-        c_ = action.contact
-        where += f", {name} of {getattr(c_, 'object', None)} {(getattr(c_, 'extra', None) or {}).get('pose_class') or ''}".rstrip()
+    where = _where_of(action, name, stance_name, arm, carried, locked)
     pose_targets = list(iter_pose_targets(targets))
     if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
         # a packing push (block design, owner 2026-09-19 21:47) is verified as the oracle executes it: ``arm_to(pre)`` then
@@ -2095,7 +2345,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 return k_, q_
         return None, None
 
-    with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object), sampler.ikc.ignoring([], ground=not slab_off):
+    with _attach_ctx(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object), sampler.ikc.ignoring([], ground=not slab_off):
         for key, poses in pose_targets:
             if key.split(".")[0] in skip_keys:
                 continue
@@ -2113,6 +2363,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     # a single end pose (``grasp``, ``place``, ``contact``) is the end of its approach: the approached object is
                     # removed for it as along the tracked chain (owner A) - with it in the world the open pads straddling the
                     # target pass or fail at margin 0 by millimetres (teacup 18:41: 'grasp: exact IK failed at pose 1 of 1')
+                    _count("n_ik_single")
                     res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all + list(approached or []), cache=False, fingers=fingers,
                                             approached=approached, q_seed=q_seed)
             else:
@@ -2158,6 +2409,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     # the whole leg - the carried object's coarse sphere fit reaches below its mesh into the slab for the first
                     # centimetres (shampoo dispenser 0925-171050); the floor mesh is already in the ignore set
                     floor_lift = name == "lift" and any("floor" in str(getattr(o, "name", "")).lower() for o in ign_all)
+                    _count("n_chains")
                     res = sampler.ikc.continue_chain(q_start, chain, arm, ignore=ign_all, ignore_end=ign_end,
                                                      soft_stall_m=None if name == "reorient" else sampler.ikc.FREE_LEG_STALL_M,
                                                      limit_margin=RETREAT_LIMIT_MARGIN_RAD if (name == "retreat" or (name == "place" and getattr(action, "kind", None) == "attach" and key in ("carry", "descent"))) else 0.0,
@@ -2179,6 +2431,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                         raise Reject(res.code or "program_check_failed", f"{key}: {res.reason} ({where}; the leg is tracked from where the previous motion leaves the arm, "
                                                                           f"as the oracle runs it)", action=name)
                 else:
+                    _count("n_chains")
                     res = sampler.ikc.waypoints_ok(chain, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers, approached=approached,
                                                    q_seed=q_seed, track_dense=track, q_first=q_first)
                     if k_first is not None:
@@ -2187,6 +2440,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                         # a push's pre-contact pose is reached by the oracle's planned ``arm_to`` from wherever the arm is, so the
                         # branch the previous retreat ended in need not hold it: re-solve the chain from the stance posture (the
                         # sampler's seed) before failing (0920-080331: a pack push the sampler's identical chain check had passed)
+                        _count("n_chains")
                         res = sampler.ikc.waypoints_ok(chain, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers,
                                                        approached=approached, q_seed=sampler.ikc.q_locked(stance, fingers=fingers).clone(), track_dense=track, q_first=q_first)
                     if (res.ok and name == "push" and not track
@@ -2383,11 +2637,14 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                         end = wps[-1]
                         lift_end = (th.as_tensor(getattr(end, "position", end[0]), dtype=th.float32), th.as_tensor(getattr(end, "orientation", end[1]), dtype=th.float32))
                     supports = list(sampler.support_objects()) if hasattr(sampler, "support_objects") else []
-                    with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
+                    # train-fast 2026-10-31 (ATTACH_REUSE): the action's own context above holds this very attachment - the nested
+                    # contexts (one lift-end solve + one drive check per base pose) re-use it instead of re-fitting it twice per pose
+                    with _attach_ctx(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object, nested=True):
+                        _count("n_ik_single")
                         r_lift = sampler.ikc.exact([lift_end], frm_st, attach_arm, ignore_for_last=supports, cache=False)
                     if r_lift.ok and r_lift.q is not None:
                         q_arms[attach_arm] = r_lift.q[sampler.kit.robot.arm_control_idx[attach_arm]].clone()
-                drive_ctx = attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object)
+                drive_ctx = _attach_ctx(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object, nested=True)
             with drive_ctx:
                 # the stance's recorded finger opening too (a push-close re-stance records the closed fist at its pre-contact: checked
                 # open, the spread pads reached the flap - 0920-191145 'base pose ... collides at trunk')

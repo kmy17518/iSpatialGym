@@ -24,17 +24,22 @@ model axis the target stands on in its partner - it starts at its grasp key's re
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
+import time
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
 
+from ispatialgym.fastflags import fast_on, fast_value  # train-fast 2026-10-31: SPA_CACHE
 from ispatialgym.oracle.programs import TOUCHING_SHELF_LAYOUT
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
+from ispatialgym.sampling.cache import cache_get, cache_key, cache_put, cache_root  # train-fast 2026-10-31: the SPA lateral-cell memo on disk
 from ispatialgym.sampling.sim_utils import PARK_POSITION, Reject, SupportTop
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
@@ -45,7 +50,7 @@ from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, TemplateExhausted, annotate_height_extra, contact_height_extra, register, requested_height_extra
 from ispatialgym.sampling.v2.core import start_per_attempt  # noqa: E402  (train85)
 from ispatialgym.sampling.v2.navigation import attached
-from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
+from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance, pose_from_sidecar, pose_to_sidecar
 
 RETREAT_DIST_M = 0.10  # oracle ``actions.RETREAT_DIST``: a place ends this far back along the approach (release + lift-off)
 RETREAT_LITTLE_M = 0.05  # oracle ``actions.RETREAT_LITTLE``: the retreat after a place
@@ -204,6 +209,25 @@ META_SPOTS = "meta_link_spots"
 TRAVEL_REASONS = ("no_transition", "no_path", "path_collision", "path_too_long")
 #: 7e: extras key of a Phase-2 candidate dropped after such a failure (the failure)
 TRAVEL_DROPPED = "travel_dropped"
+#: train-fast 2026-10-31 (``ISPATIALGYM_FAST_SPA_CACHE``): the cache kind of a start-per-attempt lateral cell (:meth:`IORSSmall._spa_cell`); bump
+#: when what a cell holds or how it is computed changes
+SPA_CELL_KIND = "spa_cell_v1"
+#: the rejections of one lateral cell that the per-attempt draw retries on another cell / edge (every other rejection ends the attempt)
+SPA_CELL_REJECTS = ("no_workspace", "edge_too_short", "stance_collision", "shelf_width", "no_manipulation_stance", "no_start_region")
+_SPA_CACHE_ANNOUNCED = False
+
+
+def _spa_json_default(o):
+    """``json.dumps`` fallback of a lateral cell: numpy scalars, tensors, sets and records (never a crash of the train job over a type)."""
+    if isinstance(o, np.generic):
+        return o.item()
+    if isinstance(o, th.Tensor):
+        return o.tolist()
+    if isinstance(o, (set, frozenset)):
+        return sorted(o)
+    if hasattr(o, "to_sidecar"):
+        return o.to_sidecar()
+    return str(o)
 
 
 def travel_failure_deterministic(err: Reject, world) -> bool:
@@ -1485,6 +1509,10 @@ class IORSSmall(SamplerV2):
         ``region_sides``. Recorded in ``template_meta.travel_dropped`` and the counter ``travel_dropped``."""
         why = f"[{err.reason}] {err}"
         cand.extras[TRAVEL_DROPPED] = why[:400]
+        if start_per_attempt() and fast_on("SPA_CACHE"):
+            # train-fast 2026-10-31: a reused lateral cell hands out fresh copies of its candidates, so the mark above does not carry; the
+            # candidate's identity does (:meth:`_spa_apply_cell` filters it out of every later reuse in this process)
+            self.__dict__.setdefault("_spa_dropped", set()).add(self._spa_cand_key(cand))
         self.manip_candidates = [c for c in self.manip_candidates if c is not cand]
         if getattr(self, "_split_cone_cands", None):
             self._split_cone_cands = [c for c in self._split_cone_cands if c is not cand]
@@ -1538,10 +1566,259 @@ class IORSSmall(SamplerV2):
                     cache[edge.name] = e
         return cache[edge.name]
 
+    # ------------------------------------------------------------------ start_per_attempt: the lateral-cell memo (train-fast 2026-10-31, SPA_CACHE)
+    # Nothing the per-attempt draw computes depends on the attempt's object placement (the spawned objects are parked): Phase 1c's checks,
+    # the shelf layout's book poses, Phase 2 (split cone) and the start region depend on template-fixed facts plus the drawn (edge, lateral).
+    # So the lateral is discretised into cells of ISPATIALGYM_FAST_SPA_CELL_M over Phase 1c's bounds and the whole result of a cell (init
+    # stance, candidates after the start region, region sides, shelf poses, meta spots) is memoised in-process and on disk; an attempt
+    # draws the lateral as before, snaps it to its cell and reuses the cell. Off (ISPATIALGYM_FAST_SPA_CACHE=0): the draw below, unchanged.
+
+    def _spa_cache_on(self) -> bool:
+        """Whether the lateral-cell memo is live (``ISPATIALGYM_FAST_SPA_CACHE``, default on; announced once per process)."""
+        global _SPA_CACHE_ANNOUNCED
+        on = fast_on("SPA_CACHE")
+        if on and not _SPA_CACHE_ANNOUNCED:
+            _SPA_CACHE_ANNOUNCED = True
+            log.info("%s: start_per_attempt: SPA_CACHE on - the start is drawn per lateral cell of %.3f m (ISPATIALGYM_FAST_SPA_CELL_M), up to %d cells "
+                     "nearest the drawn lateral tried per edge (ISPATIALGYM_FAST_SPA_CELL_TRIES); cells memoised in-process and on disk under %s",
+                     self.gp.alias, float(fast_value("SPA_CELL_M", 0.02)), int(fast_value("SPA_CELL_TRIES", 6)), cache_root() or "(no disk cache)")
+        return on
+
+    @staticmethod
+    def _spa_cand_key(c: Stance) -> Tuple:
+        """A Phase-2 candidate's identity across the fresh copies a reused cell hands out: base pose, trunk and focus, rounded."""
+        f = c.focus
+        return (tuple(round(float(v), 4) for v in c.base_pose2d), round(float(c.translate), 3), round(float(c.tilt), 4),
+                None if f is None else tuple(round(float(v), 3) for v in f.flatten().tolist()[:3]))
+
+    @staticmethod
+    def _spa_top_signature(top) -> Dict[str, Any]:
+        """What identifies a top raster in a cell's cache key: name, height, grid (resolution, shape, origin) and a hash of its free cells."""
+        free = top.free
+        return {"name": str(top.name), "z": round(float(top.z), 4), "resolution": round(float(top.resolution), 4), "shape": [int(v) for v in free.shape],
+                "origin": [round(float(top.xs[0]), 4), round(float(top.ys[0]), 4)],
+                "free_sha": hashlib.sha1(np.ascontiguousarray(free.detach().cpu().numpy()).tobytes()).hexdigest()[:16]}
+
+    @staticmethod
+    def _spa_band_signature(bands) -> Optional[Dict[str, Any]]:
+        """:func:`tabletop.band_facts` plus the band's key / lattice / trunk count: a band recomputed under the same path changes the key."""
+        if bands is None:
+            return None
+        meta = getattr(bands, "meta", None) or {}
+        return {**(TT.band_facts(bands) or {}), "key": meta.get("key"), "lattice": meta.get("lattice"), "n_trunks": len(meta.get("trunks") or [])}
+
+    @staticmethod
+    def _spa_cell_centre(lo: float, hi: float, cell_m: float, i: int) -> float:
+        """The lateral a cell stands for: the midpoint of its interval ``[lo + i w, min(hi, lo + (i + 1) w)]`` (the last cell may be narrower)."""
+        a = float(lo) + int(i) * float(cell_m)
+        return 0.5 * (a + min(float(hi), a + float(cell_m)))
+
+    def _spa_cell_payload(self, edge: EdgeFrame, init_trunk: Stance, margins: Dict[str, Any], H_max: float, nb_top, cell_m: float, n_cells: int, i: int,
+                          lateral: float) -> Dict[str, Any]:
+        """The cache key of one lateral cell: everything the cell's computation reads - the collision world (``ikc.cache_scope``: scene, rooms,
+        floor), the template, the support and its top raster (and the neighbour top of ``start_region_on_neighbors``), the edge, the Phase-1b
+        trunk, H_max, both hulls (half extent, height, rest quat), the margins row, the generation knobs Phase 2 / the start region read, the
+        sides, the segment arms and their bands, the shelf layout, and the cell itself."""
+        ex = init_trunk.extras
+        arms = list(self.segment_arms)
+        return {**self.ikc.cache_scope, "template_id": self.choice.template_id, "support": self.support.name, "relation": self.relation,
+                "top": self._spa_top_signature(self.top), "nb_top": None if nb_top is None else self._spa_top_signature(nb_top), "edge": edge.to_json(),
+                "init_trunk": {"translate": float(init_trunk.translate), "tilt": float(init_trunk.tilt), "stand_off": init_trunk.stand_off,
+                               **{k: ex.get(k) for k in ("lam_min", "lam_max", "d_ws", "d_near", "d_far", "t_range", "b", "delta_min", "delta_max")}},
+                "H_max": float(H_max),
+                "hull": {role: [TT.half_extent(self.hull[role], self.rest[role]), TT.height_of(self.hull[role], self.rest[role]), self.rest[role]] for role in ("target", "partner")},
+                "margins": margins,
+                "gen": {"split_cone": TT.split_cone_opts(self), "angle_classes": list(TT.phase2_angle_classes(self)),
+                        "start_region_lateral_draws": int(self.gen("start_region_lateral_draws", START_REGION_LATERAL_DRAWS)), "gap_min": self.gap_min,
+                        "table_end_margin": self.table_end_margin, "partner_gap_extra": self.partner_gap_extra, "support_margin": self.margin_support,
+                        "partner_side": self.gen("partner_side"), "meta_link": self.meta_link(), "start_region_on_neighbors": bool(self.gen("start_region_on_neighbors", False)),
+                        "push_stance": self.gen("push_stance", True), "reach_screen_place": self.gen("reach_screen_place", True),
+                        "shelf_free_span_min_m": float(self.gen("shelf_free_span_min_m", 0.15))},
+                "sides": [float(sd) for sd in self.template_sides()], "pair": {"g_NT": (self.pair or {}).get("g_NT"), "handedness": (self.pair or {}).get("handedness")},
+                "segment_arms": arms, "bands": {a: self._spa_band_signature(self.band_of_arm(a)) for a in arms},
+                "shelf_start": None if self.shelf_start is None else {k: self.shelf_start.get(k) for k in ("key", "lean_side", "lean_deg")},
+                "cell": {"index": int(i), "n": int(n_cells), "width_m": float(cell_m), "lateral": float(lateral)}}
+
+    def _spa_cell_compute(self, edge: EdgeFrame, init_trunk: Stance, lateral: float, margins: Dict[str, Any], H_max: float, nb_top) -> Dict[str, Any]:
+        """The start of one lateral cell, computed as :meth:`spa_redraw_start` computes a draw without the memo - Phase 1c at the cell's lateral
+        (its floor / collision / translate-retry / trunk-sweep checks), the shelf layout's book poses, Phase 2 (split cone), the A1 start region -
+        as a JSON-ready dict: ``{"ok": True, "init", "cands", "region_sides", "shelf_pose", "shelf_partner_pose", "meta_spots",
+        "start_region_facts", "class1_deep", "n_phase2", "compute_s"}`` or ``{"ok": False, "reject": [reason, message], "compute_s"}`` for a
+        rejection of :data:`SPA_CELL_REJECTS` (the draw tries another cell / edge); any other rejection propagates. Sets ``self.edge`` /
+        ``self.init_stance`` / the shelf poses / ``meta_spots`` as the plain draw does (:meth:`_spa_apply_cell` sets them from the result)."""
+        t0 = time.time()
+
+        def rejected(reason: str, msg: str) -> Dict[str, Any]:
+            return {"ok": False, "reject": [reason, msg[:400]], "compute_s": round(time.time() - t0, 2)}
+
+        try:
+            init_stance = TT.phase1c_lateral(self, init_trunk, margins, None, top=self.top, lateral=lateral)
+        except Reject as e:
+            if e.reason in ("no_workspace", "edge_too_short", "stance_collision"):
+                return rejected(e.reason, str(e))
+            raise
+        init_stance.name = "init"
+        self.edge, self.init_stance = edge, init_stance
+        self.shelf_pose = self.shelf_partner_pose = None
+        phase2_band: Dict[str, Any] = {}
+        if self.shelf_start is not None:
+            side = self.shelf_start["lean_side"]
+            self.shelf_pose, _ = TT.shelf_lean_pose(self, self.hull["target"], self.rest["target"], self.top, edge, self.support, side)
+            self.shelf_partner_pose, _ = TT.shelf_lean_pose(self, self.hull["partner"], self.rest["partner"], self.top, edge, self.support, -side)
+            t_lat = (self.world.hull_at(self.hull["target"], self.shelf_pose)[:, :2] - edge.mid) @ edge.tangent
+            p_lat = (self.world.hull_at(self.hull["partner"], self.shelf_partner_pose)[:, :2] - edge.mid) @ edge.tangent
+            free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
+            if free < float(self.gen("shelf_free_span_min_m", 0.15)):
+                return rejected("shelf_width", f"{free:.2f} m between the two leaning books on edge {edge.name}")
+            phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
+        cands = TT.phase2_manipulation_stance(self, init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
+                                              target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
+                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                              **phase2_band)
+        kept = cands if self.shelf_start is not None else self.start_region(cands)
+        if not kept:
+            if not cands:
+                return rejected("no_manipulation_stance", f"lateral {lateral:+.3f}: Phase 2 left no survivor")
+            return rejected("no_start_region", f"lateral {lateral:+.3f}: no start cell for the partner on the " + " / ".join(TT.side_name(sd) for sd in self.template_sides()))
+        spots = self.meta_spots
+        return {"ok": True, "init": init_stance.to_cache(), "cands": [c.to_cache() for c in kept], "region_sides": [float(sd) for sd in self.region_sides],
+                "shelf_pose": pose_to_sidecar(self.shelf_pose), "shelf_partner_pose": pose_to_sidecar(self.shelf_partner_pose),
+                "meta_spots": None if spots is None else [[str(m), [float(xy[0]), float(xy[1])]] for m, xy in spots],
+                "start_region_facts": None if self.shelf_start is not None else self.template_facts.get("start_region"),
+                "class1_deep": getattr(self, "_split_cone_class1_deep", None), "n_phase2": len(cands), "compute_s": round(time.time() - t0, 2)}
+
+    def _spa_disk_hit_valid(self, edge: EdgeFrame, hit: Any) -> bool:
+        """A disk entry is trusted when it is well-formed and (for a start) its init stance is still whole-body collision-free here - one batched
+        collision check; a cached rejection is trusted as it is (its key names the collision world and every input)."""
+        if not isinstance(hit, dict) or "ok" not in hit:
+            return False
+        if not hit["ok"]:
+            return isinstance(hit.get("reject"), list) and len(hit["reject"]) == 2
+        try:
+            if not hit.get("cands"):
+                return False
+            init = Stance.from_cache(hit["init"], edge=edge)
+        except (KeyError, TypeError, ValueError):
+            return False
+        return bool(self.ikc.stance_collision_free(init))
+
+    def _spa_cell(self, edge: EdgeFrame, init_trunk: Stance, i: int, n_cells: int, lo: float, hi: float, cell_m: float, margins: Dict[str, Any], H_max: float,
+                  nb_top) -> Tuple[Dict[str, Any], str]:
+        """Cell ``i`` of ``edge`` - ``(cell, how)``, ``how`` in ``memo`` (this process), ``hit`` (disk), ``miss`` (computed now and written). The memo
+        keeps every cell as its JSON text, so each use parses a fresh copy: nothing an attempt mutates reaches the next one."""
+        memo = self.__dict__.setdefault("_spa_cells", {})
+        mkey = (edge.name, int(i))
+        if mkey in memo:
+            return json.loads(memo[mkey]), "memo"
+        lateral = self._spa_cell_centre(lo, hi, cell_m, i)
+        t0 = time.time()
+        key = cache_key(SPA_CELL_KIND, self._spa_cell_payload(edge, init_trunk, margins, H_max, nb_top, cell_m, n_cells, i, lateral))
+        hit = cache_get(key)
+        if hit is not None:
+            if self._spa_disk_hit_valid(edge, hit):
+                memo[mkey] = json.dumps(hit, default=_spa_json_default)
+                log.info("%s: start draw cache hit edge=%s cell=%d/%d lateral=%+.3f in %.2fs (%s)", self.gp.alias, edge.name, i, n_cells, lateral, time.time() - t0,
+                         f"{len(hit['cands'])} candidates" if hit["ok"] else f"reject [{hit['reject'][0]}]")
+                return json.loads(memo[mkey]), "hit"
+            log.info("%s: start draw cache entry edge=%s cell=%d/%d is stale or malformed (its init stance collides here): recomputed", self.gp.alias, edge.name, i, n_cells)
+        cell = self._spa_cell_compute(edge, init_trunk, lateral, margins, H_max, nb_top)
+        text = json.dumps(cell, default=_spa_json_default)
+        memo[mkey] = text
+        cache_put(key, json.loads(text), round_floats=False)
+        log.info("%s: start draw cache miss edge=%s cell=%d/%d lateral=%+.3f computed in %.1fs (%s)", self.gp.alias, edge.name, i, n_cells, lateral, time.time() - t0,
+                 f"{len(cell['cands'])} candidates of {cell['n_phase2']} Phase-2 survivors" if cell["ok"] else f"reject [{cell['reject'][0]}] {cell['reject'][1][:120]}")
+        return json.loads(text), "miss"
+
+    def _spa_apply_cell(self, edge: EdgeFrame, cell: Dict[str, Any]) -> bool:
+        """Make a (non-rejected) cell this attempt's start: fresh stances from the cell, the candidates dropped for their travel in this
+        process left out (``_spa_dropped``), the region sides cut to the live candidates as :meth:`drop_candidate` cuts them. False when no
+        live candidate (or, on the tabletop, no side with one) is left: the caller tries the next cell."""
+        init = Stance.from_cache(cell["init"], edge=edge)
+        init.name = "init"
+        cands = [Stance.from_cache(d, edge=edge) for d in cell["cands"]]
+        dropped = self.__dict__.get("_spa_dropped") or set()
+        if dropped:
+            cands = [c for c in cands if self._spa_cand_key(c) not in dropped]
+        sides = [float(sd) for sd in (cell.get("region_sides") or [])]
+        if self.shelf_start is None:
+            sides = [sd for sd in sides if any(TT.in_start_region(c, sd) for c in cands)]
+            if not sides:
+                return False
+        elif not cands:
+            return False
+        self.edge, self.init_stance = edge, init
+        self.shelf_pose, self.shelf_partner_pose = pose_from_sidecar(cell.get("shelf_pose")), pose_from_sidecar(cell.get("shelf_partner_pose"))
+        self.manip_candidates = cands
+        self.region_sides = sides
+        spots = cell.get("meta_spots")
+        self.meta_spots = None if spots is None else [(str(m), th.tensor([float(xy[0]), float(xy[1])])) for m, xy in spots]
+        if cell.get("start_region_facts") is not None:
+            self.template_facts["start_region"] = cell["start_region_facts"]
+        self._split_cone_class1_deep = cell.get("class1_deep")
+        return True
+
+    def _spa_redraw_start_cached(self, rng: np.random.Generator) -> None:
+        """:meth:`spa_redraw_start` through the lateral-cell memo. The edges come in the same ``rng.permutation`` order as the plain draw; for the
+        first edge with a Phase-1b trunk the lateral is drawn uniformly over Phase 1c's bounds with the same ``rng.uniform`` call, snapped to its
+        cell, and the cell fetched (memo / disk / computed). A rejected cell (Phase 1c finds no stance at that lateral, no Phase-2 survivor, no
+        start cell for a partner side, the shelf too narrow) sends the draw to the next cell nearest the drawn lateral, up to
+        ``ISPATIALGYM_FAST_SPA_CELL_TRIES`` cells, then to the next edge. ``_spa_facts`` records the cell, the edge's cell count, where the cell
+        came from (``memo`` / ``hit`` / ``miss``) and the draw's time."""
+        t0 = time.time()
+        H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        nb_top = self.neighbor_start_top()
+        margins = self.lateral_margins()
+        cell_m = max(1e-3, float(fast_value("SPA_CELL_M", 0.02)))
+        tries = max(1, int(fast_value("SPA_CELL_TRIES", 6)))
+        errors: List[str] = []
+        last_reject: Optional[str] = None
+        n_tried = 0
+        for edge, init in TT.edge_frames(self, self.top, rng):
+            trunk = self._spa_edge_trunk(edge, init, H_max)
+            if isinstance(trunk, Reject):
+                errors.append(f"{edge.name}: {trunk}")
+                continue
+            try:
+                bounds, _info, _b = TT.phase1c_bounds(self, trunk, margins, top=self.top, strict=True)
+            except Reject as e:
+                if e.reason in ("no_workspace", "edge_too_short", "stance_collision"):
+                    errors.append(f"{edge.name}: {e}")
+                    continue
+                raise
+            lo, hi = float(bounds[0]), float(bounds[1])
+            n_cells = max(1, int(math.ceil((hi - lo) / cell_m - 1e-9)))
+            lat = float(rng.uniform(lo, hi))  # the plain draw's first Phase-1c draw: the same call on the same stream
+            order = sorted(range(n_cells), key=lambda k: (abs(self._spa_cell_centre(lo, hi, cell_m, k) - lat), k))[:tries]
+            for i in order:
+                n_tried += 1
+                cell, how = self._spa_cell(edge, trunk, i, n_cells, lo, hi, cell_m, margins, H_max, nb_top)
+                if not cell["ok"]:
+                    last_reject = cell["reject"][0]
+                    errors.append(f"{edge.name} cell {i}/{n_cells}: [{cell['reject'][0]}] {cell['reject'][1][:160]}")
+                    continue
+                if not self._spa_apply_cell(edge, cell):
+                    errors.append(f"{edge.name} cell {i}/{n_cells}: every candidate dropped for its travel in this process")
+                    continue
+                self._spa_facts = {"edge": edge.name, "lateral_m": round(float(self.init_stance.lateral), 4),
+                                   "trunk": [round(float(self.init_stance.translate), 3), round(float(self.init_stance.tilt), 3)],
+                                   "base_pose2d": [round(float(v), 4) for v in self.init_stance.base_pose2d], "n_manipulation_candidates": len(self.manip_candidates),
+                                   "cell": int(i), "n_cells": int(n_cells), "cell_m": cell_m, "lateral_drawn_m": round(lat, 4), "cells_tried": n_tried,
+                                   "cache": how, "draw_s": round(time.time() - t0, 3)}
+                log.info("%s: start_per_attempt (SPA_CACHE): edge %s cell %d/%d (%s) lateral %+.3f (drawn %+.3f), %d candidates, sides %s, %.2fs", self.gp.alias,
+                         edge.name, i, n_cells, how, self.init_stance.lateral, lat, len(self.manip_candidates), [TT.side_name(sd) for sd in self.region_sides],
+                         time.time() - t0)
+                return
+        reason = last_reject if last_reject in ("no_manipulation_stance", "no_start_region", "shelf_width") else "no_free_edge"
+        raise Reject(reason, "start_per_attempt (SPA_CACHE): " + ("; ".join(errors) or f"{self.support.name}: no edge with a free, collision-free stance"))
+
     def spa_redraw_start(self, rng: np.random.Generator) -> None:
         """start_per_attempt (train85): this attempt's own edge, init stance and Phase-2 pool cut to the A1 start region (lateral redrawn until it has a cell) from the attempt's ``rng``, drawn as
         ``sample_template`` draws the template's (every edge with a free-floor run, random order; Phase 1c's lateral); the shelf layout's
-        book poses follow the edge. The segment arms and their bands are the template's."""
+        book poses follow the edge. The segment arms and their bands are the template's. Train-fast 2026-10-31: with ``SPA_CACHE`` on
+        (:meth:`_spa_cache_on`) the draw goes through the lateral-cell memo (:meth:`_spa_redraw_start_cached`); off, the draw below."""
+        if self._spa_cache_on():
+            return self._spa_redraw_start_cached(rng)
+        t0 = time.time()
         H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
         nb_top = self.neighbor_start_top()
         margins = self.lateral_margins()
@@ -1602,6 +1879,15 @@ class IORSSmall(SamplerV2):
         self._spa_facts = {"edge": self.edge.name, "lateral_m": round(float(self.init_stance.lateral), 4),
                            "trunk": [round(float(self.init_stance.translate), 3), round(float(self.init_stance.tilt), 3)],
                            "base_pose2d": [round(float(v), 4) for v in self.init_stance.base_pose2d], "n_manipulation_candidates": len(self.manip_candidates)}
+        # train-fast 2026-10-31 (facts only, no behaviour): the lateral's cell at the SPA_CACHE cell width, so the logs of both paths show the
+        # same distribution over the edge
+        lb = self.init_stance.extras.get("lateral_bounds")
+        if lb and len(lb) == 2:
+            cell_m = max(1e-3, float(fast_value("SPA_CELL_M", 0.02)))
+            lo, hi = float(lb[0]), float(lb[1])
+            n_cells = max(1, int(math.ceil((hi - lo) / cell_m - 1e-9)))
+            self._spa_facts.update({"cell": int(min(n_cells - 1, max(0, math.floor((float(self.init_stance.lateral) - lo) / cell_m)))), "n_cells": n_cells,
+                                    "cell_m": cell_m, "cache": "off", "draw_s": round(time.time() - t0, 3)})
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         d = Draft()
@@ -3248,13 +3534,15 @@ class IORSSmall(SamplerV2):
         prev = obj.get_position_orientation()
         obj.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
         obj.keep_still()
-        self.kit.sync_world()
+        # train-fast 2026-10-31 (SYNC_ONLY_OBJECTS): only this object moved - its meshes alone are re-posed (the kit falls back to the
+        # full pass when the robot root moved); the touching push-stance search enters this context per lateral (36 full syncs = 37-170 s)
+        TT.sync_moved(self.kit, [obj])
         try:
             yield
         finally:
             obj.set_position_orientation(prev[0], prev[1])
             obj.keep_still()
-            self.kit.sync_world()
+            TT.sync_moved(self.kit, [obj])
 
     def brace_gate_at(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
         """A1 joint band gate at stance ``st``: the push work point (target's right face at the place) in the right band and the
@@ -3440,7 +3728,7 @@ class IORSSmall(SamplerV2):
             self.obj("target").set_position_orientation(*[G.t(v) for v in draft.object_poses[tname]])
             self.obj("target").keep_still()
         self.sidecar.add_stance(st)
-        self.kit.sync_world()
+        TT.sync_moved(self.kit, [self.obj("target")])  # train-fast 2026-10-31: the box alone moved back
         if self.shelf_start is None and self.carry_rule() == "auto":
             self.auto_carry_height(draft, grasp, manip, st, p_pose)
         # the drive is swept with the arm at the LIFT configuration (the box carry_height above the grasp, as the oracle drives

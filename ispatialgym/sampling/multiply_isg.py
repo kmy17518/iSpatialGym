@@ -180,6 +180,17 @@ def _under(path: str, root: str) -> bool:
     return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
 
 
+def log_fast_switches() -> None:
+    """train-fast 2026-10-31: the ``ISPATIALGYM_FAST*`` switches set in the environment (``ispatialgym.fastflags``: every switch is on
+    unless ``=0``; ``ISPATIALGYM_FAST=0`` turns all of them off) and the cuRobo mesh store setting, once at startup, so a job log
+    shows its configuration before the first path logs itself."""
+    fast = {k: v for k, v in sorted(os.environ.items()) if k.startswith("ISPATIALGYM_FAST")}
+    log.info("fast switches set in the environment: %s (an unset switch is on; each path logs itself when first consulted)",
+             " ".join(f"{k}={v}" for k, v in fast.items()) or "none")
+    cache = os.environ.get("ISPATIALGYM_SAMPLER_MESH_CACHE", "").strip()
+    log.info("cuRobo mesh store: ISPATIALGYM_SAMPLER_MESH_CACHE=%s", cache or "unset (cuRobo's default 8192; 'auto' = the world's collision meshes + headroom)")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--template", required=True, action="append", help="<out>/<alias>/<template_id> directory (several: --split train)")
@@ -213,6 +224,7 @@ def main(argv=None):
     from ispatialgym.sampling.sample_isg import configure_logging
 
     configure_logging(args.log_level)
+    log_fast_switches()
     if train:
         return main_train(args)
     template_dir = os.path.abspath(args.template[0])

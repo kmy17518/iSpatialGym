@@ -46,6 +46,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import reach_bands as RB
+from ispatialgym.fastflags import fast_on  # train-fast 2026-10-31: BAND_FEASIBLE_REUSE
 from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Pose, Stance
 
@@ -1939,40 +1940,63 @@ def trunk_sweep_free(s, stance: Stance, translates: Sequence[float] = TRUNK_SWEE
     return not bool(coll.any())
 
 
+def phase1c_bounds(s, init: Stance, margins: Dict[str, Any], *, top=None, in_frame_margin: float = IN_FRAME_MARGIN, at: Optional[Stance] = None,
+                   strict: bool = False) -> Tuple[Optional[Tuple[float, float]], Dict[str, Any], float]:
+    """§4.4 step 2 for a Phase-1b init trunk ``init`` (its ``lam_min`` / ``lam_max`` / ``d_ws`` extras): ``(bounds, info, b)`` - the lateral
+    bounds [−L/2 + m_R, L/2 − m_L] (None when m_R + m_L > L), the margin row's ``info`` and the image-border lateral ``b`` at the camera of
+    ``at`` (default ``init``; :func:`phase1c_lateral` re-evaluates them at a moved trunk). A row that rejects (nextto ``pair_gap``) raises
+    its rejection; ``strict`` raises the two ``edge_too_short`` rejections of :func:`phase1c_lateral` as well. Factored out 2026-10-31
+    (train-fast) so the IORS start-per-attempt memo discretises the same bounds Phase 1c draws over."""
+    top = _top(s, top)
+    st = init if at is None else at
+    lam_min, lam_max = float(init.extras["lam_min"]), float(init.extras["lam_max"])
+    L = float(init.edge.length)
+    cam = s.camera_pose_at(st)
+    b_r, b_l = image_border_lateral(s, cam, st, float(init.extras["d_ws"]), top.z, in_frame_margin)
+    b = min(b_r, b_l)
+    m_R, m_L, info = lateral_margins(margins, lam_min, lam_max, b, b)
+    if info.get("reject"):
+        _reject(info["reject"][0], info["reject"][1])
+    bounds = lateral_bounds(L, m_R, m_L)
+    if strict:
+        if bounds is None:
+            _reject("edge_too_short", f"edge {init.edge.name}: m_R + m_L = {info['m_R'] + info['m_L']:.2f} > L = {L:.2f} ({info})")
+        if L < float(info.get("L_min", 0.0)):
+            _reject("edge_too_short", f"edge {init.edge.name}: L = {L:.2f} < 2 w_t + g_min + 2 w_p + 2 m_end = {info['L_min']:.2f} ({info})")
+    return bounds, info, b
+
+
 def phase1c_lateral(s, init: Stance, margins: Dict[str, Any], rng, *, top=None, bands: Optional[RB.ReachBands] = None, n_draws: int = 20,
-                    in_frame_margin: float = IN_FRAME_MARGIN) -> Stance:
+                    in_frame_margin: float = IN_FRAME_MARGIN, lateral: Optional[float] = None) -> Stance:
     """§4.4: margins of the task's row from the band union extent, ``b`` and ``R_img`` of Phase 1b; lateral position
     uniform over [−L/2 + m_R, L/2 − m_L] (``Reject("edge_too_short")`` when m_R + m_L > L, or for the IORS row when L is below its
     ``L_min``: the edge cannot hold both objects at the smallest gap ``m_end`` from its ends); valid when (1) the base is on
     free floor, (2) the init configuration (t*, 0, untucked, open) is whole-body collision-free — else t moves within
     [Δ_min, Δ_max] (b, R_img, margins recomputed) or the lateral is redrawn —, (3) the trunk sweep of translates
-    0 … 0.95 at tilt 0 is collision-free with the arms excluded. The result is the instance's **init pose**."""
+    0 … 0.95 at tilt 0 is collision-free with the arms excluded. The result is the instance's **init pose**.
+
+    ``lateral`` (train-fast 2026-10-31, the IORS start-per-attempt memo): that one lateral instead of the draws - the checks (1)-(3) and
+    the translate retry run unchanged on it, ``rng`` is not consulted (may be None), one try (``n_draws`` is ignored)."""
     top = _top(s, top)
     if "lam_min" not in init.extras:
         init = phase1b_init_trunk(s, init, float(margins.get("H_max", init.extras.get("H_max", 0.0))), bands=bands, top=top)
     fk = camera_fk(s)
     h = float(top.z) - float(s.kit.floor_z)
-    lam_min, lam_max = float(init.extras["lam_min"]), float(init.extras["lam_max"])
     L = float(init.edge.length)
     errors: Dict[str, int] = {"no_floor": 0, "collision": 0, "trunk_sweep": 0, "out_of_bounds_after_t": 0}
     t_lo, t_hi = init.extras.get("t_range", [init.translate, init.translate])
 
     def bounds_for(st: Stance):
-        cam = s.camera_pose_at(st)
-        b_r, b_l = image_border_lateral(s, cam, st, float(init.extras["d_ws"]), top.z, in_frame_margin)
-        b = min(b_r, b_l)
-        m_R, m_L, info = lateral_margins(margins, lam_min, lam_max, b, b)
-        if info.get("reject"):
-            _reject(info["reject"][0], info["reject"][1])
-        return lateral_bounds(L, m_R, m_L), info, b
+        return phase1c_bounds(s, init, margins, top=top, in_frame_margin=in_frame_margin, at=st)
 
     bounds, info, b = bounds_for(init)
     if bounds is None:
         _reject("edge_too_short", f"edge {init.edge.name}: m_R + m_L = {info['m_R'] + info['m_L']:.2f} > L = {L:.2f} ({info})")
     if L < float(info.get("L_min", 0.0)):
         _reject("edge_too_short", f"edge {init.edge.name}: L = {L:.2f} < 2 w_t + g_min + 2 w_p + 2 m_end = {info['L_min']:.2f} ({info})")
-    for _ in range(int(n_draws)):
-        lat = float(rng.uniform(bounds[0], bounds[1]))
+    n_draws = 1 if lateral is not None else int(n_draws)
+    for _ in range(n_draws):
+        lat = float(lateral) if lateral is not None else float(rng.uniform(bounds[0], bounds[1]))
         st = init.shifted(lateral=lat, name="init")
         if not s.kit.trav_free(st.base_xy):
             errors["no_floor"] += 1
@@ -2002,7 +2026,8 @@ def phase1c_lateral(s, init: Stance, margins: Dict[str, Any], rng, *, top=None, 
         log.info("phase 1c: edge %s lateral %.2f in [%.2f, %.2f] (m_R %.2f, m_L %.2f), t* %.2f", init.edge.name, lat, bounds[0], bounds[1], info["m_R"],
                  info["m_L"], st.translate)
         return st
-    _reject("stance_collision", f"edge {init.edge.name}: no valid lateral position in [{bounds[0]:.2f}, {bounds[1]:.2f}] after {n_draws} draws ({errors})")
+    _reject("stance_collision", f"edge {init.edge.name}: no valid lateral position in [{bounds[0]:.2f}, {bounds[1]:.2f}] after {n_draws} draws ({errors})"
+                                + ("" if lateral is None else f" at the given lateral {float(lateral):+.3f}"))
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -3411,6 +3436,19 @@ def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: 
     return placed
 
 
+def sync_moved(kit, objects) -> None:
+    """train-fast 2026-10-31 (SYNC_ONLY_OBJECTS): re-pose only ``objects`` in the cuRobo world (``RobotKit.sync_world(only_objects=...)``,
+    which itself falls back to the full pass when the robot root moved); a kit stand-in without that keyword (tests) and the switch off
+    take the plain full sync."""
+    if objects and fast_on("SYNC_ONLY_OBJECTS"):
+        try:
+            kit.sync_world(only_objects=list(objects))
+            return
+        except TypeError:
+            pass
+    kit.sync_world()
+
+
 def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], *, margin: float = 0.01, require: bool = False, reason: str = "stance_collision") -> List[bool]:
     """§4.6 step 5: teleport the drafted ``objects`` (bddl instance -> pose) into the world, sync the collision world and
     whole-body check every stance (untucked arms, its trunk). Returns the per-stance mask; with ``require`` a failing
@@ -3419,7 +3457,7 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
         obj = s.objects[name]
         obj.set_position_orientation(_t(pose[0]), _t(pose[1]))
         obj.keep_still()
-    s.kit.sync_world()
+    sync_moved(s.kit, [s.objects[n] for n in objects])  # train-fast 2026-10-31: only these objects moved
     free = s.ikc.stances_collision_free(list(stances), margin=margin).tolist()
     if require:
         bad = [st.name for st, f in zip(stances, free) if not f]
@@ -3550,7 +3588,7 @@ __all__ = [
     "object_pose_on", "hull_extents", "half_extent", "height_of", "hull_corners_world", "box_corners", "library_grasps",
     "BandSpec", "ensure_bands", "compute_bands", "band_cells_world", "band_union_cells", "workspace", "store_feasible_set",
     "image_border_lateral", "r_img", "in_frame", "all_in_frame",
-    "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_lateral", "tilt_scan",
+    "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_bounds", "phase1c_lateral", "tilt_scan",
     "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "posed_in_hand",
     "placement_stance", "facade_v1_spec",
     "side_name", "in_start_region", "gap_grid", "longest_run", "lateral_gap_masks", "polygons_supported", "partner_origin_xy", "partner_gap_masks",

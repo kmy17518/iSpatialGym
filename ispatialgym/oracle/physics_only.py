@@ -16,12 +16,29 @@ rendered run reads.
 from __future__ import annotations
 
 import contextlib
+import os
 from typing import Optional
 
 import numpy as np
 import torch as th
 
+from ispatialgym.fastflags import fast_on
+
 ENV_FLAG = "ISPATIALGYM_PHYSICS_ONLY"
+
+
+def enabled(environ=os.environ) -> bool:
+    """``ISPATIALGYM_PHYSICS_ONLY=1`` - the parse ``ExecutorConfig.physics_only`` / ``RecorderConfig.physics_only`` default to."""
+    return environ.get(ENV_FLAG, "").lower() in ("1", "true", "yes")
+
+
+def trim() -> bool:
+    """2026-10-31 train-fast (``ISPATIALGYM_FAST_PHYSICS_ONLY_TRIM``, on by default, physics-only runs only): also skip the renders
+    nothing reads in a physics-only run - the texture wait and init_rgb.png, ``Environment.reset``'s 3 observation renders, the
+    goal image and the goal-occlusion depth renders - and run the cameras small (``ISPATIALGYM_FAST_PHYSICS_ONLY_IMAGE_SIZE``,
+    128). The head rgb sensor stays (cam_key discovery, camera_pose, the FOV monitor's projection are size-invariant). Off, or
+    without ``ISPATIALGYM_PHYSICS_ONLY=1``: today's renders."""
+    return enabled() and fast_on("PHYSICS_ONLY_TRIM")
 
 _FABRIC = {"iface": None}
 

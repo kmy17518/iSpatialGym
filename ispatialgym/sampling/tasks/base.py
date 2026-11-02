@@ -656,15 +656,38 @@ class TaskSampler:
         return written
 
     def on_reject(self, err: Reject):  # hook
+        self.park_spawned_objects(only_moved=False)
+
+    def park_spawned_objects(self, only_moved: bool = True) -> int:
+        """Release any assisted grasp and park every spawned object of the template where ``SimWorld.spawn`` parked it (slot ``i``
+        of ``PARK_POSITION``), then one physics step - the ``on_reject`` parking, shared since train-fast 2026-10-31 so that
+        ``PARK_SPAWNED`` can run it at the start of every attempt (after a written instance the objects would otherwise still sit on
+        the support while the next attempt samples). ``only_moved`` (the reset-phase call): an object already within 1 cm of its
+        slot is left alone and the step is skipped when nothing moved; ``on_reject`` parks all and always steps (as before).
+        Returns the number of objects parked."""
+        from ispatialgym.sampling.sim_utils import PARK_POSITION
+
         try:
             for arm in M.ARMS:
                 if self.robot._ag_obj_in_hand.get(arm) is not None:
                     self.robot.release_grasp_immediately(arm)
         except Exception:
             pass
-        for i, o in enumerate(self.world.spawned.values()):
+        n = 0
+        # ``getattr``: a sampler driven without a live world (the pure-python run_instances tests stub ``world``) has nothing to park
+        for i, o in enumerate((getattr(self.world, "spawned", None) or {}).values()):
+            if only_moved:
+                try:
+                    at = o.get_position_orientation()[0].float()
+                    if float(th.linalg.norm(at - (PARK_POSITION + th.tensor([i * 1.0, 0.0, 0.0])))) <= 0.01:
+                        continue
+                except Exception:  # noqa: BLE001 - unreadable pose: park it
+                    pass
             self.world.park(o, i)
-        og.sim.step_physics()
+            n += 1
+        if n or not only_moved:
+            og.sim.step_physics()
+        return n
 
     # ------------------------------------------------------------------ shared geometry helpers
 

@@ -13,6 +13,7 @@ lateral offset from the robot's centre line), as the v1 ``Stance`` did.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -325,6 +326,45 @@ class Stance:
                       edge, face, float(d.get("lateral", 0.0)), None if d.get("focus") is None else _t(d["focus"]), d.get("arms", "untucked"),
                       list(d.get("contacts", [])), None, d.get("carried"), extras, None if d.get("fingers") is None else float(d["fingers"]),
                       d.get("idle_posture"))
+
+    # -- cache round trip (2026-10-31 train-fast, SPA_CACHE: the lateral-cell memo of IORS small's start per attempt) -------------
+    #: the key under which :meth:`to_cache` keeps the extras :meth:`to_sidecar` leaves out (``_``-prefixed): ``_position`` is the split
+    #: cone's lattice position of a Phase-2 candidate (``tabletop.split_cone_draw`` groups the candidates by it, ``core.record_stance_travel``
+    #: reads it as the edge-travel mark; ints, kept a tuple)
+    CACHE_PRIVATE_EXTRAS_KEY = "_private_extras"
+
+    def to_cache(self) -> Dict[str, Any]:
+        """Everything :meth:`from_cache` needs to rebuild this stance as the sampler holds it in memory: the sidecar block of
+        :meth:`to_sidecar` plus what that block leaves out - ``name``, the raw ``arms`` (a posture string stays itself), ``fingers``,
+        ``idle_posture`` as is (None stays None, the sidecar's ``"untucked"`` default is not written) and the private ``_``-prefixed
+        extras. The edge / face frames are not included (the caller keeps them and passes them back); ``q`` is never cached."""
+        d = self.to_sidecar()
+        d["name"] = self.name
+        d["arms"] = list(self.arms) if isinstance(self.arms, (list, tuple)) else self.arms
+        if self.fingers is not None:
+            d["fingers"] = float(self.fingers)
+        if self.idle_posture is None:
+            d.pop("idle_posture", None)
+        else:
+            d["idle_posture"] = self.idle_posture
+        private = {str(k): _jsonable(v) for k, v in self.extras.items() if str(k).startswith("_")}
+        if private:
+            d[self.CACHE_PRIVATE_EXTRAS_KEY] = private
+        return d
+
+    @staticmethod
+    def from_cache(d: Dict[str, Any], edge: Optional[EdgeFrame] = None, face: Optional[FaceFrame] = None) -> "Stance":
+        """The inverse of :meth:`to_cache`: a fresh stance whose containers are its own (``d`` is deep-copied: the nested ``start_region`` /
+        ``start_region_arms`` lists are never shared with the cached dict, so later mutations - ``drop_candidate``, the idle-posture retry -
+        stay with the copy), ``focus`` a tensor again and ``_position`` a tuple of ints again."""
+        d = copy.deepcopy(d)
+        private = d.pop(Stance.CACHE_PRIVATE_EXTRAS_KEY, None) or {}
+        name = str(d.pop("name", "stance"))
+        st = Stance.from_sidecar(name, d, edge=edge, face=face)
+        st.extras.pop("fingers", None)  # a field, not an extra (from_sidecar keeps every non-field key as an extra)
+        for k, v in private.items():
+            st.extras[k] = tuple(int(i) for i in v) if k == "_position" and isinstance(v, (list, tuple)) else v
+        return st
 
 
 # ----------------------------------------------------------------------------------------------------------------

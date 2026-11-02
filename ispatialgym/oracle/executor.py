@@ -54,6 +54,7 @@ import torch as th
 
 from ispatialgym import ASSETS_ROOT
 from ispatialgym import single_env as SE
+from ispatialgym.fastflags import fast_on, fast_value  # 2026-10-31 train-fast switches
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action, Brace, Grasp, Navigate, Place, Push, Transition
 from ispatialgym.oracle.execute import aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
@@ -2300,7 +2301,13 @@ class Executor:
             self.stats.record(verdict)
         self.timings["settle_s"] = time.time() - t0
         goal_obs = None
-        if verdict is None and self.cfg.goal_image:
+        # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): in a physics-only run the goal image (10 renders) and the goal-occlusion depth
+        # renders are the last renders left; neither is taken - the result notes it and the gate records "skipped" without judging
+        po_trim = bool(self.cfg.physics_only) and fast_on("PHYSICS_ONLY_TRIM")
+        if verdict is None and self.cfg.goal_image and po_trim:
+            goal_obs = {"skipped": "physics_only", "step": self.n}
+            log.info("train-fast PHYSICS_ONLY_TRIM: goal image not rendered (physics-only: no frame is recorded)")
+        elif verdict is None and self.cfg.goal_image:
             t1 = time.time()
             try:
                 goal_obs = self.capture_goal_image()
@@ -2309,7 +2316,10 @@ class Executor:
                 goal_obs = {"error": repr(e)}
             self.timings["goal_image_s"] = time.time() - t1
         goal_occlusion = None
-        if verdict is None and "goal_occlusion" in self.cfg.demo_gating:
+        if verdict is None and "goal_occlusion" in self.cfg.demo_gating and po_trim:
+            goal_occlusion = {"skipped": "physics_only", "occluded": None, "method": "none (physics-only: no depth render)", "step": self.n}
+            log.info("train-fast PHYSICS_ONLY_TRIM: goal_occlusion gate not measured (it would render depth; physics-only) - the demo is not judged by it")
+        elif verdict is None and "goal_occlusion" in self.cfg.demo_gating:
             t1 = time.time()
             try:
                 goal_occlusion = self.goal_occlusion_report()
@@ -2365,6 +2375,8 @@ class Executor:
             "jams": _jsonable(list(getattr(self.motions, "jams", []) or [])),
             "witness_branch_accepted": _jsonable(list(getattr(self.motions, "witness_branch_accepted_events", []) or [])),
             "witness_via_posture": _jsonable(list(getattr(self.motions, "witness_via_posture_events", []) or [])),
+            # 2026-10-31 train-fast (STRAIGHT_ARM): straight ramps taken in place of trajopt plans, and the fall-backs by cause
+            "straight_arm": _jsonable(dict(getattr(self.motions, "straight_arm_stats", None) or {})),
             "protection": _jsonable({"protected": [getattr(o, "name", n) for n, o in self.protected_goal], "plan_checks": int(getattr(self.motions, "protect_checks", 0) or 0),
                                      "fired": list(getattr(self.motions, "protect_events", []) or []) + list(getattr(self.monitors, "protect_events", []) or [])}),
             "demo_gating": demo_gating,

@@ -43,12 +43,14 @@ from __future__ import annotations
 import logging
 import math
 import os
+import time
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Set, Tuple, Union
 
 import torch as th
 
+from ispatialgym.fastflags import fast_on, fast_value  # 2026-10-31 train-fast switches
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.action import ActionState
 from ispatialgym.oracle.base_tracker import BaseTrackerConfig, BaseTrajectoryTracker
@@ -439,6 +441,30 @@ class PathTracker(BaseTrajectoryTracker):
 # ==========================================================================================
 
 
+@dataclass
+class StraightPlan:
+    """2026-10-31 train-fast (STRAIGHT_ARM): the result of :meth:`Motions._straight_plan`, with the fields of
+    ``curobo_planner.PlanResult`` that ``arm_to`` and its gates read (``status`` is ``"straight"``)."""
+
+    success: bool
+    q_traj: Optional[th.Tensor] = None
+    dt: float = 1.0 / 30.0
+    status: str = "straight"
+    plan_time: float = 0.0
+    diagnostics: Dict[str, Any] = field(default_factory=dict)
+
+    def __bool__(self):
+        return bool(self.success)
+
+    @property
+    def duration(self) -> float:
+        return 0.0 if self.q_traj is None else (len(self.q_traj) - 1) * self.dt
+
+
+class _StraightFallback(Exception):
+    """The straight ramp is not clear: ``arm_to`` falls through to its planner ladder (internal to ``_straight_plan``)."""
+
+
 class Motions:
     """The eight Layer-1 motions bound to one R1Pro (``env.scene.robots[0]``) and one cuRobo backend."""
 
@@ -470,6 +496,9 @@ class Motions:
         self.witness_via_posture_events: List[Dict[str, Any]] = []
         # the dipping-transit gate of a grasp transit (first-demo v3.0 F5, ``transit_dip_gate``): the active context, None outside it
         self._dip: Optional[Dict[str, Any]] = None
+        # 2026-10-31 train-fast (STRAIGHT_ARM): how often ``arm_to`` took a checked straight ramp instead of a trajopt plan, and why
+        # not (recorded in meta.fast.straight_arm / result.straight_arm)
+        self.straight_arm_stats: Dict[str, Any] = {"straight_arm_ok": 0, "straight_arm_fallback": 0, "waypoints": 0, "check_s": 0.0, "fallback_why": {}}
         self._joint_limits = (
             self.robot.joint_lower_limits[self.robot.trunk_control_idx],
             self.robot.joint_upper_limits[self.robot.trunk_control_idx],
@@ -1399,6 +1428,138 @@ class Motions:
         finally:
             self._protect = P
 
+    def _straight_plan(self, emb: str, arms: Sequence[str], q_start: th.Tensor, q_goal: th.Tensor, relax, what: str) -> Optional[StraightPlan]:
+        """2026-10-31 train-fast (``ISPATIALGYM_FAST_STRAIGHT_ARM``, on by default): before ``arm_to`` asks trajopt (~37 s per plan on
+        a TITAN RTX) a straight joint-space ramp from ``q_start`` to the arm joints of ``q_goal`` is tried: a cosine profile (zero
+        speed at both ends - no jolt for the stutter gate) whose largest per-step arm-joint increment stays within
+        ``STRAIGHT_ARM_STEP_RAD`` (0.02 rad) and within the embodiment's ``velocity_scale`` x the joint's velocity limit x dt. It is
+        kept when every waypoint clears the collision world (the attached objects' spheres included) at ``STRAIGHT_ARM_MARGIN_M``
+        (1 cm), under the same relaxed self-collision pairs the plan would use, and the protected objects (``_protect_violations``).
+        Tolerated: a leading run of waypoints within the margin when the start itself is (the hand leaving a contact - a release,
+        a held object on its support) and a trailing run into a goal within it (a pre-pose a centimetre off its object), each up to
+        ``STRAIGHT_ARM_CONTACT_RAD`` (0.1 rad) of arm motion, as long as no waypoint but the start penetrates. Returns the plan
+        (status ``straight``) or None: the caller's planner ladder then runs unchanged. The ramp is checked at its waypoints only
+        (<= 0.02 rad apart, ~1 cm of hand motion): an obstacle thinner than the sweep between two samples could be missed, as it
+        can be between trajopt's own waypoints; the run-time contact monitors stay the backstop."""
+        if not fast_on("STRAIGHT_ARM"):
+            return None
+        check = getattr(self.backend, "check_collision", None)
+        if check is None:  # a backend without the batched check (the executor tests' fakes)
+            return None
+        S = self.straight_arm_stats
+        t0 = time.time()
+        why = "error"
+        try:
+            idx = th.cat([th.as_tensor(self.robot.arm_control_idx[a]).reshape(-1).long().cpu() for a in arms])
+            q0 = C.as_tensor(q_start).reshape(-1)
+            q1 = q0.clone()
+            q1[idx] = C.as_tensor(q_goal).reshape(-1)[idx]
+            delta = (q1 - q0)[idx].abs()
+            step_rad = float(fast_value("STRAIGHT_ARM_STEP_RAD", 0.02))
+            bound = th.full_like(delta, step_rad)
+            try:  # velocity_scale x the joint velocity limits (cached on the robot) when readable; else the step bound alone
+                vmax = C.as_tensor(self.robot.control_limits["velocity"][1]).reshape(-1)[idx]
+                scale = float(getattr(M.EMBODIMENTS.get(emb), "velocity_scale", 1.0) or 1.0)
+                bound = th.minimum(bound, (scale * vmax * self.dt).clamp_min(1e-4))
+            except Exception:  # noqa: BLE001
+                pass
+            n = max(2, int(math.ceil(float(((math.pi / 2.0) * delta / bound).max()))))  # the cosine's steepest step is pi/2 x the mean
+            a_max = float(getattr(M.EMBODIMENTS.get(emb), "max_acceleration", 0.0) or 0.0)
+            if a_max > 0.0 and float(delta.max()) > 0.0:  # the profile's peak acceleration delta/2 (pi/T)^2 stays within the embodiment's
+                n = max(n, int(math.ceil((math.pi / self.dt) * math.sqrt(float(delta.max()) / (2.0 * a_max)))))
+            if n > self.cfg.trajectory_max_steps:
+                why = "too_long"
+                raise _StraightFallback(f"{n} steps exceed the budget {self.cfg.trajectory_max_steps}")
+            prof = 0.5 * (1.0 - th.cos(th.linspace(0.0, math.pi, n + 1, dtype=q0.dtype)))
+            ramp = q0.unsqueeze(0) + prof.unsqueeze(1) * (q1 - q0).unsqueeze(0)
+            ramp[0], ramp[-1] = q0, q1
+            margin = float(fast_value("STRAIGHT_ARM_MARGIN_M", 0.01))
+            with (relax(emb, q0, arms) if relax is not None else nullcontext([])) as relaxed:
+                if relax is not None:
+                    self.last_relaxed_links = list(relaxed)
+                hit_m = th.as_tensor(check(ramp, emb_name=emb, sync_world=False, margin=margin)).reshape(-1).bool().cpu()
+                hit_0 = th.as_tensor(check(ramp, emb_name=emb, sync_world=False)).reshape(-1).bool().cpu() if bool(hit_m.any()) else hit_m
+            if bool(hit_0[1:].any()):
+                why = "collision"
+                k = int(th.nonzero(hit_0[1:]).reshape(-1)[0]) + 1
+                raise _StraightFallback(f"waypoint {k}/{n} penetrates an obstacle")
+            if bool(hit_m.any()):
+                budget = float(fast_value("STRAIGHT_ARM_CONTACT_RAD", 0.1))
+                lead = 0
+                while bool(hit_m[0]) and lead <= n and bool(hit_m[lead]):
+                    lead += 1
+                trail = n + 1
+                while bool(hit_m[-1]) and trail > 0 and bool(hit_m[trail - 1]):
+                    trail -= 1
+                lead_rad = float((ramp[lead - 1, idx] - q0[idx]).abs().max()) if lead > 0 else 0.0
+                trail_rad = float((q1[idx] - ramp[trail, idx]).abs().max()) if trail <= n else 0.0
+                if lead >= trail or bool(hit_m[lead:trail].any()) or lead_rad > budget or trail_rad > budget:
+                    why = "collision"
+                    k = int(th.nonzero(hit_m).reshape(-1)[0])
+                    raise _StraightFallback(f"waypoint {k}/{n} within {margin * 1000:.0f} mm of an obstacle (leading contact run {lead_rad:.2f} rad, trailing {trail_rad:.2f} rad)")
+            if self._protect is not None:
+                viol = self._protect_violations(arms, ramp, emb)
+                if viol:
+                    why = "protected"
+                    raise _StraightFallback(f"passes {viol[0].get('object')} at {viol[0].get('clearance_m')} m")
+        except _StraightFallback as e:
+            S["straight_arm_fallback"] += 1
+            S["fallback_why"][why] = S["fallback_why"].get(why, 0) + 1
+            S["check_s"] = round(S["check_s"] + time.time() - t0, 3)
+            log.info("arm_to(%s, %s): straight ramp not clear (%s): the planner ladder runs", ",".join(arms), what, e)
+            return None
+        except Exception as e:  # noqa: BLE001 - the ramp is a shortcut; the planner ladder is the behaviour
+            S["straight_arm_fallback"] += 1
+            S["fallback_why"]["error"] = S["fallback_why"].get("error", 0) + 1
+            S["check_s"] = round(S["check_s"] + time.time() - t0, 3)
+            log.warning("arm_to(%s, %s): straight ramp check failed (%r): the planner ladder runs", ",".join(arms), what, e)
+            return None
+        dt_check = time.time() - t0
+        S["straight_arm_ok"] += 1
+        S["waypoints"] += n
+        S["check_s"] = round(S["check_s"] + dt_check, 3)
+        if S["straight_arm_ok"] == 1:
+            log.info("train-fast STRAIGHT_ARM: first straight joint-space ramp taken in place of a trajopt plan (step <= %.3f rad, margin %.0f mm)", step_rad, margin * 1000)
+        log.info("arm_to(%s, %s): straight ramp of %d steps (%.1f s, largest step %.3f rad) clears the world at %.0f mm - trajopt skipped (checked in %.2f s)",
+                 ",".join(arms), what, n, n * self.dt, float((ramp[1:, idx] - ramp[:-1, idx]).abs().max()), margin * 1000, dt_check)
+        return StraightPlan(success=True, q_traj=ramp, dt=self.dt, status="straight", plan_time=dt_check,
+                            diagnostics={"straight": True, "n": n, "margin_m": margin, "step_rad": step_rad})
+
+    def _straight_via(self, emb: str, arms: Sequence[str], q_start: th.Tensor, q_goal: th.Tensor, relax, what: str) -> Optional[StraightPlan]:
+        """2026-10-31 train-fast (``ISPATIALGYM_FAST_STRAIGHT_ARM_VIA``, on by default with STRAIGHT_ARM): when the direct ramp to the goal is
+        not clear, two checked straight legs through an arm posture (``cfg.witness_via_postures``: ready, untucked - the postures
+        ``_plan_via_posture`` plans through after every trajopt round failed), start -> posture -> goal, each leg checked as
+        :meth:`_straight_plan` checks a ramp (the arm comes to rest at the posture: no jolt at the join). The first posture both legs
+        clear wins; None when none does - the planner ladder runs as before. Single-arm moves only (the postures are per arm)."""
+        if len(arms) != 1 or not fast_on("STRAIGHT_ARM") or not fast_on("STRAIGHT_ARM_VIA"):
+            return None
+        arm = arms[0]
+        idx = self.robot.arm_control_idx[arm]
+        S = self.straight_arm_stats
+        for name in self.cfg.witness_via_postures:
+            q_via = C.as_tensor(q_start).reshape(-1).clone()
+            if name == "ready":
+                q_via[idx] = th.tensor(M.ARM_READY_Q[arm], dtype=q_via.dtype)
+            elif name == "untucked":
+                q_via[idx] = C.as_tensor(self.robot.untucked_default_joint_pos)[idx].to(q_via.dtype)
+            else:
+                continue
+            if float((q_via[idx] - C.as_tensor(q_start).reshape(-1)[idx]).abs().max()) < 1e-3:
+                continue  # the arm already rests in this posture: the via ramp would be the direct ramp again
+            leg1 = self._straight_plan(emb, arms, q_start, q_via, relax, f"{what} via {name} (leg 1)")
+            if leg1 is None:
+                continue
+            leg2 = self._straight_plan(emb, arms, q_via, q_goal, relax, f"{what} via {name} (leg 2)")
+            if leg2 is None:
+                continue
+            S["straight_arm_via_ok"] = S.get("straight_arm_via_ok", 0) + 1
+            S["straight_arm_ok"] -= 1  # the two legs counted twice; one ramp taken
+            log.info("arm_to(%s, %s): straight ramp via the %s posture (%d + %d steps) clears the world - trajopt skipped", arm, what, name,
+                     len(leg1.q_traj) - 1, len(leg2.q_traj) - 1)
+            return StraightPlan(success=True, q_traj=th.cat([leg1.q_traj, leg2.q_traj[1:]]), dt=self.dt, status=f"straight via {name}",
+                                plan_time=leg1.plan_time + leg2.plan_time, diagnostics={"straight": True, "via": name, "n": len(leg1.q_traj) + len(leg2.q_traj) - 2})
+        return None
+
     def _plan_via_posture(self, emb: str, arm: str, q_start: th.Tensor, q_goal: th.Tensor, relax, why: str):
         """The witness ``q_goal`` reached through an arm posture (``cfg.witness_via_postures``, in turn): start -> posture -> witness
         as two joint-space plans; the first posture both legs plan through wins and is recorded (``witness_via_posture_events``).
@@ -1491,12 +1652,17 @@ class Motions:
                         q_goal[idx] = q_ik[idx]
                     else:
                         log.info("arm_to(%s): IK of the recorded pose lies %.2f rad from the witness (> %.2f): keeping the witness", arm, jump, self.cfg.witness_refine_max_jump)
-            if relax is not None:
-                with relax(emb, q_start, arms) as relaxed:
-                    self.last_relaxed_links = list(relaxed)
+            # 2026-10-31 train-fast (STRAIGHT_ARM): a checked straight joint-space ramp to the witness first; None = today's ladder
+            res = self._straight_plan(emb, arms, q_start, q_goal, relax, "witness")
+            if res is None:
+                res = self._straight_via(emb, arms, q_start, q_goal, relax, "witness")  # STRAIGHT_ARM_VIA: two checked legs through a posture
+            if res is None:
+                if relax is not None:
+                    with relax(emb, q_start, arms) as relaxed:
+                        self.last_relaxed_links = list(relaxed)
+                        res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+                else:
                     res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
-            else:
-                res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
             if not res.success:
                 # owner 2026-09-25 (teacup pod demo 0925-172723): the joint-space plan is stochastic (trajopt seeds) - the same witness
                 # planned fine on the local GPU; a second round of attempts comes before any change of branch
@@ -1619,7 +1785,12 @@ class Motions:
                 q28 = C.as_tensor(q).reshape(-1)
                 for a in arms:
                     q_goal[self.robot.arm_control_idx[a]] = q28[self.robot.arm_control_idx[a]]
-            res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+            # 2026-10-31 train-fast (STRAIGHT_ARM): the checked straight ramp first (no relax context: this plan never used one)
+            res = self._straight_plan(emb, arms, q_start, q_goal, None, "joint")
+            if res is None:
+                res = self._straight_via(emb, arms, q_start, q_goal, None, "joint")
+            if res is None:
+                res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
             what = "joint"
         if not res.success:
             raise SkillError("plan_failed", f"arm_to({','.join(arms)}, {what}): {res.status}", diagnostics=dict(res.diagnostics), stage="trajopt")

@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
 
+from ispatialgym.fastflags import fast_on  # train-fast 2026-10-31: ISPATIALGYM_FAST_* switches (off = the former behaviour)
 from ispatialgym.sampling.v2.stances import PathRecord, Stance, Transition, path_length
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -506,6 +507,21 @@ class attached:
         if not attached_checks_enabled():
             self.obj = None
         self._saved = None
+        self._no_step = False
+
+    @staticmethod
+    def _step_skippable(obj) -> bool:
+        """ATTACH_NO_STEP (train-fast 2026-10-31) applies to a single rigid body only. What the sphere fit reads: the eef pose from the
+        robot's PhysX view (current the moment it is asked) and each collision mesh's pose through OmniGibson's Fabric hierarchy
+        (``get_world_pose``), which ``set_position_orientation`` refreshes itself (``sync_physx_to_fabric`` right after the PhysX write);
+        ``og.sim.step_physics`` does NOT refresh Fabric (``sync_render_transforms``: "stale after physics-only steps"), so the two steps
+        never fed the fit - they only let PhysX react for one step to the object teleported into the hand (gravity on the robot,
+        contact impulses against the fingers) before the velocities were zeroed again. An articulated object's child links, however,
+        follow a root teleport only through PhysX itself, so it keeps the steps."""
+        try:
+            return not bool(getattr(obj, "articulated", False)) and len(getattr(obj, "links", {}) or {}) <= 1
+        except Exception:  # noqa: BLE001
+            return False
 
     def __enter__(self):
         if self.obj is None or self.arm is None:
@@ -525,9 +541,13 @@ class attached:
             self.obj.disable_gravity()
             self.obj.set_position_orientation(obj_pose[0], obj_pose[1])
             self.obj.keep_still()
-            og.sim.step_physics()
-            self.kit.robot.keep_still()
-            self.obj.keep_still()
+            # train-fast 2026-10-31 (ATTACH_NO_STEP): no physics step for a single rigid body - the pose set above is already what the sphere
+            # fit reads (see ``_step_skippable``); off, or an articulated object: the step and the keep-stills as before
+            self._no_step = fast_on("ATTACH_NO_STEP") and self._step_skippable(self.obj)
+            if not self._no_step:
+                og.sim.step_physics()
+                self.kit.robot.keep_still()
+                self.obj.keep_still()
         # the sphere fit of ``attach_object`` samples the mesh at random (5–7 spheres for a small object, a different set
         # per call): seed torch around it so every check of one attempt sees the same attached geometry
         import random
@@ -541,7 +561,12 @@ class attached:
         np.random.seed(ATTACH_FIT_SEED)
         random.seed(ATTACH_FIT_SEED)
         try:
-            self.kit.backend.attach_object(self.arm, self.obj)
+            # the kit's timed wrapper (``attach_calls`` / ``attach_s`` / ``fit_cache_hits``; train-fast 2026-10-31), the backend on a kit without it
+            attach = getattr(self.kit, "attach_object", None)
+            if callable(attach):
+                attach(self.arm, self.obj)
+            else:
+                self.kit.backend.attach_object(self.arm, self.obj)
         finally:
             th.set_rng_state(cpu_state)
             if cuda_state is not None:
@@ -565,9 +590,10 @@ class attached:
             elif grav:
                 self.obj.enable_gravity()
             self.obj.keep_still()
-            og.sim.step_physics()
-            self.kit.robot.keep_still()
-            self.obj.keep_still()
+            if not self._no_step:  # ATTACH_NO_STEP: the restored pose is in PhysX and Fabric already (train-fast 2026-10-31)
+                og.sim.step_physics()
+                self.kit.robot.keep_still()
+                self.obj.keep_still()
             self._saved = None
         return False
 

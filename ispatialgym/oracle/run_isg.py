@@ -75,7 +75,9 @@ from ispatialgym.eval.tro import TROFile, load_tro  # noqa: E402
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
 from ispatialgym.oracle.action import ActionState, apply_recorded_targets  # noqa: E402
 from ispatialgym.oracle.executor import Executor, ExecutorConfig, SimState, apply_goal_override  # noqa: E402
-from ispatialgym.oracle.motions import Motions  # noqa: E402
+from ispatialgym.oracle.motions import Motions, MotionsConfig  # noqa: E402
+from ispatialgym.oracle import physics_only as PO  # noqa: E402
+from ispatialgym.fastflags import fast_flags_seen, fast_on, fast_value  # noqa: E402  (2026-10-31 train-fast switches)
 from ispatialgym.oracle.programs import expand  # noqa: E402
 from ispatialgym.oracle.qa import Monitors, QAConfig  # noqa: E402
 from ispatialgym.oracle.recorder import EpisodeAnnotations, Recorder, RecorderConfig, dump_json, json_default, save_png  # noqa: E402
@@ -457,7 +459,17 @@ class InstanceLoader:
             self._hold_entities()
         env.scene.update_initial_file()
         task._reset_tracking()
-        obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
+        if PO.trim():
+            # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): Environment.reset renders 3 frames before it reads the observation (no
+            # config key for the count in OmniGibson 3.9); a physics-only run keeps no frame - the same reset and step, the
+            # observation read without the renders (its images are stale, nothing reads them)
+            env.reset(get_obs=False)
+            og.sim.step()
+            obs, obs_info = SE.get_obs(env)
+            info = {"obs_info": obs_info}
+            log.info("train-fast PHYSICS_ONLY_TRIM: reset without the 3 observation renders")
+        else:
+            obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
         self.report["after_reset"] = self.restore_after_reset()
         if self.report["controller_targets_restored"]:
             robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
@@ -1022,6 +1034,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
     reused (:meth:`InstanceLoader.attach`); the first instance fills it in."""
     t_start = time.time()
     timings: Dict[str, float] = {}
+    fast_meta: Dict[str, Any] = {}  # 2026-10-31 train-fast: what the switches did this run (meta["fast"], written in the finally)
     meta: Dict[str, Any] = {"status": "error", "mode": args.mode, "argv": sys.argv[1:], "hostname": os.uname().nodename,
                             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_start)), "provenance": provenance(),
                             "reused_world": bool(shared and shared.get("env") is not None)}
@@ -1034,7 +1047,14 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
     sidecar_path: Optional[str] = None
 
     try:
-        loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=args.image_size, head_aperture=args.head_aperture)
+        image_size = int(args.image_size)
+        if PO.trim() and image_size == DEFAULT_IMAGE_SIZE:
+            # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): no frame is recorded, yet every step copies each camera buffer - the cameras
+            # run small (an explicit --image-size is kept); the head rgb sensor stays, so cam_key / camera_pose / the FOV monitor work
+            image_size = int(fast_value("PHYSICS_ONLY_IMAGE_SIZE", 128))
+            fast_meta["physics_only_trim"] = {"image_size": image_size, "skipped": []}
+            log.info("train-fast PHYSICS_ONLY_TRIM: cameras at %d x %d (physics-only: no frame is recorded)", image_size, image_size)
+        loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=image_size, head_aperture=args.head_aperture)
         loader.external_camera = bool(args.dev)
         loader.behavior_output = bool(args.behavior_shard)
         meta["dev"] = bool(args.dev)
@@ -1118,14 +1138,22 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         from ispatialgym.oracle import texture_wait as _TW
 
         t_tex = time.time()
-        meta["texture_wait"], obs_tex = _TW.wait_for_textures(lambda: SE.get_obs(env)[0], og.sim.render, robot.name, EXTERNAL_CAMERA_NAME if args.dev else None)
+        if PO.trim():
+            # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): the texture wait (render-only frames, up to ISG_TEXTURE_WAIT_MAX_S) and
+            # init_rgb.png exist for the recorded frames; a physics-only run records none - skipped, noted in meta
+            meta["texture_wait"] = {"skipped": "physics_only", "complete": None, "renders": 0, "wait_s": 0.0}
+            meta["init_rgb"] = {"skipped": "physics_only"}
+            fast_meta.setdefault("physics_only_trim", {"skipped": []})["skipped"] += ["texture_wait", "init_rgb.png", "reset_renders"]
+            log.info("train-fast PHYSICS_ONLY_TRIM: texture wait and init_rgb.png skipped (physics-only: no frame is recorded)")
+        else:
+            meta["texture_wait"], obs_tex = _TW.wait_for_textures(lambda: SE.get_obs(env)[0], og.sim.render, robot.name, EXTERNAL_CAMERA_NAME if args.dev else None)
+            if obs_tex is not None:
+                obs = obs_tex
+            try:
+                save_png(os.path.join(out_dir, "init_rgb.png"), obs[robot.name][cam_key]["rgb"])
+            except Exception as e:  # noqa: BLE001
+                log.warning("init render not saved: %r", e)
         timings["texture_wait_s"] = time.time() - t_tex
-        if obs_tex is not None:
-            obs = obs_tex
-        try:
-            save_png(os.path.join(out_dir, "init_rgb.png"), obs[robot.name][cam_key]["rgb"])
-        except Exception as e:  # noqa: BLE001
-            log.warning("init render not saved: %r", e)
         tracked = loader.tracked
         meta["tracked_objects"] = {k: v.name for k, v in tracked.items()}
         log.info("instance loaded in %.1fs (base %s, %d grasps, %d hinges)", timings["load_s"], [round(float(v), 3) for v in rp], len(loader.grasps), len(loader.hinges))
@@ -1145,7 +1173,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         else:
             room_filter = lambda: make_obstacle_filter(task_bounds(env.scene, loader.rooms) if loader.rooms else None, robot,  # noqa: E731
                                                        [o.name for o in tracked.values()])
-            backend = R1ProCuRobo(robot, prebuild=prebuild, **executor_mesh_cache_kw(robot, room_filter))
+            planner_kw = executor_mesh_cache_kw(robot, room_filter)
+            if fast_on("PLAN_LADDER"):
+                # 2026-10-31 train-fast (PLAN_LADDER): fewer trajopt seeds per attempt (cuRobo default 4); a plan costs ~37 s on a TITAN RTX
+                planner_kw["num_trajopt_seeds"] = int(fast_value("TRAJOPT_SEEDS", 2))
+            backend = R1ProCuRobo(robot, prebuild=prebuild, **planner_kw)
             if shared is not None:
                 shared["backend"] = backend
             if GC_FREEZE:
@@ -1156,7 +1188,33 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         backend.obstacle_filter = make_obstacle_filter(bounds, robot, [o.name for o in tracked.values()])
         # load the collision world *before* attaching the held objects (their meshes must be known to be disabled)
         backend.update_world()
-        motions = Motions(env, backend)
+        mcfg = MotionsConfig()
+        if fast_on("PLAN_LADDER"):
+            # 2026-10-31 train-fast (PLAN_LADDER): a shorter ladder in arm_to - attempts per round (4 -> 2), retry rounds to a witness (4 -> 1)
+            mcfg.plan_attempts = int(fast_value("PLAN_ATTEMPTS", 2))
+            mcfg.witness_plan_retries = int(fast_value("WITNESS_PLAN_RETRIES", 1))
+            fast_meta["plan_ladder"] = {"num_trajopt_seeds": getattr(backend, "num_trajopt_seeds", None), "plan_attempts": mcfg.plan_attempts,
+                                        "witness_plan_retries": mcfg.witness_plan_retries}
+            log.info("train-fast PLAN_LADDER: trajopt seeds %s, plan_attempts %d, witness_plan_retries %d", fast_meta["plan_ladder"]["num_trajopt_seeds"],
+                     mcfg.plan_attempts, mcfg.witness_plan_retries)
+        # 2026-11-01 train-fast (always on): count and time the collision-world syncs of this instance (meta["fast"]["world_sync"])
+        if not getattr(backend, "_isg_sync_timed", False):
+            _uw = backend.update_world
+
+            def _timed_update_world(*a, **kw):
+                st = backend.__dict__.setdefault("_isg_sync_stats", {"calls": 0, "s": 0.0, "partial_calls": 0})
+                t = time.perf_counter()
+                try:
+                    return _uw(*a, **kw)
+                finally:
+                    st["calls"] += 1
+                    st["partial_calls"] += int(kw.get("only_objects") is not None)
+                    st["s"] += time.perf_counter() - t
+
+            backend.update_world = _timed_update_world
+            backend._isg_sync_timed = True
+        backend.__dict__["_isg_sync_stats"] = {"calls": 0, "s": 0.0, "partial_calls": 0}
+        motions = Motions(env, backend, cfg=mcfg)
         for g in loader.grasps:
             backend.attach_object(g["arm"], loader.physical[g["object"]])
             if g.get("finger_q"):
@@ -1181,6 +1239,14 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                                  behavior_shard=args.behavior_shard, behavior_task=meta.get("alias") or loader.activity)
         recorder = Recorder(out_dir, env, robot, cam_key, tracked, fps=int(loader.cfg["env"]["action_frequency"]), cfg=rec_cfg,
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
+        if image_size != int(args.image_size) and hasattr(recorder, "nominal_image_size"):
+            # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): the hdf5 header's env config keeps the evaluation camera size the run would
+            # have had (a playback builds its env from it), not the shrunk live cameras
+            recorder.nominal_image_size = int(args.image_size)
+        if image_size != int(args.image_size):
+            # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): the hdf5 header's config keeps the evaluation camera size (recorder._snapshot_scene)
+            recorder.nominal_image_size = int(args.image_size)
+            fast_meta.setdefault("physics_only_trim", {"skipped": []})["hdf5_config_image_size"] = int(args.image_size)
         if sidecar is not None:
             recorder.episode = episode_annotations(sidecar)
         gating = demo_gating_for(args.mode, args.demo_gating)
@@ -1302,6 +1368,17 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         timings["total_s"] = time.time() - t_start
         meta["timings"] = timings
         meta["wall_time_s"] = timings["total_s"]
+        # 2026-10-31 train-fast: the switches / tunables this process consulted (ispatialgym.fastflags) and the straight-arm counters
+        _motions = locals().get("motions")
+        fast_meta["straight_arm"] = dict(getattr(_motions, "straight_arm_stats", None) or {})
+        _ex = locals().get("executor")
+        if _ex is not None and getattr(_ex, "step_costs", None):
+            fast_meta["step_costs"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in _ex.step_costs.items()}
+        _bk = getattr(_motions, "backend", None)
+        if _bk is not None and getattr(_bk, "_isg_sync_stats", None):
+            fast_meta["world_sync"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in _bk._isg_sync_stats.items()}
+            fast_meta["world_sync"]["n_meshes"] = len(getattr(_bk, "_world_mesh_names", ()) or ())
+        meta["fast"] = {"flags": fast_flags_seen(), **fast_meta}
         _backend = locals().get("backend")
         if os.environ.get("ISPATIALGYM_EXECUTOR_MESH_CACHE") and _backend is not None:
             # the store cannot grow: meshes held (loaded ones stay, disabled, once their object leaves) vs capacity
@@ -1418,8 +1495,14 @@ def run_queue(args) -> int:
                    "provisional": bool(n > 1 and not prov["queue_scene_restore"]), "provenance": prov,
                    "hdf5_ok": result.get("hdf5_ok"), "behavior_lerobot": result.get("behavior_lerobot"),
                    "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "pid": os.getpid(), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
-            with open(args.results, "a") as f:
-                f.write(json.dumps(row, default=json_default) + "\n")
+            # 2026-10-31 train-fast: k runners append to one results file - one O_APPEND write per line keeps the lines intact
+            # (a buffered ``open(..., "a").write`` of several processes can interleave)
+            line = (json.dumps(row, default=json_default) + "\n").encode()
+            fd = os.open(args.results, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+            try:
+                os.write(fd, line)
+            finally:
+                os.close(fd)
         if code == EXIT_ERROR:
             return code
 

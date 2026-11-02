@@ -21,11 +21,13 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
 
+from ispatialgym.fastflags import fast_on, fast_value  # train-fast 2026-10-31: ISPATIALGYM_FAST_* switches (off = the former behaviour)
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.cache import cache_get, cache_key, cache_put
@@ -584,6 +586,17 @@ class IKChecker:
                         q_s[idx] = G.t(s)[idx]
                         cands.append(q_s)
                 for q_s in cands:
+                    if fast_on("SINGLE_RETRY_EXACT", default=False):
+                        # train-fast 2026-10-31: one pose re-solved in a padded 64-slot batch cost ~10 s (TITAN RTX, 8192-mesh store; 9 such
+                        # calls = 90 s of one written instance); the 32-seed single solve from the same seed costs ~0.1 s and its solution
+                        # passes the same collision checker (the nearest-to-seed one instead of the batched solver's best-of-12)
+                        self._count("screen_single_retry")
+                        q1s = self.kit.ik(poses[i], q_s, arm=arm)
+                        if q1s is not None:
+                            out[i] = True
+                            self.solutions[(arm, self._pose_key(poses[i]))] = G.t(q1s).clone()
+                            break
+                        continue
                     ok1, q1 = self.kit.ik_batch_solve([poses[i]], q_s, arm=arm)
                     if bool(ok1[0]):
                         out[i] = True
@@ -708,6 +721,16 @@ class IKChecker:
                     # a remembered solution of this very pose is verified as a witness (FK + collision) before the solver
                     # is asked again (cuRobo's IK is randomised, a witness check is not); otherwise it seeds the solver
                     q_near = self._seeded(q0, p, arm) if q_seed is None else q0
+                    # train-fast 2026-10-31 (REMEMBERED_WITH_SEED): with a caller's seed the remembered solution is consulted too - as the
+                    # witness only (the solver, if asked, still starts from the caller's seed), and only when its arm joints lie within
+                    # REMEMBERED_SEED_RAD (max abs difference, default 0.6 rad: the oracle's excursion bound) of the seed's - the same
+                    # IK branch the caller asked for
+                    q_rem = None
+                    if q_seed is not None and fast_on("REMEMBERED_WITH_SEED", default=False):
+                        cand = self._seeded(q0, p, arm)
+                        idx_a = self.kit.robot.arm_control_idx[arm]
+                        if not th.equal(cand, q0) and float((G.t(cand)[idx_a] - G.t(q0)[idx_a]).abs().max()) <= float(fast_value("REMEMBERED_SEED_RAD", 0.6)):
+                            q_rem = cand
                     pinned = False
                     if i == 0 and q_first is not None and self.reaches(q_first, p, arm):
                         q = G.t(q_first).clone()  # the chain leaves from the recorded start configuration (owner 2026-09-24)
@@ -719,14 +742,17 @@ class IKChecker:
                         q, pinned = G.t(q_seed).clone(), True
                     elif q_seed is None and not th.equal(q_near, q0) and self._witness_ok(q_near, p, arm):
                         q = q_near
+                    elif q_rem is not None and self._witness_ok(q_rem, p, arm):
+                        self._count("remembered_with_seed")
+                        q = q_rem
                     else:
-                        q = self.kit.ik(p, q_near, arm=arm)
+                        q = self._solve_exact(p, q_near, arm)
                     if q is None:
                         # the 32 random seeds missed: retry seeded from the nearest remembered solution within the wide
                         # radius (the chain's other pose 10 cm away, an earlier draw of the same grasp) and from the
                         # solutions already found in this chain
                         for q_alt in self._retry_seeds(q0, p, arm, [x for x in qs if x is not None]):
-                            q = self.kit.ik(p, q_alt, arm=arm)
+                            q = self._solve_exact(p, q_alt, arm)
                             if q is not None:
                                 break
                 if q is None:
@@ -800,7 +826,7 @@ class IKChecker:
         best, best_m = q, m
         seeds = self._retry_seeds(q0, pose, arm) + [q0] * max(0, tries - 1)
         for q_s in seeds[:tries]:
-            q_alt = self.kit.ik(pose, q_s, arm=arm)
+            q_alt = self._solve_max_margin(pose, q_s, arm)
             if q_alt is None:
                 continue
             m_alt, _ = self.joint_limit_margin(q_alt, arm)
@@ -822,7 +848,7 @@ class IKChecker:
                 self._count("limit_retry_random")
                 q_s = G.t(q0).clone().float()
                 q_s[idx] = lo + (hi - lo) * th.rand(len(idx), generator=gen)
-                q_alt = self.kit.ik(pose, q_s, arm=arm)
+                q_alt = self._solve_max_margin(pose, q_s, arm)
                 if q_alt is None:
                     continue
                 m_alt, _ = self.joint_limit_margin(q_alt, arm)
@@ -842,6 +868,73 @@ class IKChecker:
         st = getattr(self.kit, "stats", None)
         if isinstance(st, dict):
             st[key] = st.get(key, 0) + n
+
+    # -- return-all solves (train-fast 2026-10-31, LIMIT_RETRY_RETURN_ALL) ------------------------------------------------
+    #: solutions of one solve farther than this (rad, max abs arm joint difference) from the nearest-to-seed solution belong to
+    #: another IK branch and are not picked in its place (the oracle's finish / excursion bound, ``FINISH_MAX_EXCURSION``)
+    RETURN_ALL_BRANCH_RAD = 0.6
+
+    def _solve_exact(self, pose: Pose, q_seed: th.Tensor, arm: str) -> Optional[th.Tensor]:
+        """One 32-seed solve of ``pose`` from ``q_seed`` for a chain witness: the solution nearest to the seed (``kit.ik``, the former
+        behaviour), or with ``fast_on("LIMIT_RETRY_RETURN_ALL", default=False)`` every solution of the same solve (``kit.ik_all``) and the pick of
+        :meth:`_pick_solution` within the nearest solution's branch - the one clear of the joint limits when the solve found one, so
+        :meth:`away_from_limits` (4 seeded + 12 random re-solves, ~0.1 s each) usually has nothing left to do. A kit without
+        ``ik_all`` (tests' stubs) solves as before."""
+        ik_all = getattr(self.kit, "ik_all", None)
+        if not (callable(ik_all) and fast_on("LIMIT_RETRY_RETURN_ALL", default=False)):
+            return self.kit.ik(pose, q_seed, arm=arm)
+        sols = ik_all(pose, q_seed, arm=arm)
+        if sols is None or len(sols) == 0:
+            return None
+        return self._pick_solution(sols, q_seed, arm, branch=True)
+
+    def _solve_max_margin(self, pose: Pose, q_seed: th.Tensor, arm: str) -> Optional[th.Tensor]:
+        """A re-solve of :meth:`away_from_limits`: as :meth:`_solve_exact`, but every branch is eligible (the re-solves from random arm
+        configurations land anywhere by design) - the solution clear of the limits nearest to the seed, else the largest margin."""
+        ik_all = getattr(self.kit, "ik_all", None)
+        if not (callable(ik_all) and fast_on("LIMIT_RETRY_RETURN_ALL", default=False)):
+            return self.kit.ik(pose, q_seed, arm=arm)
+        sols = ik_all(pose, q_seed, arm=arm)
+        if sols is None or len(sols) == 0:
+            return None
+        return self._pick_solution(sols, q_seed, arm, branch=False)
+
+    def _pick_solution(self, sols: th.Tensor, q_seed: th.Tensor, arm: str, branch: bool) -> th.Tensor:
+        """Among the ``(K, 28)`` solutions of one solve: the candidates are all of them (``branch=False``) or those within
+        ``RETURN_ALL_BRANCH_RAD`` of the solution nearest to ``q_seed`` (``branch=True``); the pick is the candidate with margin
+        >= ``JOINT_LIMIT_MARGIN`` nearest to the seed - the former nearest-to-seed pick itself whenever that one is clear, so the
+        branch a chain uses only changes when the former pick would have gone to ``away_from_limits`` - else the largest margin."""
+        idx = self.kit.robot.arm_control_idx[arm]
+        sols = G.t(sols).reshape(-1, G.t(sols).shape[-1]).float()
+        qa = sols[:, idx]
+        d = th.linalg.norm(qa - G.t(q_seed)[idx].float().unsqueeze(0), dim=1)
+        k_near = int(th.argmin(d))
+        lo = self.kit.robot.joint_lower_limits[idx].float()
+        hi = self.kit.robot.joint_upper_limits[idx].float()
+        margins = th.minimum(qa - lo, hi - qa).amin(dim=1)
+        cand = ((qa - qa[k_near].unsqueeze(0)).abs().amax(dim=1) <= self.RETURN_ALL_BRANCH_RAD) if branch else th.ones(len(sols), dtype=th.bool)
+        clear = cand & (margins >= self.JOINT_LIMIT_MARGIN)
+        if bool(clear.any()):
+            k = int(th.argmin(th.where(clear, d, th.full_like(d, float("inf")))))
+            if k != k_near:
+                self._count("return_all_repicked")
+        else:
+            k = int(th.argmax(th.where(cand, margins, th.full_like(margins, -float("inf")))))
+        return sols[k].clone()
+
+    def _solve_ik_path(self, emb: str, waypoints: Sequence[Dict[str, Pose]], **kw):
+        """``kit.ik_path`` (timed: ``ik_path_calls`` / ``ik_path_s`` / ``ik_path_waypoints``; train-fast 2026-10-31) or, on a kit without
+        it (tests' stubs), the backend's ``solve_ik_path`` with the same counters kept here."""
+        fn = getattr(self.kit, "ik_path", None)
+        if callable(fn):
+            return fn(emb, waypoints, **kw)
+        t0 = time.time()
+        try:
+            return self.kit.backend.solve_ik_path(emb, waypoints, **kw)
+        finally:
+            self._count("ik_path_calls")
+            self._count("ik_path_waypoints", len(waypoints))
+            self._count("ik_path_s", time.time() - t0)
 
     # -- gripper symmetry (twin grasps) ---------------------------------------------------------------------------
     def twin_q(self, q: Optional[th.Tensor], arm: str) -> Optional[th.Tensor]:
@@ -865,8 +958,8 @@ class IKChecker:
 
         best = G.t(q).clone()
         try:
-            res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(pose[0]), G.t(pose[1]))}], q_start=best, pos_tol=1e-3, rot_tol=5e-3,
-                                                 max_iters=40, check_collisions=False, sync_world=False, max_joint_step=0.3)
+            res = self._solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(pose[0]), G.t(pose[1]))}], q_start=best, pos_tol=1e-3, rot_tol=5e-3,
+                                      max_iters=40, check_collisions=False, sync_world=False, max_joint_step=0.3)
             if res.success and res.q_traj is not None:
                 cand = res.q_traj[-1].clone()
                 with self.ignoring(list(ignore)):
@@ -945,9 +1038,9 @@ class IKChecker:
         wps = [tuple(w) for w in C.line_waypoints(p0, p1, n)]
         self.kit._ensure_synced()
         with self.ignoring(ignore_mid):
-            res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in wps], q_start=G.t(q_from),
-                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=60)
-        self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1
+            res = self._solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in wps], q_start=G.t(q_from),
+                                      check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=60)
+        self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1  # kept (the former accounting; the timed one is ik_path_*)
         if not res.success:
             return None, f"approach_untrackable: {res.status}"
         traj = res.q_traj  # (n + 1, 28): the start and one configuration per dense waypoint
@@ -1164,8 +1257,8 @@ class IKChecker:
 
         def solve(poses):
             with self.ignoring(list(ignore)):
-                return self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in poses], q_start=G.t(q_from),
-                                                      check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=int(max_iters), **extra_kw)
+                return self._solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in poses], q_start=G.t(q_from),
+                                           check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=int(max_iters), **extra_kw)
 
         res = solve(dense)
         if refine_jumps and not res.success and str(res.status).startswith("joint jump"):

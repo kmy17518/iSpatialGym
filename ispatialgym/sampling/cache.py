@@ -17,6 +17,7 @@ import logging
 import os
 from typing import Any, Optional
 
+import numpy as np
 import torch as th
 
 log = logging.getLogger("ispatialgym.sampling")
@@ -25,16 +26,30 @@ log = logging.getLogger("ispatialgym.sampling")
 CACHE_SCHEMA = 1
 
 
-def _plain(x):
+def _plain(x, round_floats: bool = True):
+    """JSON-able copy of ``x``: dicts with sorted string keys, tensors / tuples as lists, floats rounded to 4 decimals (the key hash and
+    today's entries). ``round_floats=False`` (2026-10-31 train-fast: entries that hold stances the sampler re-uses as they were, the
+    start-per-attempt lateral cells) keeps every float and tensor value exact."""
     if isinstance(x, dict):
-        return {str(k): _plain(v) for k, v in sorted(x.items(), key=lambda kv: str(kv[0]))}
+        return {str(k): _plain(v, round_floats) for k, v in sorted(x.items(), key=lambda kv: str(kv[0]))}
     if isinstance(x, (list, tuple)):
-        return [_plain(v) for v in x]
+        return [_plain(v, round_floats) for v in x]
     if isinstance(x, th.Tensor):
-        return [round(float(v), 4) for v in x.flatten().tolist()]
+        return [round(float(v), 4) for v in x.flatten().tolist()] if round_floats else x.flatten().tolist()
     if isinstance(x, float):
-        return round(x, 4)
+        return round(x, 4) if round_floats else x
     return x
+
+
+def _json_default(x):
+    """``json.dump`` fallback for the numpy / torch scalars a value may still carry (a ``np.bool_`` mask verdict, a 0-d tensor angle)."""
+    if isinstance(x, np.generic):
+        return x.item()
+    if isinstance(x, th.Tensor):
+        return x.tolist()
+    if isinstance(x, (set, frozenset)):
+        return sorted(x)
+    raise TypeError(f"not JSON serialisable: {type(x).__name__}")
 
 
 def cache_root() -> Optional[str]:
@@ -45,7 +60,7 @@ def cache_root() -> Optional[str]:
 
 
 def cache_key(kind: str, payload: Any) -> str:
-    blob = json.dumps({"schema": CACHE_SCHEMA, "kind": kind, "payload": _plain(payload)}, sort_keys=True)
+    blob = json.dumps({"schema": CACHE_SCHEMA, "kind": kind, "payload": _plain(payload)}, sort_keys=True, default=_json_default)
     return f"{kind}-{hashlib.sha256(blob.encode()).hexdigest()[:24]}"
 
 
@@ -64,13 +79,28 @@ def cache_get(key: str) -> Optional[Any]:
         return None
 
 
-def cache_put(key: str, value: Any) -> None:
+def cache_put(key: str, value: Any, *, round_floats: bool = True) -> None:
+    """Write ``value`` under ``key`` (atomic: a temp file renamed into place). 2026-10-31 train-fast: the temp name is unique per process
+    (``.tmp.<pid>``) - many train workers write the same entry at once on NFS, and a shared ``.tmp`` name let one writer rename
+    another's half-written file -, and a temp file that vanished under us (another writer's rename raced ours on a non-POSIX mount) is
+    tolerated: the entry on disk is then the other writer's, computed from the same key. ``round_floats`` as :func:`_plain`."""
     root = cache_root()
     if root is None:
         return
     os.makedirs(root, exist_ok=True)
     path = os.path.join(root, key + ".json")
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(_plain(value), f)
-    os.replace(tmp, path)
+    tmp = f"{path}.tmp.{os.getpid()}"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(_plain(value, round_floats), f, default=_json_default)
+        os.replace(tmp, path)
+    except FileNotFoundError as e:
+        log.warning("cache entry %s: temp file vanished before it was renamed (a concurrent writer of the same entry?): %r", path, e)
+    except OSError as e:  # a stale NFS handle / a full or read-only mount: the entry is simply not written this time, the sampler goes on
+        log.warning("cache entry %s not written: %r", path, e)
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+        except OSError:
+            pass

@@ -299,6 +299,8 @@ class Recorder:
         self._video_keys: List[str] = []
         self.scene_file = None
         self.env_config = None
+        # 2026-10-31 train-fast PHYSICS_ONLY_TRIM (set by run_isg): the run's cameras were shrunk; the hdf5 header's config keeps this size
+        self.nominal_image_size: Optional[int] = None
         self.hdf5_path = os.path.join(out_dir, "demo.hdf5") if self.cfg.hdf5 else None
         self.behavior = None  # behavior_lerobot.ShardWriter of the episode
         self.behavior_status: Optional[str] = None
@@ -446,6 +448,15 @@ class Recorder:
             env_cfg = cfg.get("env") if isinstance(cfg, dict) else None
             if isinstance(env_cfg, dict) and env_cfg.get("num_envs", 1) != 1:
                 env_cfg["num_envs"] = 1
+            if self.nominal_image_size and isinstance(cfg, dict):
+                # 2026-10-31 train-fast PHYSICS_ONLY_TRIM: no image is recorded and the live cameras were shrunk (run_isg); the config a
+                # playback builds its env from keeps the evaluation camera size (the hdf5 contract is unchanged)
+                for rcfg in cfg.get("robots") or []:
+                    kw = ((rcfg.get("sensor_config") or {}).get("VisionSensor") or {}).get("sensor_kwargs") if isinstance(rcfg, dict) else None
+                    if isinstance(kw, dict):
+                        for k in ("image_height", "image_width"):
+                            if k in kw:
+                                kw[k] = int(self.nominal_image_size)
             self.env_config = cfg
         except Exception as e:  # noqa: BLE001
             log.warning("scene snapshot for the hdf5 header failed: %r", e)

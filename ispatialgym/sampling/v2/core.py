@@ -42,6 +42,8 @@ from ispatialgym.sampling import robot_utils  # noqa: F401  (warp pinning before
 
 import omnigibson as og  # noqa: E402
 
+from ispatialgym.fastflags import fast_on  # noqa: E402  (train-fast switches, 2026-10-31: ISPATIALGYM_FAST_<NAME>, default on, =0 off)
+
 from ispatialgym.activity.problem import AGENT_INSTANCE, ISGProblem  # noqa: E402
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
 from ispatialgym.robot import conventions as C  # noqa: E402
@@ -279,6 +281,9 @@ class SamplerV2(TaskSampler):
         self.variant = ctx.variant
         self.last_program_check: Optional[Dict[str, Any]] = None
         self._park_xy: Optional[th.Tensor] = None
+        # train-fast (2026-10-31): PARK_ONCE's (key, xy, floor_z) of the last computed park; the one-line "first time taken" log keys
+        self._park_cache: Optional[Tuple[Tuple, th.Tensor, float]] = None
+        self._fast_logged: set = set()
 
     # ------------------------------------------------------------------ hooks (task modules)
 
@@ -513,21 +518,77 @@ class SamplerV2(TaskSampler):
         """Floor footprints (world xy polygons) every recorded path plans around on the local map (default none)."""
         return []
 
+    def _log_once(self, key: str, msg: str, *args, level: int = logging.INFO) -> None:
+        """One log line per sampler the first time a train-fast path is taken (``key``)."""
+        seen = getattr(self, "_fast_logged", None)  # a sampler built without __init__ (the pure-python run_instances tests) gets the set here
+        if seen is None:
+            seen = self._fast_logged = set()
+        if key not in seen:
+            seen.add(key)
+            log.log(level, msg, *args)
+
     def park_robot(self) -> th.Tensor:
-        """§3.3: tucked at a free cell of the task rooms' floor, >= 1 m from every spawned object and support (and :meth:`park_keep_away`)."""
+        """§3.3: tucked at a free cell of the task rooms' floor, >= 1 m from every spawned object and support (and :meth:`park_keep_away`).
+
+        train-fast PARK_ONCE (2026-10-31): the cell and the floor height are cached under :func:`park_key` (rooms, the keep-away and
+        task objects' poses / joints), so a second park with nothing moved is the teleport + the five physics steps without
+        ``NAV.park_pose``; the cuRobo re-sync after it is :meth:`_sync_after_park`. Switch off: today's path."""
         keep = list(self.world.spawned.values()) + self.support_objects() + self.park_keep_away()
-        try:
-            xy = NAV.park_pose(self.kit, self.gp.rooms(self.scene) or (self.world.rooms or []), keep_away=keep)
-        except NAV.NavigationError as e:
-            log.warning("%s: %s; parking at the room centre", self.gp.alias, e)
-            xy = self.world.robot_park_xy
+        rooms = self.gp.rooms(self.scene) or (self.world.rooms or [])
+        park_once = fast_on("PARK_ONCE")
+        key = park_key(_dedupe(keep + list((getattr(self, "objects", None) or {}).values())), rooms) if park_once else None  # a stand-in without bindings (tests): keep-away set only
+        cached = getattr(self, "_park_cache", None)  # a stand-in built without __init__ (tests) has no cache
+        if park_once and cached is not None and cached[0] == key:
+            _, xy, floor_z = cached
+            self.counters["park_cell_reused"] = self.counters.get("park_cell_reused", 0) + 1
+            self._log_once("park_once", "%s: PARK_ONCE: park cell (%.2f, %.2f) / floor z %.4f reused while the keep-away set is unchanged (no park_pose)",
+                           self.gp.alias, float(xy[0]), float(xy[1]), floor_z)
+        else:
+            try:
+                xy = NAV.park_pose(self.kit, rooms, keep_away=keep)
+            except NAV.NavigationError as e:
+                log.warning("%s: %s; parking at the room centre", self.gp.alias, e)
+                xy = self.world.robot_park_xy
+            # the task room's measured floor (``SimWorld.measure_floor_z``: raycast, cached per room); the kit's copy follows
+            floor_z = self.world.measure_floor_z(xy)
+            if park_once:
+                self._park_cache = (key, xy, floor_z)
         self._park_xy = xy
-        # the task room's measured floor (``SimWorld.measure_floor_z``: raycast, cached per room); the kit's copy follows
-        self.world.floor_z = self.world.measure_floor_z(xy)
+        self.world.floor_z = floor_z
         self.kit.floor_z = self.world.floor_z
         self.world.park_robot(xy, floor_z=self.world.floor_z)
-        self.kit.sync_world()
+        if park_once:
+            self._sync_after_park()
+        else:
+            self.kit.sync_world()
         return xy
+
+    def _sync_after_park(self) -> None:
+        """PARK_ONCE: the cuRobo re-sync after a park. The kit stores obstacles relative to the robot root, so a root that moved (every
+        park after an ``apply_draft``: the robot comes from its stance) takes the full pass (``RobotKit.sync_world`` does so itself
+        when the root drifted > 1 cm). When the root did not move - the previous attempt was rejected while the robot was still parked
+        here (a ``sample`` rejection, the common case) - only the objects that can have moved since the last full sync are refreshed:
+        the task objects (spawned ones re-parked, bound scene objects, articulated ones whose joints an attempt set) and the scene
+        objects ``reset_scene_objects`` just put back (``SimWorld.last_reloaded``). Every other scene object is within 1 mm / 0.005 rad
+        of the scene file (else it would have been reset and listed) - below the 1 cm collision margin of the checks."""
+        backend = getattr(self.kit, "backend", None)
+        if backend is None or not hasattr(backend, "root_pose"):  # a kit stand-in (tests): the plain sync
+            self.kit.sync_world()
+            return
+        root = backend.root_pose()[0]
+        prev = getattr(self.kit, "_synced_root", None)
+        if prev is None or float(th.linalg.norm(root - prev)) > 0.01 or not getattr(backend, "_world_loaded", False):
+            self.kit.sync_world()
+            return
+        objs = _dedupe(list((getattr(self, "objects", None) or {}).values()) + list((getattr(self.world, "spawned", None) or {}).values()))
+        for name in getattr(self.world, "last_reloaded", None) or []:
+            o = self.world.scene.object_registry("name", name)
+            if o is not None and o not in objs:
+                objs.append(o)
+        self.counters["park_sync_partial"] = self.counters.get("park_sync_partial", 0) + 1
+        self._log_once("park_once_sync", "%s: PARK_ONCE: robot root unmoved since the last full cuRobo sync; refreshing %d task / reset objects only",
+                       self.gp.alias, len(objs))
+        self.kit.sync_world(only_objects=objs)
 
     def settle_still_entities(self, draft: Draft) -> List[Any]:
         """Entities held at rest during the settle / trembling / goal windows (hook of ``TaskSampler``). None by default:
@@ -1274,6 +1335,12 @@ class SamplerV2(TaskSampler):
             return 0
         return len([f for f in os.listdir(d) if f.endswith("-tro_state.json")])
 
+    def log_attempt_stages(self, index: int, attempt: int, clock: "_StageClock") -> None:
+        """STAGE_TIMING: two INFO lines per attempt - the stage seconds and the attempt's kit counters (every ``*_calls`` / ``*_s`` /
+        ``*_problems`` / ``*_configs`` key of ``RobotKit.stats_snapshot``, whatever the kit counts)."""
+        log.info("%s: instance %d attempt %d stages: %s", self.gp.alias, index, attempt, clock.stages_text())
+        log.info("%s: instance %d attempt %d kit: %s", self.gp.alias, index, attempt, format_kit_delta(clock.total_kit()))
+
     def run_instances(self, n: int, max_attempts: int = 30, start_index: Optional[int] = None, indices: Optional[Sequence[int]] = None) -> List[str]:
         """Per attempt: sample (task module) -> apply -> settle + BEHAVIOR validation -> goal feasibility (robot parked per
         §3.3) -> ``after_goal_check`` -> program check -> TRO + sidecar -> constraints write-back. Rejections are counted
@@ -1300,6 +1367,8 @@ class SamplerV2(TaskSampler):
                 rng = np.random.default_rng(seed)
                 t0 = time.time()
                 k0 = self.kit.stats_snapshot()
+                # train-fast STAGE_TIMING (2026-10-31): seconds and kit counters per stage, logged after every attempt (success or rejection)
+                clock = _StageClock(self.kit)
                 phase = "reset"
                 try:
                     n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()],
@@ -1307,53 +1376,75 @@ class SamplerV2(TaskSampler):
                     if n_reset:
                         # a counter (scene objects put back before the attempt), not a rejection
                         self.counters["scene_reset"] = self.counters.get("scene_reset", 0) + n_reset
+                    if fast_on("PARK_SPAWNED"):
+                        # train-fast PARK_SPAWNED (2026-10-31): every attempt starts with the template's spawned objects parked (the on_reject
+                        # parking; after a written instance they would otherwise still sit on the support while the next attempt samples)
+                        n_parked = self.park_spawned_objects()
+                        if n_parked:
+                            self.counters["spawned_parked_at_reset"] = self.counters.get("spawned_parked_at_reset", 0) + n_parked
+                            self._log_once("park_spawned", "%s: PARK_SPAWNED: %d spawned objects parked before the attempt (one physics step)", self.gp.alias, n_parked)
                     self.park_robot()
                     self.ikc.solutions.clear()
                     self.ikc.attempt = attempt  # ``IKChecker.LIMIT_RETRY_RANDOM_FROM_ATTEMPT``: attempt 0 solves without the random re-solves
+                    clock.mark("reset")
                     phase = "sample"
                     draft = self.sample(rng)
+                    clock.mark("sample")
                     t_sample = time.time() - t0
                     phase = "apply"
                     self.apply_draft(draft)
+                    clock.mark("apply")
                     t_apply = time.time() - t0 - t_sample
                     phase = "settle_validate"
                     self.settle_and_validate(draft)
                     # §4.6 step 5 with the objects at their settled (= recorded) poses
                     self.check_stances_with_objects(draft)
+                    clock.mark("settle_validate")
                     t_settle = time.time() - t0 - t_sample - t_apply
                     phase = "goal_check"
                     self.check_goal_feasible(draft)
                     self.after_goal_check(draft)
                     self.verify_carry_legs(draft)
+                    clock.mark("goal_check")
                     phase = "program_check"
                     self.program_check(draft)
+                    clock.mark("program_check")
                     phase = "write"
                     if self.template_paths is None:
                         self.save_template()
                     draft.summary["wall_time_s"] = time.time() - t0
+                    # the four legacy keys as before (train scripts read them) + the split stages (STAGE_TIMING)
                     draft.summary["phase_s"] = {"sample": round(t_sample, 2), "apply": round(t_apply, 2), "settle_validate": round(t_settle, 2),
-                                                "goal_check_program_check_write": round(time.time() - t0 - t_sample - t_apply - t_settle, 2)}
+                                                "goal_check_program_check_write": round(time.time() - t0 - t_sample - t_apply - t_settle, 2),
+                                                **{k: round(v, 2) for k, v in clock.seconds.items() if k not in ("sample", "apply", "settle_validate")}}
                     draft.summary["kit"] = self.kit.stats_delta(k0, self.kit.stats_snapshot())
+                    draft.summary["kit_attempt"] = {"by_stage": {k: dict(v) for k, v in clock.kit_by_stage.items()}, "total": clock.total_kit()}
                     draft.summary["attempt"] = attempt
                     path = self.write_instance(draft, index, seed)
+                    clock.mark("write")
                     phase = "instance_filter"
                     self.check_instance_filter(path)
+                    clock.mark("instance_filter")
                     phase = "goal_occlusion"
                     self.check_goal_occlusion(draft, path)
                     self.constraints_write_back(draft, self.instance_id(index))
+                    clock.mark("goal_occlusion")
                     self.instance_seeds.append(seed)
                     written.append(path)
                     # run_isg loads an instance through the template meta; demos replay instances while the rest of the
                     # template is still being sampled
                     self.write_template_meta()
                     log.info("%s: instance %d written (attempt %d, %.1fs)", self.gp.alias, index, attempt, time.time() - t0)
+                    self.log_attempt_stages(index, attempt, clock)
                     ok = True
                     break
                 except Reject as e:
+                    clock.mark(phase)
                     self.rejection_log.add(e.reason, str(e), phase=phase, index=index, attempt=attempt, seed=seed, **_plain_details(e.details))
                     log.debug("rejection traceback", exc_info=True)
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.alias, index, attempt, phase, time.time() - t0, e)
+                    self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
                     if isinstance(e, TemplateExhausted) and not start_per_attempt():
                         exhausted = True
@@ -1391,3 +1482,114 @@ def _sha_text(text: str) -> str:
     import hashlib
 
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# train-fast (2026-10-31): per-stage timing of an attempt, the park cache key, compact kit-counter formatting
+# ----------------------------------------------------------------------------------------------------------------
+
+#: stage -> short name in the per-attempt ``stages:`` log line (STAGE_TIMING)
+STAGE_SHORT = {"reset": "reset", "sample": "sample", "instance_filter": "filter", "apply": "apply", "settle_validate": "settle", "goal_check": "goal",
+               "program_check": "program", "write": "write", "goal_occlusion": "occlusion"}
+
+
+class _StageClock:
+    """STAGE_TIMING (always on): wall seconds and kit-counter deltas (``RobotKit.stats_snapshot``, any key) per stage of one attempt.
+    ``mark(stage)`` closes the stage that ran since the previous mark (a stage marked twice accumulates: the repeat filter runs
+    early and after the write)."""
+
+    def __init__(self, kit):
+        self.kit = kit
+        self.t0 = time.time()
+        self.seconds: Dict[str, float] = {}
+        self.kit_by_stage: Dict[str, Dict[str, float]] = {}
+        self._t = self.t0
+        self._k0 = self._snap()
+        self._k = dict(self._k0)
+
+    def _snap(self) -> Dict[str, float]:
+        snap = getattr(self.kit, "stats_snapshot", None)  # a stub kit (tests) may have no counters
+        return dict(snap()) if callable(snap) else {}
+
+    @staticmethod
+    def _delta(before: Dict[str, float], after: Dict[str, float]) -> Dict[str, float]:
+        return {k: round(float(after.get(k, 0.0)) - float(before.get(k, 0.0)), 3) for k in set(before) | set(after)}
+
+    def mark(self, stage: str) -> None:
+        now, k = time.time(), self._snap()
+        self.seconds[stage] = round(self.seconds.get(stage, 0.0) + (now - self._t), 3)
+        delta = {kk: v for kk, v in self._delta(self._k, k).items() if v}
+        if delta:
+            acc = self.kit_by_stage.setdefault(stage, {})
+            for kk, v in delta.items():
+                acc[kk] = round(acc.get(kk, 0.0) + v, 3)
+        self._t, self._k = now, k
+
+    def total_kit(self) -> Dict[str, float]:
+        return {k: v for k, v in self._delta(self._k0, self._snap()).items() if v}
+
+    def elapsed(self) -> float:
+        return time.time() - self.t0
+
+    def stages_text(self) -> str:
+        order = list(STAGE_SHORT) + [k for k in self.seconds if k not in STAGE_SHORT]
+        parts = [f"{STAGE_SHORT.get(k, k)}={self.seconds[k]:.1f}s" for k in order if k in self.seconds]
+        return " ".join(parts) + f" total={self.elapsed():.1f}s"
+
+
+def format_kit_delta(delta: Dict[str, float]) -> str:
+    """``{"ik_calls": 12, "ik_s": 1.4, "ik_batch_calls": 3, "ik_batch_problems": 210, ...}`` -> ``"ik 12 calls 1.4s, ik_batch 3 calls 9.8s
+    (210 problems), ..."``; generic over the counter names (``<name>_calls`` / ``_s`` / ``_problems`` / ``_configs``, anything else
+    printed as is); counters at zero are left out."""
+    groups: Dict[str, Dict[str, float]] = {}
+    for k, v in (delta or {}).items():
+        for suf in ("_calls", "_problems", "_configs", "_s"):
+            if k.endswith(suf) and len(k) > len(suf):
+                groups.setdefault(k[: -len(suf)], {})[suf] = v
+                break
+        else:
+            groups.setdefault(k, {})[""] = v
+    parts = []
+    for name, g in groups.items():
+        if not any(abs(float(v)) > 0 for v in g.values()):
+            continue
+        txt = name
+        if "_calls" in g:
+            txt += f" {int(g['_calls'])} calls"
+        if "_s" in g:
+            txt += f" {float(g['_s']):.1f}s"
+        extras = [f"{int(g[suf])} {suf[1:]}" for suf in ("_problems", "_configs") if g.get(suf)]
+        if "" in g:
+            extras.append(f"{g['']:g}" if isinstance(g[""], float) else str(g[""]))
+        if extras:
+            txt += " (" + ", ".join(extras) + ")"
+        parts.append(txt)
+    return ", ".join(parts) if parts else "none"
+
+
+def _dedupe(objs: Sequence[Any]) -> List[Any]:
+    """The objects in order without repeats, by identity (an unhashable stand-in in the tests is fine; train-fast 2026-10-31)."""
+    seen: set = set()
+    out: List[Any] = []
+    for o in objs:
+        if id(o) not in seen:
+            seen.add(id(o))
+            out.append(o)
+    return out
+
+
+def park_key(objs: Sequence[Any], rooms: Sequence[str]) -> Tuple:
+    """PARK_ONCE: what ``park_robot``'s answer depends on besides the (fixed) scene - the task rooms and, per object the parked robot
+    keeps away from or that an attempt can move, its name, root pose (5 cm / 0.05 quaternion units) and joint positions (0.05 rad).
+    A key that differs recomputes the cell (never wrong, only slower); the rounding makes a settled object's millimetre jitter reuse it."""
+    parts: List[Any] = [tuple(rooms)]
+    for o in objs:
+        try:
+            p, q = o.get_position_orientation()
+            item: Tuple[Any, ...] = (o.name, tuple(round(float(v) / 0.05) for v in p.tolist()), tuple(round(float(v) / 0.05) for v in q.tolist()))
+            if int(getattr(o, "n_joints", 0) or 0) > 0:
+                item += (tuple(round(float(v) / 0.05) for v in o.get_joint_positions().tolist()),)
+        except Exception:  # noqa: BLE001 - an object without a readable pose: never reuse
+            item = (getattr(o, "name", repr(o)), id(o), time.time())
+        parts.append(item)
+    return tuple(parts)

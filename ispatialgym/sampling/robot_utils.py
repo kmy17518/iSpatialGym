@@ -58,10 +58,20 @@ class RobotKit:
         self.floor_z = float(getattr(world, "floor_z", 0.0))
         #: call / time counters for the expensive queries (reported per template in template_meta.timings.kit)
         self.stats: Dict[str, float] = {"ik_calls": 0, "ik_s": 0.0, "ik_batch_calls": 0, "ik_batch_problems": 0, "ik_batch_s": 0.0,
-                                        "collision_calls": 0, "collision_configs": 0, "collision_s": 0.0}
+                                        "collision_calls": 0, "collision_configs": 0, "collision_s": 0.0,
+                                        # train-fast 2026-10-31: the formerly uninstrumented costs - differential IK (``ik_path``: approach / chain
+                                        # tracking, the witness polish), world syncs (``sync_world`` / ``ignoring``; ``sync_full_calls`` = passes over
+                                        # every mesh), attachments (``attach_object``; ``fit_cache_hits`` = SEEDED_SPHERE_FIT=cache hits) and the
+                                        # return-all IK solves (``ik_all``; counted in ``ik_calls`` / ``ik_s`` as well)
+                                        "ik_path_calls": 0, "ik_path_s": 0.0, "ik_path_waypoints": 0, "sync_calls": 0, "sync_s": 0.0, "sync_full_calls": 0,
+                                        "attach_calls": 0, "attach_s": 0.0, "fit_cache_hits": 0, "ik_all_calls": 0}
 
     def stats_snapshot(self) -> Dict[str, float]:
         return dict(self.stats)
+
+    def _bump(self, key: str, n: float = 1) -> None:
+        """``stats[key] += n`` (the key created when a subclass built its own ``stats``; train-fast 2026-10-31)."""
+        self.stats[key] = self.stats.get(key, 0) + n
 
     @staticmethod
     def count_collision_meshes(world) -> int:
@@ -131,12 +141,18 @@ class RobotKit:
     def sync_world(self, ignore_objects=(), only_objects=None):
         """``only_objects``: refresh those objects' meshes alone (cheap; the rest of the world has not moved) - a full
         sync when the world is not loaded yet or the robot root drifted since the last full sync."""
-        if only_objects is not None and getattr(self.backend, "_world_loaded", False) and getattr(self, "_synced_root", None) is not None \
-                and float(th.linalg.norm(self.backend.root_pose()[0] - self._synced_root)) <= 0.01:
-            self.backend.update_world(ignore_objects=ignore_objects, only_objects=only_objects)
-            return
-        self.backend.update_world(ignore_objects=ignore_objects)
-        self._synced_root = self.backend.root_pose()[0].clone()
+        t0 = time.time()  # train-fast 2026-10-31: timed (sync_calls / sync_s; sync_full_calls = the passes over every mesh)
+        self._bump("sync_calls")
+        try:
+            if only_objects is not None and getattr(self.backend, "_world_loaded", False) and getattr(self, "_synced_root", None) is not None \
+                    and float(th.linalg.norm(self.backend.root_pose()[0] - self._synced_root)) <= 0.01:
+                self.backend.update_world(ignore_objects=ignore_objects, only_objects=only_objects)
+                return
+            self._bump("sync_full_calls")
+            self.backend.update_world(ignore_objects=ignore_objects)
+            self._synced_root = self.backend.root_pose()[0].clone()
+        finally:
+            self._bump("sync_s", time.time() - t0)
 
     def _ensure_synced(self):
         """cuRobo stores obstacles relative to the robot root at sync time; if the simulated root moved since (e.g. the
@@ -225,6 +241,54 @@ class RobotKit:
         self.stats["ik_s"] += time.time() - t0
         return out
 
+    def ik_all(self, eef_pose: G.Pose, q_seed: th.Tensor, arm: str = "right", torso: bool = False) -> Optional[th.Tensor]:
+        """Every successful solution of one 32-seed solve, ``(K, 28)`` (locked joints from ``q_seed``), or None - the same solve as
+        :meth:`ik` (``backend.solve_ik(return_all=True)``), which keeps only the solution nearest to the seed; the caller picks
+        (``IKChecker`` prefers the one clear of the joint limits). Timed like :meth:`ik` (``ik_calls`` / ``ik_s``) plus ``ik_all_calls``.
+        Train-fast 2026-10-31 (LIMIT_RETRY_RETURN_ALL)."""
+        emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"
+        self._ensure_synced()
+        t0 = time.time()
+        out = self.backend.solve_ik(emb, {M.EEF_LINK[arm]: (G.t(eef_pose[0]), G.t(eef_pose[1]))}, q_seed=q_seed, sync_world=False, return_all=True)
+        self.stats["ik_calls"] += 1
+        self.stats["ik_s"] += time.time() - t0
+        self._bump("ik_all_calls")
+        if out is None:
+            return None
+        return out.reshape(-1, out.shape[-1]) if out.ndim > 1 else out.unsqueeze(0)
+
+    def ik_path(self, emb: str, waypoints: Sequence[Dict[str, G.Pose]], q_start: Optional[th.Tensor] = None, **kw):
+        """``backend.solve_ik_path(emb, waypoints, q_start=q_start, **kw)`` (differential IK along dense waypoints: the approach /
+        chain tracking and the witness polish of ``IKChecker``), timed into ``ik_path_calls`` / ``ik_path_s`` / ``ik_path_waypoints``
+        (train-fast 2026-10-31: the largest formerly uninstrumented cost). The world is NOT re-synced here (the callers hold their
+        ignore contexts); pass ``sync_world`` explicitly to change that."""
+        t0 = time.time()
+        try:
+            return self.backend.solve_ik_path(emb, waypoints, q_start=q_start, **kw)
+        finally:
+            self._bump("ik_path_calls")
+            self._bump("ik_path_waypoints", len(waypoints))
+            self._bump("ik_path_s", time.time() - t0)
+
+    # ------------------------------------------------------------------ attachment (timed; train-fast 2026-10-31)
+
+    def attach_object(self, arm: str, obj, **kw) -> None:
+        """``backend.attach_object(arm, obj, **kw)`` timed into ``attach_calls`` / ``attach_s``; ``fit_cache_hits`` counts the sphere fits
+        served from the SEEDED_SPHERE_FIT=cache store (0 unless that env is set)."""
+        from ispatialgym.oracle import curobo_planner as CP
+
+        hits0 = int(getattr(CP, "_FIT_COUNTS", {}).get("hits", 0))
+        t0 = time.time()
+        try:
+            self.backend.attach_object(arm, obj, **kw)
+        finally:
+            self._bump("attach_calls")
+            self._bump("attach_s", time.time() - t0)
+            self._bump("fit_cache_hits", int(getattr(CP, "_FIT_COUNTS", {}).get("hits", 0)) - hits0)
+
+    def detach_object(self, arm: str) -> None:
+        self.backend.detach_object(arm)
+
     def reachable(self, eef_poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", torso: bool = False, ignore_for_last=()) -> Optional[th.Tensor]:
         """Configuration reaching the *last* pose if every pose in the list is IK-feasible from ``q_seed``, else None.
         ``ignore_for_last``: objects ignored (collision) for the last pose only (the support under a grasp)."""
@@ -276,30 +340,35 @@ class RobotKit:
                 out.append([(p - axis * pregrasp, q), (p, q)])
         return out
 
-    def ik_batch(self, poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", batch_size: int = 64, ignore=(), torso: bool = False) -> th.Tensor:
+    def ik_batch(self, poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", batch_size: int = 64, ignore=(), torso: bool = False,
+                 seeds: Optional[int] = None) -> th.Tensor:
         """Screening IK for many eef poses at once (fewer seeds than :meth:`ik`); returns a bool mask.
 
         ``ignore``: objects whose collision meshes are disabled for these queries (e.g. the support surface for the
         final grasp pose, which the oracle approaches without collision checking); re-enabled afterwards.
         ``torso``: use the arm + torso embodiment (single tool frame as well, so batching applies).
+        ``seeds`` (train-fast 2026-10-31): seeds per pose of the batched solver (default: the backend's ``batch_ik_seeds``, 12).
         """
-        return self.ik_batch_solve(poses, q_seed, arm=arm, batch_size=batch_size, ignore=ignore, torso=torso)[0]
+        return self.ik_batch_solve(poses, q_seed, arm=arm, batch_size=batch_size, ignore=ignore, torso=torso, seeds=seeds)[0]
 
     def ik_batch_solve(self, poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", batch_size: int = 64, ignore=(),
-                       torso: bool = False) -> Tuple[th.Tensor, th.Tensor]:
+                       torso: bool = False, seeds: Optional[int] = None) -> Tuple[th.Tensor, th.Tensor]:
         """Like :meth:`ik_batch` but also returns the solutions ``(success (N,), q (N, 28))`` (locked joints from
         ``q_seed``). The screening solutions are collision-checked by the same checker as the exact solver, so callers
         that need a configuration (not just feasibility) can use them directly and skip the exact solve.
 
         Note: every call with a *different* set of locked-joint values (trunk configuration) re-derives the fixed
-        transforms of the batched solver, which costs a few seconds; group queries by trunk configuration."""
+        transforms of the batched solver, which costs a few seconds; group queries by trunk configuration.
+        ``seeds`` (train-fast 2026-10-31): seeds per pose (default: the backend's ``batch_ik_seeds``); a solver is cached per
+        (embodiment, batch size, seeds), so a small anchor batch may ask for 32 seeds without touching the screening solver."""
         if len(poses) == 0:
             return th.zeros(0, dtype=th.bool), th.zeros(0, 28)
         self._ensure_synced()
         t0 = time.time()
         emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"
         with self.ignoring(ignore):
-            succ, q_out = self.backend.solve_ik_batch(emb, M.EEF_LINK[arm], list(poses), q_seed, batch_size=batch_size)
+            succ, q_out = self.backend.solve_ik_batch(emb, M.EEF_LINK[arm], list(poses), q_seed, batch_size=batch_size,
+                                                      **({"seeds": int(seeds)} if seeds is not None else {}))
         self.stats["ik_batch_calls"] += 1
         self.stats["ik_batch_problems"] += len(poses)
         self.stats["ik_batch_s"] += time.time() - t0
@@ -312,11 +381,22 @@ class RobotKit:
         class _Ctx:
             def __enter__(self_inner):
                 if objs:
-                    kit.backend.update_world(ignore_objects=list(objs))
+                    self_inner._timed(ignore_objects=list(objs))
 
             def __exit__(self_inner, *exc):
                 if objs:
-                    kit.backend.update_world()
+                    self_inner._timed()
+
+            @staticmethod
+            def _timed(**kw):
+                # train-fast 2026-10-31: both are full passes over every mesh (sync_calls / sync_full_calls / sync_s)
+                t0 = time.time()
+                try:
+                    kit.backend.update_world(**kw)
+                finally:
+                    kit._bump("sync_calls")
+                    kit._bump("sync_full_calls")
+                    kit._bump("sync_s", time.time() - t0)
 
         return _Ctx()
 
