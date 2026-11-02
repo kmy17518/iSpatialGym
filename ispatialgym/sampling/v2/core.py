@@ -272,6 +272,9 @@ class SamplerV2(TaskSampler):
         if crop.get("mode", "full") != "full":
             # train-fast SCENE_CROP (2026-11-01): a cropped world is another collision world - its own cache namespace (full keeps today's)
             ik_scope["scene_crop"] = f"{crop['mode']}:{crop.get('center_object')}:{crop.get('radius_m')}"
+            # IK_CACHE_SHARE_CROP (2026-11-01): the rooms the full world of this scene loads, which the exact-IK key uses instead of the
+            # crop's (verified hits: the cropped and the full world share them; ik.IKChecker.exact_cache_scope)
+            ik_scope["full_rooms"] = sorted(getattr(self.world, "eval_rooms", None) or self.world.loaded_rooms or [])
         self.ikc = IKChecker(self.kit, ik_scope,
                              default_working_arms=default_arms, joint_limit_margin=None if margin is None else float(margin),
                              witness_residual_at_draw=None if reach is None else float(reach))

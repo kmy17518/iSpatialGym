@@ -648,36 +648,43 @@ class IKChecker:
             cache = False  # a chain pinned to a given start is never a cached verdict of the poses alone
         key = None
         if cache:
-            key = cache_key("exact_ik_v3", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
+            key = cache_key("exact_ik_v3", {**self.exact_cache_scope(), "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
                                             "poses": [list(G.t(p[0]).tolist()) + list(G.t(p[1]).tolist()) for p in poses],
                                             "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_last), "scale": scale_key,
                                             "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]],
                                             "locked": q0[[i for a in ("left", "right") for i in self.kit.robot.arm_control_idx[a].tolist()] + self.kit.robot.gripper_control_idx["right"].tolist()]})
             hit = cache_get(key)
-            if hit is not None:
+            fresh = hit is not None and self._fresh_draw()
+            if fresh:
+                self._count("ik_cache_fresh")  # train-fast 2026-11-01 (IK_FRESH_P): solve afresh although an entry exists (more branches)
+            if hit is not None and not fresh:
                 # a cached verdict is only a set of *candidate witnesses*: each stored configuration (arm joints on the
                 # current locked configuration - the base joints belong to another robot root) is verified in the current
                 # world (FK + collision, the last pose with ``ignore_for_last`` removed) before it counts; anything that
                 # does not verify - a stale entry from another object layout, an entry without per-pose witnesses - is a
-                # miss and gets solved. Entries written before 2026-09-16 14:45 carry the last pose only.
-                stored = hit.get("qs") or [None] * (len(poses) - 1) + [hit.get("q")]
-                verified: List[th.Tensor] = []
+                # miss and gets solved. Entries written before 2026-09-16 14:45 carry the last pose only. Train-fast 2026-11-01: an
+                # entry may hold several witness chains (``alts``, IK_FRESH_P); they are tried in a random order.
+                chains = [hit.get("qs") or [None] * (len(poses) - 1) + [hit.get("q")]] + [c for c in (hit.get("alts") or []) if c]
+                if len(chains) > 1:
+                    chains = [chains[int(j)] for j in self._fresh_rng().permutation(len(chains))]
                 idx = self.kit.robot.arm_control_idx[arm]
-                for i, (p, q_i) in enumerate(zip(poses, stored)):
-                    if q_i is None or len(stored) != len(poses):
-                        break
-                    q_v = q0.clone()
-                    q_v[idx] = th.tensor(q_i)[idx]
-                    with self.ignoring(list(ignore_for_last) if i == len(poses) - 1 else []):
-                        if not self._witness_ok(q_v, p, arm):
+                for stored in chains:
+                    verified: List[th.Tensor] = []
+                    for i, (p, q_i) in enumerate(zip(poses, stored)):
+                        if q_i is None or len(stored) != len(poses):
                             break
-                    verified.append(q_v)
-                if len(verified) == len(poses) and bool(hit.get("ok", True)):
-                    for p, q_v in zip(poses, verified):
-                        self.solutions[(arm, self._pose_key(p))] = q_v.clone()
-                    log.debug("exact IK cache hit verified (%d poses, arm %s)", len(poses), arm)
-                    return IKResult(True, verified[-1], "cache", len(poses))
-                log.debug("exact IK cache entry not verified in the current world (%d/%d poses): solving", len(verified), len(poses))
+                        q_v = q0.clone()
+                        q_v[idx] = th.tensor(q_i)[idx]
+                        with self.ignoring(list(ignore_for_last) if i == len(poses) - 1 else []):
+                            if not self._witness_ok(q_v, p, arm):
+                                break
+                        verified.append(q_v)
+                    if len(verified) == len(poses) and bool(hit.get("ok", True)):
+                        for p, q_v in zip(poses, verified):
+                            self.solutions[(arm, self._pose_key(p))] = q_v.clone()
+                        log.debug("exact IK cache hit verified (%d poses, arm %s)", len(poses), arm)
+                        return IKResult(True, verified[-1], "cache", len(poses))
+                log.debug("exact IK cache entry not verified in the current world (%d chains): solving", len(chains))
         q = None
         qs: List[Optional[th.Tensor]] = []
         n = len(poses)
@@ -782,8 +789,70 @@ class IKChecker:
                 self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
-            cache_put(key, {"ok": True, "q": q.tolist(), "qs": [None if x is None else x.tolist() for x in qs]})
+            chain = [None if x is None else x.tolist() for x in qs]
+            entry = {"ok": True, "q": q.tolist(), "qs": chain}
+            if fast_on("IK_CACHE_GROW"):
+                # train-fast 2026-11-01 (IK_CACHE_GROW): the entry keeps every distinct branch found (a fresh solve under IK_FRESH_P, or a
+                # re-solve after the stored chains failed to verify) - the first chain as before, the others in ``alts``
+                old = hit if hit is not None else cache_get(key)
+                entry = self._grown_entry(old, entry, arm)
+            cache_put(key, entry)
         return res
+
+    def exact_cache_scope(self) -> Dict[str, Any]:
+        """The scope of the exact-IK cache keys. Train-fast 2026-11-01 (IK_CACHE_SHARE_CROP, default on): without the scene crop - every hit
+        is verified in the current world (FK + collision) before it counts, so a cropped world and the full world of the same scene and
+        loaded rooms share entries (a full-world witness is collision-free among the crop's subset of objects; a crop-world witness is
+        re-checked before the full world uses it). The feasible-set and start-draw caches keep the crop: their entries are not re-checked."""
+        if fast_on("IK_CACHE_SHARE_CROP") and "scene_crop" in self.cache_scope:
+            out = {k: v for k, v in self.cache_scope.items() if k not in ("scene_crop", "full_rooms")}
+            if self.cache_scope.get("full_rooms"):
+                out["rooms"] = list(self.cache_scope["full_rooms"])  # the full world's key (its scope's rooms are the rooms it loads)
+            return out
+        return {k: v for k, v in self.cache_scope.items() if k != "full_rooms"}
+
+    # -- train-fast 2026-11-01: fresh solves and several witnesses per exact-IK cache entry ------------------------------------------
+    #: share of exact-IK calls with a cache entry that solve afresh anyway (IK_FRESH_P); the new branch joins the entry
+    FRESH_P = 0.2
+    #: a chain is a new branch when its last pose's working-arm joints differ from every stored chain's by more than this (max abs, rad)
+    BRANCH_MIN_RAD = 0.2
+    #: chains kept per entry
+    MAX_CHAINS = 6
+
+    def _fresh_rng(self):
+        r = getattr(self, "_fresh_rng_", None)
+        if r is None:
+            import numpy as np
+
+            r = self._fresh_rng_ = np.random.default_rng()
+        return r
+
+    def _fresh_draw(self) -> bool:
+        p = float(fast_value("IK_FRESH_P", self.FRESH_P))
+        return p > 0 and float(self._fresh_rng().random()) < p
+
+    def _grown_entry(self, old: Optional[Dict[str, Any]], new: Dict[str, Any], arm: str) -> Dict[str, Any]:
+        """``old`` (a cache entry or None) with ``new``'s chain added as an alternative when it is another branch (:data:`BRANCH_MIN_RAD`)."""
+        if not old or not old.get("qs"):
+            return new
+        idx = [int(i) for i in self.kit.robot.arm_control_idx[arm].tolist()]
+        chains = [old["qs"]] + [c for c in (old.get("alts") or []) if c]
+
+        def last_arm(chain):
+            last = chain[-1] if chain else None
+            return None if last is None else [float(last[i]) for i in idx]
+
+        mine = last_arm(new["qs"])
+        if mine is None:
+            return old
+        for c in chains:
+            other = last_arm(c)
+            if other is not None and max(abs(a - b) for a, b in zip(mine, other)) <= float(fast_value("IK_BRANCH_MIN_RAD", self.BRANCH_MIN_RAD)):
+                return old  # the same branch: nothing new
+        self._count("ik_cache_new_branch")
+        out = dict(old)
+        out["alts"] = (list(old.get("alts") or []) + [new["qs"]])[-(int(fast_value("IK_CACHE_MAX_CHAINS", self.MAX_CHAINS)) - 1):]
+        return out
 
     # -- witness quality (primary oracle 2026-09-16 23:06) ---------------------------------------------------------------
     #: a chain witness must keep this much room (rad) to every arm joint limit: the oracle's straight approach / descent from
