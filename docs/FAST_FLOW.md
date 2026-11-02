@@ -8,7 +8,8 @@ later by the kinematic replay (the Vast replay of isg-1020-b1k, or the vectorize
 Base: `merge/v3.0-reconciled+lab-vec-eval-next` at 43ad206a (contains all 21 snapshot commits that produced isg-1020) + the train85
 spa2still patch (start per attempt, oracle still exit). Cluster worktree `/vision/u/minyeong/projects/ispatialgym-train-fast`, record
 `/vision/u/minyeong/projects/isg_home/trainfast/` (DECISIONS.md, scripts/, out/<tag>/<key>/g<start>-<end>/), lambda mirror
-`~/Desktop/projects/ispatialgym-train-fast`.
+`~/Desktop/projects/ispatialgym-train-fast`. The commits, the experiments and how to re-run them:
+[TRAIN_FAST_README.md](TRAIN_FAST_README.md).
 
 ## Where production's time went (train85, 487 jobs)
 
@@ -45,7 +46,10 @@ same code). Each logs once when first consulted. Off = the base code's behaviour
 | PARK_ONCE, PARK_SPAWNED | core.py, tasks/base.py | park cell cached per attempt loop; spawned task objects parked at every attempt start |
 | SAMPLER_CAMERAS | sample_isg.py, sim_utils.py | camera-free sampler world for the families that use no pixels (iors, axial, attachment, block design, articulation); `visibility: pending` in the summary; pixel families keep their cameras |
 | SPA_CACHE | v2/tasks/iors_small.py, v2/tabletop.py, cache.py | the start-per-attempt draw memoised per (edge, 2 cm lateral cell) in-process and on disk; the attempt draws edge order, lateral and side from its rng as before |
-| BATCH_SIZE_FIT, SINGLE_RETRY_EXACT, LIMIT_RETRY_RETURN_ALL, REMEMBERED_WITH_SEED, BATCH_IK_SEEDS | oracle/curobo_planner.py, sampling/robot_utils.py, v2/ik.py | batched IK solver sized to the query (8/16/32/64) instead of always 64 padded slots; single 32-seed re-solves instead of padded batches for one pose; `return_all` solve picks the max-margin branch so `away_from_limits` rarely re-solves; remembered witnesses also accepted with a seed |
+| BATCH_SIZE_FIT, SINGLE_RETRY_EXACT, LIMIT_RETRY_RETURN_ALL, REMEMBERED_WITH_SEED, BATCH_IK_SEEDS | oracle/curobo_planner.py, sampling/robot_utils.py, v2/ik.py | batched IK solver sized to the query (8/16/32/64) instead of always 64 padded slots; single 32-seed re-solves instead of padded batches for one pose; `return_all` solve picks the max-margin branch so `away_from_limits` rarely re-solves; remembered witnesses also accepted with a seed. SINGLE_RETRY_EXACT, LIMIT_RETRY_RETURN_ALL and REMEMBERED_WITH_SEED are **off** since 2026-11-01 (they change the recorded witness branch: robot stutters on touching_large_03) |
+| SCENE_CROP (`full` / `rooms` / `region`, region radius 2.5 m) | sampling/scene_crop.py, sample_isg.py, sim_utils.py, v2/core.py | the sampler's world loads a cropped copy of the scene: `full` for camera relocalization and alignment-world_vertical, `rooms` for large-scale IORS / large articulation / object scaling / mental rotation, `region` (support + 2.5 m) for small IORS, small articulation, attachment, block design, alignment-axial and disembedding, `full` for any other family; the uncropped scene stays the template.json merge source; the crop is part of the world pool key (2026-11-01) |
+| CROP_NEIGHBOUR_FLOORS | sampling/scene_crop.py | OmniGibson loads floors only with their room: the floors of the neighbour rooms are crop candidates and their rooms join the loaded rooms (without it bases beyond the task room's floor stood 1.5 cm low) (2026-11-01) |
+| PARTIAL_SCENE | oracle/run_isg.py, recorder.py, multienv/replay.py | the collector of a cropped template builds the cropped world and writes the crop into the hdf5 header; `multienv.replay --scene full` replays the demo in the full template merged with its recorded objects (`auto`: full for a cropped demo) (2026-11-01) |
 | EARLY_FRAME_GATE, SYNC_ONLY_OBJECTS, ATTACH_REUSE | v2/program_check.py | the fingertip-in-frame gate for every static target before any IK; cuRobo world syncs of only the moved objects |
 | PHYSICS_ONLY_TRIM | oracle/run_isg.py, executor.py | physics-only collectors skip the texture wait / init image / reset re-renders, small camera buffers |
 | STRAIGHT_ARM | oracle/motions.py | a straight joint-space ramp to the sidecar's IK witness, collision-checked in one batched call, before trajopt (trajopt stays the fallback) |
