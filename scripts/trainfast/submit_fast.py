@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""trainfast: submit speed-test jobs for counted eval aliases (train85's parameters, this campaign's roots).
+
+    submit_fast.py submit <key> <n> --flow base|fast --code <snapshot or worktree> [--gres titanrtx] [--acct vision] [--part svl]
+                   [--kcollect K] [--sample-limit-s S] [--time-s T] [--tag name] [--dry-run]
+    submit_fast.py params <key> [<n>]
+    submit_fast.py running
+
+Train indices come from this campaign's ledger (manifests/allocations.tsv) starting at 100000 per alias, so they never collide
+with isg-1020's. Reuses train85's counted tables, per-alias eval index and template copies (read-only).
+"""
+import argparse
+import csv
+import fcntl
+import importlib.util
+import os
+import shlex
+import subprocess
+import sys
+import time
+
+F = "/vision/u/minyeong/projects/isg_home/trainfast"
+T85 = "/vision/u/minyeong/projects/isg_home/train85"
+LEDGER = os.path.join(F, "manifests", "allocations.tsv")
+LEDGER_COLS = ["submitted", "key", "alias", "start", "n", "job_tag", "job_dir", "flow", "code", "jobid", "acct", "part", "gres", "time_s",
+               "sample_limit_s", "max_attempts", "demo_limit_s", "kcollect", "tag"]
+BASE_INDEX = 100000
+
+spec = importlib.util.spec_from_file_location("submit_train", os.path.join(T85, "scripts", "submit_train.py"))
+st = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(st)
+
+
+
+#: 2026-11-01 (REPEAT_MEASURED, owner): train85 per-alias eval indexes rebuilt with the measured entries (scripts/build_eval_index_v2.py);
+#: an alias without a rebuilt index keeps train85's (the old repeat rule then applies to it)
+EVAL_INDEX_V2 = os.path.join(F, "eval_index_v2", "per_alias")
+
+
+def eval_index_of(key):
+    p = os.path.join(EVAL_INDEX_V2, key + ".json")
+    return p if os.path.exists(p) else os.path.join(st.EVAL_INDEX_DIR, key + ".json")
+
+def submit(a):
+    counted = st.load_counted()
+    if a.key not in counted:
+        raise SystemExit(f"unknown key {a.key}")
+    c = counted[a.key]
+    os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
+    lock = open(LEDGER + ".lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX)  # best effort: this NFS returns EIO for flock
+    except OSError:
+        pass
+    try:
+        rows = list(csv.DictReader(open(LEDGER), delimiter="\t")) if os.path.exists(LEDGER) else []
+        start = max([BASE_INDEX] + [int(r["start"]) + int(r["n"]) for r in rows if r["key"] == a.key])
+        n = int(a.n)
+        p = st.params(c, n, a.sample_limit_s, a.time_s)
+        tag = f"g{start}-{start + n - 1}"
+        job_dir = os.path.join(F, "out", a.tag or a.flow, a.key, tag)
+        if os.path.exists(job_dir):
+            raise SystemExit(f"{job_dir} exists")
+        tmpl = os.path.join(T85, "templates", a.key, "inst", c["alias"], c["template_id"])
+        if not os.path.exists(os.path.join(tmpl, "template_meta.json")):
+            raise SystemExit(f"no train85 template copy for {a.key}: {tmpl}")
+        fam = st.family_of(c["subtask"], c["tag"])
+        aff = a.key in st.affected_keys()
+        env = {"ALIAS": c["alias"], "ALIAS_KEY": a.key, "PICK": c["pick"], "TAG": c["tag"], "COUNTED_RUN": c["run_dir"],
+               "ISGE_CODE": os.path.abspath(a.code), "COUNTED_SNAPSHOT": c["isg_root"], "TEMPLATE": tmpl, "TEMPLATE_ID": c["template_id"],
+               "COUNTED_TEMPLATE": c["template_dir"], "EVAL_INDEX": eval_index_of(a.key), "FAMILY": fam,
+               "KEEP_SCENE": "--keep-template-scene" if fam in ("object_scaling", "mental_rotation") else "",
+               "TRUNK_CHECK": "idle-arm" if c["tag"] == "iors_large" else "", "START": start, "N": n, "JOB_TAG": tag, "KIND": a.flow,
+               "FLOW": a.flow, "KCOLLECT": a.kcollect, **{k: p[k] for k in ("MAX_ATTEMPTS", "DEMO_LIMIT_S", "SAMPLE_LIMIT_S", "TIME_LIMIT_S")},
+               "START_PER_ATTEMPT": 1 if aff else 0, "STILL_EXIT": 1, "CODE_VARIANT": a.flow}
+        if a.extra_env:
+            for kv in a.extra_env:
+                k, v = kv.split("=", 1)
+                env[k] = v
+        script = os.path.join(F, "scripts", f"job_{a.flow}.sh")
+        gres = f"--gres=gpu:{a.gres}:1" if a.gres else "--gres=gpu:1"
+        cmd = ["sbatch", "--parsable", "-J", f"isgf_{st.short_of(a.key)}", "-A", a.acct, "-p", a.part, f"--time={st.hms(p['TIME_LIMIT_S'])}",
+               "--exclude=visionlab-dgx1,viscam7,viscam11,viscam12,viscam-hgx-1,viscam-hgx-2,viscam14,viscam15,viscam16", gres, "-c", str(a.cpus),
+               f"--mem={a.mem}", "-o", os.path.join(F, "slurm", "%x_%j.log"), script, job_dir]
+        if a.dry_run:
+            print("DRY", tag, " ".join(shlex.quote(x) for x in cmd))
+            print("\n".join(f"  {k}={v}" for k, v in env.items()))
+            return 0
+        os.makedirs(job_dir)
+        with open(os.path.join(job_dir, "job.env"), "w") as fh:
+            for k, v in env.items():
+                fh.write(f"{k}={shlex.quote(str(v))}\n")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            os.rename(job_dir, job_dir + ".failed_submit")
+            raise SystemExit(f"sbatch failed: {res.stderr.strip()}")
+        jobid = res.stdout.strip().split(";")[0]
+        row = {"submitted": time.strftime("%Y-%m-%dT%H:%M:%S"), "key": a.key, "alias": c["alias"], "start": start, "n": n, "job_tag": tag,
+               "job_dir": job_dir, "flow": a.flow, "code": env["ISGE_CODE"], "jobid": jobid, "acct": a.acct, "part": a.part, "gres": a.gres or "any",
+               "time_s": p["TIME_LIMIT_S"], "sample_limit_s": p["SAMPLE_LIMIT_S"], "max_attempts": p["MAX_ATTEMPTS"], "demo_limit_s": p["DEMO_LIMIT_S"],
+               "kcollect": a.kcollect, "tag": a.tag or a.flow}
+        new = not os.path.exists(LEDGER)
+        with open(LEDGER, "a") as fh:
+            if new:
+                fh.write("\t".join(LEDGER_COLS) + "\n")
+            fh.write("\t".join(str(row[k]) for k in LEDGER_COLS) + "\n")
+        print(f"SUBMITTED {jobid} {a.flow} {a.key} {tag} {a.acct}/{a.part} {gres} time={st.hms(p['TIME_LIMIT_S'])} sample_limit={p['SAMPLE_LIMIT_S']} "
+              f"max_attempts={p['MAX_ATTEMPTS']} demo_limit={p['DEMO_LIMIT_S']} spa={env['START_PER_ATTEMPT']} k={a.kcollect}")
+    finally:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+        except OSError:
+            pass
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("submit")
+    s.add_argument("key")
+    s.add_argument("n", type=int)
+    s.add_argument("--flow", default="base", choices=["base", "fast"])
+    s.add_argument("--code", required=True)
+    s.add_argument("--gres", default="titanrtx")
+    s.add_argument("--acct", default="vision")
+    s.add_argument("--part", default="svl")
+    s.add_argument("--cpus", type=int, default=8)
+    s.add_argument("--mem", default="32G")
+    s.add_argument("--kcollect", type=int, default=1)
+    s.add_argument("--sample-limit-s", type=int, default=None)
+    s.add_argument("--time-s", type=int, default=None)
+    s.add_argument("--tag", default=None)
+    s.add_argument("--extra-env", action="append", default=[])
+    s.add_argument("--dry-run", action="store_true")
+    pp = sub.add_parser("params")
+    pp.add_argument("key")
+    pp.add_argument("n", type=int, nargs="?", default=4)
+    sub.add_parser("running")
+    a = ap.parse_args()
+    if a.cmd == "submit":
+        return submit(a)
+    if a.cmd == "params":
+        print(st.params(st.load_counted()[a.key], a.n))
+        return 0
+    if a.cmd == "running":
+        out = subprocess.run(["squeue", "-u", "minyeong", "-h", "-o", "%i|%j|%T|%P|%M|%l|%N|%R"], capture_output=True, text=True).stdout
+        for l in out.splitlines():
+            if l.split("|")[1].startswith("isgf_"):
+                print(l)
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
