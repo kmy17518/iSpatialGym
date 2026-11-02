@@ -12,11 +12,20 @@ B=$2
 ID=$SLURM_JOB_ID
 HALF=$(( ${SLURM_CPUS_PER_TASK:-24} / 2 ))
 T0=$(date +%s)
-for D in $A $B; do echo "PAIR_START $ID a=$A b=$B cpus_each=$HALF host=$(hostname -s) start=$(date -Is)" >> $D/pair.txt; done
-( export SLURM_JOB_ID=${ID}_a SLURM_CPUS_PER_TASK=$HALF; exec bash $F/scripts/job_fast.sh $A ) > $F/slurm/pair_${ID}_a.log 2>&1 &
+# 2026-11-02: each member on half of this job's physical cores (taskset; scripts/cpu_split.py halves), so its COLLECTOR_PIN (job_fast.sh)
+# splits only its own half - on the full CPU list both members pinned their sampler and collectors onto the same CPUs. The 11-01 pk_pair*
+# members ran before this, unpinned on all the CPUs. Fewer than two cores: both members on all the CPUs, COLLECTOR_PIN off
+HALVES=( $(python3 $F/scripts/cpu_split.py halves) )
+if [ ${#HALVES[@]} -eq 2 ]; then
+  TA="taskset -c ${HALVES[0]}"; TB="taskset -c ${HALVES[1]}"
+else
+  TA=""; TB=""; export ISPATIALGYM_FAST_COLLECTOR_PIN=0
+fi
+for D in $A $B; do echo "PAIR_START $ID a=$A b=$B cpus_each=$HALF cpus_a=${HALVES[0]:-all} cpus_b=${HALVES[1]:-all} host=$(hostname -s) start=$(date -Is)" >> $D/pair.txt; done
+( export SLURM_JOB_ID=${ID}_a SLURM_CPUS_PER_TASK=$HALF; exec $TA bash $F/scripts/job_fast.sh $A ) > $F/slurm/pair_${ID}_a.log 2>&1 &
 PA=$!
 sleep 30   # stagger the two members' Kit starts
-( export SLURM_JOB_ID=${ID}_b SLURM_CPUS_PER_TASK=$HALF; exec bash $F/scripts/job_fast.sh $B ) > $F/slurm/pair_${ID}_b.log 2>&1 &
+( export SLURM_JOB_ID=${ID}_b SLURM_CPUS_PER_TASK=$HALF; exec $TB bash $F/scripts/job_fast.sh $B ) > $F/slurm/pair_${ID}_b.log 2>&1 &
 PB=$!
 wait $PA; RA=$?
 wait $PB; RB=$?

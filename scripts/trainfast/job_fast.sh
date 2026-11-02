@@ -50,11 +50,12 @@ DEADLINE=$(( JOB_END - DEMO_LIMIT_S - 420 ))
 # ---- GPU memory monitor (one line per minute: used MiB per process) ----
 ( while true; do echo "$(date +%s) $(nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader | tr -d ' ') $(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader | tr -d ' ' | tr '\n' ' ')"; sleep 60; done ) >> $JOBDIR/gpu.log 2>/dev/null &
 MONPID=$!
-# ---- COLLECTOR_PIN (2026-11-02, default off until its job-level A/B): the sampler and each collector on CPUs of their own (taskset;
+# ---- COLLECTOR_PIN (2026-11-02, default on since its job-level A/B): the sampler and each collector on CPUs of their own (taskset;
 # scripts/cpu_split.py, ISPATIALGYM_FAST_COLLECTOR_CPUS per collector). Unpinned Kit processes on one job's CPUs slow each other: two
-# de03 collectors stepped at 334 ms each against 95 alone, and at 63-65 pinned to 3 CPUs each (E16) ----
+# de03 collectors stepped at 334 ms each against 95 alone, and at 63-65 pinned to 3 CPUs each (E16); pinned de03 jobs made 30.6-32.6
+# successes per GPU-hour on TITAN against 12.9 unpinned, 52.7-64.0 on L40S against 13.0-14.7 ----
 PINS=()
-if [ "${ISPATIALGYM_FAST:-1}" != 0 ] && [ "${ISPATIALGYM_FAST_COLLECTOR_PIN:-0}" != 0 ]; then
+if [ "${ISPATIALGYM_FAST:-1}" != 0 ] && [ "${ISPATIALGYM_FAST_COLLECTOR_PIN:-1}" != 0 ]; then
   PINS=( $(python3 $F/scripts/cpu_split.py $K ${ISPATIALGYM_FAST_COLLECTOR_CPUS:-3}) )
   if [ ${#PINS[@]} -gt 0 ]; then
     echo "PIN sampler=${PINS[0]} $(for i in $(seq 1 $K); do printf "c$i=%s " ${PINS[$i]}; done)" | tee -a $JOBDIR/job.txt
