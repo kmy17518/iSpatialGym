@@ -21,7 +21,9 @@ are the sibling dataset ``<demos>`` = ``$ISPATIALGYM_DEMOS_PATH``, default ``<ro
 
 As in BEHAVIOR, the BDDL problems are not in the dataset: an instance names its problem (``<activity>-<id>``: ``problem`` in
 the index and the template metadata, ``activity_definition_id`` in the instance file), loaded from the repository's
-``ispatialgym/assets/bddl/activity_definitions`` (BEHAVIOR's bddl package holds its problems).
+``ispatialgym/assets/bddl/eval_release/activity_definitions`` (BEHAVIOR's bddl package holds its problems): the release's problems,
+numbered from 0 per activity, as the dataset names them. The sampler's ``ispatialgym/assets/bddl/activity_definitions`` keeps this
+repository's numbering (the train templates and TROs name those ids; their runs carry their own BDDL copies).
 
 ``run_isg --task`` gives an instance ``max(300, round(1.5 x`` its demo's length ``))`` steps by default and a ``--settle-steps`` window of 45
 steps (oracle, policy) or its demo's settle rows (replay; ``step_budget``).
@@ -82,8 +84,9 @@ _INSTANCES_DIR = re.compile(r"^(?P<prefix>.+_task_.+)_instances$")
 
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#: the release's BDDL problems (ISpatialGymTask's default activity definitions root)
-ACTIVITY_DEFINITIONS = os.path.join(REPO, "ispatialgym", "assets", "bddl", "activity_definitions")
+#: the release's BDDL problems, the eval dataset's numbering (95b03b3b's activity_definitions; the sampler's own problems keep this
+#: repository's numbering under ``assets/bddl/activity_definitions``)
+ACTIVITY_DEFINITIONS = os.path.join(REPO, "ispatialgym", "assets", "bddl", "eval_release", "activity_definitions")
 
 
 def data_root() -> str:

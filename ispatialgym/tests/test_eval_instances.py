@@ -59,6 +59,24 @@ def test_resolve_levels(tmp_path):
         INST.resolve("alignment-axial", [0], root)
 
 
+def test_the_dataset_problems_are_the_release_numbering_beside_the_samplers():
+    """The eval dataset names the release's problem ids (numbered from 0 per activity): its BDDL root is the release's copy
+    (assets/bddl/eval_release/activity_definitions, 83 problems, each registered and parseable); the sampler's own problems keep
+    this repository's ids in assets/bddl/activity_definitions."""
+    from ispatialgym.activity.problem import ACTIVITY_DEFINITIONS_ROOT, list_activities, list_problem_ids, load_problem_registry
+
+    assert os.path.realpath(INST.ACTIVITY_DEFINITIONS) != os.path.realpath(ACTIVITY_DEFINITIONS_ROOT)
+    n = 0
+    for act in list_activities(INST.ACTIVITY_DEFINITIONS):
+        ids = list_problem_ids(act, INST.ACTIVITY_DEFINITIONS)
+        assert ids == list(range(len(ids))), act  # re-indexed from 0
+        assert sorted(load_problem_registry(os.path.join(INST.ACTIVITY_DEFINITIONS, act)).values()) == ids, act
+        for did in ids:
+            assert load_problem(act, did, root=INST.ACTIVITY_DEFINITIONS).measure, (act, did)  # migrated: every problem measures
+        n += len(ids)
+    assert n == 83
+
+
 def test_template_files(tmp_path):
     root = str(tmp_path)
     _dataset(root, ENTRIES[:1])
