@@ -381,6 +381,12 @@ class SamplerV2(TaskSampler):
 
         self.sidecar.reset_instance()
         if start_per_attempt():
+            full = getattr(self, "_split_cone_cands", None)
+            if full is not None and fast_on("SPLIT_CONE_RESTORE"):
+                # train-fast 2026-11-01 (SPLIT_CONE_RESTORE): split_cone_draw narrowed manip_candidates to the last attempt's position; the
+                # reset below rebuilds the pools from manip_candidates, so without this every attempt after the first kept that one
+                # position (only iors_small's spa_redraw_start rebuilds the list): the template's full list goes back first
+                self.manip_candidates = list(full)
             if not getattr(self, "_spa_drawn", False):
                 t_spa = time.time()
                 self.spa_redraw_start(rng)
