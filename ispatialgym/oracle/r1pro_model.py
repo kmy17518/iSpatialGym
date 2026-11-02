@@ -18,7 +18,7 @@ import math
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 
 import yaml
 
@@ -89,10 +89,11 @@ TUCKED_BOX_IN_BASE = ((-0.40, -0.345, 0.0), (0.24, 0.345, 1.70))
 EVAL_BASE_LINK_MASS_KG = 250.0
 
 
-def apply_eval_base_mass(robot, mass_kg: Optional[float] = None) -> Dict[str, float]:
+def apply_eval_base_mass(robot, mass_kg: Optional[float] = None, while_stopped: Optional[Callable[[], Any]] = None) -> Dict[str, float]:
     """Set the robot's base footprint link mass the way the BEHAVIOR-1K evaluator does (a mass write needs the simulator
     stopped: ``og.sim.stop()`` / ``play()`` around it, then ``update_handles``). ``mass_kg`` defaults to
-    ``ISG_BASE_MASS_KG`` or :data:`EVAL_BASE_LINK_MASS_KG`; ``<= 0`` leaves the mass alone. Returns
+    ``ISG_BASE_MASS_KG`` or :data:`EVAL_BASE_LINK_MASS_KG`; ``<= 0`` leaves the mass alone. ``while_stopped``: called in
+    the same stop / play, after the mass (``run_isg``'s rigid-body overrides, as ``VecInstanceLoader.build_env``). Returns
     ``{"before": kg, "after": kg}``."""
     import omnigibson as og
 
@@ -100,10 +101,14 @@ def apply_eval_base_mass(robot, mass_kg: Optional[float] = None) -> Dict[str, fl
         mass_kg = float(os.environ.get("ISG_BASE_MASS_KG", EVAL_BASE_LINK_MASS_KG))
     link = robot.base_footprint_link if hasattr(robot, "base_footprint_link") else robot.links[BASE_LINK]
     before = float(link.mass)
-    if mass_kg <= 0.0 or abs(before - mass_kg) < 1e-6:
+    set_mass = mass_kg > 0.0 and abs(before - mass_kg) >= 1e-6
+    if not set_mass and while_stopped is None:
         return {"before": before, "after": before}
     og.sim.stop()
-    link.mass = float(mass_kg)
+    if set_mass:
+        link.mass = float(mass_kg)
+    if while_stopped is not None:
+        while_stopped()
     og.sim.play()
     if hasattr(og.sim, "update_handles"):
         og.sim.update_handles()

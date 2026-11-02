@@ -19,7 +19,9 @@ What it does
    load and therefore also when the policy attaches), ``articulation_targets`` (the target's initial joint values held
    during the settle), plus the trav-map patches of the scene variant (``freed_footprints`` of the template,
    ``blocked_footprints`` of the instance) on the planner map. ``pose_targets`` / ``groups`` /
-   ``orientation_equivalences`` / ``evaluation_profile`` are the task's (``configure_targets``).
+   ``orientation_equivalences`` / ``evaluation_profile`` are the task's (``configure_targets``). The physics of
+   ``run_isg_vec`` (:mod:`~ispatialgym.oracle.sleep_assist`, the same flags and defaults): ``--rigid-sleep-threshold``
+   on the free objects of the scene at the build and on the task objects at the restore.
 2. **Sidecar** (``--sidecar``, default ``<iid>.oracle.json`` next to the TRO): loaded, validated, ``tro_sha256``
    verified (``--allow-sha-mismatch`` for hand-built sidecars), ``expand(variant, sidecar)`` → the action list.
 3. **Executor** (:class:`~ispatialgym.oracle.executor.Executor`): per action checkpoint → execute under the retry
@@ -30,7 +32,8 @@ What it does
    ``goal_observation.camera_pose_world``, profile ``isg-v1``) → TRO goal override with the settled values when within
    tolerance (written back into the TRO, the sidecar's ``tro_sha256`` updated; ``--no-goal-override`` to disable). The
    tolerances are the ``isg-v2`` profile's (``ispatialgym.eval.tolerance_profile``, ``--tolerance-scale``), computed after the
-   loader's settle and before the first step.
+   loader's settle and before the first step. ``--sleep-assist`` after every control step, as in ``run_isg_vec``
+   (``meta.sleep_assist``).
 4. **Recording** (``--record full|hdf5|video``): ``demo.hdf5`` (BEHAVIOR-replayable) + the LeRobot v3 dataset under
    ``lerobot/`` (``full``), ``<view>_rgb.mp4`` per ``--record-view`` view (``tiled``, ``head``, ``external``,
    ``left_wrist``, ``right_wrist``), ``init_rgb.png`` / ``final_rgb.png`` / ``goal_rgb.png``, ``annotations.json`` (the
@@ -85,6 +88,7 @@ from ispatialgym.oracle.action import ActionState, apply_recorded_targets  # noq
 from ispatialgym.oracle.executor import Executor, ExecutorConfig, SimState, apply_goal_override  # noqa: E402
 from ispatialgym.oracle.motions import Motions, MotionsConfig  # noqa: E402
 from ispatialgym.oracle import physics_only as PO  # noqa: E402
+from ispatialgym.oracle import sleep_assist as SA  # noqa: E402
 from ispatialgym.fastflags import fast_flags_seen, fast_on, fast_value  # noqa: E402  (2026-10-31 train-fast switches)
 from ispatialgym.oracle.programs import expand  # noqa: E402
 from ispatialgym.oracle.qa import Monitors, QAConfig  # noqa: E402
@@ -423,6 +427,9 @@ class InstanceLoader:
         self.grasps: List[dict] = []
         self.hold: Optional[ActionState] = None
         self._articulation_q: Dict[str, th.Tensor] = {}
+        #: the rigid-body physics overrides (``sleep_assist.rigid_overrides`` of the run's flags, set by run_instance; empty: stock):
+        #: the scene's free objects at the build, the task objects at every restore, as ``VecInstanceLoader``
+        self.physics_overrides: Dict[str, Any] = {}
 
     # -- environment --------------------------------------------------------------------------------------------
 
@@ -462,8 +469,14 @@ class InstanceLoader:
         self.task = self.env.task
         self.robot = self.env.scene.robots[0]
         # the BEHAVIOR-1K evaluator's 250 kg chassis (owner 2026-09-21 23:49): the stock 47.6 kg base tipped 0.8 deg on
-        # its wheel spheres under the dishwasher pull and snapped back at the release - the grader's physics, not ours
-        self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot)
+        # its wheel spheres under the dishwasher pull and snapped back at the release - the grader's physics, not ours. The rigid-body
+        # overrides of the scene's free objects in the same stop / play (VecInstanceLoader.build_env)
+        ov = self.physics_overrides
+
+        def _rigid():
+            self.report["physics_overrides"] = SA.apply_to_scenes([self.env.scene], ov)
+
+        self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot, while_stopped=_rigid if ov else None)
         log.info("robot base_link mass %.2f -> %.2f kg (BEHAVIOR-1K eval: %.0f)", self.report["base_link_mass_kg"]["before"], self.report["base_link_mass_kg"]["after"], M.EVAL_BASE_LINK_MASS_KG)
         self.cam_key = _first_key(self.robot.sensors, M.HEAD_CAMERA_SENSOR_SUFFIX)
         if self.cam_key is None:
@@ -530,6 +543,9 @@ class InstanceLoader:
         env, task, robot = self.env, self.task, self.robot
         task.load_tro_instance(env, tro=self.tro, settle_steps=0)
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
+        # the rigid-body overrides of the task objects the TRO placed (the build's pass reaches the scene's own objects only), before
+        # the constraints and the settle, as VecInstanceLoader.restore
+        self.report["rigid_sleep_threshold"] = SA.apply_to_objects(self.physical.values(), self.physics_overrides)
         extras = self.tro.meta.extras
         self.report["constraints"] = self._restore_constraints(extras.get("constraints") or [])
         self.report["attachments"] = self._attachment_report(extras.get("attachment_targets") or [])
@@ -1057,6 +1073,21 @@ def record_views(text: str) -> Tuple[str, ...]:
     return views
 
 
+def add_lean_step_argument(p) -> None:
+    """``--lean-step`` of both drivers (``run_isg_vec``'s default): ``ISG_VEC_LEAN_STEP`` for the overlay's ``Simulator._non_physics_step``."""
+    p.add_argument("--lean-step", action=argparse.BooleanOptionalAction, default=True,
+                   help="ISG_VEC_LEAN_STEP=1 for the overlay's Simulator._non_physics_step: no per-object update_visuals() loop (the texture "
+                        "changes of Burnt / Cooked / Frozen / Saturated / ToggledOn and their emitters; no ISG task changes a visual state, "
+                        "nothing the physics or the verdicts read). run_isg_vec's default; --no-lean-step = stock")
+
+
+def apply_driver_env(args) -> None:
+    """The environment the drivers' physics flags set for the code that reads it: ``ISG_SLEEP_ASSIST*`` (``sleep_assist.export_env``)
+    and ``ISG_VEC_LEAN_STEP``; :func:`_run_with_args` calls it for both entry points (this module's and ``ispatialgym.run_isg``)."""
+    SA.export_env(args)
+    os.environ["ISG_VEC_LEAN_STEP"] = "1" if getattr(args, "lean_step", True) else "0"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config", default=None, help="YAML file of option values; command-line options override it")
@@ -1140,6 +1171,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--behavior-shard", default=None,
                    help="<root>/<repo_id>: append each successful demo without a mid-episode retry to this LeRobot v3 dataset in BEHAVIOR's "
                         "replay_obs.py format (robot with replay_obs's sensors: head 720 px, wrists 480 px, rgb + depth_linear + proprio)")
+    # the physics of run_isg_vec, the same flags and defaults (demos are generated here, policies evaluated there)
+    SA.add_arguments(p)
+    add_lean_step_argument(p)
     p.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     p.add_argument("--load-only", action="store_true", help="load the instance, record its start state (meta.start_state) and exit: no program, no demo, no "
                                                             "TRO writes - the fresh-reload reference a warm demo's start state is compared with")
@@ -1160,17 +1194,20 @@ def config_argv(path: str, parser: argparse.ArgumentParser) -> List[str]:
     unknown = sorted(set(config) - set(known))
     if unknown:
         raise SystemExit(f"{path}: unknown option(s) {unknown}; known: {sorted(known)}")
+    negatable = {a.dest for a in parser._actions if isinstance(a, argparse.BooleanOptionalAction)}  # --qa / --no-qa, --lean-step / --no-lean-step
     argv: List[str] = []
     for key, value in config.items():
         if value is None or (isinstance(value, (list, tuple)) and not value):
             continue
         if key == "settle_eval" and isinstance(value, bool):  # YAML reads a bare on / off as a boolean
             value = "on" if value else "off"
+        if key == "sleep_assist" and isinstance(value, bool):  # likewise: off, or on = the default window
+            value = parser.get_default("sleep_assist") if value else "off"
         if key == "record_view" and isinstance(value, (list, tuple)):
             value = ",".join(value)
         if isinstance(value, bool):
-            if key == "qa":
-                argv.append("--qa" if value else "--no-qa")
+            if key in negatable:
+                argv.append(known[key] if value else "--no-" + known[key][2:])
             elif value:
                 argv.append(known[key])
             continue
@@ -1281,6 +1318,7 @@ def main(argv=None, default_policy: bool = False) -> int:
 
 def _run_with_args(args, argv=None) -> int:
     logging.getLogger("ispatialgym").setLevel(args.log_level)
+    apply_driver_env(args)
     if args.queue:
         return run_queue(args)
     if args.task:
@@ -1345,6 +1383,12 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=image_size, head_aperture=args.head_aperture)
         loader.external_camera = bool({"external", "tiled"} & set(args.record_view))
         loader.behavior_output = bool(args.behavior_shard)
+        loader.physics_overrides = SA.rigid_overrides(args)
+        # run_isg_vec's physics (oracle.sleep_assist; ISG_VEC_LEAN_STEP): what this run used, for the demo's provenance
+        assist = {"config": os.environ.get("ISG_SLEEP_ASSIST"), "mode": SA.sleep_assist_mode(), "max_mass_kg": SA.sleep_assist_max_mass(),
+                  "wake_radius_m": SA.sleep_assist_wake_radius()}
+        meta["driver_physics"] = {"rigid_overrides": dict(loader.physics_overrides), "sleep_assist": assist if SA.sleep_assist_config() is not None else None,
+                                  "lean_step": os.environ.get("ISG_VEC_LEAN_STEP") == "1"}
         meta["record_view"] = list(args.record_view)
         iid, tro_path = loader.iid, loader.tro_path
         # an eval dataset instance (template_meta "_paths") never gets runs written into the dataset

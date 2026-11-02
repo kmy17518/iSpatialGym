@@ -56,6 +56,7 @@ from ispatialgym import ASSETS_ROOT
 from ispatialgym import single_env as SE
 from ispatialgym.fastflags import fast_on, fast_value  # 2026-10-31 train-fast switches
 from ispatialgym.oracle import r1pro_model as M
+from ispatialgym.oracle import sleep_assist as SA
 from ispatialgym.oracle.actions import Action, Brace, Grasp, Navigate, Place, Push, Transition
 from ispatialgym.oracle.execute import (aim_push_past_goal, check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace,
                                         run_action, shorten_push)
@@ -770,6 +771,9 @@ class Executor:
         self.verdict: Optional[Verdict] = None
         self.support_load: Optional[SupportLoad] = None  # the support loading fact (meta.support_disturbance), built by run_program
         self.arm_stutter: Optional[ArmStutter] = None  # the commanded arm jolts (meta.arm_stutter, gate arm_stutter), built per episode
+        #: ``--sleep-assist`` (``oracle.sleep_assist``, as run_isg_vec's slots): the tracked task objects at rest put to sleep, built per
+        #: episode when the driver's flag is on (``ISG_SLEEP_ASSIST``)
+        self.sleep_assist: Optional[SA.SleepAssist] = None
         #: ``--qa`` (``cfg.qa``): the episode's QA metrics, built by run_program / run_stream
         self.qa: Optional[QA] = None
         #: a stream's program (the sidecar's expanded actions, set by run_isg): its operated articulated roots are what
@@ -955,6 +959,10 @@ class Executor:
             self.recorder.record(self.n, action, obs, info, state=state, phase=phase, action_index=action_index, attempt=attempt,
                                  reward=rew, terminated=bool(terminated), truncated=bool(truncated), sim_time=sim_time)
             sc["record_s"] += time.perf_counter() - _t3
+        if self.sleep_assist is not None:
+            _t5 = time.perf_counter()
+            self.sleep_assist.step(self.n)  # after the step's record, before QA observes it (run_isg_vec: SlotRecorder.record, then qa.observe)
+            sc["sleep_assist_s"] = sc.get("sleep_assist_s", 0.0) + (time.perf_counter() - _t5)
         verdict = None
         _t4 = time.perf_counter()
         if self.qa is not None:
@@ -1054,6 +1062,8 @@ class Executor:
             self.release_check[k] = [r for r in self.release_check[k] if r["step"] <= cp.step]
         if self.arm_stutter is not None:
             self.arm_stutter.trim(cp.step)
+        if self.sleep_assist is not None:
+            self.sleep_assist.trim(cp.step)
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
         if ag is not None:
@@ -1549,6 +1559,11 @@ class Executor:
 
     # ------------------------------------------------------------------ the loop
 
+    def _init_sleep_assist(self) -> None:
+        """``--sleep-assist`` (``ISG_SLEEP_ASSIST``, set by the driver's flags; off: None): the episode's tracked task objects, as
+        run_isg_vec's ``SlotRecorder`` (the robot itself is never slept: ``sleep_assist.is_free_rigid``)."""
+        self.sleep_assist = SA.SleepAssist(self.robot, self.tracked, "s0") if SA.sleep_assist_config() is not None else None
+
     def _init_support_load(self) -> None:
         """The support loading fact: every tracked object no program action manipulates (the table of a tabletop task)."""
         acted = set()
@@ -1643,6 +1658,7 @@ class Executor:
         self._stream = False
         self._init_support_load()
         self._init_qa(oracle=True, actions=actions)
+        self._init_sleep_assist()
         # every tracked object's pose at the start (the loaded init): the reference for a partner displaced during the run
         # (attachment 0920-164504: the bottle knocked 4.7 cm during the grasp phase, the place aimed at its recorded pose)
         init_poses: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
@@ -1838,6 +1854,7 @@ class Executor:
         verdict: Optional[Verdict] = None
         self._stream = True
         self._init_qa(oracle=False, actions=self.qa_program)
+        self._init_sleep_assist()
         if self.monitors is not None:
             self.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=self.state.held_objects(), manipulation=False, fov=False)
         phases = self.stream_phases
@@ -2193,6 +2210,8 @@ class Executor:
             "wall_clock_exceeded": bool(self.wall_clock_exceeded),
             # owner 2026-10-13: repeated jolts of an arm's commanded joint motion (the QA hard metric arm_stutter)
             "arm_stutter": stutter_report,
+            # owner 2026-11-01: run_isg_vec's sleep assist in the demos too (what it slept / woke, per tracked object; None when off)
+            "sleep_assist": self.sleep_assist.report() if self.sleep_assist is not None else None,
             "pose_settled_config": isg.get("pose_settled_config"),
             "conditions": isg.get("conditions"),
             "group_assignments": isg.get("group_assignments"),

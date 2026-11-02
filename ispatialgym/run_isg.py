@@ -121,6 +121,10 @@ def build_parser(default_policy: bool = True) -> argparse.ArgumentParser:
     p.add_argument("--frame-buffer", default="jpeg", choices=["jpeg", "raw"])
     p.add_argument("--all-cameras", action="store_true")
     p.add_argument("--behavior-shard", default=None)
+    from ispatialgym.oracle import sleep_assist as SA  # the physics flags of both drivers (run_isg_vec's defaults)
+
+    SA.add_arguments(p)
+    p.add_argument("--lean-step", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     p.add_argument("--load-only", action="store_true")
     return p
@@ -140,17 +144,20 @@ def config_argv(path: str, parser: argparse.ArgumentParser) -> List[str]:
     unknown = sorted(set(config) - set(known))
     if unknown:
         raise SystemExit(f"{path}: unknown option(s) {unknown}; known: {sorted(known)}")
+    negatable = {a.dest for a in parser._actions if isinstance(a, argparse.BooleanOptionalAction)}  # --qa / --no-qa, --lean-step / --no-lean-step
     argv: List[str] = []
     for key, value in config.items():
         if value is None or (isinstance(value, (list, tuple)) and not value):
             continue
         if key == "settle_eval" and isinstance(value, bool):  # YAML reads a bare on / off as a boolean
             value = "on" if value else "off"
+        if key == "sleep_assist" and isinstance(value, bool):  # likewise: off, or on = the default window
+            value = parser.get_default("sleep_assist") if value else "off"
         if key == "record_view" and isinstance(value, (list, tuple)):
             value = ",".join(value)
         if isinstance(value, bool):
-            if key == "qa":
-                argv.append("--qa" if value else "--no-qa")
+            if key in negatable:
+                argv.append(known[key] if value else "--no-" + known[key][2:])
             elif value:
                 argv.append(known[key])
             continue

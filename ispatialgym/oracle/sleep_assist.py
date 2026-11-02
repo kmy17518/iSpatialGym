@@ -1,6 +1,7 @@
 """Resting light objects and the sleep they never reach (vec_next 2026-10-30, ``docs/VEC_NEXT.md`` section 1, "small-object
-trembling"), moved out of ``run_isg_vec`` / ``vec_loader`` unchanged so that ``run_isg`` can run the same physics (the flags:
-:func:`add_arguments`, :func:`export_env`).
+trembling"), shared by both drivers so that they run the same physics: ``run_isg`` (one scene; demo generation) and ``run_isg_vec``
+(N scenes; evaluation) take the same flags with the same defaults (:func:`add_arguments`, :func:`export_env`) and apply them at the
+same points of the loader contract.
 
 * The rigid sleep threshold: ``physxRigidBody:sleepThreshold`` of every free, non-articulated object (:func:`is_free_rigid`) = 0.005,
   the PhysX default (OmniGibson sets 5e-5 on everything, at which a placed light object's TGS residual keeps its stack awake for good) -
@@ -206,7 +207,8 @@ def apply_to_scenes(scenes: Iterable[Any], ov: Dict[str, Any]) -> Dict[str, Any]
 
 class SleepAssist:
     """``--sleep-assist`` for one scene's robot and tracked task objects: :meth:`step` after every control step (``run_isg_vec``'s
-    ``SlotRecorder.record``), :meth:`report` for ``meta.sleep_assist``. ``name`` prefixes the log lines (the slot)."""
+    ``SlotRecorder.record``, ``run_isg``'s ``Executor.step``), :meth:`trim` when the executor rolls the world back to a checkpoint,
+    :meth:`report` for ``meta.sleep_assist``. ``name`` prefixes the log lines (the slot)."""
 
     def __init__(self, robot, tracked: Dict[str, Any], name: str, config: Optional[Tuple[int, float, float]] = None):
         self.robot, self.tracked, self.name = robot, tracked, name
@@ -222,6 +224,24 @@ class SleepAssist:
         self.hist: Dict[str, list] = {}
         self.free: Dict[str, bool] = {}
         self.sleeps: Dict[str, List[int]] = {}
+        self.rollbacks: List[int] = []
+
+    def trim(self, step: int) -> None:
+        """The executor rolled the world back to its checkpoint after control step ``step`` (``Executor.restore``; ``run_isg_vec`` never
+        does): the rolled-back attempt's sleeps and wakes leave the record, as its steps leave the recording (``ArmStutter.trim``); every
+        rest window restarts and the end effectors' speeds are measured anew. An object the assist put to sleep at or before ``step`` and
+        did not wake since is still the assist's to wake when a gripper approaches."""
+        step = int(step)
+        for events in (self.sleeps, self.wakes):
+            for inst in list(events):
+                events[inst] = [s for s in events[inst] if s <= step]
+                if not events[inst]:
+                    del events[inst]
+        self.hist.clear()
+        self.eef_prev.clear()
+        self.eef_speed.clear()
+        self.slept = {inst: True for inst, s in self.sleeps.items() if self.mode == "sleep" and s[-1] > max(self.wakes.get(inst) or [-1])}
+        self.rollbacks.append(step)
 
     def report(self) -> Dict[str, Any]:
         W, pos_tol, rot_tol = self.config
@@ -229,6 +249,8 @@ class SleepAssist:
                "wake_radius_m": self.wake_m, "max_mass_kg": self.max_kg, "wakes": {k: v[:50] for k, v in self.wakes.items()},
                "sleeps" if self.mode == "sleep" else "clamp_run_steps": {k: v[:50] for k, v in self.sleeps.items()},
                "clamped_steps": dict(self.clamped), "free_objects": [k for k, v in self.free.items() if v]}
+        if self.rollbacks:
+            out["rollbacks"] = self.rollbacks[:50]  # run_isg: the checkpoint steps the executor rolled back to (events after them trimmed)
         return out
 
     def step(self, step: int) -> None:
