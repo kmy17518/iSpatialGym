@@ -87,7 +87,35 @@ in the sample log and the instance summary; `program_check.last_stats`; meta.jso
    still-exit verdicts; the checks and the vec_next sleep-threshold fix were tuned on CPU dynamics).
 2. Vectorized oracle collector: N scenes per process with GPU physics on the vec_next world build. Needs the oracle restructured to step N
    independent skill programs and the 48 synchronous planner calls made non-blocking; bounded by ~31 ms of Python per scene per step on the
-   main thread, so ~3-4x per GPU at best.
+   main thread, so ~3-4x per GPU at best. **Not built** (owner, 2026-11-01 after the vec-eval-next merge): `run_isg_vec` replays and runs
+   policies only; the partial stepping / replay numbers measured before the decision are in `$F/merge_vecnext/DECISIONS.md`.
+
+## The vec-eval-next merge (branch `train-fast-vecnext`, 2026-11-01)
+
+The eval-release code (`ispatialgym-eval` f4c0d23c: 16 commits since the merge-base 2eba1e97) and vec_next's vectorized evaluator (the
+eight commits up to 95b03b3b) are merged into train-fast (merge commit 5d406152); the record is `$F/merge_vecnext/DECISIONS.md`, the
+evaluator's guide `scripts/vec_eval/next/README.md`. The release had pruned the repository to its 83 eval instances; every file and test it
+removed is train-fast's again. What it changes for this flow:
+
+| area | after the merge |
+|---|---|
+| names | "alias" -> "variant" in code, BDDL `(:variant ...)`, outputs and flags (`--variant`, `--variants`); small IORS tasks `touching` / `nextto` / `inside` -> `*_small_scale`. Data written before (train85 templates, TROs, sidecars, template metadata, eval indexes, BDDL copies) reads through the release's legacy readers; icl pick ids keep their eval85 spelling (`ground_isg.subtask_of_pick`); the frozen eval-room salt of `split_seeds` keeps its spelling |
+| customs | `isg_customs.json` stays keyed by variant (the release keys by subtask name, which would merge variants of different supports); `customs.entry_key` finds a variant's entry in either list |
+| BDDL | every problem has a `(:measure ...)` block (the release's migration, applied at train-fast's ids in `assets/bddl/activity_definitions`); the eval dataset's problems, in the release's numbering, are `assets/bddl/eval_release/activity_definitions`; a BDDL copy written before the migration reads with the atom it would have measured (`activity.problem.legacy_measure`, goal as written) |
+| oracle success | the release's scoring (`eval.metrics`): symbolic = the BDDL goal, geometric = also every `:measure` atom within tolerance; oracle runs settle-eval on: a full settled window of `--settle-steps` (45) with the goal held, the epilogue exactly that long and reserved in the budget. New failure reasons: `symbolic_only`, a stricter `not_settled` |
+| tolerances | the isg-v2 profile computed at load (`eval.tolerance_profile`, oracle scale 1, policy 3), also read by the oracle's push loops; the TRO files keep their stored values (the train-repeat rule reads those) |
+| demo QA | `run_isg --qa` (default on) replaces `--demo-gating` / `--stream-qa`: BEHAVIOR's QA metrics plus the former gates as HARD metrics that fail an oracle demo at once without a retry - new: `robot_touching_objects`, `robot_touching_itself`, `pause`, `jerky_motion`, `ghost_hand`; former gates: `object_tilt` (root_moved), `robot_wobble`, `bad_release` (release_commanded), `goal_occlusion`, `arm_stutter` (train-fast's gate, now a metric). `placed_orientation` is a fact, no longer a verdict; replays and policies only log |
+| run_isg flags | `--record-view` replaces `--video` / `--dev`; new `--task`, `--settle-eval`, `--success-metric`, `--tolerance-scale`, `--wallclock`, `--config`; the sampler's `--sub-variant` is gone (block design draws its pattern from `generation.patterns`) |
+| switches | every `ISPATIALGYM_FAST_*` switch and default unchanged (`fastflags.py` identical; the same 60 switches at the same call sites); PHYSICS_ONLY_TRIM also skips QA's goal-occlusion render (recorded as skipped, never judged) |
+| Behavior-1K | 6a6194600 + vec_next's overlay (`scripts/vec_eval/apply_b1k_overlay.sh`, 12 files); the single-scene collectors run on it too |
+| vectorized | `python -m ispatialgym.oracle.run_isg_vec` (N scenes per process, replay / policy), its rigid sleep threshold 0.005 and sleep assist (driver only, not in `run_isg`), the batch restore fix |
+
+Validation (2026-11-01, svl TITAN RTX, n=8 jobs of this flow on the merged code): artic_open_small_01 8/8 demos successful, touching_01
+6/7, axial_01 4/8 (rule2 baseline 50 %), ontop_small_01 5/8 cropped and 0/3 in the full scene against 85-100 % before - lost to
+`robot_touching_objects` (torso against the table at the first transition), `symbolic_only` and `not_settled` (the kielbasa pack's
+settle window). The collectors' per-step costs are unchanged (QA 17-25 ms per step before and after); the kinematic replay renders at
+6.96 env-steps/s as before; vec_next's apple and teapot-bar verifications pass at N=8. Unit tests: the base failures plus
+`test_eval_instances::test_step_budget`, which fails on the release's own code (`$F/merge_vecnext/new_base_fails.txt`).
 
 ## Measuring
 
