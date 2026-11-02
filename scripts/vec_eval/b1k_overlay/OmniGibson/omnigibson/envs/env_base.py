@@ -503,6 +503,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # vec_next overlay (2026-10-31): the build's plays are over - ISG_PHYSX_REPLICATE never replicates a later play (the clones
         # stop being copies of scene 0 once their instances are restored)
         og.sim._isg_replicate_build = False
+        # vec_next overlay (2026-10-31): the persistent asset-geometry cache's new entries of this build (ISG_VEC_ASSET_CACHE_DIR)
+        from omnigibson.utils import isg_asset_cache as _isg_ac
+
+        _isg_ac.flush("build")
         # Run any additional task post-loading behavior
         with _isg_bt("env.task_post_play_load"):
             self.task.post_play_load(env=self)

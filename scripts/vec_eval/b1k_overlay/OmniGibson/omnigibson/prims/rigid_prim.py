@@ -21,7 +21,9 @@ from omnigibson.utils.usd_utils import (
     check_extent_radius_ratio,
     ensure_usd_api,
     get_mesh_volume_and_com,
+    get_world_pose_with_scale,
 )
+from omnigibson.utils import isg_asset_cache as _isg_ac
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -229,8 +231,19 @@ class RigidPrim(XFormPrim):
                              if os.environ.get("ISG_VEC_MESH_CACHE", "1") == "1" else None)
                 hit = _ISG_MESH_CACHE.get(cache_key) if cache_key is not None else None
                 if hit is None:
-                    volume, com = get_mesh_volume_and_com(mesh.prim)
-                    oblong = bool(prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) and not check_extent_radius_ratio(mesh, com))
+                    # the persistent store (utils/isg_asset_cache.py, ISG_VEC_ASSET_CACHE_DIR): keyed by the mesh geometry and the
+                    # collision-API flag, i.e. every input of the two computations below; the stored values keep their original types
+                    disk_key = (_isg_ac.combine(_isg_ac.geometry_fingerprint(mesh.prim),
+                                                str(bool(prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI))))
+                                if _isg_ac.enabled() else None)
+                    stored = _isg_ac.get("local_vol_com_oblong", disk_key) if disk_key is not None else None
+                    if stored is not None:
+                        volume, com, oblong = stored[0], th.as_tensor(stored[1]).clone(), stored[2]
+                    else:
+                        volume, com = get_mesh_volume_and_com(mesh.prim)
+                        oblong = bool(prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) and not check_extent_radius_ratio(mesh, com))
+                        if disk_key is not None:
+                            _isg_ac.put("local_vol_com_oblong", disk_key, (volume, com.detach().cpu().clone(), oblong))
                     if cache_key is not None:
                         _ISG_MESH_CACHE[cache_key] = (float(volume), com.clone(), oblong)
                 else:
@@ -436,7 +449,16 @@ class RigidPrim(XFormPrim):
             key = ("world_volume", mesh.relative_prim_path) if scene is not None else None
             hit = _ISG_MESH_CACHE.get(key) if (key is not None and scene.idx > 0) else None
             if hit is None:
-                vol = get_mesh_volume_and_com(mesh.prim, world_frame=True)[0]
+                # the persistent store: keyed by the geometry and the exact world transform with scale the conversion applies
+                disk_key = (_isg_ac.combine(_isg_ac.geometry_fingerprint(mesh.prim), get_world_pose_with_scale(mesh.prim.GetPath().pathString))
+                            if _isg_ac.enabled() else None)
+                stored = _isg_ac.get("world_volume", disk_key) if disk_key is not None else None
+                if stored is not None:
+                    vol = stored
+                else:
+                    vol = get_mesh_volume_and_com(mesh.prim, world_frame=True)[0]
+                    if disk_key is not None:
+                        _isg_ac.put("world_volume", disk_key, vol)
                 if key is not None and scene.idx == 0:
                     _ISG_MESH_CACHE[key] = vol
             else:
@@ -558,7 +580,23 @@ class RigidPrim(XFormPrim):
         if key is not None and scene.idx > 0 and key in _ISG_MESH_CACHE:
             hit = _ISG_MESH_CACHE[key]
             return None if hit is None else (hit[0].clone(), hit[1].clone())
-        data = self._isg_collision_mesh_cpu_data_stock()
+        # the persistent store: keyed by the link pose and, per collision geom, its geometry and world transform with scale (every input
+        # of the stock computation; the faces derive from the geometry)
+        disk_key = None
+        if _isg_ac.enabled():
+            pos, orn = self.get_position_orientation()
+            parts = ["cpu_data", pos, orn]
+            for geom in self._collision_meshes.values():
+                parts += [_isg_ac.geometry_fingerprint(geom.prim), get_world_pose_with_scale(geom.prim_path)]
+            disk_key = _isg_ac.combine(*parts)
+        stored = _isg_ac.get("collision_mesh_cpu_data", disk_key) if disk_key is not None else None
+        if stored is not None:
+            data = None if (isinstance(stored, str) and stored == _isg_ac.STORED_NONE) else (th.as_tensor(stored[0]).clone(), th.as_tensor(stored[1]).clone())
+        else:
+            data = self._isg_collision_mesh_cpu_data_stock()
+            if disk_key is not None:
+                _isg_ac.put("collision_mesh_cpu_data", disk_key,
+                            _isg_ac.STORED_NONE if data is None else (data[0].detach().cpu().clone(), data[1].detach().cpu().clone()))
         if key is not None and scene.idx == 0:
             _ISG_MESH_CACHE[key] = None if data is None else (data[0].clone(), data[1].clone())
         return data
