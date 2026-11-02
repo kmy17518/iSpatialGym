@@ -32,7 +32,8 @@ from ispatialgym.harness.planners import EpisodeContext, make_planner
 log = logging.getLogger(__name__)
 
 EPISODE_KEYS = ("success", "reason", "success_metric", "settle_eval", "settle_steps", "symbolic_success", "symbolic_success_step",
-                "geometric_success", "geometric_success_step", "error_metric", "other_mode", "n_steps", "n_action_steps")
+                "symbolic_first_step", "geometric_success", "geometric_success_step", "geometric_first_step", "evaluation_step",
+                "evaluation_settled", "error_metric", "other_mode", "n_steps", "n_action_steps")
 
 
 #: run_isg's budget for an instance without a demo (``ispatialgym.eval.instances.DEFAULT_MAX_STEPS``)
@@ -121,8 +122,9 @@ class HarnessPolicy:
         if self.stopped is not None:
             return None
         self.step += 1
-        if self.cfg.stop_on_success and task_info(info).get("official_success"):
-            return self._stop("success")
+        ti = task_info(info)
+        if self.cfg.stop_on_success and ti.get("official_success") and ti.get("success_final", True):
+            return self._stop("success")  # the evaluated success step is final (eval.metrics: the settle window after the first)
         if self.step > self.max_steps:
             return self._stop("step_budget")
         for _ in range(self.cfg.max_calls + 50):

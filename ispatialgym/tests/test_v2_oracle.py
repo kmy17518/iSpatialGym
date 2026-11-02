@@ -486,9 +486,12 @@ class FakeEnv:
                                                                                    .get(a) or {}).get("within_tolerance")} for p, a in atoms]
 
         isg = {**d, "goal": goal, "measure_within": within, "settled": settled, "settle_eval": rep["settle_eval"], "settle_steps": rep["settle_steps"],
-               "official_success": rep["geometric_success"], "symbolic_success": rep["symbolic_success"], "symbolic_success_step": rep["symbolic_success_step"],
+               "official_success": rep["geometric_success"], "success_final": rep["success_final"],
+               "symbolic_success": rep["symbolic_success"], "symbolic_success_step": rep["symbolic_success_step"],
+               "symbolic_first_step": rep["symbolic_first_step"], "geometric_first_step": rep["geometric_first_step"],
                "geometric_success": rep["geometric_success"], "geometric_success_step": rep["geometric_success_step"], "goal_first_step": rep["goal_first_step"],
-               "other_mode": rep["other_mode"], "evaluation": {"errors": rep["errors"], "error_metric": rep["error_metric"], "measured": measured(rep["errors"])},
+               "other_mode": rep["other_mode"], "evaluation": {"errors": rep["errors"], "error_metric": rep["error_metric"], "measured": measured(rep["errors"]),
+                                                     "step": rep["evaluation_step"], "kind": rep["evaluation_kind"], "settled": rep["evaluation_settled"]},
                "error_metric": rep["error_metric"]}
         isg.setdefault("errors", errors)
         isg.setdefault("conditions", [])

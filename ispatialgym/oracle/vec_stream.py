@@ -267,7 +267,9 @@ class VecStreamExecutor:
                     T["monitors_s"] += time.time() - t1
                 if verdict is not None:
                     self._end_stream(s, verdict)
-                elif s.cfg.stop_on_success and s.isg.get("official_success"):
+                elif s.cfg.stop_on_success and s.isg.get("official_success") and s.isg.get("success_final", True):
+                    # the evaluated success step is chosen within the settle window after the first success (eval.metrics): the
+                    # stream ends once that selection is final, not at the first success
                     self._end_stream(s, None)
             if self.post_step is not None:
                 t1 = time.time()
@@ -337,6 +339,12 @@ class VecStreamExecutor:
             "symbolic_success_step": isg.get("symbolic_success_step"),
             "geometric_success": bool(isg.get("geometric_success")),
             "geometric_success_step": isg.get("geometric_success_step"),
+            "symbolic_first_step": isg.get("symbolic_first_step"),
+            "geometric_first_step": isg.get("geometric_first_step"),
+            "evaluation_step": evaluation.get("step"),
+            "evaluation_kind": evaluation.get("kind"),
+            "evaluation_settled": evaluation.get("settled"),
+            "success_final": isg.get("success_final"),
             "errors": evaluation.get("errors") or isg.get("errors") or {},
             "errors_final_step": isg.get("errors") or {},
             "error_metric": evaluation.get("error_metric"),

@@ -81,10 +81,15 @@ def main():
     cams_all = {}
     for name in common:
         ma, mb = json.load(open(f"{ea[name]}/meta.json")), json.load(open(f"{eb[name]}/meta.json"))
-        e = {"verdict_a": {k: ma.get(k) for k in ("success", "symbolic_success", "geometric_success", "geometric_success_step", "n_steps", "reason", "status")},
-             "verdict_b": {k: mb.get(k) for k in ("success", "symbolic_success", "geometric_success", "geometric_success_step", "n_steps", "reason", "status")},
+        # the first geometric success step is compared (the evaluated step, chosen by the lowest error within the settle window since
+        # 2026-11-01, can move far on a tiny error difference); metas before that change carry only geometric_success_step (= the first)
+        def _verdict(m):
+            v = {k: m.get(k) for k in ("success", "symbolic_success", "geometric_success", "geometric_success_step", "n_steps", "reason", "status")}
+            v["geometric_first_step"] = m.get("geometric_first_step") if "geometric_first_step" in m else m.get("geometric_success_step")
+            return v
+        e = {"verdict_a": _verdict(ma), "verdict_b": _verdict(mb),
              "rooms_a": (ma.get("load_rooms") or {}).get("rooms"), "rooms_b": (mb.get("load_rooms") or {}).get("rooms"), "frames": {}}
-        e["verdicts_equal"] = all(e["verdict_a"][k] == e["verdict_b"][k] for k in ("success", "symbolic_success", "geometric_success", "geometric_success_step"))
+        e["verdicts_equal"] = all(e["verdict_a"][k] == e["verdict_b"][k] for k in ("success", "symbolic_success", "geometric_success", "geometric_first_step"))
         ta, tb = f"{ea[name]}/trajectory.npz", f"{eb[name]}/trajectory.npz"
         if os.path.exists(ta) and os.path.exists(tb):
             dv = traj_diff(np.load(ta), np.load(tb))

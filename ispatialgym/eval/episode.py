@@ -23,9 +23,12 @@ def summarize_episode(last_info: Dict[str, Any], steps: int, terminated: bool, t
         ``success`` -- the run mode's geometric success (the BDDL goal plus every ``(:measure ...)`` atom within tolerance at
         the same step(s); ``settle_eval``: through a settled window of ``settle_steps`` steps).
         ``symbolic_success`` / ``symbolic_success_step``, ``geometric_success`` / ``geometric_success_step`` -- the run mode's
-        (steps: 0-based, None when not reached); ``other_mode`` -- the same for the off mode when ``settle_eval`` is on,
-        else None.
-        ``errors`` / ``error_metric`` / ``measured`` -- at the run mode's geometric success, else at the terminal step;
+        (``*_success_step``: the evaluated step - settle-eval off: the lowest-error candidate in the settle window after the first
+        success; settle-eval on: the first settled step;
+        ``*_first_step``: the first; 0-based, None when not reached); ``other_mode`` -- the same for the off mode when
+        ``settle_eval`` is on, else None.
+        ``errors`` / ``error_metric`` / ``measured`` -- at the run mode's evaluated geometric step, else its evaluated symbolic
+        step, else the terminal step (``evaluation_step`` / ``evaluation_kind`` / ``evaluation_settled``: which, and its S);
         ``errors_final_step`` -- at the terminal step.
     """
     isg = isg_info(last_info)
@@ -39,8 +42,14 @@ def summarize_episode(last_info: Dict[str, Any], steps: int, terminated: bool, t
         "settle_steps": isg["settle_steps"],
         "symbolic_success": bool(isg["symbolic_success"]),
         "symbolic_success_step": isg["symbolic_success_step"],
+        "symbolic_first_step": isg.get("symbolic_first_step"),
         "geometric_success": bool(isg["geometric_success"]),
         "geometric_success_step": isg["geometric_success_step"],
+        "geometric_first_step": isg.get("geometric_first_step"),
+        "evaluation_step": evaluation.get("step"),
+        "evaluation_kind": evaluation.get("kind"),
+        "evaluation_settled": evaluation.get("settled"),
+        "success_final": isg.get("success_final"),
         "other_mode": isg["other_mode"],
         "errors": evaluation.get("errors"),
         "error_metric": evaluation.get("error_metric"),

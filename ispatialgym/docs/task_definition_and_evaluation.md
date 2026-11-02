@@ -510,13 +510,33 @@ same step(s). The settle-eval switch defines both:
 | off | the first `t` with `G(t)` | the first `t` with `G(t)` and `M(t)` |
 | on | the first `t` with `S(t)` where `G` held at every step of the window | the first `t` with `S(t)` where `G` and `M` held at every step of the window |
 
+These are the *first* steps. **The evaluated step** (owner 2026-11-01) is the
+step an episode is judged at. A settled success (settle-eval on) is judged at
+its first step, as before: the settled window already certifies the state. An
+unsettled success (settle-eval off, and the off mode reported alongside a
+settle-eval run) is judged at the candidate with the lowest selection score,
+ties to the earlier step: the steps `t` in `[first, first + W - 1]` (`W` =
+`settle_steps`) where the kind's condition (`G`; `G` and `M`) holds. The selection score
+(`eval.metrics.selection_score`) is the largest error-to-tolerance ratio over
+the `:measure` atoms' reports: position error / position tolerance and
+orientation error / orientation tolerance of a pose or group target, every
+joint's error / its own tolerance of an articulation (a missing component is
+skipped; a zero tolerance gives 0 for a zero error, else infinity). Without a
+computable score (no `:measure` atom) the evaluated step is the first step.
+The errors, the error metric and the settled flag of a mode are those of its
+evaluated geometric step, else its evaluated symbolic step, else the current
+step.
+
 `ISpatialGymTask(settle_eval=..., settle_steps=...)` (or `configure_evaluation`
 per instance, before its reset) tracks the run's mode every step: it gives
-`info["success"]`, `official_success` and the termination (its geometric
-success), a value the episode ended before reaching being null. A
-settle-eval-on run also tracks the off mode and reports it as `other_mode`; a
-settle-eval-off run tracks no other mode (`other_mode` null: a policy run ends
-at its first success, before an on-mode window could fill). `settle_steps` is
+`info["success"]` and `official_success` (its geometric success reached),
+`success_final` (its geometric selection can no longer change: at the first
+settled geometric success with settle-eval on, at `first + W - 1` with it off)
+and the termination (`success_final`), a value the episode ended before
+reaching being null. A settle-eval-on run also tracks the off mode and reports
+it as `other_mode`; a settle-eval-off run tracks no other mode (`other_mode`
+null: a policy run ends `W - 1` steps after its first success, before an
+on-mode window could fill). `settle_steps` is
 also the `PoseSettled` window (`n_steps`) of every settled entity. A checkpoint
 rollback restores the tracking (`ISpatialGymTask.metrics_state`).
 
@@ -526,8 +546,11 @@ epilogue is exactly that long and reserved in the step budget (default 45); a
 replay streams its demo's action rows and only the first that many settle rows
 (default all of them; more than the demo has is an error); a policy run has no
 epilogue (default 45). `--success-metric geometric|symbolic` (default
-geometric) decides `success`, the status and the exit code; the episode ends at
-the geometric success either way, and without it runs to `--max-steps` (an
+geometric) decides `success`, the status and the exit code; a policy run ends
+when its geometric selection is final (settle-eval off: `W - 1` steps after the
+first geometric success, or at its step budget if that comes first; settle-eval
+on: at the first settled geometric success) either way, a replay runs its whole
+demo, and without geometric success an episode runs to `--max-steps` (an
 oracle program: plus its epilogue). Consequences accepted with the change:
 articulation open / close tasks' symbolic success is BEHAVIOR's `open`, and an
 episode without geometric success runs to its step budget.
@@ -614,12 +637,18 @@ episode result (`run_isg` writes the same keys into `meta.json` and its
 
 - `success`: the run mode's geometric success (`--success-metric symbolic`: its
   symbolic success); `symbolic_success` / `symbolic_success_step`,
-  `geometric_success` / `geometric_success_step` (0-based episode steps, null
-  when not reached); `settle_eval`, `settle_steps`; `other_mode`: the same four
-  values of the off mode with its `error_metric` when `settle_eval` is on, else
-  null.
+  `geometric_success` / `geometric_success_step` (`*_success_step`: the
+  evaluated step; 0-based episode steps, null when not reached) with
+  `symbolic_first_step` / `geometric_first_step` (the first steps);
+  `evaluation_step` / `evaluation_kind` / `evaluation_settled` (the step the
+  errors below are from, which kind's, and its `S`); `success_final`;
+  `settle_eval`, `settle_steps`; `other_mode`: the same values of the off mode
+  with its `error_metric` when `settle_eval` is on, else null. Verification
+  (`scripts/vec_eval/compare_slots.py`, `verify_rules.py`, the rooms gate)
+  compares the first steps.
 - `errors`: the per-target error reports the run mode is judged by - at its
-  geometric success, else at the last step (`errors_final_step`):
+  evaluated geometric step, else its evaluated symbolic step, else at the last
+  step (`errors_final_step`):
   `pose_errors` / `layout_errors`, each with its metric labels,
   `within_tolerance`, `tolerances` and whether the atom is `in_goal` /
   `in_measure`.

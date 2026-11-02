@@ -77,6 +77,7 @@ def main():
             r.update({"instance": name, "episode_index": m.get("episode_index"), "status": m.get("status"), "success": m.get("success"),
                       "reason": m.get("reason"), "success_metric": m.get("success_metric", r.get("success_metric")),
                       "symbolic_success_step": m.get("symbolic_success_step"), "geometric_success_step": m.get("geometric_success_step"),
+                      "symbolic_first_step": m.get("symbolic_first_step"), "geometric_first_step": m.get("geometric_first_step"),
                       "n_steps": m.get("n_steps", r.get("n_steps")), "max_steps": budget.get("max_steps", r.get("max_steps")),
                       "wall_time_s": m.get("wall_time_s", r.get("wall_time_s")), "task_id": m.get("task_id", r.get("task_id"))})
             if r.get("n_steps") is not None and r.get("max_steps"):

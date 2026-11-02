@@ -1759,8 +1759,10 @@ class Executor:
                 verdict = self.step(a, PHASE_SETTLE if settle_row else phase, 0, 0)  # a replayed settle row is recorded as one
                 if verdict is not None:
                     break
-                if self.cfg.stop_on_success and self.isg.get("official_success"):
-                    log.info("stream: geometric success at step %s; the episode ends", self.isg.get("geometric_success_step"))
+                if self.cfg.stop_on_success and self.isg.get("official_success") and self.isg.get("success_final", True):
+                    # the evaluated success step is chosen within the settle window after the first success (eval.metrics)
+                    log.info("stream: geometric success (first at step %s, evaluated at step %s) final; the episode ends",
+                             self.isg.get("geometric_first_step"), self.isg.get("geometric_success_step"))
                     break
         finally:
             if self.monitors is not None:
@@ -2056,7 +2058,14 @@ class Executor:
             "symbolic_success_step": isg.get("symbolic_success_step"),
             "geometric_success": bool(isg.get("geometric_success")),
             "geometric_success_step": isg.get("geometric_success_step"),
-            # the errors the run mode is judged by (at its geometric success, else at the last step) and the last step's
+            "symbolic_first_step": isg.get("symbolic_first_step"),
+            "geometric_first_step": isg.get("geometric_first_step"),
+            "evaluation_step": evaluation.get("step"),
+            "evaluation_kind": evaluation.get("kind"),
+            "evaluation_settled": evaluation.get("settled"),
+            "success_final": isg.get("success_final"),
+            # the errors the run mode is judged by (at its evaluated geometric step, else at its evaluated symbolic step, else at the
+            # last step) and the last step's
             "errors": evaluation.get("errors") or isg.get("errors") or {},
             "errors_final_step": isg.get("errors") or {},
             "error_metric": evaluation.get("error_metric"),

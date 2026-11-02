@@ -8,7 +8,11 @@ relative poses between group members); ``M(t)`` - every ``(:measure ...)`` atom 
 **Symbolic** success is the BDDL ``:goal``; **geometric** success (the primary metric) is symbolic success plus every
 ``:measure`` atom within tolerance at the same step(s). ``settle_eval`` off: symbolic = the first ``t`` with ``G(t)``,
 geometric = the first with ``G(t)`` and ``M(t)``; on: the first ``t`` with ``S(t)`` where ``G`` (``G`` and ``M``) held at every
-step of the window. The run's mode gives ``info["success"]``, ``official_success`` and the termination (its geometric success);
+step of the window. The *evaluated* success step of an unsettled success (settle-eval off) is the lowest-error candidate within
+the settle window after its first step; a settled success is judged at its first step as before (``ispatialgym.eval.metrics``,
+owner 2026-11-01); the first step is kept as ``*_first_step``. The run's mode gives
+``info["success"]`` and ``official_success`` (its geometric success reached), ``success_final`` (its selection can no longer change)
+and the termination (``success_final``);
 a settle-eval-on run also reports the off mode in ``other_mode`` (None with settle-eval off). The tolerances are the
 ``isg-v2`` profile's (``ispatialgym.eval.tolerance_profile``, :meth:`ISpatialGymTask.apply_tolerance_profile` at load).
 
@@ -647,10 +651,14 @@ class ISpatialGymTask(BehaviorTask):
         if env is not None:
             t = int(env.episode_steps[env_idx])
             if tracker.last is None or tracker.last[0] != t:
+                if tracker.last is None and list(tracker.atoms) != list(self._measure_atoms):
+                    tracker.atoms = list(self._measure_atoms)  # trackers made before the activity was loaded
                 tracker.update(t, goal, within, settled, errors)
         self._last_goal_evals[env_idx] = (goal, within, settled, status)
         self._last_errors[env_idx] = errors
-        return tracker.done, status
+        # the termination: the run mode's geometric selection is final (first settled success with settle-eval on; the end of the
+        # selection window after the first success with it off). info["success"] (success_of) is reached-or-not, as before.
+        return tracker.final, status
 
     def settle_steps_of(self, env_idx: int = 0) -> int:
         """Env ``env_idx``'s ``pose_settled`` / settle-eval window (:meth:`configure_evaluation`)."""
@@ -672,7 +680,7 @@ class ISpatialGymTask(BehaviorTask):
             env_indices = range(n)
         for i in env_indices:
             i = int(i)
-            self._trackers[i] = MET.SuccessTracker(self.settle_eval, self.settle_steps_of(i))
+            self._trackers[i] = MET.SuccessTracker(self.settle_eval, self.settle_steps_of(i), atoms=self._measure_atoms)
             self._last_goal_evals[i] = None
             self._last_errors[i] = None
 
@@ -840,9 +848,11 @@ class ISpatialGymTask(BehaviorTask):
 
     def _populate_isg_info(self, env, info, env_idx: int = 0):
         """``info["ispatialgym"]`` of env ``env_idx``: this step's facts (``goal`` = G, ``measure_within`` = M, ``settled`` = S, its
-        ``errors`` / ``error_metric`` / ``measured``), the run mode's symbolic and geometric success (steps: 0-based episode steps,
-        None while not reached), ``evaluation`` (the errors the run mode is judged by: at its geometric success, else its symbolic
-        success, else this step's), ``other_mode`` (the off mode's success with settle-eval on, else None) and the goal conditions."""
+        ``errors`` / ``error_metric`` / ``measured``), the run mode's symbolic and geometric success (``*_success_step``: the evaluated
+        step, ``*_first_step``: the first; 0-based episode steps, None while not reached), ``success_final`` (the run mode's geometric
+        selection can no longer change), ``evaluation`` (the errors the run mode is judged by: at its evaluated geometric step, else its
+        evaluated symbolic step, else this step's, with that ``step``, ``kind`` and its ``settled`` flag), ``other_mode`` (the off mode's
+        success with settle-eval on, else None) and the goal conditions."""
         goal, within, settled, status = self._last_goal_evals[env_idx] or (False, False, False, info["goal_status"])
         errors = self._last_errors[env_idx]
         if errors is None:
@@ -864,13 +874,17 @@ class ISpatialGymTask(BehaviorTask):
             "settled": bool(settled),
             "error_metric": MET.error_metric(errors, self._measure_atoms, where),
             "official_success": ev["geometric_success"],
+            "success_final": ev["success_final"],
             "symbolic_success": ev["symbolic_success"],
             "symbolic_success_step": ev["symbolic_success_step"],
+            "symbolic_first_step": ev["symbolic_first_step"],
             "geometric_success": ev["geometric_success"],
             "geometric_success_step": ev["geometric_success_step"],
+            "geometric_first_step": ev["geometric_first_step"],
             "goal_first_step": ev["goal_first_step"],
             "other_mode": ev["other_mode"],
-            "evaluation": {"errors": ev["errors"], "error_metric": ev["error_metric"], "measured": self.measured_conditions_report(ev["errors"])},
+            "evaluation": {"errors": ev["errors"], "error_metric": ev["error_metric"], "measured": self.measured_conditions_report(ev["errors"]),
+                           "step": ev["evaluation_step"], "kind": ev["evaluation_kind"], "settled": ev["evaluation_settled"]},
             "conditions": self.goal_conditions_report(status),
             "measured": self.measured_conditions_report(errors),
             "errors": errors,

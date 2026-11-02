@@ -92,8 +92,13 @@ def test_never_settled_and_errors_at_the_cutoff():
     current = {"t": "cutoff"}
     rep = tr.report(current, [(POSE, "t")])
     assert rep["geometric_success"] is False and rep["geometric_success_step"] is None and rep["errors"] is current
-    assert rep["other_mode"] == {"settle_eval": False, "symbolic_success": True, "symbolic_success_step": 0, "geometric_success": True,
-                                 "geometric_success_step": 0, "error_metric": {"position_error": None, "orientation_error": None, "case": "pose"}}
+    other = rep["other_mode"]
+    assert {k: other[k] for k in ("settle_eval", "symbolic_success", "symbolic_success_step", "geometric_success", "geometric_success_step",
+                                  "error_metric")} == {"settle_eval": False, "symbolic_success": True, "symbolic_success_step": 0, "geometric_success": True,
+                                                       "geometric_success_step": 0, "error_metric": {"position_error": None, "orientation_error": None, "case": "pose"}}
+    # no score computable (the errors carry no reports): the chosen steps are the first steps
+    assert (other["symbolic_first_step"], other["geometric_first_step"], other["evaluation_step"], other["evaluation_kind"]) == (0, 0, 0, "geometric")
+    assert other["success_final"] is True and "errors" not in other
     assert tr.evaluation_errors(current, "off") == {"t": 0}
 
 
@@ -138,3 +143,96 @@ def test_state_and_load_restore_a_rollback():
 def test_settle_steps_must_be_positive():
     with pytest.raises(ValueError):
         MET.SuccessTracker(settle_steps=0)
+
+
+# ---------------------------------------------------------------------------------------------- the evaluated success step (2026-11-01)
+
+ATOM = [(POSE, "x")]
+
+
+def perr(pos, ori, within=True, tol=(0.02, 0.1)):
+    """Errors with one pose report on ``x`` (position / orientation tolerances ``tol``)."""
+    return errors(poses={"x": {"position_error": pos, "orientation_error": ori, "within_tolerance": within,
+                               "tolerances": {"position": tol[0], "orientation": tol[1]}}})
+
+
+def feed(tracker, steps):
+    """``steps``: (G, M, S, errors) per step from step 0."""
+    for t, (g, m, s, e) in enumerate(steps):
+        tracker.update(t, g, m, s, e)
+    return tracker
+
+
+def test_selection_score_is_the_largest_error_to_tolerance_ratio():
+    assert MET.selection_score(perr(0.01, 0.02), ATOM) == pytest.approx(0.5)  # max(0.01/0.02, 0.02/0.1)
+    assert MET.selection_score(perr(0.001, 0.08), ATOM) == pytest.approx(0.8)
+    # an orientation-free target: only its position ratio
+    assert MET.selection_score(perr(0.01, None, tol=(0.02, None)), ATOM) == pytest.approx(0.5)
+    # an articulation: every joint against its own tolerance
+    joints = {"j1": {"error": 0.05, "tolerance": 0.1}, "j2": {"error": 0.03, "tolerance": 0.05}}
+    art = errors(layouts={"a": {"position_error": None, "orientation_error": 0.05, "within_tolerance": True, "joints": joints,
+                                "tolerances": {"joints": {"j1": 0.1, "j2": 0.05}}}})
+    assert MET.selection_score(art, [(LAYOUT, "a")]) == pytest.approx(0.6)
+    # a zero tolerance: 0 for a zero error, else infinity; nothing to score: None
+    assert MET.selection_score(perr(0.0, 0.0, tol=(0.0, 0.0)), ATOM) == 0.0
+    assert MET.selection_score(perr(0.001, 0.0, tol=(0.0, 0.1)), ATOM) == float("inf")
+    assert MET.selection_score(errors(), ATOM) is None and MET.selection_score(perr(0.01, 0.02), []) is None
+
+
+def test_off_mode_chooses_the_lowest_score_within_the_window_after_the_first_success():
+    # W = 3: candidates are the steps 1..3 where G and M hold; step 2 is best; step 4 (better still) is outside the window
+    steps = [(0, 0, 0, perr(0.0, 0.0)), (1, 1, 0, perr(0.015, 0.0)), (1, 1, 0, perr(0.002, 0.0)), (1, 1, 0, perr(0.01, 0.0)),
+             (1, 1, 0, perr(0.0, 0.0))]
+    tr = feed(MET.SuccessTracker(settle_eval=False, settle_steps=3, atoms=ATOM), steps)
+    assert tr.first["off"] == {"symbolic": 1, "geometric": 1}
+    assert tr.best["off"] == {"symbolic": 2, "geometric": 2}
+    rep = tr.report(perr(9, 9), ATOM)
+    assert (rep["geometric_success_step"], rep["geometric_first_step"], rep["evaluation_step"]) == (2, 1, 2)
+    assert rep["error_metric"]["position_error"] == pytest.approx(0.002)
+
+
+def test_off_mode_candidates_need_the_kinds_condition_and_ties_keep_the_earlier_step():
+    # step 2 has the lowest error but M fails there: no geometric candidate; symbolic (G only) may take it
+    steps = [(1, 1, 0, perr(0.01, 0.0)), (1, 1, 0, perr(0.01, 0.0)), (1, 0, 0, perr(0.001, 0.0, within=False)), (1, 1, 0, perr(0.01, 0.0))]
+    tr = feed(MET.SuccessTracker(settle_eval=False, settle_steps=4, atoms=ATOM), steps)
+    assert tr.best["off"]["geometric"] == 0  # 0, 1, 3 tie: the earliest
+    assert tr.best["off"]["symbolic"] == 2
+
+
+def test_off_mode_selection_is_final_at_the_window_end_and_a_one_step_window_is_the_first_success():
+    steps = [(0, 0, 0, perr(0.0, 0.0))] + [(1, 1, 0, perr(0.01 - 0.001 * k, 0.0)) for k in range(6)]
+    tr = MET.SuccessTracker(settle_eval=False, settle_steps=3, atoms=ATOM)
+    finals = []
+    for t, (g, m, s, e) in enumerate(steps):
+        tr.update(t, g, m, s, e)
+        finals.append(tr.final)
+    assert finals == [False, False, False, True, True, True, True]  # first at 1, window 1..3
+    assert tr.done and tr.best["off"]["geometric"] == 3
+    one = feed(MET.SuccessTracker(settle_eval=False, settle_steps=1, atoms=ATOM), steps)
+    assert one.best["off"]["geometric"] == one.first["off"]["geometric"] == 1 and one.final
+
+
+def test_on_mode_keeps_the_first_settled_step_and_the_off_mode_alongside_chooses():
+    # W = 3: G and M from step 1, S from step 3 -> first settled geometric success at 3. A settled success is judged at that step as
+    # before (no selection), even though step 2 has a lower error; the off mode reported alongside (an unsettled success) chooses 2
+    steps = [(0, 0, 0, perr(0.0, 0.0)), (1, 1, 0, perr(0.01, 0.0)), (1, 1, 0, perr(0.003, 0.0)), (1, 1, 1, perr(0.008, 0.0)),
+             (1, 1, 1, perr(0.0, 0.0))]
+    tr = feed(MET.SuccessTracker(settle_eval=True, settle_steps=3, atoms=ATOM), steps)
+    assert tr.first["on"]["geometric"] == tr.best["on"]["geometric"] == 3
+    assert tr.settled_at["on"]["geometric"] is True and tr.final
+    rep = tr.report(perr(9, 9), ATOM)
+    assert (rep["geometric_success_step"], rep["geometric_first_step"], rep["evaluation_step"], rep["evaluation_settled"]) == (3, 3, 3, True)
+    assert rep["error_metric"]["position_error"] == pytest.approx(0.008)  # the errors at the first settled step
+    assert (rep["other_mode"]["geometric_first_step"], rep["other_mode"]["geometric_success_step"]) == (1, 2)
+
+
+def test_state_and_load_carry_the_selection():
+    steps = [(1, 1, 0, perr(0.01, 0.0)), (1, 1, 0, perr(0.002, 0.0))]
+    tr = feed(MET.SuccessTracker(settle_eval=False, settle_steps=4, atoms=ATOM), steps)
+    cp = tr.state()
+    tr.update(2, 1, 1, 0, perr(0.0, 0.0))
+    assert tr.best["off"]["geometric"] == 2
+    tr.load(cp)
+    assert tr.best["off"]["geometric"] == 1 and tr.best_score["off"]["geometric"] == pytest.approx(0.1)
+    tr.update(2, 1, 0, 0, perr(0.0, 0.0, within=False))  # the retried step fails M: the selection stays
+    assert tr.best["off"]["geometric"] == 1

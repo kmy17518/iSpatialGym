@@ -433,16 +433,29 @@ def test_alignment_task_symbolic_and_geometric_success(task_env):
             rod.keep_still()
         return th.zeros(env.scene.robots[0].action_dim)
 
+    errs = []
+
     def on_step(i, info):
         isg = isg_info(info)
         trace.append((isg["step"], isg["goal"], isg["settled"], info["done"]["success"]))
+        errs.append((isg["step"], isg["error_metric"]["orientation_error"]))
 
     result = run_episode(env, policy, on_step=on_step)
 
-    # settle-eval off (the task's default): symbolic and geometric success at the teleport step (the pose_reached atom is in
-    # :goal and :measure), the episode ends there
-    assert result["symbolic_success"] and result["symbolic_success_step"] == teleport_step
-    assert result["geometric_success"] and result["geometric_success_step"] == teleport_step
+    # settle-eval off (the task's default): symbolic and geometric success first at the teleport step (the pose_reached atom is in
+    # :goal and :measure); the evaluated step is the lowest-error candidate of the settle window after it (eval.metrics,
+    # 2026-11-01) and the episode ends at that window's last step
+    W = result["settle_steps"]
+    assert result["symbolic_success"] and result["symbolic_first_step"] == teleport_step
+    assert result["geometric_success"] and result["geometric_first_step"] == teleport_step
+    for kind in ("symbolic", "geometric"):
+        assert teleport_step <= result[f"{kind}_success_step"] <= teleport_step + W - 1
+    assert result["evaluation_step"] == result["geometric_success_step"] and result["evaluation_kind"] == "geometric"
+    assert result["success_final"] and result["steps"] == teleport_step + W
+    # the evaluated step's error is no larger than the first success step's
+    first_err = next(e for (s_, e) in errs if s_ == teleport_step)
+    assert result["error_metric"]["orientation_error"] <= first_err + 1e-12
+    assert result["error_metric"]["orientation_error"] == pytest.approx(min(e for (s_, e) in errs if teleport_step <= s_ <= teleport_step + W - 1), abs=0)
     assert all(not g for (s, g, _, _) in trace if s < teleport_step)
     assert all(g and succ for (s, g, _, succ) in trace if s >= teleport_step)
     assert result["success"] and result["terminated"] and not result["truncated"]
@@ -497,8 +510,11 @@ def test_alignment_task_measure_only_atom(measure_task_env):
 
     result = run_episode(env, policy)
 
-    assert result["symbolic_success"] and result["symbolic_success_step"] == 0
-    assert result["geometric_success"] and result["geometric_success_step"] == teleport_step and result["success"]
+    # first steps: symbolic at 0, geometric at the teleport step; the evaluated steps lie in the settle windows after them
+    W = result["settle_steps"]
+    assert result["symbolic_success"] and result["symbolic_first_step"] == 0 and 0 <= result["symbolic_success_step"] <= W - 1
+    assert result["geometric_success"] and result["geometric_first_step"] == teleport_step and result["success"]
+    assert teleport_step <= result["geometric_success_step"] <= teleport_step + W - 1 and result["steps"] == teleport_step + W
     kinds = {c["bddl"]: c["kind"] for c in result["conditions"]}
     assert "(pose_reached ?fishing_rod.n.01_1)" not in kinds
     assert result["measured"] == [

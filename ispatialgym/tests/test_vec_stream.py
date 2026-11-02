@@ -331,3 +331,60 @@ def test_attachment_context_is_per_scene():
     assert PRED.attachment_context(Ent("bolt", 1), Ent("nut", 1))["equivalences"] == []  # falls back to the single-env entry
     PRED.set_attachment_context([])
     PRED.set_attachment_context([], scene_idx=0)
+
+
+# ------------------------------------------------------------------------------- the evaluated success step and the stop rule (2026-11-01)
+
+
+class GoalTrackerTol(GoalTracker):
+    """``GoalTracker`` with the report's tolerances (what ``ISpatialGymTask.collect_errors`` adds), so the selection can score steps."""
+
+    def __init__(self, goal_xy, tol: float = 0.05):
+        super().__init__(goal_xy, tol)
+        self.log: Dict[int, Any] = {}  # step -> (position error, within)
+
+    def __call__(self, env: FakeEnv) -> Dict[str, Any]:
+        d = super().__call__(env)
+        rep = d["errors"]["pose_errors"][AGENT]
+        rep["tolerances"] = {"position": self.tol, "orientation": None}
+        self.log[int(env._current_step)] = (rep["position_error"], rep["within_tolerance"])
+        return d
+
+
+@pytest.mark.parametrize("vec", [False, True])
+def test_stop_on_success_waits_for_the_final_selection_and_judges_the_lowest_error_step(vec):
+    # the source never stops by itself; the robot drives through the goal (error falls, then rises): the executor's stop rule must
+    # end the episode W - 1 steps after the first success, judged at the closest approach inside that window
+    W = 10
+    robot = FakeRobot()
+    goal = GoalTrackerTol((0.5, 0.0), tol=0.05)
+    env = FakeEnv(robot, {}, evaluate=goal)
+    env.task.tracker = MET.SuccessTracker(settle_eval=False, settle_steps=W, atoms=[("pose_reached", AGENT)])
+    source = Drive(robot, 0.5, 400, stop_on_success=False)
+    cfg = ExecutorConfig(max_steps=20000, stop_on_success=True)
+    if vec:
+        slot = Slot(idx=0, robot=robot, source=source, cfg=cfg, task=env.task, tracked={}, held=lambda: [])
+        r = VecStreamExecutor(FakeVecEnv([env]), [slot], sim=None).run([env._obs()], [env._info()])[0]
+    else:
+        ex = Executor(env, env.task, None, recorder=None, motions=None, monitors=None, cfg=cfg, sim=env.sim, state=_State(), tracked_objects={}, cam_key=CAM_KEY)
+        obs, info = env._obs(), env._info()
+        ex.last_obs, ex.last_info = obs, info
+
+        def stream():
+            o, i = obs, info
+            while True:
+                a = source(o, i)
+                if a is None:
+                    return
+                yield a
+                o, i = ex.last_obs, ex.last_info
+
+        r = ex.run_stream(stream())
+    first = r["geometric_first_step"]
+    assert r["success"] and first is not None and r["success_final"]
+    assert r["n_action_steps"] == first + W - 1  # not at the first success: at the end of its selection window
+    best = r["geometric_success_step"]
+    assert first <= best <= first + W - 1
+    assert r["evaluation_step"] == best and r["evaluation_kind"] == "geometric"
+    # the judged error is the window's minimum among the steps within tolerance
+    assert r["error_metric"]["position_error"] == min(goal.log[t][0] for t in range(first, first + W) if t in goal.log and goal.log[t][1])

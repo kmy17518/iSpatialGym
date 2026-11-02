@@ -16,6 +16,14 @@ import os
 import numpy as np
 
 
+
+def _first_step(meta, kind):
+    """The step ``kind``'s success was FIRST reached (verification compares first steps: the evaluated step, chosen within the
+    settle window by the lowest error since 2026-11-01, can move far on a tiny error difference). Metas written before that
+    change carry only ``*_success_step``, which was the first step."""
+    key = f"{kind}_first_step"
+    return meta.get(key) if key in meta else meta.get(f"{kind}_success_step")
+
 def load(ep_dir):
     meta = json.load(open(os.path.join(ep_dir, "meta.json")))
     traj = np.load(os.path.join(ep_dir, "trajectory.npz")) if os.path.exists(os.path.join(ep_dir, "trajectory.npz")) else None
@@ -76,7 +84,8 @@ def main():
             trajs[d] = t
             rows.append({"slot": m.get("vec", {}).get("slot"), "status": m.get("status"), "success": m.get("success"), "reason": m.get("reason"),
                          "wall_clock_exceeded": bool(m.get("wall_clock_exceeded")), "max_steps": m.get("max_steps"),
-                         "n_steps": m.get("n_steps"), "geo_step": m.get("geometric_success_step"), "sym_step": m.get("symbolic_success_step"),
+                         "n_steps": m.get("n_steps"), "geo_step": _first_step(m, "geometric"), "sym_step": _first_step(m, "symbolic"),
+                         "geo_eval_step": m.get("geometric_success_step"), "sym_eval_step": m.get("symbolic_success_step"),
                          "pos_err_final": ((m.get("errors_final_step") or {}).get("pose_errors") or {}) and next(iter(((m.get("errors_final_step") or {}).get("pose_errors") or {}).values())).get("position_error"),
                          "wall_s": m.get("wall_time_s")})
         rows.sort(key=lambda r: (r["slot"] is None, r["slot"]))
@@ -92,11 +101,12 @@ def main():
                 continue
             devs[os.path.basename(d)] = diff(a_traj, trajs[d])
         verdict_set = {(r["success"], r["geo_step"], r["n_steps"]) for r in rows}
-        report[base] = {"anchor": "ref N=1" if ref_dir else os.path.basename(anchor), "anchor_success": a_meta.get("success"), "anchor_geo_step": a_meta.get("geometric_success_step"),
+        report[base] = {"anchor": "ref N=1" if ref_dir else os.path.basename(anchor), "anchor_success": a_meta.get("success"), "anchor_geo_step": _first_step(a_meta, "geometric"),
+                        "anchor_geo_eval_step": a_meta.get("geometric_success_step"),
                         "anchor_n_steps": a_meta.get("n_steps"), "anchor_wall_clock_exceeded": bool(a_meta.get("wall_clock_exceeded")),
-                        "rows": rows, "identical_verdicts": len(verdict_set) == 1 and (not ref_dir or (a_meta.get("success"), a_meta.get("geometric_success_step"), a_meta.get("n_steps")) in verdict_set),
+                        "rows": rows, "identical_verdicts": len(verdict_set) == 1 and (not ref_dir or (a_meta.get("success"), _first_step(a_meta, "geometric"), a_meta.get("n_steps")) in verdict_set),
                         "deviations": devs}
-        print(f"== {base}  anchor={report[base]['anchor']} success={a_meta.get('success')} geo_step={a_meta.get('geometric_success_step')} n_steps={a_meta.get('n_steps')}")
+        print(f"== {base}  anchor={report[base]['anchor']} success={a_meta.get('success')} geo_step={_first_step(a_meta, 'geometric')} n_steps={a_meta.get('n_steps')}")
         for r in rows:
             print(f"  slot {r['slot']}: success={r['success']} reason={r['reason']} n_steps={r['n_steps']} geo_step={r['geo_step']} sym_step={r['sym_step']} pos_err_final={r['pos_err_final']} wall={r['wall_s']}")
         for name, dv in devs.items():
