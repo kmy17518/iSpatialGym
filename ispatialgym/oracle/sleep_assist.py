@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 import os
+import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import torch as th
@@ -225,6 +226,9 @@ class SleepAssist:
         self.free: Dict[str, bool] = {}
         self.sleeps: Dict[str, List[int]] = {}
         self.rollbacks: List[int] = []
+        #: wall time of step() by phase (report: cost_ms_per_step) and the number of steps
+        self.cost_s: Dict[str, float] = {}
+        self.n_steps = 0
 
     def trim(self, step: int) -> None:
         """The executor rolled the world back to its checkpoint after control step ``step`` (``Executor.restore``; ``run_isg_vec`` never
@@ -251,6 +255,9 @@ class SleepAssist:
                "clamped_steps": dict(self.clamped), "free_objects": [k for k, v in self.free.items() if v]}
         if self.rollbacks:
             out["rollbacks"] = self.rollbacks[:50]  # run_isg: the checkpoint steps the executor rolled back to (events after them trimmed)
+        if self.n_steps:
+            out["cost_ms_per_step"] = {k: round(1000.0 * v / self.n_steps, 3) for k, v in sorted(self.cost_s.items())}
+            out["cost_steps"] = self.n_steps
         return out
 
     def step(self, step: int) -> None:
@@ -260,6 +267,14 @@ class SleepAssist:
         windowed net-motion test is the ``pose_settled`` notion; PhysX's own filter sums the per-frame velocities and never fires on a
         convex-hull chatter that has no net motion. Recorded per object in ``meta.sleep_assist``."""
         W, pos_tol, rot_tol = self.config
+        self.n_steps += 1
+        cost, t_last = self.cost_s, [time.perf_counter()]
+
+        def lap(name: str) -> None:  # the time since the last lap, to the phase that just ended
+            now = time.perf_counter()
+            cost[name] = cost.get(name, 0.0) + (now - t_last[0])
+            t_last[0] = now
+
         try:
             from omnigibson.object_states import Touching
         except Exception:  # noqa: BLE001
@@ -276,6 +291,7 @@ class SleepAssist:
                 eefs[arm] = pe
         except Exception:  # noqa: BLE001
             eefs = {}
+        lap("eef")
         for inst, obj in self.tracked.items():
             free = self.free.get(inst)
             if free is None:
@@ -299,10 +315,12 @@ class SleepAssist:
             hist.append((pos.detach().clone(), quat.detach().clone()))
             if len(hist) > W:
                 del hist[0]
+            lap("pose")
             try:
                 asleep = obj.is_asleep() if callable(getattr(obj, "is_asleep", None)) else bool(getattr(obj, "is_asleep", False))
             except Exception:  # noqa: BLE001
                 asleep = False
+            lap("asleep")
             # proactive wake: a gripper approaching a slept object wakes it before the contact (sleep mode)
             near = False
             if self.mode == "sleep" and self.wake_m > 0:
@@ -318,6 +336,7 @@ class SleepAssist:
                     near = dmin < self.wake_m
                 except Exception:  # noqa: BLE001
                     near = False
+                lap("near")
                 if near and asleep and self.slept.get(inst):
                     try:
                         obj.wake()
@@ -338,10 +357,12 @@ class SleepAssist:
                         hist.clear()
                         if debug:
                             print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: touching the robot (window restarted)", flush=True)
+                        lap("touch")
                         continue
                 except Exception as ex:  # noqa: BLE001
                     if debug:
                         print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: Touching(robot) failed {ex!r}", flush=True)
+            lap("touch")
             if asleep or near or len(hist) < W:
                 if debug:
                     print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: asleep={asleep} near={near} hist={len(hist)}", flush=True)
@@ -349,6 +370,7 @@ class SleepAssist:
             p0, q0 = hist[0]
             dp = max(float(th.linalg.norm(pp - p0)) for pp, _ in hist)
             dq = max(2.0 * math.acos(min(1.0, abs(float(th.dot(q0, qq))))) for _, qq in hist)
+            lap("rest")
             if dp >= pos_tol or dq >= rot_tol:
                 if debug:
                     print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: moving dp={dp * 1000:.2f}mm dq={dq * 1000:.2f}mrad", flush=True)
@@ -383,6 +405,7 @@ class SleepAssist:
                             break
                     except Exception:  # noqa: BLE001
                         continue
+                lap("support")
                 if blocked:
                     if debug:
                         print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: at rest but an awake tracked body rests on it", flush=True)
@@ -408,3 +431,4 @@ class SleepAssist:
                         runs[-1] = step  # extend: the list keeps run starts as [start, ..., last] pairs implicitly via the counter below
             except Exception as ex:  # noqa: BLE001
                 print(f"SLEEP_ASSIST {self.name} step {step}: {inst} assist failed: {ex!r}", flush=True)
+            lap("act")
