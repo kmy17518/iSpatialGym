@@ -50,10 +50,23 @@ DEADLINE=$(( JOB_END - DEMO_LIMIT_S - 420 ))
 # ---- GPU memory monitor (one line per minute: used MiB per process) ----
 ( while true; do echo "$(date +%s) $(nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader | tr -d ' ') $(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader | tr -d ' ' | tr '\n' ' ')"; sleep 60; done ) >> $JOBDIR/gpu.log 2>/dev/null &
 MONPID=$!
+# ---- COLLECTOR_PIN (2026-11-02, default off until its job-level A/B): the sampler and each collector on CPUs of their own (taskset;
+# scripts/cpu_split.py, ISPATIALGYM_FAST_COLLECTOR_CPUS per collector). Unpinned Kit processes on one job's CPUs slow each other: two
+# de03 collectors stepped at 334 ms each against 95 alone, and at 63-65 pinned to 3 CPUs each (E16) ----
+PINS=()
+if [ "${ISPATIALGYM_FAST:-1}" != 0 ] && [ "${ISPATIALGYM_FAST_COLLECTOR_PIN:-0}" != 0 ]; then
+  PINS=( $(python3 $F/scripts/cpu_split.py $K ${ISPATIALGYM_FAST_COLLECTOR_CPUS:-3}) )
+  if [ ${#PINS[@]} -gt 0 ]; then
+    echo "PIN sampler=${PINS[0]} $(for i in $(seq 1 $K); do printf "c$i=%s " ${PINS[$i]}; done)" | tee -a $JOBDIR/job.txt
+  else
+    echo "PIN off: $(nproc) CPUs are fewer than $(( (K + 1) * ${ISPATIALGYM_FAST_COLLECTOR_CPUS:-3} ))" | tee -a $JOBDIR/job.txt
+  fi
+fi
+pin_of() { [ ${#PINS[@]} -gt 0 ] && echo "taskset -c ${PINS[$1]}"; }
 # ---- sampler ----
 t0=$(date +%s)
 ( export ISPATIALGYM_PHYSICS_ONLY=; unset ISPATIALGYM_PHYSICS_ONLY
-  timeout -s INT -k 300 $SAMPLE_LIMIT_S python -m ispatialgym.sampling.multiply_isg --split train --template $TEMPLATE --instances $N --start-index $START \
+  timeout -s INT -k 300 $SAMPLE_LIMIT_S $(pin_of 0) python -m ispatialgym.sampling.multiply_isg --split train --template $TEMPLATE --instances $N --start-index $START \
     --out $JOBDIR/inst --eval-run $EVAL_INDEX --no-write-back --max-attempts $MAX_ATTEMPTS $KEEP_SCENE $CUSTOMS_ARG --log-level INFO > $JOBDIR/sample.log 2>&1
   echo $? > $JOBDIR/sample.rc ) &
 SPID=$!
@@ -71,7 +84,7 @@ collector() {
     q=$(( q + 1 ))
     local r0=$(cat $JOBDIR/results.jsonl 2>/dev/null | wc -l) t1=$(date +%s)
     echo "ISGF_COLLECT $SLURM_JOB_ID c$i q=$q left=$(python $F/scripts/queue_watch.py $JOBDIR left) deadline=$DEADLINE start=$(date -Is)" | tee -a $JOBDIR/job.txt
-    python -m ispatialgym.oracle.run_isg --queue $JOBDIR/inst --claims $JOBDIR/claims --done-file $JOBDIR/sampling.done --poll-s 15 \
+    $(pin_of $i) python -m ispatialgym.oracle.run_isg --queue $JOBDIR/inst --claims $JOBDIR/claims --done-file $JOBDIR/sampling.done --poll-s 15 \
       --results $JOBDIR/results.jsonl --deadline $DEADLINE --mode oracle --out $JOBDIR/demo --record hdf5 $COLLECT_EXTRA $( [ -e $JOBDIR/prebuild.mismatch ] || echo $PREBUILD_ARG ) > $JOBDIR/collect_c${i}_q$q.log 2>&1 &
     local qpid=$! killed=""
     while kill -0 $qpid 2>/dev/null; do
@@ -97,12 +110,18 @@ if [ "${ISPATIALGYM_FAST:-1}" != 0 ] && [ "${ISPATIALGYM_FAST_COLLECTOR_PREBUILD
   # source: a template copy an EARLIER train job of this alias wrote (the sampler's output - scene variant and settle as this job's
   # sampler writes them), newest first, this campaign then train85; the counted eval template (the sampler's input) only when none
   # exists - it differs where the train sampler draws another scene variant (disembedding_03)
-  SRC=""
-  for d in $(ls -td $F/out/*/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID /vision/u/minyeong/projects/isg_home/train85/out/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID 2>/dev/null); do
+  # 2026-11-02: only a copy whose scene crop request is this job's (scripts/prebuild_crop.py) - the 11-01 packing fleet took full4's
+  # SCENE_CROP=full copies for cropped jobs and every collector rebuilt its world after its first instance (prebuild.mismatch)
+  SRC=""; NSKIP=0
+  for d in $(ls -td $F/out/*/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID /vision/u/minyeong/projects/isg_home/train85/out/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID 2>/dev/null) ${COUNTED_TEMPLATE:-}; do
     case "$d" in $JOBDIR/*) continue ;; esac
-    if [ -f "$d/template.json" ] && ls $d/instances/*-tro_state.json >/dev/null 2>&1; then SRC=$d; break; fi
+    if [ -f "$d/template.json" ] && ls $d/instances/*-tro_state.json >/dev/null 2>&1; then
+      fit=$(python $F/scripts/prebuild_crop.py $d 2>/dev/null || echo "skip prebuild_crop.py failed")
+      if [ "$fit" = fits ]; then SRC=$d; break; fi
+      NSKIP=$(( NSKIP + 1 )); [ $NSKIP -le 3 ] && echo "PREBUILD_SKIP $d $fit" | tee -a $JOBDIR/job.txt
+    fi
   done
-  [ -z "$SRC" ] && [ -n "${COUNTED_TEMPLATE:-}" ] && SRC=$COUNTED_TEMPLATE
+  [ $NSKIP -gt 0 ] && echo "PREBUILD_SKIPPED $NSKIP source(s) with another crop request" | tee -a $JOBDIR/job.txt
   CT=""
   [ -n "$SRC" ] && CT=$(ls $SRC/instances/*-tro_state.json 2>/dev/null | head -1)
   if [ -n "$CT" ]; then
