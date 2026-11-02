@@ -43,6 +43,7 @@ from ispatialgym.sampling import robot_utils  # noqa: F401  (warp pinning before
 import omnigibson as og  # noqa: E402
 
 from ispatialgym.fastflags import fast_on  # noqa: E402  (train-fast switches, 2026-10-31: ISPATIALGYM_FAST_<NAME>, default on, =0 off)
+from ispatialgym.sampling import instance_separation as SEP  # noqa: E402  (pure python: the early repeat filter's record)
 
 from ispatialgym.activity.problem import AGENT_INSTANCE, ISGProblem  # noqa: E402
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
@@ -1207,9 +1208,64 @@ class SamplerV2(TaskSampler):
             source = {"action": last.get("name"), "index": last.get("index"), "witness": None, "stance": last.get("stance")}
         return q, tuple(float(v) for v in stance.base_pose2d), source
 
+    def instance_record(self, draft: Draft) -> SEP.InstanceRecord:
+        """train-fast EARLY_REPEAT_FILTER (2026-10-31): the ``instance_separation.InstanceRecord`` of the draft as the written instance
+        would read it - a minimal TRO dict (``robot_poses.robot[0]`` from ``draft.base_pose2d`` at z 0 with the yaw's quaternion, the
+        ``ispatialgym`` block ``tro_meta_block`` builds for ``configure_targets`` before every write: activity, task_variant, scene
+        model / task_rooms, ``pose_targets`` / ``grasps`` from the draft, and the draft's object poses as ``root_link`` states), the
+        sidecar as it stands after ``sample`` (``goal.base_pose2d`` / ``goal.eef`` from the ``goal()`` hook) and the draft summary.
+        No settle, IK or disk I/O: the poses are the draft's, millimetres from the settled ones the rule compares at 0.25 m / 15 deg."""
+        x, y, yaw = (float(v) for v in draft.base_pose2d)
+        tro: Dict[str, Any] = {"robot_poses": {"robot": [{"position": [x, y, 0.0], "orientation": [float(v) for v in G.quat_from_yaw(yaw).tolist()]}]},
+                               "ispatialgym": self.tro_meta_block(draft, instance_id="draft", seed=0)}
+        for name, pose in draft.object_poses.items():
+            tro[name] = {"root_link": {"pos": [float(v) for v in G.t(pose[0]).tolist()], "ori": [float(v) for v in G.t(pose[1]).tolist()]}}
+        # REPEAT_MEASURED (2026-11-01): the written TRO keys object states by the task's instance names - the draft's object poses are
+        # keyed by scene object; both keys, so the measured objects' start states are found
+        try:
+            for b in self.bindings.all():
+                if b.scene_object_name in draft.object_poses and b.name not in tro:
+                    tro[b.name] = tro[b.scene_object_name]
+        except Exception:  # noqa: BLE001 - a stand-in sampler without bindings (tests): record_complete then sends it to the post-write check
+            pass
+        return SEP.record_from_dicts(tro, self.sidecar.to_dict(), draft.summary, self.template_meta, path="draft")
+
+    def check_early_repeat(self, draft: Draft) -> None:
+        """EARLY_REPEAT_FILTER: :attr:`instance_filter`'s ``check_record`` on :meth:`instance_record` right after ``sample`` - the same
+        ``Reject("repeats_eval")`` the post-write check raises, before the apply / settle / goal check / program check / write of an
+        instance that would be deleted anyway. The record must carry every pose the written record compares
+        (``instance_separation.record_complete``: start base + goal base; camera: goal camera; held tasks: the object's start and goal
+        pose) - fewer poses would compare fewer constraints and could reject what the post-write check keeps - else, or when the
+        filter has no ``check_record`` or the record cannot be built, this task falls back to the post-write check (logged once).
+        The post-write check stays as the final guard."""
+        if self.instance_filter is None or not fast_on("EARLY_REPEAT_FILTER"):
+            return
+        check_record = getattr(self.instance_filter, "check_record", None)
+        if check_record is None:
+            self._log_once("early_filter_off", "%s: EARLY_REPEAT_FILTER: the instance filter has no check_record; post-write check only", self.gp.alias)
+            return
+        try:
+            rec = self.instance_record(draft)
+            incomplete = SEP.record_complete(rec)
+        except Exception as e:  # noqa: BLE001 - never lose an attempt to the early check: the post-write check decides
+            self._log_once(f"early_filter_error:{self.activity}", "%s: EARLY_REPEAT_FILTER: draft record not built (%r); post-write check only for %s",
+                           self.gp.alias, e, self.activity, level=logging.WARNING)
+            return
+        if incomplete:
+            self._log_once(f"early_filter_incomplete:{self.activity}", "%s: EARLY_REPEAT_FILTER: draft record of %s is %s; post-write check only",
+                           self.gp.alias, self.activity, incomplete)
+            return
+        self._log_once("early_filter_on", "%s: EARLY_REPEAT_FILTER: repeat rule checked on the draft after sample (poses %s -> %s) against %d eval instances",
+                       self.gp.alias, [p.name for p in rec.start], [p.name for p in rec.goal], len(getattr(self.instance_filter, "pool", None) or []))
+        why = check_record(rec)
+        if why:
+            self.counters["repeats_eval_early"] = self.counters.get("repeats_eval_early", 0) + 1
+            raise Reject("repeats_eval", f"early: {why}")
+
     def check_instance_filter(self, tro_path: str) -> None:
         """:attr:`instance_filter` on the instance just written: when it gives a reason the instance's files are removed and the
-        attempt is rejected (``repeats_eval``)."""
+        attempt is rejected (``repeats_eval``). With EARLY_REPEAT_FILTER (:meth:`check_early_repeat`, train-fast 2026-10-31) this is
+        the cheap final guard on the files as written."""
         if self.instance_filter is None:
             return
         why = self.instance_filter(tro_path)
@@ -1430,6 +1486,9 @@ class SamplerV2(TaskSampler):
                     draft = self.sample(rng)
                     clock.mark("sample")
                     t_sample = time.time() - t0
+                    phase = "instance_filter"
+                    self.check_early_repeat(draft)  # EARLY_REPEAT_FILTER: Reject("repeats_eval", "early: ...") before any physics / IK / write
+                    clock.mark("instance_filter")
                     phase = "apply"
                     self.apply_draft(draft)
                     clock.mark("apply")

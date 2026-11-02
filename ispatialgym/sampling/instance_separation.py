@@ -120,6 +120,57 @@ class Pose:
 
 
 @dataclass
+class Measured:
+    """train-fast 2026-11-01 (REPEAT_MEASURED): one thing the task measures, at the start or the goal, with the task's own metric and
+    tolerance (TRO ``pose_targets`` / ``articulation_targets``). ``kind`` "pose": ``p`` (``pos_metric`` "full" -> distance, "depth" ->
+    |dz| in the camera ``frame``, None -> not compared), ``q`` (``tol_rad``, the smallest angle over ``equiv``, the object-frame symmetry
+    quaternions as ``eval.geometry.orientation_error``); kind "joint": ``p = [position]``, ``tol_m`` its tolerance (rad or m)."""
+
+    name: str
+    kind: str = "pose"
+    frame: str = "world"
+    p: Optional[List[float]] = None
+    q: Optional[List[float]] = None
+    pos_metric: Optional[str] = None
+    tol_m: Optional[float] = None
+    tol_rad: Optional[float] = None
+    equiv: List[List[float]] = field(default_factory=list)
+    #: entries with the same ``match`` tag form a set compared without regard to names (an exchangeable group's members / slots)
+    match: Optional[str] = None
+
+    def gap(self, other: "Measured") -> Optional[Dict[str, float]]:
+        """``{"pos": err, "ang": err}`` of the components ``self`` measures, or None when the two are not comparable (kind / frame)."""
+        if self.kind != other.kind or self.frame != other.frame:
+            return None
+        out: Dict[str, float] = {}
+        if self.p is not None and other.p is not None and (self.kind == "joint" or self.pos_metric):
+            if self.kind == "joint":
+                out["pos"] = abs(float(self.p[0]) - float(other.p[0]))
+            elif self.pos_metric == "depth":
+                out["pos"] = abs(float(self.p[2]) - float(other.p[2]))
+            else:
+                out["pos"] = math.dist(self.p[:3], other.p[:3])
+        if self.q is not None and other.q is not None and self.tol_rad is not None:
+            eqs = [(0.0, 0.0, 0.0, 1.0)] + [tuple(e) for e in self.equiv]
+            out["ang"] = min(math.radians(quat_gap_deg(_qmul(other.q, e), self.q)) for e in eqs)
+        return out
+
+    def within(self, other: "Measured") -> Optional[Dict[str, float]]:
+        """The gaps when ``other`` lies within ``self``'s tolerances on every measured component, else None."""
+        g = self.gap(other)
+        if g is None or not g:
+            return None
+        if "pos" in g and self.tol_m is not None and g["pos"] > float(self.tol_m):
+            return None
+        if "ang" in g and g["ang"] > float(self.tol_rad):
+            return None
+        return g
+
+    def to_json(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if v is not None and v != []}
+
+
+@dataclass
 class InstanceRecord:
     path: str
     task: str
@@ -132,17 +183,22 @@ class InstanceRecord:
     start: List[Pose]
     goal: List[Pose]
     split: Dict[str, Any] = field(default_factory=dict)
+    #: REPEAT_MEASURED (train-fast 2026-11-01): what the task measures (TRO pose_targets / articulation_targets) at the start and the goal
+    measured_start: List[Measured] = field(default_factory=list)
+    measured_goal: List[Measured] = field(default_factory=list)
 
     def to_json(self) -> Dict[str, Any]:
         return {"path": self.path, "task": self.task, "alias": self.alias, "instance_id": self.instance_id, "scene": self.scene, "room": self.room,
                 "start_base": self.start_base, "goal_base": self.goal_base, "start": [p.to_json() for p in self.start],
-                "goal": [p.to_json() for p in self.goal], "split": self.split}
+                "goal": [p.to_json() for p in self.goal], "split": self.split,
+                "measured_start": [m.to_json() for m in self.measured_start], "measured_goal": [m.to_json() for m in self.measured_goal]}
 
     @staticmethod
     def from_json(d: Dict[str, Any]) -> "InstanceRecord":
         return InstanceRecord(d.get("path", ""), d["task"], d["alias"], d.get("instance_id", ""), d["scene"], d.get("room", ""),
                               list(d["start_base"]), None if d.get("goal_base") is None else list(d["goal_base"]),
-                              [Pose(**p) for p in d.get("start") or []], [Pose(**p) for p in d.get("goal") or []], dict(d.get("split") or {}))
+                              [Pose(**p) for p in d.get("start") or []], [Pose(**p) for p in d.get("goal") or []], dict(d.get("split") or {}),
+                              [Measured(**m) for m in d.get("measured_start") or []], [Measured(**m) for m in d.get("measured_goal") or []])
 
 
 def _base2d(v: Any) -> Optional[List[float]]:
@@ -207,6 +263,69 @@ def held_object_poses(tro: Dict[str, Any], sidecar: Optional[Dict[str, Any]] = N
     return start, goal
 
 
+def measured_of(tro: Dict[str, Any]) -> Tuple[List[Measured], List[Measured]]:
+    """REPEAT_MEASURED: ``(start, goal)`` of what the TRO's task measures - every ``pose_targets`` entry (goal: the target in its frame,
+    with its metrics, tolerances and orientation equivalences; start: the object's TRO ``root_link`` state, world frame, the same
+    components and tolerances - none for the agent, whose start is the start base) and every ``articulation_targets`` joint (goal: the
+    target position; start: the object's ``joint_pos`` when it has that one joint). Distractors and other objects are not measured."""
+    isg = tro.get("ispatialgym") or {}
+    start: List[Measured] = []
+    goal: List[Measured] = []
+    for name, t in sorted((isg.get("pose_targets") or {}).items()):
+        if not isinstance(t, dict):
+            continue
+        pm, om = t.get("position_metric"), t.get("orientation_metric")
+        p = [float(v) for v in t["position"]] if (pm and t.get("position") is not None) else None
+        q = [float(v) for v in t["orientation"]] if (om and t.get("orientation") is not None) else None
+        if p is None and q is None:
+            continue
+        tol_m = float(t["position_tolerance"]) if (p is not None and t.get("position_tolerance") is not None) else None
+        tol_rad = float(t["orientation_tolerance"]) if (q is not None and t.get("orientation_tolerance") is not None) else None
+        if (p is not None and tol_m is None) or (q is not None and tol_rad is None):
+            continue  # a measured component without a tolerance cannot be compared at the task's precision
+        eqv = [[float(v) for v in e] for e in (t.get("orientation_equivalences") or [])]
+        goal.append(Measured(f"goal:{name}", "pose", str(t.get("frame") or "world"), p, q, pm if p is not None else None, tol_m, tol_rad, eqv))
+        if name == AGENT:
+            continue
+        s = _pose_of((tro.get(name) or {}).get("root_link"))
+        if s is not None:
+            start.append(Measured(f"start:{name}", "pose", "world", s[0] if p is not None else None, s[1] if q is not None else None,
+                                  "full" if p is not None else None, tol_m, tol_rad, eqv))
+    for gname, gspec in sorted((isg.get("groups") or {}).items()):
+        # groups (attachment's assembly, block design's slots): world-frame target slots at the group's pose tolerances; members of an
+        # ``exchangeable`` group (any member in any slot) and their slots compare as sets
+        if not isinstance(gspec, dict) or not gspec.get("target_slots"):
+            continue
+        tol = gspec.get("pose_tolerances") or {}
+        tol_m = float(tol["position"]) if tol.get("position") is not None else None
+        tol_rad = float(tol["orientation"]) if tol.get("orientation") is not None else None
+        if tol_m is None and tol_rad is None:
+            continue
+        eqv = [[float(v) for v in e] for e in (gspec.get("orientation_equivalences") or [])]
+        exch = ((gspec.get("assignment") or {}).get("mode") or "fixed") == "exchangeable"
+        for slot, sp in sorted(gspec["target_slots"].items()):
+            pose = _pose_of(sp)
+            if pose is None:
+                continue
+            goal.append(Measured(f"goal:{gname}:{slot}", "pose", "world", pose[0] if tol_m is not None else None, pose[1] if tol_rad is not None else None,
+                                 "full" if tol_m is not None else None, tol_m, tol_rad, eqv, match=f"{gname}:slots" if exch else None))
+        for member in gspec.get("members") or []:
+            s0 = _pose_of((tro.get(member) or {}).get("root_link"))
+            if s0 is not None:
+                start.append(Measured(f"start:{member}", "pose", "world", s0[0] if tol_m is not None else None, s0[1] if tol_rad is not None else None,
+                                      "full" if tol_m is not None else None, tol_m, tol_rad, eqv, match=f"{gname}:members" if exch else None))
+    for obj, spec in sorted((isg.get("articulation_targets") or {}).items()):
+        joints = (spec or {}).get("joints") or {}
+        for jn, j in sorted(joints.items()):
+            if not isinstance(j, dict) or j.get("position") is None or j.get("tolerance") is None:
+                continue
+            goal.append(Measured(f"goal:{obj}:{jn}", "joint", "joint", [float(j["position"])], tol_m=float(j["tolerance"])))
+            jp = (tro.get(obj) or {}).get("joint_pos")
+            if isinstance(jp, list) and len(jp) == 1 and len(joints) == 1:
+                start.append(Measured(f"start:{obj}:{jn}", "joint", "joint", [float(jp[0])], tol_m=float(j["tolerance"])))
+    return start, goal
+
+
 def record_from_dicts(tro: Dict[str, Any], sidecar: Optional[Dict[str, Any]] = None, summary: Optional[Dict[str, Any]] = None,
                       meta: Optional[Dict[str, Any]] = None, path: str = "") -> InstanceRecord:
     """The :class:`InstanceRecord` of one instance from its TRO (and, when given, sidecar / summary / template_meta dicts)."""
@@ -234,8 +353,9 @@ def record_from_dicts(tro: Dict[str, Any], sidecar: Optional[Dict[str, Any]] = N
             goal.append(Pose("goal_camera", [float(v) for v in cam["position"]], q=[float(v) for v in cam["orientation"]]))
         elif goal_base is not None:
             goal.append(Pose("goal_base", goal_base[:2], yaw=goal_base[2]))
+    m_start, m_goal = measured_of(tro)
     return InstanceRecord(path, task, alias, str(isg.get("instance_id") or (sidecar or {}).get("instance_id") or ""), scene, room, start_base,
-                          goal_base, start, goal, dict(meta.get("split") or {}))
+                          goal_base, start, goal, dict(meta.get("split") or {}), m_start, m_goal)
 
 
 def _read_json(path: str) -> Optional[Dict[str, Any]]:
@@ -423,8 +543,14 @@ def find_repeat(rec: InstanceRecord, eval_records: Sequence[InstanceRecord], pos
                 ang_deg: float = REPEAT_ANG_DEG) -> Optional[Tuple[InstanceRecord, Dict[str, Tuple[float, float]]]]:
     """The first eval instance of ``rec``'s task and scene whose start and goal poses are all within ``pos_m`` / ``ang_deg`` of
     ``rec``'s, with the gaps (m, deg) per pose; None when ``rec`` repeats none."""
+    measured = measured_rule_on()
     for e in eval_records:
         if e.task != rec.task or e.scene != rec.scene:
+            continue
+        if measured and rec.measured_goal and e.measured_goal:
+            gaps = measured_repeat(rec, e, pos_m, ang_deg)
+            if gaps is not None:
+                return e, gaps
             continue
         g0 = _all_within(rec.start, e.start, pos_m, ang_deg)
         if g0 is None:
@@ -436,19 +562,129 @@ def find_repeat(rec: InstanceRecord, eval_records: Sequence[InstanceRecord], pos
     return None
 
 
+def expected_pose_names(task: str) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
+    """(start pose names, goal pose names) a complete record of ``task`` compares (:func:`record_from_dicts`): the held-object
+    tasks the start base and the held object's start / goal pose, camera relocalization the start base and the goal camera, every
+    other task the start base and the goal base. A record with fewer poses compares fewer constraints (``_all_within`` skips a
+    name the other side lacks), so an *early* record (train-fast 2026-10-31: built from the draft before the settle) must carry
+    all of them before it may reject - see :func:`record_complete`."""
+    if task in HELD_TASKS:
+        return ("start_base", "object_start"), ("object_goal",)
+    if task == CAMERA:
+        return ("start_base",), ("goal_camera",)
+    return ("start_base",), ("goal_base",)
+
+
+def measured_rule_on() -> bool:
+    """``ISPATIALGYM_FAST_REPEAT_MEASURED`` (train-fast 2026-11-01, default on; owner 2026-11-01): the train-repeat rule compares what the
+    task measures (:func:`measured_repeat`) instead of the robot base (+ the held object) of the 2026-10-11 rule."""
+    from ispatialgym.fastflags import fast_on
+
+    return fast_on("REPEAT_MEASURED")
+
+
+def measured_repeat(rec: InstanceRecord, e: InstanceRecord, pos_m: float = REPEAT_POS_M, ang_deg: float = REPEAT_ANG_DEG
+                    ) -> Optional[Dict[str, Tuple[float, float]]]:
+    """REPEAT_MEASURED (owner 2026-11-01): ``rec`` repeats ``e`` when the robot's start base is within ``pos_m`` / ``ang_deg`` and every
+    measured entry (:func:`measured_of`: each measured object's start state and goal target, each joint target) is within that entry's
+    own task tolerance (its metric, its orientation equivalences); entries are matched by name and both records must measure the same
+    things (else they are not the same task instance). Returns the gaps per entry (m or rad as m, deg), or None."""
+    sb_a = [p for p in rec.start if p.name == "start_base"]
+    sb_b = [p for p in e.start if p.name == "start_base"]
+    g0 = _all_within(sb_a, sb_b, pos_m, ang_deg)
+    if g0 is None:
+        return None
+    gaps: Dict[str, Tuple[float, float]] = dict(g0)
+    mine_all, theirs_all = rec.measured_start + rec.measured_goal, e.measured_start + e.measured_goal
+    mine = {m.name: m for m in mine_all if m.match is None}
+    theirs = {m.name: m for m in theirs_all if m.match is None}
+    if set(mine) != set(theirs):
+        return None
+    for name, m in sorted(theirs.items()):
+        g = m.within(mine[name])
+        if g is None:
+            return None
+        gaps[name] = (float(g.get("pos", 0.0)), math.degrees(float(g.get("ang", 0.0))))
+    sets_a: Dict[str, List[Measured]] = {}
+    sets_b: Dict[str, List[Measured]] = {}
+    for m in mine_all:
+        if m.match is not None:
+            sets_a.setdefault(m.match, []).append(m)
+    for m in theirs_all:
+        if m.match is not None:
+            sets_b.setdefault(m.match, []).append(m)
+    if set(sets_a) != set(sets_b):
+        return None
+    for tag in sorted(sets_b):
+        pairing = _match_sets(sets_b[tag], sets_a[tag])
+        if pairing is None:
+            return None
+        for name, g in pairing.items():
+            gaps[name] = (float(g.get("pos", 0.0)), math.degrees(float(g.get("ang", 0.0))))
+    return gaps
+
+
+def _match_sets(theirs: Sequence[Measured], mine: Sequence[Measured]) -> Optional[Dict[str, Dict[str, float]]]:
+    """An exchangeable set: each of ``theirs`` paired with a distinct one of ``mine`` within its tolerances (every permutation up to 7
+    entries, else greedy), the gaps per entry of ``theirs``; None when the sizes differ or no pairing fits."""
+    if len(theirs) != len(mine):
+        return None
+    ok = [[t.within(m) for m in mine] for t in theirs]
+    n = len(theirs)
+    if n <= 7:
+        import itertools
+
+        for perm in itertools.permutations(range(n)):
+            if all(ok[i][perm[i]] is not None for i in range(n)):
+                return {theirs[i].name: ok[i][perm[i]] for i in range(n)}
+        return None
+    used, out = set(), {}
+    for i in range(n):
+        j = next((j for j in range(n) if j not in used and ok[i][j] is not None), None)
+        if j is None:
+            return None
+        used.add(j)
+        out[theirs[i].name] = ok[i][j]
+    return out
+
+
+def record_complete(rec: InstanceRecord) -> Optional[str]:
+    """None when ``rec`` carries every pose :func:`expected_pose_names` lists for its task, else the missing names (a reason to
+    leave the decision to the post-write check). REPEAT_MEASURED: the start base and, for every measured pose target but the agent's,
+    the object's start state (an early record built from the draft may lack one)."""
+    if measured_rule_on() and rec.measured_goal:
+        have = {m.name for m in rec.measured_start}
+        missing = [] if any(p.name == "start_base" for p in rec.start) else ["start_base"]
+        # pose targets only (``goal:<object>``; a group's slot ``goal:<group>:<slot>`` has no start of its own)
+        missing += ["start:" + m.name[len("goal:"):] for m in rec.measured_goal
+                    if m.kind == "pose" and m.match is None and m.name.count(":") == 1 and m.name != f"goal:{AGENT}"
+                    and "start:" + m.name[len("goal:"):] not in have]
+        return None if not missing else "missing " + ", ".join(missing)
+    want_start, want_goal = expected_pose_names(rec.task)
+    missing = [n for n in want_start if n not in {p.name for p in rec.start}] + [n for n in want_goal if n not in {p.name for p in rec.goal}]
+    return None if not missing else "missing " + ", ".join(missing)
+
+
 def repeat_filter(eval_records: Sequence[InstanceRecord], task: Optional[str] = None, pos_m: float = REPEAT_POS_M,
                   ang_deg: float = REPEAT_ANG_DEG) -> Callable[[str], Optional[str]]:
     """``SamplerV2.instance_filter`` of a train run: ``(tro_path) -> None | why`` - why the instance just written repeats an eval
-    instance (``task``: only the eval instances of that task are kept)."""
+    instance (``task``: only the eval instances of that task are kept). The returned callable also carries ``check_record``
+    (``(InstanceRecord) -> None | why``, the same decision on a record built in memory: ``SamplerV2.instance_record`` runs it on
+    the draft right after the sample, train-fast ``EARLY_REPEAT_FILTER`` 2026-10-31) and ``pool`` (the eval records compared)."""
     pool = [e for e in eval_records if task is None or e.task == task]
 
-    def check(tro_path: str) -> Optional[str]:
-        hit = find_repeat(read_instance(tro_path), pool, pos_m, ang_deg)
+    def check_record(rec: InstanceRecord) -> Optional[str]:
+        hit = find_repeat(rec, pool, pos_m, ang_deg)
         if hit is None:
             return None
         e, gaps = hit
         return f"repeats eval instance {e.instance_id or e.path} ({e.alias}): " + ", ".join(f"{k} {d:.2f} m / {a:.0f} deg" for k, (d, a) in gaps.items())
 
+    def check(tro_path: str) -> Optional[str]:
+        return check_record(read_instance(tro_path))
+
+    check.check_record = check_record  # type: ignore[attr-defined]
+    check.pool = pool  # type: ignore[attr-defined]
     return check
 
 
