@@ -377,7 +377,10 @@ class InstanceLoader:
     # -- environment --------------------------------------------------------------------------------------------
 
     def build_env(self):
-        for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", False), ("ENABLE_TRANSITION_RULES", False)):
+        # 2026-11-01 train-fast COLLECTOR_GPU_DYNAMICS (default off; owner follow-up F1): GPU PhysX for this single-scene collector, the
+        # simulator device staying "cpu" (PhysX steps on the GPU, the tensor API hands CPU copies), for the CPU vs GPU dynamics A/B
+        gpu_dynamics = fast_on("COLLECTOR_GPU_DYNAMICS", default=False)
+        for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", gpu_dynamics), ("ENABLE_TRANSITION_RULES", False)):
             if getattr(gm, name) != value:
                 with gm.unlocked():
                     setattr(gm, name, value)
