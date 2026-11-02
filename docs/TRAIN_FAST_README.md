@@ -1,6 +1,6 @@
 # train-fast: what changed and how to re-run the experiments
 
-The record of the train-fast campaign (2026-10-31 .. 11-01): the code changes on this branch, the experiments run on the
+The record of the train-fast campaign (2026-10-31 .. 11-02): the code changes on this branch, the experiments run on the
 Stanford cluster, their results, and the commands to repeat them. The design and the full switch table are in
 [FAST_FLOW.md](FAST_FLOW.md); the 10-31 interim speed report is [SPEED_REPORT.md](SPEED_REPORT.md). The chronological log with
 every job id is `$F/DECISIONS.md` on the cluster (append-only); this file is the summary and the replication guide.
@@ -22,10 +22,11 @@ curated training data.
 | shared sampling cache | `$F/cache/sampling` (start-draw cells, exact-IK witnesses; `ISGF_SAMPLING_CACHE` overrides) |
 | read-only inputs | `$E=/vision/u/minyeong/projects/isg_home/eval85` (counted eval templates, `snapshot.sh`), train85's `bands_train` and templates |
 
-A snapshot of `$F/scripts` (11-01 20:10 PST, refreshed at 22:30 with the E15 scripts) is in
+A snapshot of `$F/scripts` (11-01 20:10 PST, refreshed at 22:30 with the E15 scripts and on 11-02 with the E16 / E17 scripts) is in
 [scripts/trainfast/](../scripts/trainfast/), without `__pycache__`. The scripts hard-code the cluster paths (`$F`, `$W`, train85,
 eval85) and run from `$F/scripts`; the cluster copy is the live one. The `*.bak_*` files are `job_fast.sh` / `submit_fast.py` before
-their 10-31 21:50 and 11-01 09:27 edits, which is what earlier tags ran. Section 6 lists the scripts each experiment needs.
+their 10-31 21:50, 11-01 09:27 and 11-02 01:46 edits, which is what earlier tags ran. Section 6 lists the scripts each experiment
+needs.
 
 ## 2. Code changes (commits on 43ad206a)
 
@@ -44,6 +45,8 @@ their 10-31 21:50 and 11-01 09:27 edits, which is what earlier tags ran. Section
 | `0bc722ac` | FAST_FLOW.md, SPEED_REPORT.md |
 | `2616ca71` | this README |
 | later | the owner's 11-01 defaults (TILT_SNAP off, BAND_REFINE_INIT nearest) and the `scripts/trainfast/` snapshot: `git log --oneline 2616ca71..train-fast` |
+| `cb7bc1dd`, `3eb83ac9` | COLLECTOR_GPU_DYNAMICS (off, E17), COLLECTOR_PHYSX_THREADS (E16) |
+| `0b716acf` and later | `job_fast.sh`: the crop-matched prebuild source and COLLECTOR_PIN (default on since 11-02 04:41), `job_pair.sh` halves (E16) |
 
 Every switch is `ISPATIALGYM_FAST_<NAME>`, read by `fastflags.fast_on` / `fast_value`. `=0` turns one off and `ISPATIALGYM_FAST=0`
 turns all of them off (the base code's behaviour, an A side on the same code). They are **on by default** except:
@@ -98,6 +101,8 @@ python3 scripts/submit_fast.py submit <alias key> 24 $COMMON --tag <tag> [--extr
 - `--flow base --code $F/code_base_43ad206a_spa2still` = train85's job flow (sampler, then rendered demos one after the other).
 - **Resources:**
   - 12 CPUs / 32 GB per job. 24 CPUs filled a 72-CPU / 8-GPU TITAN node at 3 jobs; jobs use a median of 8 cores.
+  - COLLECTOR_PIN (on by default since 11-02) gives each collector 3 CPUs of its own and the sampler the rest; it needs
+    (K + 1) x 3 CPUs, so k=2 runs on 12 and k=3 on 16 (48 GB). With fewer CPUs it stays off and `job.txt` says `PIN off`.
   - Caps are 48 GPUs / 56 jobs per user on svl and 30 GPUs on viscam (`--part viscam --acct viscam --gres l40s`; gres = the type only).
   - viscam12 is excluded (two CUDA illegal-memory-access crashes in cuRobo).
   - Submit with `sbatch` only (srun from svl11 hangs).
@@ -141,6 +146,11 @@ The cluster worktree was edited during the campaign, so a tag ran on the code of
 | 11-01 15:40 | TILT_SNAP |
 | 11-01 16:20 | BAND_REFINE, BAND_VERIFY_STORE, RECORD_CHANGED_ONLY (DECISIONS logs them at 17:00; the first `refine_on` jobs started 16:20, `full3` at 16:33) |
 | 11-01 20:10 | defaults: TILT_SNAP off, BAND_REFINE_INIT `nearest`. Tags submitted from 15:40 ran TILT_SNAP on, and tags from 16:20 the `bracket` start: to repeat them add `ISPATIALGYM_FAST_TILT_SNAP=1` / `ISPATIALGYM_FAST_BAND_REFINE_INIT=bracket` |
+| 11-01 22:51 | COLLECTOR_GPU_DYNAMICS (off) |
+| 11-02 01:39 | COLLECTOR_PHYSX_THREADS (0 = PhysX's own count) |
+| 11-02 01:46 | `job_fast.sh`: COLLECTOR_PREBUILD takes only a template copy with the job's scene crop request (`prebuild_crop.py`); the `pk_*` tags (E16) ran before it |
+| 11-02 02:34 | `job_fast.sh`: COLLECTOR_PIN (off; on per job with `ISPATIALGYM_FAST_COLLECTOR_PIN=1`), `cpu_split.py` |
+| 11-02 04:41 | COLLECTOR_PIN on by default (`ISPATIALGYM_FAST_COLLECTOR_PIN=0` turns it off); `job_pair.sh` runs each member on half of the job's physical cores (`cpu_split.py halves`). Tags before it ran unpinned unless they set the switch; the `pk_pair*` members shared all the CPUs |
 
 ## 6. Experiments
 
@@ -397,6 +407,109 @@ which the job walls do not reproduce. Speed-ups are against train85 on the same 
 - Decision: no narrower per-step dump / sync set (it cannot move throughput while the sampler bounds the job). Details and the
   projection: SPEED_REPORT.md.
 
+### E16. More processes per GPU, the CPU contention and COLLECTOR_PIN (11-01 night .. 11-02)
+
+- **Fleet** (11-01 22:36, `pk_submit.sh singles | pairs`, n=24 per sampler). Keys: ontop_small_01 (sampler-bound), disembedding_03
+  (collector-bound), mental_rotation-mug (fast sampler, short demos). Arms:
+  - `pk_k2`: sampler + 2 collectors, 12 CPUs / 32G (the default);
+  - `pk_k3`: + 3 collectors, 16 CPUs / 48G;
+  - `pk_pair1`: 2 x (sampler + 1) on one GPU (`job_pair.sh`), 24 CPUs / 64G;
+  - `pk_pair2`: 2 x (sampler + 2), 24 CPUs / 96G, L40S only.
+
+  Successes per GPU-hour (`pack_ab.py`; per job `pack_detail.py`):
+
+  | key | TITAN k2 | TITAN k3 | TITAN pair1 | L40S k2 | L40S k3 | L40S pair1 | L40S pair2 |
+  |---|---|---|---|---|---|---|---|
+  | ontop_small_01 | 12.2 | 12.8 | 14.9 | 7.4 | 11.4 | 25.9 | 19.2 |
+  | disembedding_03 | 12.8 | 9.4 | 4.5 | 14.7 | 13.0 | 46.5 | 32.2 |
+  | mental_rotation-mug | 28.6 | 24.8 | 39.1 | 50.6 | 55.8 | 66.3 | 82.1 |
+
+  - One unit per cell (two for TITAN k2).
+  - ontop's yield is decided by its slice of train indices (written per attempt 5-25 %).
+  - The TITAN de03 / mug k2 and k3 jobs prebuilt from SCENE_CROP=full copies and rebuilt their world (the prebuild fix below).
+  - TITAN de03 pair1: both samplers ran out of CUDA memory in cuRobo after ~12 min (24 GB) and wrote 1 demo. L40S pair2 peaked at 43
+    of 48 GB.
+  - A third collector made de03 slower (TITAN 12.8 -> 9.4): its collectors stepped at 724 ms, against 340 with two and 95 alone.
+- **The contention.** One de03 instance (crop4 g100336-100359), run by N collectors (`run_isg --instance`) started 45 s apart in one
+  job, each with its own Kit app data (`job_ct.sh`, `ct_submit.sh threads | env | pinsize | copy`, table `ct_ab.py`). Every run
+  recorded the same demo (929 steps, first success at 714).
+
+  | arm | env ms/step per collector |
+  |---|---|
+  | 1 collector, 12 CPUs | 95 |
+  | 2 collectors, 12 CPUs | 334-350 |
+  | 2, PhysX 2 / 4 threads (COLLECTOR_PHYSX_THREADS; PhysX's default is 8) | 322 / 344 |
+  | 2, 24 CPUs | 367 (759-808 % CPU each) |
+  | 3, 16 CPUs (with PhysX 2) | 516-586 (560-642) |
+  | 2, each with its own HOME / isg caches / SLURM_JOB_ID / a pair member's whole environment | 349 / 322 / 341 / 283-298 |
+  | 2, each with its own copy of the template files (plus the pair environment) | 307-309 (271-297) |
+  | 2, pinned (taskset) to 6 CPUs each | 86-87 (144-149 % CPU each) |
+  | 2, pinned to 2 / 3 / 4 CPUs each | 76 / 63-65 / 83 |
+  | 3, pinned to 3 CPUs each | 75-97 |
+
+  - Two unpinned Kit processes (~340 threads each) on one job's CPUs slow each other about 4x and burn about 4 cores each. QA goes
+    from 3.7 to 22-41 ms per step.
+  - More CPUs, fewer PhysX threads, and separate environments, caches or files do not remove it. Disjoint CPU sets do.
+  - In the fleet's metas (per-demo time windows), a demo overlapped by another demo of its own `job_fast.sh` steps at 309-342 ms. A
+    pair1 L40S de03 demo overlapped by the other member's demo steps at 55 ms. Why the two members of a pair escape it is open (it
+    was not reproduced on TITAN; pair1 ran on L40S).
+  - E2's sampler (62 s per attempt alone, 108-137 s next to two collectors) is likely the same contention.
+- **Prebuild fix (11-02 01:46).**
+  - The fleet's TITAN mug / de03 jobs prebuilt from full4's SCENE_CROP=full copies. Each collector then rebuilt its world after its
+    first instance (`prebuild.mismatch`, ~8 min per collector).
+  - `job_fast.sh` now takes only a copy whose scene crop request is the job's (`prebuild_crop.py`).
+  - Smoke `pb_smoke` (mr-mug, n=4): the default took the newest cropped copy, 0 mismatches. `pb_smoke_full` (SCENE_CROP=full)
+    skipped 11 cropped copies and took full4's.
+- **COLLECTOR_PIN job-level A/B** (11-02 02:34, `pin_submit.sh`, n=24). `job_fast.sh` puts each collector on 3 CPUs of its own and
+  the sampler on the rest (`cpu_split.py`). Per job `pack_detail.py`; per demo the medians of meta `fast.step_costs`:
+
+  | arm | succ/GPU-h | collector env ms/step | sampler s/attempt | demo wall s |
+  |---|---|---|---|---|
+  | de03 TITAN k2 pinned (2 jobs) | 32.0 / 29.2 | 89 | 35-39 | 114 |
+  | de03 TITAN k3 pinned, 16 CPUs | 32.6 | 92 | 32 | 127 |
+  | de03 TITAN k2 unpinned (fresh control) | 12.9 | 374 | 77 | 423 |
+  | de03 TITAN k2 / k3 unpinned (fleet) | 12.8 / 9.4 | 340 / 724 | 54-69 / 82 | 431 / 882 |
+  | de03 L40S k2 / k3 pinned | 52.7 / 64.0 | 46 / 47 | 17 / 17 | 61 / 66 |
+  | de03 L40S k2 / k3 unpinned (fleet) | 14.7 / 13.0 | 307 / 669 | 45 / 74 | 370 / 763 |
+  | ontop TITAN k2 pinned / fleet | 4.0 / 12.2 | 49 / 113 | 24 / 27-49 | 120 / 203 |
+  | mr-mug TITAN k2 pinned / fleet | 31.1 / 28.6 | 74 / 77 | 42 / 42-43 | 16 / 20 |
+
+  - Pinned collectors step at about their alone speed, and three pinned collectors step as fast as two.
+  - The de03 sampler gets faster too (35-39 against 77 s per attempt; acceptance 36-50 % in every arm), since its collectors are busy.
+    mr-mug's collectors are idle (10 % busy) and nothing changes.
+  - ontop pinned: its slice (g100921-100944) wrote 8 of 289 attempts. 275 of its 281 rejections are target_placement (geometry), as
+    in the fleet's ontop jobs (68-228 of 72-233). The low count is the slice's; its collectors stepped 2.3x faster.
+  - mr-mug's 31.1 against 28.6 comes from the prebuild fix (0 mismatches), not from the pinning.
+  - **Decision (11-02 04:41): COLLECTOR_PIN on by default.** `job_pair.sh` now runs each member on half of the job's physical cores
+    (`cpu_split.py halves`), so each member pins inside its own half.
+- **Pinned pair** (11-02 04:42, `pin_submit.sh pair`, tag `pinpair2_l40s`, 18264576 on viscam10): 2 x (sampler + 2 collectors) on
+  one L40S, each member pinned inside its half of the cores (a: 14-19 + 78-83, b: 20-23, 26, 27 + 84-87, 90, 91).
+  - 104.6 successes per GPU-hour (42 in 24 min), against 32.2 for the unpinned `pk_pair2_l40s` and 64.0 for `pin_k3_l40s`.
+  - Collectors 52 ms per step (308 unpinned), samplers 19-20 s per attempt (45-47), drain 65-89 s (1,893-1,983).
+  - Peak GPU memory 43.2 of 48 GB; every process exited 0.
+
+### E17. GPU PhysX and the vectorized collector (owner follow-ups, 11-01 evening)
+
+- **F1, GPU PhysX for one scene.** Switch `ISPATIALGYM_FAST_COLLECTOR_GPU_DYNAMICS=1` (`run_isg.InstanceLoader.build_env` sets
+  `gm.USE_GPU_DYNAMICS`; the simulator device stays `cpu`). One instance alone per TITAN RTX, two runs per arm, the median-length
+  successful demo of a finished job (`job_gpu_dyn.sh`, `gd_submit.sh`, table `gpudyn_ab.py`; out `out/gpudyn/<instance>/<arm>_r<k>/`).
+
+  | instance | env ms/step CPU (r1 / r2) | GPU | episode s CPU | GPU | steps, first success CPU -> GPU |
+  |---|---|---|---|---|---|
+  | ontop_small_01 | 52.6 / 52.4 | 95.7 / 87.1 | 145 / 144 | 192 / 182 | 896, 688 -> 926, 713 |
+  | mental_rotation-mug | 35.5 / 42.8 | 82.2 / 82.3 | 18.6 / 18.7 | 26.0 / 25.6 | 94, 37 (both) |
+  | disembedding_03 | 119.3 / 92.0 | 148.0 / 111.6 | 177 / 139 | 203 / 155 | 929, 714 -> 960, 740 |
+
+  - All 12 runs succeed. Each arm repeats its own demo exactly; GPU dynamics is another physics realisation. GPU memory +1.1-1.2 GB per
+    process.
+  - Decision: keep CPU PhysX (the switch stays off).
+- **F2, a vectorized oracle collector** (N scenes per process with GPU physics): not built.
+  - It needs GPU PhysX, which is slower here for one scene, and the vec_next world build (merged by another session).
+  - The multienv report (10-03) measured several environments in one process at 15.5 env-steps/s against 16.4 for separate processes.
+  - Collectors are idle most of the time in the sampler-bound families (E15), and the same "more scenes per GPU" comes from more
+    collector processes, which run at the alone speed when pinned to their own CPUs (E16).
+  - Revisit if pinned collectors become the bottleneck of the collector-bound families.
+
 ### Production-configuration fills (stopped)
 
 - Tags `pilot2` (27 aliases on viscam L40S, 93 % demo success by 12:34), `pilot3`, `pilot4` (`refill.py`, stop file `refill.stop`).
@@ -417,10 +530,12 @@ which the job walls do not reproduce. Speed-ups are against train85 on the same 
   - the split-cone collapse (E8);
   - bands written back into the eval85 / train85 snapshots;
   - static-object recording in full-scene demos (E13).
-- Packing beyond sampler + 2 collectors: 3+ collectors per GPU (large IORS, disembedding) and 2 samplers per GPU (L40S), with a
-  TITAN control on the same keys (SPEED_REPORT.md recommendation 1).
-- Follow-ups the owner asked for on 10-31, not started: GPU PhysX for a single-scene collector; a vectorized oracle collector
-  (FAST_FLOW.md).
+- Why the collectors of two unpinned pair members did not slow each other (pair1 on L40S) while two of one job did (E16).
+- `cpu_split.py` takes the job's CPUs in ascending order, which on the svl / viscam nodes puts physical cores first; on a node that
+  numbers hyperthread siblings next to each other a collector would get fewer cores. Check the `PIN` line of `job.txt`.
+- Two samplers per TITAN RTX do not fit disembedding (cuRobo out of memory, E16); per-family packing on TITAN is not measured
+  beyond the three fleet keys.
+- Pinned pairs were run once, for disembedding_03 on L40S. The sampler-bound families (ontop, mug) ran in pairs only unpinned.
 
 ## 8. Pitfalls met
 
@@ -431,3 +546,6 @@ which the job walls do not reproduce. Speed-ups are against train85 on the same 
 - **Long-running work on svl11.** Background processes on the login node die (4 parallel video decodes were killed). Run analyses that
   decode video as small CPU `sbatch` jobs.
 - **Lambda GPU.** The lambda 4090 is shared with another session. Test on the cluster.
+- **`job.env` names.** A harness that sources a job's `job.env` inherits its variables: it sets `N` (the instance count), so a test
+  script that read its own `N` before sourcing started 24 collectors per job (E16's first contention run, cancelled). Read arguments
+  into names `job.env` does not use, after sourcing it.

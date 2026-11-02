@@ -1,7 +1,7 @@
-# train-fast speed report (final, 2026-11-01)
+# train-fast speed report (final, 2026-11-02)
 
 Written for: the owner of the isg-1020 scale-up (who knows the sampler / oracle / replay pipeline). The experiments behind each number
-are in [TRAIN_FAST_README.md](TRAIN_FAST_README.md) (E1-E15); the switches in [FAST_FLOW.md](FAST_FLOW.md).
+are in [TRAIN_FAST_README.md](TRAIN_FAST_README.md) (E1-E17); the switches in [FAST_FLOW.md](FAST_FLOW.md).
 
 ## Bottom line
 
@@ -14,9 +14,16 @@ are in [TRAIN_FAST_README.md](TRAIN_FAST_README.md) (E1-E15); the switches in [F
 - **The sampler is the bottleneck.** The collectors are busy 29 % of their time in the median job and the GPUs are 8-39 % used. A
   sampler attempt costs 28-40 s instead of 109 s, but 61-80 % of sampler time is still rejected attempts, mostly `target_placement`.
 - The collector's own costs therefore barely matter for throughput. The per-step state dump is 1-3 % of collector time in cropped
-  scenes; a narrower dump or sync set was not built (section 6).
-- Next steps, by expected gain: more samplers per GPU (the GPU and, on L40S, the memory have room; a test fleet is next), longer jobs
-  (50+ instances), and cheaper `target_placement` rejections.
+  scenes; a narrower dump or sync set was not built.
+- **Collectors of one job slowed each other ~4x** (11-02). Two unpinned Kit processes on one job's CPUs step at 334-374 ms against 95
+  alone, whatever the CPU count. Pinning each collector to 3 CPUs of its own (COLLECTOR_PIN, now on by default) brings them back to
+  the alone speed. In the collector-bound disembedding_03 it raised successes per GPU-hour **2.4x on TITAN (12.9 -> 30.6-32.6) and
+  3.6-4.9x on L40S (13.0-14.7 -> 52.7-64.0)**, and made its sampler 2x faster. Two pinned disembedding jobs on one L40S made
+  **104.6**. The rates above were measured unpinned; the sampler-bound families gain less (see Packing).
+- GPU PhysX (follow-up F1) is 1.2-2.1x slower per step than CPU PhysX for one scene, so it stays off, and the vectorized collector
+  (F2) was not built.
+- Next steps, by expected gain: two pinned jobs per L40S for every family (measured only for disembedding), cheaper
+  `target_placement` rejections, and longer jobs (50+ instances).
 
 ## What was asked
 
@@ -137,7 +144,8 @@ costs 4-8 s (19 s in production) and on L40S 0.8 s.
     - Camera relocalization: dump 14 %, 1,200 floats per step.
     - Alignment: world syncs 24 % (5.5 s per sync).
     - Large configuration matching: dump 7 %, syncs 12 %.
-  - Disembedding's env step is 483 ms (83 % of its time): physics.
+  - Disembedding's env step is 483 ms (83 % of its time). That is the contention between the job's two unpinned collectors, not the
+    physics: one collector alone steps at 95 ms, pinned ones at 63-92 (Packing).
 
 ### GPUs (mostly idle)
 
@@ -146,7 +154,9 @@ costs 4-8 s (19 s in production) and on L40S 0.8 s.
   - the mixed pilot tags 8-14 %, with GPU use ≥ 50 % in 9-11 % of samples.
 - Peak memory: median 17-20 GB per job, at most 35 GB (L40S pilot2).
 
-## Packing tests (10-31, n=12, same keys as fast2; noisy)
+## Packing tests
+
+### 10-31 (n=12, same keys as fast2; noisy)
 
 | layout | keys | succ / GPU-h | fast2 (sampler + 2 collectors, 9 CPUs) |
 |---|---|---|---|
@@ -157,10 +167,50 @@ costs 4-8 s (19 s in production) and on L40S 0.8 s.
 - sampler + 2 collectors on one GPU is the best of the tested layouts.
 - The split layout halves the rate: the collector GPU is mostly idle.
 - 24 CPUs did not beat 9. A sampler alone runs an attempt in 62 s against 108-137 s next to two collectors (ontop, E2), so
-  contention is real; but more CPUs did not remove it, so it is not only a CPU shortage.
-- Not tested yet: 3 or more collectors per GPU, and 2 samplers per GPU. The data above says only the second can raise throughput for
-  most families; the first helps only large IORS and disembedding. Both are the next test (L40S, with a TITAN control on the same
-  keys to separate the hardware).
+  contention is real; but more CPUs did not remove it, so it is not only a CPU shortage. The 11-02 tests below found what it is.
+
+### 11-01 / 11-02 fleet: more processes per GPU (n=24 per sampler, E16)
+
+Successes per GPU-hour, unpinned (one job or pair per cell; a pair is two sampler + collector jobs on one GPU, `job_pair.sh`):
+
+| key | TITAN k2 | TITAN k3 | TITAN pair1 | L40S k2 | L40S k3 | L40S pair1 | L40S pair2 |
+|---|---|---|---|---|---|---|---|
+| ontop_small_01 (sampler-bound) | 12.2 | 12.8 | 14.9 | 7.4 | 11.4 | 25.9 | 19.2 |
+| disembedding_03 (collector-bound) | 12.8 | 9.4 | 4.5 | 14.7 | 13.0 | 46.5 | 32.2 |
+| mental_rotation-mug (fast sampler) | 28.6 | 24.8 | 39.1 | 50.6 | 55.8 | 66.3 | 82.1 |
+
+- k = collectors per sampler; pair1 / pair2 = two samplers with 1 / 2 collectors each.
+- ontop's yield is decided by the slice of train indices each job draws (5-25 % of attempts written), so its column-to-column
+  differences are not the layout's.
+- Two disembedding samplers ran out of CUDA memory on the 24 GB TITAN RTX (cuRobo); L40S pair2 peaked at 43 of 48 GB.
+- A third unpinned collector made disembedding slower, not faster (TITAN 12.8 -> 9.4; its collectors stepped at 724 ms).
+
+**The contention.** One disembedding instance run by two collectors in one job steps at 334-350 ms each against 95 alone, and they
+burn ~4 cores each. 24 CPUs, 2 or 4 PhysX threads, and separate HOME, caches, job ids or template files leave it at 271-367 ms.
+Disjoint CPU sets (`taskset`) bring each back to 63-87 ms at 1.1-1.5 cores each, and record the same demo. Collectors of the two
+members of an unpinned L40S pair did not slow each other (55 ms); why is open.
+
+**COLLECTOR_PIN** (`job_fast.sh`: each collector on 3 CPUs of its own, the sampler on the rest; job-level A/B, n=24):
+
+| arm | succ / GPU-h | collector ms/step | sampler s/attempt | demo wall s |
+|---|---|---|---|---|
+| disembedding TITAN k2 pinned (2 jobs) | 32.0 / 29.2 | 89 | 35-39 | 114 |
+| disembedding TITAN k3 pinned (16 CPUs) | 32.6 | 92 | 32 | 127 |
+| disembedding TITAN k2 unpinned | 12.9 (fleet 12.8) | 340-374 | 54-77 | 423-431 |
+| disembedding L40S k2 / k3 pinned | 52.7 / 64.0 | 46 / 47 | 17 | 61 / 66 |
+| disembedding L40S k2 / k3 unpinned | 14.7 / 13.0 | 307 / 669 | 45 / 74 | 370 / 763 |
+| ontop TITAN k2 pinned / unpinned | 4.0 / 12.2 (slice) | 49 / 113 | 24 / 27-49 | 120 / 203 |
+| mental_rotation-mug TITAN k2 pinned / unpinned | 31.1 / 28.6 | 74 / 77 | 42 / 42-43 | 16 / 20 |
+
+- Pinned collectors step at their alone speed, and three pinned collectors step as fast as two, so k=3 now pays for collector-bound
+  families (L40S 64.0 against 52.7).
+- The sampler gains where its collectors are busy (disembedding 2x); mental rotation's collectors are idle and nothing changes. Its
+  31.1 against 28.6 is the prebuild fix (the fleet's TITAN mug jobs prebuilt from full-scene copies and rebuilt their world).
+- The pinned ontop job drew a slice where 275 of 281 rejections were `target_placement` (8 written of 289 attempts); its collectors
+  stepped 2.3x faster.
+- **A pinned pair on one L40S** (two disembedding jobs with 2 collectors each, each member pinned inside half of the cores) made
+  **104.6** successes per GPU-hour, against 32.2 for the same pair unpinned and 64.0 for one pinned k=3 job. Its four collectors
+  stepped at 52 ms, its samplers took 19-20 s per attempt, and peak memory was 43 of 48 GB.
 
 ## Collector state dump and syncs: why no narrower set was built
 
@@ -174,7 +224,29 @@ costs 4-8 s (19 s in production) and on L40S 0.8 s.
     can alter full-scene physics.
 - World syncs: 7 % of collector time (24 % in alignment, whose collectors are 69 % busy and drain 124 s after the sampler).
 - With the sampler bounding the job, neither change would move successes per GPU-hour measurably. Only large IORS and disembedding
-  are collector-bound, and their cost is the physics step (62-83 %) and QA (19 % on large IORS).
+  are collector-bound. Their env step (62-83 % of collector time) and QA (19 % on large IORS) were inflated by the two unpinned
+  collectors slowing each other; for disembedding, pinning removed most of it (Packing). Large IORS was not re-measured pinned.
+
+## Follow-ups: GPU PhysX and a vectorized collector (E17)
+
+- **F1, GPU PhysX for one scene** (`ISPATIALGYM_FAST_COLLECTOR_GPU_DYNAMICS=1`; one instance alone per TITAN RTX, two runs per arm):
+
+  | instance | env ms/step CPU | GPU | episode s CPU | GPU |
+  |---|---|---|---|---|
+  | ontop_small_01 | 52.6 / 52.4 | 95.7 / 87.1 | 145 / 144 | 192 / 182 |
+  | mental_rotation-mug | 35.5 / 42.8 | 82.2 / 82.3 | 18.6 / 18.7 | 26.0 / 25.6 |
+  | disembedding_03 | 119.3 / 92.0 | 148.0 / 111.6 | 177 / 139 | 203 / 155 |
+
+  - All 12 runs succeed. GPU dynamics is another physics realisation (ontop 896 -> 926 steps, disembedding 929 -> 960; mug
+    unchanged), and it takes 1.1-1.2 GB more GPU memory.
+  - Kept off: one scene is too small for the GPU solver to pay.
+- **F2, a vectorized oracle collector** (N scenes per process on GPU physics): not built.
+  - It depends on GPU PhysX, which is slower here, and on the vec_next world build (being merged by another session).
+  - The multienv report (10-03) measured 15.5 env-steps/s for several environments in one process against 16.4 for separate
+    processes.
+  - The collectors are idle most of the time in the sampler-bound families, and "more scenes per GPU" is reached by more pinned
+    collector processes, which run at the alone speed.
+  - Worth revisiting only if pinned collectors become the bottleneck of the collector-bound families.
 
 ## Replay stage (separate budget)
 
@@ -194,8 +266,11 @@ costs 4-8 s (19 s in production) and on L40S 0.8 s.
 
 ## Recommendation
 
-1. **Pack samplers, not collectors.** Test 2 jobs per L40S (two samplers, 1-2 collectors each; ~40 GB) against 1 job; keep k=2 on
-   TITAN. Use k=3 only for large IORS and disembedding.
+1. **Pin, then pack.** COLLECTOR_PIN is on by default (it needs (K + 1) x 3 CPUs).
+   - On L40S, run two jobs per GPU (`job_pair.sh`, 24 CPUs / 96 GB). A pinned disembedding pair made 104.6 per GPU-hour against 52.7
+     for one pinned job, and the unpinned mental-rotation pair 82.1 against 50.6. Sampler-bound families were not run as pinned pairs.
+   - As single jobs, collector-bound families take k=3 on 16 CPUs (TITAN 32.6, L40S 64.0); the others keep k=2.
+   - On TITAN keep one job per GPU: two disembedding samplers ran out of the 24 GB, and pinned pairs were not tried there.
 2. **Run long jobs.** 50+ instances per (alias, scene, room), so the 3-4 min world load and the per-template caches amortise; steady
    rates are ~1.2x the whole-job rates at n=24.
 3. **Cut `target_placement` rejections.** They are 69-93 % of the rejections (52-83 % of all attempts) and the bulk of sampler time; a
