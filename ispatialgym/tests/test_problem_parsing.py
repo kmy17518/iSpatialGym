@@ -71,12 +71,13 @@ def _shipped_problems():
 
 
 def test_all_shipped_problems_are_listed():
-    """The shipped problems are those of the eval release's subtasks (``isg_customs.json``: iddl family + definition id);
-    the retired directory name is gone."""
+    """Every customs entry's problem (``isg_customs.json``: iddl family + definition id) is shipped - this repository also ships
+    the v1 templates and the problems of earlier groundings next to them (the eval release ships its subtasks' only); the
+    retired directory name is gone."""
     with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
         customs = json.load(f)
     expected = {(e["iddl"].split("/")[0], int(e["definition_id"])) for k, e in customs.items() if not k.startswith("_")}
-    assert set(_shipped_problems()) == expected
+    assert expected <= set(_shipped_problems())
     assert "world_alignment" not in list_activities()
     assert "alignment" in list_activities()
 

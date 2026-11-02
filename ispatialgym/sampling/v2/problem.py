@@ -708,7 +708,11 @@ class GroundedProblem:
         if os.path.exists(path):
             with open(path) as f:
                 data = json.load(f)
-        data[entry_key(data, self.variant) or self.variant] = entry
+        key = entry_key(data, self.variant)
+        if key is None and self.customs_path and os.path.exists(self.customs_path) and os.path.abspath(self.customs_path) != os.path.abspath(path):
+            with open(self.customs_path) as f:
+                key = entry_key(json.load(f), self.variant)  # a new file takes the key of the list the entry came from
+        data[key or self.variant] = entry
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f, indent=1)
