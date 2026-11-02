@@ -107,8 +107,10 @@ removed is train-fast's again. What it changes for this flow:
 | demo QA | `run_isg --qa` (default on) replaces `--demo-gating` / `--stream-qa`: BEHAVIOR's QA metrics plus the former gates as HARD metrics that fail an oracle demo at once without a retry - new: `robot_touching_objects`, `robot_touching_itself`, `pause`, `jerky_motion`, `ghost_hand`; former gates: `object_tilt` (root_moved), `robot_wobble`, `bad_release` (release_commanded), `goal_occlusion`, `arm_stutter` (train-fast's gate, now a metric). `placed_orientation` is a fact, no longer a verdict; replays and policies only log |
 | run_isg flags | `--record-view` replaces `--video` / `--dev`; new `--task`, `--settle-eval`, `--success-metric`, `--tolerance-scale`, `--wallclock`, `--config`; the sampler's `--sub-variant` is gone (block design draws its pattern from `generation.patterns`) |
 | switches | every `ISPATIALGYM_FAST_*` switch and default unchanged (`fastflags.py` identical; the same 60 switches at the same call sites); PHYSICS_ONLY_TRIM also skips QA's goal-occlusion render (recorded as skipped, never judged) |
-| Behavior-1K | 6a6194600 + vec_next's overlay (`scripts/vec_eval/apply_b1k_overlay.sh`, 12 files); the single-scene collectors run on it too |
-| vectorized | `python -m ispatialgym.oracle.run_isg_vec` (N scenes per process, replay / policy), its rigid sleep threshold 0.005 and sleep assist (driver only, not in `run_isg`), the batch restore fix |
+| Behavior-1K | 6a6194600 + vec_next's overlay (`scripts/vec_eval/apply_b1k_overlay.sh`, 12 files); the single-scene collectors run on it too, with the overlay's default-on build speed-ups (asset preparation cache, mesh cache, lazy particle systems, the shared assisted-grasp contact view) |
+| physics (both drivers) | owner 2026-11-01: `run_isg` generates the demos and `run_isg_vec` evaluates, with the same physics - `oracle/sleep_assist.py`, the same flags and defaults in both: `--rigid-sleep-threshold 0.005` (PhysX's default instead of OmniGibson's 5e-5 on every free non-articulated object: the scene's at the build, the task objects at every restore; articulations and the robot keep 5e-5), `--sleep-assist 30,1,3` (a free task object of at most 5 kg that moved less than 1 mm / 3 mrad over 30 steps, does not touch the robot, has no moving gripper within 5 cm and nothing awake resting on it, is put to sleep and woken again when a moving gripper comes within 5 cm; a rollback to a checkpoint trims its record), `--lean-step` (no per-object `update_visuals` pass). `meta.driver_physics`, `meta.sleep_assist` (with `cost_ms_per_step`), `fast.step_costs.sleep_assist_s`. Off (the collector before 2026-11-02): `--sleep-assist off --rigid-sleep-threshold 0 --no-lean-step` |
+| asset cache | vec_next's persistent asset-geometry cache (overlay `utils/isg_asset_cache.py`, content-keyed): `ISG_VEC_ASSET_CACHE_DIR=<shared dir>` in the job env (sampler and collectors); a process writes a shard only when it computed something new. Off unless set |
+| vectorized | `python -m ispatialgym.oracle.run_isg_vec` (N scenes per process, replay / policy; no collector, owner 2026-11-01), the batch restore fix |
 
 Validation (2026-11-01, svl TITAN RTX, n=8 jobs of this flow on the merged code): artic_open_small_01 8/8 demos successful, touching_01
 6/7, axial_01 4/8 (rule2 baseline 50 %), ontop_small_01 5/8 cropped and 0/3 in the full scene against 85-100 % before - lost to
@@ -116,6 +118,27 @@ Validation (2026-11-01, svl TITAN RTX, n=8 jobs of this flow on the merged code)
 settle window). The collectors' per-step costs are unchanged (QA 17-25 ms per step before and after); the kinematic replay renders at
 6.96 env-steps/s as before; vec_next's apple and teapot-bar verifications pass at N=8. Unit tests: the base failures plus
 `test_eval_instances::test_step_budget`, which fails on the release's own code (`$F/merge_vecnext/new_base_fails.txt`).
+
+Owner decisions on that validation (2026-11-01): `robot_touching_objects` stays as the release defines it (the torso must not touch the
+table: those demos are failures); vec_next's physics goes into `run_isg` (the row above); the block_design board problem keeps its tray
+outside `targets_group`.
+
+Validation of the shared physics (2026-11-02, svl TITAN RTX; `$F/merge_vecnext/DECISIONS.md`):
+- Drivers: `run_isg_vec` N=1 is bit-identical to before the code moved (apple, teapot-bar). `run_isg --mode replay` of an eval demo vs
+  `run_isg_vec` N=1: apple bit-identical; teapot-bar the same verdict, success step, sleep / wake events and robot rows, object poses
+  within 0.5 mm after the lid's attachment (step ~765) - the same with every switch off in both drivers and with `--no-qa`, so a
+  difference between the drivers' task evaluation that predates the shared physics.
+- Collectors, rerun on the instances of the merge's validation jobs (`job_recollect.sh`: the sampled TROs restored, no sampler): the
+  same verdicts per alias (axial_01 4/8, artic_open_small_01 8/8, touching_01 6/7, ontop_small_01 5/8 cropped and 0/3 full scene);
+  ontop's `not_settled` demos became a success and `symbolic_only` (the kielbasa pack lands 0.43-0.44 rad off its goal orientation);
+  touching's one `not_settled` stays (the gripper keeps passing the boxes). With identical starts the new physics parts from the old at
+  step 12, when PhysX first sleeps the resting objects; two runs of the same code are bit-identical (the collector is deterministic).
+- Cost: the env step is unchanged (cropped ontop 107 ms off vs 103-106 ms on; full scene 156 vs 154-166 ms; lean step nothing
+  measurable); the assist costs 3-4 ms per control step (it was 14-31 ms until `SleepAssist` stopped re-running OmniGibson's per-call
+  convex hull in `aabb` - every demo bit-identical before and after). The asset cache, warm, shortens the first world load by 22 %
+  (full scene 441 -> 344 s) with bit-identical demos; it is on in the `tfvn_*` test jobs (`merge_vecnext/scripts/fast_env.sh`).
+- The sampler keeps OmniGibson's physics: none of the 228 sampler attempts of those jobs was rejected for settling (paths, reach,
+  partner placement), so the threshold would only change which instances it accepts.
 
 ## Measuring
 
