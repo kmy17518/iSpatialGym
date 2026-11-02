@@ -407,6 +407,20 @@ class InstanceLoader:
                 "pose_frame": "parent",
             }]
         self.env = og.Environment(configs=self.cfg)
+        # 2026-11-02 train-fast COLLECTOR_PHYSX_THREADS (default 0 = PhysX's own count; packing test E16): the CPU PhysX worker threads
+        # of this collector, for jobs that run several collectors on few CPUs
+        import omnigibson.lazy as lazy
+
+        settings = lazy.carb.settings.get_settings()
+        self.report["physx_threads"] = {"default": settings.get("/persistent/physics/numThreads")}
+        physx_threads = fast_value("COLLECTOR_PHYSX_THREADS", 0, int)
+        if physx_threads > 0:
+            from omni.physx import get_physx_interface
+
+            settings.set_int("/persistent/physics/numThreads", physx_threads)
+            get_physx_interface().set_thread_count(physx_threads)
+            self.report["physx_threads"]["set"] = physx_threads
+        log.info("train-fast COLLECTOR_PHYSX_THREADS: %s", self.report["physx_threads"])
         from ispatialgym.sampling.scene_variants import block_trav_map_from_meta, patch_trav_map_from_meta
 
         # the scene variant's freed footprints (template) and the instance's blocked footprints on the planner map
