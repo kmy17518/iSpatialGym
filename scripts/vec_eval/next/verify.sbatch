@@ -64,9 +64,16 @@ stage_assets() {  # stage_assets <dir>: every part extracted under <dir>/behavio
   return 0
 }
 ok=0
-case "$WORK" in
-  /tmp/minyeong/*)
-    ASSETS=/tmp/minyeong/isg_assets_isg-1020-b1k; mkdir -p "$ASSETS"
+# the node cache root (2026-10-31): /scr when the node has it - the same local disk as /tmp but shared by every job on the node; /tmp is
+# PRIVATE per job here (job_container/tmpfs), so a cache under /tmp/minyeong was never reused (0 of 34 round-D, 0 of 48 round-E tasks) and
+# every task streamed its own ~30 GB (simultaneous truncated streams, round E 16:09). Nodes without a writable /scr keep the old path.
+NODE_CACHE=""
+if [ -d /scr ] && [ -w /scr ] && [ "$(df --output=avail -k /scr 2>/dev/null | tail -1)" -gt 100000000 ] 2>/dev/null; then NODE_CACHE=/scr/minyeong
+elif case "$WORK" in /tmp/minyeong/*) true;; *) false;; esac; then NODE_CACHE=/tmp/minyeong; fi
+echo "[$(date -Is)] assets: node cache root ${NODE_CACHE:-none (per-job copy)}"
+case "$NODE_CACHE" in
+  ?*)
+    ASSETS=$NODE_CACHE/isg_assets_isg-1020-b1k; mkdir -p "$ASSETS"
     exec 9> "$ASSETS.lock"; flock 9
     if [ -f "$ASSETS/.complete" ]; then ok=1; echo "[$(date -Is)] assets: node cache $ASSETS reused"
     else rm -rf "$ASSETS"/*; if stage_assets "$ASSETS"; then touch "$ASSETS/.complete"; ok=1; else echo "assets: node cache staging failed"; fi; fi
@@ -121,6 +128,19 @@ case ",$PHASES," in *,compare,*)
   PYTHONPATH=$EVAL python $EVAL/scripts/vec_eval/verify_rules.py "$RUNS/n8same" --ref "$RUNS/n1" > "$RUNS/n8same/verify_rules.log" 2>&1 || echo "verify_rules rc=$?"
   PYTHONPATH=$EVAL ISG_EVAL_ROOT=$EVAL python $EVAL/scripts/vec_eval/next/verify_record.py --task "$TASK" --runs "$RUNS" --num-envs $N --out "$CAMP/$VERIFY_DIR/$TASK.json" --previous "$V/mirror/verify/$TASK.json" --b1k "$B1K" || RC=1
   echo "[$(date -Is)] VERDICT $(python -c "import json;d=json.load(open('$CAMP/$VERIFY_DIR/$TASK.json'));print('PASS' if d['pass'] else 'FAIL', d['runs'].get('n8same',{}).get('reasons',[])[:3])" 2>&1)";; esac
+# mp (2026-10-31, option 1): the same demo as K concurrent processes x N scenes on this one GPU (scripts/vec_eval/next/mp_launch.py,
+# one app-data copy per process under $WORK, texture cache linked); ISG_MP_LAYOUTS e.g. 1x8+2x4+4x2; GPU memory sampled every 2 s
+case ",$PHASES," in *,mp,*)
+  for kn in ${ISG_MP_LAYOUTS//+/ }; do
+    K=${kn%x*}; NN=${kn#*x}; MO="$RUNS/mp/k${K}n${NN}"; rm -rf "$MO"; mkdir -p "$MO"
+    ( while true; do echo "$(date +%s),$(nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | head -1)"; sleep 2; done ) > "$MO/gpu.csv" &
+    MON=$!; t=$SECONDS
+    PYTHONPATH=$EVAL python $EVAL/scripts/vec_eval/next/mp_launch.py --instances "$INST" --procs $K --num-envs $NN --same-instance-shards --out "$MO" \
+      --appdata-template "$OMNIGIBSON_APPDATA_PATH" --appdata-root "$WORK/appdata_mp" -- $COMMON --same-instance-all-slots > "$MO/mp_launch.log" 2>&1
+    mrc=$?; kill $MON 2>/dev/null
+    peak=$(cut -d, -f2 "$MO/gpu.csv" | sort -n | tail -1)
+    echo "[$(date -Is)] MP_RESULT k=$K n=$NN rc=$mrc wall=$((SECONDS - t))s gpu_peak_mib=$peak $(grep -o "MP_LAUNCH_DONE.*" "$MO/mp_launch.log" | cut -c1-900)"
+  done;; esac
 KIT_RC=$RC
 echo "[$(date -Is)] verify done rc=$RC task=$TASK"
 exit $RC

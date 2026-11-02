@@ -5,6 +5,9 @@ plus the changes below, uncommitted like the campaign worktrees). Behavior-1K 6a
 `scripts/vec_eval/apply_b1k_overlay.sh <Behavior-1K dir>`). Record: `$V/campaigns/vec_next/{DECISIONS.md,verify/,runs/}` on the cluster,
 `$V/docs/EVAL_RECORD.md` §11 entry of 2026-10-29 22:15.
 
+The whole campaign (rounds A-F, the restore fix, the build options, the evaluated success step, every experiment with its script and
+result) and how to replicate it: [scripts/vec_eval/next/README.md](../scripts/vec_eval/next/README.md). This file stops at round D.
+
 ## 1. What changed, and where
 
 | item | where | default / switch |
