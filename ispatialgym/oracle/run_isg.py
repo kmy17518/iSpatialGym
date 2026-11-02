@@ -1363,10 +1363,6 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             "instance_id": iid, "template_dir": loader.template_dir, "template_id": loader.tmeta.get("template_id"), "problem": loader.tmeta["problem"],
             "activity": loader.activity, "activity_definition_id": loader.did, "variant": loader.tmeta.get("variant") or loader.tro.meta.task_variant,
             "scene": loader.tmeta.get("scene"), "load_room_instances": loader.tmeta.get("load_room_instances"), "tro_path": tro_path,
-            # the rooms the world actually loaded (rooms_for_template: the template's list, or the ISG_ROOMS_OVERRIDE entry of this variant)
-            "load_rooms": {"rooms": loader.cfg["scene"].get("load_room_instances"), "template_rooms": loader.tmeta.get("load_room_instances"),
-                           "mode": "env-override" if loader.cfg["scene"].get("load_room_instances") != loader.tmeta.get("load_room_instances") else "template",
-                           "source": os.environ.get("ISG_ROOMS_OVERRIDE")},
             "goal_image": loader.goal_image_path, "robot_name": loader.robot_name, "out_dir": out_dir,
         })
         # task family / task / subtask (isg_customs.json is keyed by subtask): the eval dataset's names, else from the sampling key
@@ -1450,6 +1446,12 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                 gc.freeze()
         if shared is not None:
             shared["loader"] = loader
+        # the rooms the world actually loaded (rooms_for_template: the template's list, or the ISG_ROOMS_OVERRIDE entry of this variant;
+        # a PARTIAL_SCENE crop's own rooms) - recorded once the world exists: the loader's cfg is built by build_env / taken by attach
+        loaded = loader.cfg["scene"].get("load_room_instances")
+        meta["load_rooms"] = {"rooms": loaded, "template_rooms": loader.tmeta.get("load_room_instances"),
+                              "mode": "env-override" if loaded != loader.tmeta.get("load_room_instances") else "template",
+                              "source": os.environ.get("ISG_ROOMS_OVERRIDE")}
         crop = (loader.tmeta.get("scene_crop") or {}) if isinstance(loader.tmeta.get("scene_crop"), dict) else {}
         if loader.scene_crop:
             # 2026-11-01 train-fast (PARTIAL_SCENE): which world the demo was collected in ("scene" stays the scene model name)
