@@ -620,7 +620,7 @@ def test_harness_run_prepares_dataset_episodes(tmp_path):
     assert cfg["task"] == "alignment_axial_keyboard" and cfg["instance_index"] == 0 and cfg["alias"] == "alignment-axial-keyboard-table"
     assert cfg["max_steps"] is None and cfg["instances_root"] == str(tmp_path / "ds")  # run_isg's budget
     budgets = [json.loads((out / s / "0" / "source.json").read_text())["max_steps"] for s in ("alignment_axial_board_game", "alignment_axial_keyboard")]
-    assert budgets == [300, 800]  # max(300, 2 x the demo's length)
+    assert budgets == [300, 600]  # max(300, round(1.5 x the demo's length))
     rows = (out / "episodes.tsv").read_text().splitlines()
     assert rows[0].split("\t") == list(RUN.MANIFEST_COLUMNS) and len(rows) == 3
     with pytest.raises(ValueError, match="settle"):  # run_isg refuses a budget below the 45-step settle window: fail before submitting

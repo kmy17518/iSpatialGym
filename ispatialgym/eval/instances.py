@@ -23,7 +23,7 @@ As in BEHAVIOR, the BDDL problems are not in the dataset: an instance names its 
 the index and the template metadata, ``activity_definition_id`` in the instance file), loaded from the repository's
 ``ispatialgym/assets/bddl/activity_definitions`` (BEHAVIOR's bddl package holds its problems).
 
-``run_isg --task`` gives an instance ``max(300, 2 x`` its demo's length ``)`` steps by default and a ``--settle-steps`` window of 45
+``run_isg --task`` gives an instance ``max(300, round(1.5 x`` its demo's length ``))`` steps by default and a ``--settle-steps`` window of 45
 steps (oracle, policy) or its demo's settle rows (replay; ``step_budget``).
 
 The goal image is the head camera's last frame (``final_rgb.png``) of a successful replay of the instance's demo: the eval
@@ -73,7 +73,7 @@ EVALUATION_PROFILE = "isg-v1"  # run_isg.EVALUATION_PROFILE (run_isg imports the
 #: step budget of run_isg --task: max(MIN_MAX_STEPS, DEMO_STEP_FACTOR x the demo's length) steps, WALL_S_PER_STEP seconds per
 #: step; DEFAULT_MAX_STEPS without a demo; a settle window (run_isg --settle-steps) of DEFAULT_SETTLE_STEPS (oracle, policy)
 MIN_MAX_STEPS = 300
-DEMO_STEP_FACTOR = 2
+DEMO_STEP_FACTOR = 1.5  # 2 until 2026-10-23 11:50 (the evaluation plan's change: 1.5 x the demo's length)
 WALL_S_PER_STEP = 1.0
 DEFAULT_MAX_STEPS = 3000
 DEFAULT_SETTLE_STEPS = 45
@@ -129,7 +129,7 @@ def step_budget(length: Optional[int], max_steps: Optional[int] = None, settle_s
                 wallclock_s: Optional[float] = None, mode: str = "oracle", demo_settle_steps: Optional[int] = None,
                 instance_max_steps: Optional[int] = None) -> Dict[str, Any]:
     """``run_isg``'s step budget. ``max_steps`` (the actions: policy steps, a replay, an oracle program) given, else
-    ``instance_max_steps`` when given, else ``max(300, 2 x length)`` for a demo of ``length`` steps, else 3000;
+    ``instance_max_steps`` when given, else ``max(300, round(1.5 x length))`` for a demo of ``length`` steps, else 3000;
     ``wallclock_s`` (seconds the actions may take) given, else 1 s x ``max_steps``. ``settle_steps`` - the
     ``pose_settled`` and settle-eval window, in every mode - given, else 45 (oracle, policy) or the demo's settle rows
     (replay: ``demo_settle_steps``). An oracle program's epilogue is exactly ``settle_steps`` long and reserved: its
@@ -143,7 +143,7 @@ def step_budget(length: Optional[int], max_steps: Optional[int] = None, settle_s
         if instance_max_steps is not None:
             max_steps = int(instance_max_steps)
         else:
-            max_steps = max(MIN_MAX_STEPS, DEMO_STEP_FACTOR * int(length)) if length else DEFAULT_MAX_STEPS
+            max_steps = max(MIN_MAX_STEPS, int(round(DEMO_STEP_FACTOR * int(length)))) if length else DEFAULT_MAX_STEPS
     if mode == "replay" and demo_settle_steps is None:
         raise ValueError("--mode replay: the demo's settle rows are unknown (isg/phase, or the eval dataset's settle_steps of a LeRobot "
                          "episode), so the --settle-steps window cannot be placed")
@@ -195,11 +195,11 @@ class InstanceRecord:
 
     @property
     def max_steps(self) -> Optional[int]:
-        """The instance's ``max_steps`` from ``instances.jsonl``, else ``max(300, 2 * length)`` when a demo length is known."""
+        """The instance's ``max_steps`` from ``instances.jsonl``, else ``max(300, round(1.5 * length))`` when a demo length is known."""
         if self.extra.get("max_steps") is not None:
             return int(self.extra["max_steps"])
         length = self.extra.get("length") or self.episode.get("length")
-        return max(MIN_MAX_STEPS, DEMO_STEP_FACTOR * int(length)) if length else None
+        return max(MIN_MAX_STEPS, int(round(DEMO_STEP_FACTOR * int(length)))) if length else None
 
 
 def load_index(root: Optional[str] = None) -> List[InstanceRecord]:

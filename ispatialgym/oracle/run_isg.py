@@ -189,6 +189,36 @@ EXTERNAL_CAMERA_NAME = "external_sensor0"
 EXTERNAL_CAMERA_HW = (960, 1440)
 
 
+def rooms_for_template(meta: dict):
+    """The room instances a world of this template loads: the template's ``load_room_instances`` (task rooms + every adjacent
+    room), unless ``ISG_ROOMS_OVERRIDE`` names a JSON file ({alias or variant: [rooms] | {"rooms": [...], "variant": ...}},
+    campaign rooms 2026-10-28: the rooms the demos can see) with an entry for this template's ``variant`` - the single-env
+    evaluator and the vectorized one (``VecInstanceLoader(load_rooms=...)``, which resolves the alias itself) then load the
+    same rooms. The chosen list is logged once per template."""
+    rooms = meta.get("load_room_instances") or None
+    path = os.environ.get("ISG_ROOMS_OVERRIDE")
+    if path and os.path.exists(path):
+        try:
+            with open(path) as f:
+                d = json.load(f)
+            d = d.get("overrides", d) if isinstance(d, dict) else {}
+            variant = meta.get("variant")
+            hit = None
+            for key, e in d.items():
+                ev = e.get("variant") if isinstance(e, dict) else None
+                if key == variant or ev == variant:
+                    hit = e
+                    break
+            if hit is not None:
+                override = hit.get("rooms") if isinstance(hit, dict) else hit
+                if override:
+                    log.info("rooms override for %s: %s (template: %s)", variant, override, rooms)
+                    return [str(r) for r in override]
+        except Exception as ex:  # noqa: BLE001
+            log.warning("ISG_ROOMS_OVERRIDE %s not applied: %r", path, ex)
+    return rooms
+
+
 def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str, activity: str, did: int, robot_name: str, image_size: int, proprio: bool = True,
                      behavior_output: bool = False) -> dict:
     """Evaluator configuration (mirrors ``validate_instances.py``) with the robot spawned at the TRO base pose so the
@@ -212,7 +242,7 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
             "type": "InteractiveTraversableScene",
             "scene_model": meta["scene"],
             "scene_file": (meta.get("_paths") or {}).get("scene_file") or os.path.join(template_dir, "template.json"),
-            "load_room_instances": meta.get("load_room_instances") or None,
+            "load_room_instances": rooms_for_template(meta),
         },
         "robots": [M.joylo_robot_config(robot_name, **sensors, **robot_kw)],
         "task": {
@@ -1017,7 +1047,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
     p.add_argument("--max-steps", type=int, default=None,
                    help="steps of the actions (policy steps, a replay, the oracle program; 30 Hz control steps); default: an eval dataset "
-                        "instance max(300, 2 x its demo's length), else 3000. An oracle episode is cut at --max-steps + --settle-steps "
+                        "instance max(300, round(1.5 x its demo's length)), else 3000. An oracle episode is cut at --max-steps + --settle-steps "
                         "(its epilogue), a replay / policy episode at --max-steps; without geometric success a policy runs to it")
     p.add_argument("--settle-steps", type=int, default=None,
                    help="the pose_settled window and the --settle-eval window, in steps, in every mode: oracle = its epilogue, exactly this "
@@ -1264,6 +1294,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             "instance_id": iid, "template_dir": loader.template_dir, "template_id": loader.tmeta.get("template_id"), "problem": loader.tmeta["problem"],
             "activity": loader.activity, "activity_definition_id": loader.did, "variant": loader.tmeta.get("variant") or loader.tro.meta.task_variant,
             "scene": loader.tmeta.get("scene"), "load_room_instances": loader.tmeta.get("load_room_instances"), "tro_path": tro_path,
+            # the rooms the world actually loaded (rooms_for_template: the template's list, or the ISG_ROOMS_OVERRIDE entry of this variant)
+            "load_rooms": {"rooms": loader.cfg["scene"].get("load_room_instances"), "template_rooms": loader.tmeta.get("load_room_instances"),
+                           "mode": "env-override" if loader.cfg["scene"].get("load_room_instances") != loader.tmeta.get("load_room_instances") else "template",
+                           "source": os.environ.get("ISG_ROOMS_OVERRIDE")},
             "goal_image": loader.goal_image_path, "robot_name": loader.robot_name, "out_dir": out_dir,
         })
         # task family / task / subtask (isg_customs.json is keyed by subtask): the eval dataset's names, else from the sampling key

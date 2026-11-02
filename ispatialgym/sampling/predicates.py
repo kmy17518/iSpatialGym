@@ -624,8 +624,44 @@ def pair_in_contact(child: Any, parent: Any) -> bool:
     return bool(RigidContactAPI.is_in_contact(scene_idx=child.scene.idx, query_set=[child], with_set=[parent], ignore_set=None, current_only=True))
 
 
-#: (child name, parent name) of the pairs whose collision is filtered right now (set_pair_collision_filter)
+#: (scene index, child name, parent name) of the pairs whose collision is filtered right now (set_pair_collision_filter). The
+#: scene index (None for a single-scene world) keys every per-pair record below: a vectorized world's clones share their object
+#: names, and a key without it made one clone's filter / pending record stand for every clone's (2026-10-23).
 _FILTERED: set = set()
+
+
+def _pair_key(child: Any, parent: Any):
+    """``(scene index, child name, parent name)`` of a pair - the clone's own record in a vectorized world."""
+    return (getattr(getattr(child, "scene", None), "idx", None), getattr(child, "name", None), getattr(parent, "name", None))
+
+
+def reset_pair_records(scene: Any = None) -> Dict[str, int]:
+    """Forget the per-pair records of ``scene`` (its index; None = every scene): the pairs still filtered are restored first
+    (``set_pair_collision_filter(..., False)`` through the scene's object registry), then the pending / released sets are cleared.
+    The vectorized loader calls it for a clone before the clone goes back to its template state (the USD filtered-pairs
+    relationships are not part of the scene state, so a pair left filtered would stay filtered into the next episode)."""
+    idx = None if scene is None else getattr(scene, "idx", None)
+    match = (lambda k: True) if scene is None else (lambda k: k[0] == idx)
+    out = {"unfiltered": 0, "pending_cleared": 0}
+    for key in [k for k in list(_FILTERED) if match(k)]:
+        child = parent = None
+        if scene is not None:
+            child, parent = scene.object_registry("name", key[1]), scene.object_registry("name", key[2])
+        if child is not None and parent is not None:
+            try:
+                set_pair_collision_filter(child, parent, False)
+                out["unfiltered"] += 1
+                continue
+            except Exception as e:  # noqa: BLE001
+                import logging
+
+                logging.getLogger(__name__).warning("reset_pair_records: %s/%s not unfiltered: %r", key[1], key[2], e)
+        _FILTERED.discard(key)
+    for pending in (_PENDING_UNFILTER, _PENDING_FILTER, _RELEASED_TOUCHING):
+        for key in [k for k in list(pending) if match(k)]:
+            pending.discard(key)
+            out["pending_cleared"] += 1
+    return out
 
 
 def _filtered_pairs_rel(link: Any):
@@ -648,7 +684,7 @@ def set_pair_collision_filter(child: Any, parent: Any, filtered: bool) -> bool:
     :func:`install_attach_overrides`). Idempotent; returns True when it changed something."""
     import omnigibson as og
 
-    key = (child.name, parent.name)
+    key = _pair_key(child, parent)
     if bool(filtered) == (key in _FILTERED):
         return False
 
@@ -715,7 +751,7 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
     ``tilt_rad``, ``spin_rad``, and the alignment at the join) for a snap, and ``reason`` when not joined."""
     from omnigibson.object_states import AttachedTo
 
-    key = (getattr(child, "name", None), getattr(parent, "name", None))
+    key = _pair_key(child, parent)
     hook_call = trigger == "release_hook"
     a = attachment_alignment(child, parent, equivalences)
     a.pop("fix", None)
@@ -842,7 +878,7 @@ def install_attach_overrides() -> bool:
         return stock["_update"](self)
 
     def _attach(self, other, child_link, parent_link, joint_type=None, can_joint_break=True):
-        key = (getattr(self.obj, "name", None), getattr(other, "name", None))
+        key = _pair_key(self.obj, other)
         if attachment_context(self.obj, other) is not None:
             attach_in_place(self.obj, other, _link_name(self.obj, child_link), _link_name(other, parent_link), can_joint_break=can_joint_break)
             _PENDING_UNFILTER.discard(key)
@@ -854,7 +890,7 @@ def install_attach_overrides() -> bool:
     def _detach(self):
         parent = self.parent
         out = stock["_detach"](self)
-        key = (getattr(self.obj, "name", None), getattr(parent, "name", None))
+        key = _pair_key(self.obj, parent)
         if parent is not None and attachment_context(self.obj, parent) is not None:
             _PENDING_FILTER.discard(key)
             if key in _FILTERED:

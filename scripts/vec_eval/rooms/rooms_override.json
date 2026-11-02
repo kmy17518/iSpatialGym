@@ -1,0 +1,441 @@
+{
+ "generated": "2026-10-28T08:36",
+ "source": "campaign rooms 2026-10-28 (segmentation pass + same-host frame / physics gate)",
+ "rule": {
+  "pos_tol_m": 0.02,
+  "rot_tol_rad": 0.05,
+  "excess_mean_255": 0.25,
+  "excess_p90_255": 0.6,
+  "frames": "steps 0..60 every 5, robot cameras, 224^2 bilinear (the policy input)"
+ },
+ "overrides": {
+  "configuration_matching-articulation_close_large_scale-door": {
+   "rooms": [
+    "garden_0",
+    "sauna_0",
+    "entryway_0",
+    "garage_0"
+   ],
+   "variant": "configuration_matching-articulation_close_large_scale-door",
+   "template_rooms": [
+    "garden_0",
+    "sauna_0",
+    "bathroom_0",
+    "bathroom_1",
+    "bedroom_0",
+    "childs_room_0",
+    "childs_room_1",
+    "childs_room_2",
+    "closet_0",
+    "closet_3",
+    "closet_4",
+    "corridor_0",
+    "dining_room_0",
+    "entryway_0",
+    "garage_0",
+    "kitchen_0",
+    "living_room_0",
+    "living_room_1",
+    "utility_room_0"
+   ],
+   "dropped": [
+    "bathroom_0",
+    "bathroom_1",
+    "bedroom_0",
+    "childs_room_0",
+    "childs_room_1",
+    "childs_room_2",
+    "closet_0",
+    "closet_3",
+    "closet_4",
+    "corridor_0",
+    "dining_room_0",
+    "kitchen_0",
+    "living_room_0",
+    "living_room_1",
+    "utility_room_0"
+   ],
+   "scene": "house_single_floor",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": -0.3500784876254889,
+    "traj_pos_max_m": 0.0001612450578249991,
+    "traj_rot_max_rad": 0.0013810679083690047
+   }
+  },
+  "configuration_matching-articulation_open_large_scale-door": {
+   "rooms": [
+    "garden_0",
+    "sauna_0",
+    "corridor_0",
+    "garage_0",
+    "living_room_1"
+   ],
+   "variant": "configuration_matching-articulation_open_large_scale-door",
+   "template_rooms": [
+    "garden_0",
+    "sauna_0",
+    "bathroom_0",
+    "bathroom_1",
+    "bedroom_0",
+    "childs_room_0",
+    "childs_room_1",
+    "childs_room_2",
+    "closet_0",
+    "closet_3",
+    "closet_4",
+    "corridor_0",
+    "dining_room_0",
+    "entryway_0",
+    "garage_0",
+    "kitchen_0",
+    "living_room_0",
+    "living_room_1",
+    "utility_room_0"
+   ],
+   "dropped": [
+    "bathroom_0",
+    "bathroom_1",
+    "bedroom_0",
+    "childs_room_0",
+    "childs_room_1",
+    "childs_room_2",
+    "closet_0",
+    "closet_3",
+    "closet_4",
+    "dining_room_0",
+    "entryway_0",
+    "kitchen_0",
+    "living_room_0",
+    "utility_room_0"
+   ],
+   "scene": "house_single_floor",
+   "evidence": {
+    "segmentation_demos": 12,
+    "gate_episodes": 3,
+    "head_excess_mean_255": -0.011023756785270495,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0013810679083690047
+   }
+  },
+  "configuration_matching-articulation_open_small_scale-carton-desk": {
+   "rooms": [
+    "private_office_2",
+    "corridor_0"
+   ],
+   "variant": "configuration_matching-articulation_open_small_scale-carton-desk",
+   "template_rooms": [
+    "private_office_2",
+    "corridor_0",
+    "private_office_1",
+    "private_office_3"
+   ],
+   "dropped": [
+    "private_office_1",
+    "private_office_3"
+   ],
+   "scene": "office_cubicles_right",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.020598263694689825,
+    "traj_pos_max_m": 0.0012930353404954076,
+    "traj_rot_max_rad": 0.0045804851688444614
+   }
+  },
+  "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench": {
+   "rooms": [
+    "bedroom_0",
+    "garden_0"
+   ],
+   "variant": "inter_object_relation_satisfaction-nextto_small_scale-gym_shoe-gym_shoe-bench",
+   "template_rooms": [
+    "bedroom_0",
+    "bathroom_1",
+    "closet_0",
+    "closet_1",
+    "corridor_0",
+    "garden_0"
+   ],
+   "dropped": [
+    "bathroom_1",
+    "closet_0",
+    "closet_1",
+    "corridor_0"
+   ],
+   "scene": "house_single_floor",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.032015168514007174,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0009765625
+   }
+  },
+  "mental_rotation-carving_knife": {
+   "rooms": [
+    "bathroom_0",
+    "corridor_0",
+    "garden_0"
+   ],
+   "variant": "mental_rotation-carving_knife",
+   "template_rooms": [
+    "bathroom_0",
+    "childs_room_1",
+    "corridor_0",
+    "garden_0"
+   ],
+   "dropped": [
+    "childs_room_1"
+   ],
+   "scene": "house_single_floor",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": -0.04705811425661429,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0011960399569943547
+   }
+  },
+  "mental_rotation-classroom_mock_up": {
+   "rooms": [
+    "corridor_0",
+    "conference_hall_0",
+    "lobby_0"
+   ],
+   "variant": "mental_rotation-classroom_mock_up",
+   "template_rooms": [
+    "corridor_0",
+    "bathroom_0",
+    "conference_hall_0",
+    "copy_room_0",
+    "empty_room_0",
+    "lobby_0",
+    "meeting_room_0",
+    "private_office_0",
+    "private_office_1",
+    "private_office_2",
+    "private_office_3",
+    "shared_office_0"
+   ],
+   "dropped": [
+    "bathroom_0",
+    "copy_room_0",
+    "empty_room_0",
+    "meeting_room_0",
+    "private_office_0",
+    "private_office_1",
+    "private_office_2",
+    "private_office_3",
+    "shared_office_0"
+   ],
+   "scene": "office_cubicles_right",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.18726476568442124,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0009765625
+   }
+  },
+  "mental_rotation-crab": {
+   "rooms": [
+    "garage_0",
+    "garden_0"
+   ],
+   "variant": "mental_rotation-crab",
+   "template_rooms": [
+    "garage_0",
+    "corridor_0",
+    "garden_0"
+   ],
+   "dropped": [
+    "corridor_0"
+   ],
+   "scene": "house_double_floor_lower",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.028352847084020957,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0011960399569943547
+   }
+  },
+  "mental_rotation-hook": {
+   "rooms": [
+    "kitchen_0"
+   ],
+   "variant": "mental_rotation-hook",
+   "template_rooms": [
+    "kitchen_0",
+    "bar_0",
+    "corridor_0",
+    "dining_room_0"
+   ],
+   "dropped": [
+    "bar_0",
+    "corridor_0",
+    "dining_room_0"
+   ],
+   "scene": "restaurant_diner",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.09769815282943921,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0011960399569943547
+   }
+  },
+  "mental_rotation-mug": {
+   "rooms": [
+    "living_room_0",
+    "bedroom_0",
+    "entryway_0",
+    "kitchen_0"
+   ],
+   "variant": "mental_rotation-mug",
+   "template_rooms": [
+    "living_room_0",
+    "bathroom_0",
+    "bedroom_0",
+    "entryway_0",
+    "kitchen_0"
+   ],
+   "dropped": [
+    "bathroom_0"
+   ],
+   "scene": "Rs_int",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.012845558233750172,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0009765625
+   }
+  },
+  "mental_rotation-walker": {
+   "rooms": [
+    "living_room_0"
+   ],
+   "variant": "mental_rotation-walker",
+   "template_rooms": [
+    "living_room_0",
+    "bathroom_0",
+    "bedroom_0",
+    "bedroom_1",
+    "bedroom_2"
+   ],
+   "dropped": [
+    "bathroom_0",
+    "bedroom_0",
+    "bedroom_1",
+    "bedroom_2"
+   ],
+   "scene": "house_double_floor_upper",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.03899402343309843,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0011960399569943547
+   }
+  },
+  "object_scaling-beeswax_candle": {
+   "rooms": [
+    "empty_room_0"
+   ],
+   "variant": "object_scaling-beeswax_candle",
+   "template_rooms": [
+    "empty_room_0",
+    "corridor_0",
+    "private_office_0"
+   ],
+   "dropped": [
+    "corridor_0",
+    "private_office_0"
+   ],
+   "scene": "office_cubicles_right",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.10361169813535152,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0011960399569943547
+   }
+  },
+  "object_scaling-bottle_of_pop": {
+   "rooms": [
+    "private_office_0",
+    "corridor_0",
+    "shared_office_0"
+   ],
+   "variant": "object_scaling-bottle_of_pop",
+   "template_rooms": [
+    "private_office_0",
+    "corridor_0",
+    "empty_room_0",
+    "shared_office_0"
+   ],
+   "dropped": [
+    "empty_room_0"
+   ],
+   "scene": "office_cubicles_right",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.011353539541745797,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0009765625
+   }
+  },
+  "object_scaling-canned_food": {
+   "rooms": [
+    "bedroom_1",
+    "living_room_0"
+   ],
+   "variant": "object_scaling-canned_food",
+   "template_rooms": [
+    "bedroom_1",
+    "bathroom_0",
+    "bedroom_2",
+    "living_room_0"
+   ],
+   "dropped": [
+    "bathroom_0",
+    "bedroom_2"
+   ],
+   "scene": "house_double_floor_upper",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": 0.02479017659639701,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0011960399569943547
+   }
+  },
+  "object_scaling-pack_of_cigarettes": {
+   "rooms": [
+    "bedroom_0",
+    "living_room_0"
+   ],
+   "variant": "object_scaling-pack_of_cigarettes",
+   "template_rooms": [
+    "bedroom_0",
+    "bathroom_0",
+    "living_room_0"
+   ],
+   "dropped": [
+    "bathroom_0"
+   ],
+   "scene": "house_double_floor_upper",
+   "evidence": {
+    "segmentation_demos": 11,
+    "gate_episodes": 3,
+    "head_excess_mean_255": -0.002860870116796249,
+    "traj_pos_max_m": 0.0,
+    "traj_rot_max_rad": 0.0009765625
+   }
+  }
+ }
+}

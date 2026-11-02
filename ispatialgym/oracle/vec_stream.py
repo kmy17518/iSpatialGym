@@ -21,8 +21,11 @@ times of the shared loop (every environment advances together).
 from __future__ import annotations
 
 import time
+import os
+import sys
+import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import torch as th
 
@@ -105,10 +108,14 @@ class VecStreamExecutor:
     infos``); ``sim`` provides ``current_time`` for the recorders (None: not recorded)."""
 
     def __init__(self, env, slots: List[Slot], sim=None, n_render_iterations: int = 1, num_envs: Optional[int] = None, idle_actions: Optional[Dict[int, th.Tensor]] = None,
-                 qa: bool = False):
+                 qa: bool = False, pre_step: Optional[Callable[[List[Slot]], None]] = None, post_step: Optional[Callable[[int, List[Slot]], None]] = None,
+                 on_stream_end: Optional[Callable[[Slot], None]] = None, stall_timeout_s: float = 0.0):
         """``num_envs`` / ``idle_actions``: the batch may have environments without an episode (a partial last batch); their
         rows of every step's action are ``idle_actions[env_idx]`` (a hold of that robot's joints). ``qa``: log the ``--qa``
-        metrics per environment (module docstring)."""
+        metrics per environment (module docstring). ``pre_step(slots)``: called once per batch step with the slots whose
+        stream is still open before their sources are queried (a batched policy computes every slot's action in one
+        request there); ``post_step(batch_step, slots)``: after the step's bookkeeping, with the slots that streamed an
+        action this step (a batch video, progress). ``timings`` accumulates the wall time of the loop's stages."""
         self.qa = bool(qa)
         self.env = env
         self.slots = list(slots)
@@ -116,6 +123,22 @@ class VecStreamExecutor:
         self.n_render_iterations = int(n_render_iterations)
         self.num_envs = int(num_envs) if num_envs is not None else (max(s.idx for s in self.slots) + 1 if self.slots else 1)
         self.idle_actions = dict(idle_actions or {})
+        self.pre_step, self.post_step = pre_step, post_step
+        # called once when a slot's stream ends, after its last frame was recorded (lever S1-finished: the driver turns the slot's
+        # render products off; its no-op actions keep being stepped, nothing of it is observed any more)
+        self.on_stream_end = on_stream_end
+        # the stuck-episode guard (2026-10-29, replaces the per-episode wall clock): a daemon thread ends the process (exit 75,
+        # ``RUN_ISG_VEC_STALL`` on stdout) when no batch step completes for ``stall_timeout_s`` seconds while ``run`` is active -
+        # a hung Kit / PhysX call, never a slow episode (the step budget is the only episode limit). 0 = off.
+        self.stall_timeout_s = float(stall_timeout_s or 0.0)
+        self.progress: Dict[str, float] = {"t": time.time(), "steps": 0}
+        self._running = False
+        if self.stall_timeout_s > 0:
+            threading.Thread(target=self._stall_watchdog, name="vec-stall-watchdog", daemon=True).start()
+        self.timings: Dict[str, float] = {"pre_step_s": 0.0, "sources_s": 0.0, "env_step_s": 0.0, "record_s": 0.0, "qa_s": 0.0, "monitors_s": 0.0,
+                                          "post_step_s": 0.0, "loop_s": 0.0}
+        # per batch step: (env_step seconds, number of slots still streaming) - the timeline the finished-slot render switch is judged on
+        self.timeline: List[Tuple[float, int]] = []
         for s in self.slots:
             if s.monitors is not None:
                 s.stats = s.monitors.stats
@@ -155,15 +178,31 @@ class VecStreamExecutor:
             s.rules._reset_predicate_branches()
             if s.monitors is not None:
                 s.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=s.held(), manipulation=False, fov=False)
+        t_loop = time.time()
+        T = self.timings
+        self.progress["t"] = time.time()
+        self._running = True
         while any(not s.done for s in self.slots):
             actions = th.zeros((self.num_envs, self.action_dim), dtype=th.float32)
             for i, a in self.idle_actions.items():
                 actions[i] = th.as_tensor(a, dtype=th.float32).reshape(-1)
             phases: Dict[int, int] = {}
+            t0 = time.time()
+            streaming = []
             for s in self.slots:
                 if s.stage == "stream":
                     s.wall_clock_exceeded = bool(s.cfg.max_wall_s) and time.time() - s.t_stream0 > s.cfg.max_wall_s
-                    a = None if (s.wall_clock_exceeded or s.n >= s.cfg.max_steps) else s.source(s.last_obs, s.last_info)
+                    if s.wall_clock_exceeded or s.n >= s.cfg.max_steps:
+                        self._end_stream(s, None)
+                    else:
+                        streaming.append(s)
+            if streaming and self.pre_step is not None:
+                self.pre_step(streaming)
+            T["pre_step_s"] += time.time() - t0
+            t0 = time.time()
+            for s in self.slots:
+                if s.stage == "stream":
+                    a = s.source(s.last_obs, s.last_info)
                     if a is None:
                         self._end_stream(s, None)
                     else:
@@ -174,10 +213,15 @@ class VecStreamExecutor:
                         phases[s.idx] = int(s.phases[k]) if s.phases is not None and k < len(s.phases) else PHASE_ORACLE
                         continue
                 actions[s.idx] = self._noop(s)
+            T["sources_s"] += time.time() - t0
             if all(s.done for s in self.slots):
                 break
+            t0 = time.time()
             ag_before = {s.idx: Executor._ag_held(s) for s in self.slots if s.idx in phases}
             obs_list, rewards, terminateds, truncateds, infos = self.env.step(actions, n_render_iterations=self.n_render_iterations)
+            dt_env = time.time() - t0
+            T["env_step_s"] += dt_env
+            self.timeline.append((round(dt_env, 4), len(phases)))
             self.steps += 1
             sim_time = None
             if self.sim is not None:
@@ -185,9 +229,11 @@ class VecStreamExecutor:
                     sim_time = float(self.sim.current_time)
                 except Exception:  # noqa: BLE001
                     pass
+            stepped = []
             for s in self.slots:
                 if s.idx not in phases:
                     continue  # finished: its no-op was stepped, nothing recorded
+                stepped.append(s)
                 phase = phases[s.idx]
                 s.n += 1
                 ag_after = Executor._ag_held(s)
@@ -197,27 +243,51 @@ class VecStreamExecutor:
                 s.phase_steps[phase] = s.phase_steps.get(phase, 0) + 1
                 s.last_obs, s.last_info = obs_list[s.idx], infos[s.idx]
                 if s.recorder is not None:
+                    t1 = time.time()
                     try:
                         rew = float(rewards[s.idx])
                     except Exception:  # noqa: BLE001
                         rew = 0.0
                     s.recorder.record(s.n, actions[s.idx], s.last_obs, s.last_info, state=None, phase=phase, action_index=0, attempt=0, reward=rew,
                                       terminated=bool(terminateds[s.idx]), truncated=bool(truncateds[s.idx]), sim_time=sim_time)
+                    T["record_s"] += time.time() - t1
                 if s.qa is not None:
+                    t1 = time.time()
                     s.qa.observe(s.n, actions[s.idx], acting=phase == PHASE_ORACLE, held=[n for n in ag_after.values() if n],
                                  release_violations=s.release_check["violations"][n_violations:])
+                    T["qa_s"] += time.time() - t1
                 verdict = None
                 if s.monitors is not None:
+                    t1 = time.time()
                     verdict = s.monitors.check_timeout_only(s.n, settle=phase != PHASE_ORACLE)
                     pop = getattr(s.monitors, "pop_logged", None)
                     for v in (pop() if pop is not None else ()):
                         if s.qa is not None:
                             s.qa.note_rule(v)
+                    T["monitors_s"] += time.time() - t1
                 if verdict is not None:
                     self._end_stream(s, verdict)
                 elif s.cfg.stop_on_success and s.isg.get("official_success"):
                     self._end_stream(s, None)
+            if self.post_step is not None:
+                t1 = time.time()
+                self.post_step(self.steps, stepped)
+                T["post_step_s"] += time.time() - t1
+            self.progress["t"] = time.time()
+            self.progress["steps"] = int(self.steps)
+        self._running = False
+        T["loop_s"] += time.time() - t_loop
         return [s.result for s in self.slots]
+
+    def _stall_watchdog(self) -> None:
+        while True:
+            time.sleep(min(30.0, self.stall_timeout_s / 4))
+            if self._running and time.time() - self.progress["t"] > self.stall_timeout_s:
+                msg = (f"RUN_ISG_VEC_STALL no batch step completed for {time.time() - self.progress['t']:.0f} s (stall timeout {self.stall_timeout_s:.0f} s) "
+                       f"after batch step {self.progress['steps']}; the process is ended (exit 75) - a hung simulator, not an episode verdict")
+                print(msg, flush=True)
+                print(msg, file=sys.stderr, flush=True)
+                os._exit(75)
 
     # ------------------------------------------------------------------ stream end -> verdict
 
@@ -232,6 +302,11 @@ class VecStreamExecutor:
         if s.monitors is not None:
             s.monitors.begin_epilogue(held=s.held())
         self._finalize(s)
+        if self.on_stream_end is not None:
+            try:
+                self.on_stream_end(s)
+            except Exception as e:  # noqa: BLE001  (a render switch must never decide an episode)
+                s.result["on_stream_end_error"] = repr(e)
 
     # ------------------------------------------------------------------ verdict (Executor.epilogue's)
 

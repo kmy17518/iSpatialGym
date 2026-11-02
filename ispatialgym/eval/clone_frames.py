@@ -59,6 +59,20 @@ def offset_targets_meta(meta, scene):
         if (t.frame in (None, "world")) and t.position is not None:
             t.position = th.as_tensor(t.position, dtype=th.float32).reshape(3) + t_scene
         new.pose_targets[inst] = t
+    # group targets: the absolute slot positions of (pose_reached <group>) move with the clone (the layout relations are
+    # member-relative and need no change); without this a clone's group never reaches its pose (attachment, 2026-10-23)
+    groups = getattr(meta, "groups", None)
+    if groups:
+        new.groups = {}
+        for name, group in groups.items():
+            g = copy.copy(group)
+            g.target_slots = {
+                sid: copy.copy(slot) for sid, slot in (group.target_slots or {}).items()
+            }
+            for slot in g.target_slots.values():
+                if slot.position is not None:
+                    slot.position = th.as_tensor(slot.position, dtype=th.float32).reshape(3) + t_scene
+            new.groups[name] = g
     return new
 
 

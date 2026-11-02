@@ -88,7 +88,7 @@ def test_release_hook_joins_only_a_part_that_already_touches(monkeypatch):
         assert not PRED._RELEASED_TOUCHING
         monkeypatch.setattr(PRED, "pair_in_contact", lambda c, p: True)
         rec = PRED.attach_on_release(None, "right", child)
-        assert not rec["attached"] and rec["reason"].startswith("touching at the release") and not events and PRED._RELEASED_TOUCHING == {("cap_0", "bottle_0")}
+        assert not rec["attached"] and rec["reason"].startswith("touching at the release") and not events and PRED._RELEASED_TOUCHING == {(None, "cap_0", "bottle_0")}
         rec = PRED.attach_if_aligned(child, parent)  # the step's own check (the registry still names the part)
         assert rec["attached"] and PRED.JOINS[-1]["trigger"] == "release_hook" and PRED.JOINS[-1]["released"] and not PRED._RELEASED_TOUCHING
     finally:
@@ -98,7 +98,7 @@ def test_release_hook_joins_only_a_part_that_already_touches(monkeypatch):
 def test_deferred_filter_work_runs_at_the_next_check(monkeypatch):
     """A rollback's detach (inside a state load) restores the pair's collision at the next per-step check, before the rule."""
     child, parent, events = _rule(monkeypatch, contact=False)
-    monkeypatch.setattr(PRED, "_PENDING_UNFILTER", {("cap_0", "bottle_0")})
+    monkeypatch.setattr(PRED, "_PENDING_UNFILTER", {(None, "cap_0", "bottle_0")})
     a = PRED.attach_if_aligned(child, parent)
     assert not a["attached"] and events == [("filter", "cap_0", "bottle_0", False)] and not PRED._PENDING_UNFILTER
 
@@ -265,11 +265,11 @@ def test_attached_to_overrides_leave_registered_pairs_to_the_rule(monkeypatch):
         monkeypatch.setattr(PRED, "_PENDING_UNFILTER", set())
         FakeAT(cap)._attach(bottle, male, female)
         FakeAT(apple)._attach(bottle, male, female)
-        assert calls == [("in_place", "cap_0", "bottle_0", "M", "F"), ("stock_attach", "apple_0")] and PRED._PENDING_FILTER == {("cap_0", "bottle_0")}
+        assert calls == [("in_place", "cap_0", "bottle_0", "M", "F"), ("stock_attach", "apple_0")] and PRED._PENDING_FILTER == {(None, "cap_0", "bottle_0")}
         calls.clear()
-        PRED._FILTERED.add(("cap_0", "bottle_0"))
+        PRED._FILTERED.add((None, "cap_0", "bottle_0"))
         FakeAT(cap, parent=bottle)._detach()  # a state load rolling back to before the join
-        assert calls == [("stock_detach", "cap_0")] and PRED._PENDING_UNFILTER == {("cap_0", "bottle_0")} and not PRED._PENDING_FILTER
+        assert calls == [("stock_detach", "cap_0")] and PRED._PENDING_UNFILTER == {(None, "cap_0", "bottle_0")} and not PRED._PENDING_FILTER
     finally:
         PRED.set_attachment_context([])
 

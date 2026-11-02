@@ -279,6 +279,20 @@ def test_clone_frames_translate_targets_objects_and_robot_but_not_the_base_scene
     assert th.equal(out.pose_targets["cup.n.01_1"].position, rel.position)
     assert offset_targets_meta(meta, base) is meta  # bit-identical path for the base scene
     assert th.equal(world.position, th.tensor([15.4, 1.94, 1.15]))  # the TRO meta itself is untouched
+    # a group target: the absolute slot positions move with the clone, the layout relations (member-relative) do not
+    from ispatialgym.eval.targets import GroupTarget, LayoutRelation, Slot
+
+    group = GroupTarget("assembly", ["lid.n.01_1", "pot.n.01_1"], "fixed", "slot_position", {"lid.n.01_1": "s0", "pot.n.01_1": "s1"}, [],
+                        {"s0": Slot("s0", th.tensor([1.0, 2.0, 0.9]), th.tensor([0.0, 0.0, 0.0, 1.0])),
+                         "s1": Slot("s1", th.tensor([1.0, 2.0, 0.8]), th.tensor([0.0, 0.0, 0.0, 1.0]))},
+                        (0.05, 0.1), [LayoutRelation("s1", "s0", th.tensor([0.0, 0.0, 0.1]), th.tensor([0.0, 0.0, 0.0, 1.0]))], (0.01, 0.1))
+    meta = types.SimpleNamespace(pose_targets={}, groups={"assembly": group})
+    out = offset_targets_meta(meta, clone)
+    assert th.allclose(out.groups["assembly"].target_slots["s0"].position, th.tensor([41.0, 2.0, 0.9]))
+    assert th.allclose(out.groups["assembly"].target_slots["s1"].position, th.tensor([41.0, 2.0, 0.8]))
+    assert th.equal(out.groups["assembly"].layout_relations[0].position, th.tensor([0.0, 0.0, 0.1]))
+    assert th.equal(group.target_slots["s0"].position, th.tensor([1.0, 2.0, 0.9]))  # the TRO meta itself is untouched
+    assert out.groups["assembly"].members == group.members and out.groups["assembly"].pose_tolerances == (0.05, 0.1)
     # an object state: root position translated, orientation / joints untouched
     st = {"root_link": {"pos": th.tensor([1.0, 2.0, 0.5]), "ori": th.tensor([0.0, 0.0, 0.0, 1.0])}, "joint_pos": th.tensor([0.3])}
     out = offset_object_state(st, clone)

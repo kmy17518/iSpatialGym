@@ -473,15 +473,15 @@ def claim_next():
         taken = done | set(n[:-5] for n in list_names("claims/")) | set(n[:-5] for n in list_names("dead/"))
         release_all = exists("ctl/release_all")
         candidates = [u for u in UNITS.values() if u["unit"] not in taken and local_fails.get(u["unit"], 0) < 2 and (not ONLY_RUNS or u["run"] in ONLY_RUNS)
-                      and (u["kind"] in ("act", "dp", "replay_verify") or (PI_OK and os.environ.get("ISG_NO_PI") != "1"))]
+                      and (u["kind"] in ("act", "dp", "replay_verify", "vec_cmd", "vec_runs") or (PI_OK and os.environ.get("ISG_NO_PI") != "1"))]
         if not candidates:
             return None
-        verify_open = [u for u in candidates if u["kind"] == "replay_verify"]
+        verify_open = [u for u in candidates if u["kind"] in ("replay_verify", "vec_cmd", "vec_runs")]  # vec_cmd: campaign rooms replay probes, no gate
         policy_open = []
         waiting = 0
         too_long = False
         for u in candidates:
-            if u["kind"] == "replay_verify":
+            if u["kind"] in ("replay_verify", "vec_cmd", "vec_runs"):
                 continue
             v = verification(u.get("requires_verify") or u["task"]) if not release_all else {"pass": True, "num_envs": NUM_ENVS}
             if not (v and v.get("pass")):
@@ -620,6 +620,14 @@ def proc_env(appdata, home, gpu, ncpu):
         "CUDA_VISIBLE_DEVICES": str(gpu), "CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_CACHE_PATH": str(WORK / "cuda_cache"), "CUDA_CACHE_MAXSIZE": str(4 * 2**30),
         "ISG_TEXTURE_WAIT_MAX_S": os.environ.get("ISG_TEXTURE_WAIT_MAX_S", "240"),
     })
+    # the rooms override (campaign rooms 2026-10-28, adopted 2026-10-29): the worker's ISG_ROOMS_OVERRIDE if set ("" = none), else the
+    # worktree's frozen copy scripts/vec_eval/rooms/rooms_override.json when present; both evaluators read it by template variant
+    rooms = os.environ.get("ISG_ROOMS_OVERRIDE")
+    if rooms is None:
+        default = f"{EVAL_ROOT}/scripts/vec_eval/rooms/rooms_override.json"
+        rooms = default if os.path.exists(default) else ""
+    if rooms:
+        env["ISG_ROOMS_OVERRIDE"] = rooms
     for d in ("numba", ".cache"):
         Path(home, d).mkdir(parents=True, exist_ok=True)
     for d in ("inductor_cache", "triton_cache", "cuda_cache"):
@@ -1082,7 +1090,11 @@ def run_verify_unit(unit, gpu, slot, kk, cpus):
         base = [f"{ENVP}/bin/python", "-u", "-m", "ispatialgym.oracle.run_isg_vec", "--mode", "replay", "--instances", str(inst_file), "--record-view", "tiled",
                 "--tile-px", "240", "--external-size", "240", "--grid-video", "--tag", f"{TAG}:{INSTANCE}"]
         L = int(unit.get("demo_length") or 1500)
-        per_run_s = 3600 + L * 1.5
+        # the process budget (no wall clock inside the driver since 2026-10-24): a house scene at N=8 steps at 0.3-0.5 batch-steps/s on a
+        # shared 24-48 GB card (teapot's 1,007-step demo took 2.5 h on a 3090 in the first campaign), so 4 s per demo step + the build
+        per_run_s = 3600 + L * 4.0
+        if os.environ.get("ISG_VERIFY_NOTE"):
+            verdict["note"] = json.loads(os.environ["ISG_VERIFY_NOTE"])  # the campaign's description of what this verdict supersedes
 
         def run(n, same):
             name = f"n{n}same" if same else f"n{n}"
@@ -1113,16 +1125,27 @@ def run_verify_unit(unit, gpu, slot, kk, cpus):
         ref = run(1, False)
         ladder = [int(n) for n in unit.get("num_envs_ladder") or [8, 4, 2]]
         passed_n = None
-        for n in ladder:
-            run_dir = run(n, True)
+
+        def judge(run_dir):
             cmp_cmd = [f"{ENVP}/bin/python", str(EVAL_ROOT / "scripts/vec_eval/compare_slots.py"), str(run_dir), "--ref", str(ref)]
             r = subprocess.run(cmp_cmd, capture_output=True, text=True, cwd=str(EVAL_ROOT), env=dict(os.environ, PYTHONPATH=str(EVAL_ROOT)))
             (run_dir / "compare.txt").write_text(r.stdout + r.stderr)
             r = subprocess.run([f"{ENVP}/bin/python", str(EVAL_ROOT / "scripts/vec_eval/verify_rules.py"), str(run_dir), "--ref", str(ref)], capture_output=True, text=True,
                                cwd=str(EVAL_ROOT), env=dict(os.environ, PYTHONPATH=str(EVAL_ROOT)))
-            dec = json.load(open(run_dir / "verify.json")) if (run_dir / "verify.json").exists() else {"pass": False, "reasons": [f"verify_rules failed: {r.stderr[-300:]}"]}
-            verdict["runs"][f"n{n}same"].update({"pass": dec.get("pass"), "reasons": dec.get("reasons"), "instances": dec.get("instances")})
-            log(f"VERIFY {uid}: N={n} {'PASS' if dec.get('pass') else 'FAIL'} {dec.get('reasons')[:3] if dec.get('reasons') else ''}")
+            return json.load(open(run_dir / "verify.json")) if (run_dir / "verify.json").exists() else {"pass": False, "reasons": [f"verify_rules failed: {r.stderr[-300:]}"]}
+
+        for n in ladder:
+            run_dir = run(n, True)
+            dec = judge(run_dir)
+            if dec.get("inconclusive"):
+                # a wall-clock cut (never with the --wallclock 0 default; a stall-watchdog kill looks the same) says nothing about the
+                # clones: the run is repeated once (verify_rules.py, 2026-10-27); a second inconclusive run stays recorded as such
+                log(f"VERIFY {uid}: N={n} INCONCLUSIVE {dec.get('reasons')[:2] if dec.get('reasons') else ''}; re-running once")
+                s5("cp", f"{run_dir}/", f"{S3_URL}/out/{uid}/n{n}same-inconclusive/", check=False)
+                run_dir = run(n, True)
+                dec = judge(run_dir)
+            verdict["runs"][f"n{n}same"].update({"pass": dec.get("pass"), "inconclusive": bool(dec.get("inconclusive")), "reasons": dec.get("reasons"), "instances": dec.get("instances")})
+            log(f"VERIFY {uid}: N={n} {'PASS' if dec.get('pass') else ('INCONCLUSIVE' if dec.get('inconclusive') else 'FAIL')} {dec.get('reasons')[:3] if dec.get('reasons') else ''}")
             if dec.get("pass"):
                 passed_n = n
                 break
@@ -1155,6 +1178,90 @@ def run_verify_unit(unit, gpu, slot, kk, cpus):
             (udir / "fail.txt").write_text(f"instance {INSTANCE} slot {slot} gpu {GPUS[gpu]['name']}\n{msg}\n{traceback.format_exc()}\n{json.dumps(verdict, default=str)}\n")
             s5("cp", str(udir / "fail.txt"), f"{S3_URL}/fail/{uid}/{INSTANCE}-{n}.txt", check=False)
             s5("cp", f"{out}/", f"{S3_URL}/out/{uid}/attempt-{INSTANCE}-{n}/", check=False)
+            if n + 1 >= MAX_UNIT_FAILS:
+                put_json(f"dead/{uid}.json", {"unit": uid, "fails": n + 1, "last": msg}, if_none_match=True)
+            delete(f"claims/{uid}.json")
+        except Exception as e2:  # noqa: BLE001
+            log(f"fail bookkeeping for {uid} failed: {e2}")
+        return False
+    finally:
+        with lock:
+            state["running"].pop(slot, None)
+        rm_tree(appdata)
+        shutil.rmtree(udir / "out", ignore_errors=True)
+        shutil.rmtree(udir / "home", ignore_errors=True)
+
+
+def run_cmd_unit(unit, gpu, slot, kk, cpus):
+    """``vec_cmd`` (campaign rooms, 2026-10-28): one ``run_isg_vec`` replay invocation with the unit's ``args`` (everything but
+    ``--out``; instance paths are cluster-absolute, present in the eval bundle), outputs uploaded to ``out/<out_key>/``,
+    ``done/<unit>.json`` with the result rows' summary. Textures of ``unit["scene"]`` are ensured first."""
+    uid = unit["unit"]
+    udir = WORK / "units" / uid
+    shutil.rmtree(udir, ignore_errors=True)
+    udir.mkdir(parents=True)
+    status = {"unit": uid, "gpu": gpu, "slot": slot, "started": time.time(), "phase": "setup", "kind": "vec_cmd", "task": unit.get("task")}
+    with lock:
+        state["running"][slot] = status
+    t0 = time.time()
+    appdata = WORK / "appdata" / f"{hashlib.sha1(uid.encode()).hexdigest()[:10]}.{slot}"
+    out = udir / "out"
+    out.mkdir(parents=True)
+    try:
+        status["phase"] = "textures"
+        ensure_scene_textures("common")
+        if unit.get("scene"):
+            ensure_scene_textures(unit["scene"])
+        # one invocation (``args``) or several on the same GPU in sequence (``runs``: [{"name", "args"}], outputs to
+        # out/<name>/ - the gate of campaign rooms replays a demo under two room loadings and once more as the noise floor
+        # on one host, so GPU-to-GPU rendering differences do not enter the comparison)
+        runs = unit.get("runs") or [{"name": "", "args": unit["args"]}]
+        L = int(unit.get("frames") or 20000)
+        rows = []
+        for k, rr in enumerate(runs):
+            sub = out / rr["name"] if rr.get("name") else out
+            sub.mkdir(parents=True, exist_ok=True)
+            warm, ntex = make_appdata(appdata)
+            env = proc_env(appdata, udir / "home", gpu, len(cpus))
+            cmd = [f"{ENVP}/bin/python", "-u", "-m", "ispatialgym.oracle.run_isg_vec", "--out", str(sub)] + [str(a) for a in rr["args"]] + ["--tag", f"{TAG}:{INSTANCE}"]
+            status["phase"] = f"run {rr.get('name') or k}"
+            log(f"CMD {uid}: run {k + 1}/{len(runs)} {rr.get('name') or ''} start (warm={warm}) {' '.join(cmd[4:])[:300]}")
+            logf = udir / (f"run_{rr['name']}.log" if rr.get("name") else "run.log")
+            rc, reason = run_vec_process(cmd, env, str(EVAL_ROOT), logf, status, total_s=3600 + 2.0 * L, cpus=cpus, stall_s=2700)
+            s5("cp", str(logf), f"{S3_URL}/logs/units/{uid}/{INSTANCE}-{logf.name}", check=False)
+            rm_tree(appdata)
+            sub_rows = [json.loads(l) for l in open(sub / "results.jsonl") if l.strip()] if (sub / "results.jsonl").exists() else []
+            ok = rc == 0 and sub_rows and all(r.get("status") in ("success", "oracle_failed") for r in sub_rows)
+            if not ok:
+                raise RuntimeError(f"run {rr.get('name') or k}: rc={rc} {reason}; rows={len(sub_rows)} errors={sum(1 for r in sub_rows if r.get('status') == 'error')}")
+            rows += sub_rows
+        status["phase"] = "upload"
+        for attempt in range(4):
+            r = s5("cp", f"{out}/", f"{S3_URL}/out/{unit.get('out_key') or uid}/", check=False)
+            if r.returncode == 0:
+                break
+            time.sleep(15)
+        put_json(f"done/{uid}.json", {"unit": uid, "instance": INSTANCE, "slot": slot, "rc": rc, "episodes": len(rows), "successes": sum(1 for r in rows if r.get("success")),
+                                      "seconds": round(time.time() - t0, 1), "gpu_name": GPUS[gpu]["name"], "time": time.time()})
+        with lock:
+            state["done"].append(uid)
+            state["successes"] += 1
+            state["episodes_done"] += len(rows)
+        log(f"CMD DONE {uid}: {len(rows)} episodes in {time.time() - t0:.0f}s")
+        return True
+    except Exception as e:  # noqa: BLE001
+        msg = f"{type(e).__name__}: {e}"
+        log(f"FAIL {uid} slot={slot}: {msg}")
+        with lock:
+            state["failed"].append(uid)
+            local_fails[uid] = local_fails.get(uid, 0) + 1
+            if time.time() - t0 < 900:
+                state["startup_fails"] += 1
+        try:
+            n = fail_count(uid)
+            (udir / "fail.txt").write_text(f"instance {INSTANCE} slot {slot} gpu {GPUS[gpu]['name']}\n{msg}\n{traceback.format_exc()}\n")
+            s5("cp", str(udir / "fail.txt"), f"{S3_URL}/fail/{uid}/{INSTANCE}-{n}.txt", check=False)
+            s5("cp", f"{out}/", f"{S3_URL}/out/{unit.get('out_key') or uid}/attempt-{INSTANCE}-{n}/", check=False)
             if n + 1 >= MAX_UNIT_FAILS:
                 put_json(f"dead/{uid}.json", {"unit": uid, "fails": n + 1, "last": msg}, if_none_match=True)
             delete(f"claims/{uid}.json")
@@ -1280,6 +1387,8 @@ def slot_loop(slot, gpu, kk, cpus):
         refresh_code()
         if unit["kind"] == "replay_verify":
             run_verify_unit(unit, gpu, slot, kk, cpus)
+        elif unit["kind"] in ("vec_cmd", "vec_runs"):  # vec_runs: several invocations per unit (workers started before 2026-10-28 02:30 ignore the kind)
+            run_cmd_unit(unit, gpu, slot, kk, cpus)
         else:
             run_unit(unit, gpu, slot, kk, cpus)
         with lock:
